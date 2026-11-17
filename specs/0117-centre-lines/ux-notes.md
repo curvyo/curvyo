@@ -34,7 +34,7 @@ Customer decisions of 2026-11-18 behind this revision: the operation lives in th
 
 While open, the bar **replaces the Node bar in place** (left-aligned at `--rail-right` + 12, the Select bar pill, 36 px rows, 8 px between items, wrapping by whole items, dividers hidden at row starts), as the Trace bar replaces the Select bar. `role="toolbar"` "Find centre lines". The Node tool stays pressed in the rail. Leaving (Apply, Cancel, Escape) gives the Node bar back.
 
-Order (also the Tab order): **i**, Overlap, Thick parts, Optimise, Keep inner areas, Offset (only while Keep inner areas is on), then at the far right (`margin-left: auto`) Cancel and Apply. No visible name label at the start, as in Trace (Frage 84).
+Order (also the Tab order): **i**, Overlap, Thick parts, Optimise, Join tips, Keep inner areas, Offset (only while Keep inner areas is on), then at the far right (`margin-left: auto`) Cancel and Apply. No visible name label at the start, as in Trace (Frage 84).
 
 ### 3.1 The sliders
 
@@ -48,6 +48,7 @@ The four values are the app's usual slider: the shared `ValueField` through the 
 | Offset | mm | −5 to +5, linear, signed bar | 0.3 | 0.1 / 1 / 0.01 | up to 2 decimals, "0.3 mm" | "Inner area offset, millimetres" |
 
 - **Thick parts range (Proposal), from the orca image (768 px wide):** placed at 96 dpi it is 203 mm wide (0.2646 mm per px), so the outline strokes (6 to 8 px) are 1.6 to 2.1 mm, the thick wave bands (8 to 20 px) 2.1 to 5.3 mm, and the pupil (about 12 px) about 3.2 mm. The log track spends half its length below 3.2 mm, where line art lives, and reaches 20 mm, about four times the orca's widest band, room for the same art placed at A3 or larger. A typed value up to 100 mm is the "maximum" of criterion 12 (nothing stays filled except what no centre line describes, a disc).
+- **Join tips (criterion 9b, CENTRE-TIPS, Proposal):** the same "Switch" (on by default), label "Join tips", before Keep inner areas, never a popup. Tooltip (the app's `Tooltip`, bottom): "Run lines that meet at a point into it as one path". On: where two lines meet in a point of the shape (a wave's crest, a drop's tail, a fin's point), one path runs into the point and out again, its width falling to the shape's own width there. Off: the traditional overlapping branches (one line stops at the other with a butt end, overlapping it by Overlap). It previews at once like Keep inner areas.
 - **Keep inner areas:** the "Switch" (off by default), label "Keep inner areas". **Offset** appears beside it only while it is on (hidden, not disabled): the items after it move, which is acceptable because the move follows the maker's own press.
 - **Values** are remembered for the session (criterion 15), and a value change is never a history step.
 - **Typed input:** the value field's own rules: an invalid entry outlines the field in `--field-invalid` and keeps it open; a number outside the range is clamped. No status line.
@@ -65,6 +66,7 @@ The four values are the app's usual slider: the shared `ValueField` through the 
 | Overlap | "How far a side line reaches into the line it joins, in percent of that line's width. 0 % touches its edge; a negative value leaves a gap." | a filled T → its bar line and a stem line whose start dips into the bar |
 | Thick parts | "A part wider than this stays filled as it is; the rest becomes lines. Raise it to turn broad bands into lines too." | a band with a fat blob → the blob filled at a low value, all lines at a high value (CENTRE-THICK-SCOPE B, Proposal) |
 | Optimise | "Higher gives fewer nodes and a looser fit; lower follows the shape more closely. Corners keep their detail at every setting." | one wavy line with many node dots → the same line with few dots |
+| Join tips | "Where two lines meet in a point, one path runs into the point and out again, getting as thin as the shape. Off, one line stops at the other and overlaps it by Overlap." | a filled Λ → a main line and a side line butting into it near the point; on: one line running up into the point and down again |
 | Keep inner areas | "Also turns each hole inside a shape into a grey filled shape of its own. Off leaves the holes empty." | a filled ring → a closed line with a grey disc inside |
 | Offset | "Moves the edge of each inner area inward, in mm. A negative value moves it outward, under the line." | grey disc with a white gap to the ring → grey disc reaching under the ring |
 
@@ -109,25 +111,25 @@ Edit width (`0115`) is the last control of the Node bar when **one** stroked pat
 
 | Key | Where | Does |
 |---|---|---|
-| Tab / Shift+Tab | bar | i, Overlap, Thick parts, Optimise, Keep inner areas, Offset, Cancel, Apply |
+| Tab / Shift+Tab | bar | i, Overlap, Thick parts, Optimise, Join tips, Keep inner areas, Offset, Cancel, Apply |
 | Left/Right or Up/Down | a slider | one step and a new preview; held: repeats, the latest value previews |
 | Shift / Ctrl + arrow | a slider | ten steps / a tenth step (never below the grid) |
 | Home / End | a slider | track minimum / end |
 | Enter, F2, a digit | a slider | opens the number entry; Enter in it commits the value and previews |
-| Enter | canvas, the switch, i | Apply |
+| Enter | canvas, a switch, i | Apply |
 | Ctrl+Enter | anywhere in the bar, also in the entry | Apply |
-| Space | the switch | toggles Keep inner areas |
+| Space | a switch | toggles Join tips or Keep inner areas |
 | Escape | typing or dragging | ends that first (typed text or drag dropped) |
 | Escape | anywhere else (bar or canvas) | Cancel; a second Escape is the Node tool's own |
 
-A mouse press on i, the switch or a slider hands the keyboard back to the canvas afterwards, a key keeps it there (the Trace bar's rule). Opening from the button by mouse leaves focus on the canvas; by Enter or Space puts it on Overlap.
+A mouse press on i, a switch or a slider hands the keyboard back to the canvas afterwards, a key keeps it there (the Trace bar's rule). Opening from the button by mouse leaves focus on the canvas; by Enter or Space puts it on Overlap.
 
 ## 8. Layout
 
 ```text
 1440 x 1000, panel open: one row, about 1000 px
 +------------------------------------------------------------------------------------------------------------+
-| (i) [Overlap      20 %] [Thick parts  6.0 mm] [Optimise     75 %] (o) Keep inner areas [Offset  0.3 mm]  Cancel [ Apply ] |
+| (i) [Overlap 20 %] [Thick parts 6.0 mm] [Optimise 75 %] (o) Join tips (o) Keep inner areas [Offset 0.3 mm] Cancel [ Apply ] |
 +------------------------------------------------------------------------------------------------------------+
      ^ signed bar, zero mark                                       ^ switch      ^ only while on
 
@@ -135,10 +137,10 @@ A mouse press on i, the switch or a slider hands the keyboard back to the canvas
 +--------------------------------------+
 | (i) [Overlap      20 %]              |   row 1: 28 + 8 + 150
 | [Thick parts 6.0 mm] [Optimise 75 %] |   row 2: 150 + 8 + 150 = 308
-| (o) Keep inner areas [Offset 0.3 mm] |   row 3: about 140 + 8 + 150 (only while on)
-|                     Cancel [ Apply ] |   row 4: at the right
+| (o) Join tips (o) Keep inner areas   |   row 3: about 90 + 8 + 140 = 238
+| [Offset 0.3 mm]     Cancel [ Apply ] |   row 4: 150 + 8 + 64 + 8 + 75 = 305 (Offset only while on)
 +--------------------------------------+
-Keep inner areas off: the switch, Cancel and Apply share row 3 (140 + 8 + 64 + 8 + 75 = 295): 3 rows.
+Keep inner areas off: Cancel and Apply go to row 4 alone, or share row 3 when it fits: 3 or 4 rows (Join tips, Proposal 2026-11-21).
 
 Node bar with the group (800 x 600, wraps by whole groups):
 | [kind] | Insert Delete Line Curve Join Split |

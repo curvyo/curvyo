@@ -486,6 +486,48 @@ stub. Amends Decision 4 and criterion 20's budget; measurements in `specs/0117-c
   accepted a cubic running 100 mm past a crest's leg; a fitted cubic straying more than three
   times its accuracy from its piece is split in two (`safe_fit.rs`).
 
+## Amendment 2026-11-21 (implementer, customer CENTRE-TIPS: Join tips; Proposal)
+
+Screenshots 24 to 26 showed tips handled two ways: crests up to 60 degrees ran through their tip
+(CENTRE-THROUGH), wider crests, drops and fin points still ended in a branch's butt, a round
+corner with the tip unpainted, or a main path's round cap as a bulb above the tip; and the legs
+into a tip were straight with a linear width, wider than a curved tip near its point. Amends the
+CENTRE-THROUGH crest rule and criterion 20's node budget; measurements in `specs/0117-centre-lines/adrs.md`
+(Round E).
+
+- **Option.** `CentreOptions::join_tips: bool`, default `true` (Proposal). Off joins no tip at
+  all: the traditional branches of Decision 4 (also at the narrow crests that CENTRE-THROUGH
+  joined). The direction-first pairing, the butt inside the parent and the fit guard of
+  CENTRE-THROUGH stay in both settings.
+- **Tips at a junction.** At a junction of three edges, a free spur is a tip when it falls to a
+  point (`r ≤ r_J / 4`), is shorter than both other edges, and is no longer than the larger of
+  1.5 times their miter and 6 junction radii (the traced fixtures' tips reach 5, their tapering
+  strokes start at 9). The direction gates of CENTRE-THROUGH go: a drop's tail (its arms are the
+  two ends of one loop, which stays one closed path through the tip) and a fin point at any
+  angle are tips too.
+- **Tips without a spur** (`centre_line/tips.rs`). A crest wider than about 60 degrees has no
+  spur after the prune (or none at all in the triangulation), a drop's short tail neither. The
+  region's outline is scanned for sharp convex corners (a turn of more than 30 degrees over
+  0.25 mm either way, the sharpest of its neighbourhood); the chain sample whose disc comes
+  nearest takes one when the tip lies within 3 of its radii and is not yet painted, the chain runs
+  on by its radius both ways (a tip at a free end is criterion 8's), the tip lies beside the path
+  (within 45 degrees of its normal), and no other corner lies within 2.5 radii (a flat end's two
+  corners). The samples within that radius go and the legs run into the tip as below.
+- **Legs.** Along the spur (or, without one, the straight line from the sample to the tip),
+  resampled at half the junction radius, each leg's disc touches the outline on its arm's side
+  and reaches 25 % of the local width past the spur (the two legs overlap there); it is capped by
+  the clearance of its centre (a notch beside the spur) and its width only falls towards the tip
+  (the traced outline's stairs go). So each leg is as wide as its half of the shape and both
+  meet at the point at width 0. The fit's cuts at the tip and the legs' starts stay.
+- **Stages.** The chains depend on Join tips, so it is the first stage, not a late one: the
+  default's chains are built with the skeleton; the other setting's are made once, on first use,
+  and only for a region where a tip was joined (the axis is kept for it); the cut, through and
+  branch stages are keyed on it. Measured natively on the whale x29: the switch 0.12 s (gate
+  0.2 s), the first preview 0.35 s (gate 0.5 s).
+- **Criterion 20.** A joined tip needs its own node and its two legs' starts: the node budget is
+  `2 + 2 t + ceil(0.12 L)`, `t` the tips a path runs through (Proposal); the width point budget
+  already counts a tip as two pointed ends.
+
 ## Consequences
 
 - **Gained.** Centre lines arrive with editable profiles, and the axis graph is reusable for V-carve

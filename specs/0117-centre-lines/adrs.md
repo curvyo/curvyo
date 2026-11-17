@@ -475,3 +475,36 @@ end trim, Round 4); the shape's concave fillet where a branch meets its parent s
 `2 r_J`; measured: apex 60° runs through the tip, 70° to 90° keep a round corner 1.4 to 1.75 mm
 short of it) and leaves its sharp tip unpainted; with `p > 0` each path's outline still crosses
 the one it joins in the preview (the butt now lies inside it, deeper for an oblique branch).
+
+## Round E (2026-11-21, implementer): Join tips (CENTRE-TIPS)
+
+Tip measures (`centre_line/tip_tests.rs`, `measure_tips`): tips found on the outline (sharp
+convex corners, no flat end's); per fixture the tips, those with a branch butt within three tip
+radii, those no path reaches at a tenth of their width (a stroke's own end excepted), the worst
+paint outside the shape within three tip radii (mm) and the mean unpainted share within two.
+
+| Fixture | Run | Tips | Butt | Unreached | Outside (mm) | Unpainted |
+|---|---|---|---|---|---|---|
+| dolphin | before (main) | 57 | 1 | 11 | 0.198 | 10.5 % |
+| dolphin | Join tips on | 57 | 0 | 0 | 0.053 | 5.5 % |
+| dolphin | Join tips off | 57 | 13 | 11 | 0.147 | 11.6 % |
+| whale | all three | 2 | 0 | 0 | 0 | (a hooked stroke end, criterion 8) |
+| orca (local) | before (main) | 60 | 0 | 18 | 0.191 | 13.2 % |
+| orca (local) | Join tips on | 60 | 0 | 2 | 0.166 | 11.2 % |
+| orca (local) | Join tips off | 60 | 6 | 20 | 0.228 | 19.6 % |
+
+The orca's two unreached tips are crests of lines 0.3 to 0.5 mm wide whose nearest sample lies
+farther than 3 radii; its 0.166 mm is one leg's profile overshoot at a 50 degree crest.
+
+Whole result at the defaults (`measure_traced`): dolphin 55 paths, 381 nodes, 607 width points
+before; 44 paths, 435 nodes, 709 width points after (each joined tip adds its node, two leg starts
+and about eight width points); whale unchanged (19 paths, 61 nodes, 133 width points); orca 68
+paths, 450 nodes, 664 width points before, 66 paths, 539 nodes, 788 width points after.
+Criterion 20 on the dolphin: every band within `2 + 2 t + ceil(0.12 L)` nodes and
+`6 + 4 p + ceil(0.12 L)` width points; the bands' sum 196 of 273 nodes and 328 of 333 width
+points (the tester's sum test, which gives tips nothing). Synthetic crests of 40 to 120 degrees
+(`join_tips_runs_every_crest_into_its_tip`): one path, the tip reached at width 0, outside at
+most 0.03 mm, unpainted at most 4.7 %.
+
+CPU, native release (`centre_lines_cpu_time`): whale x29 first preview 0.346 s, Join tips
+switched off 0.117 s, Optimise 0.125 s; dolphin 0.071 s and 0.033 s.
