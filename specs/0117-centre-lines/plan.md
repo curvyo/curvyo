@@ -128,6 +128,26 @@ Round D (customer CENTRE-THROUGH A, screenshots 20 to 23, 2026-11-20):
 - [x] 37. Fit guard against cubics straying past their piece; goldens regenerated; the dolphin
   and whale measures asserted (AC 19, 20).
 
+Round E (customer Join tips, screenshots 24 to 26, 2026-11-21):
+
+- [x] 38. Tip measures from the outline, not from the production rule (`centre_line/tip_tests.rs`:
+  sharp convex corners that are no flat end's, per tip the nearest path at width 0, branch butts
+  near it, paint outside the shape and the unpainted share near it), failing first on crests of
+  40 to 120 degrees, a drop, and the traced fixtures (AC 9b).
+- [x] 39. `CentreOptions::join_tips` (default on, Proposal): off gives the traditional branches,
+  no tip joined; on, every three-way junction with a pointed spur no longer than both arms and
+  than 1.5 miters or 6 junction radii runs its arms through the tip, a loop's too (a drop) (AC 9b).
+- [x] 40. Tips whose spur the prune took or that no spur reaches (a wide crest, a drop's short
+  tail): the outline's sharp convex corners beside a chain within 3 radii (`centre_line/tips.rs`)
+  (AC 9b).
+- [x] 41. Legs that follow the shape into the tip: each leg runs between the spur and the outline
+  on its side, its disc touching the outline there, never past another part of it, the width only
+  falling (AC 9b, issue 1 of the screenshots).
+- [x] 42. Staging: the chains for the other setting made once, on first use, only where a tip was
+  joined; the stages keyed on Join tips; native CPU gate with a Join tips step (AC 15b, 18).
+- [x] 43. Wasm entry points, worker request, bar switch with tooltip, info page entry and
+  picture, defaults (AC 15, 15c).
+
 ## Validation
 
 Golden text fixtures compared within 0.01 mm; strokes generated from known centre lines checked
@@ -163,3 +183,11 @@ the wire, field by field in wire order). Test modules over 500 lines: `centre_li
 functions) and `medial_axis/tests.rs` (561: the axis fixtures and their error measures); each
 is one fixture family, so a split would only move the shared helpers into a third file; the session's bar and slices are `session/centre_lines_bar.rs`, apart from
 `session/centre_lines.rs`.
+
+Round E adds `centre_line/tips.rs` (376 lines) apart from `chains.rs` (464) and keeps over 60 lines,
+justified as above: `outline_tips` (66: one scan of each ring, its turns and their maxima),
+`legs_to_tip` (68: the two legs of one tip, built by one closure) and `corner_tip` (65: one
+removal walk either way round the corner, then the spur); `chains` hands the junctions' tips to
+`junction_tips` to stay under 100. `centre_line/tip_tests.rs` (about 580 lines) is one fixture
+family: the outline's tip finder `tips` (99) and `tip_measures` (94: one tip's four measures over
+every path) read top to bottom.
