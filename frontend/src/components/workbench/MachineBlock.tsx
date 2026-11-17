@@ -152,8 +152,12 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", onRetur
           {machine.name_notice}
         </p>
       ) : null}
-      {machine.state ? (
-        <div className="flex h-7 items-center justify-between gap-1" {...{ [ARM_ZONE]: "update" }}>
+      {/* The state row keeps its 28 px place on every laser page, empty while the copy equals its
+          profile, so nothing below it moves under the pointer after a press (`specs/0029` P31). */}
+      {machine.state === null || machine.state === undefined ? (
+        <div aria-hidden data-machine-state-row="" className="h-7 shrink-0" />
+      ) : (
+        <div data-machine-state-row="" className="flex h-7 items-center justify-between gap-1" {...{ [ARM_ZONE]: "update" }}>
           <span role="status" className="text-xs text-[var(--toolbar-icon)]">
             {machine.state === "differs" ? "Differs from profile" : "Not in your profiles"}
           </span>
@@ -197,7 +201,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", onRetur
             {update.status}
           </span>
         </div>
-      ) : null}
+      )}
       {open ? (
         <MachineProfileList
           rows={machine.profiles}
@@ -239,7 +243,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", onRetur
           notice={noticeAt("power")}
           onCommit={(value) => show(api.setMaxPower(value), "power")}
         />
-        <div className="flex h-7 items-center justify-between">
+        <div className={SWITCH_ROW}>
           <ToolbarSwitch
             label="Laser mode"
             tooltip="Laser mode"
@@ -249,13 +253,27 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", onRetur
         </div>
         {/* The capability Z offset reads (`specs/0111` criterion 22): one undo step on the page's
             profile copy; default off. */}
-        <div className="flex h-7 items-center justify-between">
+        <div className={SWITCH_ROW}>
           <PanelSwitch
             label="Motorised Z axis"
             checked={copy.motorised_z === true}
             onCheckedChange={(on) => api.setMotorisedZ(on)}
             onReturnFocus={onReturnFocus}
           />
+        </div>
+        {/* Air assist (`specs/0029` criterion 25): one undo step on the page's profile copy. */}
+        <div className={SWITCH_ROW}>
+          <PanelSwitch
+            label="Air assist"
+            checked={copy.air_assist === true}
+            onCheckedChange={(on) => api.setAirAssist(on)}
+            onReturnFocus={onReturnFocus}
+          />
+        </div>
+        {/* The output format, plain text while there is one (`specs/0029` P23, criterion 39). */}
+        <div className="flex h-7 items-center justify-between">
+          <span className="text-sm text-[var(--toolbar-icon)]">Output</span>
+          <span className="text-[13px] text-[var(--panel-muted-fg)]">{copy.output}</span>
         </div>
       </div>
       <ConnectionGroup
@@ -266,6 +284,9 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", onRetur
     </section>
   );
 }
+
+/** A switch row: the label at the left, the switch at the row's right edge (`specs/0111` 6.3, P31). */
+const SWITCH_ROW = "flex h-7 items-center justify-between [&>label]:w-full [&>label]:justify-between";
 
 function FieldNotice({ notice }: { notice: Notice }) {
   return (

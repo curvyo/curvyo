@@ -221,6 +221,12 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   write_svg_export: () => {
     throw new Error("the browser downloads an SVG export");
   },
+  // The browser downloads a job file without a dialog (`specs/0029` criterion 27); the page calls
+  // these two only on the desktop.
+  pick_job_export_path: (args) => String(args?.suggestedName ?? "Untitled.gcode"),
+  write_job_export: () => {
+    throw new Error("the browser downloads a job file");
+  },
   // A workspace document open from this browser's storage is saved there; anything else downloads.
   save_project_bytes: async (args) => {
     const bytes = args?.bytes as number[];
@@ -429,4 +435,15 @@ export function unsupportedReason(): string | null {
     return "This browser or device has no WebGL 2, which Curvyo needs to draw. Try a current Chrome, Edge, Firefox or Safari with hardware acceleration on.";
   }
   return null;
+}
+
+/** Browser Export job file (`specs/0029-laser-job-preview-and-output` criterion 27): one Blob,
+ * downloaded as `name`; the browser has no save dialog to cancel. */
+export function downloadJobFile(name: string, bytes: Uint8Array): void {
+  const url = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: "text/plain" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
 }

@@ -28,6 +28,7 @@ mod formats;
 mod import_dialog;
 #[cfg(target_os = "linux")]
 mod import_preview;
+mod job_export;
 mod local_files;
 mod machine_profiles;
 mod materials;
@@ -121,6 +122,8 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         project::set_shared,
         project::save_project_bytes,
         project::quit_app,
+        job_export::pick_job_export_path,
+        job_export::write_job_export,
         svg_export::pick_svg_export_path,
         svg_export::write_svg_export,
         formats::read_formats_file,

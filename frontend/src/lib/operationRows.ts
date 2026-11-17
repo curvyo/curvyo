@@ -5,12 +5,11 @@
  * component only draws what these return.
  */
 
-import { ROW_HEIGHT, entryHeight } from "./operationUnfold.ts";
+import { ROW_HEIGHT, entryHeight, rowHeight } from "./operationUnfold.ts";
 
 export { ROW_HEIGHT };
 import {
   operationIdKey,
-  type CountKey,
   type OperationKind,
   type OperationRow,
   type OperationSection,
@@ -36,8 +35,14 @@ export function itemsText(count: number): string {
   return count === 1 ? "1 item" : `${count} items`;
 }
 
-/** The row's accessible name: "Cut 1, Cut, 4 items", with ", Output off" when Output is off. */
+/** The row's accessible name (`specs/0029` UX 6.1): a row that runs reads the session's "Cut 1, run 3,
+ * 3 min 21 s"; any other row "Cut 1, Cut, 4 items", with ", Output off" when Output is off. */
 export function rowName(row: OperationRow): string {
+  if (row.run === null) return builtName(row);
+  return `${row.accessibleName}${row.groupInPart === null ? "" : `, ${row.groupInPart} in part`}`;
+}
+
+function builtName(row: OperationRow): string {
   if (row.kind === "unknown") return `${row.name}, unknown operation`;
   const off = row.output ? "" : ", Output off";
   const part = row.groupInPart === null ? "" : `, ${row.groupInPart} in part`;
@@ -51,6 +56,15 @@ export function rowLine2(row: OperationRow, digit: number | null): { text: strin
     text: `${digit} · ${KIND_WORDS[row.kind]} · ${itemsText(row.items)}`,
     part: row.groupInPart === null ? "" : ` · ${row.groupInPart} in part`,
     tail: row.output ? "" : " · Output off",
+  };
+}
+
+/** Line 2 of a row that runs, after its ring (`specs/0029` UX 6.1): "Cut · 6 items", then the
+ * semibold group words of a mixed tick. The digit is the ring, the time sits at the right. */
+export function rowRunLine2(row: OperationRow): { text: string; part: string } {
+  return {
+    text: `${KIND_WORDS[row.kind]} · ${itemsText(row.items)}`,
+    part: row.groupInPart === null ? "" : ` · ${row.groupInPart} in part`,
   };
 }
 
@@ -87,46 +101,6 @@ export function listGroups(view: OperationsView): RowGroup[] {
   }));
 }
 
-function count(n: number, one: string, many: string): string {
-  return n === 1 ? one : many;
-}
-
-/** One summary line: its text, and the count it selects when pressed (`null`: not a button). */
-export interface SummaryLine {
-  text: string;
-  count: CountKey | null;
-}
-
-/** The summary's lines (criterion 17): the run line, then only the lines whose count is above 0. */
-export function summaryLines(view: OperationsView): SummaryLine[] {
-  if (view.rows.length === 0) {
-    return [{ text: "Nothing runs. Assign items to an operation.", count: null }];
-  }
-  const s = view.summary;
-  const lines: SummaryLine[] = [
-    {
-      text: `Runs ${s.operations} ${count(s.operations, "operation", "operations")}, ${s.running} ${count(s.running, "item", "items")}.`,
-      count: null,
-    },
-  ];
-  if (s.notAssigned > 0) {
-    lines.push({ text: `${s.notAssigned} ${count(s.notAssigned, "item", "items")} not assigned.`, count: "notAssigned" });
-  }
-  if (s.runsWhileHidden > 0) {
-    lines.push({
-      text: `${s.runsWhileHidden} ${count(s.runsWhileHidden, "item runs", "items run")} while hidden.`,
-      count: "runsWhileHidden",
-    });
-  }
-  if (s.outputOff > 0) {
-    lines.push({
-      text: `${s.outputOff} ${count(s.outputOff, "item sits", "items sit")} in operations with Output off.`,
-      count: "outputOff",
-    });
-  }
-  return lines;
-}
-
 /** The height of a header row, of an operation row, and of its open details (`ux-notes.md` 4.1,
  * 4.2, 4.4): fixed, so the window and the scrollbar agree. */
 export const HEADER_HEIGHT = 24;
@@ -141,6 +115,7 @@ export function listEntries(
   view: OperationsView,
   openKey: string | null = null,
   measuredBody: number | null = null,
+  coarse = false,
 ): ListEntry[] {
   const entries: ListEntry[] = [];
   for (const group of listGroups(view)) {
@@ -149,7 +124,7 @@ export function listEntries(
     }
     for (const { row, index } of group.rows) {
       // The one unfolded row (`openKey`) is a single tall item: the row and its body.
-      entries.push({ kind: "row", row, index, height: entryHeight(openKey === operationIdKey(row.id), measuredBody) });
+      entries.push({ kind: "row", row, index, height: entryHeight(openKey === operationIdKey(row.id), measuredBody, rowHeight(row, coarse)) });
     }
   }
   return entries;

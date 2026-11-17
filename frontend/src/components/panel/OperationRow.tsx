@@ -3,7 +3,8 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboard
 
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
-import { focusAfterRename, nameKeyAction, rowLine2, rowName, tickPressAdds } from "@/lib/operationRows";
+import { focusAfterRename, nameKeyAction, rowLine2, rowName, rowRunLine2, tickPressAdds } from "@/lib/operationRows";
+import { NumbersText } from "@/components/panel/NumbersText";
 import { canUnfold } from "@/lib/operationUnfold";
 import type { OperationRow as Row } from "@/lib/operationsView";
 import type { PressMods } from "@/lib/rowSelection";
@@ -29,8 +30,10 @@ export interface RowActions {
 
 export interface RowProps {
   row: Row;
-  /** The row's fixed height: 40 px (`ux-notes.md` 4.2). */
+  /** The window item's height: the folded row, plus the body while unfolded. */
   height: number;
+  /** The folded row's height: 56 px, 64 coarse, 70 and 78 for Engrave + Outline (`specs/0029` P25). */
+  base: number;
   /** A canvas drag is over this row: the drop ground and the outline. */
   dropping: boolean;
   /** This row is the one a reorder drag picks up: a dashed outline and no ground (ux-notes 4.6). */
@@ -123,9 +126,9 @@ export function OperationRowView(props: RowProps) {
       {props.unfolded ? (
         <div aria-hidden data-row-bar="" className="absolute top-0 bottom-0 left-0 w-[3px] rounded-l bg-[var(--accent)]" />
       ) : null}
-      {/* Arming the trash tints line 1 and line 2 only; the body keeps its ground. */}
-      <div className={`flex h-10 shrink-0 flex-col rounded ${armed ? "bg-[var(--destructive-soft)]" : ""}`}>
-      <div className="flex h-[26px] shrink-0 items-center gap-1" onPointerDown={(event) => {
+      {/* Arming the trash tints the lines of the row only; the body keeps its ground. */}
+      <div style={{ height: props.base }} className={`flex shrink-0 flex-col rounded ${armed ? "bg-[var(--destructive-soft)]" : ""}`}>
+      <div className="flex h-[26px] shrink-0 items-center gap-1 pointer-coarse:h-[34px]" onPointerDown={(event) => {
         if (!renaming && (event.target as HTMLElement).closest("button:not([data-row-name]), input") === null) actions.dragStart(row, event);
       }}>
         {props.selecting && !unknown ? (
@@ -199,11 +202,12 @@ export function OperationRowView(props: RowProps) {
         )}
       </div>
       <div
-        className="block truncate text-[11px] leading-[14px] text-[var(--panel-muted-fg)]"
+        className="flex min-h-0 flex-1 flex-col text-[11px] leading-[14px] text-[var(--panel-muted-fg)]"
         title={line2Title(row, props.digit)}
         onClick={(event) => pressRow(event, row, actions)}
       >
         <Line2 row={row} digit={props.digit} />
+        <NumbersLines row={row} />
       </div>
       </div>
       {props.body}
@@ -225,16 +229,52 @@ function line2Title(row: Row, digit: number | null): string | undefined {
   return `${line.text}${line.part}${line.tail}`;
 }
 
-/** Line 2: the digit, the kind and the count; a mixed group row adds " · Group 3 in part" in
- * semibold ink (`specs/0111` `ux-notes.md` 4.1). */
+/** Line 2 (16 px): a row that runs starts with its ring (the row's digit, the ring of the Toolpath
+ * view), then the kind and the count, and ends with the run's time in ink; any other row keeps the
+ * plain digit as built and has no time. A mixed group row adds " · Group 3 in part" in semibold ink
+ * (`specs/0029` UX 6.1, `specs/0111` UX 4.1). */
 function Line2({ row, digit }: { row: Row; digit: number | null }) {
-  if (row.kind === "unknown") return <>{`${digit} · Unknown operation`}</>;
-  const line = rowLine2(row, digit);
+  if (row.kind === "unknown") return <div className="h-4 truncate leading-4">{`${digit} · Unknown operation`}</div>;
+  if (row.run === null) {
+    const line = rowLine2(row, digit);
+    return (
+      <div className="h-4 truncate leading-4">
+        {line.text}
+        {line.part ? <span className="font-semibold text-[var(--toolbar-icon)]">{line.part}</span> : null}
+        {line.tail}
+      </div>
+    );
+  }
+  const line = rowRunLine2(row);
+  return (
+    <div className="flex h-4 items-center gap-1 leading-4" data-run-line>
+      <span
+        aria-hidden
+        data-run-ring={row.run.digit}
+        className="flex size-[14px] shrink-0 items-center justify-center rounded-full border-[1.25px] border-[var(--toolbar-icon)] bg-white text-[9px] font-semibold leading-none tabular-nums text-[var(--toolbar-icon)]"
+      >
+        {row.run.digit}
+      </span>
+      <span className="min-w-0 flex-1 truncate">
+        {line.text}
+        {line.part ? <span className="font-semibold text-[var(--toolbar-icon)]">{line.part}</span> : null}
+      </span>
+      <span data-run-time className="shrink-0 tabular-nums text-[var(--toolbar-icon)]">
+        {row.run.time}
+      </span>
+    </div>
+  );
+}
+
+/** Line 3, and line 4 "Outline …" of Engrave + Outline: the effective numbers, on every row; "No
+ * settings" with none; nothing for an Unknown row or damaged settings. */
+function NumbersLines({ row }: { row: Row }) {
+  if (row.numbers === null || row.kind === "unknown") return null;
+  if (row.numbers.length === 0) return <span className="block h-[14px] truncate">No settings</span>;
   return (
     <>
-      {line.text}
-      {line.part ? <span className="font-semibold text-[var(--toolbar-icon)]">{line.part}</span> : null}
-      {line.tail}
+      <NumbersText line={row.numbers[0]} />
+      {row.kind === "engrave_outline" && row.numbers[1] ? <NumbersText line={row.numbers[1]} prefix="Outline " /> : null}
     </>
   );
 }

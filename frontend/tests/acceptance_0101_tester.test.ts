@@ -25,10 +25,8 @@ test("c17: the five-kind fixture decodes with its list, Cuts last and counts", (
   assert.equal(view.cutsLast, true);
   const kinds = view.rows.map((r) => r.kind).sort();
   assert.deepEqual(kinds, ["cut", "cut", "cut_out", "engrave", "engrave_outline", "score"]);
-  assert.equal(typeof view.summary.running, "number");
-  assert.equal(typeof view.summary.notAssigned, "number");
-  assert.equal(typeof view.summary.runsWhileHidden, "number");
-  assert.equal(typeof view.summary.outputOff, "number");
+  // The summary's counts are the output group's checks now (`0029` M11, P28).
+  assert.ok(!("summary" in view), "no summary counts in the view");
 });
 
 test("c26: an unknown kind is kept as the unknown kind and the list is not dropped", () => {
@@ -60,8 +58,6 @@ test("c27: the summary has no missing count and no missing row (Frage 169 A)", (
     assert.ok(!text.includes("missing"), `${name} must not name a missing item`);
     const view = decodeOperationsText(fixtureText(name));
     assert.ok(view, `${name} decodes`);
-    const keys = Object.keys(view.summary).join(" ").toLowerCase();
-    assert.ok(!keys.includes("missing"), `${name} summary has no missing count: ${keys}`);
   }
 });
 

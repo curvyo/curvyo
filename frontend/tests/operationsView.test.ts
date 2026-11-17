@@ -58,13 +58,11 @@ test("an unknown operation has no section, and is decoded as unknown (customer 2
   assert.equal(plasma.section, null);
 });
 
-test("the summary keeps the disjoint counts and has no missing count (Frage 169 A)", () => {
+test("the view has no summary counts (they are the output group's checks, `0029` P28) and names no missing item", () => {
   const view = decodeOperationsView(fixture("five_kinds_cuts_last"));
   assert.ok(view);
-  assert.equal(view.summary.operations, 5);
-  assert.equal(view.summary.notAssigned, 1);
-  assert.equal(view.summary.outputOff, 1);
-  assert.ok(view.summary.runsWhileHidden <= view.summary.running);
+  assert.equal(view.rows.length, 6);
+  assert.ok(!("summary" in view) && !("items" in view));
   assert.ok(!JSON.stringify(view).includes("missing"));
 });
 
@@ -99,19 +97,32 @@ test("a wrong enum value is refused, not guessed (checked decode)", () => {
   const negativeItems = structuredClone(good);
   negativeItems.rows[0].items = -1;
   assert.equal(decodeOperationsView(negativeItems), null);
-  const missingSummary = structuredClone(good) as Record<string, unknown>;
-  delete missingSummary.summary;
-  assert.equal(decodeOperationsView(missingSummary), null);
+  const brokenRun = structuredClone(good);
+  brokenRun.rows[0].run = { digit: "1", time: "–" };
+  assert.equal(decodeOperationsView(brokenRun), null);
+  const brokenNumbers = structuredClone(good);
+  brokenNumbers.rows[0].numbers = [{ text: "35 %", typed: ["colour"] }];
+  assert.equal(decodeOperationsView(brokenNumbers), null);
+  const missingName = structuredClone(good) as Record<string, unknown> & { rows: Array<Record<string, unknown>> };
+  delete missingName.rows[0].accessible_name;
+  assert.equal(decodeOperationsView(missingName), null);
 });
 
-test("the count items decode as node ids, and the items of each count match its number", () => {
-  const view = decodeOperationsView(fixture("placed_and_clone_rows"));
-  assert.ok(view);
-  assert.equal(view.items.running.length, view.summary.running);
-  assert.equal(view.items.notAssigned.length, view.summary.notAssigned);
-  assert.equal(view.items.runsWhileHidden.length, view.summary.runsWhileHidden);
-  assert.equal(view.items.outputOff.length, view.summary.outputOff);
-  assert.deepEqual(view.items.running[0], { peer: "1", counter: 29 });
+test("a row that runs carries its ring digit, time, numbers and accessible name; one that does not has none (`0029` UX 6.1)", () => {
+  const engrave = decodeOperationsView(fixture("options_engrave"));
+  assert.ok(engrave);
+  const row = engrave.rows[0];
+  assert.deepEqual(row.run, { digit: 1, time: "27 s" });
+  assert.deepEqual(row.numbers, [{ text: "40 %, 3,000 mm/min, 1 ×, 0.25 mm", typed: [] }]);
+  assert.equal(row.accessibleName, "Engrave 1, run 1, 27 s");
+  const mixed = decodeOperationsView(fixture("five_kinds_cuts_last"));
+  assert.ok(mixed);
+  const off = mixed.rows.find((r) => r.name === "Cut 2");
+  assert.ok(off);
+  assert.equal(off.run, null);
+  assert.equal(off.accessibleName, "Cut 2");
+  const damaged = decodeOperationsView(fixture("options_damaged"));
+  assert.equal(damaged?.rows[0].numbers, null, "damaged settings have no numbers line");
 });
 
 // `specs/0111-laser-operation-tools` Part C1: the new fields, each checked (AC 1, 10, 17 to 21).

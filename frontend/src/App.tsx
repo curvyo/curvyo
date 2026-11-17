@@ -52,6 +52,7 @@ import { useCollaboration } from "@/hooks/useCollaboration";
 import { useFixtures } from "@/hooks/useFixtures";
 import { useMachineRecords } from "@/hooks/useMachineRecords";
 import { useFixtureJobs } from "@/hooks/useFixtureJobs";
+import { useOutput } from "@/hooks/useOutput";
 import { useMaterials } from "@/hooks/useMaterials";
 import { useTestGridTool } from "@/hooks/useTestGridTool";
 import { useOperations } from "@/hooks/useOperations";
@@ -172,6 +173,12 @@ function Editor() {
   const selectedLock = selectedLockBar(fixtures.view);
   // The fixture jobs of the active laser page (`specs/0103-fixture-jobs`).
   const fixtureJobs = useFixtureJobs(editor);
+  // The Output tab, the Toolpath view toggle and Export job file (`specs/0029`).
+  const output = useOutput(
+    editor,
+    () => project.info.fileName,
+    (message, title) => setOpenError({ message, title }),
+  );
   // The Settings block and the Materials section (`specs/0028-material-test-library`).
   const operationSettings = useOperationSettings(editor);
   const materials = useMaterials(editor);
@@ -466,6 +473,7 @@ function Editor() {
           overlay={<PresenceOverlay getSession={editor.getSession} />}
           showPageFrames
           onToggleOperationsView={operationTools.toggleView}
+          onToggleToolpathView={output.toggleRoute}
         />
         <CollaborationPill
           view={collab.view}
@@ -500,6 +508,7 @@ function Editor() {
           operationSettings={operationSettings}
           operationTools={operationTools}
           materials={materials}
+          output={output}
         />
       </div>
       <ErrorDialog

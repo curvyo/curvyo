@@ -68,6 +68,8 @@ interface CanvasProps {
   fitCue?: FitCue | null;
   /** The Operations view toggle in a laser page's label (`specs/0111` criterion 15). */
   onToggleOperationsView?: (page: string) => void;
+  /** The Toolpath view toggle beside it (`specs/0029` criterion 8). */
+  onToggleToolpathView?: (page: string) => void;
 }
 
 /**
@@ -91,6 +93,7 @@ export function Canvas({
   overOperationRow = false,
   fitCue = null,
   onToggleOperationsView,
+  onToggleToolpathView,
 }: CanvasProps) {
   const penCue = usePenCue(editor);
   const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
@@ -247,7 +250,7 @@ export function Canvas({
         />
 
       </NodeContextMenu>
-      {showPageFrames && <PageFrames getSession={editor.getSession} dropTarget={editor.moveBadges.dropTarget} onToggleOperationsView={onToggleOperationsView} />}
+      {showPageFrames && <PageFrames getSession={editor.getSession} dropTarget={editor.moveBadges.dropTarget} onToggleOperationsView={onToggleOperationsView} onToggleToolpathView={onToggleToolpathView} />}
       {showPageFrames && <PlacedPageTags getSession={editor.getSession} />}
       {showPageFrames && <FixtureLabels getSession={editor.getSession} />}
       <SketchAnnotations sketch={sketch} />

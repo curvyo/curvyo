@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { DropBadgePill } from "@/components/DropBadgePill";
 import { OperationRowView, type RowActions } from "@/components/panel/OperationRow";
@@ -12,7 +12,6 @@ import type { OperationToolsApi } from "@/hooks/useOperationTools";
 import { NO_ROWS, extend, press as pressRow, prune, type PressMods, type RowSelection } from "@/lib/rowSelection";
 import {
   ghostTop,
-  ROW_HEIGHT,
   insertionEdge,
   listEntries,
   nextFocusIndex,
@@ -20,14 +19,12 @@ import {
   rowDigit,
   sectionOf,
   sectionRuns,
-  summaryLines,
   itemsText,
   type ListEntry,
 } from "@/lib/operationRows";
-import { operationIdKey, type CountKey, type OperationsView } from "@/lib/operationsView";
-import { bodyOpen, entryHeight, pressUnfolds } from "@/lib/operationUnfold";
+import { operationIdKey, type OperationsView } from "@/lib/operationsView";
+import { bodyOpen, entryHeight, pressUnfolds, ROW_HEIGHT, ROW_HEIGHT_COARSE, rowHeight } from "@/lib/operationUnfold";
 import { visibleRange } from "@/lib/operationWindow";
-import { summaryWithFixtures } from "@/lib/fixtureJobRows";
 
 /** The list's scroll area: 300 px high; the rows outside it (and the overscan) are not drawn. */
 const VIEWPORT = 300;
@@ -38,10 +35,10 @@ interface OperationsSectionProps {
   /** Items selected on the canvas: the ticks show in the rows while it is above 0. */
   selectionCount: number;
   onReturnFocus: () => void;
-  /** The Fixture jobs section (`specs/0103-fixture-jobs`), drawn between the list and the summary. */
+  /** The Fixture jobs section (`specs/0103-fixture-jobs`), drawn under the list. */
   fixtureJobs?: ReactNode;
-  /** How many fixture jobs run: the summary's fixture line (criterion 17). */
-  fixtureRunning?: number;
+  /** The output group (`specs/0029` UX 6.3), drawn after the Fixture jobs section. */
+  outputGroup?: ReactNode;
   /** The Settings block's commands (`specs/0028-material-test-library`). */
   settings: OperationSettingsApi;
   /** The operation tools: the fold of a row, its options and the status of a kind press
@@ -77,14 +74,17 @@ function entryOfRow(entries: ListEntry[]): number[] {
 /**
  * The Operations tab of a laser page (`specs/0101-laser-operations` `ux-notes.md`): the add group,
  * the Cuts last switch, the operation list in its sections (windowed), the clone member rows, the
- * View switch, the summary with its count buttons and the notice. Nothing here decides a rule;
+ * View switch, the Fixture jobs section, the output group and the notice. Nothing here decides a rule;
  * the session does, and the view is re-read after each call.
  */
 /** The names of the two section groups (`ux-notes.md` 4.3). */
 const SECTION_NAMES = { marking: "Marking", cutting: "Cutting" } as const;
 
-export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, fixtureRunning = 0, settings, tools, onEditMaterial }: OperationsSectionProps) {
+export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, outputGroup, settings, tools, onEditMaterial }: OperationsSectionProps) {
   const { view, notice, dropKey, dropBadge } = api;
+  /** A coarse pointer takes the 64 px rows (`specs/0029` P25). */
+  const coarse = useMemo(() => window.matchMedia?.("(pointer: coarse)").matches ?? false, []);
+  const rowBase = coarse ? ROW_HEIGHT_COARSE : ROW_HEIGHT;
   /** The selected rows (Ctrl and Shift extend, `specs/0028` ux-notes 8.2); one opens its Settings block. */
   const [selection, setSelection] = useState<RowSelection>(NO_ROWS);
   /** The row whose name is being edited in place (criterion 3): one at a time. */
@@ -136,7 +136,10 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   // into view (`specs/0111` UX 3.3). A press from before this tab was drawn is not replayed.
   const pressedSeq = tools.pressed?.seq ?? 0;
   const pressedId = tools.pressed?.id ?? null;
-  const [seenPress, setSeenPress] = useState(pressedSeq);
+  // A reveal from the Output tab's check is the one press that comes before the tab is drawn
+  // and is replayed (`specs/0029` UX P15).
+  const replayed = tools.pressed?.reveal ? pressedSeq - 1 : pressedSeq;
+  const [seenPress, setSeenPress] = useState(replayed);
   if (pressedSeq > seenPress) {
     setSeenPress(pressedSeq);
     if (pressedId !== null) {
@@ -150,7 +153,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   useEffect(() => {
     latest.current = { view, openBodyKey, bodyHeight };
   });
-  const scrolledPress = useRef(pressedSeq);
+  const scrolledPress = useRef(replayed);
   useEffect(() => {
     if (pressedId === null || pressedSeq <= scrolledPress.current) return;
     scrolledPress.current = pressedSeq;
@@ -158,7 +161,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     const { view: current, openBodyKey: openKeyNow, bodyHeight: height } = latest.current;
     const index = current ? indexOfKey(current, key) : -1;
     if (!current || index < 0) return;
-    const entries = listEntries(current, openKeyNow, height);
+    const entries = listEntries(current, openKeyNow, height, coarse);
     const at = entryOfRow(entries)[index];
     const list = listRef.current;
     if (list && at !== undefined) {
@@ -168,7 +171,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
         list.scrollTop = Math.max(0, top - VIEWPORT / 2);
       }
     }
-  }, [pressedSeq, pressedId]);
+  }, [pressedSeq, pressedId, coarse]);
 
   const dropAtRef = useRef<number | null>(null);
   useEffect(() => {
@@ -264,7 +267,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     return null;
   }
 
-  const entries = listEntries(view, openBodyKey, bodyHeight);
+  const entries = listEntries(view, openBodyKey, bodyHeight, coarse);
   const rowEntry = entryOfRow(entries);
   const openIndex = openKey === null ? -1 : indexOfKey(view, openKey);
   // The unfolded row is one tall item: the list grows to hold it and the row after it, up to
@@ -275,7 +278,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
       ? VIEWPORT
       : listHeight <= 520
         ? Math.max(VIEWPORT, listHeight)
-        : Math.min(520, Math.max(VIEWPORT, entryHeight(true, bodyHeight) + ROW_HEIGHT));
+        : Math.min(520, Math.max(VIEWPORT, entryHeight(true, bodyHeight, rowBase) + rowBase));
   const range = visibleRange(
     entries.map((entry) => entry.height),
     scrollTop,
@@ -380,7 +383,6 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     }
   };
 
-  const lines = summaryWithFixtures(summaryLines(view), fixtureRunning);
   return (
     <section ref={addRef} aria-label="Operations" className="flex flex-col gap-2">
       <PanelSwitch
@@ -415,6 +417,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
                     digit={rowDigit(view, entry.index)}
                     total={view.rows.length}
                     height={entry.height}
+                    base={rowHeight(entry.row, coarse)}
                     dropping={dropKey === operationIdKey(entry.row.id)}
                     dragSource={dragFrom === entry.index}
                     insertion={dragFrom !== null && dropAt === entry.index ? insertionEdge(dragFrom, dropAt) : null}
@@ -481,19 +484,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
         />
       ) : null}
       {fixtureJobs}
-      <section aria-label="Operations summary" className="flex flex-col text-xs tabular-nums text-[var(--toolbar-icon)]">
-        <div role="status" aria-atomic="true" className="flex flex-col">
-          {lines.map((line) =>
-            line.count === null ? (
-              <p key={line.text} className="leading-4">
-                {line.text}
-              </p>
-            ) : (
-              <SummaryButton key={line.text} text={line.text} count={line.count} onPress={api.selectItems} />
-            ),
-          )}
-        </div>
-      </section>
+      {outputGroup}
       {notice && notice !== settings.skip ? (
         <p role="status" className="text-xs text-[var(--toolbar-icon)]">
           {notice}
@@ -523,27 +514,6 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
         {tools.status}
       </div>
     </section>
-  );
-}
-
-/** A summary line that selects its items on the canvas when pressed (criterion 17). */
-function SummaryButton({
-  text,
-  count,
-  onPress,
-}: {
-  text: string;
-  count: CountKey;
-  onPress: (count: CountKey) => boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onPress(count)}
-      className="flex h-6 items-center text-left underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
-    >
-      {text}
-    </button>
   );
 }
 

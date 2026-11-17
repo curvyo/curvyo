@@ -7,6 +7,8 @@
  * (`curvyo-editor-wasm/tests/fixtures/fixture_jobs_view/`).
  */
 import { asKind, type FixtureKind } from "./fixturesView.ts";
+import { asNumbersLines, type NumbersLine } from "./numbersLine.ts";
+import { asPick, type FixturePick } from "./outputView.ts";
 
 /** The five kinds a job can have (`0101`'s symbols). */
 export const JOB_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out"] as const;
@@ -83,6 +85,22 @@ export interface AddTarget {
   name: string;
 }
 
+/** One fixture run line: the kind that runs, its time ("–" with No settings) and its numbers. */
+export interface FixtureRun {
+  kind: JobKindText;
+  time: string;
+  /** The numbers of the picked material's set; empty without a pick ("No settings"). */
+  numbers: NumbersLine[];
+}
+
+/** The output part of the section (`specs/0029` UX 6.2): the pick, the run lines, the header time. */
+export interface FixtureOutput {
+  pick: FixturePick;
+  runs: FixtureRun[];
+  /** The fixture runs' total time, shown at the header's right. */
+  time: string;
+}
+
 /** The whole Fixture jobs section of the active laser page. */
 export interface FixtureJobsView {
   /** The jobs, Unknown ones included: the header "Fixture jobs (N)". */
@@ -99,6 +117,8 @@ export interface FixtureJobsView {
   damaged: number;
   /** One notice per fixture with damaged job values: "1 value damaged on Holder 1 job.". */
   damageNotices: string[];
+  /** The pick, run lines and time while a fixture job runs; `null` otherwise (P17). */
+  output: FixtureOutput | null;
 }
 
 type Json = Record<string, unknown>;
@@ -232,6 +252,27 @@ function asParts(value: unknown): PartsView | null | undefined {
   return { job: value.job, rows };
 }
 
+function asRun(value: unknown): FixtureRun | null {
+  if (!isObject(value) || typeof value.time !== "string") return null;
+  const kind = JOB_KINDS.find((known) => known === value.kind);
+  const numbers = asNumbersLines(value.numbers);
+  return kind === undefined || numbers === null ? null : { kind, time: value.time, numbers };
+}
+
+function asOutput(value: unknown): FixtureOutput | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value) || !Array.isArray(value.runs) || typeof value.time !== "string") return undefined;
+  const pick = asPick(value.pick);
+  if (pick === undefined || pick === null) return undefined;
+  const runs: FixtureRun[] = [];
+  for (const raw of value.runs) {
+    const run = asRun(raw);
+    if (run === null) return undefined;
+    runs.push(run);
+  }
+  return { pick, runs, time: value.time };
+}
+
 /**
  * The view in `value` (already parsed JSON), or `null`: `null` itself (a page that is not an
  * active laser page), or any value that is not the view.
@@ -252,7 +293,9 @@ export function decodeFixtureJobsView(value: unknown): FixtureJobsView | null {
   const count = asCount(value.count);
   const running = asCount(value.running);
   const damaged = asCount(value.damaged);
+  const output = asOutput(value.output);
   if (
+    output === undefined ||
     addTo === undefined ||
     parts === undefined ||
     selected === undefined ||
@@ -275,6 +318,7 @@ export function decodeFixtureJobsView(value: unknown): FixtureJobsView | null {
     runningFixtures: value.running_fixtures as string[],
     damaged,
     damageNotices: value.damage_notices as string[],
+    output,
   };
 }
 

@@ -51,6 +51,10 @@ export interface MachineView {
     laser_mode: boolean;
     /** The machine has a motorised Z axis (`specs/0111` criterion 22). */
     motorised_z: boolean;
+    /** Air assist is on (`specs/0029` criterion 25). */
+    air_assist: boolean;
+    /** The output format's name, "GRBL", or "unknown" for a damaged value (criterion 39). */
+    output: string;
     width: number;
     height: number;
   };
@@ -131,6 +135,8 @@ export function useWorkbenches(editor: EditorSession) {
       setLaserMode: (on: boolean) => run((session) => session.set_machine_laser_mode(on)),
       /** The Motorised Z axis switch of the page's profile copy: one undo step. */
       setMotorisedZ: (on: boolean) => run((session) => session.set_motorised_z(on)),
+      /** The Air assist switch of the page's profile copy: one undo step. */
+      setAirAssist: (on: boolean) => run((session) => session.set_air_assist(on)),
       reset: () => run((session) => session.reset_machine_profile()),
       saveAs: () => run((session) => session.save_machine_profile(randomBytes(), Date.now())) ?? "",
       update: () => run((session) => session.update_machine_profile(Date.now())) ?? "",

@@ -1,4 +1,5 @@
 import { OpenGroups } from "@/components/OpenGroups";
+import { useNoticeBottom } from "@/hooks/usePlayBarClearance";
 import type { ContextAnnouncement } from "@/hooks/useGrouping";
 import type { CanvasNotice as CanvasNoticeState } from "@/hooks/useHistory";
 import type { EnteredGroup } from "@/lib/operationsView";
@@ -24,7 +25,8 @@ interface CanvasNoticeProps {
 /**
  * The canvas notice slot (`docs/design-system.md`, "Canvas notice slot"): the line for everything a
  * key press or a rail command produces (undo, redo, the Pen hint, Group and Ungroup), centred in
- * the free part of the viewport right of the tool rail and 12 px above its bottom edge. A notice
+ * the free part of the viewport right of the tool rail and 12 px above its bottom edge (8 px above
+ * the Toolpath view's play bar while it shows). A notice
  * takes no focus and has no controls; a status is announced politely and ends after 3 s (5 s above
  * 70 characters), a refusal is an alert and stays 8 s; the next notice replaces it. A refusal with
  * a point (`specs/0110` UX review U8) shows beside it instead, in the same look. Below it, while
@@ -57,8 +59,13 @@ export function CanvasNotice({
     </div>
   );
   const near = shown?.at;
+  // 12 px above the canvas bottom; 8 px above the play bar while the Toolpath view shows it.
+  const bottom = useNoticeBottom(12);
   return (
-    <div className="pointer-events-none absolute right-0 bottom-3 left-[var(--rail-right)] z-30 flex flex-col items-center gap-2 px-3">
+    <div
+      className="pointer-events-none absolute right-0 left-[var(--rail-right)] z-30 flex flex-col items-center gap-2 px-3"
+      style={{ bottom }}
+    >
       <div role="status" aria-live="polite">
         {shown && shown.kind === "status" ? box : null}
       </div>

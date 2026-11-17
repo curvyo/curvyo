@@ -18,9 +18,7 @@ import {
   landingPosition,
   partsFor,
   partsHeader,
-  runningLine,
   sectionTitle,
-  summaryWithFixtures,
   tickTitle,
 } from "../src/lib/fixtureJobRows.ts";
 
@@ -61,12 +59,9 @@ test("the add row has the five kinds in the order of the notes, with the fixture
   assert.equal(addLabel("engrave_outline", "Holder 1"), "Add Engrave + Outline job to Holder 1");
 });
 
-test("the header counts every job, and the summary line counts the running ones", () => {
+test("the header counts every job", () => {
   assert.equal(sectionTitle(0), "Fixture jobs (0)");
   assert.equal(sectionTitle(3), "Fixture jobs (3)");
-  assert.equal(runningLine(0), null);
-  assert.equal(runningLine(1), "1 fixture job runs.");
-  assert.equal(runningLine(2), "2 fixture jobs run.");
 });
 
 test("line 2 says not on the bed, then Output off, then the part count", () => {
@@ -140,36 +135,6 @@ test("the drop lands inside the group: down past a midpoint, up above one, else 
   assert.equal(landingPosition(0, middles, 95), 2);
   assert.equal(landingPosition(2, middles, 45), 1, "up past the midpoint above");
   assert.equal(landingPosition(2, middles, 5), 0);
-});
-
-test("the summary puts the fixture line after the work line and drops 'Nothing runs.' when jobs run", () => {
-  const work = [
-    { text: "Runs 1 operation, 4 items.", count: null },
-    { text: "2 items not assigned.", count: "notAssigned" as const },
-  ];
-  const texts = (lines: ReadonlyArray<{ text: string }>) => lines.map((line) => line.text);
-  assert.deepEqual(texts(summaryWithFixtures(work, 1)), [
-    "Runs 1 operation, 4 items.",
-    "1 fixture job runs.",
-    "2 items not assigned.",
-  ]);
-  assert.deepEqual(texts(summaryWithFixtures(work, 0)), ["Runs 1 operation, 4 items.", "2 items not assigned."]);
-  const nothing = [{ text: "Nothing runs. Assign items to an operation.", count: null }];
-  assert.deepEqual(texts(summaryWithFixtures(nothing, 2)), ["2 fixture jobs run."]);
-  assert.deepEqual(texts(summaryWithFixtures(nothing, 0)), ["Nothing runs. Assign items to an operation."]);
-});
-
-const texts = (lines: ReadonlyArray<{ text: string }>) => lines.map((line) => line.text);
-
-test("criterion 17 (J7): the work line is dropped when no operation runs; 'Nothing runs.' needs neither", () => {
-  const idle = [
-    { text: "Runs 0 operations, 0 items.", count: null },
-    { text: "2 items not assigned.", count: "notAssigned" as const },
-  ];
-  assert.deepEqual(texts(summaryWithFixtures(idle, 0)), ["Nothing runs. Assign items to an operation.", "2 items not assigned."]);
-  assert.deepEqual(texts(summaryWithFixtures(idle, 1)), ["1 fixture job runs.", "2 items not assigned."]);
-  const running = [{ text: "Runs 3 operations, 5 items.", count: null }];
-  assert.deepEqual(texts(summaryWithFixtures(running, 0)), ["Runs 3 operations, 5 items."]);
 });
 
 test("a pin's or screw's fixed jobs have no trash and no rename, and static part ticks (F10)", () => {

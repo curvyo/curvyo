@@ -6,6 +6,7 @@
  * Rust contract test reads the same fixtures (`curvyo-editor-wasm/tests/fixtures/operations_view/`).
  */
 
+import { asNumbersLines, type NumbersLine } from "./numbersLine.ts";
 import {
   decodePick,
   decodeSettings,
@@ -31,6 +32,12 @@ export type OperationSection = "marking" | "cutting";
 /** A row's tick over the selection: none, some (mixed) or all of it. */
 export type TickState = "none" | "some" | "all";
 
+/** A row that runs: its ring (the row's digit) and its time ("3 min 21 s"; "–" with No settings). */
+export interface RowRun {
+  digit: number;
+  time: string;
+}
+
 /** One operation's row, in run order. */
 export interface OperationRow {
   id: OperationId;
@@ -51,6 +58,13 @@ export interface OperationRow {
   settings: OperationSettings | null;
   /** The source line of a row a test grid made (`specs/0112` UX 6); `null` for any other row. */
   source: RowSource | null;
+  /** The run ring and time of a row that runs (`specs/0029` UX 6.1); `null` for a row that does not. */
+  run: RowRun | null;
+  /** Line 3 (and line 4 of Engrave + Outline): the effective numbers; `null` for Unknown or damaged
+   * settings, empty for No settings. */
+  numbers: NumbersLine[] | null;
+  /** "Cut 1, run 3, 3 min 21 s" (the session's wording). */
+  accessibleName: string;
 }
 
 /** Which grid and cell a derived row runs: "Birch 3 mm · K7Q2M column 3, row 2". */
@@ -60,32 +74,6 @@ export interface RowSource {
   cell: boolean;
   text: string;
 }
-
-/** The summary counts (criterion 17). Nothing here counts a missing object (Frage 169 A). */
-export interface OperationsSummary {
-  operations: number;
-  running: number;
-  notAssigned: number;
-  runsWhileHidden: number;
-  outputOff: number;
-}
-
-/** The four counts of the summary, in the order the session lists them. */
-export const COUNT_KEYS = ["running", "notAssigned", "runsWhileHidden", "outputOff"] as const;
-
-/** A summary count's key. */
-export type CountKey = (typeof COUNT_KEYS)[number];
-
-/** The items behind each count, each once: what a count button selects (criterion 17). */
-export type CountItems = Record<CountKey, OperationId[]>;
-
-/** The name each count has in the session's calls (`select_operation_items`). */
-export const COUNT_WIRE: Record<CountKey, string> = {
-  running: "running",
-  notAssigned: "not_assigned",
-  runsWhileHidden: "runs_while_hidden",
-  outputOff: "output_off",
-};
 
 /** One Select-bar kind button: the kind and what a press does (`specs/0111` criterion 2). */
 export interface KindButton {
@@ -105,8 +93,6 @@ export interface EnteredGroup {
 export interface OperationsView {
   cutsLast: boolean;
   rows: OperationRow[];
-  summary: OperationsSummary;
-  items: CountItems;
   /** Whether the page's Operations view toggle is pressed (`specs/0111` criterion 15). */
   operationsView: boolean;
   /** The five kind buttons in bar order; `null` while the Select bar hides them. */
@@ -179,6 +165,14 @@ function asSource(value: unknown): RowSource | null | undefined {
   return { grid, cell: value.cell, text: value.text };
 }
 
+function asRowRun(value: unknown): RowRun | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value)) return undefined;
+  const digit = asCount(value.digit);
+  if (digit === null || typeof value.time !== "string") return undefined;
+  return { digit, time: value.time };
+}
+
 function asRow(value: unknown): OperationRow | null {
   if (!isObject(value)) return null;
   const id = asId(value.id);
@@ -188,9 +182,14 @@ function asRow(value: unknown): OperationRow | null {
   const tick = asTick(value.tick);
   const settings = decodeSettings(value.settings);
   const source = asSource(value.source);
+  const run = asRowRun(value.run);
+  const numbers = value.numbers === null ? null : (asNumbersLines(value.numbers) ?? undefined);
   const groupInPart = value.group_in_part === null ? null : typeof value.group_in_part === "string" ? value.group_in_part : undefined;
   if (
     groupInPart === undefined ||
+    run === undefined ||
+    numbers === undefined ||
+    typeof value.accessible_name !== "string" ||
     typeof value.unfolded !== "boolean" ||
     settings === undefined ||
     source === undefined ||
@@ -224,30 +223,10 @@ function asRow(value: unknown): OperationRow | null {
     unfolded: value.unfolded,
     settings,
     source,
+    run,
+    numbers,
+    accessibleName: value.accessible_name,
   };
-}
-
-function asIdList(value: unknown): OperationId[] | null {
-  if (!Array.isArray(value)) return null;
-  const ids: OperationId[] = [];
-  for (const raw of value) {
-    const id = asId(raw);
-    if (id === null) return null;
-    ids.push(id);
-  }
-  return ids;
-}
-
-function asItems(value: unknown): CountItems | null {
-  if (!isObject(value)) return null;
-  const running = asIdList(value.running);
-  const notAssigned = asIdList(value.not_assigned);
-  const runsWhileHidden = asIdList(value.runs_while_hidden);
-  const outputOff = asIdList(value.output_off);
-  if (running === null || notAssigned === null || runsWhileHidden === null || outputOff === null) {
-    return null;
-  }
-  return { running, notAssigned, runsWhileHidden, outputOff };
 }
 
 const BUTTON_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out"] as const;
@@ -272,26 +251,6 @@ function asEnteredGroup(value: unknown): EnteredGroup | null | undefined {
   return { page: value.page, groups: value.groups as string[] };
 }
 
-function asSummary(value: unknown): OperationsSummary | null {
-  if (!isObject(value)) return null;
-  const operations = asCount(value.operations);
-  const running = asCount(value.running);
-  const notAssigned = asCount(value.not_assigned);
-  const runsWhileHidden = asCount(value.runs_while_hidden);
-  const outputOff = asCount(value.output_off);
-  if (
-    operations === null ||
-    running === null ||
-    notAssigned === null ||
-    runsWhileHidden === null ||
-    outputOff === null ||
-    runsWhileHidden > running
-  ) {
-    return null;
-  }
-  return { operations, running, notAssigned, runsWhileHidden, outputOff };
-}
-
 /**
  * The view in `value` (already parsed JSON), or `null`: `null` itself (a page that is not an
  * active laser page with its extension on), or any value that is not the view.
@@ -306,14 +265,10 @@ export function decodeOperationsView(value: unknown): OperationsView | null {
     if (row === null) return null;
     rows.push(row);
   }
-  const summary = asSummary(value.summary);
-  const items = asItems(value.items);
   const pick = decodePick(value.pick);
   const selectBarKinds = asKindButtons(value.select_bar_kinds);
   const enteredGroup = asEnteredGroup(value.entered_group);
   if (
-    summary === null ||
-    items === null ||
     pick === null ||
     typeof value.operations_view !== "boolean" ||
     selectBarKinds === undefined ||
@@ -324,8 +279,6 @@ export function decodeOperationsView(value: unknown): OperationsView | null {
   return {
     cutsLast: value.cuts_last,
     rows,
-    summary,
-    items,
     operationsView: value.operations_view,
     selectBarKinds,
     enteredGroup,
