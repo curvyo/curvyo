@@ -435,3 +435,43 @@ trial took 21 s of wall time (a dolphin scaled 8.5 times with 3 pieces, five run
 not 0.15 s: on the CI runner whale ×29 Optimise took 0.177 s (0.115 s locally, about 25 % slower
 on CI). No cheap speedup of the refit was found, and the wasm limit of 0.3 s, which holds at
 0.17 s, is the binding one. See ADR 0063 §10.
+
+## Round D (2026-11-20, implementer): CENTRE-THROUGH A, junctions and crests
+
+Customer screenshots 20 to 23 (dolphin and orca): butt ends poking out of the path they join,
+wave crests split into two paths at the tip (one arm ran into the tip spur, the other ended as a
+butt across it), the orca's fin cut off as a stub. ADR 0063 amendment 2026-11-20. Measured on
+the output paths as `0085` paints them (`centre_line/quality_tests.rs`, `measure_quality`):
+*outside* is the farthest painted point outside the subject, *poke* the farthest butt corner of a
+branch outside the paint of the other paths. Default options; native release, thread CPU.
+
+| Fixture | Paths | Nodes / width points | Outside (mm) | Poke (mm) | Painted area differs |
+|---|---|---|---|---|---|
+| Dolphin before | 69 | 394 / 571 | 0.51 (flipper corner) | 0.77 (crests) | 2.92 % |
+| Dolphin after | 55 | 381 / 607 | 0.51 (flipper corner) | 0.17 | 2.57 % |
+| Orca (local) before | 76 | 462 / 632 | 0.67 | 0.87 | |
+| Orca (local) after | 68 | 450 / 664 | 0.25 | 0.15 | |
+| Whale before | 19 | 61 / 136 | 0.12 | 0.01 | |
+| Whale after | 19 | 61 / 133 | 0.12 | 0.00 | |
+
+Synthetic (`centre_line/junction_tests.rs`): crests of 30 to 50 degrees give one path through the
+tip (width ≤ 0.06 mm within 0.06 mm of it; before: two paths, poke 0.83 mm); an oblique T at 35
+degrees poked 0.79 mm, at 35 to 90 degrees and `p` 20 % and 0 now at most 0.001 mm; a fin on a
+90-degree crest continues one arm to its end, the other arm's butt inside (before: arms through
+with a flat corner, the fin a stub).
+
+Width points rise by 36 on the dolphin: a crest tip's straight legs taper linearly to 0, about
+four smoothstep points each, as criterion 8's pointed ends; criterion 20 counts a crest tip as two
+pointed ends (all 17 bands within their own budget). The crest legs exposed a kurbo fit that ran
+100 mm past its piece's end (its error is measured from the source only); the fit now splits such
+a cubic. CPU (native release): Apply 0.29 s (gate 0.5 s), option change 0.11 s (0.20 s); whale
+x29 per slider Overlap 0.053 s (was 0.039 s), Thick parts 0.042 s, Optimise 0.122 s (was
+0.115 s; gate 0.2 s). Wasm (Node, release): Apply 0.35 s, option change 0.13 s, 100,000 nodes
+7.1 s.
+
+Left as they were: the flipper's U-turn corner paints 0.51 mm outside (a corner settled by the
+end trim, Round 4); the shape's concave fillet where a branch meets its parent stays unpainted
+(a butt covers no fillet); a crest wider than 60 degrees has its tip spur pruned (shorter than
+`2 r_J`; measured: apex 60° runs through the tip, 70° to 90° keep a round corner 1.4 to 1.75 mm
+short of it) and leaves its sharp tip unpainted; with `p > 0` each path's outline still crosses
+the one it joins in the preview (the butt now lies inside it, deeper for an oblique branch).

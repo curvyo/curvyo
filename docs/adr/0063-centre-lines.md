@@ -456,6 +456,36 @@ The lead's target of 100 ms wasm per Overlap, Thick parts and Optimise change at
 target, not a gate: the whole `finish` measures 0.18 s wasm today, and the staged memo is what
 should reach it. The PR reports the measured numbers.
 
+## Amendment 2026-11-20 (implementer, customer CENTRE-THROUGH A: better junctions and through-paths, no new option; Proposal)
+
+The customer's screenshots of the dolphin and the orca showed branches whose butt ends poke out
+of the path they join, wave crests split into two paths at their tip, and a fin cut off as a
+stub. Amends Decision 4 and criterion 20's budget; measurements in `specs/0117-centre-lines/adrs.md`
+(Round D).
+
+- **Crest tips (Decision 4).** At a junction of three edges, a free spur is a crest's tip when
+  it ends in a point (`r ≤ r_J / 4`), points out along the outer bisector of the other two edges
+  (within 30°), is shorter than both, and is no longer than `1.5 r_J / sin(θ/2) + T`, θ the
+  angle between them (their miter); the two arms then make no crest when they lie within 15° of
+  each other or 150° of a straight line. The arms pair, and their path runs through the tip: a
+  straight leg from the first arm into the tip, its width falling linearly to 0, and one out to
+  the other arm. The fit cuts the curve at the tip and where each leg begins, so each leg is one
+  straight piece (measured up to a 60° apex; a wider crest's spur is pruned as before). A crest tip counts as two pointed ends in criterion 20's budget (a taper in
+  and one out).
+- **Pairing (Decision 4).** The pair with the smaller direction term `(1 + d_a·d_b) / 2` wins
+  outright when the two differ by more than 0.1; only within 0.1 does the full cost (with the
+  width term) decide, then the length and the start as before. So a band runs on into the thin
+  fin that continues it instead of turning into its other arm (the orca's fin, screenshot 23).
+- **Branch start (Decision 4).** The centre at `(0.5 - p) w` as before, unless the butt's
+  farther corner then lies less than `p/2 w` inside the parent's paint (the union of its discs):
+  then deeper, back along the extension past the junction's centre by at most one parent width,
+  to where it does. A gap (`p < 0`) also keeps the nearer corner out of the parent's paint.
+  Where the nearer corner would leave the parent's far side (an acute junction), the branch's
+  first samples narrow until it stays inside. A branch at right angles starts where it did.
+- **Fit guard (Decision 5).** kurbo measures a candidate's error from the source only and so
+  accepted a cubic running 100 mm past a crest's leg; a fitted cubic straying more than three
+  times its accuracy from its piece is split in two (`safe_fit.rs`).
+
 ## Consequences
 
 - **Gained.** Centre lines arrive with editable profiles, and the axis graph is reusable for V-carve

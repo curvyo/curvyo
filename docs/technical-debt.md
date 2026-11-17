@@ -2562,3 +2562,13 @@ link goes here). **Resolution:** drop `safe_fit.rs` once kurbo bounds the arms. 
 > 0.01 to 0.5 units with turns up to ±3.2 rad and accuracy 0.15 (the seeds in our proptest file).
 > Suggested fix: the maximum `d` value the comment in `cubic_fit` proposes (for example
 > `d0, d1 <= 1e3`), and an `epsilon` floor in `inv_arclen` relative to `t`'s ulp.
+
+## kurbo 0.13.1 curve fitting accepts a cubic that runs past its source (`0117`, 2026-11-20)
+
+`fit_to_cubic` measures a candidate's error by rays cast from the source curve only, so a
+candidate that runs on past the source's end along a straight run is accepted: on the dolphin a
+crest's straight leg was fitted with a 121 mm handle and painted 15 mm outside the shape.
+**Workaround:** `centre_line/safe_fit.rs` (`strays`) samples each fitted cubic and splits a piece
+whose cubic strays more than three times the accuracy from the piece's points (no issue filed
+yet; the lead files it upstream with the one above). **Resolution:** drop `strays` once kurbo
+measures the error both ways.
