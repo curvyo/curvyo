@@ -273,7 +273,7 @@ crates; then Part E. Format 48 and profile record format 6 stay; no migration, n
   10, 24, 31, 37, 38), then the full gate; UX review of R4; architect review of R1 to R3.
 
 ### Part E: finish (Sonnet)
-- [ ] E1. Full gate of `CLAUDE.md` §7; `specs/README.md` format row 48; ADR 0038/0039 notes;
+- [x] E1. Full gate of `CLAUDE.md` §7; `specs/README.md` format row 48; ADR 0038/0039 notes;
   `docs/design-system.md` rows of UX 15; spec `Status: Done (PR #n)`.
 
 ## Validation
