@@ -1,0 +1,22 @@
+[package]
+name = "curvyo-connector-server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The machine connector program: runs next to the machine and serves the app over TLS (ADR 0035)."
+
+[lints]
+workspace = true
+
+[dependencies]
+curvyo-connector-io = { path = "../curvyo-connector-io", version = "0.1.0" }
+curvyo-connector-core = { path = "../curvyo-connector-core", version = "0.1.0" }
+anyhow = "1"
+# The default state directory. MIT OR Apache-2.0; already locked through Tauri.
+dirs = "7"
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+uuid.workspace = true
