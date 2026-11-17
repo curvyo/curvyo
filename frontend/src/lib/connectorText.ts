@@ -1,0 +1,301 @@
+// The texts and rules of the Connector group in the Machine block (`specs/0064-machine-connector`
+// UX notes §3 to §9): what each answer of the host says, which job buttons apply in which state,
+// and the number formats. Pure, so the tests load it without a bundler.
+
+/** The state of the connector's job, as the protocol sends it (`State` in `curvyo-connector-core`). */
+export type JobState =
+  | { name: "NoController" | "Idle" | "Receiving" | "Ready" | "AwaitingLocalStart" | "Running" | "Paused" | "Alarm" }
+  | { name: "Done"; result: "Completed" | "Stopped" | "Failed" };
+
+/** The `Status` message. */
+export interface StatusMessage {
+  type: "Status";
+  state: JobState;
+  job: { job_id: string; line: number; lines: number; elapsed_ms: number } | null;
+  position: [number, number, number] | null;
+  alarm: string | null;
+}
+
+/** Why the connector could not be used (`LinkError` of the host). */
+export type LinkError =
+  | { kind: "notPaired" }
+  | { kind: "noCredentialStore" }
+  | { kind: "badAddress" }
+  | { kind: "unreachable"; address: string }
+  | { kind: "timedOut" }
+  | { kind: "keyChanged"; stored: string; presented: string }
+  | { kind: "noLongerPaired" }
+  | { kind: "protocolMismatch"; connector: number }
+  | { kind: "other"; message: string };
+
+export type TestAnswer =
+  | { kind: "connected"; controller: string | null; protocol: number; version: string; connectorName: string; status: StatusMessage }
+  | { kind: "failed"; error: LinkError };
+
+export type PairAnswer =
+  | { kind: "paired"; connectorName: string; fingerprint: string }
+  | { kind: "wrongCode"; attemptsLeft: number }
+  | { kind: "codeSpent" }
+  | { kind: "codeExpired" }
+  | { kind: "codeNotValid" }
+  | { kind: "failed"; error: LinkError };
+
+export type SendAnswer =
+  | { kind: "cancelled" }
+  | { kind: "ready"; name: string; lines: number; bytes: number }
+  | { kind: "rejected"; name: string; reason: string }
+  | { kind: "unreadable"; name: string }
+  | { kind: "failed"; error: LinkError };
+
+export type CommandAnswer =
+  | { kind: "done" }
+  | { kind: "wrongState" }
+  | { kind: "unknownJob" }
+  | { kind: "failed"; error: LinkError };
+
+/** One line of the row: its words and how it looks. */
+export interface Line {
+  text: string;
+  failure: boolean;
+}
+
+const neutral = (text: string): Line => ({ text, failure: false });
+const failure = (text: string): Line => ({ text, failure: true });
+
+/** The link line for an error (UX notes §4); `null` when the error has no line of its own. */
+export function errorLine(error: LinkError): Line {
+  switch (error.kind) {
+    case "notPaired":
+      return neutral("Not paired");
+    case "noCredentialStore":
+      return failure("No credential store on this computer");
+    case "badAddress":
+      return failure("Not a valid address");
+    case "unreachable":
+      return failure(`Nothing answers at ${error.address}`);
+    case "timedOut":
+      return failure("Timed out");
+    case "keyChanged":
+      return failure("This connector's key changed");
+    case "noLongerPaired":
+      return neutral("No longer paired");
+    case "protocolMismatch":
+      return failure(`Protocol mismatch: app 0, connector ${error.connector}`);
+    case "other":
+      return failure(error.message);
+  }
+}
+
+/** The line after a connection test. */
+export function testLine(answer: TestAnswer): Line {
+  if (answer.kind === "failed") {
+    return errorLine(answer.error);
+  }
+  const controller = answer.controller ?? "none";
+  return neutral(
+    `Connected, controller answered: ${controller}, protocol ${answer.protocol}, connector ${answer.version}`,
+  );
+}
+
+/** The line after a pairing attempt that did not pair; `null` when it paired. */
+export function pairLine(answer: PairAnswer): Line | null {
+  switch (answer.kind) {
+    case "paired":
+      return null;
+    case "wrongCode":
+      return failure(
+        `Wrong code, ${answer.attemptsLeft} ${answer.attemptsLeft === 1 ? "attempt" : "attempts"} left`,
+      );
+    case "codeSpent":
+      return failure("Code spent");
+    case "codeExpired":
+      return failure("Code expired");
+    case "codeNotValid":
+      return failure("Code not valid");
+    case "failed":
+      return errorLine(answer.error);
+  }
+}
+
+/** The chosen job file could not be read; the connector was never asked. */
+export const UNREADABLE_TEXT = "Could not read the file";
+
+/** Forgetting the pairing failed: the credential store would not remove the record. */
+export const FORGET_FAILED_TEXT = "Could not forget the pairing";
+
+/** Pairing needs a credential store to keep the key and the token in, so without one (or while a
+ * pairing exists) the Pair row is not shown. */
+export function pairRowShown(state: { paired: boolean; noStore: boolean }): boolean {
+  return !state.paired && !state.noStore;
+}
+
+/** The connector holds another job than the one a command named. */
+export const UNKNOWN_JOB_TEXT = "The connector holds another job";
+
+const REFUSALS: Record<string, string> = {
+  NotAscii: "Not plain ASCII text",
+  TooLarge: "Larger than 64 MiB",
+  HashMismatch: "Hash mismatch",
+  Busy: "Connector busy",
+  NoController: "No controller",
+};
+
+/** The words of a refused job; the alarm explains a `Busy` (Q19). */
+export function refusalText(reason: string, alarm: string | null): string {
+  if (reason === "Busy" && alarm !== null) {
+    return `Machine in alarm: ${alarm}`;
+  }
+  return REFUSALS[reason] ?? reason;
+}
+
+/** The states in which a job is in flight: a dropped connection is then "Connection lost". */
+export function jobIsActive(state: JobState): boolean {
+  return ["Receiving", "Ready", "AwaitingLocalStart", "Running", "Paused"].includes(state.name);
+}
+
+/** Whether a pushed status ends a shown refusal (UX notes §8, "A refusal stays until the next
+ * Send, test or state change"): the job moved into another state that has a line count. A
+ * refused send passes through Receiving back to Idle, and that late push must not clear it. */
+export function clearsRefusal(last: StatusMessage | null, next: StatusMessage): boolean {
+  const changed =
+    last === null ||
+    last.state.name !== next.state.name ||
+    (last.state.name === "Done" && next.state.name === "Done" && last.state.result !== next.state.result);
+  return changed && hasProgress(next);
+}
+
+/** Which job buttons apply in a state (UX notes §7); `null` is "no status yet". */
+export interface JobButtons {
+  send: boolean;
+  start: boolean;
+  startName: "Start" | "Resume";
+  pause: boolean;
+  stop: boolean;
+}
+
+export function jobButtons(state: JobState | null): JobButtons {
+  const none: JobButtons = { send: false, start: false, startName: "Start", pause: false, stop: false };
+  if (state === null) {
+    return { ...none, send: true };
+  }
+  switch (state.name) {
+    case "Idle":
+    case "Done":
+      return { ...none, send: true };
+    case "Ready":
+      return { ...none, start: true, stop: true };
+    case "AwaitingLocalStart":
+      return { ...none, stop: true };
+    case "Running":
+      return { ...none, pause: true, stop: true };
+    case "Paused":
+      return { ...none, start: true, startName: "Resume", stop: true };
+    default:
+      return none;
+  }
+}
+
+/** Binary units, one decimal under 10 (UX notes §8): "812 B", "4.2 KiB", "120 KiB", "3.5 MiB". */
+export function formatSize(bytes: number): string {
+  const units = ["B", "KiB", "MiB", "GiB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  if (unit === 0) {
+    return `${bytes} B`;
+  }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
+/** "m:ss" under an hour, "h:mm:ss" from an hour. */
+export function formatElapsed(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const seconds = String(total % 60).padStart(2, "0");
+  const minutes = Math.floor(total / 60) % 60;
+  const hours = Math.floor(total / 3600);
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`
+    : `${minutes}:${seconds}`;
+}
+
+/** A thousands comma: "5,000". */
+export function formatCount(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/** What the job block knows beyond the status (the job this app sent). */
+export interface HeldJob {
+  name: string;
+  lines: number;
+  bytes: number;
+}
+
+/** The state line of the job block (UX notes §8); `null` when there is no block. */
+export function jobStateLine(status: StatusMessage, held: HeldJob | null): Line | null {
+  const lines = status.job?.lines ?? held?.lines ?? 0;
+  const line = status.job?.line ?? 0;
+  switch (status.state.name) {
+    case "Receiving":
+      return neutral(held ? `Sending ${held.name}` : "Receiving a job");
+    case "Ready":
+      return neutral(
+        held ? `Ready: ${held.name}, ${formatCount(held.lines)} lines, ${formatSize(held.bytes)}` : "Ready",
+      );
+    case "AwaitingLocalStart":
+      return neutral("Waiting for the start at the machine");
+    case "Running":
+      return neutral("Running");
+    case "Paused":
+      return neutral("Paused");
+    case "Done":
+      switch (status.state.result) {
+        case "Completed":
+          return neutral(`Completed, ${formatCount(lines)} lines`);
+        case "Stopped":
+          return neutral(`Stopped at line ${formatCount(line)}`);
+        case "Failed":
+          return failure(`Failed at line ${formatCount(line)}`);
+      }
+      return null;
+    case "Alarm":
+      return failure(`Alarm: ${status.alarm ?? ""}`);
+    case "NoController":
+      return neutral("No controller");
+    default:
+      return null;
+  }
+}
+
+/** Whether the job block shows a progress bar and the counts (UX notes §8 table). */
+export function hasProgress(status: StatusMessage): boolean {
+  switch (status.state.name) {
+    case "AwaitingLocalStart":
+    case "Running":
+    case "Paused":
+    case "Done":
+      return true;
+    case "Alarm":
+      return status.job !== null;
+    default:
+      return false;
+  }
+}
+
+/** What is typed in the Code field, cut as typed (UX notes §6): at most 9 characters, upper case. */
+export function typedCode(text: string): string {
+  return text.toUpperCase().slice(0, 9);
+}
+
+/** Whether the field holds 8 characters of the code's alphabet (spaces and hyphens ignored). */
+export function codeComplete(text: string): boolean {
+  return /^[0-9A-TV-Z]{8}$/.test(text.toUpperCase().replace(/[-\s]/g, ""));
+}
+
+/** The fingerprint as two lines of 4 groups (UX notes §5). */
+export function fingerprintLines(fingerprint: string): [string, string] {
+  const groups = fingerprint.split(" ");
+  return [groups.slice(0, 4).join(" "), groups.slice(4).join(" ")];
+}

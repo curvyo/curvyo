@@ -12,6 +12,8 @@ import { CornerControl } from "@/components/CornerControl";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import { PanelSwitch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ConnectorGroup } from "@/components/workbench/ConnectorGroup";
+import { FIELD, ICON_BUTTON } from "@/components/workbench/machineStyles";
 import { MachineProfileList } from "@/components/workbench/MachineProfileList";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
@@ -19,12 +21,6 @@ import type { MachineView, WorkbenchesApi } from "@/hooks/useWorkbenches";
 import { typedNumber } from "@/lib/machineBlockKeys";
 import { setMachineWriteFailureHandler } from "@/lib/machineProfilesFile";
 import { formatWorkArea } from "@/lib/workAreaText";
-
-const ICON_BUTTON =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
-
-const FIELD =
-  "flex h-7 items-center gap-1 rounded-[5px] border border-[var(--field-border)] bg-white px-2 text-sm focus-within:ring-2 focus-within:ring-[var(--editor-accent)]";
 
 /** The write-failure alert (UX notes §7). */
 const WRITE_FAILED = "Could not save the profile. Nothing was changed.";
@@ -487,6 +483,11 @@ function ConnectionGroup({
         describedBy={describedBy}
         notice={notice}
         onCommit={(value) => onCommit(address, port, value)}
+      />
+      <ConnectorGroup
+        profileId={readOnly ? null : (machine.profiles.find((row) => row.chosen)?.id ?? null)}
+        address={address.trim()}
+        reasonId={readOnly ? reason : undefined}
       />
     </section>
   );

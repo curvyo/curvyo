@@ -72,11 +72,58 @@ pub(crate) fn write_machine_profile(
     curvyo_storage_io::write_atomic(&path, text.as_bytes()).map_err(|e| e.to_string())
 }
 
-/// Removes the record `id`.
+/// Removes the record file and the connector pairing kept for it (`0064` Q10a).
+fn remove_profile_and_pairing(
+    path: &std::path::Path,
+    store: Option<&curvyo_storage_io::CredentialStore>,
+    id: &str,
+) -> Result<(), String> {
+    curvyo_storage_io::remove_file(path).map_err(|e| e.to_string())?;
+    if let Some(store) = store {
+        crate::connector::forget_record(store, id).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Removes the record `id`, and with it the connector pairing kept for that profile.
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn remove_machine_profile(app: AppHandle, id: String) -> Result<(), String> {
-    curvyo_storage_io::remove_file(&record_path(&app, &id)?).map_err(|e| e.to_string())
+pub(crate) fn remove_machine_profile(
+    app: AppHandle,
+    open: tauri::State<'_, crate::device_keys::OpenStore>,
+    id: String,
+) -> Result<(), String> {
+    let path = record_path(&app, &id)?;
+    match open.with_keychain(&app, |store| {
+        remove_profile_and_pairing(&path, Some(store), &id)
+    }) {
+        Ok(result) => result,
+        // No credential store here means no pairing was ever kept.
+        Err(_) => remove_profile_and_pairing(&path, None, &id),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deleting_a_profile_removes_its_pairing_too() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = curvyo_storage_io::CredentialStore::file(dir.path(), "pass").unwrap();
+        let path = dir.path().join("a.json");
+        std::fs::write(&path, "{}").unwrap();
+        store
+            .set(&crate::connector::record_name("a"), b"pairing")
+            .unwrap();
+        store
+            .set(&crate::connector::record_name("b"), b"other")
+            .unwrap();
+        remove_profile_and_pairing(&path, Some(&store), "a").unwrap();
+        assert!(!path.exists());
+        assert!(store.get("connector/a").unwrap().is_none());
+        assert!(store.get("connector/b").unwrap().is_some());
+    }
 }
 
 /// The text of `machine-choice.json`; `None` when there is none yet.

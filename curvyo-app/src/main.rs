@@ -15,6 +15,8 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod connector;
+mod connector_link;
 mod device_keys;
 mod devices;
 mod dropped_fonts;
@@ -110,7 +112,12 @@ fn relaunch_for_linux_webkit_env() -> ! {
     panic!("failed to relaunch with WEBKIT_DISABLE_DMABUF_RENDERER set: {error}");
 }
 
-/// Every command the page may invoke (ADR 0001 §6).
+/// The event the connector watcher emits to the page (`0064`); named here with the other host
+/// entry points, which `tests/acceptance_0051_tester.rs` reads for every event the page listens to.
+pub(crate) const CONNECTOR_EVENT: &str = "connector-event";
+
+/// Every command the page may invoke (ADR 0001 §6); one line per command, so it is long by design.
+#[allow(clippy::too_many_lines)]
 fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
         project::take_pending_open,
@@ -165,6 +172,14 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         font_library::set_font_library_aside,
         font_library::read_font_checks,
         font_library::write_font_checks,
+        connector::connector_pairing,
+        connector::connector_test,
+        connector::connector_pair,
+        connector::connector_forget,
+        connector::connector_send_job,
+        connector::connector_command,
+        connector::connector_watch,
+        connector::connector_unwatch,
         device_keys::read_device_keys,
         device_keys::write_document_keys,
         devices::read_device_group,
@@ -223,6 +238,7 @@ fn main() {
         .manage(AppState::default())
         .manage(workspace_shared::ShareCache::default())
         .manage(device_keys::OpenStore::default())
+        .manage(connector::ConnectorState::default())
         .manage(fonts::FontFiles::default())
         .manage(fonts::GrantedFontPaths::default())
         .invoke_handler(commands())
