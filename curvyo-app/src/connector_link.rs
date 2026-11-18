@@ -77,6 +77,8 @@ pub(crate) enum TestAnswer {
     /// Connected and authenticated.
     Connected {
         controller: Option<String>,
+        /// What the controller reported (`specs/0127` G19): the Controller block's rows.
+        controller_info: Option<Box<ControllerInfo>>,
         protocol: u32,
         version: String,
         connector_name: String,

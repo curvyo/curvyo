@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { linkStore, useLinkEntry } from "@/hooks/useLinkEntry";
 import {
   type CommandAnswer,
+  type ControllerInfo,
   type HeldJob,
   type Line,
   type LinkError,
@@ -31,7 +32,18 @@ type PairingState =
   | { kind: "failed"; message: string };
 
 /** The buttons that run a command (the busy one shows a spinner). */
-export type Busy = "test" | "pair" | "send" | "start" | "resume" | "pause" | "stop" | null;
+export type Busy = "test" | "pair" | "send" | "start" | "resume" | "pause" | "stop" | "unlock" | null;
+
+/** A job command and when its button stops being busy: the state the press waits for
+ * (`specs/0127` UX notes sections 6 and 7), or the time limit. */
+type Command = "start" | "resume" | "pause" | "stop" | "unlock";
+const SETTLES: Record<Command, { done: (s: StatusMessage | null) => boolean; ms: number }> = {
+  start: { done: () => true, ms: 0 },
+  resume: { done: (s) => s?.state.name !== "Paused", ms: 3_000 },
+  pause: { done: (s) => s?.state.name !== "Running", ms: 3_000 },
+  stop: { done: (s) => s?.state.name !== "Running" && s?.state.name !== "Paused", ms: 8_000 },
+  unlock: { done: (s) => s?.state.name !== "Alarm", ms: 5_000 },
+};
 
 export interface ConnectorModel {
   paired: { connectorName: string; fingerprint: string } | null;
@@ -42,6 +54,8 @@ export interface ConnectorModel {
   /** The text of the hidden alert: a failure that answers the maker's own press, or a changed key. */
   alert: string;
   status: StatusMessage | null;
+  /** What the controller reported at its last identify. */
+  controller: ControllerInfo | null;
   held: HeldJob | null;
   sendingName: string | null;
   refusal: Line | null;
@@ -50,7 +64,7 @@ export interface ConnectorModel {
   pair: (code: string) => Promise<boolean>;
   forget: () => void;
   send: () => void;
-  command: (kind: "start" | "resume" | "pause" | "stop") => void;
+  command: (kind: Command) => void;
 }
 
 const LOST: Line = { text: "Connection lost", failure: true };
@@ -237,7 +251,29 @@ export function useConnector(profileId: string | null, address: string, enabled:
     });
   };
 
-  const command = (kind: "start" | "resume" | "pause" | "stop") => {
+  /** Resolves once the entry's status satisfies `done`, or after `ms`. */
+  const settle = (done: (s: StatusMessage | null) => boolean, ms: number) =>
+    new Promise<void>((resolve) => {
+      const id = profileId as string;
+      let off = () => {};
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const finish = () => {
+        off();
+        if (timer !== undefined) clearTimeout(timer);
+        resolve();
+      };
+      if (ms === 0 || done(linkStore.get(id).status) || linkStore.get(id).lost) {
+        resolve();
+        return;
+      }
+      timer = setTimeout(finish, ms);
+      off = linkStore.subscribe(() => {
+        const entry = linkStore.get(id);
+        if (done(entry.status) || entry.lost) finish();
+      });
+    });
+
+  const command = (kind: Command) => {
     void guard(kind, async () => {
       setRefusal(null);
       const answer = await invoke<CommandAnswer>("connector_command", {
@@ -252,6 +288,8 @@ export function useConnector(profileId: string | null, address: string, enabled:
       } else {
         // The connector's status says what changed; a fresh read also covers a lost connection.
         await read(false, false);
+        // A real machine confirms later: the button stays busy until it does (`0127` G10 to G12).
+        await settle(SETTLES[kind].done, SETTLES[kind].ms);
       }
     });
   };
@@ -263,6 +301,7 @@ export function useConnector(profileId: string | null, address: string, enabled:
     line: entry.lost ? LOST : line,
     alert,
     status: entry.status,
+    controller: entry.controller,
     held: entry.held,
     sendingName: entry.sendingName,
     refusal,

@@ -1,7 +1,7 @@
 // The state line and bar under the buttons of the Output group (`specs/0125-send-to-machine` S13,
 // S15; UX notes §4, §5): the words of the connector's job for one profile, derived from the shared
 // link entry. Pure, so the tests load it without a bundler.
-import { formatCount, formatSize, hasProgress, type StatusMessage } from "./connectorText.ts";
+import { formatCount, formatSize, hasProgress, isLossText, type StatusMessage } from "./connectorText.ts";
 import { type LinkEntry } from "./connectorLink.ts";
 
 /** The longest line (UX notes §4, U5). */
@@ -74,7 +74,7 @@ function jobLine(entry: LinkEntry, status: StatusMessage): StateLine | null {
         return words(`Completed, ${formatCount(lines)} lines`, { line: lines, lines, failure: false });
       }
       if (status.state.result === "Stopped") return words(`Stopped at line ${formatCount(line)}`, bar());
-      return { ...words(`Failed at line ${formatCount(line)}`, bar(true)), failure: true };
+      return { ...words(status.detail ?? `Failed at line ${formatCount(line)}`, bar(true)), failure: true };
     case "Alarm":
       return {
         text: `Alarm: ${status.alarm ?? ""}`,
@@ -83,6 +83,13 @@ function jobLine(entry: LinkEntry, status: StatusMessage): StateLine | null {
         bar: hasProgress(status) ? bar(true) : null,
         spoken: `Alarm: ${status.alarm ?? ""}`,
       };
+    case "NoController":
+    case "Idle":
+      // A lost job or an unconfirmed stop, also after the reconnect (`0127` UX notes section 8);
+      // an open failure without a job is the Connector row's line only.
+      return isLossText(status.detail)
+        ? { text: status.detail as string, failure: true, alarm: false, bar: null, spoken: status.detail as string }
+        : null;
     default:
       return null;
   }
@@ -100,7 +107,9 @@ export function alertAfter(before: LinkEntry, now: LinkEntry, pressedHere: boole
   if (alarm && before.status !== null && before.status.state.name !== "Alarm") {
     return `Alarm: ${now.status?.alarm ?? ""}`;
   }
-  return failure === null && !alarm ? "" : null;
+  const loss = isLossText(now.status?.detail) ? (now.status?.detail as string) : null;
+  if (loss !== null && before.status !== null && before.status.detail !== loss) return loss;
+  return failure === null && !alarm && loss === null ? "" : null;
 }
 
 /** The line and bar of the Output group for `entry`, `null` when there is nothing to say. */

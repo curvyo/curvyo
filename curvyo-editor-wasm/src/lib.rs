@@ -68,6 +68,8 @@ mod wasm_clone;
 #[cfg(target_arch = "wasm32")]
 mod wasm_combine;
 #[cfg(target_arch = "wasm32")]
+mod wasm_connector_text;
+#[cfg(target_arch = "wasm32")]
 mod wasm_cut;
 #[cfg(target_arch = "wasm32")]
 mod wasm_devices;
