@@ -132,6 +132,17 @@ impl Stream {
     pub fn system_in_flight(&self) -> bool {
         self.system
     }
+
+    /// Whether the line in flight is `$H`: a `$` line goes alone, so it is the last one written.
+    #[must_use]
+    pub fn homing(&self) -> bool {
+        self.system
+            && self
+                .next
+                .checked_sub(1)
+                .and_then(|i| self.lines.get(i))
+                .is_some_and(|l| l.to_ascii_uppercase().starts_with("$H"))
+    }
 }
 
 #[cfg(test)]
@@ -166,9 +177,11 @@ mod tests {
         stream.fill(0, &mut out);
         assert_eq!(out, b"$H\n");
         assert!(stream.system_in_flight());
+        assert!(stream.homing());
         stream.fill(0, &mut out);
         assert_eq!(out, b"$H\n");
         assert_eq!(stream.answer(), Some(1));
+        assert!(!stream.homing());
         stream.fill(0, &mut out);
         assert_eq!(out, b"$H\nG0X0\nG1X1\n");
         assert_eq!(
@@ -180,6 +193,17 @@ mod tests {
         stream.answer();
         assert_eq!(stream.answered(), 4);
         assert!(stream.all_answered());
+    }
+
+    #[test]
+    fn only_dollar_h_in_flight_is_homing() {
+        let mut stream = Stream::new(lines(&["$$", "$H"]), Duration::ZERO);
+        let mut out = Vec::new();
+        stream.fill(0, &mut out);
+        assert!(stream.system_in_flight() && !stream.homing());
+        stream.answer();
+        stream.fill(0, &mut out);
+        assert!(stream.homing());
     }
 
     #[test]
