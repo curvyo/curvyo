@@ -581,9 +581,10 @@ Inkscape's arcs (as ellipse arcs), polygons and exact stars as primitives when t
 line within 0.001 mm, and imports spirals as a path and 3D boxes as a group of paths without
 their perspective; rectangles with `rx ≠ ry` and rounded, randomized or twisted stars stay paths.
 Everything else (clip paths,
-masks, filters, markers, gradients beyond their middle colour, linked images, text decorations,
+masks, filters, markers, mesh and conic gradients, gradient focal points and `reflect`/`repeat` (counted in the import notice, `0124` criterion 27), linked images, text decorations,
 foreign data such as `inkstitch:`) is ignored silently: there is no loss report and no passthrough bag (customer decisions of 2026-10-16,
-ADR 0018 §5).
+ADR 0018 §5), except the gradient notice of `0124`. Linear and radial gradients import with every
+stop since `0124`.
 
 **Resolution:** driven by real files. Each failing customer file becomes a golden-file fixture
 (`curvyo-ui-core/tests/fixtures/svg/`) and either widens the subset or is accepted as a
@@ -1758,8 +1759,10 @@ of the Select bar (click-through, 3 s or 8 s).
   write (`specs/0017-style-panel-rework/adrs.md`, decision 1). The module, the
   validation of `fill_kind` and `tests/fixtures/legacy_gradient_v7.curvyo` go
   when no such file can still exist (for example once a file conversion step has
-  run over every customer project). Until then they are the only place the word
-  "gradient" remains in the code.
+  run over every customer project). Since `0124` the gradient fill is back as a new design
+  (`fill_paint` `gradient`, `fill_gradient`, `fill_gradient_stops`), so these are no longer
+  the only place the word "gradient" appears in the code; they remain the only reader of the
+  old keys.
 
 **2026-10-09 (`0018-stroke-markers`):**
 
@@ -2619,3 +2622,34 @@ for satin stitch (embroidery family) rather than here.
 - Optional input of the earlier plan: more nodes per joined tip (about 8 width points each).
 
 **Resolution:** satin-stitch story; off-thread commit for the freeze.
+
+## Gradient fill: known gaps (`0124`, 2026-11-18)
+
+- **A History document preview greys laser-page gradients by today's pages.** The version's
+  leaves are placed on the current document's pages (`session/frame.rs`,
+  `laser_gradient_ids`), not on the pages the version had; a leaf that moved between a drawing
+  and a laser page since shows the other look. **Resolution:** read the homes from the version's
+  own pages when the preview builds its read.
+- **The tiling bar's instance preview draws gradients in colour on a laser page.** Its preview
+  instances have fresh ids that are not in the laser set (`session/tiling_view.rs`); the applied
+  tiling is grey. **Resolution:** grey by the source leaf's home.
+- **The stop table is cut at the device's largest 2D texture.** One row holds 1,024 stops; a
+  frame whose distinct stop lists need more rows than `max_texture_dimension_2d` (2,048 on
+  WebGL2's minimum, so about 2 million distinct stops) uploads only the rows that fit, and the
+  shapes that read past the cut are drawn transparent (`gpu_stops.rs`,
+  `DrawList::stop_texture_within`). Equal stop lists share their rows, so 10,000 shapes with
+  one list cost one row. **Resolution:** a second texture or a texture array when a real file
+  reaches it.
+- **SVG export writes every gradient's stops in full.** Each exported shape gets its own
+  `linearGradient` or `radialGradient` with all its `stop` elements (`write_gradient.rs`);
+  shapes with equal stops do not share one stop vector through `href`, as Inkscape writes its
+  vector gradient plus a per-object link. A file of 1,000 shapes with one 9-stop gradient
+  repeats the stops 1,000 times. **Resolution:** write one stop-only gradient per distinct stop
+  list and `href` it from each shape's gradient, keeping the ids stable and the output
+  byte-identical across exports.
+- **Three selection bars use shadcn's `--accent` instead of `--editor-accent`.** In the panel
+  `--accent` is shadcn's grey hover surface (`docs/design-system.md`, 2026-10-03 wiring note),
+  so the 3px bars of `OperationRow.tsx` (line 127), `MaterialRow.tsx` (line 73) and
+  `MaterialPick.tsx` (line 177) show grey, not the selection blue. Found in the `0124` UX
+  review, where the Gradient block's active-stop bar had the same mistake (fixed there).
+  **Resolution:** a separate fix PR switches the three to `--editor-accent`.

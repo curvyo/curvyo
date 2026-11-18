@@ -3,8 +3,8 @@
 Open… reads an `.svg` file as a new, untitled project; the Import button of the tool rail (Ctrl+I)
 adds one as a new layer in the middle of the view, or at the point where it is dropped on the
 canvas (`specs/0024-svg-import-export`, `specs/0058-bitmap-import`). Both read the same subset.
-What is not in it is left out without a message; when nothing at all could be imported, one
-notice says so. Five kinds of file are refused: not an SVG, XML entities beyond plain text
+What is not in it is left out without a message, except the gradient features below; when
+nothing at all could be imported, one notice says so. Five kinds of file are refused: not an SVG, XML entities beyond plain text
 constants, larger than 50 MiB, not UTF-8, and compressed `.svgz`.
 
 ## Read
@@ -28,9 +28,25 @@ constants, larger than 50 MiB, not UTF-8, and compressed `.svgz`.
   looks the same; otherwise an ordinary copy (also of symbols).
 - **Style.** Presentation attributes, the `style` attribute, and `<style>` rules with element,
   `.class`, `#id` and `*` selectors. Fill and stroke colours in every CSS form, `currentColor`,
-  fill and stroke opacity and the object's opacity, stroke width, caps, joins, dashes. A gradient
-  becomes its middle colour, a pattern mid grey. An even-odd fill is re-wound so it looks the
-  same where the outlines do not touch or cross.
+  fill and stroke opacity and the object's opacity, stroke width, caps, joins, dashes. A pattern
+  becomes mid grey. An even-odd fill is re-wound so it looks the same where the outlines do not
+  touch or cross.
+- **Gradients** (`specs/0124-gradient-fill`). A fill that refers to a `linearGradient` or
+  `radialGradient` becomes a Gradient fill with every stop: `offset` (number or percent, clamped
+  to 0..1 and never below the stop before), `stop-color` and `stop-opacity` as attributes or in
+  `style`; a first stop above 0 or a last below 1 gets a stop of the end colour, one stop gives
+  exactly two of its colour, at 0 and 1, no stop is no fill. `href` and `xlink:href` chains of up to 16 links lend
+  each attribute from the nearest link that has it and the stops from the nearest link that has
+  any (Inkscape's vector gradient plus a per-object link). Both `gradientUnits`
+  (`objectBoundingBox` on a box with no width or height paints nothing) and `gradientTransform`
+  of any kind; a skewed or unequally scaled radial becomes an elliptical one. The element's
+  `fill-opacity` is multiplied into the stops. The Colour of the fill is the first stop.
+  **Lost, and named in one notice**, a line each: `spreadMethod` `reflect` and `repeat` are
+  shown as `pad` ("1 gradient repeat was shown as a plain shade."), a focal point `fx fy` away
+  from the centre is read as the centre ("1 focal point was read as the centre."), a mesh
+  gradient is no fill ("1 mesh gradient was left out."); each gradient element counts once. A
+  stroke has no gradient: it takes the gradient's colour at the middle of its line. A text keeps
+  its first stop as its colour (Proposal).
 - **Transforms** of every kind are applied to the geometry.
 
 ## Text
@@ -154,6 +170,7 @@ profile.
 | Text on path | `<textPath xlink:href startOffset>` on its carrier, which is always written |
 | Single-line text | open paths, stroked, always |
 | Image | `<image>` with the stored bytes as a base64 `data:` URI |
+| Gradient fill | `fill="url(#gradient-n)"`, ids in document order, and one `linearGradient` (`x1 y1 x2 y2`) or `radialGradient` (`cx cy r`, `fx fy` equal to `cx cy`) in `defs` with `gradientUnits="userSpaceOnUse"` in the element's own user space and its stops inside (`offset`, `stop-color`, `stop-opacity` with three decimals); `gradientTransform="matrix(…)"` only for an elliptical radial; no `fill-opacity` |
 | Sketch | a group with one element per drawn entity in sketch order: a line as `<path>`, a circle as `<circle>`, an arc as an ellipse arc; constraints and construction geometry are not written |
 | Markers | `<marker>` definitions referenced by `marker-start`, `-mid`, `-end` on open single-outline paths, plus `curvyo:markers`; spaced and closed-path markers only in `curvyo:markers` |
 | Guides | one hidden, locked layer "Guides" with `curvyo:guides="1"` after all layers |

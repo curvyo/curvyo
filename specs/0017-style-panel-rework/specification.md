@@ -30,7 +30,9 @@ made by the customer and final. What changes:
   no text selection by dragging, no +/- buttons. Width and opacity drag on a
   slightly logarithmic scale.
 - No popups anywhere in the properties panel.
-- Gradients are removed completely (YAGNI: no application of ours needs them).
+- Gradients are removed completely (YAGNI: no application of ours needs them). Reversed by the
+  customer on 2026-11-17: `specs/0124-gradient-fill` brings a new Gradient fill paint (criteria
+  49 to 52 are replaced by its tests; 53 stays).
 
 **Reference tools.** Inkscape's Fill & Stroke shows every control all the time,
 puts dash and marker choices into dropdown lists, and hides its colour picker

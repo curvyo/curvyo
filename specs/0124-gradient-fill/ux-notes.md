@@ -41,16 +41,19 @@ moves when the rows under it come and go (0071 section 1).
   transparent at the bottom right (an SVG `linearGradient` whose stops use `currentColor`, so the pressed
   white glyph fades too). Hairline-free, no second colour.
 - Offered for every selected rectangle, ellipse, polygon, star, path, compound path, linked clone, open
-  path and multi-line text. Not for images, groups and single-line texts (those have no fill, `0076`).
+  path and multi-line text, and for a selected group's members. Not for images and single-line texts
+  (those have no fill, `0076`).
   For a text alone the switch shows None / Solid / Gradient (Pattern is not offered for text, `0071`),
   so the Gradient item sits in the third place there: hidden, not disabled.
 - Choosing Gradient on a shape that has none: Linear, Start = the shape's Solid colour (alpha kept), End
   `#FFFFFFFF`, Angle 0 across the box; one step "Fill: Gradient" (criterion 2). Switching away keeps the
   gradient; choosing Gradient again brings it back as it was, no step needed beyond the switch's own.
-- Mixed selection with images or groups: the others change; the skip line under the Fill title says
-  "1 image cannot have a gradient and was not changed." / "2 images cannot have a gradient and were not
-  changed." / "1 group cannot have a gradient and was not changed."; images and groups together:
-  "3 objects cannot have a gradient and were not changed." (P16).
+- A selected group: as with a Solid fill, each member that takes a fill gets its own gradient, in its
+  own box (amended 2026-11-18, UX review U9, Proposal: the build does this; one shade across a group
+  is not offered). Mixed selection with images or other objects without a fill: the others change; the
+  skip line under the Fill title says "1 image cannot have a gradient and was not changed." / "2
+  images cannot have a gradient and were not changed."; images and other objects without a fill
+  together: "3 objects cannot have a gradient and were not changed." (P16).
 
 ## 3. The Gradient block: order and sizes (criterion 3)
 
