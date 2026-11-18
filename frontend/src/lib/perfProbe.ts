@@ -29,8 +29,8 @@ function start() {
   if (!perfEnabled || socket) return;
   // An error that stops the render loop or the scenarios (a wasm binding older than the page,
   // say) names itself in the runner's table instead of leaving zero counters.
-  window.addEventListener("error", (event) => send({ event: "error", scenario, message: String(event.message) }));
-  window.addEventListener("unhandledrejection", (event) => send({ event: "error", scenario, message: String(event.reason) }));
+  window.addEventListener("error", (event) => send({ event: "error", scenario, message: `${event.message} ${event.filename}:${event.lineno} ${event.error instanceof Error ? event.error.stack : ""}` }));
+  window.addEventListener("unhandledrejection", (event) => send({ event: "error", scenario, message: event.reason instanceof Error ? `${event.reason} ${event.reason.stack}` : String(event.reason) }));
   socket = new WebSocket(target as string);
   socket.onopen = () => {
     for (const text of queue.splice(0)) socket?.send(text);
