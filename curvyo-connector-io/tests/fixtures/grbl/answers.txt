@@ -1,0 +1,8 @@
+ok
+error:22
+error:9
+ALARM:1
+[MSG:Reset to continue]
+[MSG:'$H'|'$X' to unlock]
+[MSG:Caution: Unlocked]
+ALARM:3
