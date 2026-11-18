@@ -25,6 +25,7 @@ fn deadline() -> Instant {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // one story from pairing to revoke
 fn the_demo_path_from_pairing_to_revoke() {
     let dir = tempfile::tempdir().unwrap();
     let server = RunningServer::start(&config(dir.path().to_owned(), 1000, None)).unwrap();
@@ -85,6 +86,7 @@ fn the_demo_path_from_pairing_to_revoke() {
                 &token,
                 Duration::from_millis(20),
                 &stop,
+                &|| true,
                 |e| {
                     let _ = events.send(e);
                 },

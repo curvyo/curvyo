@@ -178,6 +178,7 @@ pub const FREE_STEPS: &[&str] = &[
     "set_start_head_position",
     "set_start_home_then_origin",
     "export_job",
+    "send_job",
     "add_sketch",
     "edit_sketch",
     "place_sketch_clone",

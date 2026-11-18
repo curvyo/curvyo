@@ -260,6 +260,12 @@ impl Connection {
         self.send_text(text)
     }
 
+    /// Ends the connection with a close frame; every later send fails with [`ClientError::Io`].
+    pub fn close(&mut self) {
+        let _ = self.socket.close(None);
+        let _ = self.socket.flush();
+    }
+
     /// Sends one frame, of core's protocol or of this crate.
     ///
     /// # Errors

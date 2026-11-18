@@ -13,6 +13,7 @@ mod handshake;
 mod machine;
 mod message;
 mod millimetres;
+mod send_watch;
 
 pub use assembly::{Job, MAX_CHUNK_BYTES, MAX_JOB_BYTES};
 pub use codec::{CodecError, MAX_FRAME_BYTES, decode, encode};
@@ -22,3 +23,4 @@ pub use message::{
     ControllerInfo, ErrorCode, JobKind, JobResult, Message, Progress, RejectReason, State,
 };
 pub use millimetres::Millimetres;
+pub use send_watch::{Resolution, SendWatch};

@@ -40,7 +40,11 @@ pub struct SentJob {
     pub bytes: u64,
 }
 
-fn new_job_id() -> Result<Uuid, ClientError> {
+/// A fresh random job id.
+///
+/// # Errors
+/// [`ClientError::Io`] when the system has no random bytes.
+pub fn new_job_id() -> Result<Uuid, ClientError> {
     let mut bytes = [0; 16];
     SystemRandom::new()
         .fill(&mut bytes)
@@ -81,7 +85,21 @@ impl Connection {
         text: &str,
         deadline: Instant,
     ) -> Result<SentJob, SendError> {
-        let job_id = new_job_id()?;
+        self.send_job_with_id(new_job_id()?, name, text, deadline)
+    }
+
+    /// [`Self::send_job`] with the id chosen by the caller, who follows the job by it
+    /// (`specs/0124` B4).
+    ///
+    /// # Errors
+    /// As [`Self::send_job`].
+    pub fn send_job_with_id(
+        &mut self,
+        job_id: Uuid,
+        name: &str,
+        text: &str,
+        deadline: Instant,
+    ) -> Result<SentJob, SendError> {
         let bytes = text.len() as u64;
         let sha256 = hex::encode(digest::digest(&digest::SHA256, text.as_bytes()).as_ref());
         self.send(&Message::SubmitJob {

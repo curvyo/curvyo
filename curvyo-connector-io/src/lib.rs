@@ -17,6 +17,7 @@ pub mod pairing;
 pub mod pairing_code;
 pub mod pin_verifier;
 pub mod record;
+pub mod send_tracked;
 pub mod server;
 pub mod server_tls;
 mod session;
