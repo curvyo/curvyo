@@ -80,6 +80,7 @@ impl FakeController {
                 ControllerCommand::Pause => self.paused = true,
                 ControllerCommand::Resume => self.paused = false,
                 ControllerCommand::Stop => self.streaming = None,
+                ControllerCommand::Unlock => {}
             }
         }
     }

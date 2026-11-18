@@ -27,6 +27,10 @@ pub enum RejectReason {
     NotAscii,
     /// No controller is attached.
     NoController,
+    /// The controller's laser mode is off (GRBL `$32=0`, `specs/0127` G34).
+    LaserModeOff,
+    /// The controller's laser mode could not be read (GRBL without `$32` in `$$`, G34).
+    LaserModeUnknown,
 }
 
 /// How a job ended.
@@ -81,12 +85,32 @@ pub struct Progress {
 }
 
 /// The controller the connector talks to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ControllerInfo {
-    /// Port or device name.
+    /// The controller's own name ("GRBL", "Fake controller").
     pub name: String,
-    /// Firmware banner.
+    /// Its firmware version ("1.1h").
     pub firmware: String,
+    /// The serial port the connector uses; absent for the fake controller.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<String>,
+    /// The baud rate the connector uses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baud: Option<u32>,
+    /// The settings the controller reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings: Option<ControllerSettings>,
+}
+
+/// What the controller reported of its settings (GRBL `$$`); `None` for a value it did not report.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ControllerSettings {
+    /// Laser mode (GRBL `$32`).
+    pub laser_mode: Option<bool>,
+    /// The S value of full power, rounded (GRBL `$30`).
+    pub s_max: Option<u32>,
+    /// The travel of X and Y (GRBL `$130`, `$131`).
+    pub travel: Option<[Millimetres; 2]>,
 }
 
 /// The code of an `Error` message.
@@ -187,6 +211,8 @@ pub enum Message {
     Resume,
     /// Stops; idempotent.
     Stop,
+    /// Leaves the controller's alarm lock (GRBL `$X`); only in `Alarm` (`specs/0127` G14).
+    Unlock,
     /// Answer to `Hello` once accepted.
     Welcome {
         /// The connector's name.
@@ -221,6 +247,10 @@ pub enum Message {
         position: Option<[Millimetres; 3]>,
         /// The controller's alarm text.
         alarm: Option<String>,
+        /// The sentence that explains the state ("Failed at line 12: No feed rate (error 22)",
+        /// "Lost the controller at line 120", "Stopping", "Controller state: Door").
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
     },
     /// A refusal that keeps the connection open, except where stated.
     Error {

@@ -32,6 +32,7 @@ fn status(
         job,
         position: position.map(|p| p.map(Millimetres)),
         alarm: alarm.map(str::to_owned),
+        detail: None,
     }
 }
 
@@ -48,6 +49,9 @@ fn controller() -> ControllerInfo {
     ControllerInfo {
         name: "/dev/ttyUSB0".to_owned(),
         firmware: "Grbl 1.1h".to_owned(),
+        port: None,
+        baud: None,
+        settings: None,
     }
 }
 

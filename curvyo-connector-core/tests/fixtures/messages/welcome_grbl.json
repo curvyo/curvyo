@@ -1,0 +1,1 @@
+{"type":"Welcome","connector_name":"Workshop Pi","controller":{"name":"GRBL","firmware":"1.1h","port":"/dev/ttyUSB0","baud":115200,"settings":{"laser_mode":true,"s_max":1000,"travel":[400.0,300.0]}}}

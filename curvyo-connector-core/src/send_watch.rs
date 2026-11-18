@@ -106,6 +106,7 @@ mod tests {
             }),
             position: None,
             alarm: None,
+            detail: None,
         }
     }
 
