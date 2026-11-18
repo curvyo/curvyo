@@ -21,10 +21,9 @@ pub fn dim_outside(
             let mut shown = object.clone();
             if !inside(object.id()) {
                 let style = shown.style_mut();
-                let dim =
-                    |opacity: Opacity| Opacity::new(opacity.get() * CONTEXT_DIM).unwrap_or(opacity);
-                style.stroke.opacity = dim(style.stroke.opacity);
-                style.fill.opacity = dim(style.fill.opacity);
+                let opacity = style.stroke.opacity;
+                style.stroke.opacity = Opacity::new(opacity.get() * CONTEXT_DIM).unwrap_or(opacity);
+                crate::node_opacity::fade_fill(&mut style.fill, CONTEXT_DIM);
             }
             shown
         })

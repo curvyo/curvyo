@@ -182,6 +182,8 @@ impl Session {
         }
         // A whole test grid keeps its box and centre move only (`specs/0028` ux-notes 6.5).
         tolerances.move_only = self.whole_test_grid_selected();
+        // A shape handle under a drawn gradient handle yields (`specs/0124` criterion 6).
+        tolerances.yielded = self.gradient_yielded(tolerances);
         tolerances
     }
 

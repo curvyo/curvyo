@@ -393,11 +393,13 @@ impl Session {
                 None => self.sketch_key(input),
             };
         }
-        if let Some(outcome) = self.mode_key(&input) {
-            return outcome;
-        }
-        // A selected fixture takes the arrows, Delete and Escape (`specs/0102` criteria 13, 14).
-        if let Some(outcome) = self.fixture_key(&input) {
+        // A dragged, selected or opened gradient handle takes Escape and Delete (`specs/0124`);
+        // a selected fixture the arrows, Delete and Escape (`specs/0102` criteria 13, 14).
+        if let Some(outcome) = self
+            .gradient_key(&input)
+            .or_else(|| self.mode_key(&input))
+            .or_else(|| self.fixture_key(&input))
+        {
             return outcome;
         }
         match self.table_action(&input) {

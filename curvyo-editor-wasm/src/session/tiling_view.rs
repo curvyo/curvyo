@@ -49,7 +49,7 @@ fn varied(path: &PathSnapshot, leaf_opacity: f64, cell: &TilingCell, vary: bool)
     style.stroke.color = hue_shifted(style.stroke.color, cell.hue);
     let factor = (leaf_opacity + cell.opacity.get() / 100.0).clamp(0.0, 1.0);
     let times = |o: Opacity| Opacity::new(o.get() * factor).unwrap_or(o);
-    style.fill.opacity = times(style.fill.opacity);
+    curvyo_render_core::fade_fill(&mut style.fill, factor);
     style.stroke.opacity = times(style.stroke.opacity);
     mapped
 }

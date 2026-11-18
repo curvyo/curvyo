@@ -49,6 +49,10 @@ image.workspace = true
 # documents (`specs/0024-svg-import-export`); the workspace's own property-test crate.
 proptest.workspace = true
 
+# `src/gpu_shader.rs` validates the WGSL and translates it to GLSL ES 3.00 on the host, so a shader
+# error fails `cargo test` instead of the browser; the same `naga` `wgpu` already compiles in.
+naga = { version = "30", default-features = false, features = ["wgsl-in", "glsl-out"] }
+
 # `tests/send_to_machine.rs` drives Send to machine against the connector with the fake controller
 # (`specs/0125-send-to-machine` S17); internal path crates and `tempfile`, native tests only, no
 # edge in the production or wasm build.

@@ -15,6 +15,7 @@ use curvyo_svg_core::{
 };
 use kurbo::{Affine, Rect};
 
+use crate::svg_export_gradient::with_gradient;
 use crate::svg_export_leaf::{export_style, path_kind, svg_draws_markers};
 use crate::svg_export_parts::Parts;
 use crate::svg_export_shapes::primitive_kind;
@@ -567,16 +568,19 @@ pub(crate) fn shape_leaf(
     match object {
         ObjectSnapshot::Path(path) => {
             let (style, shadow) = export_style(&path.style, svg_draws_markers(path));
+            let style = with_gradient(style, &path.style.fill, object.gradient_box(), t);
             Some((path_kind(path, t), style, shadow))
         }
         ObjectSnapshot::Clone(clone) => {
             let path = &clone.resolved;
             let (style, shadow) = export_style(&path.style, svg_draws_markers(path));
+            let style = with_gradient(style, &path.style.fill, object.gradient_box(), t);
             Some((path_kind(path, t), style, shadow))
         }
         ObjectSnapshot::Primitive(p) => {
             let (kind, mut shadow) = primitive_kind(&p.shape, p.rotation, t);
             let (style, stroke_shadow) = export_style(&p.style, false);
+            let style = with_gradient(style, &p.style.fill, object.gradient_box(), t);
             shadow.stroke_width = stroke_shadow.stroke_width;
             shadow.dash = stroke_shadow.dash;
             // A turned element's width is read through its transform: keep it exact.

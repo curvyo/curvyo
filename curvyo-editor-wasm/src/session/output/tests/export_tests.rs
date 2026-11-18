@@ -162,3 +162,26 @@ fn criterion_28_c_an_export_marks_its_test_grid_lasered_and_undo_keeps_it() {
     );
     assert_eq!(lasered(&s), Some(1_762_948_800_000));
 }
+
+/// `specs/0124-gradient-fill` criterion 12: a Gradient fill changes nothing in a laser job; the
+/// fill paint never counts.
+#[test]
+fn a_gradient_fill_changes_nothing_in_the_job() {
+    for kind in ["cut", "engrave"] {
+        let (mut s, square) = laser_with_square();
+        s.selection.set(&[square]);
+        s.set_fill_paint(true);
+        s.selection.set(&[square]);
+        let id = s.press_operation_kind(kind, true).unwrap();
+        s.selection.set(&[]);
+        s.edit_operation_setting(id, "main", "power", 60.0).unwrap();
+        s.edit_operation_setting(id, "main", "speed", 600.0)
+            .unwrap();
+        let colour = s.export_job("x").unwrap().bytes;
+        s.selection.set(&[square]);
+        assert!(s.set_fill_kind("gradient"));
+        assert!(s.set_gradient_kind("radial"));
+        s.selection.set(&[]);
+        assert_eq!(s.export_job("x").unwrap().bytes, colour, "{kind}");
+    }
+}

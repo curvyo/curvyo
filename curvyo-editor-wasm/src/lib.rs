@@ -40,9 +40,14 @@ mod workspace_tree_glue;
 #[cfg(target_arch = "wasm32")]
 mod gpu;
 #[cfg(target_arch = "wasm32")]
+mod gpu_gradient_buffer;
+#[cfg(target_arch = "wasm32")]
 mod gpu_images;
 #[cfg(target_arch = "wasm32")]
 mod gpu_pipeline;
+mod gpu_shader;
+#[cfg(target_arch = "wasm32")]
+mod gpu_stops;
 #[cfg(target_arch = "wasm32")]
 mod wasm_api;
 #[cfg(target_arch = "wasm32")]
@@ -75,6 +80,8 @@ mod wasm_font_library;
 mod wasm_formats;
 #[cfg(target_arch = "wasm32")]
 mod wasm_fracture;
+#[cfg(target_arch = "wasm32")]
+mod wasm_gradient;
 #[cfg(target_arch = "wasm32")]
 mod wasm_group;
 #[cfg(target_arch = "wasm32")]

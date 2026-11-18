@@ -6,8 +6,8 @@
 use std::collections::HashSet;
 
 use curvyo_document_core::{
-    NodeId, ObjectSnapshot, Opacity, PathSnapshot, PrimitiveSnapshot, Stroke, Style, ViewTransform,
-    drawing_outline_of_rotated,
+    NodeId, ObjectSnapshot, Opacity, PathSnapshot, PlacedGradient, PrimitiveSnapshot, Stroke,
+    Style, ViewTransform, drawing_outline_of_rotated,
 };
 
 use lyon::path::Path;
@@ -16,6 +16,7 @@ use crate::color::RgbaColor;
 use crate::dash::{self, DashBudget};
 use crate::fill;
 use crate::glyphs::DrawList;
+use crate::gradient_fill::{StopRanges, placed_gradient};
 use crate::marker_place::marker_placements;
 use crate::markers::{MarkerBudget, marker_triangles};
 use crate::shape_preview::outline_to_anchors;
@@ -67,10 +68,25 @@ pub fn build_artwork_with_guides(
     guides: &HashSet<NodeId>,
     view: ViewTransform,
 ) -> DrawList {
+    build_artwork_greyed(objects, guides, &|_| false, view)
+}
+
+/// [`build_artwork_with_guides`] where the gradient of every leaf whose id `grey` accepts is
+/// drawn as its grey over white (a leaf on a laser page, `specs/0124-gradient-fill`
+/// criterion 10, ADR 0067 §3). Colours, patterns and strokes are drawn as they are.
+#[must_use]
+#[allow(clippy::implicit_hasher)]
+pub fn build_artwork_greyed(
+    objects: &[ObjectSnapshot],
+    guides: &HashSet<NodeId>,
+    grey: &dyn Fn(NodeId) -> bool,
+    view: ViewTransform,
+) -> DrawList {
     let marking = (!guides.is_empty()).then(|| crate::guide_style::marking_style(view));
     let mut budgets = FrameBudgets {
         dashes: DashBudget::per_frame(),
         markers: MarkerBudget::per_frame(),
+        stops: StopRanges::default(),
     };
     let mut list = DrawList::default();
     let mut shared = SharedOutlines::default();
@@ -79,7 +95,7 @@ pub fn build_artwork_with_guides(
             draw_guide(&mut list, object, style, view, &mut budgets);
             continue;
         }
-        draw_one(&mut list, &mut shared, object, view, &mut budgets);
+        draw_one(&mut list, &mut shared, object, grey, view, &mut budgets);
     }
     list
 }
@@ -89,32 +105,41 @@ fn draw_one(
     list: &mut DrawList,
     shared: &mut SharedOutlines,
     object: &ObjectSnapshot,
+    grey: &dyn Fn(NodeId) -> bool,
     view: ViewTransform,
     budgets: &mut FrameBudgets,
 ) {
+    // The gradient is placed in the leaf's own box (a clone's: its root's box under its matrix,
+    // a text's: its line box), never in the box of the outline it is drawn through.
+    let placed = placed_gradient(object);
+    let gradient = placed.as_ref().map(|p| Shade {
+        placed: p,
+        grey: grey(object.id()),
+    });
     match object {
         // A clone of a group, text or image draws its original's leaves (ADR 0045 §3).
         ObjectSnapshot::Clone(clone) if clone.is_picture() => {
             for leaf in clone.chain.picture.iter().flat_map(|p| p.iter()) {
-                draw_one(list, shared, leaf, view, budgets);
+                draw_one(list, shared, leaf, &|_| grey(object.id()), view, budgets);
             }
         }
         // A clone with a rigid map of a plain root reuses the root's tessellation
         // (`specs/0049-linked-clone` criterion 44).
-        ObjectSnapshot::Clone(clone) if shared.draw(list, clone, view) => {}
-        ObjectSnapshot::Path(path) => draw_path(list, path, view, budgets),
-        ObjectSnapshot::Clone(clone) => draw_path(list, &clone.resolved, view, budgets),
+        ObjectSnapshot::Clone(clone)
+            if shared.draw(list, clone, view, gradient, &mut budgets.stops) => {}
+        ObjectSnapshot::Path(path) => draw_path(list, path, gradient, view, budgets),
+        ObjectSnapshot::Clone(clone) => draw_path(list, &clone.resolved, gradient, view, budgets),
         ObjectSnapshot::Sketch(sketch) => {
-            draw_path(list, &sketch.resolved, view, budgets);
+            draw_path(list, &sketch.resolved, None, view, budgets);
         }
         ObjectSnapshot::Primitive(primitive) => {
-            draw_primitive(list, primitive, view, budgets);
+            draw_primitive(list, primitive, gradient, view, budgets);
         }
         // A text is drawn through the outlines the session laid out (ADR 0020 §2: what
         // you see is what is cut); a text not laid out yet draws nothing.
         ObjectSnapshot::Text(text) => {
             if let Some(outline) = &text.outline {
-                draw_path(list, &outline.glyphs, view, budgets);
+                draw_path(list, &outline.glyphs, gradient, view, budgets);
             }
         }
         // An image is a layer of its own that the host fills with its texture
@@ -146,14 +171,14 @@ fn draw_guide(
                     closed: subpath.closed,
                 })
                 .collect();
-            draw_object(list, &outlines, style, false, view, budgets);
+            draw_object(list, &outlines, style, None, false, view, budgets);
         }
         ObjectSnapshot::Primitive(primitive) => {
             let marked = PrimitiveSnapshot {
                 style: style.clone(),
                 ..primitive.clone()
             };
-            draw_primitive(list, &marked, view, budgets);
+            draw_primitive(list, &marked, None, view, budgets);
         }
         // An image is never a guide (ADR 0019); it draws as itself.
         ObjectSnapshot::Image(image) => list.push_image(image),
@@ -168,15 +193,23 @@ fn draw_guide(
                         closed: subpath.closed,
                     })
                     .collect();
-                draw_object(list, &outlines, style, false, view, budgets);
+                draw_object(list, &outlines, style, None, false, view, budgets);
             }
         }
     }
 }
 
+/// How a leaf's gradient fill is drawn: placed in its box, in colour or as grey.
+#[derive(Clone, Copy)]
+pub(crate) struct Shade<'a> {
+    pub(crate) placed: &'a PlacedGradient,
+    pub(crate) grey: bool,
+}
+
 fn draw_path(
     list: &mut DrawList,
     path: &PathSnapshot,
+    gradient: Option<Shade<'_>>,
     view: ViewTransform,
     budgets: &mut FrameBudgets,
 ) {
@@ -187,12 +220,13 @@ fn draw_path(
             closed: subpath.closed,
         })
         .collect();
-    draw_object(list, &outlines, &path.style, true, view, budgets);
+    draw_object(list, &outlines, &path.style, gradient, true, view, budgets);
 }
 
 fn draw_primitive(
     list: &mut DrawList,
     primitive: &PrimitiveSnapshot,
+    gradient: Option<Shade<'_>>,
     view: ViewTransform,
     budgets: &mut FrameBudgets,
 ) {
@@ -205,13 +239,23 @@ fn draw_primitive(
         closed: drawn.closed,
     }];
     // A primitive has no markers and draws none (`0018` criterion 21).
-    draw_object(list, &outline, &primitive.style, false, view, budgets);
+    draw_object(
+        list,
+        &outline,
+        &primitive.style,
+        gradient,
+        false,
+        view,
+        budgets,
+    );
 }
 
-/// The limits shared by every object of one frame.
+/// The limits and tables shared by every object of one frame.
 struct FrameBudgets {
     dashes: DashBudget,
     markers: MarkerBudget,
+    /// The stop lists already in the frame's table.
+    stops: StopRanges,
 }
 
 /// An object's outlines as the fill and the stroke read them: one for an
@@ -221,6 +265,7 @@ fn draw_object(
     list: &mut DrawList,
     outlines: &[OutlineRef<'_>],
     style: &Style,
+    gradient: Option<Shade<'_>>,
     markers: bool,
     view: ViewTransform,
     budgets: &mut FrameBudgets,
@@ -230,6 +275,12 @@ fn draw_object(
     // A pattern fill is drawn by the session as its pieces (ADR 0029 §7), never as a colour.
     if style.fill.paints_solid() {
         draw_fill(list, outlines, style, view);
+    } else if let Some(shade) = gradient {
+        // The same tessellation as a Colour fill, in white; the host shades it per pixel
+        // (ADR 0067 §1).
+        if let Some(layer) = fill_layer(outlines, RgbaColor::WHITE, view) {
+            list.extend_gradient_artwork(layer, shade.placed, shade.grey, &mut budgets.stops);
+        }
     }
     if style.stroke.enabled {
         draw_stroke(list, outlines, style, markers, view, budgets);

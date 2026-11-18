@@ -81,7 +81,7 @@ impl From<PatternFieldView> for PatternFieldJson {
 pub struct PatternPanelJson {
     /// Some edited object can take a pattern: the Pattern item is in the kind group.
     pub(super) offered: bool,
-    /// `"none"`, `"solid"`, `"pattern"` or `"mixed"`.
+    /// `"none"`, `"solid"`, `"pattern"`, `"gradient"` or `"mixed"`.
     pub(super) kind: String,
     /// Every edited object paints a pattern: the block is shown.
     pub(super) shown: bool,
@@ -131,6 +131,8 @@ fn kind_of(object: &ObjectSnapshot) -> &'static str {
         "none"
     } else if fill.paint == FillPaint::Pattern {
         "pattern"
+    } else if fill.paint == FillPaint::Gradient {
+        "gradient"
     } else {
         "solid"
     }
@@ -339,12 +341,16 @@ impl Session {
         self.pattern_refusal.take().map(refusal_text)
     }
 
-    /// The fill kind group: `"none"`, `"solid"` or `"pattern"`, one commit.
+    /// The fill kind group: `"none"`, `"solid"`, `"pattern"` or `"gradient"`, one commit
+    /// (Gradient: "Fill: Gradient", `specs/0124-gradient-fill` criterion 2).
     pub fn set_fill_kind(&mut self, kind: &str) -> bool {
         let edit = match kind {
             "none" => StyleEdit::FillEnabled(false),
             "solid" => StyleEdit::FillPaint(FillPaint::Colour),
             "pattern" => StyleEdit::FillPaint(FillPaint::Pattern),
+            "gradient" => {
+                return self.apply_gradient_edit(&StyleEdit::FillPaint(FillPaint::Gradient));
+            }
             _ => return false,
         };
         self.apply_pattern_edit(&edit)

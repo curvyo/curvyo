@@ -142,7 +142,6 @@ pub(crate) fn paint(color: curvyo_document_core::Color, opacity: f64) -> Paint {
 
 /// The writer's style of `style` and its shadow values (criteria 56, 57, 141). `svg_markers`:
 /// the leaf is one open outline of two or more nodes, so SVG draws its end and node markers.
-#[allow(clippy::float_cmp)] // exactness of the read-back dash list is the question
 pub(crate) fn export_style(style: &Style, svg_markers: bool) -> (ExportStyle, Shadow) {
     // A pattern fill is written as its pieces beside the region (ADR 0029 §8): `fill="none"`.
     let fill = style
@@ -150,54 +149,71 @@ pub(crate) fn export_style(style: &Style, svg_markers: bool) -> (ExportStyle, Sh
         .paints_solid()
         .then(|| paint(style.fill.color, style.fill.opacity.get()));
     let s = &style.stroke;
-    let width = s.width.as_mm();
     let mut shadow = Shadow::default();
-    let stroke = (s.enabled && width > 0.0).then(|| {
-        let dash = s.dash.as_slice();
-        if !six_decimals_exact(width) {
-            shadow.stroke_width = Some(width);
-        }
-        let read_back = |d: f64| {
-            let mm: f64 = format!("{:.6}", d * width).parse().unwrap_or(0.0);
-            let w: f64 = format!("{width:.6}").parse().unwrap_or(1.0);
-            mm / w
-        };
-        if dash.iter().any(|d| read_back(*d) != *d) {
-            shadow.dash = Some(dash.to_vec());
-        }
-        let markers = s.markers;
-        if markers != Markers::default() {
-            shadow.markers = Some(ShadowMarkers {
-                start: marker(markers.start),
-                middle: marker(markers.mid),
-                at_nodes: markers.mid_place == MarkerPlace::AtNodes,
-                count: markers.mid_count.get(),
-                end: marker(markers.end),
-            });
-        }
-        let at_nodes = markers.mid_place == MarkerPlace::AtNodes;
-        ExportStroke {
-            paint: paint(s.color, s.opacity.get()),
-            width_mm: width,
-            dash_mm: dash.iter().map(|d| d * width).collect(),
-            cap: match s.cap {
-                LineCap::Butt => Cap::Butt,
-                LineCap::Round => Cap::Round,
-                LineCap::Square => Cap::Square,
-            },
-            join: match s.join {
-                LineJoin::Miter => Join::Miter,
-                LineJoin::Round => Join::Round,
-                LineJoin::Bevel => Join::Bevel,
-            },
-            start: svg_markers.then(|| marker(markers.start)).flatten(),
-            mid: (svg_markers && at_nodes)
-                .then(|| marker(markers.mid))
-                .flatten(),
-            end: svg_markers.then(|| marker(markers.end)).flatten(),
-        }
-    });
-    (ExportStyle { fill, stroke }, shadow)
+    let stroke =
+        (s.enabled && s.width.as_mm() > 0.0).then(|| export_stroke(s, svg_markers, &mut shadow));
+    (
+        ExportStyle {
+            fill,
+            fill_gradient: None,
+            stroke,
+        },
+        shadow,
+    )
+}
+
+/// The writer's stroke of `s` (on, wider than 0), noting in `shadow` what SVG cannot hold
+/// exactly (criteria 56, 57, 141); `svg_markers` as [`export_style`].
+#[allow(clippy::float_cmp)] // exactness of the read-back dash list is the question
+fn export_stroke(
+    s: &curvyo_document_core::Stroke,
+    svg_markers: bool,
+    shadow: &mut Shadow,
+) -> ExportStroke {
+    let width = s.width.as_mm();
+    let dash = s.dash.as_slice();
+    if !six_decimals_exact(width) {
+        shadow.stroke_width = Some(width);
+    }
+    let read_back = |d: f64| {
+        let mm: f64 = format!("{:.6}", d * width).parse().unwrap_or(0.0);
+        let w: f64 = format!("{width:.6}").parse().unwrap_or(1.0);
+        mm / w
+    };
+    if dash.iter().any(|d| read_back(*d) != *d) {
+        shadow.dash = Some(dash.to_vec());
+    }
+    let markers = s.markers;
+    if markers != Markers::default() {
+        shadow.markers = Some(ShadowMarkers {
+            start: marker(markers.start),
+            middle: marker(markers.mid),
+            at_nodes: markers.mid_place == MarkerPlace::AtNodes,
+            count: markers.mid_count.get(),
+            end: marker(markers.end),
+        });
+    }
+    let at_nodes = markers.mid_place == MarkerPlace::AtNodes;
+    ExportStroke {
+        paint: paint(s.color, s.opacity.get()),
+        width_mm: width,
+        dash_mm: dash.iter().map(|d| d * width).collect(),
+        cap: match s.cap {
+            LineCap::Butt => Cap::Butt,
+            LineCap::Round => Cap::Round,
+            LineCap::Square => Cap::Square,
+        },
+        join: match s.join {
+            LineJoin::Miter => Join::Miter,
+            LineJoin::Round => Join::Round,
+            LineJoin::Bevel => Join::Bevel,
+        },
+        start: svg_markers.then(|| marker(markers.start)).flatten(),
+        mid: (svg_markers && at_nodes)
+            .then(|| marker(markers.mid))
+            .flatten(),
+        end: svg_markers.then(|| marker(markers.end)).flatten(),
+    }
 }
 
 /// Whether `path` is a single open outline of two or more nodes (criterion 141 (b)).

@@ -349,6 +349,7 @@ impl<'t, 'a> Parts<'t, 'a> {
             };
             let fill_only = ExportStyle {
                 fill: style.fill,
+                fill_gradient: style.fill_gradient.clone(),
                 stroke: None,
             };
             children.push(leaf_node(
@@ -379,6 +380,7 @@ impl<'t, 'a> Parts<'t, 'a> {
                 },
                 ExportStyle {
                     fill: Some(paint(s.color, s.opacity.get())),
+                    fill_gradient: None,
                     stroke: None,
                 },
                 Shadow::default(),
@@ -423,6 +425,13 @@ impl<'t, 'a> Parts<'t, 'a> {
         let mut path = glyphs.clone();
         path.style = style.clone();
         let (export, shadow) = export_style(&style, false);
+        // The glyphs share the text's one shade (`specs/0124-gradient-fill` criterion 21).
+        let export = crate::svg_export_gradient::with_gradient(
+            export,
+            &style.fill,
+            text.gradient_box(),
+            self.t,
+        );
         // One outline is a `path`, more a `compound`, as the import gives them back (criterion 152).
         let kind = path_kind(&path, self.t);
         if !(self.options.strokes_as_paths && draws_stroke(&style)) {

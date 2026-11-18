@@ -189,7 +189,7 @@ impl WasmSession {
     pub fn colour_pick_hover(&self) -> Vec<String> {
         self.session
             .colour_pick_hover()
-            .map(|(hex, paint)| vec![hex, paint.name().to_string()])
+            .map(|(hex, paint)| vec![hex, paint.name()])
             .unwrap_or_default()
     }
 

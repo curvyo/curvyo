@@ -324,6 +324,14 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("pattern_mode_shapes", "Pattern: Shapes"),
     ("pattern_seed", "Pattern: new seed"),
     ("pattern_whole_pieces", "Pattern: whole pieces"),
+    // `specs/0124-gradient-fill` criterion 18, UX notes §11.
+    ("fill_gradient", "Fill: Gradient"),
+    ("gradient_linear", "Gradient: Linear"),
+    ("gradient_radial", "Gradient: Radial"),
+    ("edit_gradient", "Edit gradient"),
+    ("add_gradient_stop", "Add gradient stop"),
+    ("remove_gradient_stop", "Remove gradient stop"),
+    ("reverse_gradient", "Reverse gradient"),
     // `specs/0025-raster-trace` criterion 13.
     ("trace_image", "Trace image"),
     // `specs/0114-image-trace-mask` criterion 17, ADR 0061 §6.
@@ -510,6 +518,33 @@ mod tests {
         assert_eq!(
             known_operation_name(curvyo_document_core::LABEL_ALIGN_FIXTURE_SETS),
             None
+        );
+    }
+
+    /// `specs/0124-gradient-fill` criterion 18.
+    #[test]
+    fn the_gradient_edits_are_named() {
+        use curvyo_document_core::{FillPaint, GradientKind, StyleEdit};
+        for (edit, name) in [
+            (StyleEdit::FillPaint(FillPaint::Gradient), "Fill: Gradient"),
+            (
+                StyleEdit::GradientKind(GradientKind::Linear),
+                "Gradient: Linear",
+            ),
+            (
+                StyleEdit::GradientKind(GradientKind::Radial),
+                "Gradient: Radial",
+            ),
+            (StyleEdit::GradientStopOffset(1, 0.5), "Edit gradient"),
+            (StyleEdit::AddGradientStop(None), "Add gradient stop"),
+            (StyleEdit::RemoveGradientStop(1), "Remove gradient stop"),
+            (StyleEdit::ReverseGradient, "Reverse gradient"),
+        ] {
+            assert_eq!(operation_name(edit.commit_label()), name);
+        }
+        assert_eq!(
+            operation_name(curvyo_document_core::EDIT_GRADIENT_LABEL),
+            "Edit gradient"
         );
     }
 

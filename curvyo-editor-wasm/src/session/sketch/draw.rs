@@ -21,11 +21,7 @@ impl Session {
         if previewing {
             self.sketch_replace_preview(&snapshot, solution, &mut artwork);
         }
-        let mut list = curvyo_render_core::build_artwork_with_guides(
-            &artwork,
-            &self.document_read().guides,
-            self.view(),
-        );
+        let mut list = self.shown_artwork(&artwork);
         let construction = filtered_outline(&snapshot, solution, &solution.construction);
         let selected = self.sketch_highlighted(&snapshot);
         let selected_outline = filtered_outline(&snapshot, solution, &selected);
@@ -150,11 +146,7 @@ impl Session {
     }
 
     fn empty_sketch_draw_list(&self, render: &[ObjectSnapshot]) -> DrawList {
-        let mut list = curvyo_render_core::build_artwork_with_guides(
-            render,
-            &self.document_read().guides,
-            self.view(),
-        );
+        let mut list = self.shown_artwork(render);
         if let Some(placement) = self.sketch_placement() {
             if let Some(preview) = self.sketch_construction_preview()
                 && let Ok(paths) =

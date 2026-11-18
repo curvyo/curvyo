@@ -54,6 +54,16 @@ pub(crate) struct OnCarrier {
     pub(crate) length: f64,
 }
 
+/// The writer's style of `text`, with its gradient over its line box mapped by `t`.
+fn text_style(text: &TextSnapshot, t: Affine) -> curvyo_svg_core::ExportStyle {
+    crate::svg_export_gradient::with_gradient(
+        export_style(&text.style, false).0,
+        &text.style.fill,
+        text.gradient_box(),
+        t,
+    )
+}
+
 /// The live text of `text` (criteria 132 to 135), its frame mapped by `t`.
 pub(crate) fn live_text(
     text: &TextSnapshot,
@@ -151,7 +161,7 @@ pub(crate) fn live_text(
             TextGlyphOrientation::Upright => Some("upright"),
             TextGlyphOrientation::Sideways => Some("sideways"),
         },
-        style: export_style(&text.style, false).0,
+        style: text_style(text, t),
         size,
         face: format!(
             "{}|{}|{}",

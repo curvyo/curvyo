@@ -4,7 +4,7 @@
 
 use curvyo_document_core::{ObjectSnapshot, Opacity, Style, ViewTransform};
 
-use crate::artwork::build_artwork;
+use crate::artwork::build_artwork_greyed;
 use crate::glyphs::DrawList;
 use crate::live_preview::build_live_edit_preview;
 use crate::theme;
@@ -15,7 +15,7 @@ fn ghost(opacity: Opacity) -> Opacity {
 }
 
 fn ghost_style(style: &mut Style) {
-    style.fill.opacity = ghost(style.fill.opacity);
+    crate::node_opacity::fade_fill(&mut style.fill, theme::PREVIEW_GHOST_OPACITY);
     style.stroke.opacity = ghost(style.stroke.opacity);
 }
 
@@ -24,6 +24,17 @@ fn ghost_style(style: &mut Style) {
 /// outline is overlay.
 #[must_use]
 pub fn build_history_preview(objects: &[ObjectSnapshot], view: ViewTransform) -> DrawList {
+    build_history_preview_greyed(objects, &|_| false, view)
+}
+
+/// [`build_history_preview`] where the gradient of every leaf whose id `grey` accepts is drawn as
+/// its grey (a leaf on a laser page, `specs/0124-gradient-fill` criterion 10).
+#[must_use]
+pub fn build_history_preview_greyed(
+    objects: &[ObjectSnapshot],
+    grey: &dyn Fn(curvyo_document_core::NodeId) -> bool,
+    view: ViewTransform,
+) -> DrawList {
     let ghosts: Vec<ObjectSnapshot> = objects
         .iter()
         .cloned()
@@ -48,7 +59,7 @@ pub fn build_history_preview(objects: &[ObjectSnapshot], view: ViewTransform) ->
             object
         })
         .collect();
-    let mut list = build_artwork(&ghosts, view);
+    let mut list = build_artwork_greyed(&ghosts, &std::collections::HashSet::new(), grey, view);
     list.extend(build_live_edit_preview(objects, view));
     list
 }

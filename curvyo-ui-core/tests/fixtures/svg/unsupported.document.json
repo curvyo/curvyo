@@ -47,12 +47,46 @@
               "style": {
                 "fill": {
                   "color": {
-                    "b": 128,
-                    "g": 128,
-                    "r": 128
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
                   },
                   "enabled": true,
-                  "opacity": 1.0
+                  "gradient": {
+                    "geometry": {
+                      "end": {
+                        "x": 1.0,
+                        "y": 0.0
+                      },
+                      "kind": "linear",
+                      "start": {
+                        "x": 0.0,
+                        "y": 0.0
+                      }
+                    },
+                    "stops": [
+                      {
+                        "alpha": 255,
+                        "colour": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "offset": 0.0
+                      },
+                      {
+                        "alpha": 255,
+                        "colour": {
+                          "b": 255,
+                          "g": 255,
+                          "r": 255
+                        },
+                        "offset": 1.0
+                      }
+                    ]
+                  },
+                  "opacity": 1.0,
+                  "paint": "gradient"
                 },
                 "stroke": {
                   "cap": "butt",
@@ -107,12 +141,47 @@
               "style": {
                 "fill": {
                   "color": {
-                    "b": 128,
-                    "g": 128,
-                    "r": 128
+                    "b": 0,
+                    "g": 0,
+                    "r": 0
                   },
                   "enabled": true,
-                  "opacity": 1.0
+                  "gradient": {
+                    "geometry": {
+                      "centre": {
+                        "x": 1.5,
+                        "y": 0.5
+                      },
+                      "kind": "radial",
+                      "radius": {
+                        "x": 2.0,
+                        "y": 0.5
+                      },
+                      "ratio": 1.0
+                    },
+                    "stops": [
+                      {
+                        "alpha": 255,
+                        "colour": {
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "offset": 0.0
+                      },
+                      {
+                        "alpha": 255,
+                        "colour": {
+                          "b": 255,
+                          "g": 255,
+                          "r": 255
+                        },
+                        "offset": 1.0
+                      }
+                    ]
+                  },
+                  "opacity": 1.0,
+                  "paint": "gradient"
                 },
                 "stroke": {
                   "cap": "butt",

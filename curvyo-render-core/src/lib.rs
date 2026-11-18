@@ -27,6 +27,7 @@ mod fill;
 mod fixture_look;
 mod fixture_overlay;
 mod glyphs;
+mod gradient_fill;
 mod grid_lines;
 mod group_box;
 mod guide_style;
@@ -60,7 +61,7 @@ mod toolpath_look;
 mod trace_mask_overlay;
 mod width_handles;
 
-pub use artwork::{build_artwork, build_artwork_with_guides};
+pub use artwork::{build_artwork, build_artwork_greyed, build_artwork_with_guides};
 pub use carrier_line::{build_carrier_hover, build_carrier_lines, build_carrier_picked};
 pub use centre_line_preview::build_centre_line_preview;
 pub use clone_marks::{CloneTrace, build_clone_marks};
@@ -79,14 +80,17 @@ pub use fixture_overlay::{
     build_fixture_box, build_fixture_ghost, build_fixture_preview, build_slot_cue,
 };
 pub use glyphs::{DrawList, Vertex};
+pub use gradient_fill::{
+    GradientSpan, STOP_TEXTURE_WIDTH, StopTexel, StopTexture, placed_gradient, stop_texels,
+};
 pub use grid_lines::{GridStroke, build_grid_lines, grid_ink};
 pub use group_box::{GroupBoxKind, GroupDecorationInput};
-pub use history_preview::build_history_preview;
+pub use history_preview::{build_history_preview, build_history_preview_greyed};
 pub use image_layer::{ImageQuad, build_unreadable_frame};
 pub use live_preview::{build_drag_ghost, build_live_edit_preview};
 pub use marquee_overlay::{MarqueeOverlay, build_marquee_overlay};
 pub use move_axes::{LockedAxis, MoveAxes, build_move_axes};
-pub use node_opacity::{drawn_leaves, drawn_leaves_with, faded};
+pub use node_opacity::{drawn_leaves, drawn_leaves_with, fade_fill, faded};
 pub use offset_preview::{
     OffsetCenterState, OffsetHandleState, PreviewAnchor, build_offset_center_handle,
     build_offset_grown_box, build_offset_handles, build_offset_preview, build_preview_outline,

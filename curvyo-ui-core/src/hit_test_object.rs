@@ -351,7 +351,21 @@ pub(crate) fn fills_point_with_artwork(
         .iter()
         .map(|(anchors, closed)| Outline::new(anchors, *closed))
         .collect();
-    contains_point_in_outlines(&borrowed, point)
+    contains_point_in_outlines(&borrowed, point) && gradient_paints_at(object, point)
+}
+
+/// Whether a gradient fill paints at `point`: where its colour has alpha above 0
+/// (`specs/0124-gradient-fill` criterion 9, ADR 0067 §5); any other fill paints everywhere.
+fn gradient_paints_at(object: &ObjectSnapshot, point: Point) -> bool {
+    let Some(gradient) = object.style().fill.painted_gradient() else {
+        return true;
+    };
+    object.gradient_box().is_none_or(|frame| {
+        curvyo_document_core::PlacedGradient::new(gradient, &frame)
+            .colour_at(point)
+            .a
+            > 0
+    })
 }
 
 fn needs_curve_evaluation(object: &ObjectSnapshot) -> bool {

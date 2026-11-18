@@ -143,9 +143,14 @@ fn flip_results(
 }
 
 /// Whether `a` is drawn the same as `b` (criterion 3): the same snapshot within the
-/// tolerances of `0009` criterion 12, or the same circle at any rotation, or the same
+/// tolerances of `0009` criterion 12, with the same gradient, or the same circle at any rotation, or the same
 /// outlines (a symmetric path or polygon whose anchors were permuted by the mirror).
 fn looks_the_same(a: &ObjectSnapshot, b: &ObjectSnapshot) -> bool {
+    // A flipped gradient is a changed picture, even on a symmetric outline
+    // (`specs/0124-gradient-fill` criterion 15).
+    if a.style().fill.gradient != b.style().fill.gradient {
+        return false;
+    }
     if same_within_tolerance(a, b) {
         return true;
     }

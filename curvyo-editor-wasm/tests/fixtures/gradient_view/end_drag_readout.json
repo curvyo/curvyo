@@ -1,0 +1,63 @@
+{
+  "handles": {
+    "ellipse": null,
+    "entry": null,
+    "handles": [
+      {
+        "active": false,
+        "hex": "#000000FF",
+        "hovered": false,
+        "kind": "start",
+        "stop": 0,
+        "x": 37.795275590551185,
+        "y": 113.38582677165356
+      },
+      {
+        "active": true,
+        "hex": "#FFFFFFFF",
+        "hovered": false,
+        "kind": "end",
+        "stop": 1,
+        "x": 377.9527559055118,
+        "y": 75.59055118110237
+      }
+    ],
+    "line": [
+      37.795275590551185,
+      113.38582677165356,
+      377.9527559055118,
+      75.59055118110237
+    ],
+    "radial": false,
+    "readout": {
+      "text": "6.3°",
+      "x": 377.9527559055118,
+      "y": 75.59055118110237
+    },
+    "shown": true
+  },
+  "view": {
+    "activeStop": 1,
+    "angle": "6.3",
+    "angleShown": true,
+    "kind": "linear",
+    "mixedGradients": false,
+    "offered": true,
+    "radius": "",
+    "radiusShown": false,
+    "shown": true,
+    "skip": "",
+    "stops": [
+      {
+        "fixed": true,
+        "hex": "#000000FF",
+        "position": "0"
+      },
+      {
+        "fixed": true,
+        "hex": "#FFFFFFFF",
+        "position": "100"
+      }
+    ]
+  }
+}

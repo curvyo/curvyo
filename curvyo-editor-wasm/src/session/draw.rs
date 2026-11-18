@@ -7,9 +7,8 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use curvyo_render_core::{
-    DrawList, TransformDecorationInput, build_artwork_with_guides, build_decorations,
-    build_group_draw_list, build_marquee_overlay, build_pen_preview, build_select_draw_list,
-    build_transform_draw_list,
+    DrawList, TransformDecorationInput, build_decorations, build_group_draw_list,
+    build_marquee_overlay, build_pen_preview, build_select_draw_list, build_transform_draw_list,
 };
 
 use curvyo_document_core::{ObjectSnapshot, PathSnapshot, ViewTransform};
@@ -108,7 +107,14 @@ impl Session {
         self.patterns
             .borrow_mut()
             .retain_only(&objects.iter().map(ObjectSnapshot::id).collect());
-        build_artwork_with_guides(&drawn(self, objects), guides, view)
+        // A gradient on a laser page is drawn as its grey (`specs/0124-gradient-fill` crit. 10).
+        let laser = self.laser_gradient_ids(objects);
+        curvyo_render_core::build_artwork_greyed(
+            &drawn(self, objects),
+            guides,
+            &|id| laser.contains(&id),
+            view,
+        )
     }
 
     /// Builds this frame's draw list from the document's current state,

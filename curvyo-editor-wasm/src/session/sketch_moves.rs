@@ -177,11 +177,7 @@ impl Session {
                 .filter(|o| self.selection.contains(o.id()))
                 .cloned()
                 .collect();
-            list.extend(curvyo_render_core::build_artwork_with_guides(
-                &moved,
-                &self.document_read().guides,
-                view,
-            ));
+            list.extend(self.shown_artwork(&moved));
         }
         list.extend(curvyo_render_core::build_select_draw_list(
             view,

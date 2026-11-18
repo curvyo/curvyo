@@ -47,6 +47,9 @@ pub struct SvgImport {
     pub assets: Vec<Arc<[u8]>>,
     /// The decoded pictures of those assets, for the canvas.
     pub working: Vec<(AssetHash, Arc<WorkingImage>)>,
+    /// The gradient features the file lost, for the import notice (`specs/0124-gradient-fill`
+    /// criterion 27; [`crate::gradient_loss_lines`]).
+    pub gradient_losses: curvyo_svg_core::GradientLosses,
 }
 
 /// The texts and images of a drawing converted in the file's millimetres, in tree order.
@@ -100,6 +103,7 @@ pub fn svg_import(
         nodes,
         assets: assets.bytes,
         working: assets.working,
+        gradient_losses: drawing.gradient_losses,
     }
 }
 
@@ -306,6 +310,21 @@ impl Mapper {
                     }
                     let mut style = model_style(&leaf.style);
                     apply_shadow_style(leaf, &mut style);
+                    let frame = match &geometry {
+                        Some(LeafGeometry::Path(outlines)) => {
+                            crate::svg_import_gradient::outlines_box(outlines)
+                        }
+                        Some(LeafGeometry::Primitive(shape, rotation)) => Some(
+                            curvyo_document_core::primitive_gradient_box(shape, *rotation),
+                        ),
+                        None => None,
+                    };
+                    crate::svg_import_gradient::apply_gradient(
+                        &mut style,
+                        leaf.style.fill_gradient.as_ref(),
+                        self.matrix,
+                        frame,
+                    );
                     out.push(match (&leaf.kind, geometry) {
                         (LeafKind::Clone { original, matrix }, _) => DrawingNode::Clone {
                             registers,
