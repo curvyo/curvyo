@@ -7,6 +7,8 @@ decisions of 2026-10-16. Supersedes the words "SVG import/export" in the `docume
 2026-10-20 (`text-core → (external only)`). Amends
 [ADR 0002](0002-document-model-units-and-svg-round-trip.md) §10. Asked by `specs/0024`.
 
+**Note 2026-11-18:** gradients are no longer reduced to their middle colour on fills; [ADR 0067](0067-gradient-drawing-and-svg-gradients.md) reads and writes `linearGradient` and `radialGradient` (spec `0124`). The crate edges of this ADR stay.
+
 ## Context
 
 `0024` adds the first importer: SVG bytes become groups, layers, paths, primitives and linked

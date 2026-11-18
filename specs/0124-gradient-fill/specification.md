@@ -1,6 +1,6 @@
 # Gradient fill: a third fill paint that shades closed shapes, open paths and text from colour to colour, linear or radial, with any number of stops and handles on the shape
 
-Status: Draft
+Status: Done (PR #389)
 Priority: Should
 Origin: Customer (decision on Frage 227 C of `0123`, 2026-11-17: "every closed shape gets a third fill paint, Gradient, next to Colour and Pattern; pull it forward as its own slice before `0123`, because it would blow up `0123`"; answers of 2026-11-18 to Frage 232 to 236, see "Decided questions"). Everything marked **(Proposal)** is the product owner's and vetoable at the demo. No question is open.
 

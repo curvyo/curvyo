@@ -6,6 +6,8 @@ computed. Option A decided (Frage PAT-STORE in `specs/0071-pattern-fill/adrs.md`
 `specs/0071-pattern-fill`. Extends the style schema of `specs/0007-stroke-and-fill-styling` and
 `specs/0017-style-panel-rework` (decision 1) with a second fill paint; no accepted ADR text changes.
 
+**Note 2026-11-18:** [ADR 0066](0066-gradient-fill-in-the-document-model.md) adds a third fill paint, Gradient, on the same style schema (spec `0124`); nothing here changes.
+
 **In plain words (for the customer).** A shape with a pattern stores only "which pattern, its
 settings, the margin, Lines or Shapes, and a seed". The hatch lines, dots or leaves themselves are
 never saved; Curvyo computes them from the shape whenever it draws or exports, so they always fit
