@@ -202,11 +202,44 @@ pub enum ExportKind {
     },
 }
 
+impl ExportKind {
+    /// The `transform` the writer puts on the element: from its user space into the file's
+    /// coordinates (a turn about its centre for a rectangle, an ellipse and an arc; the clone
+    /// matrix of a `use`).
+    pub(crate) fn element_transform(&self) -> Affine {
+        let about = |centre: Point, deg: f64| {
+            if deg == 0.0 {
+                Affine::IDENTITY
+            } else {
+                Affine::rotate_about(deg.to_radians(), centre)
+            }
+        };
+        match self {
+            Self::Rect {
+                rect, rotation_deg, ..
+            } => about(rect.center(), *rotation_deg),
+            Self::Ellipse {
+                center,
+                rotation_deg,
+                ..
+            } => about(*center, *rotation_deg),
+            Self::Arc {
+                arc, rotation_deg, ..
+            } => about(arc.center, *rotation_deg),
+            Self::Use { matrix, .. } => *matrix,
+            Self::Path { .. } | Self::Star { .. } => Affine::IDENTITY,
+        }
+    }
+}
+
 /// A resolved style.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ExportStyle {
     /// The fill; `None` is off.
     pub fill: Option<Paint>,
+    /// The gradient the fill paints instead of `fill`'s colour, in exported coordinates
+    /// (`specs/0124-gradient-fill` criterion 13).
+    pub fill_gradient: Option<crate::gradient_paint::SvgGradient>,
     /// The stroke; `None` is off.
     pub stroke: Option<ExportStroke>,
 }

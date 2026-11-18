@@ -275,16 +275,22 @@ impl Computed {
     /// The leaf's style in millimetres under the map with `scale` (√|det| of user units to
     /// millimetres).
     pub(crate) fn leaf_style(&self, scale: f64) -> LeafStyle {
-        let paint_of = |value: PaintValue, opacity: f64| match value {
-            PaintValue::None => None,
-            PaintValue::Colour(c) => Some(Paint {
-                rgb: c.rgb,
-                opacity: (opacity * c.alpha).clamp(0.0, 1.0),
-            }),
+        let colour_of = |c: Rgba, opacity: f64| Paint {
+            rgb: c.rgb,
+            opacity: (opacity * c.alpha).clamp(0.0, 1.0),
+        };
+        // A gradient stands in as its first stop for the fill's Colour (the reader places the
+        // gradient itself) and as its middle colour for a stroke, which has no gradient.
+        let paint_of = |value: PaintValue, opacity: f64, fill: bool| match value {
+            PaintValue::None | PaintValue::Mesh(_) => None,
+            PaintValue::Colour(c) => Some(colour_of(c, opacity)),
+            PaintValue::Gradient(g) => {
+                Some(colour_of(if fill { g.first } else { g.middle }, opacity))
+            }
         };
         let width = self.stroke_width;
         let stroked = width.is_none_or(|w| w > 0.0);
-        let stroke = paint_of(self.stroke, self.stroke_opacity).filter(|_| stroked);
+        let stroke = paint_of(self.stroke, self.stroke_opacity, false).filter(|_| stroked);
         let width_user = match (stroke.is_some(), width) {
             (true, None) => Some(1.0),
             (_, Some(w)) if w > 0.0 => Some(w),
@@ -295,7 +301,8 @@ impl Computed {
             _ => Vec::new(),
         };
         LeafStyle {
-            fill: paint_of(self.fill, self.fill_opacity),
+            fill: paint_of(self.fill, self.fill_opacity, true),
+            fill_gradient: None,
             even_odd: self.even_odd,
             stroke,
             stroke_width_mm: width_user.map(|w| w * scale),
@@ -367,7 +374,7 @@ mod tests {
         );
         let fill = |i: usize| match styles[i].fill {
             PaintValue::Colour(c) => c.rgb,
-            PaintValue::None => [1, 1, 1],
+            PaintValue::None | PaintValue::Gradient(_) | PaintValue::Mesh(_) => [1, 1, 1],
         };
         assert_eq!(fill(0), [255, 0, 0]);
         assert_eq!(styles[0].opacity, 1.0, "opacity is not inherited");

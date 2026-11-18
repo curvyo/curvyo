@@ -267,6 +267,7 @@ impl Reader<'_, '_, '_> {
                             },
                             style: LeafStyle {
                                 fill: None,
+                                fill_gradient: None,
                                 even_odd: false,
                                 stroke: None,
                                 stroke_width_mm: None,

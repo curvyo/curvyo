@@ -3,13 +3,39 @@
      xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
      width="127mm" height="95.25mm" viewBox="0 0 127 95.25" curvyo:format="1">
   <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <defs>
+    <linearGradient id="gradient-1" gradientUnits="userSpaceOnUse" x1="7.9375" y1="10.583333" x2="21.166667" y2="10.583333">
+      <stop offset="0" stop-color="#ff00ff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#0000ff" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="gradient-2" gradientUnits="userSpaceOnUse" x1="7.9375" y1="15.875" x2="21.166667" y2="15.875">
+      <stop offset="0" stop-color="#ff00ff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#0000ff" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="gradient-3" gradientUnits="userSpaceOnUse" x1="7.9375" y1="21.166667" x2="21.166667" y2="21.166667">
+      <stop offset="0" stop-color="#ff00ff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#0000ff" stop-opacity="1"/>
+    </linearGradient>
+    <radialGradient id="gradient-4" gradientUnits="userSpaceOnUse" cx="11.90625" cy="41.010417" r="3.96875" fx="11.90625" fy="41.010417">
+      <stop offset="0" stop-color="#ff00ff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#0000ff" stop-opacity="1"/>
+    </radialGradient>
+    <radialGradient id="gradient-5" gradientUnits="userSpaceOnUse" cx="28.045833" cy="41.010417" r="3.96875" fx="28.045833" fy="41.010417">
+      <stop offset="0" stop-color="#ff00ff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#0000ff" stop-opacity="1"/>
+    </radialGradient>
+    <radialGradient id="gradient-6" gradientUnits="userSpaceOnUse" cx="44.185417" cy="41.010417" r="3.96875" fx="44.185417" fy="41.010417">
+      <stop offset="0" stop-color="#ff00ff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#0000ff" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
   <g id="g1">
     <g id="g2">
       <text id="text1" xml:space="preserve" x="7.9375" y="7.9375" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.704167" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.4299333333333335" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="7.9375" y="7.9375">Bounding box relative coordinates (percentage and fraction)</tspan></text>
       <g id="g3">
-        <rect id="rect1" x="7.9375" y="10.583333" width="13.229167" height="5.291667" fill="#8000ff" stroke="none" fill-rule="nonzero"/>
-        <rect id="rect2" x="7.9375" y="15.875" width="13.229167" height="5.291667" fill="#8000ff" stroke="none" fill-rule="nonzero"/>
-        <rect id="rect3" x="7.9375" y="21.166667" width="13.229167" height="5.291667" fill="#8000ff" stroke="none" fill-rule="nonzero"/>
+        <rect id="rect1" x="7.9375" y="10.583333" width="13.229167" height="5.291667" fill="url(#gradient-1)" stroke="none" fill-rule="nonzero"/>
+        <rect id="rect2" x="7.9375" y="15.875" width="13.229167" height="5.291667" fill="url(#gradient-2)" stroke="none" fill-rule="nonzero"/>
+        <rect id="rect3" x="7.9375" y="21.166667" width="13.229167" height="5.291667" fill="url(#gradient-3)" stroke="none" fill-rule="nonzero"/>
         <path id="path1" d="M 7.9375 15.875 L 21.166667 15.875" sodipodi:nodetypes="cc" fill="#000000" stroke="#cccccc" stroke-width="0.264583" fill-rule="nonzero" curvyo:stroke-width="0.26458333333333334"/>
         <path id="path2" d="M 7.9375 21.166667 L 21.166667 21.166667" sodipodi:nodetypes="cc" fill="#000000" stroke="#cccccc" stroke-width="0.264583" fill-rule="nonzero" curvyo:stroke-width="0.26458333333333334"/>
         <text id="text2" xml:space="preserve" x="23.8125" y="14.552083" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.704167" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.4299333333333335" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="23.8125" y="14.552083">Percentage</tspan></text>
@@ -18,9 +44,9 @@
       </g>
       <text id="text5" xml:space="preserve" x="7.9375" y="34.395833" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.704167" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.4299333333333335" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="7.9375" y="34.395833">Bounding box relative length (percentage and fraction)</tspan></text>
       <g id="g4">
-        <rect id="rect4" x="7.9375" y="37.041667" width="15.875" height="15.875" fill="#8000ff" stroke="none" fill-rule="nonzero"/>
-        <rect id="rect5" x="24.077083" y="37.041667" width="15.875" height="15.875" fill="#8000ff" stroke="none" fill-rule="nonzero"/>
-        <rect id="rect6" x="40.216667" y="37.041667" width="15.875" height="15.875" fill="#8000ff" stroke="none" fill-rule="nonzero"/>
+        <rect id="rect4" x="7.9375" y="37.041667" width="15.875" height="15.875" fill="url(#gradient-4)" stroke="none" fill-rule="nonzero"/>
+        <rect id="rect5" x="24.077083" y="37.041667" width="15.875" height="15.875" fill="url(#gradient-5)" stroke="none" fill-rule="nonzero"/>
+        <rect id="rect6" x="40.216667" y="37.041667" width="15.875" height="15.875" fill="url(#gradient-6)" stroke="none" fill-rule="nonzero"/>
         <text id="text6" xml:space="preserve" x="7.9375" y="56.35625" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.704167" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.4299333333333335" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="7.9375" y="56.35625">Percent.</tspan></text>
         <text id="text7" xml:space="preserve" x="24.077083" y="56.35625" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.704167" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.4299333333333335" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="24.077083" y="56.35625">Fraction</tspan></text>
         <text id="text8" xml:space="preserve" x="40.216667" y="56.35625" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.704167" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.4299333333333335" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="40.216667" y="56.35625">User Space</tspan></text>

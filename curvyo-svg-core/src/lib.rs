@@ -17,6 +17,8 @@ mod data_uri;
 mod drawing;
 mod drawing_text;
 mod export;
+mod gradient;
+mod gradient_paint;
 mod image;
 pub mod limits;
 mod page;
@@ -32,6 +34,7 @@ mod text_style;
 mod units;
 mod uses;
 mod write;
+mod write_gradient;
 mod write_leaf;
 mod write_number;
 mod write_text;
@@ -50,6 +53,7 @@ pub use export::{
     ExportStroke, ExportStyle, ExportText, ExportTextPath, MarkerShape, PathId, Shadow, ShadowKind,
     ShadowMarkers, SvgExport,
 };
+pub use gradient_paint::{GradientLosses, SvgGradient, SvgGradientShape, SvgStop};
 pub use read::{SvgError, read_svg};
 pub use uses::is_isometry;
 pub use write::write_svg;

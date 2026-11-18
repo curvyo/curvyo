@@ -244,7 +244,8 @@ fn the_round_trip_golden_reads_back_every_job_switch_and_tick() {
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
     // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
     // Format 48 since `specs/0029-laser-job-preview-and-output` (ADR 0065 §4).
-    assert_eq!(CURRENT_FORMAT_VERSION, 48);
+    // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 49);
     let read = open_unchanged(&bytes);
     assert_eq!(read.len(), 4);
     let engrave = &read[0].jobs[0];
@@ -372,8 +373,8 @@ fn a_file_of_format_42_is_refused() {
         // Superseded by `0110` (format 42), `0028` (format 43), `0111` (format 44), `0114`
         // (format 45), `0112` (format 46) and `0113` (format 47): the next number is 48.
         Err(OpenError::FormatTooNew {
-            found: 49,
-            supported: 48
+            found: 50,
+            supported: 49
         })
     ));
 }

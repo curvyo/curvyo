@@ -103,6 +103,7 @@ pub fn read_svg(bytes: &[u8]) -> Result<SvgDrawing, SvgError> {
         truncated: checked.truncated || reader.stopped || pages_cut,
         pages,
         profile: reader.profile,
+        gradient_losses: reader.lost.counts(),
     })
 }
 

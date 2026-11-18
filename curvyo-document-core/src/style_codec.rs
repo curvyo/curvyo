@@ -21,8 +21,10 @@
 //!   fill_enabled   : bool                          absent = false
 //!   fill           : [r, g, b]                     absent = black
 //!   fill_opacity   : f64 in [0, 1]                 absent = 1
-//!   fill_paint     : "colour" | "pattern"          absent = "colour"
+//!   fill_paint     : "colour" | "pattern" | "gradient"  absent = "colour"
 //!   fill_pattern   : one atomic map                absent = none (`pattern_codec`)
+//!   fill_gradient  : one compact text              absent = none (`gradient_codec`)
+//!   fill_gradient_stops : one compact text         absent = none (`gradient_codec`)
 //! ```
 //!
 //! A version-7 file written by a build with gradients may also hold `fill_kind`
@@ -89,6 +91,8 @@ pub(crate) const ALL_STYLE_KEYS: &[&str] = &[
     KEY_FILL_OPACITY,
     crate::pattern_codec::KEY_FILL_PAINT,
     crate::pattern_codec::KEY_FILL_PATTERN,
+    crate::gradient_codec::KEY_FILL_GRADIENT,
+    crate::gradient_codec::KEY_FILL_GRADIENT_STOPS,
 ];
 
 // ---------------------------------------------------------------------------
@@ -226,6 +230,7 @@ pub(crate) fn read_style(meta: &LoroMap) -> Style {
             opacity: read_opacity(meta, KEY_FILL_OPACITY),
             paint: crate::pattern_codec::read_paint(meta),
             pattern: crate::pattern_codec::read_pattern(meta).map(Box::new),
+            gradient: crate::gradient_codec::read_gradient(meta),
         },
     }
 }
@@ -377,6 +382,13 @@ pub(crate) fn write_changes(meta: &LoroMap, old: &Style, new: &Style) -> bool {
         wrote = true;
     }
     wrote |= write_marker_changes(meta, os.markers, ns.markers);
+    wrote |= write_fill_changes(meta, of, nf);
+    wrote
+}
+
+/// The fill part of [`write_changes`]: every fill key of `nf` that differs from `of`.
+fn write_fill_changes(meta: &LoroMap, of: &Fill, nf: &Fill) -> bool {
+    let mut wrote = false;
     if of.enabled != nf.enabled {
         write_bool(meta, KEY_FILL_ENABLED, nf.enabled);
         wrote = true;
@@ -389,6 +401,15 @@ pub(crate) fn write_changes(meta: &LoroMap, old: &Style, new: &Style) -> bool {
         write_number(meta, KEY_FILL_OPACITY, nf.opacity.get());
         wrote = true;
     }
+    // Choosing Gradient writes both registers with the paint, so a merge that keeps this
+    // `fill_paint` keeps registers of the same write (ADR 0066 §2).
+    let picks_gradient = nf.paint == crate::pattern_model::FillPaint::Gradient
+        && of.paint != crate::pattern_model::FillPaint::Gradient;
+    wrote |= crate::gradient_codec::write_changes(
+        meta,
+        of.gradient.as_ref().filter(|_| !picks_gradient),
+        nf.gradient.as_ref(),
+    );
     wrote |= crate::pattern_codec::write_changes(
         meta,
         (of.paint, of.pattern.as_deref()),

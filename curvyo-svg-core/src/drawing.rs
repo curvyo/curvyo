@@ -29,6 +29,8 @@ pub struct SvgDrawing {
     /// written by Curvyo's export, and a closed outline whose last segment ends on its first node
     /// ends there (the writer's form of a curved closing segment).
     pub profile: bool,
+    /// The gradient features the reading could not keep (criterion 27 of `0124`).
+    pub gradient_losses: crate::gradient_paint::GradientLosses,
 }
 
 /// One `inkscape:page`.
@@ -295,8 +297,12 @@ pub enum Join {
 /// The style of a leaf, resolved.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LeafStyle {
-    /// The fill, `None` when it is off.
+    /// The fill, `None` when it is off; with a gradient, the colour of its first stop.
     pub fill: Option<Paint>,
+    /// The gradient the fill paints, placed in millimetres (`specs/0124-gradient-fill`
+    /// criterion 14); `None` for a colour or no fill, and for a text (Proposal: a text keeps
+    /// the first stop's colour).
+    pub fill_gradient: Option<crate::gradient_paint::SvgGradient>,
     /// `fill-rule: evenodd`.
     pub even_odd: bool,
     /// The stroke, `None` when it is off.

@@ -151,8 +151,9 @@ fn golden_bytes() -> Vec<u8> {
 }
 
 #[test]
-fn the_format_is_48() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 48);
+fn the_format_moved_on_from_48() {
+    // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 49);
 }
 
 fn has_register(values: &serde_json::Map<String, serde_json::Value>, field: &str) -> bool {

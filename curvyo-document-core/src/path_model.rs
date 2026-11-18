@@ -204,6 +204,12 @@ pub struct Color {
 impl Color {
     /// Solid black, the default stroke and fill colour.
     pub const BLACK: Self = Self { r: 0, g: 0, b: 0 };
+    /// White, the End stop of a first gradient (`specs/0124-gradient-fill` criterion 2).
+    pub const WHITE: Self = Self {
+        r: 255,
+        g: 255,
+        b: 255,
+    };
 }
 
 /// One anchor's full data, as a caller builds it before a write (pen-tool

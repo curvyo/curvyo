@@ -1,6 +1,7 @@
-//! Colours and paints (`specs/0024-svg-import-export` criteria 37 and 38): every CSS colour form
-//! through `svgtypes`, `currentColor`, and a `url(#id)` to a gradient (its middle colour), a
-//! pattern (mid grey) or nothing (the fallback, else none). Nothing outside the file is followed.
+//! Colours and paints (`specs/0024-svg-import-export` criteria 37 and 38, `specs/0124-gradient-fill`
+//! criterion 14): every CSS colour form through `svgtypes`, `currentColor`, and a `url(#id)` to a
+//! gradient (kept as a gradient), a mesh gradient (no paint, counted), a pattern (mid grey) or
+//! nothing (the fallback, else none). Nothing outside the file is followed.
 
 use std::collections::BTreeMap;
 
@@ -27,16 +28,29 @@ const PATTERN_GREY: Rgba = Rgba {
     alpha: 1.0,
 };
 
-/// How many gradients a chain of `href`s may pass to find the stops.
-const MAX_GRADIENT_LINKS: usize = 16;
-
-/// A paint as specified: off, or a colour.
+/// A paint as specified: off, a colour or a gradient.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum PaintValue {
     /// `none`.
     None,
-    /// A colour (from a colour, `currentColor`, or a paint server's substitute).
+    /// A colour (from a colour, `currentColor`, or a pattern's substitute).
     Colour(Rgba),
+    /// A linear or radial gradient with at least one stop.
+    Gradient(GradientPaint),
+    /// A mesh gradient: paints nothing, and the import notice counts it.
+    Mesh(roxmltree::NodeId),
+}
+
+/// A gradient paint as the cascade carries it: the server and the colours that stand in where
+/// a colour is needed (the Colour register of the fill, a stroke).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct GradientPaint {
+    /// The gradient element.
+    pub(crate) server: roxmltree::NodeId,
+    /// Its first stop's colour.
+    pub(crate) first: Rgba,
+    /// Its colour at the middle of the line, which a stroke takes (a stroke has no gradient).
+    pub(crate) middle: Rgba,
 }
 
 /// The elements of the file by `id` (the first element with an id wins).
@@ -100,94 +114,28 @@ pub(crate) fn paint(text: &str, current: Rgba, ids: &Ids<'_, '_>) -> Option<Pain
     colour(text).map(PaintValue::Colour)
 }
 
-/// The substitute of a paint server: a gradient's middle colour, a pattern's grey; `None` for
-/// any other element (the fallback applies).
+/// The paint of a paint server: a gradient as itself (none without a stop), a mesh as counted
+/// nothing, a pattern's grey; `None` for any other element (the fallback applies).
 fn server_colour(server: Node<'_, '_>, ids: &Ids<'_, '_>) -> Option<PaintValue> {
+    if crate::gradient::is_gradient(server) {
+        return Some(crate::gradient::stand_ins(server, ids).map_or(
+            PaintValue::None,
+            |(first, middle)| {
+                PaintValue::Gradient(GradientPaint {
+                    server: server.id(),
+                    first,
+                    middle,
+                })
+            },
+        ));
+    }
+    if crate::gradient::is_mesh(server) {
+        return Some(PaintValue::Mesh(server.id()));
+    }
     match server.tag_name().name() {
-        "linearGradient" | "radialGradient" => {
-            Some(gradient_middle(server, ids).map_or(PaintValue::None, PaintValue::Colour))
-        }
         "pattern" => Some(PaintValue::Colour(PATTERN_GREY)),
         _ => None,
     }
-}
-
-/// The colour at offset 0.5 of a gradient's stops, interpolated in sRGB, each channel rounded
-/// to the nearest whole value with halves up. The stops may come through `href`s to other
-/// gradients. `None` without stops.
-fn gradient_middle(gradient: Node<'_, '_>, ids: &Ids<'_, '_>) -> Option<Rgba> {
-    let mut current = gradient;
-    let mut stops = Vec::new();
-    for _ in 0..MAX_GRADIENT_LINKS {
-        stops = read_stops(current);
-        if !stops.is_empty() {
-            break;
-        }
-        let link = crate::style::href(current)?.strip_prefix('#')?;
-        current = *ids.get(link)?;
-    }
-    let first = stops.first()?;
-    let last = stops.last()?;
-    if 0.5 <= first.0 {
-        return Some(first.1);
-    }
-    if 0.5 >= last.0 {
-        return Some(last.1);
-    }
-    let after = stops.iter().position(|(offset, _)| *offset > 0.5)?;
-    let (o0, c0) = stops[after - 1];
-    let (o1, c1) = stops[after];
-    let t = if o1 > o0 { (0.5 - o0) / (o1 - o0) } else { 1.0 };
-    let mix = |a: u8, b: u8| {
-        let value = f64::from(a) + (f64::from(b) - f64::from(a)) * t;
-        // invariant: between two channel values, so within 0..=255.
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let rounded = (value + 0.5).floor().clamp(0.0, 255.0) as u8;
-        rounded
-    };
-    Some(Rgba {
-        rgb: [
-            mix(c0.rgb[0], c1.rgb[0]),
-            mix(c0.rgb[1], c1.rgb[1]),
-            mix(c0.rgb[2], c1.rgb[2]),
-        ],
-        alpha: c0.alpha + (c1.alpha - c0.alpha) * t,
-    })
-}
-
-/// The `stop` children of a gradient: offsets clamped to 0..=1 and never below the one before,
-/// colours from `stop-color` (attribute or `style`), black by default.
-fn read_stops(gradient: Node<'_, '_>) -> Vec<(f64, Rgba)> {
-    let mut stops: Vec<(f64, Rgba)> = Vec::new();
-    for stop in gradient
-        .children()
-        .filter(|n| n.is_element() && n.tag_name().name() == "stop")
-    {
-        let offset = stop.attribute("offset").map_or(0.0, |text| {
-            let text = text.trim();
-            let (number, scale) = text.strip_suffix('%').map_or((text, 1.0), |n| (n, 0.01));
-            number.trim().parse::<f64>().map_or(0.0, |n| n * scale)
-        });
-        let offset = if offset.is_finite() {
-            offset.clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-        let offset = stops
-            .last()
-            .map_or(offset, |(before, _)| offset.max(*before));
-        let mut colour_text = stop.attribute("stop-color");
-        if let Some(style) = stop.attribute("style") {
-            for declaration in simplecss::DeclarationTokenizer::from(style) {
-                if declaration.name.eq_ignore_ascii_case("stop-color") {
-                    colour_text = Some(declaration.value);
-                }
-            }
-        }
-        let rgba = colour_text.and_then(colour).unwrap_or(BLACK);
-        stops.push((offset, rgba));
-    }
-    stops
 }
 
 #[cfg(test)]
@@ -225,10 +173,12 @@ mod tests {
     }
 
     #[test]
-    fn paint_servers_become_colours() {
+    fn paint_servers_become_paints() {
         let text = r##"<svg xmlns="http://www.w3.org/2000/svg">
             <linearGradient id="g"><stop offset="0" stop-color="#000"/><stop offset="1" style="stop-color:#fff"/></linearGradient>
             <linearGradient id="h" href="#g"/>
+            <linearGradient id="empty"/>
+            <meshgradient id="m"/>
             <pattern id="p"/>
         </svg>"##;
         let doc = roxmltree::Document::parse(text).unwrap();
@@ -237,8 +187,16 @@ mod tests {
             rgb: [0x80; 3],
             alpha: 1.0,
         });
-        assert_eq!(paint("url(#g)", BLACK, &ids), Some(grey));
-        assert_eq!(paint("url(#h)", BLACK, &ids), Some(grey));
+        let Some(PaintValue::Gradient(g)) = paint("url(#h)", BLACK, &ids) else {
+            panic!("a gradient")
+        };
+        assert_eq!(g.server, ids["h"].id());
+        assert_eq!((g.first.rgb, g.middle.rgb), ([0; 3], [0x80; 3]));
+        assert_eq!(paint("url(#empty)", BLACK, &ids), Some(PaintValue::None));
+        assert_eq!(
+            paint("url(#m)", BLACK, &ids),
+            Some(PaintValue::Mesh(ids["m"].id()))
+        );
         assert_eq!(paint("url(#p)", BLACK, &ids), Some(grey));
         assert_eq!(paint("url(#missing)", BLACK, &ids), Some(PaintValue::None));
         assert_eq!(

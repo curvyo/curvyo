@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::gradient_model::GradientFill;
 use crate::path_model::Color;
 use crate::pattern_model::{FillPaint, PatternFill};
 use crate::units::Length;
@@ -297,8 +298,9 @@ impl Default for Stroke {
 }
 
 /// An object's fill: the on/off flag, the solid colour and its opacity, and what it paints (a
-/// colour or a pattern, `specs/0071-pattern-fill`). The colour, opacity and pattern stay stored
-/// while the fill is off or paints the other kind, so switching back restores them.
+/// colour, a pattern (`specs/0071-pattern-fill`) or a gradient (`specs/0124-gradient-fill`)). The
+/// colour, opacity, pattern and gradient stay stored while the fill is off or paints another
+/// kind, so switching back restores them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Fill {
     /// Whether the fill is painted (`false` is "None").
@@ -313,6 +315,9 @@ pub struct Fill {
     /// The stored pattern, if one was ever set (ADR 0029 §1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pattern: Option<Box<PatternFill>>,
+    /// The stored gradient, if one was ever set and both its registers read (ADR 0066 §1, §7).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gradient: Option<GradientFill>,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference
@@ -324,10 +329,19 @@ impl Fill {
     /// Whether this fill paints anything: it is on. A fill at opacity 0 still
     /// counts, because it is a non-None fill (`0007` acceptance criterion 23).
     /// The one rule the renderer and the interior hit-test share; a pattern fill
-    /// counts too (ADR 0029 §7).
+    /// counts too (ADR 0029 §7), and a gradient paint only with its gradient (ADR 0066 §7).
     #[must_use]
     pub const fn paints(&self) -> bool {
-        self.enabled
+        self.enabled && !(matches!(self.paint, FillPaint::Gradient) && self.gradient.is_none())
+    }
+
+    /// The gradient this fill paints, if it paints one: on, the Gradient paint and a stored
+    /// gradient (ADR 0066 §1).
+    #[must_use]
+    pub fn painted_gradient(&self) -> Option<&GradientFill> {
+        (self.enabled && self.paint == FillPaint::Gradient)
+            .then_some(self.gradient.as_ref())
+            .flatten()
     }
 
     /// Whether this fill paints its solid colour over the whole region.
@@ -353,6 +367,7 @@ impl Default for Fill {
             opacity: Opacity::OPAQUE,
             paint: FillPaint::Colour,
             pattern: None,
+            gradient: None,
         }
     }
 }

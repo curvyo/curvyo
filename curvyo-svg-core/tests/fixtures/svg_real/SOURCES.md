@@ -128,3 +128,20 @@ and the other way round. Measured agreement where the spec and Inkscape agree: 0
 (0.037 mm on the circle). Where the spec and Inkscape disagree the test follows the spec and says
 so (`flowRoot` first baseline: the spec's ascender rule sits 0.68 mm below Inkscape's half-leading;
 the comparison aligns the first baselines and checks the breaks).
+
+## Gradient goldens (`specs/0124-gradient-fill` criterion 14, hand-written, project licence)
+
+No Inkscape or Illustrator was available when these were made (2026-11-18), so they are written by
+hand in the layout those programs write; they are parser input for
+`curvyo-svg-core/tests/gradient_import.rs`. At the demo the tester opens them in Inkscape where it
+is installed.
+
+| File | What it holds |
+|---|---|
+| `inkscape_linear_href.svg` | Inkscape's vector gradient (`inkscape:collect`, stops with `style`) and a per-object `userSpaceOnUse` link on a rectangle |
+| `inkscape_radial_transform.svg` | a radial link with a rotating, unequally scaling `gradientTransform` (Inkscape's comma form) on an ellipse |
+| `inkscape_multistop_chain.svg` | a swatch of five stops with a hard edge, a link with `gradientUnits` and `spreadMethod="reflect"`, and a link with the line |
+| `inkscape_userspace_units.svg` | one `objectBoundingBox` and one `userSpaceOnUse` gradient under a layer `translate` and a path `scale` |
+| `inkscape_stop_opacity.svg` | `stop-opacity` in `style` and the element's `fill-opacity` |
+| `illustrator_gradient_linear.svg` | Illustrator's `SVGID_1_` gradient in a `<style>` class, three stops with upper-case hex |
+| `illustrator_gradient_radial.svg` | an Illustrator radial with a focal point and a first stop above 0 |

@@ -3,7 +3,7 @@
 //! strictly when a file is opened.
 //!
 //! ```text
-//!   fill_paint   : "colour" | "pattern"            absent = "colour"
+//!   fill_paint   : "colour" | "pattern" | "gradient"  absent = "colour"
 //!   fill_pattern : { generator: string id,          absent = no stored pattern
 //!                    margin: f64 mm >= 0,
 //!                    mode: "lines" | "shapes",
@@ -29,6 +29,7 @@ pub(crate) const KEY_FILL_PATTERN: &str = "fill_pattern";
 
 const PAINT_COLOUR: &str = "colour";
 const PAINT_PATTERN: &str = "pattern";
+const PAINT_GRADIENT: &str = "gradient";
 const MODE_LINES: &str = "lines";
 const MODE_SHAPES: &str = "shapes";
 const FIELD_GENERATOR: &str = "generator";
@@ -38,10 +39,11 @@ const FIELD_SEED: &str = "seed";
 const FIELD_PARAMS: &str = "params";
 const FIELD_WHOLE_PIECES: &str = "whole_pieces";
 
-/// Reads `fill_paint`: anything but `"pattern"` is a colour (lenient).
+/// Reads `fill_paint`: anything but `"pattern"` or `"gradient"` is a colour (lenient).
 pub(crate) fn read_paint(meta: &LoroMap) -> FillPaint {
     match read_value(meta, KEY_FILL_PAINT) {
         Some(LoroValue::String(s)) if s.as_str() == PAINT_PATTERN => FillPaint::Pattern,
+        Some(LoroValue::String(s)) if s.as_str() == PAINT_GRADIENT => FillPaint::Gradient,
         _ => FillPaint::Colour,
     }
 }
@@ -146,6 +148,7 @@ pub(crate) fn write_changes(
         let text = match new_paint {
             FillPaint::Colour => PAINT_COLOUR,
             FillPaint::Pattern => PAINT_PATTERN,
+            FillPaint::Gradient => PAINT_GRADIENT,
         };
         // invariant: inserting a plain value under a known key cannot fail.
         #[allow(clippy::unwrap_used)]
@@ -172,14 +175,18 @@ pub(crate) fn write_changes(
     wrote
 }
 
-/// Whether the two keys of an opened file are valid (ADR 0029 §2, "damage"): a known paint; a
+/// Whether the two keys of an opened file are valid (ADR 0029 §2, "damage"): a known paint (the
+/// gradient registers are `gradient_codec`'s); a
 /// pattern map with a known generator, a margin that is a finite number of at least 0, a known
 /// mode, a seed that is an integer in u32, a whole-pieces switch that is a bool if present, and
 /// parameters of the generator that are numbers in
 /// their range (absent ones read as their default; unknown names are damage).
 pub(crate) fn keys_are_valid(meta: &LoroMap) -> bool {
     let paint_ok = read_value(meta, KEY_FILL_PAINT).is_none_or(|v| {
-        matches!(&v, LoroValue::String(s) if [PAINT_COLOUR, PAINT_PATTERN].contains(&s.as_str()))
+        matches!(
+            &v,
+            LoroValue::String(s) if [PAINT_COLOUR, PAINT_PATTERN, PAINT_GRADIENT].contains(&s.as_str())
+        )
     });
     let pattern_ok = read_value(meta, KEY_FILL_PATTERN).is_none_or(|v| {
         let known_names = match &v {
@@ -313,7 +320,7 @@ mod tests {
             assert!(!keys_are_valid(&meta), "{map:?}");
         }
         let (_doc, meta) = meta();
-        meta.insert(KEY_FILL_PAINT, "gradient").unwrap();
+        meta.insert(KEY_FILL_PAINT, "conic").unwrap();
         assert!(!keys_are_valid(&meta));
     }
 }

@@ -20,6 +20,9 @@ pub struct TextConversion {
     pub name: String,
     /// One entry per drawn glyph; a glyph without outlines is left out by the caller.
     pub glyphs: Vec<Vec<(Vec<NewAnchor>, bool)>>,
+    /// The text's gradient box (its line box, ADR 0066 §4), so the glyph paths continue its
+    /// shade (`specs/0124-gradient-fill` criterion 21); `None` re-bases nothing.
+    pub frame: Option<crate::GradientBox>,
 }
 
 fn tree_id_of(id: NodeId) -> loro::TreeID {
@@ -168,16 +171,22 @@ fn write_group(
     meta.insert(crate::node_registers::KEY_NAME, text.name.as_str())
         .unwrap();
     let mut previous: Option<loro::TreeID> = None;
+    // Each glyph path continues the text's one shade (criterion 21).
+    let glyph_style = |style: &crate::Style, glyph: &[(Vec<NewAnchor>, bool)]| {
+        crate::gradient_frame::rebased_for_piece(style, text.frame.as_ref(), glyph)
+    };
     for glyph in &text.glyphs {
         // The first path is the group's first child, every next one goes above the one before.
         let path = match previous {
             None => {
                 #[allow(clippy::unwrap_used)]
                 let first = tree.create(TreeParentId::Node(group)).unwrap();
-                crate::replace::write_path_node(tree, first, &style, glyph);
+                crate::replace::write_path_node(tree, first, &glyph_style(&style, glyph), glyph);
                 first
             }
-            Some(after) => crate::replace::create_path_after(tree, after, &style, glyph),
+            Some(after) => {
+                crate::replace::create_path_after(tree, after, &glyph_style(&style, glyph), glyph)
+            }
         };
         if guide {
             #[allow(clippy::unwrap_used)]

@@ -176,7 +176,7 @@ impl Document {
                 continue;
             }
             let opacity = crate::clone_write::source_opacity(&tree, &clone);
-            let mut path = clone.resolved;
+            let mut path = unlinked_outline(clone);
             if path.all_anchors().count() != unlink.anchor_ids.len()
                 || !unlink.anchor_ids.iter().all(|id| fresh.insert(*id))
             {
@@ -350,4 +350,21 @@ fn convert_linkless_outlines(tree: &LoroTree, orphans: &[NodeId]) -> Vec<TreeID>
         }
     }
     converted
+}
+
+/// The path a clone unlinks into: its resolved outline, the shade it showed re-expressed in the
+/// path's own box (`specs/0124-gradient-fill` criterion 17).
+fn unlinked_outline(
+    clone: crate::clone_model::CloneSnapshot,
+) -> Box<crate::path_model::PathSnapshot> {
+    let shown_box = clone.gradient_box();
+    let mut path = clone.resolved;
+    if let (Some(gradient), Some(old), Some(new)) = (
+        path.style.fill.gradient.as_ref(),
+        shown_box.as_ref(),
+        path.gradient_box(),
+    ) {
+        path.style.fill.gradient = Some(gradient.rebased(old, &new));
+    }
+    path
 }

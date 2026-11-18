@@ -122,10 +122,25 @@ const KEPT_NODE_REGISTERS: [&str; 5] = [
     crate::node_registers::KEY_LAYER,
 ];
 
-fn mapped_outline(path: &PathSnapshot, affine: Affine, ids: &[AnchorId]) -> PathSnapshot {
+/// `path` carried by `affine` with the anchor ids `ids` and `style`, whose gradient is carried
+/// by the same map (`specs/0124-gradient-fill` criterion 15).
+fn mapped_outline(
+    path: &PathSnapshot,
+    affine: Affine,
+    ids: &[AnchorId],
+    style: Style,
+) -> PathSnapshot {
     let mut mapped = path.mapped(affine);
     for (anchor, id) in mapped.all_anchors_mut().zip(ids) {
         anchor.id = *id;
+    }
+    mapped.style = style;
+    if let (Some(gradient), Some(old), Some(new)) = (
+        mapped.style.fill.gradient.as_ref(),
+        path.gradient_box(),
+        mapped.gradient_box(),
+    ) {
+        mapped.style.fill.gradient = Some(gradient.mapped(&old, affine, &new));
     }
     mapped
 }
@@ -173,8 +188,7 @@ pub(crate) fn write_new(
         }
         (LeafSource::Outline(path), _) => {
             let ids: Vec<AnchorId> = (0..path.all_anchors().count()).map(|_| mint()).collect();
-            let mut copy = mapped_outline(path, cell.affine, &ids);
-            copy.style = style;
+            let copy = mapped_outline(path, cell.affine, &ids, style);
             crate::clone_write::unlink_meta(meta, &copy, opacity);
         }
         (LeafSource::Text { text, root }, MemberKind::TextClone) => {
@@ -361,8 +375,7 @@ fn update_path_copy(
     } else {
         (0..count).map(|_| mint()).collect()
     };
-    let mut expected = mapped_outline(path, target.affine, &ids);
-    expected.style = target.style;
+    let expected = mapped_outline(path, target.affine, &ids, target.style);
     if !path_differs(stored, &expected, (stored_opacity(meta), target.opacity)) {
         return false;
     }

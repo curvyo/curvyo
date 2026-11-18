@@ -608,6 +608,12 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "mfg_profile_not_a_map_v36.curvyo",
         // The malformed `0113` centres register.
         "snapping_centres_type_v47.curvyo",
+        // The damaged gradients of `0124` (ADR 0066 §7).
+        "gradient_fill_damaged_colour_v49.curvyo",
+        "gradient_fill_damaged_fraction_v49.curvyo",
+        "gradient_fill_damaged_one_stop_v49.curvyo",
+        "gradient_fill_damaged_unordered_v49.curvyo",
+        "gradient_fill_damaged_paint_without_gradient_v49.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

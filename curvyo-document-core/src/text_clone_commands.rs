@@ -261,9 +261,13 @@ pub(crate) fn write_text_clone_colours(
     true
 }
 
-/// Removes every style key of a text clone (its opacity register stays). Uncommitted.
+/// Removes every style key of a text clone (its opacity register and the gradient registers,
+/// `gradient_codec::KEPT_ON_RESET`, stay). Uncommitted.
 fn clear_style_keys(meta: &LoroMap) {
-    for key in crate::style_codec::ALL_STYLE_KEYS {
+    for key in crate::style_codec::ALL_STYLE_KEYS
+        .iter()
+        .filter(|key| !crate::gradient_codec::KEPT_ON_RESET.contains(key))
+    {
         if meta.get(key).is_some() {
             // invariant: deleting a key just confirmed present on an attached map cannot fail.
             #[allow(clippy::unwrap_used)]

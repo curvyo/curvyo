@@ -90,6 +90,7 @@ fn ac52_the_skeleton_byte_for_byte() {
         },
         ExportStyle {
             fill: None,
+            fill_gradient: None,
             stroke: Some(black_stroke(0.25)),
         },
     );
@@ -166,6 +167,7 @@ fn kitchen_sink() -> SvgExport {
             rgb: [0x12, 0xab, 0xef],
             opacity: 0.25,
         }),
+        fill_gradient: None,
         stroke: None,
     };
     let shadowed = ExportNode::Leaf {
@@ -285,6 +287,7 @@ fn kitchen_sink() -> SvgExport {
                     },
                     ExportStyle {
                         fill: None,
+                        fill_gradient: None,
                         stroke: Some(marked),
                     },
                 ),
@@ -388,6 +391,7 @@ fn kitchen_sink() -> SvgExport {
             },
             ExportStyle {
                 fill: None,
+                fill_gradient: None,
                 stroke: Some(black_stroke(0.1)),
             },
         )],

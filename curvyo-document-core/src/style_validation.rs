@@ -91,4 +91,5 @@ pub(crate) fn style_is_valid(meta: &LoroMap) -> bool {
         && key_ok(meta, KEY_FILL, is_color)
         && key_ok(meta, KEY_FILL_OPACITY, is_unit_number)
         && crate::pattern_codec::keys_are_valid(meta)
+        && crate::gradient_codec::keys_are_valid(meta, crate::pattern_codec::read_paint(meta))
 }

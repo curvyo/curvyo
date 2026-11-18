@@ -70,6 +70,8 @@ impl Document {
             .get_meta(tree_id_of(base))
             .map_err(|_| ObjectEditError::NoSuchObject)?;
         let style = crate::clone_write::leaf_style(&tree, base, &base_meta);
+        // The result continues the base's shade (ADR 0066 §6).
+        let style = self.rebased_style(base, &style, outlines);
         Ok(self.write_replacement(&tree, &doomed, tree_id_of(base), &style, outlines, label))
     }
 
@@ -203,12 +205,22 @@ impl Document {
         tree.enable_fractional_index(0);
         let mut after: HashMap<NodeId, loro::TreeID> = HashMap::new();
         let mut created = Vec::with_capacity(pieces.len());
+        let mut frames: HashMap<NodeId, Option<crate::GradientBox>> = HashMap::new();
         for (source, outlines) in pieces {
             // invariant: every source was resolved above.
             #[allow(clippy::unwrap_used)]
             let (place, style) = sources.get(source).unwrap();
             let anchor = *after.get(source).unwrap_or(place);
-            let piece = create_path_after(&tree, anchor, style, outlines);
+            // Each piece continues its source's shade (ADR 0066 §6).
+            let style = if style.fill.gradient.is_some() {
+                let frame = frames
+                    .entry(*source)
+                    .or_insert_with(|| self.object(*source).and_then(|o| o.gradient_box()));
+                crate::gradient_frame::rebased_for_piece(style, frame.as_ref(), outlines)
+            } else {
+                style.clone()
+            };
+            let piece = create_path_after(&tree, anchor, &style, outlines);
             // A piece of a guide is a guide: its one input was (criterion 34).
             if crate::guides::all_guides(&tree, &[*place]) {
                 // invariant: the node was just created.
@@ -228,6 +240,23 @@ impl Document {
         crate::groups::remove_emptied_groups(&tree, &parents);
         self.commit_with_label(label);
         Ok(created)
+    }
+}
+
+impl Document {
+    /// `style`, taken from `source`, with its gradient re-based into the box of a new path with
+    /// `outlines` (ADR 0066 §6); reads `source` only when the style has a gradient.
+    pub(crate) fn rebased_style(
+        &self,
+        source: NodeId,
+        style: &Style,
+        outlines: &[(Vec<NewAnchor>, bool)],
+    ) -> Style {
+        if style.fill.gradient.is_none() {
+            return style.clone();
+        }
+        let frame = self.object(source).and_then(|object| object.gradient_box());
+        crate::gradient_frame::rebased_for_piece(style, frame.as_ref(), outlines)
     }
 }
 

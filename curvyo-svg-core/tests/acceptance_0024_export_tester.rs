@@ -63,6 +63,7 @@ fn leaf(name: Option<&str>, kind: ExportKind) -> ExportNode {
             kind,
             style: ExportStyle {
                 fill: None,
+                fill_gradient: None,
                 stroke: Some(stroke(0.25)),
             },
             shadow: Shadow::default(),

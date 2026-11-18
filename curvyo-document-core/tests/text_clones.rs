@@ -362,6 +362,7 @@ fn c42_object_to_path_of_a_clone_leaves_the_others_texts() {
                 id: clones[0],
                 name: "Hello".to_owned(),
                 glyphs: vec![glyph],
+                frame: None,
             }],
         )
         .unwrap();
