@@ -49,6 +49,14 @@ image.workspace = true
 # documents (`specs/0024-svg-import-export`); the workspace's own property-test crate.
 proptest.workspace = true
 
+# `tests/send_to_machine.rs` drives Send to machine against the connector with the fake controller
+# (`specs/0124-send-to-machine` S17); internal path crates and `tempfile`, native tests only, no
+# edge in the production or wasm build.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+curvyo-connector-core = { path = "../curvyo-connector-core", version = "0.1.0" }
+curvyo-connector-io = { path = "../curvyo-connector-io", version = "0.1.0" }
+tempfile = "3"
+
 # `tests/cpu_time/` times budget tests by the thread's CPU time, so a busy CI runner does not
 # fail them (the marquee frame of `specs/0053-node-marquee-selection/` crit. 25, the template
 # load of `specs/0046-document-shapes`).

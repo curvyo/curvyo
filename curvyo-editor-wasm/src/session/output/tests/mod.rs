@@ -4,6 +4,7 @@
 mod export_tests;
 mod group_tests;
 mod play_tests;
+mod send_tests;
 mod toolpath_tests;
 
 use curvyo_document_core::{Direction, NodeId};

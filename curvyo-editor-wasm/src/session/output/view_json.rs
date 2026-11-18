@@ -31,6 +31,9 @@ pub struct OutputGroupView {
     pub total: Option<TotalView>,
     /// The Export button.
     pub export: ExportView,
+    /// The Send to machine button; absent without a connector (`0124` S1).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub send: Option<super::send::SendView>,
     /// Whether the page's Toolpath view is pressed.
     pub toolpath_view: bool,
 }
@@ -258,6 +261,7 @@ impl Session {
         let names = &facts.names;
         let format = job.input.machine.values.output_format;
         let first_block = gate.first_block().map(|i| check_text(i, names).whole());
+        let send = self.send_view(&job, first_block.clone());
         Some(OutputGroupView {
             machine: machine_line(&gate.machine),
             start: StartView {
@@ -279,6 +283,7 @@ impl Session {
                 file_type: file_type(format),
                 extension: extension(format),
             },
+            send,
             toolpath_view: self.toolpath_view_pressed(job.manufacturing),
         })
     }

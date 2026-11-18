@@ -122,7 +122,7 @@ pub use fixtures::{
     RoleToggle, RoundValues, SetView, SlotRow, TapesView,
 };
 pub use materials::{MaterialWrite, MaterialsView};
-pub use output::{ExportedJob, OutputGroupView, PlayView};
+pub use output::{ExportedJob, OutputGroupView, PlayView, SendView, SentJobFile, send_notice};
 pub use test_grid::TestGridView;
 mod page_drag;
 mod page_tree_panel;

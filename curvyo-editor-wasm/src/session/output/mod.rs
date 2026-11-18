@@ -9,6 +9,7 @@ mod input;
 mod job_cache;
 mod leaf_geometry;
 mod play;
+mod send;
 #[cfg(test)]
 mod tests;
 mod toolpath;
@@ -21,6 +22,7 @@ use curvyo_document_core::NodeId;
 pub use export::ExportedJob;
 pub use fixture_pick::FixtureOutputView;
 pub use play::PlayView;
+pub use send::{SendView, SentJobFile, send_notice};
 pub use view_json::{NumbersLineView, OutputGroupView, RowRunView};
 
 /// What the session keeps for the output group and the Toolpath view: the job and geometry caches,
@@ -39,4 +41,6 @@ pub(in crate::session) struct OutputState {
     play: play::PlayState,
     /// The jobs handed out for saving, by token (`export.rs`).
     exports: export::Exports,
+    /// The one pending send and the link to the connector (`send.rs`).
+    send: send::SendState,
 }
