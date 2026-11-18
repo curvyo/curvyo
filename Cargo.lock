@@ -1028,6 +1028,8 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "console_error_panic_hook",
+ "curvyo-connector-core",
+ "curvyo-connector-io",
  "curvyo-crypto-core",
  "curvyo-document-core",
  "curvyo-extension-core",
@@ -1046,6 +1048,7 @@ dependencies = [
  "rustix",
  "serde",
  "serde_json",
+ "tempfile",
  "vectrace",
  "wasm-bindgen",
  "wasm-bindgen-futures",

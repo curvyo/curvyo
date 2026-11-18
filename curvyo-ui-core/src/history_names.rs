@@ -138,6 +138,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
         "Start: Home, then machine origin",
     ),
     ("export_job", "Export job file"),
+    ("send_job", "Send job to machine"),
     ("add_sketch", "Add sketch"),
     ("edit_sketch", "Edit sketch"),
     ("convert_sketch_to_path", "Sketch to path"),

@@ -186,7 +186,7 @@ fn c28_the_export_step_switches_fixture_jobs_off_and_refreshes_in_one_undoable_s
         operation: cut,
         value: Some(own(85.0)),
     }];
-    assert!(d.export_job(&[job], &refreshed));
+    assert!(d.export_job(EXPORT_JOB_COMMIT_LABEL, &[job], &refreshed));
     assert_eq!(d.own_step_count(), steps + 1, "one step");
     assert_eq!(last_label(&d), EXPORT_JOB_COMMIT_LABEL);
     assert!(!d.fixture_job(job).unwrap().output);
@@ -197,6 +197,24 @@ fn c28_the_export_step_switches_fixture_jobs_off_and_refreshes_in_one_undoable_s
     undo(&d);
     assert!(d.fixture_job(job).unwrap().output, "undo restores (a)");
     assert_eq!(power(&d), json!(80.0), "undo restores (b)");
+}
+
+#[test]
+fn s10_the_send_step_has_its_own_label_and_undo_restores_the_fixture_job() {
+    let d = Document::new(1);
+    let m = laser(&d);
+    let job = holder_job(&d, m);
+    let steps = d.own_step_count();
+    assert!(d.export_job(SEND_JOB_COMMIT_LABEL, &[job], &[]));
+    assert_eq!(d.own_step_count(), steps + 1, "one step");
+    assert_eq!(last_label(&d), SEND_JOB_COMMIT_LABEL);
+    assert!(!d.fixture_job(job).unwrap().output);
+    undo(&d);
+    assert!(d.fixture_job(job).unwrap().output);
+    assert!(
+        !d.export_job(SEND_JOB_COMMIT_LABEL, &[], &[]),
+        "nothing to change, no step"
+    );
 }
 
 #[test]
@@ -223,6 +241,6 @@ fn c28_an_export_with_nothing_to_change_writes_no_step_and_gone_ids_are_skipped(
         operation: gone,
         value: Some(own(85.0)),
     }];
-    assert!(!d.export_job(&[job, m], &refreshed));
+    assert!(!d.export_job(EXPORT_JOB_COMMIT_LABEL, &[job, m], &refreshed));
     assert_eq!(d.own_step_count(), steps);
 }

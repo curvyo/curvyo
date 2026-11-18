@@ -4,7 +4,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use curvyo_connector_core::Message;
+use curvyo_connector_core::{Message, State};
 
 use crate::client::{CONNECT_TIMEOUT, ClientError, open_paired};
 use crate::frames::Frame;
@@ -38,19 +38,40 @@ fn pause(period: Duration, stop: &AtomicBool) {
     }
 }
 
+/// Whether `status` is a state in which a job is in flight (`Receiving` to `Paused`).
+fn is_active(status: &Message) -> bool {
+    matches!(
+        status,
+        Message::Status {
+            state: State::Receiving
+                | State::Ready
+                | State::AwaitingLocalStart
+                | State::Running
+                | State::Paused,
+            ..
+        }
+    )
+}
+
 /// Watches the connector at `address` until `stop` is set or a final error (changed key, revoked
-/// token, other protocol) is reported. `retry` is the pause between tries.
+/// token, other protocol) is reported. `retry` is the pause between tries. It tries again only
+/// while the last status it saw had a job in flight or `send_pending` says a send awaits its
+/// answer (`specs/0124` B5); otherwise a drop or a failed read is reported once and the watcher
+/// ends, so an idle connector is never polled.
 pub fn watch(
     address: &str,
     spki: SpkiHash,
     token: &Token,
     retry: Duration,
     stop: &AtomicBool,
+    send_pending: &dyn Fn() -> bool,
     mut on_event: impl FnMut(WatchEvent),
 ) {
+    let mut active = false;
     while !stop.load(Ordering::Relaxed) {
         match open_paired(address, spki, token, CONNECT_TIMEOUT) {
             Ok((mut connection, status)) => {
+                active = is_active(&status);
                 on_event(WatchEvent::Status(status));
                 let ended = loop {
                     if stop.load(Ordering::Relaxed) {
@@ -58,6 +79,7 @@ pub fn watch(
                     }
                     match connection.try_recv(Instant::now() + Duration::from_millis(100)) {
                         Ok(Some(Frame::Core(status @ Message::Status { .. }))) => {
+                            active = is_active(&status);
                             on_event(WatchEvent::Status(status));
                         }
                         Ok(_) => {}
@@ -74,6 +96,9 @@ pub fn watch(
                     return;
                 }
             }
+        }
+        if !(active || send_pending()) {
+            return;
         }
         pause(retry, stop);
     }

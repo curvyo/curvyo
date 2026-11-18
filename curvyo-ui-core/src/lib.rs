@@ -141,6 +141,7 @@ pub use edit_context_text::{
     NO_DRAWING_PAGE_NOTICE, OutsideHomes, home_row_line, not_editable_notice, out_of_context_line,
     out_of_context_suffix,
 };
+pub use send_button::{SendButton, SendCause, SendLink, connector_speaks, send_button};
 pub use step_scope::{EDIT_STEPS, FREE_STEPS, MOVE_STEPS, StepScope, step_scope};
 mod centre_lines_plan;
 mod placement_view;
@@ -157,6 +158,7 @@ mod select_bar;
 mod select_bar_arc;
 mod select_tool;
 mod selection;
+mod send_button;
 mod shape_arc_edit;
 mod shape_arc_text;
 mod shape_knobs;

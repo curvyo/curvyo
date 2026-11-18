@@ -20,6 +20,8 @@ pub const SET_START_HEAD_POSITION_COMMIT_LABEL: &str = "set_start_head_position"
 pub const SET_START_HOME_THEN_ORIGIN_COMMIT_LABEL: &str = "set_start_home_then_origin";
 /// The label of the export step (criterion 28).
 pub const EXPORT_JOB_COMMIT_LABEL: &str = "export_job";
+/// The label of the send step (`specs/0124` criterion S10).
+pub const SEND_JOB_COMMIT_LABEL: &str = "send_job";
 
 /// The register field of the fixture jobs' material id.
 const FIXTURE_MATERIAL_FIELD: &str = "fixture_material";
@@ -117,12 +119,18 @@ impl Document {
         )
     }
 
-    /// The export step "Export job file" (criterion 28 a, b; ADR 0064 §11): switches Output off
+    /// The export or send step (criterion 28 a, b; ADR 0064 §11; `0124` S10), labelled `label`
+    /// ([`EXPORT_JOB_COMMIT_LABEL`] or [`SEND_JOB_COMMIT_LABEL`]): switches Output off
     /// on every fixture job of `fixture_jobs_off` and writes the refreshed stored numbers
     /// `refreshed`, in one history step. An id that names no live fixture job or operation (gone
     /// while the save dialog was open) is skipped. Whether anything was written; nothing is
     /// committed when nothing differs.
-    pub fn export_job(&self, fixture_jobs_off: &[NodeId], refreshed: &[SettingsWrite]) -> bool {
+    pub fn export_job(
+        &self,
+        label: &str,
+        fixture_jobs_off: &[NodeId],
+        refreshed: &[SettingsWrite],
+    ) -> bool {
         let jobs: Vec<LoroMap> = fixture_jobs_off
             .iter()
             .filter_map(|&id| self.job_meta(id).ok().map(|(meta, _)| meta))
@@ -147,7 +155,7 @@ impl Document {
         }
         changed |= Self::write_settings(&metas, &writes);
         if changed {
-            self.commit_with_label(EXPORT_JOB_COMMIT_LABEL);
+            self.commit_with_label(label);
         }
         changed
     }
