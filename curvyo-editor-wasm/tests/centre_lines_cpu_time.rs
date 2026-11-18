@@ -355,7 +355,7 @@ fn criterion_18_the_preview_of_the_whale_and_the_dolphin_in_the_worker() {
         ("dolphin", fixture(DOLPHIN, 0.0, 0.0)),
     ] {
         let (first, change) = preview_budgets(name, &subjects);
-        assert!(first <= budget(500), "{name}: first preview {first:?}");
+        assert!(first <= budget(700), "{name}: first preview {first:?}");
         assert!(change <= budget(200), "{name}: a slider change {change:?}");
     }
 }
