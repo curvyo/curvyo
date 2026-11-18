@@ -2,6 +2,7 @@
 //! pair, forget, send job, job controls and the status watcher. The pinned key and the token stay
 //! in the credential store and in this process; the webview gets fingerprints and states only.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -25,6 +26,7 @@ use crate::connector_link::{
     CommandAnswer, FileSendError, LinkError, OTHER_TEXT, PairAnswer, PairingView, SendAnswer,
     TestAnswer,
 };
+use crate::connector_send::{PendingSends, report_resolution, send_pending};
 use crate::device_keys::{OpenStore, StoreProblem};
 
 /// The pause between two tries of the watcher (`ux-notes.md` section 4).
@@ -34,10 +36,12 @@ const SEND_TIMEOUT: Duration = Duration::from_secs(120);
 /// The file remembering where Send job last looked.
 const JOB_DIR_FILE: &str = "connector-job-dir.txt";
 
-/// What the app remembers between commands: the running watcher.
+/// What the app remembers between commands: the running watcher of each profile and the sends
+/// that await their answer.
 #[derive(Default)]
 pub(crate) struct ConnectorState {
-    watcher: Mutex<Option<Arc<AtomicBool>>>,
+    watchers: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    pub(crate) pending: PendingSends,
 }
 
 /// The name of a profile's record in the credential store (addendum A8).
@@ -57,7 +61,7 @@ fn valid_id(profile_id: &str) -> bool {
     curvyo_laser_core::is_profile_id(profile_id)
 }
 
-fn load_record(
+pub(crate) fn load_record(
     app: &AppHandle,
     open: &OpenStore,
     profile_id: &str,
@@ -233,7 +237,7 @@ pub(crate) fn connector_forget(
     if !valid_id(&profile_id) {
         return Err("not a machine profile id".to_owned());
     }
-    stop_watcher(&state);
+    stop_watcher(&state, &profile_id);
     match open.with_keychain(&app, |store| forget_record(store, &profile_id)) {
         Ok(result) => result.map_err(|e| e.to_string()),
         Err(StoreProblem::NoStore) => Ok(()),
@@ -401,18 +405,20 @@ fn emit(app: &AppHandle, profile_id: &str, event: WatchView) {
     );
 }
 
-fn stop_watcher(state: &ConnectorState) {
+fn stop_watcher(state: &ConnectorState, profile_id: &str) {
     if let Some(stop) = state
-        .watcher
+        .watchers
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .take()
+        .remove(profile_id)
     {
         stop.store(true, Ordering::Relaxed);
     }
 }
 
-/// Starts the standing connection while the block is shown; a running one is replaced.
+/// Starts the standing connection of `profile_id` while the page shows it; a running one of the
+/// same profile is replaced. It tries again only while a job is in flight or a send awaits its
+/// answer (`0124` B5).
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn connector_watch(
@@ -422,22 +428,35 @@ pub(crate) fn connector_watch(
     profile_id: String,
     address: String,
 ) {
-    stop_watcher(&state);
+    stop_watcher(&state, &profile_id);
     let Ok(record) = load_record(&app, &open, &profile_id) else {
         return;
     };
     let stop = Arc::new(AtomicBool::new(false));
-    *state.watcher.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::clone(&stop));
+    state
+        .watchers
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .insert(profile_id.clone(), Arc::clone(&stop));
     std::thread::spawn(move || {
+        let state = app.state::<ConnectorState>();
         watch(
             &address,
             record.spki,
             &record.token,
             RETRY,
             &stop,
+            &|| send_pending(&state.pending, &profile_id),
             |event| {
                 let event = match event {
-                    WatchEvent::Status(status) => WatchView::Status { status },
+                    WatchEvent::Status(status) => {
+                        let view = WatchView::Status {
+                            status: status.clone(),
+                        };
+                        emit(&app, &profile_id, view);
+                        report_resolution(&app, &state.pending, &profile_id, &status);
+                        return;
+                    }
                     WatchEvent::Lost => WatchView::Lost,
                     WatchEvent::Failed(e) => WatchView::Failed { error: e.into() },
                 };
@@ -447,11 +466,11 @@ pub(crate) fn connector_watch(
     });
 }
 
-/// Ends the standing connection (the block is hidden or another profile is picked).
+/// Ends the standing connection of `profile_id` (its last viewer is gone).
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn connector_unwatch(state: State<'_, ConnectorState>) {
-    stop_watcher(&state);
+pub(crate) fn connector_unwatch(state: State<'_, ConnectorState>, profile_id: String) {
+    stop_watcher(&state, &profile_id);
 }
 
 #[cfg(test)]

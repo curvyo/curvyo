@@ -17,6 +17,7 @@
 
 mod connector;
 mod connector_link;
+mod connector_send;
 mod device_keys;
 mod devices;
 mod dropped_fonts;
@@ -180,6 +181,7 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         connector::connector_command,
         connector::connector_watch,
         connector::connector_unwatch,
+        connector_send::connector_send_page_job,
         device_keys::read_device_keys,
         device_keys::write_document_keys,
         devices::read_device_group,
