@@ -25,6 +25,25 @@ pub struct WasmJobFile {
     pub token: u32,
 }
 
+/// A job for the connector (`specs/0124-send-to-machine` S6).
+#[wasm_bindgen]
+pub struct WasmSentJob {
+    /// The job text's bytes: the file Export would write.
+    #[wasm_bindgen(getter_with_clone)]
+    pub bytes: Vec<u8>,
+    /// The page's name.
+    #[wasm_bindgen(getter_with_clone)]
+    pub name: String,
+    /// The machine profile whose pairing is used.
+    #[wasm_bindgen(getter_with_clone)]
+    pub profile_id: String,
+    /// The connector's address.
+    #[wasm_bindgen(getter_with_clone)]
+    pub address: String,
+    /// The token `send_job_done` and `send_job_failed` take.
+    pub token: u32,
+}
+
 #[wasm_bindgen]
 impl WasmSession {
     /// The output group of the active laser page's Operations tab as JSON, `null` on another
@@ -131,5 +150,48 @@ impl WasmSession {
             .export_job_done(token, name, downloaded, now)
             .map(|(text, ms)| format!("{ms}:{text}"))
             .unwrap_or_default()
+    }
+
+    /// How the app stands to the page's connector: `browser`, `not_paired`, `no_longer_paired`,
+    /// `key_changed` or `paired`. Session state, never saved.
+    pub fn set_send_link(&mut self, link: &str) {
+        self.session.set_send_link(link);
+    }
+
+    /// The job of the active laser page for the connector; `undefined` unless Send is enabled
+    /// (the checks are read again at this moment). Nothing is written to the project.
+    pub fn send_job(&mut self) -> Option<WasmSentJob> {
+        let job = self.session.send_job()?;
+        Some(WasmSentJob {
+            bytes: job.bytes,
+            name: job.name,
+            profile_id: job.profile_id,
+            address: job.address,
+            token: job.token,
+        })
+    }
+
+    /// The connector accepted the job of `token` (`0124` S10): the step "Send job to machine"
+    /// and Lasered at `now_ms`. The notice as `"<ms>:<text>"`, empty when there is none and for
+    /// an unknown token.
+    pub fn send_job_done(&mut self, token: u32, now_ms: f64) -> String {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        // invariant: a clock in ms since 1970, positive and far below 2^53
+        let now = now_ms.max(0.0) as u64;
+        self.session
+            .send_job_done(token, now)
+            .map(|(text, ms)| format!("{ms}:{text}"))
+            .unwrap_or_default()
+    }
+
+    /// The send of `token` got no answer in time: Send is enabled again, a late acceptance of
+    /// `token` still commits once.
+    pub fn send_job_timed_out(&mut self, token: u32) {
+        self.session.send_job_timed_out(token);
+    }
+
+    /// The send of `token` ended without an accepted job: nothing is committed.
+    pub fn send_job_failed(&mut self, token: u32) {
+        self.session.send_job_failed(token);
     }
 }

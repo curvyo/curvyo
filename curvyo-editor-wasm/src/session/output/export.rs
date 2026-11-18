@@ -3,12 +3,14 @@
 //! "Export job file" with Lasered recorded beside it.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
-use curvyo_document_core::SettingsWrite;
+use curvyo_document_core::{EXPORT_JOB_COMMIT_LABEL, SettingsWrite};
 use curvyo_laser_core::job::{ExportEffects, export_effects, extension, file_type, write};
 
 use super::super::Session;
 use super::super::materials::LibraryChange;
+use super::job_cache::PageJob;
 
 /// How long the export notice shows, in ms (criterion 27).
 pub const OUTPUT_NOTICE_MS: u32 = 3_000;
@@ -95,16 +97,29 @@ pub fn export_notice(name: &str, downloaded: bool, fixture_jobs_off: usize) -> (
     }
 }
 
+/// A laser page's job as handed out: the page's job and what writing it records.
+pub(super) struct HandOut {
+    pub(super) job: Arc<PageJob>,
+    pub(super) effects: ExportEffects,
+}
+
 impl Session {
-    /// The job file of the active laser page for the save dialog (criterion 27), `None` while a
-    /// block disables Export or on another page. Nothing is written to the project.
-    pub fn export_job(&mut self, project_file: &str) -> Option<ExportedJob> {
+    /// The active laser page's job and its effects, `None` on another page and while a block
+    /// disables Export; the one place Export and Send check the gate (`0124` B3).
+    pub(super) fn hand_out(&self) -> Option<HandOut> {
         let job = self.laser_job()?;
         if !job.gate.export_allowed() {
             return None;
         }
-        let format = job.input.machine.values.output_format;
         let effects = export_effects(&job.input, &job.built, self.materials().reads());
+        Some(HandOut { job, effects })
+    }
+
+    /// The job file of the active laser page for the save dialog (criterion 27), `None` while a
+    /// block disables Export or on another page. Nothing is written to the project.
+    pub fn export_job(&mut self, project_file: &str) -> Option<ExportedJob> {
+        let HandOut { job, effects } = self.hand_out()?;
+        let format = job.input.machine.values.output_format;
         let exports = &mut self.output.exports;
         let token = exports.next;
         exports.next = exports.next.wrapping_add(1);
@@ -132,6 +147,20 @@ impl Session {
         let effects = self.output.exports.pending.remove(&token)?;
         // Every older token is stale once one job is saved.
         self.output.exports.pending.retain(|&held, _| held > token);
+        let jobs_on = self.commit_job_effects(&effects, EXPORT_JOB_COMMIT_LABEL, now_ms);
+        Some(export_notice(name, downloaded, jobs_on))
+    }
+
+    /// The commit of an export or a send (`0124` B3): one history step `label` switching the
+    /// fixture jobs off and refreshing the stored numbers (nothing when nothing differs), then
+    /// Lasered at `now_ms` on the test grids and their records, which an undo keeps. How many
+    /// fixture jobs were switched off.
+    pub(super) fn commit_job_effects(
+        &mut self,
+        effects: &ExportEffects,
+        label: &str,
+        now_ms: u64,
+    ) -> usize {
         let writes: Vec<SettingsWrite> = effects
             .refreshed
             .iter()
@@ -145,7 +174,8 @@ impl Session {
             .collect();
         let jobs_on = self.fixture_jobs_with_output(&effects.fixture_jobs_off);
         self.recording_unguarded(|this| {
-            this.document.export_job(&effects.fixture_jobs_off, &writes)
+            this.document
+                .export_job(label, &effects.fixture_jobs_off, &writes)
         });
         if !effects.lasered_grids.is_empty() {
             let mut change = LibraryChange::default();
@@ -157,7 +187,7 @@ impl Session {
                 .mark_test_grids_lasered(&effects.lasered_grids, now_ms);
             self.write_library_unjournalled(change);
         }
-        Some(export_notice(name, downloaded, jobs_on))
+        jobs_on
     }
 
     /// How many of `jobs` have Output on now.
