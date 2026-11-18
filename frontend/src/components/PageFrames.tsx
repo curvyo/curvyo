@@ -6,6 +6,7 @@ import { PlayBar } from "@/components/PlayBar";
 import { RingLabels } from "@/components/RingLabels";
 import { Tooltip } from "@/components/ui/tooltip";
 import { KindChip } from "@/components/KindChip";
+import { pagesTick, perfStart } from "@/lib/perfProbe";
 /** Screen-sized page chrome above the un-clipped drawing. Geometry comes from Rust. */
 export function PageFrames({
   getSession,
@@ -26,11 +27,14 @@ export function PageFrames({
     let frame = 0;
     let previous = "";
     const tick = () => {
+      const probeStart = perfStart();
       const next = getSession()?.pages_json() ?? "[]";
-      if (next !== previous) {
+      const changed = next !== previous;
+      if (changed) {
         previous = next;
         setJson(next);
       }
+      pagesTick(probeStart, changed);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
