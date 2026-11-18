@@ -42,12 +42,13 @@ impl WasmSession {
 
     /// The host writes made since the last call, as JSON.
     pub fn take_material_writes(&mut self) -> String {
-        self.session.take_material_writes_json()
+        self.session.untracked_mut().take_material_writes_json()
     }
 
     /// The bytes of the photo write `handle`, once (empty when unknown).
     pub fn take_material_photo_bytes(&mut self, handle: u32) -> Vec<u8> {
         self.session
+            .untracked_mut()
             .take_material_photo_bytes(handle)
             .unwrap_or_default()
     }
@@ -210,6 +211,6 @@ impl WasmSession {
 
     /// The notice of the last material command, once.
     pub fn take_materials_notice(&mut self) -> Option<String> {
-        self.session.take_materials_notice()
+        self.session.untracked_mut().take_materials_notice()
     }
 }

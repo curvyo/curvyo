@@ -60,17 +60,21 @@ impl WasmSession {
 
     /// The transport's timer, every 50 ms.
     pub fn sync_tick(&mut self, now: f64) {
-        self.session.sync_tick(millis(now));
+        // The link's clock: a frame only when it moved the document (an idle shared document,
+        // and any document without a link, draws nothing).
+        self.session
+            .document_moves(|session| session.sync_tick(millis(now)));
     }
 
     /// Before a frame is drawn: remote records are imported. `true` when the document changed.
     pub fn sync_frame_start(&mut self) -> bool {
+        // A frame of its own only when records were imported or the document moved on.
         self.session.sync_frame_start()
     }
 
     /// The next transport action, `undefined` when there is none.
     pub fn sync_next_action(&mut self) -> Option<SyncAction> {
-        let action = self.session.sync_next_action()?;
+        let action = self.session.untracked_mut().sync_next_action()?;
         Some(match action {
             TransportAction::Connect(address) => SyncAction {
                 kind: "connect".to_owned(),
@@ -92,12 +96,14 @@ impl WasmSession {
 
     /// Whether remote records changed the document since the last call.
     pub fn take_sync_changed(&mut self) -> bool {
-        self.session.take_sync_changed()
+        // Only the panels' flag: the import that set it forced its frame already.
+        self.session.untracked_mut().take_sync_changed()
     }
 
     /// The next notice of sharing as `{"text", "alert"}`, empty when there is none.
     pub fn take_sync_notice(&mut self) -> String {
         self.session
+            .untracked_mut()
             .take_sync_notice()
             .map(|(text, alert)| json!({"text": text, "alert": alert}).to_string())
             .unwrap_or_default()
@@ -106,6 +112,7 @@ impl WasmSession {
     /// The epoch keys to store as `{"room", "keys": [[epoch, "hex"], ...]}`, empty when unchanged.
     pub fn take_key_update(&mut self) -> String {
         self.session
+            .untracked_mut()
             .take_key_update()
             .map(|(room, keys)| {
                 let keys: Vec<(u32, String)> = keys
@@ -135,7 +142,10 @@ impl WasmSession {
     /// "Ben is editing this." once when the selection gains another participant's object; empty
     /// otherwise.
     pub fn take_contested_notice(&mut self) -> String {
-        self.session.take_contested_notice().unwrap_or_default()
+        self.session
+            .untracked_mut()
+            .take_contested_notice()
+            .unwrap_or_default()
     }
 
     /// Changes the "Name shown to others".

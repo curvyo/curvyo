@@ -102,7 +102,7 @@ pub struct DocumentPoint {
 /// frame.
 #[wasm_bindgen]
 pub struct WasmSession {
-    pub(crate) session: Session,
+    pub(crate) session: crate::frame_gate::TrackedSession,
     pub(crate) gpu: Option<Gpu>,
 }
 
@@ -116,7 +116,7 @@ impl WasmSession {
     pub fn new(peer: u64) -> Self {
         let mut session = Session::new(peer);
         session.show_default_view();
-        Self { session, gpu: None }
+        Self::of(session)
     }
 
     /// Reopens a previously saved `.curvyo` container's bytes.
@@ -137,7 +137,7 @@ impl WasmSession {
         let mut session = Session::open(peer, bytes)
             .map_err(|err| JsValue::from_str(crate::session::map_open_error(&err)))?;
         session.show_default_view();
-        Ok(Self { session, gpu: None })
+        Ok(Self::of(session))
     }
 
     /// Packs the current document into `.curvyo` container bytes for a save, recording the

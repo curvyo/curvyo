@@ -73,7 +73,8 @@ impl WasmSession {
 
     /// "An image in this project could not be read." once per open; empty otherwise.
     pub fn take_bad_asset_notice(&mut self) -> String {
-        self.session.take_bad_asset_notice()
+        // Taking a notice draws nothing new.
+        self.session.untracked_mut().take_bad_asset_notice()
     }
 }
 

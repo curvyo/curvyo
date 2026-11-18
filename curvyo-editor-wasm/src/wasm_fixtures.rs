@@ -116,7 +116,10 @@ impl WasmSession {
 
     /// The notice of the last fixture command, once; empty when there is none.
     pub fn take_fixture_notice(&mut self) -> String {
-        self.session.take_fixture_notice().unwrap_or_default()
+        self.session
+            .untracked_mut()
+            .take_fixture_notice()
+            .unwrap_or_default()
     }
 
     /// Whether the pointer is coarse: the fixture outline hit grows to 12 px.

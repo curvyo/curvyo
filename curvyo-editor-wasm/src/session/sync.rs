@@ -240,6 +240,20 @@ impl Session {
         self.sync = Some(link);
     }
 
+    /// Whether this session carries a link, live or ended: the frame start runs every frame.
+    #[cfg(any(target_arch = "wasm32", test))]
+    #[must_use]
+    pub(crate) fn has_sync_link(&self) -> bool {
+        self.sync.is_some()
+    }
+
+    /// The document's version, to tell whether a call moved it on.
+    #[cfg(any(target_arch = "wasm32", test))]
+    #[must_use]
+    pub(crate) fn document_version(&self) -> curvyo_document_core::DocumentVersion {
+        self.document.version()
+    }
+
     /// Whether this session carries a live link.
     #[must_use]
     pub fn is_shared(&self) -> bool {

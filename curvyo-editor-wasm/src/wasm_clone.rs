@@ -233,12 +233,12 @@ impl WasmSession {
 
     /// The sentence of the last transform that held clones with own placement back, once.
     pub fn take_clone_hold_notice(&mut self) -> String {
-        self.session.take_clone_hold_notice()
+        self.session.untracked_mut().take_clone_hold_notice()
     }
 
     /// The notice of the last style or opacity edit that left clones alone, once.
     pub fn take_style_skip_notice(&mut self) -> String {
-        self.session.take_style_skip_notice()
+        self.session.untracked_mut().take_style_skip_notice()
     }
 
     /// The notice of the last Delete key when it repaired clones, once: "Deleted 1 object. 1
@@ -259,7 +259,7 @@ impl WasmSession {
 
     /// The notice of the orphan repair after the Open, once.
     pub fn take_orphan_notice(&mut self) -> String {
-        self.session.take_orphan_notice()
+        self.session.untracked_mut().take_orphan_notice()
     }
 
     /// The DOM chips over the canvas as `[x, y, w, h, ...]` in canvas px: no clone tag meets one.

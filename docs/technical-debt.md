@@ -9,17 +9,6 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 (each names its slice). An entry is removed when its resolution lands, or stays with the note that
 it is accepted for good.
 
-
-## The fixture layer is rebuilt every animation frame (`0113`, 2026-11-16)
-
-On a laser page the session rebuilds the fixture layer (sets, job fixtures, pin and screw grids,
-centre marks) and the host re-uploads the whole frame on every animation frame, also when nothing
-changed. The draw budget of `0113` criterion 42 (a) holds (within 16 ms on 3 sets of 20 fixtures,
-64 job fixtures and a 400-centre grid), but an idle page costs CPU and battery.
-
-**Resolution:** its own `fix/` PR (architect review 2026-11-16): first skip a frame whose
-generation did not change, then cache the fixture list until a fixture, set or page choice changes.
-
 ## Two devices aligning one profile's sets at once can leave duplicate set copies (`0113`, ADR 0059 §10, 2026-11-16)
 
 The set mirror of a page is aligned to its profile record by uid, creating a node for each set,

@@ -184,7 +184,7 @@ impl WasmSession {
     /// refused or unchanged stacking-order key), once, as `{"kind", "text"}`; empty when there is
     /// none.
     pub fn take_layer_notice(&mut self) -> String {
-        self.session.take_layer_notice_json()
+        self.session.untracked_mut().take_layer_notice_json()
     }
 
     /// The index of the row of `id` in the whole list, -1 when it is not shown: the focus follows

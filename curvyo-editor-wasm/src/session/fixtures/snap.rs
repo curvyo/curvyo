@@ -104,11 +104,6 @@ impl Session {
 
     /// The fixtures of every laser page whose extension is on.
     pub(super) fn available_page_fixtures(&self) -> Vec<PageFixtures> {
-        self.document
-            .manufacturings()
-            .iter()
-            .filter(|m| self.process_enabled(&m.process))
-            .filter_map(PageFixtures::read)
-            .collect()
+        self.available_read().to_vec()
     }
 }

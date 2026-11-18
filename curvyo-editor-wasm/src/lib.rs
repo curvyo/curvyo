@@ -27,6 +27,9 @@ mod font_checks_glue;
 mod font_file_glue;
 mod font_library_glue;
 mod font_preview_glue;
+// The frame generation of `WasmSession`, plain Rust so its unit tests run on the host.
+#[cfg(any(target_arch = "wasm32", test))]
+mod frame_gate;
 mod ocr_pool_glue;
 mod pairing_glue;
 mod session;

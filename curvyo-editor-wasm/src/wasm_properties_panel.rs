@@ -179,7 +179,7 @@ impl WasmSession {
     /// The sentence for the status region after a pick, for example "Background color
     /// set to #E8E8EBFF": returned once, then empty.
     pub fn take_colour_pick_announcement(&mut self) -> String {
-        self.session.take_colour_pick_announcement()
+        self.session.untracked_mut().take_colour_pick_announcement()
     }
 
     /// What a click at the pointer would take while picking: empty, or the
