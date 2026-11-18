@@ -16,7 +16,7 @@ use curvyo_connector_core::{
 };
 use curvyo_connector_io::Uuid;
 use curvyo_connector_io::client::{CONNECT_TIMEOUT, ClientError, Connection, connect, open_paired};
-use curvyo_connector_io::hub::FakeSettings;
+use curvyo_connector_io::hub::{ControllerChoice, FakeSettings};
 use curvyo_connector_io::job_send::new_job_id;
 use curvyo_connector_io::pin_verifier::PinMode;
 use curvyo_connector_io::record::PairingRecord;
@@ -67,7 +67,7 @@ fn rig() -> Rig {
     let server = RunningServer::start(&ServerConfig {
         listen: "127.0.0.1:0".parse().unwrap(),
         state_dir: dir.path().to_owned(),
-        fake: Some(FakeSettings {
+        controller: ControllerChoice::Fake(FakeSettings {
             lines_per_second: 200,
             alarm_at_line: None,
         }),

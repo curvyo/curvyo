@@ -20,7 +20,7 @@ use curvyo_connector_core::{
     JobKind, MAX_CHUNK_BYTES, Message, Progress, RejectReason, Resolution, SendWatch, State,
 };
 use curvyo_connector_io::client::{CONNECT_TIMEOUT, ClientError, Connection, connect, open_paired};
-use curvyo_connector_io::hub::FakeSettings;
+use curvyo_connector_io::hub::{ControllerChoice, FakeSettings};
 use curvyo_connector_io::job_send::new_job_id;
 use curvyo_connector_io::pin_verifier::PinMode;
 use curvyo_connector_io::record::PairingRecord;
@@ -469,7 +469,7 @@ fn rig() -> Rig {
     let server = RunningServer::start(&ServerConfig {
         listen: "127.0.0.1:0".parse().unwrap(),
         state_dir: dir.path().to_owned(),
-        fake: Some(FakeSettings {
+        controller: ControllerChoice::Fake(FakeSettings {
             lines_per_second: 200,
             alarm_at_line: None,
         }),
@@ -710,6 +710,7 @@ fn s11_connection_dropped_and_a_fresh_read_fails_commits_nothing_and_keeps_the_w
         }),
         position: None,
         alarm: None,
+        detail: None,
     };
     let r = curvyo_connector_io::send_tracked::observe_shared(&watch, &ready);
     assert_eq!(r, Some(Resolution::Accepted));

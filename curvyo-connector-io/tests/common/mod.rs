@@ -1,6 +1,11 @@
 //! A connector on a free local port with a state directory of its own, and helpers to pair,
-//! connect and wait for a status. Waiting is by condition with a long deadline, never by sleep.
+//! connect and wait for a status, and the GRBL simulator with its in-memory bench. Waiting is by
+//! condition with a long deadline, never by sleep.
 #![allow(dead_code, clippy::unwrap_used, clippy::expect_used)]
+
+pub mod grbl_bench;
+pub mod grbl_sim;
+pub mod pty_link;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -8,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use curvyo_connector_core::{Message, State};
 use curvyo_connector_io::client::{CONNECT_TIMEOUT, Connection, connect, open_paired};
-use curvyo_connector_io::hub::FakeSettings;
+use curvyo_connector_io::hub::{ControllerChoice, FakeSettings};
 use curvyo_connector_io::pin_verifier::PinMode;
 use curvyo_connector_io::record::PairingRecord;
 use curvyo_connector_io::server::{RunningServer, ServerConfig};
@@ -24,7 +29,7 @@ pub fn config(dir: PathBuf, lines_per_second: u32, alarm_at_line: Option<u32>) -
     ServerConfig {
         listen: "127.0.0.1:0".parse().unwrap(),
         state_dir: dir,
-        fake: Some(FakeSettings {
+        controller: ControllerChoice::Fake(FakeSettings {
             lines_per_second,
             alarm_at_line,
         }),

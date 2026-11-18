@@ -1,0 +1,4 @@
+Grbl 1.1h ['$' for help]
+Grbl 0.9j ['$' for help]
+GrblHAL 1.1f ['$' or '$HELP' for help]
+Grbl 3.7.8 [FluidNC v3.7.8 (wifi) '$' for help]
