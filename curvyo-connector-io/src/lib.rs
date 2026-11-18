@@ -1,15 +1,22 @@
 //! The machine connector's transport (ADR 0035): TLS 1.3 with a pinned key, pairing by SPAKE2, the
-//! connector server with a fake controller, and the client the desktop app uses. Native only; the
-//! protocol itself is `curvyo-connector-core`.
+//! connector server with the fake controller or GRBL over serial, and the client the desktop app
+//! uses. Native only; the protocol itself is `curvyo-connector-core`.
 
-#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    test,
+    allow(clippy::unwrap_used, clippy::expect_used, clippy::assert_is_empty)
+)]
 
 pub mod client;
 pub mod clients;
+pub mod controller;
 pub mod fake_controller;
 pub mod frames;
+pub mod grbl;
 pub mod hex;
 pub mod hub;
+pub mod hub_log;
 pub mod identity;
 pub mod job_log;
 pub mod job_send;
@@ -18,6 +25,7 @@ pub mod pairing_code;
 pub mod pin_verifier;
 pub mod record;
 pub mod send_tracked;
+pub mod serial_link;
 pub mod server;
 pub mod server_tls;
 mod session;

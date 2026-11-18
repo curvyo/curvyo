@@ -1,10 +1,12 @@
 //! A controller that streams a job's lines at a steady pace and touches nothing (no laser, no
-//! serial port). A plain struct: the trait comes with the second controller (`CLAUDE.md` §5).
-//! Pure: the caller passes the time since the server's start with every call.
+//! serial port); one of the two [`Controller`]s. Pure: the caller passes the time since the
+//! server's start with every call.
 
 use std::time::Duration;
 
-use curvyo_connector_core::{ControllerCommand, ControllerInfo, Event};
+use curvyo_connector_core::{ControllerCommand, ControllerInfo, Event, Job};
+
+use crate::controller::{Advance, Controller};
 
 /// The text of the alarm the fake controller raises.
 #[must_use]
@@ -48,6 +50,9 @@ impl FakeController {
         ControllerInfo {
             name: "Fake controller".to_owned(),
             firmware: "curvyo-fake 0".to_owned(),
+            port: None,
+            baud: None,
+            settings: None,
         }
     }
 
@@ -60,7 +65,7 @@ impl FakeController {
     }
 
     /// Takes a command of the job machine; `job_lines` is the number of lines of the held job.
-    pub fn command(&mut self, command: &ControllerCommand, job_lines: u32, at: Duration) {
+    pub fn take(&mut self, command: &ControllerCommand, job_lines: u32, at: Duration) {
         match command {
             ControllerCommand::Start { .. } => {
                 self.run = Some(Run {
@@ -84,12 +89,13 @@ impl FakeController {
                 }
             }
             ControllerCommand::Stop => self.run = None,
+            ControllerCommand::Unlock => {}
         }
     }
 
     /// Lets time pass and returns the events that happened: progress, the end of the job, or the
     /// alarm, after which the stream stops by itself.
-    pub fn advance(&mut self, at: Duration) -> Vec<Event> {
+    pub fn run_until(&mut self, at: Duration) -> Vec<Event> {
         let Some(mut run) = self.run else {
             return Vec::new();
         };
@@ -127,6 +133,30 @@ impl FakeController {
     }
 }
 
+impl Controller for FakeController {
+    fn info(&self) -> Option<ControllerInfo> {
+        Some(Self::info())
+    }
+
+    fn command(
+        &mut self,
+        command: &ControllerCommand,
+        job: Option<&Job>,
+        at: Duration,
+    ) -> Vec<Event> {
+        let lines = job.map_or(0, |j| j.text.lines().count());
+        self.take(command, u32::try_from(lines).unwrap_or(u32::MAX), at);
+        Vec::new()
+    }
+
+    fn advance(&mut self, _read: &[u8], at: Duration) -> Advance {
+        Advance {
+            events: self.run_until(at),
+            ..Advance::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,7 +167,7 @@ mod tests {
     }
 
     fn start(c: &mut FakeController, lines: u32, at: Duration) {
-        c.command(
+        c.take(
             &ControllerCommand::Start {
                 job_id: Uuid::nil(),
             },
@@ -157,40 +187,40 @@ mod tests {
     fn it_streams_at_the_set_pace_and_finishes() {
         let mut c = FakeController::new(20, None);
         start(&mut c, 3, ms(1000));
-        assert_eq!(c.advance(ms(1049)), Vec::new());
-        assert_eq!(lines_of(&c.advance(ms(1050))), Some(1));
-        assert_eq!(lines_of(&c.advance(ms(1100))), Some(2));
-        let end = c.advance(ms(1150));
+        assert_eq!(c.run_until(ms(1049)), Vec::new());
+        assert_eq!(lines_of(&c.run_until(ms(1050))), Some(1));
+        assert_eq!(lines_of(&c.run_until(ms(1100))), Some(2));
+        let end = c.run_until(ms(1150));
         assert_eq!(lines_of(&end), Some(3));
         assert_eq!(end.last(), Some(&Event::JobFinished { elapsed_ms: 150 }));
-        assert_eq!(c.advance(ms(5000)), Vec::new());
+        assert_eq!(c.run_until(ms(5000)), Vec::new());
     }
 
     #[test]
     fn pause_holds_the_count_and_resume_continues_from_the_same_line() {
         let mut c = FakeController::new(20, None);
         start(&mut c, 100, ms(0));
-        assert_eq!(lines_of(&c.advance(ms(500))), Some(10));
-        c.command(&ControllerCommand::Pause, 0, ms(500));
-        assert_eq!(c.advance(ms(9000)), Vec::new());
-        c.command(&ControllerCommand::Resume, 0, ms(9000));
-        assert_eq!(lines_of(&c.advance(ms(9050))), Some(11));
+        assert_eq!(lines_of(&c.run_until(ms(500))), Some(10));
+        c.take(&ControllerCommand::Pause, 0, ms(500));
+        assert_eq!(c.run_until(ms(9000)), Vec::new());
+        c.take(&ControllerCommand::Resume, 0, ms(9000));
+        assert_eq!(lines_of(&c.run_until(ms(9050))), Some(11));
     }
 
     #[test]
     fn stop_ends_the_stream() {
         let mut c = FakeController::new(20, None);
         start(&mut c, 100, ms(0));
-        c.advance(ms(200));
-        c.command(&ControllerCommand::Stop, 0, ms(200));
-        assert_eq!(c.advance(ms(2000)), Vec::new());
+        c.run_until(ms(200));
+        c.take(&ControllerCommand::Stop, 0, ms(200));
+        assert_eq!(c.run_until(ms(2000)), Vec::new());
     }
 
     #[test]
     fn an_alarm_at_a_line_stops_the_stream_by_itself() {
         let mut c = FakeController::new(20, Some(5));
         start(&mut c, 100, ms(0));
-        let events = c.advance(ms(2000));
+        let events = c.run_until(ms(2000));
         assert_eq!(lines_of(&events), Some(5));
         assert_eq!(
             events.last(),
@@ -198,14 +228,17 @@ mod tests {
                 text: alarm_text(5)
             })
         );
-        assert_eq!(c.advance(ms(4000)), Vec::new());
+        assert_eq!(c.run_until(ms(4000)), Vec::new());
     }
 
     #[test]
     fn an_empty_job_finishes_at_once() {
         let mut c = FakeController::new(20, None);
         start(&mut c, 0, ms(0));
-        assert_eq!(c.advance(ms(1)), vec![Event::JobFinished { elapsed_ms: 1 }]);
+        assert_eq!(
+            c.run_until(ms(1)),
+            vec![Event::JobFinished { elapsed_ms: 1 }]
+        );
     }
 
     #[test]

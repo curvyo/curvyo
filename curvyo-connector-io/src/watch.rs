@@ -4,7 +4,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use curvyo_connector_core::{Message, State};
+use curvyo_connector_core::{ControllerInfo, Message, State};
 
 use crate::client::{CONNECT_TIMEOUT, ClientError, open_paired};
 use crate::frames::Frame;
@@ -16,6 +16,8 @@ use crate::token::Token;
 pub enum WatchEvent {
     /// A `Status`, the first one right after connecting.
     Status(Message),
+    /// The controller changed (identified, lost): the `Welcome` the connector sent again.
+    Controller(Option<ControllerInfo>),
     /// The connection dropped; the watcher will try again.
     Lost,
     /// A try failed; the watcher will try again unless the error is final.
@@ -81,6 +83,9 @@ pub fn watch(
                         Ok(Some(Frame::Core(status @ Message::Status { .. }))) => {
                             active = is_active(&status);
                             on_event(WatchEvent::Status(status));
+                        }
+                        Ok(Some(Frame::Core(Message::Welcome { controller, .. }))) => {
+                            on_event(WatchEvent::Controller(controller));
                         }
                         Ok(_) => {}
                         Err(e) => break e,

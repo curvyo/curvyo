@@ -163,6 +163,22 @@ impl Clients {
         });
         Ok(found)
     }
+
+    /// The name of the app `token` belongs to, for the log (`specs/0127` G33).
+    ///
+    /// # Errors
+    /// [`ClientsError`] for a damaged list.
+    pub fn name_of(&self, token: &str) -> Result<Option<String>, ClientsError> {
+        let Some(token) = Token::from_hex(token) else {
+            return Ok(None);
+        };
+        let hash = token.sha256_hex();
+        Ok(self
+            .list()?
+            .into_iter()
+            .find(|c| same(c.token_sha256.as_bytes(), hash.as_bytes()))
+            .map(|c| c.name))
+    }
 }
 
 /// Equality of two byte strings of public length without an early exit.

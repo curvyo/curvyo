@@ -1,5 +1,5 @@
-//! The connector server: the listener, one thread per connection, the streamer thread and the
-//! handle the binary and the tests drive.
+//! The connector server: the listener, one thread per connection, the controller's thread (the
+//! fake's streamer or the serial port) and the handle the binary and the tests drive.
 
 use std::net::{SocketAddr, TcpListener};
 use std::path::PathBuf;
@@ -10,7 +10,9 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use crate::clients::ClientsError;
-use crate::hub::{FakeSettings, Hub, HubSettings, TICK};
+use curvyo_connector_core::State;
+
+use crate::hub::{ControllerChoice, Hub, HubSettings, TICK};
 use crate::identity::{self, IdentityError};
 use crate::server_tls::server_config;
 use crate::session;
@@ -26,8 +28,8 @@ pub struct ServerConfig {
     pub listen: SocketAddr,
     /// The state directory.
     pub state_dir: PathBuf,
-    /// The fake controller, if one is attached.
-    pub fake: Option<FakeSettings>,
+    /// The controller.
+    pub controller: ControllerChoice,
     /// `Start` waits for the connector's terminal.
     pub require_local_start: bool,
     /// The name `Welcome` carries.
@@ -66,7 +68,7 @@ pub struct RunningServer {
     hub: Arc<Hub>,
     addr: SocketAddr,
     shutdown: Arc<AtomicBool>,
-    threads: Vec<JoinHandle<()>>,
+    threads: Mutex<Vec<JoinHandle<()>>>,
     notices: Mutex<Option<Receiver<String>>>,
     started: Instant,
 }
@@ -93,7 +95,7 @@ impl RunningServer {
         let (hub, notices) = Hub::new(
             HubSettings {
                 state_dir: config.state_dir.clone(),
-                fake: config.fake,
+                controller: config.controller.clone(),
                 require_local_start: config.require_local_start,
                 connector_name: config.connector_name.clone(),
                 spki: identity.spki,
@@ -105,15 +107,28 @@ impl RunningServer {
             hub.issue_code(started).ok_or(ServerError::Random)?;
         }
         let shutdown = Arc::new(AtomicBool::new(false));
-        let threads = vec![
-            spawn_acceptor(listener, tls, Arc::clone(&hub), Arc::clone(&shutdown)),
-            spawn_streamer(Arc::clone(&hub), Arc::clone(&shutdown)),
-        ];
+        let mut threads = vec![spawn_acceptor(
+            listener,
+            tls,
+            Arc::clone(&hub),
+            Arc::clone(&shutdown),
+        )];
+        match &config.controller {
+            ControllerChoice::None => {}
+            ControllerChoice::Fake(_) => {
+                threads.push(spawn_streamer(Arc::clone(&hub), Arc::clone(&shutdown)));
+            }
+            ControllerChoice::Serial(serial) => threads.push(crate::serial_link::spawn(
+                serial.clone(),
+                Arc::clone(&hub),
+                Arc::clone(&shutdown),
+            )),
+        }
         Ok(Self {
             hub,
             addr,
             shutdown,
-            threads,
+            threads: Mutex::new(threads),
             notices: Mutex::new(Some(notices)),
             started,
         })
@@ -149,6 +164,18 @@ impl RunningServer {
         self.hub.local_start(Instant::now())
     }
 
+    /// Stops a running or paused job before the program exits (G16); its name if one ran.
+    #[must_use]
+    pub fn stop_for_exit(&self) -> Option<String> {
+        self.hub.stop_for_exit(Instant::now())
+    }
+
+    /// The job state.
+    #[must_use]
+    pub fn state(&self) -> State {
+        self.hub.state()
+    }
+
     /// The lines for the terminal (job outcomes, "Press Enter to start ..."); once.
     pub fn take_notices(&self) -> Option<Receiver<String>> {
         self.notices
@@ -164,13 +191,22 @@ impl RunningServer {
     }
 
     /// Stops the threads and waits for them.
-    pub fn shutdown(mut self) {
+    pub fn shutdown(self) {
         self.stop();
     }
 
-    fn stop(&mut self) {
+    /// Stops the threads, waits for them (the serial thread's last write and flush included)
+    /// and ends the notices, for a program that exits while others still hold the server.
+    pub fn close(&self) {
+        self.stop();
+        self.hub.close_notices();
+    }
+
+    fn stop(&self) {
         self.shutdown.store(true, Ordering::Relaxed);
-        for thread in self.threads.drain(..) {
+        let threads =
+            std::mem::take(&mut *self.threads.lock().unwrap_or_else(PoisonError::into_inner));
+        for thread in threads {
             let _ = thread.join();
         }
     }
