@@ -56,6 +56,49 @@ unchanged (table in `tools/perf/README.md`).
 ## Phase 4: only if phase 0 says so
 - Draw-list cost of large pages: culling by view rectangle, level of detail for tiny nodes, reuse of
   tessellation between frames while only the view moves (the trace tool already does this with `ViewRest`).
+
+**Status 2026-11-18: culling built on `perf/draw-list-cost`.** Step 1 split a drawn frame into four
+phases (`WasmSession::take_frame_phases`, read by the probe; native twin
+`curvyo-editor-wasm/tests/frame_phase_cost.rs`, thread CPU time). Step 2 left the objects out of
+the tessellation whose outline box, grown by three stroke widths and 4 px, misses the canvas
+(`session/view_cull.rs`); images, pictures, pattern and gradient fills and guides are always kept
+(the gradient tests of `0124` criterion 10 read the stop table of shapes off the canvas).
+
+Per drawn frame on the 5 000-path page (Xvfb, software GL; probe means over about 300 frames):
+
+| scenario | phase | before ms | after ms |
+|---|---|---|---|
+| wheel-zoom | draw list (Rust, tessellation) | 53.0 | 30.0 |
+| | pictures | 0.0 | 0.0 |
+| | upload (GPU vertices, buffers) | 18.5 | 2.0 |
+| | submit (encode, submit, present) | 36.4 | 27.3 |
+| | layers / vertices | 5 001 / 1.40 M | 1 423 / 0.20 M |
+| | whole render-loop tick, frames/s | 111 ms, 8.3 | 64 ms, 12.9 |
+| pan-drag | draw list | 44.8 | 28.5 |
+| | upload | 7.5 | 1.1 |
+| | submit | 33.7 | 27.8 |
+| | layers / vertices | 5 001 / 0.92 M | 470 / 0.11 M |
+| | whole render-loop tick, frames/s | 77 ms, 11.6 | 59 ms, 14.4 |
+
+Peak RSS of zoom and pan fell from about 1.8 GiB to 1.1 GiB. Native release build (host CPU,
+draw list only): rest 34 -> 36 ms (everything is in view; the bounds pass costs about 2 ms), zoom 39
+-> 31 ms, pan 44 -> 28 ms. The canvas screenshots at the start and end of every scenario are
+pixel-identical before and after.
+
+Reading: `submit` is software GL under Xvfb (an 8x MSAA target filled by the CPU) and mostly a
+fixed cost per frame; on a GPU it is small. `draw list` and the vertex building in `upload` are
+CPU work on every machine. What remains of the draw list while zoomed in is not the artwork: the
+probe's page keeps all 5 000 imported paths selected, and the selection decorations cost about
+24 ms of the 28 ms natively (with nothing selected the zoomed frame takes 4 ms after culling and
+22 ms before). At fit zoom everything is in view and culling saves nothing.
+
+Next in line, by data: (1) the per-frame cost of a large selection (the decorations between the
+clone previews and the snap marker, and the group and transform inputs, each read all selected
+objects every frame); (2) reuse of the document-space artwork while only the view pans (exact,
+the tessellation depends on the scale only), which helps the fit zoom; (3) level of detail by zoom.
+Note (Proposal): the per-frame dash and marker budgets are now spent on visible objects only, so
+a frame that used to exhaust them may draw more dashes or markers in view than before.
+
 - Memory (2 % of 64 GB = about 1.3 GB): measure wasm heap versus JS heap versus GPU buffers before
   touching anything; likely wgpu buffers and undo history, not a fix target by default.
 

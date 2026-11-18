@@ -124,5 +124,6 @@ showed 0.0 in every column with a 7 s zoom was a stale wasm build, not the frame
   session (`DISPLAY` set, drop `xvfb-run`), which is not wired yet.
 - `tauri-driver` needs `WebKitWebDriver`, which is missing here; not used (events are synthetic).
 - No Chromium comparison or Chrome trace yet; no whale/dolphin documents (see above).
-- No split of a drawn frame's time into draw list and GPU submit; render ms is the whole `renderLoop`
-  tick (the submit counter and the change sites are Rust-side since phase 1).
+- The split of a drawn frame into draw list, pictures, upload and submit exists since phase 4
+  (`per drawn frame`); the before/after of the view culling is in
+  `specs/0126-performance-pass/plan.md`, phase 4.
