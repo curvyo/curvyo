@@ -7,11 +7,12 @@ import type { WasmSession } from "@/lib/editorSession";
 const target: string | undefined = import.meta.env.VITE_CURVYO_PERF;
 export const perfEnabled = typeof target === "string" && target.length > 0;
 
-type Counters = { built: number; submitted: number; changed: number; renderMs: number; renderMax: number; pagesTicks: number; pagesChanged: number; pagesMs: number; pagesMax: number };
-const zero = (): Counters => ({ built: 0, submitted: 0, changed: 0, renderMs: 0, renderMax: 0, pagesTicks: 0, pagesChanged: 0, pagesMs: 0, pagesMax: 0 });
+type Counters = { built: number; submitted: number; changed: number; sites: Record<string, number>; renderMs: number; renderMax: number; pagesTicks: number; pagesChanged: number; pagesMs: number; pagesMax: number };
+const zero = (): Counters => ({ built: 0, submitted: 0, changed: 0, sites: {}, renderMs: 0, renderMax: 0, pagesTicks: 0, pagesChanged: 0, pagesMs: 0, pagesMax: 0 });
 let counters = zero();
 let scenario = "boot";
-let lastView = "";
+let lastGeneration = -1;
+let lastSubmitted = 0;
 let socket: WebSocket | null = null;
 let scenariosStarted = false;
 const queue: string[] = [];
@@ -41,16 +42,28 @@ export function perfStart(): number {
   return perfEnabled ? performance.now() : 0;
 }
 
-/** End of a render-loop tick. `view` is the view string the loop already read ("" without a
- * session): a frame whose view differs from the previous tick's counts as changed. */
-export function renderTick(t0: number, rendered: boolean, view: string) {
+/** End of a render-loop tick. `generation` and `submitted` are the frame generation and the
+ * frames the session submitted to the GPU so far (`WasmSession::frame_state`, -1 and 0 without a
+ * session): a tick whose generation differs from the previous one counts as changed, and every
+ * submit the counter grew by counts, those of a resize included. `site` hands over the source
+ * lines of the session's changes (`WasmSession::take_change_sites`), read only when it changed. */
+export function renderTick(t0: number, generation: number, submitted: number, site: () => string) {
   if (!perfEnabled) return;
   const ms = performance.now() - t0;
   counters.built += 1;
-  if (rendered) counters.submitted += 1;
-  if (view !== lastView) {
-    lastView = view;
+  // A new or opened session starts its counter at 0 again.
+  counters.submitted += submitted >= lastSubmitted ? submitted - lastSubmitted : submitted;
+  lastSubmitted = submitted;
+  if (generation !== lastGeneration) {
+    lastGeneration = generation;
     counters.changed += 1;
+    for (const line of site().split("\n")) {
+      const space = line.lastIndexOf(" ");
+      if (space > 0) {
+        const at = line.slice(0, space);
+        counters.sites[at] = (counters.sites[at] ?? 0) + Number(line.slice(space + 1));
+      }
+    }
   }
   counters.renderMs += ms;
   counters.renderMax = Math.max(counters.renderMax, ms);
