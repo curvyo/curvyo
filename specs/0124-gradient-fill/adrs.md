@@ -11,6 +11,8 @@ Status: Proposed (architect, 2026-11-18). Two new ADRs: [ADR 0066](../../docs/ad
 
 ## Feature-local decisions
 
+Reconciled 2026-11-18 (product owner): every "For the PO" below is applied in the specification (criteria 11, 13, 19, 22; criterion 27 is new).
+
 - 2026-11-18: **Damage refuses the file** (ADR 0066 §7), as every style key does today, including `fill_pattern`. Criterion 22 says "the shape is shown with no fill, the file opens, the damage is counted in the existing notice" and calls that `0071`'s rule; `0071`'s rule is a refused file. **For the PO:** align criterion 22; its damaged golden becomes one file per reason (`gradient_fill_damaged_colour`, `_fraction`, `_one_stop`, `_unordered`, `_paint_without_gradient`, each `_v<N>.curvyo`), each refused.
 - 2026-11-18: **`fill_opacity` does not apply to a gradient** (Proposal): each stop has its own alpha; SVG import multiplies `fill-opacity` into the stops; export writes none for a gradient. The Fill block hides the opacity field while Gradient is chosen (for the UX engineer).
 - 2026-11-18: **"Re-based" in criterion 19 means the picture is kept** (Proposal): the result's gradient has the input's placed geometry, expressed in the result's box, so Break apart and Object to path continue one shade over the pieces. **For the PO:** say so in criterion 19.

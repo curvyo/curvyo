@@ -243,7 +243,7 @@ same way; upright; follows the handle on zoom and pan; the handle keeps the acti
 - On a laser page the canvas draws every Gradient fill as its grey (the luminance of criterion 10, over
   white). The page thumbnails of the Pages list do the same. The Style tab, the entry boxes and the
   handles show the real colours (P13). No notice, no label, no setting (spec Proposal).
-- On a drawing page the colours. PNG export always colour (criterion 11).
+- On a drawing page the colours. The page thumbnail of the container (the only PNG Curvyo writes, criterion 11) follows the same rule: colour on a drawing page, grey on a laser page.
 - In the Operations view of a laser page the gradient is replaced by the kind look as every fill
   (`0101`); once `0123` is built, an Engrave gradient shows its dots (`0123` UX notes section 3).
 
@@ -308,6 +308,8 @@ same update; the active stop is kept if it still exists, else the first.
 | P18 | Delete with an end handle canvas-selected does nothing (never deletes the shape) | as described |
 
 ## 14. Spec deltas for the product owner
+
+All nine are folded into the specification (2026-11-18): D1 and D5 in criterion 7, D2 and D3 and D9 in criterion 3, D4 and D6 in criterion 6, D7 in criterion 7, D8 as the new criterion 27.
 
 - **D1** Criterion 7, Tab order: Kind, Angle or Radius, stop rows, Add stop, Reverse (P1).
 - **D2** Criterion 3: Angle unit "°" instead of "deg" (P6).

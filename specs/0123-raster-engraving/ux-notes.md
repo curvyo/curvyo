@@ -136,13 +136,13 @@ canvas, an operation selects and unfolds its row and focuses the field named (P2
 | Kind | Symbol | Text (singular / plural) | Button does |
 |---|---|---|---|
 | block | `OctagonX` | "1 item lies outside the 400 x 300 mm bed." / "<n> items lie outside the 400 x 300 mm bed." (as built; raster items counted like any item) | selects them |
-| block | `OctagonX` | "Engrave 2 has no interval." | unfolds, focus Interval |
 | block | `OctagonX` | "Engrave 1 needs laser mode M4 for Grey." | unfolds, focus Dither |
 | block | `OctagonX` | "Photo 1 would need 120,000,000 dots; the limit is 50,000,000." | selects the item |
 | warn | `TriangleAlert` | "1 image is coarser than its Interval." / "<n> images are coarser than their Interval." | selects them |
 | warn | `TriangleAlert` | "2 items overlap and burn twice." | selects them |
 | warn | `TriangleAlert` | "1 image was reduced and loses detail." / "<n> images were reduced and lose detail." | selects them |
 | warn | `TriangleAlert` | "1 image cannot be read and is skipped." / "<n> images cannot be read and are skipped." | selects them |
+| warn | `TriangleAlert` | "Engrave 1: Lowest power is above Power." (Grey only; criterion 32 b) | unfolds, focus Lowest power |
 
 - The dot-limit line names the item by its name, also for a shape ("Ellipse 3 would need ..."), and
   drops "Raise the Interval." (P29, spec delta E3): the button selects the item and the line under it
@@ -241,6 +241,8 @@ notice.
 
 ## 12. Spec deltas for the product owner
 
+All seven are folded into the specification (2026-11-18): E1 in criterion 11, E2 in 20, E3 in 34, E4 and E5 in 35 and 36, E6 in 44, E7 in the new criterion 32 b. The "no interval" check was dropped (ADR 0069 §6; this note's table lost its row).
+
 - **E1** Criterion 11: Lowest power in the place of Threshold (row 2), not last (P20).
 - **E2** Criterion 20: the Operations view shows a raster item's dots always, not only while an Image
   setting is edited (P25).
@@ -248,7 +250,7 @@ notice.
 - **E4** Criterion 35: "<n> items overlap and burn twice." (raster items include gradient shapes) (P30).
 - **E5** Criteria 31 to 36: add the singular forms of section 4.
 - **E6** Criterion 44: Fill is a two-segment radiogroup with the paint glyphs, Dither a bar menu (P31).
-- **E7** Open: Lowest power above the set's Power is not defined (the Power can also change later by a
+- **E7** (decided: allowed, warn line, as proposed) Lowest power above the set's Power is not defined (the Power can also change later by a
   material pick, so a refusal at typing time is not enough). Proposal for the PO: allowed, and every
   burned dot then runs at Power (the ramp collapses), with a warn line "Engrave 1: Lowest power is above
   Power." (`TriangleAlert`, unfolds the row). The PO decides; the UX needs only that line.
