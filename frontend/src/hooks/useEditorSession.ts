@@ -17,6 +17,7 @@ import { type RecogniseApi, useRecognise } from "@/hooks/useRecognise";
 import { type TilingApi, useTiling } from "@/hooks/useTiling";
 import { type TraceApi, useTrace } from "@/hooks/useTrace";
 import { ViewRest } from "@/lib/viewRest";
+import { perfStart, renderTick, startPerfScenarios } from "@/lib/perfProbe";
 import { renderPageThumbnail } from "@/lib/pageThumbnail";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
@@ -1615,7 +1616,10 @@ export function useEditorSession(
     // The Trace tool draws its kept meshes while the view moves and tessellates them again for
     // the new zoom once it rests (`specs/0025-raster-trace` criterion 56).
     const viewRest = new ViewRest();
+    startPerfScenarios(canvas ?? null, () => sessionRef.current);
     let frame = requestAnimationFrame(function renderLoop() {
+      const probeStart = perfStart();
+      let probeView = "";
       const session = sessionRef.current;
       if (session) {
         const moving = viewRest.update(`${session.view_origin_x()},${session.view_origin_y()},${session.view_scale()}`, performance.now());
@@ -1642,6 +1646,7 @@ export function useEditorSession(
       }
       if (session) {
         const view = `${session.view_origin_x()},${session.view_origin_y()},${session.view_scale()}`;
+        probeView = view;
         if (view !== tagView) {
           tagView = view;
           refreshClonesRef.current();
@@ -1654,6 +1659,7 @@ export function useEditorSession(
       if (session && entryOpenRef.current) {
         syncEntry(session);
       }
+      renderTick(probeStart, session != null, probeView);
       frame = requestAnimationFrame(renderLoop);
     });
 
