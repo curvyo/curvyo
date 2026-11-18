@@ -14,6 +14,7 @@ use curvyo_render_core::{
 use curvyo_document_core::{ObjectSnapshot, PathSnapshot, ViewTransform};
 
 use super::reference_view::{reference_box_list, reference_marks_list};
+use super::view_cull::{VisibleRect, in_view};
 use super::{Session, Tool};
 
 impl Session {
@@ -79,12 +80,14 @@ impl Session {
         }
     }
 
-    /// The artwork of `objects`.
+    /// The artwork of `objects`, without those `visible` (the canvas's rectangle, `None` for
+    /// a picture of its own such as the thumbnail) cannot show.
     pub(super) fn artwork_list(
         &self,
         objects: &[ObjectSnapshot],
         guides: &std::collections::HashSet<curvyo_document_core::NodeId>,
         view: ViewTransform,
+        visible: Option<VisibleRect>,
     ) -> DrawList {
         // A pattern fill is drawn as its pieces under the shape's stroke (ADR 0029 §7).
         fn drawn<'o>(session: &Session, part: &'o [ObjectSnapshot]) -> Cow<'o, [ObjectSnapshot]> {
@@ -107,6 +110,9 @@ impl Session {
         self.patterns
             .borrow_mut()
             .retain_only(&objects.iter().map(ObjectSnapshot::id).collect());
+        // Only what the canvas can show is tessellated (`specs/0126-performance-pass` phase 4);
+        // the pattern entries above stay for the objects out of view.
+        let objects = &*in_view(objects, guides, visible);
         // A gradient on a laser page is drawn as its grey (`specs/0124-gradient-fill` crit. 10).
         let laser = self.laser_gradient_ids(objects);
         curvyo_render_core::build_artwork_greyed(
@@ -254,11 +260,11 @@ impl Session {
         // (`0101` criterion 18); "View: Drawn" leaves the artwork as it is.
         let mut list = match self.operation_looked_artwork(&artwork_objects, view) {
             Some((looked, overlay)) => {
-                let mut artwork = self.artwork_list(&looked, &guides, view);
+                let mut artwork = self.artwork_list(&looked, &guides, view, self.visible_rect());
                 artwork.extend(overlay);
                 artwork
             }
-            None => self.artwork_list(&artwork_objects, &guides, view),
+            None => self.artwork_list(&artwork_objects, &guides, view, self.visible_rect()),
         };
         // The dimensions over the artwork, following a drag in the same frame (`0070`).
         list.extend(self.dimension_layer(&artwork_objects));

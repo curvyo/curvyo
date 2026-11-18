@@ -102,10 +102,12 @@ fn report(label: &str, cost: &PhaseCost, budget: Duration) {
     }
 }
 
-/// The draw-list budgets of a frame of the perf page on the host CPU (release build).
+/// The draw-list budgets of a frame of the perf page on the host CPU (release build). Measured
+/// on 2026-11-18: 36 ms at rest (everything in view), 31 ms zooming and 28 ms panning, where only
+/// what the canvas shows is tessellated; zoom and pan are held to about 1.5 times that.
 const REST_BUDGET: Duration = Duration::from_millis(60);
-const ZOOM_BUDGET: Duration = Duration::from_millis(60);
-const PAN_BUDGET: Duration = Duration::from_millis(60);
+const ZOOM_BUDGET: Duration = Duration::from_millis(45);
+const PAN_BUDGET: Duration = Duration::from_millis(45);
 
 #[test]
 fn frame_cost_of_the_perf_page_by_phase() {
