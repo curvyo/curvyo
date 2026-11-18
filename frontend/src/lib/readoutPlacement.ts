@@ -95,7 +95,7 @@ const ENTRY_CHIP_GAP_PX = 10;
 /** Half the largest handle glyph (the 12px rotate arrow), in CSS pixels. */
 const HANDLE_GLYPH_RADIUS_PX = 6;
 
-function clampInside(left: number, top: number, chip: Size, canvas: Size): Placement {
+export function clampInside(left: number, top: number, chip: Size, canvas: Size): Placement {
   return {
     left: Math.max(0, Math.min(left, canvas.width - chip.width)),
     top: Math.max(0, Math.min(top, canvas.height - chip.height)),

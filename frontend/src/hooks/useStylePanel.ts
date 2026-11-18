@@ -60,7 +60,7 @@ export interface StyleView {
   /** Start or End is set and every selected path is closed. */
   markerClosedNote: boolean;
   /** The paint the eyedropper is picking for, or empty. */
-  pickTarget: "stroke" | "fill" | "background" | "";
+  pickTarget: "stroke" | "fill" | "background" | `stop-${number}` | "";
   /** Changes when the edited objects change. */
   scopeKey: string;
   strokePaint: "on" | "off" | "mixed";
@@ -272,7 +272,7 @@ export interface PatternFieldView {
 /** What the fill kind group and the Pattern block show (`specs/0071-pattern-fill`). */
 export interface PatternView {
   offered: boolean;
-  kind: "none" | "solid" | "pattern" | "mixed" | "";
+  kind: "none" | "solid" | "pattern" | "gradient" | "mixed" | "";
   shown: boolean;
   generator: string;
   fields: PatternFieldView[];
@@ -351,8 +351,8 @@ export interface StylePanelApi {
   pattern: PatternView;
   /** The refusal of the last commit over the limit, for 8 s; empty otherwise. */
   patternRefusal: string;
-  /** The fill kind group: None, Solid or Pattern; one commit. */
-  setFillKind: (kind: "none" | "solid" | "pattern") => void;
+  /** The fill kind group: None, Solid, Pattern or Gradient; one commit. */
+  setFillKind: (kind: "none" | "solid" | "pattern" | "gradient") => void;
   setPatternGenerator: (id: string) => void;
   setPatternMode: (mode: "lines" | "shapes") => void;
   /** Whole pieces only on or off; one commit. */
@@ -398,7 +398,7 @@ export interface StylePanelApi {
   setStrokeDashText: (text: string) => TextOutcome;
   /** The eyedropper button: starts picking for a paint, or ends it when that
    * paint is already being picked. */
-  beginPick: (target: "stroke" | "fill") => void;
+  beginPick: (target: "stroke" | "fill" | `stop-${number}`) => void;
   /** Ends picking and writes nothing. */
   endPick: () => void;
   /** A marker slot choice; one commit to the paths of the selection. */

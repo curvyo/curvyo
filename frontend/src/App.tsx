@@ -57,6 +57,7 @@ import { useMaterials } from "@/hooks/useMaterials";
 import { useTestGridTool } from "@/hooks/useTestGridTool";
 import { useOperations } from "@/hooks/useOperations";
 import { useOperationSettings } from "@/hooks/useOperationSettings";
+import { useGradient } from "@/hooks/useGradient";
 import { useOperationTools } from "@/hooks/useOperationTools";
 import { CollaborationPill } from "@/components/CollaborationPill";
 import { PresenceOverlay } from "@/components/PresenceOverlay";
@@ -79,6 +80,7 @@ function App() {
 function Editor() {
   const [cursor] = useState(createCursorPosition);
   const editor = useEditorSession(cursor.update);
+  const gradient = useGradient(editor);
   const sketch = useSketch(editor);
   const workbenches = useWorkbenches(editor);
   const historyPreview = usePreviewState();
@@ -468,6 +470,7 @@ function Editor() {
           overOperationRow={operations.dropKey !== null}
           fitCue={fixtures.fitCue}
           editor={editor}
+          gradient={gradient}
           sketch={sketch}
           onDropFiles={project.importFiles}
           overlay={<PresenceOverlay getSession={editor.getSession} />}
@@ -493,6 +496,7 @@ function Editor() {
           sketch={sketch}
           workbenches={workbenches}
           editor={editor}
+          gradient={gradient}
           document={documentPanel}
           panelOpen={panelOpen}
           project={project}

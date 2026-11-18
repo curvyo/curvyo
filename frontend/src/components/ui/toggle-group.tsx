@@ -79,15 +79,26 @@ export function ToggleGroup<T extends string>({
       value={value ?? ""}
       onValueChange={(next) => onChange(next as T)}
       onKeyDownCapture={(event) => {
-        // Home and End select the first and last item, as the arrows select
-        // the next: Radix moves focus on them but does not select.
-        if (event.key !== "Home" && event.key !== "End") {
+        // The arrows select the next or previous item (wrapping), Home and End the
+        // first and last: Radix moves focus on them, but selects on an arrow only
+        // when the key reaches the document, which a panel that keeps its keys
+        // from the canvas prevents (`0124` UX review U10).
+        const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+        if (event.key !== "Home" && event.key !== "End" && step === undefined) {
           return;
         }
         const items = Array.from(
           event.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]:not(:disabled)'),
         );
-        const target = event.key === "Home" ? items[0] : items[items.length - 1];
+        const at = items.indexOf(event.target as HTMLElement);
+        const target =
+          step !== undefined
+            ? at < 0
+              ? undefined
+              : items[(at + step + items.length) % items.length]
+            : event.key === "Home"
+              ? items[0]
+              : items[items.length - 1];
         if (target) {
           event.preventDefault();
           event.stopPropagation();
