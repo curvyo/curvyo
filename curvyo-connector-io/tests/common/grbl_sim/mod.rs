@@ -50,6 +50,12 @@ pub struct SimConfig {
     pub buffer_reports: bool,
     /// Built without `DISABLE_LASER_DURING_HOLD`: with `$32=1` the laser stays on in a hold.
     pub laser_on_in_hold: bool,
+    /// GRBL 1.1f's homing loop: no `?` is answered while it runs; one `?` received meanwhile
+    /// is answered (`<Home|...>`) when the cycle ends, before its `ok` (`specs/0129`).
+    pub quiet_homing: bool,
+    /// The homing cycle ends in this alarm (8 pull-off, 9 switch not found): `ALARM:<n>`, the
+    /// `ok` of `$H`, then GRBL restarts itself locked (banner and unlock message).
+    pub homing_fails: Option<u16>,
 }
 
 impl Default for SimConfig {
@@ -67,6 +73,8 @@ impl Default for SimConfig {
             wco: [0.0; 3],
             buffer_reports: false,
             laser_on_in_hold: false,
+            quiet_homing: false,
+            homing_fails: None,
         }
     }
 }
@@ -118,6 +126,8 @@ pub struct GrblSim {
     pub alarm: bool,
     critical: bool,
     homing: Option<u32>,
+    /// A `?` came during a quiet homing cycle.
+    report_owed: bool,
     hold: Option<Hold>,
     reports: u32,
     /// Answers nothing and takes nothing (a dead controller on a live port).
@@ -182,6 +192,7 @@ impl GrblSim {
             relative: false,
             critical: false,
             homing: None,
+            report_owed: false,
             hold: None,
             reports: 0,
             silent: false,
@@ -231,6 +242,9 @@ impl GrblSim {
                     .push(format!("real-time byte {b:#04x} inside a line"));
             }
             match b {
+                b'?' if self.homing.is_some() && self.config.quiet_homing => {
+                    self.report_owed = true;
+                }
                 b'?' => self.report(),
                 b'!' => self.feed_hold(),
                 b'~' => self.cycle_start(),
@@ -283,6 +297,7 @@ impl GrblSim {
         self.planned = self.pos;
         self.hold = None;
         self.homing = None;
+        self.report_owed = false;
         self.spindle = Spindle::Off;
         self.power = 0.0;
         self.air = false;
@@ -355,7 +370,21 @@ impl GrblSim {
         if let Some(n) = self.homing.as_mut() {
             *n = n.saturating_sub(1);
             if *n == 0 {
+                if std::mem::take(&mut self.report_owed) {
+                    self.report();
+                }
                 self.homing = None;
+                if let Some(code) = self.config.homing_fails {
+                    self.alarm = true;
+                    self.print(&format!("ALARM:{code}"));
+                    self.print("ok");
+                    self.rx.clear();
+                    let banner = format!("Grbl {} ['$' for help]", self.config.version);
+                    self.print("");
+                    self.print(&banner);
+                    self.print("[MSG:'$H'|'$X' to unlock]");
+                    return;
+                }
                 self.alarm = false;
                 self.pos = [0.0; 3];
                 self.planned = self.pos;

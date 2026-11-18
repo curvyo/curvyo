@@ -238,6 +238,22 @@ impl GrblController {
         self.identify.is_none() && at.saturating_sub(self.last_report) >= self.timing.loss
     }
 
+    /// While `$H` is in flight: GRBL 1.1's homing loop answers no `?` until the cycle ends
+    /// (`specs/0129`), so the silence is no loss and the loss clock restarts when homing ends;
+    /// a port error still is one, and the stop of G12 keeps its own banner limit. The state
+    /// word reads `Home` meanwhile, as the reports of a GRBL that does answer show it.
+    fn during_homing(&mut self, at: Duration) {
+        if !self.stream.as_ref().is_some_and(Stream::homing) {
+            return;
+        }
+        self.last_report = at;
+        if self.word.as_deref() != Some("Home") {
+            self.word = Some("Home".to_owned());
+            self.notices.push("Controller state: Home".to_owned());
+            self.events.push(Event::ControllerWord(self.word.clone()));
+        }
+    }
+
     fn take(&mut self) -> Advance {
         Advance {
             events: std::mem::take(&mut self.events),
@@ -392,6 +408,7 @@ impl Controller for GrblController {
             return Advance::default();
         }
         let lines = self.lines.push(read);
+        self.during_homing(at);
         let answered = lines.iter().any(|l| l.starts_with('<'));
         if self.stale(at) && !answered {
             // Judged before anything else is read, so no status of a stale link goes out. During
