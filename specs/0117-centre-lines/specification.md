@@ -1,6 +1,6 @@
 # Centre lines: filled line art becomes variable-width paths
 
-Status: In progress: Join tips follow-up on `story/centre-lines-tips` (criterion 9b); the first slice Done (PR #366)
+Status: Done (PR #366, follow-up PR #377: Join tips)
 Priority: Should
 Origin: Customer, 2026-11-15 ("Center finding with variable path width"; the example was a line-art whale: black strokes of varying thickness, closed outlines, an eye with a filled pupil, mouth lines, branching). Items marked **(Proposal)** are the product owner's and vetoable at the demo.
 Depends on: `0110-pen-modes-variable-stroke` and ADR 0053 (width profile), `0085-stroke-to-path` (the inverse operation, the check for criterion 5), `0025-raster-trace` and `0108-trace-library-extraction` (where such shapes come from), `0016-boolean-operations` (kernel tolerance 0.01 mm), `0020-undo-redo`, `0049-linked-clone`.
