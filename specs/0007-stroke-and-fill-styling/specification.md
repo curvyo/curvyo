@@ -5,6 +5,8 @@ Delivered in four PRs: #54 (model, format version 7), #55 (rendering, hit-testin
 Priority: Must
 Origin: Customer
 
+> **Gradients are back (2026-11-18):** [`0124-gradient-fill`](../0124-gradient-fill/specification.md) (Done, PR #389) adds a Gradient fill paint; the removal below is reversed for fills only.
+>
 > **Superseded in part by [`style-panel-rework`](../0017-style-panel-rework/specification.md)
 > (customer decisions after trying this slice, 2026-10-08).** Gradient fills are
 > removed completely (criteria 16 to 22, 34, 35 and every gradient clause), the

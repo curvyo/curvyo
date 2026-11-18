@@ -1,6 +1,6 @@
 # Raster engraving: engrave images and gradient-filled shapes as rows of dots, with dither modes, from an Engrave operation
 
-Status: Draft (depends on `0124` gradient-fill, which is built first)
+Status: Ready (customer merged the spec PR #380; depends on `0124` gradient-fill, which is built first)
 Priority: Should
 Origin: Customer (earlier wish, kept in the backlog since `0063`: "image engraving with dithering, a gradient for tests, an interval test with dithering and crosshatch"; R-MFG-LASER-001 "raster engrave fills"). Everything marked **(Proposal)** is the product owner's and vetoable at the demo. Frage 227 to 231 are answered (customer, 2026-11-17: 227 C, 228 A, 229 A, 230 B, 231 A; see "Decided questions"); Frage 237 is open with a safe default (A). Frage 227 C moved the gradient out of this story into `0124-gradient-fill`, which must be built first; this story engraves what `0124` draws.
 

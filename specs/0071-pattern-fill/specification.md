@@ -88,7 +88,7 @@ Slice
 - Motif (a user shape repeated): `0069` tiling clipped to the region; the maker does the two steps (PAT-MOTIF A). Tiling `0069` is being built separately.
 - A tile library or store; Penrose, Truchet and other tilings.
 - Choosing other curves for Interpolation waves than the top and bottom boundary.
-- Gradient fills; SVG `pattern` element output.
+- Gradient fills (built later as a third fill paint by [`0124`](../0124-gradient-fill/specification.md)); SVG `pattern` element output.
 - Machine fill / scan lines (`0063`).
 - Pattern along a path (`0033`).
 - A rail tool or top bar for patterns.

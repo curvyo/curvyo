@@ -139,7 +139,7 @@ double-click the host reads the entry box from `gradient_handles_json()`.
 
 ### Part E: gate, docs, PR (lead)
 
-- [ ] E1. Full gate (`CLAUDE.md` §7), browser check on WebKitGTK, design-system row confirmed,
+- [x] E1. Full gate (`CLAUDE.md` §7), browser check on WebKitGTK, design-system row confirmed,
   spec `Status: Done (PR #n)`, PR description with the review guide (AC 26).
 
 ## Validation
