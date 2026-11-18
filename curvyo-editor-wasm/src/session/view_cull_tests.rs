@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 
 use curvyo_document_core::{
-    AnchorId, Length, LineCap, LineJoin, MarkerShape, NewAnchor, NodeId, Point, StyleEdit,
+    AnchorId, CurveKind, Length, LineCap, LineJoin, MarkerShape, NewAnchor, NodeId, ObjectSnapshot,
+    Point, StyleEdit, SubpathSnapshot,
 };
 use curvyo_render_core::{DrawList, Vertex};
 
 use super::super::Session;
+use super::in_view;
 
 /// A session whose canvas is 800 x 600 CSS pixels, at the default view.
 fn session() -> Session {
@@ -220,4 +222,32 @@ fn a_side_pane_does_not_shrink_the_visible_rectangle() {
         (covered.max.x - whole.max.x).abs() < 1e-9,
         "{covered:?} {whole:?}"
     );
+}
+
+/// A path whose bounds cannot be computed (a compound Spiro path, `evaluate_path` refuses it)
+/// is never left out: its fallback box at the origin is off the canvas, the object is on it.
+#[test]
+fn an_object_whose_bounds_fail_is_kept() {
+    let mut session = session();
+    // Pan until the document origin is well off the canvas.
+    session.begin_pan(400.0, 300.0);
+    session.pan_to(0.0, 0.0);
+    session.end_pan();
+    let rect = session.visible_rect().unwrap();
+    let origin = Point::new(0.0, 0.0);
+    assert!(origin.x < rect.min.x || origin.x > rect.max.x, "{rect:?}");
+    let (x, y) = (rect.min.x + 5.0, rect.min.y + 5.0);
+    path(&session, &[(x, y), (x + 20.0, y + 9.0)], false, 0.5, 1);
+    let mut objects = session.render_objects().to_vec();
+    let ObjectSnapshot::Path(snapshot) = &mut objects[0] else {
+        panic!("a path");
+    };
+    snapshot.curve_kind = CurveKind::Spiro;
+    snapshot.extra_subpaths.push(SubpathSnapshot {
+        closed: false,
+        anchors: snapshot.anchors.clone(),
+    });
+    assert!(curvyo_ui_core::try_object_outline_bounds(&objects[0]).is_none());
+    let kept = in_view(&objects, &HashSet::new(), session.visible_rect());
+    assert_eq!(kept.len(), 1, "an object whose bounds failed was culled");
 }

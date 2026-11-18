@@ -423,6 +423,7 @@ pub use nudge::{
 };
 pub use object_bounds::{
     content_bounds, object_bounds, object_bounds_with_artwork, object_outline_bounds,
+    try_object_outline_bounds,
 };
 pub use object_history_text::{object_row_name, object_row_summary};
 pub use object_selection::{ObjectSelection, SelectionCombine};

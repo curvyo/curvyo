@@ -43,40 +43,42 @@ fn anchors_bounds(anchors: &[(Point, Vec2, Vec2)], closed: bool) -> (Point, Poin
 
 /// The bounds of all of a path's outlines (criterion 34: a compound path's
 /// selection box is the box of every outline).
-fn path_bounds(path: &PathSnapshot) -> (Point, Point) {
+///
+/// `None` when the curve cannot be evaluated (a compound Spiro path).
+fn path_bounds(path: &PathSnapshot) -> Option<(Point, Point)> {
     if !path.width_points.is_empty()
         && let Ok((fill, outline)) = crate::verified_variable_stroke_artwork(path)
     {
-        let (low, high) = path_bounds(&fill);
+        let (low, high) = path_bounds(&fill)?;
         if let Some(outline) = outline {
-            let (other_low, other_high) = path_bounds(&outline);
-            return (
+            let (other_low, other_high) = path_bounds(&outline)?;
+            return Some((
                 Point::new(low.x.min(other_low.x), low.y.min(other_low.y)),
                 Point::new(high.x.max(other_high.x), high.y.max(other_high.y)),
-            );
+            ));
         }
-        return (low, high);
+        return Some((low, high));
     }
-    let Ok(evaluated) = crate::evaluate_path(path) else {
-        return (Point::new(0.0, 0.0), Point::new(0.0, 0.0));
-    };
-    evaluated
-        .subpaths()
-        .map(|subpath| {
-            let anchors: Vec<_> = subpath
-                .anchors
-                .iter()
-                .map(|a| (a.point, a.handle_in, a.handle_out))
-                .collect();
-            anchors_bounds(&anchors, subpath.closed)
-        })
-        .reduce(|(min_a, max_a), (min_b, max_b)| {
-            (
-                Point::new(min_a.x.min(min_b.x), min_a.y.min(min_b.y)),
-                Point::new(max_a.x.max(max_b.x), max_a.y.max(max_b.y)),
-            )
-        })
-        .unwrap_or((Point::new(0.0, 0.0), Point::new(0.0, 0.0)))
+    let evaluated = crate::evaluate_path(path).ok()?;
+    Some(
+        evaluated
+            .subpaths()
+            .map(|subpath| {
+                let anchors: Vec<_> = subpath
+                    .anchors
+                    .iter()
+                    .map(|a| (a.point, a.handle_in, a.handle_out))
+                    .collect();
+                anchors_bounds(&anchors, subpath.closed)
+            })
+            .reduce(|(min_a, max_a), (min_b, max_b)| {
+                (
+                    Point::new(min_a.x.min(min_b.x), min_a.y.min(min_b.y)),
+                    Point::new(max_a.x.max(max_b.x), max_a.y.max(max_b.y)),
+                )
+            })
+            .unwrap_or((Point::new(0.0, 0.0), Point::new(0.0, 0.0))),
+    )
 }
 
 /// The selection-box bounds of `object`, whichever kind it is (acceptance
@@ -94,7 +96,7 @@ pub fn object_bounds(object: &ObjectSnapshot) -> (Point, Point) {
         ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
-            path_bounds(path)
+            path_bounds(path).unwrap_or((Point::new(0.0, 0.0), Point::new(0.0, 0.0)))
         }
         ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => {
             (Point::new(0.0, 0.0), Point::new(0.0, 0.0))
@@ -127,10 +129,19 @@ fn dimension_bounds(dimension: &curvyo_document_core::DimensionSnapshot) -> (Poi
 /// unrotated frame box) and without the stroke width.
 #[must_use]
 pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
+    try_object_outline_bounds(object).unwrap_or((Point::new(0.0, 0.0), Point::new(0.0, 0.0)))
+}
+
+/// [`object_outline_bounds`], or `None` when the bounds cannot be computed (a path whose curve
+/// cannot be evaluated, such as a compound Spiro path): a caller can tell that failure from a
+/// box at the origin.
+#[must_use]
+pub fn try_object_outline_bounds(object: &ObjectSnapshot) -> Option<(Point, Point)> {
     if let Some(picture) = object.picture() {
-        return union_of(picture.iter().map(object_outline_bounds));
+        let boxes: Option<Vec<_>> = picture.iter().map(try_object_outline_bounds).collect();
+        return boxes.map(|boxes| union_of(boxes.into_iter()));
     }
-    match object {
+    Some(match object {
         ObjectSnapshot::Text(text) if text.outline.is_none() => {
             crate::text_box::line_box_bounds(text)
         }
@@ -142,7 +153,7 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
         | ObjectSnapshot::Text(_)
             if let Some(path) = object.drawn_path() =>
         {
-            path_bounds(path)
+            return path_bounds(path);
         }
         // The exact box of an arc's drawn part, not of its cubics
         // (`specs/0021-ellipse-arcs-and-shaping/` criteria 9 and 54).
@@ -168,7 +179,7 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
                 .collect();
             anchors_bounds(&anchors, outline.closed)
         }
-    }
+    })
 }
 
 pub(crate) fn object_outline_bounds_with_artwork(
