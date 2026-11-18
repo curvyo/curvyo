@@ -2602,3 +2602,20 @@ crest's straight leg was fitted with a 121 mm handle and painted 15 mm outside t
 whose cubic strays more than three times the accuracy from the piece's points (no issue filed
 yet; the lead files it upstream with the one above). **Resolution:** drop `strays` once kurbo
 measures the error both ways.
+
+## Centre lines: known remainders (`0117`, 2026-11-18)
+
+Accepted by the customer on 2026-11-18; the paths and junctions stay as they are and are refined
+for satin stitch (embroidery family) rather than here.
+
+- A crest wider than about 130 degrees, or one with a rounded trace corner, has no tip spur: the
+  two arms stay two paths (trunk plus overlapping branch). Two thin orca crests are not reached.
+- A flipper corner paints up to 0.51 mm outside the shape; one orca leg 0.166 mm at a 50 degree crest.
+- T-junction branch ends are butt-cut rectangles (real branches, not tips); the preview draws the
+  branch outline over the trunk when Overlap is above 0.
+- Applying at 10k nodes or more freezes the main thread for 0.8 to 1 s (Frage 227, default A);
+  the preview costs 0.43 s per frame at 93k nodes; the native 100k test is `#[ignore]`d; the
+  worker memory is 306 of 320 MB at 93k nodes.
+- Optional input of the earlier plan: more nodes per joined tip (about 8 width points each).
+
+**Resolution:** satin-stitch story; off-thread commit for the freeze.
