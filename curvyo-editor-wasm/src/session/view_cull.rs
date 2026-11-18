@@ -9,7 +9,7 @@ use curvyo_document_core::{NodeId, ObjectSnapshot, Point};
 
 use super::Session;
 
-/// How far a stroke reaches past its path, in stroke widths: a miter (limit 4, so 2 widths), a
+/// How far a stroke reaches past its path, in stroke widths: a miter (limit 2, so 1 width), a
 /// square cap (0.71) and an arrow marker (2 widths past the end) all stay inside 3.
 const STROKE_REACH: f64 = 3.0;
 
@@ -54,7 +54,10 @@ impl VisibleRect {
             0.0
         };
         let margin = STROKE_REACH * stroke + MARGIN_PX / self.scale;
-        let (low, high) = curvyo_ui_core::object_outline_bounds(object);
+        // Bounds that cannot be computed (a compound Spiro path) never cull: the object stays.
+        let Some((low, high)) = curvyo_ui_core::try_object_outline_bounds(object) else {
+            return true;
+        };
         !(high.x + margin < self.min.x
             || low.x - margin > self.max.x
             || high.y + margin < self.min.y
