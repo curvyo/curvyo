@@ -12,12 +12,19 @@ python3 -I tools/perf/measure.py --timeout 900 # stop after 900 s (default 600)
 When the page's `done` event does not arrive in time the runner prints `timed out before scenario X`
 and reports the scenarios that ended.
 
-Needs `xvfb-run`, `npx`, `cargo`, and a built wasm (`cd frontend && npm run build:wasm`). Raw data goes to
-`target/perf/events.ndjson` (probe, one line per second per scenario) and `target/perf/procs.json`.
+Needs `xvfb-run`, `npx`, `cargo` and ImageMagick (`import`, `identify`; without them the screenshot
+check is skipped). Raw data goes to `target/perf/events.ndjson` (probe, one line per second per
+scenario), `target/perf/procs.json` and `target/perf/<scenario>-start.png`/`-end.png` (the canvas at
+the scenario's start and end).
+
+The build step runs `npm run build:wasm` first. `vite build` alone bundles whatever
+`frontend/src/wasm-bindings` holds; bindings older than the page (before `frame_state` existed, say)
+make the render loop throw on its first tick, so every column reads 0 and zoom and pan end in about
+6 s instead of 35 s (seen 2026-11-18 after PR #387). `--no-build` keeps that risk.
 
 ## How it works
 
-1. `vite build` with `VITE_CURVYO_PERF=ws://127.0.0.1:47126` into `frontend/dist-perf/` (git-ignored),
+1. `npm run build:wasm`, then `vite build` with `VITE_CURVYO_PERF=ws://127.0.0.1:47126` into `frontend/dist-perf/` (git-ignored),
    then `cargo build -p curvyo-app` with `TAURI_CONFIG` pointing `frontendDist` at it. The probe is
    compiled in only by that variable, so a normal build has no probe, no socket and no UI. Note: this
    overwrites `target/debug/curvyo-app` with the perf build; a normal `cargo build` restores it.
@@ -45,7 +52,10 @@ in `WasmSession::frame_state`, resize frames included; since phase 1); `changed/
 generation changed (every change of the session: document, view, selection, tool, hover, ...);
 `render ms` main-thread time per tick, average and worst; `pages/s` and `pages ms` the same for the
 `PageFrames` tick. `changes by` names the three source lines in `curvyo-editor-wasm` that changed the
-session most often (`WasmSession::take_change_sites`): what keeps a document drawing.
+session most often (`WasmSession::take_change_sites`): what keeps a document drawing. `view` is the
+view (origin x, origin y, scale) at the scenario's start and end, and whether the canvas screenshot
+changed. Warnings: `render loop not running` when built/s is 0, `scenario did not move the view` when
+a zoom or pan scenario has changed/s = 0; `page error` lines carry uncaught errors of the page.
 
 ## First numbers (this machine, 2026-11-18, Xvfb, no GPU)
 
@@ -85,6 +95,19 @@ shows a canvas one frame late, and without the repeat the screen kept the frame 
 (screenshots under Xvfb, both compositing modes; with the repeat the page stays right through 20 s of
 idle and a pointer over the toolbar). What remains idle is the other `requestAnimationFrame` loops (`PageFrames`,
 rulers, overlays; `pages/s` stays at 62) and WebKit itself.
+
+## After PR #387 (same machine, 2026-11-18, Xvfb, no GPU): the baseline for phase 4
+
+| scenario | s | CPU % of a core | peak RSS MiB | built/s | submit/s | changed/s | render ms avg (max) | view start -> end |
+|---|---|---|---|---|---|---|---|---|
+| idle-empty | 14 | 9.6 | 758 | 61.7 | 0.0 | 0.0 | 0.05 (1) | unchanged |
+| idle-5000 | 29 | 8.6 | 951 | 61.8 | 0.0 | 0.0 | 0.03 (1) | unchanged |
+| wheel-zoom | 38 | 173 | 1778 | 8.7 | 8.6 | 8.6 | 105 (212) | scale 3.78 -> 15.9, canvas changed |
+| pan-drag | 31 | 179 | 1699 | 11.9 | 10.2 | 10.2 | 74 (98) | origin (58, 72) -> (73, 80), canvas changed |
+
+Every zoom and pan event draws (one submit per changed tick); a frame of the 5 000-path page costs
+about 75-105 ms in software rendering, which is the draw-list cost phase 4 starts from. A run that
+showed 0.0 in every column with a 7 s zoom was a stale wasm build, not the frame gate (see above).
 
 ## Not done / could not run
 

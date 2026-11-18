@@ -3,6 +3,7 @@
 // Compiled out unless the frontend is built with `VITE_CURVYO_PERF=ws://127.0.0.1:<port>`
 // (`tools/perf/measure.py` does that); a normal build has no probe, no socket and no UI.
 import type { WasmSession } from "@/lib/editorSession";
+import { frameView } from "@/lib/frameState";
 
 const target: string | undefined = import.meta.env.VITE_CURVYO_PERF;
 export const perfEnabled = typeof target === "string" && target.length > 0;
@@ -26,6 +27,10 @@ function send(message: object) {
 
 function start() {
   if (!perfEnabled || socket) return;
+  // An error that stops the render loop or the scenarios (a wasm binding older than the page,
+  // say) names itself in the runner's table instead of leaving zero counters.
+  window.addEventListener("error", (event) => send({ event: "error", scenario, message: String(event.message) }));
+  window.addEventListener("unhandledrejection", (event) => send({ event: "error", scenario, message: String(event.reason) }));
   socket = new WebSocket(target as string);
   socket.onopen = () => {
     for (const text of queue.splice(0)) socket?.send(text);
@@ -107,11 +112,20 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
   while (!getSession()) await sleep(200);
   await sleep(1500);
   const session = getSession() as WasmSession;
+  // The view (origin x, origin y, scale) at a scenario's start and end: a zoom or pan that left
+  // it unchanged did not reach the session. `canvas` is the canvas in device pixels of the
+  // window, which the runner crops its screenshots to.
+  const view = () => frameView(session.frame_state());
+  const where = () => {
+    const box = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio;
+    return [box.left, box.top, box.width, box.height].map((value) => Math.round(value * ratio));
+  };
   const mark = async (name: string, body: () => Promise<void>) => {
     scenario = name;
-    send({ event: "scenario", name, state: "start" });
+    send({ event: "scenario", name, state: "start", view: view(), canvas: where() });
     await body();
-    send({ event: "scenario", name, state: "end" });
+    send({ event: "scenario", name, state: "end", view: view(), canvas: where() });
     scenario = "between";
     await sleep(1500);
   };
