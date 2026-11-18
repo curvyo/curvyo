@@ -6,7 +6,11 @@ new crate, no new dependency (Python standard library only).
 ```text
 python3 -I tools/perf/measure.py            # builds, runs about 3.5 minutes, prints the table
 python3 -I tools/perf/measure.py --no-build # reuse the last perf build
+python3 -I tools/perf/measure.py --timeout 900 # stop after 900 s (default 600)
 ```
+
+When the page's `done` event does not arrive in time the runner prints `timed out before scenario X`
+and reports the scenarios that ended.
 
 Needs `xvfb-run`, `npx`, `cargo`, and a built wasm (`cd frontend && npm run build:wasm`). Raw data goes to
 `target/perf/events.ndjson` (probe, one line per second per scenario) and `target/perf/procs.json`.
@@ -36,10 +40,12 @@ fall behind, so a 5 s scenario can take longer.
 ## Columns
 
 `cpu %core` process-tree CPU in percent of one core over the scenario; `peak RSS` of the tree;
-`built/s` render-loop ticks, `submit/s` ticks that called `session.render()` (equal today, phase 1
-makes them differ), `changed/s` ticks whose view string (origin, scale) differed from the previous
-tick (document edits are not seen; the generation counter is phase 1); `render ms` main-thread time per
-tick, average and worst; `pages/s` and `pages ms` the same for the `PageFrames` tick.
+`built/s` render-loop ticks; `submit/s` frames the session really submitted to the GPU (its own counter
+in `WasmSession::frame_state`, resize frames included; since phase 1); `changed/s` ticks whose frame
+generation changed (every change of the session: document, view, selection, tool, hover, ...);
+`render ms` main-thread time per tick, average and worst; `pages/s` and `pages ms` the same for the
+`PageFrames` tick. `changes by` names the three source lines in `curvyo-editor-wasm` that changed the
+session most often (`WasmSession::take_change_sites`): what keeps a document drawing.
 
 ## First numbers (this machine, 2026-11-18, Xvfb, no GPU)
 
@@ -59,11 +65,29 @@ the empty page, `changed/s` = 0); `PageFrames` adds one `pages_json()` per frame
 0.05 ms and is not the main cost. `WebKitWebProcess` carries almost all CPU; the app process itself is
 about 1 %. Zoom and pan peak RSS exceeds idle by about 0.5-0.9 GiB.
 
+## After phase 1: idle frames skipped (same machine, 2026-11-18, Xvfb, no GPU)
+
+Software rendering again, so **compare the ratios, not the absolute values**; on a real GPU the idle
+cost is smaller in both columns.
+
+| scenario | CPU % of a core before | after | submit/s before | after | changed/s after | render ms avg before | after |
+|---|---|---|---|---|---|---|---|
+| idle-empty (15 s) | 361 | 9.8 | 59.7 | 0.1 | 0.1 | 9.7 | 0.06 |
+| idle-5000 (30 s) | 232 | 8.7 | 9.8 | 0.0 | 0.0 | 100 | 0.03 |
+| wheel-zoom | 168 | 173 | 7.9 | 8.4 | 8.4 | 115 | 106 |
+| pan-drag | 180 | 179 | 10.2 | 9.8 | 9.8 | 87 | 75 |
+
+Idle CPU drops by a factor of about 25 to 35: an unchanged document builds and submits no frame, and the
+render loop asks one `frame_state()` per animation frame (on the 5 000-path page the loop runs at 62 ticks
+per second again instead of 10). Zoom and pan are unchanged, as expected: every one of their frames is a
+change (phase 2 to 4). What remains idle is the other `requestAnimationFrame` loops (`PageFrames`,
+rulers, overlays; `pages/s` stays at 62) and WebKit itself.
+
 ## Not done / could not run
 
 - No GPU: Xvfb gives software drawing only. Numbers on a real GPU need the same script on a desktop
   session (`DISPLAY` set, drop `xvfb-run`), which is not wired yet.
 - `tauri-driver` needs `WebKitWebDriver`, which is missing here; not used (events are synthetic).
 - No Chromium comparison or Chrome trace yet; no whale/dolphin documents (see above).
-- Rust-side counters in `curvyo-editor-wasm` (draw list vs GPU submit split) are not added; render ms is
-  the whole `renderLoop` tick.
+- No split of a drawn frame's time into draw list and GPU submit; render ms is the whole `renderLoop`
+  tick (the submit counter and the change sites are Rust-side since phase 1).

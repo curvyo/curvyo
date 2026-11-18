@@ -17,6 +17,15 @@ import { type RecogniseApi, useRecognise } from "@/hooks/useRecognise";
 import { type TilingApi, useTiling } from "@/hooks/useTiling";
 import { type TraceApi, useTrace } from "@/hooks/useTrace";
 import { ViewRest } from "@/lib/viewRest";
+import {
+  FRAME_FLAGS,
+  FRAME_GENERATION,
+  FRAME_NEEDED,
+  FRAME_NOTICES,
+  FRAME_SUBMITTED,
+  FRAME_SYNC_LINK,
+  frameView,
+} from "@/lib/frameState";
 import { perfStart, renderTick, startPerfScenarios } from "@/lib/perfProbe";
 import { renderPageThumbnail } from "@/lib/pageThumbnail";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
@@ -1616,57 +1625,102 @@ export function useEditorSession(
     // The Trace tool draws its kept meshes while the view moves and tessellates them again for
     // the new zoom once it rests (`specs/0025-raster-trace` criterion 56).
     const viewRest = new ViewRest();
+    // The session and frame generation the rest of the loop last ran for: an idle frame asks one
+    // `frame_state` and nothing else, and the session builds and submits no frame
+    // (`specs/0126-performance-pass` phase 1). Every call that changes the session changes the
+    // generation.
+    let seenSession: WasmSession | null = null;
+    let seenGeneration = -1;
     startPerfScenarios(canvas ?? null, () => sessionRef.current);
     let frame = requestAnimationFrame(function renderLoop() {
       const probeStart = perfStart();
-      let probeView = "";
       const session = sessionRef.current;
+      let state: Float64Array | null = null;
       if (session) {
-        const moving = viewRest.update(`${session.view_origin_x()},${session.view_origin_y()},${session.view_scale()}`, performance.now());
+        state = session.frame_state();
+        // Fed every frame: "rested" follows from the time alone, with no change of the session.
+        const moving = viewRest.update(frameView(state), performance.now());
         if (moving !== null) {
           session.set_trace_view_moving(moving);
         }
-      }
-      // Remote records of a shared document are imported before the frame is drawn, all of them
-      // in one redraw (`specs/0092-cooperative-editing` adrs.md decision 3); the panels follow.
-      if (session?.sync_frame_start() && session.take_sync_changed()) {
-        syncFromSessionRef.current();
-      }
-      session?.render();
-      // The refusals of width editing show beside the pointer (UX review U8).
-      const unsupportedWidth = session?.take_unsupported_width_notice();
-      if (unsupportedWidth) showRefusalRef.current(unsupportedWidth);
-      const widthEditNotice = session?.take_width_edit_notice();
-      if (widthEditNotice) showRefusalRef.current(widthEditNotice);
-      // An image of an opened project whose picture cannot be read, once per open
-      // (`specs/0058-bitmap-import` criterion 30).
-      const badAsset = session?.take_bad_asset_notice();
-      if (badAsset) {
-        showNoticeRef.current(badAsset, 5000, "canvas", "alert");
-      }
-      if (session) {
-        const view = `${session.view_origin_x()},${session.view_origin_y()},${session.view_scale()}`;
-        probeView = view;
-        if (view !== tagView) {
-          tagView = view;
-          refreshClonesRef.current();
-          refreshSketch();
+        // Remote records of a shared document are imported before the frame is drawn, all of
+        // them in one redraw (`specs/0092-cooperative-editing` adrs.md decision 3); the panels
+        // follow.
+        const linked = (state[FRAME_FLAGS] & FRAME_SYNC_LINK) !== 0;
+        if (linked && session.sync_frame_start() && session.take_sync_changed()) {
+          syncFromSessionRef.current();
+        }
+        if (moving !== null || linked) {
+          state = session.frame_state();
+        }
+        const fresh = session !== seenSession || state[FRAME_GENERATION] !== seenGeneration;
+        const draw = state[FRAME_NEEDED] === 1;
+        if (fresh || draw || (state[FRAME_FLAGS] & FRAME_NOTICES) !== 0) {
+          if (draw) {
+            session.render();
+          }
+          // The refusals of width editing show beside the pointer (UX review U8); a frame's
+          // drawing can raise one, so they are read after it.
+          const unsupportedWidth = session.take_unsupported_width_notice();
+          if (unsupportedWidth) showRefusalRef.current(unsupportedWidth);
+          const widthEditNotice = session.take_width_edit_notice();
+          if (widthEditNotice) showRefusalRef.current(widthEditNotice);
+          // An image of an opened project whose picture cannot be read, once per open
+          // (`specs/0058-bitmap-import` criterion 30).
+          const badAsset = session.take_bad_asset_notice();
+          if (badAsset) {
+            showNoticeRef.current(badAsset, 5000, "canvas", "alert");
+          }
+          state = session.frame_state();
+          const view = frameView(state);
+          if (view !== tagView) {
+            tagView = view;
+            refreshClonesRef.current();
+            refreshSketch();
+          }
+          // An open typed entry follows every pan, zoom and resize, whatever moved the view: the
+          // chip stays where its placement rule puts it (`0047` UX review N1). A re-read that
+          // changed nothing sets no state.
+          if (entryOpenRef.current) {
+            syncEntry(session);
+          }
+          seenSession = session;
+          seenGeneration = state[FRAME_GENERATION];
         }
       }
-      // An open typed entry follows every pan, zoom and resize, whatever moved the view: the
-      // chip stays where its placement rule puts it (`0047` UX review N1). A re-read that
-      // changed nothing sets no state.
-      if (session && entryOpenRef.current) {
-        syncEntry(session);
-      }
-      renderTick(probeStart, session != null, probeView);
+      renderTick(
+        probeStart,
+        state ? state[FRAME_GENERATION] : -1,
+        state ? state[FRAME_SUBMITTED] : 0,
+        () => session?.take_change_sites() ?? "",
+      );
       frame = requestAnimationFrame(renderLoop);
     });
+
+    // A page shown again is drawn again, whatever it kept; a move to a screen of another pixel
+    // ratio resizes the backing buffer and draws (the ResizeObserver sees no change of CSS size).
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") sessionRef.current?.request_frame();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    let ratioQuery: MediaQueryList | null = null;
+    const onRatio = () => {
+      fitCanvas();
+      watchRatio();
+    };
+    const watchRatio = () => {
+      ratioQuery?.removeEventListener("change", onRatio);
+      ratioQuery = window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`) ?? null;
+      ratioQuery?.addEventListener("change", onRatio);
+    };
+    watchRatio();
 
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame);
       resizeObserver?.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+      ratioQuery?.removeEventListener("change", onRatio);
       canvas?.removeEventListener("wheel", onWheel);
       // Queued, not immediate: an `attach_canvas` still in flight must
       // finish before its session is freed. StrictMode's remount queues

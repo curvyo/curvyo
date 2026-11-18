@@ -20,6 +20,16 @@ measurement; headless Chromium (Playwright) is only a comparison.
   `PageFrames`) and the first measured numbers of the lag, committed as `tools/perf/README.md`.
 
 ## Phase 1: stop idle work (`fix/`, expected biggest win)
+
+**Status 2026-11-18: built on `fix/idle-frame-skip`.** Every mutable access to the `Session` of a
+`WasmSession` bumps the frame generation (`curvyo-editor-wasm/src/frame_gate.rs`, `DerefMut`), so no
+trigger list can miss a call; per-frame hand-outs (notices, write queues, sync actions) are taken
+untracked, and the sync clock and frame start count only when they move the document. `render()`
+returns early while the GPU target shows the present generation; `attach_canvas`, `resize`, a failed
+submit and `request_frame()` (page shown again) force a frame; a devicePixelRatio change resizes. The
+loop asks `frame_state()` once per frame. Fixture reads are cached by document version, page choice
+and extensions. Idle CPU under Xvfb: 361 % to 10 % (empty), 232 % to 9 % (5 000 paths); zoom and pan
+unchanged (table in `tools/perf/README.md`).
 - A frame generation in `Session` (bumped by every document, view, selection, tool-state and overlay
   change); `render` returns early when it did not change and the GPU target is intact. Resize,
   device-lost and surface reconfigure always force a frame.
