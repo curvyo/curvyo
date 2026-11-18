@@ -1,6 +1,6 @@
-//! Holds the fixtures read from the document until a fixture, a set or the page choice changes
-//! (the `0113` debt entry): a pan, a zoom, a hover or a selection on a laser page reads no
-//! manufacturing again, however often a frame asks for its fixtures.
+//! Holds the fixtures read from the document until the document, the page choice or the
+//! extensions change (the `0113` debt entry): a pan, a zoom, a hover or a selection on a laser
+//! page reads no manufacturing again, however often a frame asks for its fixtures.
 
 use std::cell::RefCell;
 use std::sync::Arc;

@@ -150,14 +150,17 @@ impl Session {
 
     /// The screen rectangles of the DOM chips over the canvas (entry chips, hints, notices), in
     /// canvas px as `[x, y, w, h, ...]`: no tag of the marks may meet one (criterion 60). The
-    /// host reports them before it reads the tags.
-    pub fn set_clone_tag_obstacles(&mut self, flat: &[f64]) {
-        self.dom_chips = flat
+    /// host reports them before it reads the tags. Whether they changed.
+    pub fn set_clone_tag_obstacles(&mut self, flat: &[f64]) -> bool {
+        let chips: Vec<MarkRect> = flat
             .as_chunks::<4>()
             .0
             .iter()
             .map(|&[x, y, w, h]| MarkRect { x, y, w, h })
             .collect();
+        let changed = chips != self.dom_chips;
+        self.dom_chips = chips;
+        changed
     }
 
     /// The pointer or the keyboard focus rests on Select original (`"original"`) or Select root

@@ -72,15 +72,18 @@ cost is smaller in both columns.
 
 | scenario | CPU % of a core before | after | submit/s before | after | changed/s after | render ms avg before | after |
 |---|---|---|---|---|---|---|---|
-| idle-empty (15 s) | 361 | 9.8 | 59.7 | 0.1 | 0.1 | 9.7 | 0.06 |
-| idle-5000 (30 s) | 232 | 8.7 | 9.8 | 0.0 | 0.0 | 100 | 0.03 |
-| wheel-zoom | 168 | 173 | 7.9 | 8.4 | 8.4 | 115 | 106 |
-| pan-drag | 180 | 179 | 10.2 | 9.8 | 9.8 | 87 | 75 |
+| idle-empty (15 s) | 361 | 9.5 | 59.7 | 0.1 | 0.1 | 9.7 | 0.07 |
+| idle-5000 (30 s) | 232 | 8.5 | 9.8 | 0.0 | 0.0 | 100 | 0.03 |
+| wheel-zoom | 168 | 169 | 7.9 | 8.1 | 8.1 | 115 | 112 |
+| pan-drag | 180 | 179 | 10.2 | 9.8 | 9.8 | 87 | 74 |
 
-Idle CPU drops by a factor of about 25 to 35: an unchanged document builds and submits no frame, and the
+Idle CPU drops by a factor of about 27 to 38: an unchanged document builds and submits no frame, and the
 render loop asks one `frame_state()` per animation frame (on the 5 000-path page the loop runs at 62 ticks
 per second again instead of 10). Zoom and pan are unchanged, as expected: every one of their frames is a
-change (phase 2 to 4). What remains idle is the other `requestAnimationFrame` loops (`PageFrames`,
+change (phase 2 to 4). Each change is drawn twice (the repeat on the next animation frame): WebKitGTK
+shows a canvas one frame late, and without the repeat the screen kept the frame before an import
+(screenshots under Xvfb, both compositing modes; with the repeat the page stays right through 20 s of
+idle and a pointer over the toolbar). What remains idle is the other `requestAnimationFrame` loops (`PageFrames`,
 rulers, overlays; `pages/s` stays at 62) and WebKit itself.
 
 ## Not done / could not run
