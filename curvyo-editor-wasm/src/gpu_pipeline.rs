@@ -1,77 +1,14 @@
-//! The GPU pipeline's pieces: the draw-list shader, the vertex shape, the
+//! The GPU pipeline's pieces: the draw-list shader, the vertex layout, the
 //! per-frame screen transform, and the pipeline and multisampled target
 //! built from them. Split out of `gpu.rs` so that file keeps the device,
 //! surface and frame submission (`docs/technical-debt.md`, `Session` size
 //! item). Compiles for `wasm32` only, like `gpu.rs`.
 
-use curvyo_document_core::{Point, ViewTransform};
-use curvyo_render_core::{CHECKER_A, CHECKER_B, CheckerGrid, DrawList, RgbaColor};
+use curvyo_document_core::ViewTransform;
+use curvyo_render_core::{CHECKER_A, CHECKER_B, CheckerGrid, RgbaColor};
 
 use crate::gpu_shader::SHADER_SOURCE;
-
-/// One triangle-list vertex in the shape the GPU pipeline below expects:
-/// a clip-ready `f32` position (before the per-frame screen transform),
-/// a normalized `f32` color and the depth of the vertex's artwork layer.
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct GpuVertex {
-    position: [f32; 2],
-    color: [f32; 4],
-    depth: f32,
-}
-
-/// Converts a draw-list vertex to the GPU's own vertex shape, **relative
-/// to `origin`** (the document point currently at screen pixel `(0, 0)`)
-/// — subtracted in `f64`, before the `f32` cast
-/// (`specs/0004-canvas-navigation-and-selection/adrs.md`: "The GPU upload
-/// subtracts the view origin in `f64` before the `f32` cast"). Casting
-/// an *absolute* document-mm position straight to `f32` (the previous
-/// behaviour) loses precision proportional to its distance from the
-/// document origin; panning far from the origin at high zoom (pan is
-/// unbounded, and nothing in this spec limits it) made that loss
-/// catastrophic once it approached half the stroke width. Subtracting
-/// `origin` first keeps the `f32` error proportional to distance from
-/// the *viewport's* origin — i.e. roughly proportional to distance on
-/// screen, in pixels — regardless of where the document origin is.
-/// [`ScreenTransform`]'s own offset no longer needs `origin` at all,
-/// since every vertex arrives already shifted.
-pub(super) fn to_gpu_vertex(
-    vertex: curvyo_render_core::Vertex,
-    origin: Point,
-    depth: f32,
-) -> GpuVertex {
-    let relative_x = vertex.position.x - origin.x;
-    let relative_y = vertex.position.y - origin.y;
-    #[allow(clippy::cast_possible_truncation)]
-    let position = [relative_x as f32, relative_y as f32];
-    let color = [
-        f32::from(vertex.color.r) / 255.0,
-        f32::from(vertex.color.g) / 255.0,
-        f32::from(vertex.color.b) / 255.0,
-        f32::from(vertex.color.a) / 255.0,
-    ];
-    GpuVertex {
-        position,
-        color,
-        depth,
-    }
-}
-
-/// Every draw-list vertex in the GPU's shape, shifted by `origin` (the
-/// document point at screen pixel (0, 0)) in `f64` before its own `f32` cast
-/// ([`to_gpu_vertex`]'s doc comment), tagged with its layer's depth.
-pub(super) fn gpu_vertices(
-    draw_list: &DrawList,
-    origin: curvyo_document_core::Point,
-) -> Vec<GpuVertex> {
-    draw_list
-        .triangles
-        .iter()
-        .copied()
-        .zip(draw_list.vertex_depths())
-        .map(|(vertex, depth)| to_gpu_vertex(vertex, origin, depth))
-        .collect()
-}
+use crate::gpu_vertex::GpuVertex;
 
 /// The CPU-computed per-frame mapping from document millimetres straight
 /// to clip space — a document point's screen pixel position (via
@@ -112,12 +49,12 @@ impl ScreenTransform {
     /// sits within the canvas's displayed box, so computing this ratio
     /// against the (possibly DPR-scaled) physical buffer size instead
     /// would be wrong by exactly a factor of the device pixel ratio.
-    /// [`Gpu::render`] is the one caller, and it is the one place the
+    /// [`Gpu::prepare`] is the one caller, and it is the one place the
     /// physical-vs-CSS distinction is resolved — nothing downstream of
     /// this type needs to know about `devicePixelRatio` at all.
     ///
     /// The offset is now a fixed `-1`/`+1`, not derived from `view`'s
-    /// origin: every vertex [`to_gpu_vertex`] hands the GPU has already
+    /// origin: every vertex [`crate::gpu_vertex::to_gpu_vertex`] hands the GPU has already
     /// been shifted by that same origin in `f64`, so this uniform no
     /// longer needs to repeat that subtraction (`specs/0004-canvas-
     /// navigation-and-selection/adrs.md`: "the shader is unchanged; only
@@ -347,12 +284,12 @@ pub(super) fn create_pipeline(
 }
 
 /// (Re)creates the offscreen multisampled color target
-/// [`Gpu::render`] draws into when `sample_count > 1` — must be called
+/// [`Gpu::draw`] draws into when `sample_count > 1` — must be called
 /// after every [`wgpu::Surface::configure`] that changes `config.width`/
 /// `height`, since the two textures must match size exactly. `None` when
 /// `sample_count` is `1`: `wgpu` refuses a "multisampled" texture with a
 /// sample count of `1`, and there is nothing to resolve from in that
-/// case anyway — [`Gpu::render`] renders directly into the surface
+/// case anyway — [`Gpu::draw`] renders directly into the surface
 /// texture instead (see [`choose_sample_count`]'s own doc comment).
 pub(super) fn create_msaa_view(
     device: &wgpu::Device,

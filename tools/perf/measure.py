@@ -214,6 +214,12 @@ def report(events, procs, out):
         if sites:
             top = sorted(sites.items(), key=lambda kv: -kv[1])[:3]
             print("  changes by: " + ", ".join(f"{site} {count / n:.1f}/s" for site, count in top))
+        phases = [r["phases"] for r in rows if len(r.get("phases", [])) == 7]
+        frames = sum(p[0] for p in phases)
+        if frames:
+            sums = [sum(p[i] for p in phases) / frames for i in range(1, 7)]
+            print(f"  per drawn frame ({frames:.0f}): draw list {sums[0]:.1f} ms, pictures {sums[1]:.2f} ms, upload {sums[2]:.1f} ms, "
+                  f"submit {sums[3]:.1f} ms; {sums[4]:.0f} layers, {sums[5]:.0f} vertices")
         v = views.get(name, {})
         before, after = pixels(out / f"{name}-start.png"), pixels(out / f"{name}-end.png")
         screen = "no screenshots" if before is None or after is None else ("canvas changed" if before != after else "canvas unchanged")

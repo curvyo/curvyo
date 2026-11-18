@@ -7,6 +7,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::HtmlCanvasElement;
 
 use crate::frame_gate::TrackedSession;
+use crate::frame_phases::{FramePhases, Phase};
 use crate::gpu::Gpu;
 use crate::session::Session;
 use crate::wasm_api::WasmSession;
@@ -17,16 +18,29 @@ impl WasmSession {
         Self {
             session: TrackedSession::new(session),
             gpu: None,
+            phases: FramePhases::default(),
         }
     }
 
     /// Builds the frame and submits it to `gpu`; recorded as drawn only when the submit worked,
     /// so a lost surface is drawn again on the next frame.
-    fn submit(session: &mut TrackedSession, gpu: &mut Gpu) -> Result<(), JsValue> {
+    /// `phases` times each step when the performance probe turned it on.
+    fn submit(
+        session: &mut TrackedSession,
+        gpu: &mut Gpu,
+        phases: &mut FramePhases,
+    ) -> Result<(), JsValue> {
         let frame = session.untracked_mut();
+        phases.start();
         let mut draw_list = frame.frame_draw_list();
+        phases.mark(Phase::DrawList);
         let pictures = frame.frame_images(&mut draw_list);
-        let result = gpu.render(&draw_list, frame.view(), &pictures);
+        phases.mark(Phase::Images);
+        phases.count(&draw_list);
+        let prepared = gpu.prepare(&draw_list, frame.view(), &pictures);
+        phases.mark(Phase::Upload);
+        let result = gpu.draw(&prepared);
+        phases.mark(Phase::Submit);
         if result.is_ok() {
             session.frame_drawn();
         } else {
@@ -95,7 +109,7 @@ impl WasmSession {
     ///
     /// # Errors
     /// A `JsValue` (a plain string) if the subsequent render's surface
-    /// texture could not be acquired — see [`crate::gpu::Gpu::render`].
+    /// texture could not be acquired — see [`crate::gpu::Gpu::draw`].
     /// A no-op (`Ok(())`) before [`WasmSession::attach_canvas`] has
     /// completed, same as [`WasmSession::render`].
     pub fn resize(
@@ -111,7 +125,7 @@ impl WasmSession {
         gpu.resize(width, height, device_pixel_ratio);
         // A reconfigured surface is drawn anew, whatever the session.
         self.session.force_frame();
-        Self::submit(&mut self.session, gpu)
+        Self::submit(&mut self.session, gpu, &mut self.phases)
     }
 
     /// Builds this frame's draw list and submits it, unless the canvas
@@ -129,7 +143,7 @@ impl WasmSession {
         if !self.session.needs_frame() {
             return Ok(());
         }
-        Self::submit(&mut self.session, gpu)
+        Self::submit(&mut self.session, gpu, &mut self.phases)
     }
 
     /// The render loop's one call per frame, as numbers: the frame
@@ -147,6 +161,18 @@ impl WasmSession {
     /// (`tools/perf/`): what keeps a document drawing.
     pub fn take_change_sites(&mut self) -> String {
         self.session.take_change_sites()
+    }
+
+    /// Turns the phase timing of drawn frames on or off, for the performance probe
+    /// (`tools/perf/`, `specs/0126-performance-pass` phase 4); off by default.
+    pub fn set_frame_phase_timing(&mut self, on: bool) {
+        self.phases.set_on(on);
+    }
+
+    /// The phase times since the last call: frames drawn, milliseconds of the draw list, the
+    /// pictures, the GPU upload and the submit, then artwork layers and vertices, all summed.
+    pub fn take_frame_phases(&mut self) -> Vec<f64> {
+        self.phases.take()
     }
 
     /// Draws the next frame even though the session did not change: the

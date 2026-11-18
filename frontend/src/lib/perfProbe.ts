@@ -17,6 +17,8 @@ let lastSubmitted = 0;
 let socket: WebSocket | null = null;
 let scenariosStarted = false;
 const queue: string[] = [];
+// The session whose drawn frames are timed by phase (`WasmSession::take_frame_phases`).
+let timed: WasmSession | null = null;
 
 function send(message: object) {
   if (!perfEnabled) return;
@@ -37,7 +39,9 @@ function start() {
   };
   let second = 0;
   setInterval(() => {
-    send({ event: "second", scenario, second: second++, ...counters });
+    // Frames, ms of draw list, pictures, upload and submit, layers and vertices (summed).
+    const phases = timed ? Array.from(timed.take_frame_phases()) : [];
+    send({ event: "second", scenario, second: second++, ...counters, phases });
     counters = zero();
   }, 1000);
 }
@@ -112,6 +116,8 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
   while (!getSession()) await sleep(200);
   await sleep(1500);
   const session = getSession() as WasmSession;
+  session.set_frame_phase_timing(true);
+  timed = session;
   // The view (origin x, origin y, scale) at a scenario's start and end: a zoom or pan that left
   // it unchanged did not reach the session. `canvas` is the canvas in device pixels of the
   // window, which the runner crops its screenshots to.

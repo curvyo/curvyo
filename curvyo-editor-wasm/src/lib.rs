@@ -41,6 +41,8 @@ mod workspace_share_builder;
 mod workspace_tree_glue;
 
 #[cfg(target_arch = "wasm32")]
+mod frame_phases;
+#[cfg(target_arch = "wasm32")]
 mod gpu;
 #[cfg(target_arch = "wasm32")]
 mod gpu_gradient_buffer;
@@ -51,6 +53,7 @@ mod gpu_pipeline;
 mod gpu_shader;
 #[cfg(target_arch = "wasm32")]
 mod gpu_stops;
+mod gpu_vertex;
 #[cfg(target_arch = "wasm32")]
 mod wasm_api;
 #[cfg(target_arch = "wasm32")]
@@ -185,6 +188,7 @@ pub use font_checks_glue::FontChecksGlue;
 pub use font_file_glue::{face_preview_path, font_file_faces};
 pub use font_library_glue::FontLibraryGlue;
 pub use font_preview_glue::PreviewFacesGlue;
+pub use gpu_vertex::{GpuVertex, gpu_vertices};
 pub use ocr_pool_glue::{crops_wire, read_crops, read_crops_wire};
 pub use pairing_glue::{PairPhase, PairingGlue};
 pub use session::SvgExportResult;
