@@ -13,6 +13,7 @@ import { isMac } from "@/lib/historyText";
 import { createBusyGate } from "@/lib/busyGate";
 import { templateOutcome } from "@/lib/guideText";
 import { downloadSvg, invoke, isTauri, listen, PLATFORM } from "@/platform/host";
+import { withGradientNotice } from "@/hooks/useGradient";
 import { parseSvgExportAnswer, parseTimedNotice, type SvgExportOptions } from "@/lib/svgExport";
 import {
   clipboard_notice,
@@ -324,7 +325,8 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         onOpenError(String(error), OPEN_FILE_TITLE);
         return;
       }
-      if (opened.notice !== "") editor.showHistoryNotice(opened.notice);
+      const openedNotice = withGradientNotice(editor.getSession(), opened.notice);
+      if (openedNotice !== "") editor.showHistoryNotice(openedNotice);
       if (opened.svg) {
         // An SVG is an untitled project that no saved file holds (`0024` criterion 2): the host
         // forgets any path, and Save asks where, offering the SVG's name.
@@ -355,7 +357,8 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         const opened = await whileBusy(editor, bytes.length, svg_busy_notice(true, fileName), () =>
           editor.openFile(bytes, fileName),
         );
-        if (opened.notice !== "") editor.showHistoryNotice(opened.notice);
+        const workspaceNotice = withGradientNotice(editor.getSession(), opened.notice);
+        if (workspaceNotice !== "") editor.showHistoryNotice(workspaceNotice);
         // A new session starts on its own tab; switching from the tree keeps the File tab.
         if (inFileTab) {
           depsRef.current.panel.pressTab("file");
@@ -483,9 +486,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
           }
         }
         const outcome = await editor.importFinish();
-        if (outcome.notice) {
+        const outcomeNotice = withGradientNotice(editor.getSession(), outcome.notice ?? "");
+        if (outcomeNotice) {
           editor.showHistoryNotice(
-            outcome.notice,
+            outcomeNotice,
             outcome.alert ? 5000 : undefined,
             "canvas",
             outcome.alert ? "alert" : "status",

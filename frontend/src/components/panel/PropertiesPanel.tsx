@@ -60,6 +60,7 @@ import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
 import { useGrid } from "@/hooks/useGrid";
 import { useSnapping } from "@/hooks/useSnapping";
+import type { GradientApi } from "@/hooks/useGradient";
 import { useStylePanel } from "@/hooks/useStylePanel";
 import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
 import { TRACE_INFO_TITLE } from "@/lib/traceText";
@@ -70,6 +71,8 @@ interface PropertiesPanelProps {
   /** The workbench registry: the switcher row, a manufacturing's tab and the Extensions group. */
   workbenches: WorkbenchesApi;
   editor: EditorSession;
+  /** The gradient fill: the Gradient block in the Style tab (`specs/0124-gradient-fill`). */
+  gradient: GradientApi;
   document: DocumentPanelApi;
   /** Whether the body is shown; owned by the app so a request from outside the panel can show it. */
   panelOpen: PanelOpenApi;
@@ -122,6 +125,7 @@ export function PropertiesPanel({
   sketch,
   workbenches,
   editor,
+  gradient,
   document: doc,
   panelOpen,
   project,
@@ -575,7 +579,7 @@ export function PropertiesPanel({
                   {/* A placed page has no style of its own: no Stroke, no Fill (`specs/0106`
                       criterion 12). */}
                   {placedPage === "" ? (
-                    <StyleSection panel={panel} clones={editor.clones} onReturnFocus={returnFocus} />
+                    <StyleSection panel={panel} gradient={gradient} clones={editor.clones} onReturnFocus={returnFocus} />
                   ) : null}
                 </>
               )

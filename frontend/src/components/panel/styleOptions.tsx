@@ -9,6 +9,7 @@ import {
   NoPaintIcon,
   SolidPaintIcon,
 } from "@/components/panel/StyleIcons";
+import { GradientPaintIcon } from "@/components/panel/GradientIcons";
 import { PatternPaintIcon } from "@/components/panel/PatternIcons";
 import type { ToggleOption } from "@/components/ui/toggle-group";
 import type {
@@ -30,10 +31,11 @@ export const FILL_OPTIONS: readonly ToggleOption<"none" | "solid">[] = [
   { value: "solid", label: "Solid fill", tooltip: "Solid fill", icon: <SolidPaintIcon /> },
 ];
 
-/** The fill kind with Pattern (`specs/0071-pattern-fill` UX notes §2). */
-export const FILL_KIND_OPTIONS: readonly ToggleOption<"none" | "solid" | "pattern">[] = [
+/** The fill kind with Pattern and Gradient (`specs/0071-pattern-fill` UX notes §2, `0124` §2). */
+export const FILL_KIND_OPTIONS: readonly ToggleOption<"none" | "solid" | "pattern" | "gradient">[] = [
   ...FILL_OPTIONS,
   { value: "pattern", label: "Pattern fill", tooltip: "Pattern fill", icon: <PatternPaintIcon /> },
+  { value: "gradient", label: "Gradient fill", tooltip: "Gradient fill", icon: <GradientPaintIcon /> },
 ];
 
 export const JOIN_OPTIONS: readonly ToggleOption<JoinName>[] = [

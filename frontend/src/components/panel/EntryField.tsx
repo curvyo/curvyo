@@ -56,6 +56,8 @@ export interface EntryFieldProps {
   /** A 12 px muted word inside the left edge ("Scan angle", `specs/0111` ux-notes 6.3); the
    * accessible name stays `label`. */
   prefix?: string;
+  /** 13 px text instead of 14, for a field that must hold a nine-character hex in 84 px. */
+  compact?: boolean;
 }
 
 /**
@@ -93,6 +95,7 @@ export function EntryField({
   inputRef,
   stepText,
   prefix,
+  compact = false,
 }: EntryFieldProps) {
   const messageId = useId();
   const display = mixed ? "" : shown;
@@ -231,7 +234,7 @@ export function EntryField({
             onReturnFocus();
           }
         }}
-        className={`style-field h-7 w-full rounded-[5px] border bg-white pl-1.5 text-sm tabular-nums outline-none ${
+        className={`style-field h-7 w-full rounded-[5px] border bg-white pl-1.5 ${compact ? "text-[13px]" : "text-sm"} tabular-nums outline-none ${
           align === "right" ? "text-right" : "text-left"
         } ${
           invalid

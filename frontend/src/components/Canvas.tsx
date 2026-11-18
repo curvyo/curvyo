@@ -1,6 +1,8 @@
 import { WidthPointEntry, WidthWheelReadout } from "@/components/WidthPointEntry";
 import type { FitCue } from "@/lib/fixtureRows";
+import { GradientOverlay } from "@/components/GradientOverlay";
 import { MeasureOverlay } from "@/components/MeasureOverlay";
+import type { GradientApi } from "@/hooks/useGradient";
 import type { SketchApi } from "@/hooks/useSketch";
 import { SketchAnnotations } from "@/components/sketch/SketchAnnotations";
 import { SketchEntryBox, SketchModeLabel } from "@/components/sketch/SketchCanvasChips";
@@ -56,6 +58,8 @@ const PANEL_TAB_CLEAR_PX = 14;
 interface CanvasProps {
   sketch: SketchApi;
   editor: EditorSession;
+  /** The gradient fill's handles, readout and entry box (`specs/0124-gradient-fill`). */
+  gradient: GradientApi;
   /** Files dropped on the canvas (`specs/0058-bitmap-import` criterion 4). */
   onDropFiles?: (dropped: DroppedFiles) => void;
   /** Drawn over the canvas, in its coordinates: the other participants' marks (`0092`). */
@@ -86,6 +90,7 @@ interface CanvasProps {
  */
 export function Canvas({
   editor,
+  gradient,
   sketch,
   onDropFiles,
   overlay,
@@ -257,6 +262,7 @@ export function Canvas({
       {sketch.view.workbench !== "sketch" && (
         <MeasureOverlay getSession={editor.getSession} measuring={editor.tool === "measure"} />
       )}
+      {sketch.view.workbench !== "sketch" && <GradientOverlay gradient={gradient} containerRef={editor.containerRef} />}
       <SketchModeLabel sketch={sketch} containerRef={editor.containerRef} />
       <SketchEntryBox sketch={sketch} containerRef={editor.containerRef} />
       {/* The drop cue: a 2px dashed accent outline inside the viewport while files hover over the

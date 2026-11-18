@@ -4,18 +4,21 @@ import { useRef } from "react";
 
 import { ColourBlock } from "@/components/panel/ColourBlock";
 import { ColourPicker } from "@/components/panel/ColourPicker";
+import { GradientBlock } from "@/components/panel/GradientBlock";
 import { PaintRow } from "@/components/panel/PaintRow";
 import { PatternBlock } from "@/components/panel/PatternBlock";
 import { FILL_KIND_OPTIONS, FILL_OPTIONS } from "@/components/panel/styleOptions";
 import { ToggleGroup } from "@/components/ui/toggle-group";
 import { ValueField } from "@/components/panel/ValueField";
 import { useRowsFocus } from "@/components/panel/useRowsFocus";
+import type { GradientApi } from "@/hooks/useGradient";
 import type { StylePanelApi } from "@/hooks/useStylePanel";
 
 const PERCENT_MESSAGES = { percent: "Enter a number from 0 to 100" } as const;
 
 interface FillSectionProps {
   panel: StylePanelApi;
+  gradient: GradientApi;
   onReturnFocus: () => void;
 }
 
@@ -25,13 +28,30 @@ interface FillSectionProps {
  * picker and Opacity, which are not in the tree while every edited fill is
  * off. A fill colour or opacity edit never turns a fill on; only the switch does.
  */
-export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
+export function FillSection({ panel, gradient, onReturnFocus }: FillSectionProps) {
   const { view } = panel;
   const section = useRef<HTMLDivElement>(null);
   const hex = useRef<HTMLInputElement>(null);
   const hexEntry = useHexEntry(hex, onReturnFocus);
   const rowsFocus = useRowsFocus(view.fillRows, section);
   const { pattern } = panel;
+  const gradientView = gradient.view;
+  // The paint switch: Pattern only where offered (not for a text), Gradient where offered.
+  const kindOptions = FILL_KIND_OPTIONS.filter(
+    (option) =>
+      (option.value !== "pattern" || pattern.offered) && (option.value !== "gradient" || gradientView.offered),
+  );
+  const kindValue = pattern.offered
+    ? pattern.kind === "" || pattern.kind === "mixed"
+      ? null
+      : pattern.kind
+    : gradientView.shown
+      ? "gradient"
+      : view.fillPaint === "on"
+        ? "solid"
+        : view.fillPaint === "off"
+          ? "none"
+          : null;
   const colourRows = (
     <div className="contents">
           <ColourBlock
@@ -81,13 +101,13 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
           />
     </div>
   );
-  const kindRow = pattern.offered ? (
+  const kindRow = pattern.offered || gradientView.offered ? (
     <div className="flex h-7 items-center gap-2">
       <h3 className="w-[60px] shrink-0 text-xs font-semibold text-[var(--toolbar-icon)]">Fill</h3>
       <ToggleGroup
         label="Fill paint"
-        options={FILL_KIND_OPTIONS}
-        value={pattern.kind === "" || pattern.kind === "mixed" ? null : pattern.kind}
+        options={kindOptions}
+        value={kindValue}
         onChange={panel.setFillKind}
         itemWidth={44}
         onReturnFocus={onReturnFocus}
@@ -106,7 +126,19 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
   return (
     <div ref={section} data-style-section className="flex flex-col gap-2">
       {kindRow}
-      {pattern.shown ? (
+      {gradientView.skip !== "" && (
+        <p data-gradient-skip className="text-xs text-[var(--panel-muted-fg)]">
+          {gradientView.skip}
+        </p>
+      )}
+      {gradientView.shown ? (
+        <GradientBlock
+          gradient={gradient}
+          pickTarget={view.pickTarget}
+          onPick={(index) => panel.beginPick(`stop-${index}`)}
+          onReturnFocus={onReturnFocus}
+        />
+      ) : pattern.shown ? (
         <div className="contents" {...rowsFocus}>
           <PatternBlock panel={panel} onReturnFocus={onReturnFocus} colourRows={colourRows} />
         </div>

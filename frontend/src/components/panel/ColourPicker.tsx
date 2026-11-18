@@ -7,8 +7,8 @@ import { useSliderPointer } from "@/hooks/useSliderPointer";
 import type { HsvTriple } from "@/hooks/useStylePanel";
 import { type PickerSeen, pickerStep } from "@/lib/pickerSync";
 
-const WIDTH = 244;
-const AREA_HEIGHT = 96;
+const DEFAULT_WIDTH = 244;
+const DEFAULT_AREA_HEIGHT = 96;
 const HUE_HEIGHT = 12;
 /** The hue slider's pointer target is 24 px high around its 12 px ramp (WCAG 2.5.8,
  * `specs/0047-transform-polish/` criterion 28); the 6 px above and below overlap the gap to
@@ -47,6 +47,10 @@ interface ColourPickerProps {
    * same colour block (`specs/0047-transform-polish/` criteria 23 and 25), the picker's one
    * value entry. `origin` is the slider a key was pressed on, `null` for a double-click. */
   onOpenEntry: (origin: HTMLElement | null) => void;
+  /** The picker's width and area height in px: 244 and 96 in the panel, 236 and 80 inside a
+   * gradient entry box (`specs/0124-gradient-fill` UX notes §7). */
+  width?: number;
+  areaHeight?: number;
 }
 
 
@@ -135,6 +139,8 @@ export function ColourPicker({
   onPreview,
   onSettle,
   onOpenEntry,
+  width = DEFAULT_WIDTH,
+  areaHeight = DEFAULT_AREA_HEIGHT,
 }: ColourPickerProps) {
   const [hsv, setHsv] = useState<Hsv>({ h: 0, s: 1, v: 1 });
   // The colour the picker last read from outside (and the converter that read it), and the one
@@ -161,7 +167,7 @@ export function ColourPicker({
     const canvas = areaCanvas.current;
     if (canvas) {
       const [hr, hg, hb] = channels(rgbOf(hsv.h, 1, 1));
-      paint(canvas, WIDTH, AREA_HEIGHT, (x, y) => {
+      paint(canvas, width, areaHeight, (x, y) => {
         const light = 1 - y;
         return [
           Math.round((255 + (hr - 255) * x) * light),
@@ -170,13 +176,13 @@ export function ColourPicker({
         ];
       });
     }
-  }, [hsv.h, rgbOf]);
+  }, [hsv.h, rgbOf, width, areaHeight]);
   useEffect(() => {
     const canvas = hueCanvas.current;
     if (canvas) {
-      paint(canvas, WIDTH, HUE_HEIGHT, (x) => channels(rgbOf(360 * x, 1, 1)));
+      paint(canvas, width, HUE_HEIGHT, (x) => channels(rgbOf(360 * x, 1, 1)));
     }
-  }, [rgbOf]);
+  }, [rgbOf, width]);
 
   const apply = (next: Hsv) => {
     const clamped = {
@@ -193,19 +199,19 @@ export function ColourPicker({
   // listener its first tick installs (`usePreviewGesture`), a click by `onSettle`.
   const areaAt = (at: { x: number; y: number }): Hsv => ({
     h: hsv.h,
-    s: at.x / WIDTH,
-    v: 1 - at.y / AREA_HEIGHT,
+    s: at.x / width,
+    v: 1 - at.y / areaHeight,
   });
   const hueAt = (at: { x: number }): Hsv => ({
     ...hsv,
-    h: (360 * at.x) / WIDTH,
+    h: (360 * at.x) / width,
   });
   const areaPointer = useSliderPointer({
     thumb: () =>
       mixed
         ? null
         : {
-            at: { x: hsv.s * WIDTH, y: (1 - hsv.v) * AREA_HEIGHT },
+            at: { x: hsv.s * width, y: (1 - hsv.v) * areaHeight },
             radius: AREA_THUMB / 2,
           },
     onClick: (at) => {
@@ -221,7 +227,7 @@ export function ColourPicker({
       mixed
         ? null
         : {
-            at: { x: (hsv.h / 360) * WIDTH, y: HUE_TARGET_HEIGHT / 2 },
+            at: { x: (hsv.h / 360) * width, y: HUE_TARGET_HEIGHT / 2 },
             radius: HUE_THUMB / 2,
           },
     onClick: (at) => {
@@ -284,7 +290,7 @@ export function ColourPicker({
   const percentOf = (value: number) => Math.round(value * 100);
 
   return (
-    <div className="flex flex-col gap-2" style={{ width: WIDTH }}>
+    <div className="flex flex-col gap-2" style={{ width }}>
       <SliderTip
         side="left"
         name={colourSliderName(name, "saturationValue")}
@@ -307,7 +313,7 @@ export function ColourPicker({
               : `Saturation ${percentOf(hsv.s)} %, value ${percentOf(hsv.v)} %`
           }
           className={slider}
-          style={{ width: WIDTH, height: AREA_HEIGHT, touchAction: "none" }}
+          style={{ width, height: areaHeight, touchAction: "none" }}
           onKeyDown={areaKeys}
           {...areaPointer}
         >
@@ -315,13 +321,13 @@ export function ColourPicker({
             ref={areaCanvas}
             aria-hidden
             className="block rounded-[5px]"
-            style={{ width: WIDTH, height: AREA_HEIGHT }}
+            style={{ width, height: areaHeight }}
           />
           {!mixed && (
             <Thumb
               size={AREA_THUMB}
-              left={hsv.s * WIDTH}
-              top={(1 - hsv.v) * AREA_HEIGHT}
+              left={hsv.s * width}
+              top={(1 - hsv.v) * areaHeight}
             />
           )}
         </div>
@@ -343,7 +349,7 @@ export function ColourPicker({
           aria-valuetext={mixed ? "Mixed" : `Hue ${Math.round(hsv.h)} degrees`}
           className={`${slider} flex items-center`}
           style={{
-            width: WIDTH,
+            width,
             height: HUE_TARGET_HEIGHT,
             margin: `-${HUE_TARGET_OVERHANG}px 0`,
             touchAction: "none",
@@ -355,12 +361,12 @@ export function ColourPicker({
             ref={hueCanvas}
             aria-hidden
             className="block rounded-[6px]"
-            style={{ width: WIDTH, height: HUE_HEIGHT }}
+            style={{ width, height: HUE_HEIGHT }}
           />
           {!mixed && (
             <Thumb
               size={HUE_THUMB}
-              left={(hsv.h / 360) * WIDTH}
+              left={(hsv.h / 360) * width}
               top={HUE_TARGET_HEIGHT / 2}
             />
           )}

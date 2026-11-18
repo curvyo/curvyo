@@ -5,6 +5,7 @@ import { FillSection } from "@/components/panel/FillSection";
 import { collapseSpacer } from "@/lib/collapseSpacer";
 import { StrokeSection } from "@/components/panel/StrokeSection";
 import type { ClonesApi } from "@/hooks/useClones";
+import type { GradientApi } from "@/hooks/useGradient";
 import type { StylePanelApi } from "@/hooks/useStylePanel";
 
 /** The element that scrolls the panel body, or null. */
@@ -39,6 +40,7 @@ function Notice({ top, alert, children }: { top: number; alert: boolean; childre
 
 interface StyleSectionProps {
   panel: StylePanelApi;
+  gradient: GradientApi;
   /** Linked clones: the clone block replaces the sections for a selection of clones only, and
    * the origin line sits above them (`specs/0049-linked-clone` criteria 22 and 23). */
   clones: ClonesApi;
@@ -52,7 +54,7 @@ interface StyleSectionProps {
  * `0043`). Every value comes from the session; every
  * control sends one command back.
  */
-export function StyleSection({ panel, clones, onReturnFocus }: StyleSectionProps) {
+export function StyleSection({ panel, gradient, clones, onReturnFocus }: StyleSectionProps) {
   const body = useRef<HTMLDivElement>(null);
   const { focusRequest, panelNotice } = clones;
   // After a key press on a clone command the focus goes where the UX notes say ("Focus"): Stroke
@@ -129,7 +131,7 @@ export function StyleSection({ panel, clones, onReturnFocus }: StyleSectionProps
         className="my-1 h-px"
         style={{ background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
       />
-      <FillSection panel={panel} onReturnFocus={onReturnFocus} />
+      <FillSection panel={panel} gradient={gradient} onReturnFocus={onReturnFocus} />
     </>
   ) : null;
   // Switching back to Original's closes the open sections; with the panel scrolled the browser
