@@ -2,14 +2,22 @@
 
 Rule: measure first, one change per PR, each PR shows its before/after numbers. No speculative caches.
 
-## Phase 0: measure (one `chore/` PR, no behaviour change)
-- A Playwright script (`frontend/tests/browser/perf.cjs`, headless Chromium, one agent drives the
-  browser) records, on whale, dolphin and a 5 000 node page: idle process CPU over 30 s, frames
-  submitted over 10 s idle, main-thread time per frame during a scripted wheel zoom and pan
-  (Performance API long tasks + `PerformanceObserver`), and a Chrome trace saved to the scratchpad.
-- A native counter in `curvyo-editor-wasm` for frames built versus frames that changed; exposed in
-  the dev build only.
-- Result: a table of where the 8.5 % goes (Rust draw list, GPU submit, wasm calls, React, PageFrames).
+## Phase 0: harness and measurement (one `chore/` PR, no behaviour change)
+The app is the native Tauri shell, which runs on WebKitGTK on Linux, so WebKit is the main
+measurement; headless Chromium (Playwright) is only a comparison.
+- **Process meter** (`tools/perf/`, a script): starts the built `curvyo-app` (or `cargo tauri dev`)
+  under Xvfb, finds the app process and its `WebKitWebProcess`/`WebKitGPUProcess` children and
+  samples CPU time and RSS from `/proc` every second; reports idle CPU over 30 s and peak RSS.
+- **Frame counters** (`CURVYO_PERF=1`, dev builds only, off by default, no UI): per second frames
+  built, frames submitted, frames whose generation changed, main-thread time of the render loop and
+  of `PageFrames`, written to a file the script reads. Native counters in `curvyo-editor-wasm`.
+- **Scenarios**, driven inside the page by the harness (synthetic wheel and pointer events at a fixed
+  rate, so no OS input timing): idle 30 s; wheel zoom 5 s; pan drag 5 s; each on whale, dolphin and a
+  generated 5 000 node page. Optional second driver: `tauri-driver` with `WebKitWebDriver` for
+  real window events once the driver is installed.
+- **Chrome trace** for the Chromium comparison only.
+- Result: a table of where the 8.5 % goes (Rust draw list, GPU submit, wasm calls, React,
+  `PageFrames`) and the first measured numbers of the lag, committed as `tools/perf/README.md`.
 
 ## Phase 1: stop idle work (`fix/`, expected biggest win)
 - A frame generation in `Session` (bumped by every document, view, selection, tool-state and overlay
