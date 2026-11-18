@@ -1,4 +1,4 @@
-//! Send to machine (`specs/0124-send-to-machine`; architect addendum B4, B5, B7): the job bytes of a
+//! Send to machine (`specs/0125-send-to-machine`; architect addendum B4, B5, B7): the job bytes of a
 //! laser page reach the connector as the raw body of one command, and the send is followed by its
 //! job id until the connector has accepted or lost it, also across a dropped connection. The
 //! webview never gets the token; it gets the job id, counts and the resolution.

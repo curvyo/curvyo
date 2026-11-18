@@ -1,4 +1,4 @@
-//! Follows one sent job until the connector has accepted or lost it (`specs/0124` S11, S19;
+//! Follows one sent job until the connector has accepted or lost it (`specs/0125` S11, S19;
 //! architect addendum B4): the one place that decides "commit at most once per job id".
 
 use uuid::Uuid;

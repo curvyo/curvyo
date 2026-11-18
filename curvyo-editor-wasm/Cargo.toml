@@ -50,7 +50,7 @@ image.workspace = true
 proptest.workspace = true
 
 # `tests/send_to_machine.rs` drives Send to machine against the connector with the fake controller
-# (`specs/0124-send-to-machine` S17); internal path crates and `tempfile`, native tests only, no
+# (`specs/0125-send-to-machine` S17); internal path crates and `tempfile`, native tests only, no
 # edge in the production or wasm build.
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 curvyo-connector-core = { path = "../curvyo-connector-core", version = "0.1.0" }

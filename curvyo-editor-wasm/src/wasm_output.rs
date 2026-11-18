@@ -25,7 +25,7 @@ pub struct WasmJobFile {
     pub token: u32,
 }
 
-/// A job for the connector (`specs/0124-send-to-machine` S6).
+/// A job for the connector (`specs/0125-send-to-machine` S6).
 #[wasm_bindgen]
 pub struct WasmSentJob {
     /// The job text's bytes: the file Export would write.
@@ -171,7 +171,7 @@ impl WasmSession {
         })
     }
 
-    /// The connector accepted the job of `token` (`0124` S10): the step "Send job to machine"
+    /// The connector accepted the job of `token` (`0125` S10): the step "Send job to machine"
     /// and Lasered at `now_ms`. The notice as `"<ms>:<text>"`, empty when there is none and for
     /// an unknown token.
     pub fn send_job_done(&mut self, token: u32, now_ms: f64) -> String {

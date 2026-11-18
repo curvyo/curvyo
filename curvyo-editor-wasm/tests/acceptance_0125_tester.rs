@@ -1,4 +1,4 @@
-//! Tester acceptance cases for `specs/0124-send-to-machine` (S1 to S12, S16, S17, S19), written
+//! Tester acceptance cases for `specs/0125-send-to-machine` (S1 to S12, S16, S17, S19), written
 //! from the specification before the implementation was read; only the names of the public
 //! session calls were adapted afterwards. Black box through the public session and the fake
 //! connector. Waits are on statuses, never on sleeps.

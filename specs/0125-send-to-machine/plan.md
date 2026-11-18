@@ -1,4 +1,4 @@
-# Plan for Send to machine (0124, slice 3 of 0064)
+# Plan for Send to machine (0125, slice 3 of 0064)
 
 Criteria S1 to S19. Design: architect addendum B1 to B8 in `specs/0064-machine-connector/adrs.md`;
 UI: `ux-notes.md`. Branch `story/send-to-machine`, stacked on `story/machine-connector` (PR #375).

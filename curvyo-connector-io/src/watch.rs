@@ -56,7 +56,7 @@ fn is_active(status: &Message) -> bool {
 /// Watches the connector at `address` until `stop` is set or a final error (changed key, revoked
 /// token, other protocol) is reported. `retry` is the pause between tries. It tries again only
 /// while the last status it saw had a job in flight or `send_pending` says a send awaits its
-/// answer (`specs/0124` B5); otherwise a drop or a failed read is reported once and the watcher
+/// answer (`specs/0125` B5); otherwise a drop or a failed read is reported once and the watcher
 /// ends, so an idle connector is never polled.
 pub fn watch(
     address: &str,

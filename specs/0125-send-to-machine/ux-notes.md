@@ -1,4 +1,4 @@
-# 0124 Send to machine: UX notes
+# 0125 Send to machine: UX notes
 
 ux-engineer, 2026-11-17. Covers criteria S1 to S18 of `specification.md` and its list "Needed before Ready". Checked against `specs/0029-laser-job-preview-and-output/ux-notes.md` 6.3 to 7 (output group, Export, export notice), `specs/0064-machine-connector/ux-notes.md` sections 3, 4, 8 and 9 (symbol buttons, link line texts, job block, unavailable states), the built `frontend/src/components/panel/OutputGroup.tsx` and `frontend/src/components/workbench/ConnectorGroup.tsx`, and `docs/design-system.md` (rows "Hidden, not disabled", "Tooltips and validation chips", "Action notice", "Connector group (`0064`)"; Interaction conventions "No notice after a success", "Nothing moves under the pointer"). Customer rules applied: no popups, no dialog, symbol buttons with tooltip and accessible name, labels that name a control or a state only, no operating tips. Choices marked (Proposal) are vetoable at the demo; section 11 lists them as U1 to U12.
 
@@ -124,9 +124,9 @@ All failures use the failure look (`CircleAlert` 12px, `--destructive`, 4.8:1 on
 
 ## 10. Design-system rows to add after acceptance
 
-- **"Send to machine button (`0124`)"**, after "Output group (`0029`)" (or after "Connector group (`0064`)" while that row is not yet in): sections 2, 3 and 8 (glyph `Upload`, secondary look 32 x 32 next to a `flex: 1` Export, disabled look of Export, two-line tooltip with the cause, the cause order, busy `LoaderCircle`).
-- **"Connector state line (`0124`)"**, after it: section 4 and 5 (one line, 70 characters, the bar of the Connector group, " · <name>" for another job, sr-only state-word live region, failures as alerts).
-- In "Hidden, not disabled", the Output tab exceptions gain: "Send to machine is `aria-disabled` with its cause in the tooltip's second line, also in the browser build (`0124`)".
+- **"Send to machine button (`0125`)"**, after "Output group (`0029`)" (or after "Connector group (`0064`)" while that row is not yet in): sections 2, 3 and 8 (glyph `Upload`, secondary look 32 x 32 next to a `flex: 1` Export, disabled look of Export, two-line tooltip with the cause, the cause order, busy `LoaderCircle`).
+- **"Connector state line (`0125`)"**, after it: section 4 and 5 (one line, 70 characters, the bar of the Connector group, " · <name>" for another job, sr-only state-word live region, failures as alerts).
+- In "Hidden, not disabled", the Output tab exceptions gain: "Send to machine is `aria-disabled` with its cause in the tooltip's second line, also in the browser build (`0125`)".
 - No new token, no new glyph.
 
 ## 11. Decisions for veto (Proposal)
@@ -152,4 +152,4 @@ All failures use the failure look (`CircleAlert` 12px, `--destructive`, 4.8:1 on
 
 ## Links
 
-Spec: `specs/0124-send-to-machine/specification.md`. Built notes: `specs/0029-laser-job-preview-and-output/ux-notes.md`, `specs/0064-machine-connector/ux-notes.md`. Code: `frontend/src/components/panel/OutputGroup.tsx`, `frontend/src/components/workbench/ConnectorGroup.tsx`.
+Spec: `specs/0125-send-to-machine/specification.md`. Built notes: `specs/0029-laser-job-preview-and-output/ux-notes.md`, `specs/0064-machine-connector/ux-notes.md`. Code: `frontend/src/components/panel/OutputGroup.tsx`, `frontend/src/components/workbench/ConnectorGroup.tsx`.

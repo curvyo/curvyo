@@ -101,6 +101,35 @@ export interface ExportButton {
   extension: string;
 }
 
+/** Why Send to machine is disabled (`0125` S2 to S5, S8; UX notes §3). */
+export type SendCause =
+  | "blocked"
+  | "browser"
+  | "format_not_spoken"
+  | "not_paired"
+  | "no_longer_paired"
+  | "key_changed"
+  | "sending";
+const SEND_CAUSES: readonly SendCause[] = [
+  "blocked",
+  "browser",
+  "format_not_spoken",
+  "not_paired",
+  "no_longer_paired",
+  "key_changed",
+  "sending",
+];
+
+/** The Send to machine button, present only for a profile that names a connector (S1). */
+export interface SendButton {
+  enabled: boolean;
+  cause: SendCause | null;
+  /** The words of `blocked` (Export's text) and `format_not_spoken`. */
+  text: string | null;
+  profileId: string;
+  address: string;
+}
+
 /** The output group at the end of the Operations tab of a laser page (UX notes 6.3). */
 export interface OutputGroup {
   /** "Diode 10 W · GRBL[ · air assist]". */
@@ -109,6 +138,8 @@ export interface OutputGroup {
   checks: Check[];
   total: Total | null;
   export: ExportButton;
+  /** `null` without a connector address on the profile. */
+  send: SendButton | null;
   toolpathView: boolean;
 }
 
@@ -281,6 +312,23 @@ function asExport(value: unknown): ExportButton | null {
   return { enabled: value.enabled, tooltip, fileType: value.file_type, extension: value.extension };
 }
 
+function asSend(value: unknown): SendButton | null | undefined {
+  if (value === undefined || value === null) return null;
+  if (!isObject(value)) return undefined;
+  const text = value.text === undefined ? null : asOptionalText(value.text);
+  const cause = value.cause === undefined ? null : SEND_CAUSES.find((word) => word === value.cause);
+  if (
+    typeof value.enabled !== "boolean" ||
+    text === undefined ||
+    cause === undefined ||
+    typeof value.profile_id !== "string" ||
+    typeof value.address !== "string"
+  ) {
+    return undefined;
+  }
+  return { enabled: value.enabled, cause, text, profileId: value.profile_id, address: value.address };
+}
+
 /** The output group from its JSON value; `null` for `null` (another page) or a broken value. */
 export function decodeOutputGroup(value: unknown): OutputGroup | null {
   if (!isObject(value)) return null;
@@ -288,17 +336,19 @@ export function decodeOutputGroup(value: unknown): OutputGroup | null {
   const checks = asList(value.checks, asCheck);
   const total = asTotal(value.total);
   const exportButton = asExport(value.export);
+  const send = asSend(value.send);
   if (
     typeof value.machine !== "string" ||
     typeof value.toolpath_view !== "boolean" ||
     start === null ||
     checks === null ||
     total === undefined ||
-    exportButton === null
+    exportButton === null ||
+    send === undefined
   ) {
     return null;
   }
-  return { machine: value.machine, start, checks, total, export: exportButton, toolpathView: value.toolpath_view };
+  return { machine: value.machine, start, checks, total, export: exportButton, send, toolpathView: value.toolpath_view };
 }
 
 /** The ring labels of the Toolpath view; `null` for a broken value. */

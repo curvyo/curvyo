@@ -1,13 +1,20 @@
-import { Crosshair, Download } from "lucide-react";
-import { useRef, useState } from "react";
+import { CircleAlert, Crosshair, Download, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { OutputChecks } from "@/components/panel/OutputChecks";
 import { OutputPick } from "@/components/panel/OutputPick";
+import { SendToMachine } from "@/components/panel/SendToMachine";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useLinkEntry } from "@/hooks/useLinkEntry";
 import type { OutputApi } from "@/hooks/useOutput";
+import { sendLinkOf } from "@/lib/connectorLink";
+import { formatCount } from "@/lib/connectorText";
 import type { OperationId } from "@/lib/operationsView";
 import { EXPORT_NAME, START_DAMAGED, machineLineParts } from "@/lib/outputText";
 import type { Check, StartValue } from "@/lib/outputView";
+import { alertAfter, stateLine } from "@/lib/sendLine";
+import { sendCauseText } from "@/lib/sendText";
+import { isTauri } from "@/platform/host";
 
 /**
  * The output group at the end of the Operations tab of a laser page
@@ -33,6 +40,24 @@ export function OutputGroup({
   const view = api.view;
   const startButton = useRef<HTMLButtonElement>(null);
   const [startRequest, setStartRequest] = useState(0);
+  const send = api.view?.send ?? null;
+  const entry = useLinkEntry(send?.profileId ?? null, send?.address ?? "", isTauri && send !== null, true);
+  const spelling = isTauri ? sendLinkOf(entry) : "browser";
+  const sendProfile = send?.profileId ?? null;
+  const applyLink = api.send.applyLink;
+  useEffect(() => {
+    if (sendProfile !== null) applyLink(sendProfile, spelling);
+  }, [sendProfile, spelling, applyLink]);
+  const line = isTauri && send !== null ? stateLine(entry) : null;
+  // The hidden alert follows changes seen while the group is shown, never what it finds (UX §4).
+  const pressedHere = useRef(false);
+  const seen = useRef(entry);
+  const [alertText, setAlertText] = useState("");
+  useEffect(() => {
+    const next = alertAfter(seen.current, entry, pressedHere.current);
+    seen.current = entry;
+    if (next !== null) setAlertText(next);
+  }, [entry]);
   if (view === null) return null;
   const machine = machineLineParts(view.machine);
   const press = (check: Check) => {
@@ -110,33 +135,91 @@ export function OutputGroup({
           <p className="text-xs tabular-nums text-[var(--panel-muted-fg)]">{view.total.lengths}</p>
         </section>
       ) : null}
-      <Tooltip side="top" content={exportOn ? null : view.export.tooltip}>
-        <button
-          type="button"
-          data-export-job
-          aria-label={EXPORT_NAME}
-          aria-disabled={exportOn ? undefined : true}
-          aria-describedby={exportOn ? undefined : describedBy}
-          onClick={(event) => {
-            if (!exportOn) return;
-            void api.exportJob();
-            if (event.detail > 0) onReturnFocus();
-          }}
-          className={`flex h-8 w-full items-center justify-center gap-2 rounded-[5px] text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 ${
-            exportOn
-              ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:brightness-110"
-              : "cursor-default bg-[var(--field-disabled-bg)] text-[var(--field-disabled-fg)]"
-          }`}
-        >
-          <Download size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-          <span aria-hidden>{EXPORT_NAME}</span>
-        </button>
-      </Tooltip>
+      <div className="flex gap-1">
+        <Tooltip side="top" content={exportOn ? null : view.export.tooltip}>
+          <button
+            type="button"
+            data-export-job
+            aria-label={EXPORT_NAME}
+            aria-disabled={exportOn ? undefined : true}
+            aria-describedby={exportOn ? undefined : describedBy}
+            onClick={(event) => {
+              if (!exportOn) return;
+              void api.exportJob();
+              if (event.detail > 0) onReturnFocus();
+            }}
+            className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-2 rounded-[5px] text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 ${
+              exportOn
+                ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:brightness-110"
+                : "cursor-default bg-[var(--field-disabled-bg)] text-[var(--field-disabled-fg)]"
+            }`}
+          >
+            <Download size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+            <span aria-hidden>{EXPORT_NAME}</span>
+          </button>
+        </Tooltip>
+        {send === null ? null : (
+          <SendToMachine
+            enabled={send.enabled}
+            cause={sendCauseText(send)}
+            sending={send.cause === "sending"}
+            onPress={() => {
+              pressedHere.current = true;
+              return api.send.press();
+            }}
+            onReturnFocus={onReturnFocus}
+          />
+        )}
+      </div>
       {exportOn ? null : (
         <span id={describedBy} className="sr-only">
           {view.export.tooltip}
         </span>
       )}
+      {isTauri && send !== null ? (
+        <>
+          <p role="status" className="sr-only" data-send-status>
+            {line?.spoken ?? ""}
+          </p>
+          <p role="alert" className="sr-only">
+            {alertText}
+          </p>
+          {line === null ? null : (
+            <>
+              <p
+                aria-live="off"
+                data-send-line
+                className={`-mt-0.5 flex items-start gap-1 text-xs [overflow-wrap:anywhere] ${line.failure ? "text-[var(--destructive)]" : "text-[var(--toolbar-icon)]"}`}
+              >
+                {line.alarm ? (
+                  <TriangleAlert size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="mt-0.5 shrink-0" />
+                ) : line.failure ? (
+                  <CircleAlert size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="mt-0.5 shrink-0" />
+                ) : null}
+                <span>{line.text}</span>
+              </p>
+              {line.bar === null ? null : (
+                <div
+                  role="progressbar"
+                  aria-label="Job progress"
+                  aria-valuemin={0}
+                  aria-valuemax={line.bar.lines}
+                  aria-valuenow={line.bar.line}
+                  aria-valuetext={`${formatCount(line.bar.line)} of ${formatCount(line.bar.lines)} lines`}
+                  className="-mt-1 h-1.5 w-full overflow-hidden rounded-full border border-[var(--field-border)] bg-white"
+                >
+                  <div
+                    className={`h-full ${line.bar.failure ? "bg-[var(--destructive)]" : "bg-[var(--editor-accent)]"}`}
+                    style={{
+                      width: `${line.bar.lines === 0 ? 0 : Math.min(100, (line.bar.line / line.bar.lines) * 100)}%`,
+                    }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </>
+      ) : null}
     </section>
   );
 }

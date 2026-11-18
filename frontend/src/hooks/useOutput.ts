@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 
 import { useJobExport, type JobExportEditor } from "@/hooks/useJobExport";
+import { useSendJob, type SendApi } from "@/hooks/useSendJob";
 import type { WasmSession } from "@/lib/editorSession";
 import { operationIdText, type OperationId } from "@/lib/operationsView";
 import { decodeOutputGroupText, type OutputGroup, type StartValue } from "@/lib/outputView";
@@ -31,6 +32,8 @@ export interface OutputApi {
   toggleRoute: (page: string) => boolean;
   /** Export job file. */
   exportJob: () => Promise<void>;
+  /** Send to machine and the connector's state (`specs/0125`). */
+  send: SendApi;
 }
 
 /** The output group's API for `editor`; `projectFile` names the project for the file name. */
@@ -64,5 +67,6 @@ export function useOutput(
   const selectRunning = useCallback(() => run((s) => s.select_operation_items("running")), [run]);
   const toggleRoute = useCallback((page: string) => run((s) => s.toggle_toolpath_view(page)), [run]);
   const exportJob = useJobExport(editor, projectFile, onError);
-  return { view, setFixtureMaterial, setStart, selectItems, selectRunning, toggleRoute, exportJob };
+  const send = useSendJob(editor);
+  return { view, setFixtureMaterial, setStart, selectItems, selectRunning, toggleRoute, exportJob, send };
 }

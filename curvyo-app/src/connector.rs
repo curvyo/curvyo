@@ -418,7 +418,7 @@ fn stop_watcher(state: &ConnectorState, profile_id: &str) {
 
 /// Starts the standing connection of `profile_id` while the page shows it; a running one of the
 /// same profile is replaced. It tries again only while a job is in flight or a send awaits its
-/// answer (`0124` B5).
+/// answer (`0125` B5).
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn connector_watch(
