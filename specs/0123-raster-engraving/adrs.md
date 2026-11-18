@@ -22,6 +22,8 @@ Status: Proposed (architect, 2026-11-18). Builds after `0124` (ADR 0066, 0067). 
 - 2026-11-18: **Dot-map golden format**: one text line per grid row, `.` off and `#` on; Grey two hex digits per dot; rows outside the frame as spaces.
 - 2026-11-18: **Format**: project `format_version` next free at merge after `0124`'s (50 if only `0124` merges first); material record format 3 if Frage 237 A; no migration; the job has no format.
 
+Reconciled 2026-11-18 (product owner): every "For the PO" below is applied in the specification (criteria 6, 11, 13, 14, 15, 32, 42), Lowest power above Power warns (`LowestPowerAbovePower`, ADR 0069 §6).
+
 ## Frage 237 (RASTER-RECIPE): Where Fill and Dither of the Engrave test grid are kept
 
 A test grid's settings (its "recipe") are kept on the grid and also in the material's test record, so "Place on page" from Materials rebuilds the same grid.
