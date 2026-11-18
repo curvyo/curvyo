@@ -1,9 +1,11 @@
 //! The job state machine of one connector: events in, new state and messages out, no clock.
 
+mod controls;
+
 use uuid::Uuid;
 
 use crate::assembly::{Assembly, ChunkError, Job};
-use crate::message::{ErrorCode, JobKind, JobResult, Message, Progress, RejectReason, State};
+use crate::message::{ErrorCode, JobKind, Message, Progress, RejectReason, State};
 use crate::millimetres::Millimetres;
 
 /// Settings of the machine.
@@ -20,7 +22,7 @@ pub enum Event {
     Message(Message),
     /// A controller was attached.
     ControllerConnected,
-    /// The controller was lost.
+    /// The controller was lost; a job in flight is dropped and named in the detail.
     ControllerLost,
     /// The controller got through `line` lines; `elapsed_ms` is counted by the caller.
     Progress {
@@ -41,6 +43,13 @@ pub enum Event {
         /// Milliseconds since the start.
         elapsed_ms: u64,
     },
+    /// The controller failed the job, running or paused, for the reason in `detail`.
+    JobFailedWith {
+        /// Milliseconds since the start.
+        elapsed_ms: u64,
+        /// The sentence the app shows ("Failed at line 12: No feed rate (error 22)").
+        detail: String,
+    },
     /// The controller raised an alarm.
     Alarm {
         /// Its text.
@@ -53,6 +62,25 @@ pub enum Event {
     /// A client connection that sent a job ended; a job still being received is dropped
     /// (back to `Idle`), a job that is `Ready` or further is not affected.
     ClientDisconnected,
+    /// The controller holds the job (asked for or not): `Running` becomes `Paused`.
+    Held,
+    /// The controller runs the held job again.
+    Resumed,
+    /// The controller confirms that a stop ended: the job is `Done { Stopped }`.
+    Stopped,
+    /// The controller could not confirm a stop: the job is dropped, `NoController`.
+    StopUnconfirmed,
+    /// Why there is no controller ("Port /dev/ttyUSB0 not found"); only in `NoController`.
+    NoControllerDetail {
+        /// The sentence.
+        detail: String,
+    },
+    /// The controller reports a state outside the job's states ("Door"); `None` once it left it.
+    ControllerWord(Option<String>),
+    /// Whether the controller's laser mode is off: jobs are refused while it is (G34).
+    LaserModeOff(bool),
+    /// Whether the controller's laser mode could not be read: jobs are refused while so (G34).
+    LaserModeUnknown(bool),
 }
 
 /// What the transport has to tell the controller.
@@ -69,6 +97,8 @@ pub enum ControllerCommand {
     Resume,
     /// End the stream.
     Stop,
+    /// Leave the controller's alarm lock.
+    Unlock,
 }
 
 /// The result of one event.
@@ -90,26 +120,74 @@ struct Held {
 
 /// The state of one connector and the one job it holds.
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)] // independent flags of the job machine, each read on its own
 pub struct Machine {
     options: Options,
+    /// Pause, Resume and Stop wait for the controller's `Held`, `Resumed` and `Stopped`.
+    confirm: bool,
     state: State,
     assembly: Option<Assembly>,
     held: Option<Held>,
     position: Option<[Millimetres; 3]>,
     alarm: Option<String>,
+    /// The sentence that explains the state.
+    detail: Option<String>,
+    /// The detail names a lost job and stays through the reconnect until the next job state.
+    sticky: bool,
+    /// A controller state outside the job's states.
+    word: Option<String>,
+    /// A stop was sent and waits for the controller.
+    stop_pending: bool,
+    /// The controller's laser mode is off: `SubmitJob` is refused.
+    laser_off: bool,
+    /// The controller's laser mode is unknown: `SubmitJob` is refused.
+    laser_unknown: bool,
+}
+
+/// Controller states in which no job may start (`specs/0127` G4): the door, check mode, sleep.
+const BUSY_WORDS: [&str; 3] = ["Door", "Check", "Sleep"];
+
+/// A count with a thousands comma: "12,345".
+pub(crate) fn count(n: u32) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
 }
 
 impl Machine {
-    /// A connector without a controller.
+    /// A connector without a controller whose Pause, Resume and Stop take effect at once.
     #[must_use]
     pub fn new(options: Options) -> Self {
         Self {
             options,
+            confirm: false,
             state: State::NoController,
             assembly: None,
             held: None,
             position: None,
             alarm: None,
+            detail: None,
+            sticky: false,
+            word: None,
+            stop_pending: false,
+            laser_off: false,
+            laser_unknown: false,
+        }
+    }
+
+    /// A connector whose Pause, Resume and Stop take effect only when the controller confirms
+    /// them (`Held`, `Resumed`, `Stopped`), as a real machine needs (`specs/0127` G10 to G12).
+    #[must_use]
+    pub fn confirming(options: Options) -> Self {
+        Self {
+            confirm: true,
+            ..Self::new(options)
         }
     }
 
@@ -123,6 +201,17 @@ impl Machine {
     #[must_use]
     pub fn held_job(&self) -> Option<&Job> {
         self.held.as_ref().map(|h| &h.job)
+    }
+
+    fn shown_detail(&self) -> Option<String> {
+        if self.stop_pending {
+            return Some("Stopping".to_owned());
+        }
+        self.detail.clone().or_else(|| {
+            self.word
+                .as_ref()
+                .map(|word| format!("Controller state: {word}"))
+        })
     }
 
     /// The `Status` message for the current state.
@@ -151,6 +240,7 @@ impl Machine {
             job,
             position: self.position,
             alarm: self.alarm.clone(),
+            detail: self.shown_detail(),
         }
     }
 
@@ -170,7 +260,28 @@ impl Machine {
         out
     }
 
+    /// Enters `state`; a detail stays only when it names a lost job and the state is
+    /// `NoController` or `Idle` (the reconnect).
     fn set(&mut self, state: State, out: &mut Output) {
+        let keep = self.sticky && matches!(state, State::NoController | State::Idle);
+        if !keep {
+            self.detail = None;
+            self.sticky = false;
+        }
+        self.enter(state, out);
+    }
+
+    /// Enters `state` with `detail`.
+    fn set_with(&mut self, state: State, detail: String, sticky: bool, out: &mut Output) {
+        self.detail = Some(detail);
+        self.sticky = sticky;
+        self.enter(state, out);
+    }
+
+    fn enter(&mut self, state: State, out: &mut Output) {
+        if !matches!(state, State::Running | State::Paused) {
+            self.stop_pending = false;
+        }
         self.state = state;
         out.messages.push(self.status());
     }
@@ -216,6 +327,11 @@ impl Machine {
             } => self.chunk(job_id, index, &text, out),
             Message::Start { job_id } => self.start(job_id, out),
             Message::Pause | Message::Resume | Message::Stop => self.control(&message, out),
+            // Outside `Alarm` nothing is written; the caller answers with the status (G33).
+            Message::Unlock if self.state == State::Alarm => {
+                out.commands.push(ControllerCommand::Unlock);
+            }
+            Message::Unlock => {}
             _ => Self::error(
                 out,
                 ErrorCode::UnexpectedMessage,
@@ -235,6 +351,20 @@ impl Machine {
     ) {
         match self.state {
             State::NoController => Self::reject(out, job_id, RejectReason::NoController),
+            State::Idle | State::Done { .. } if self.laser_off => {
+                Self::reject(out, job_id, RejectReason::LaserModeOff);
+            }
+            State::Idle | State::Done { .. } if self.laser_unknown => {
+                Self::reject(out, job_id, RejectReason::LaserModeUnknown);
+            }
+            State::Idle | State::Done { .. }
+                if self
+                    .word
+                    .as_deref()
+                    .is_some_and(|w| BUSY_WORDS.contains(&w)) =>
+            {
+                Self::reject(out, job_id, RejectReason::Busy);
+            }
             State::Idle | State::Done { .. } => {
                 match Assembly::begin(job_id, name, kind, bytes, sha256) {
                     Err(reason) => Self::reject(out, job_id, reason),
@@ -311,107 +441,18 @@ impl Machine {
             self.set(State::Running, out);
         }
     }
+}
 
-    fn control(&mut self, message: &Message, out: &mut Output) {
-        match (message, self.state) {
-            (Message::Pause, State::Running) => {
-                out.commands.push(ControllerCommand::Pause);
-                self.set(State::Paused, out);
-            }
-            (Message::Resume, State::Paused) => {
-                out.commands.push(ControllerCommand::Resume);
-                self.set(State::Running, out);
-            }
-            (Message::Stop, State::Running | State::Paused) => {
-                out.commands.push(ControllerCommand::Stop);
-                self.set(
-                    State::Done {
-                        result: JobResult::Stopped,
-                    },
-                    out,
-                );
-            }
-            (Message::Stop, State::Receiving | State::Ready | State::AwaitingLocalStart) => {
-                self.discard();
-                self.set(State::Idle, out);
-            }
-            (Message::Stop, _)
-            | (Message::Pause, State::Paused)
-            | (Message::Resume, State::Running) => {}
-            _ => Self::wrong_state(out),
-        }
-    }
+#[cfg(test)]
+mod tests {
+    use super::count;
 
-    fn on_controller(&mut self, event: Event, out: &mut Output) {
-        if self.state == State::NoController {
-            if event == Event::ControllerConnected {
-                self.set(State::Idle, out);
-            }
-            return;
-        }
-        match event {
-            Event::ControllerLost => {
-                self.discard();
-                self.position = None;
-                self.alarm = None;
-                self.set(State::NoController, out);
-            }
-            Event::Alarm { text } => {
-                self.discard();
-                self.alarm = Some(text);
-                self.set(State::Alarm, out);
-            }
-            Event::AlarmCleared if self.state == State::Alarm => {
-                self.alarm = None;
-                self.set(State::Idle, out);
-            }
-            Event::Position(position) => {
-                self.position = Some(position);
-                out.messages.push(self.status());
-            }
-            Event::LocalStartPressed if self.state == State::AwaitingLocalStart => {
-                if let Some(h) = &self.held {
-                    out.commands.push(ControllerCommand::Start {
-                        job_id: h.job.job_id,
-                    });
-                }
-                self.set(State::Running, out);
-            }
-            other => self.on_job_event(&other, out),
-        }
-    }
-
-    fn on_job_event(&mut self, event: &Event, out: &mut Output) {
-        let running = matches!(self.state, State::Running | State::Paused);
-        let Some(held) = self.held.as_mut().filter(|_| running) else {
-            return;
-        };
-        match *event {
-            Event::Progress { line, elapsed_ms } => {
-                held.line = line.min(held.lines);
-                held.elapsed_ms = elapsed_ms;
-                out.messages.push(self.status());
-            }
-            Event::JobFinished { elapsed_ms } if self.state == State::Running => {
-                held.line = held.lines;
-                held.elapsed_ms = elapsed_ms;
-                self.set(
-                    State::Done {
-                        result: JobResult::Completed,
-                    },
-                    out,
-                );
-            }
-            Event::JobFailed { elapsed_ms } if self.state == State::Running => {
-                held.elapsed_ms = elapsed_ms;
-                self.set(
-                    State::Done {
-                        result: JobResult::Failed,
-                    },
-                    out,
-                );
-            }
-            _ => {}
-        }
+    #[test]
+    fn counts_have_a_thousands_comma() {
+        assert_eq!(count(0), "0");
+        assert_eq!(count(999), "999");
+        assert_eq!(count(1000), "1,000");
+        assert_eq!(count(12_345), "12,345");
+        assert_eq!(count(1_234_567), "1,234,567");
     }
 }

@@ -1,0 +1,1 @@
+{"type":"Status","state":{"name":"Done","result":"Failed"},"job":{"job_id":"67e55044-10b1-426f-9247-bb680e5fe0c8","line":11,"lines":412,"elapsed_ms":4200},"position":[12.5,0.0,0.0],"alarm":null,"detail":"Failed at line 12: No feed rate (error 22)"}
