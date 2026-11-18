@@ -301,3 +301,136 @@ lines to the handle). Q21's test drives `RunningServer` and `client` in one proc
 - No other conflict. Deferred, not conflicting: ADR 0035 §1's config file and §3's trust-mode
   setting (pinned is the only mode), §8's `Pair { code }` path. ADR 0007 §1's "no 0600 plaintext
   store" is about client credentials; the connector's own key file is ADR 0035 §3's decision.
+
+## Addendum: third slice, Send to machine (architect, 2026-11-17)
+
+Covers `specs/0124-send-to-machine` criteria S1 to S18. No new ADR: ADR 0035 (protocol), ADR 0064
+§11 (export effects) and addendum A1 to A12 above decide everything this slice reuses. Everything
+here is a **(Proposal)** unless it quotes an ADR.
+
+**B1. What does not change.** No new crate, no new external dependency, no new trait, no
+protocol change (protocol 0, every golden file under `curvyo-connector-core/tests/fixtures/` and
+`curvyo-connector-io/tests/fixtures/` byte-identical), no `format_version` change: the commit
+writes the fixture jobs' Output, the stored numbers and `test_grid_lasered`, the fields
+criterion 28 of `0029` already writes. No GRBL writer change and no golden change (B6).
+What changes, all internal API: `curvyo-connector-core` gains one module (B4);
+`curvyo-connector-io`'s `Connection::send_job` takes the job id from its caller
+(`send_job(job_id, name, text, deadline)`, `job_send::new_job_id()` becomes `pub`) and `watch`
+gets the retry rule of B5; `curvyo-ui-core` gains one module (B2); `curvyo-document-core`'s
+`export_job` takes its commit label (B3); `curvyo-editor-wasm` gains, for the S17 test only,
+`curvyo-connector-io` and `curvyo-connector-core` as `[target.'cfg(not(target_arch =
+"wasm32"))'.dev-dependencies]` (internal path crates; no production edge, nothing in the wasm build).
+
+**B2. Enabling rule: one function beside Export's gate** (S1 to S5, S8). `curvyo-ui-core/src/send_button.rs`
+("decides whether Send to machine is enabled and why not"), pure, no connector types:
+`send_button(gate: &Gate, format: OutputFormat, link: SendLink, sending: bool) -> SendButton
+{ enabled, cause: Option<SendCause> }`. Causes in this order, the first wins: (1)
+`gate.first_block()` (the very issue Export's tooltip shows, so S2 holds by construction:
+Export and Send read one `Gate` in one frame); (2) `Browser`; (3) `FormatNotSpoken(format)` from
+`connector_speaks(format)`, one `match` on the closed enum (`Grbl => true`; adding a format to
+ADR 0064 §12 adds its arm there, the compiler asks); (4) `NotPaired`, `NoLongerPaired`,
+`KeyChanged` from `link`; (5) `Sending`. `SendLink` is a ui-core enum `Browser | NotPaired |
+NoLongerPaired | KeyChanged | Paired`. The session (`session/output/view_json.rs`) adds
+`send: Option<SendView>` to `OutputGroupView`, `None` when the page copy's `connector_address`
+is empty (S1), else `send_button(..)`; `sending` is the session's own pending send (B3); `link`
+is set by the frontend through one wasm call `set_send_link(spelling)` from the link store (B5),
+session state only, never in the document. The words: a gate cause keeps its check text
+(`job_gate_text.rs`); the connector causes are serialised as tags and worded by
+`frontend/src/lib/connectorText.ts`, where the Connector row's words already live. Unit tests in
+ui-core: every cause, the order, and "Export disabled ⇒ Send disabled with the same text" for
+each `Cause` that blocks.
+
+**B3. The commit: one function, two callers** (S6, S10, S12). In `session/output/export.rs` the
+hand-out and the commit are shared: `export_job` and a new `send_job` both call one private
+`hand_out(kind)` (gate checked again at that moment, `write(format, &job)`, `export_effects`, a
+token); `send_job` returns the same bytes, the **page's name** and the token, and `None` unless
+`send_button(..).enabled`. `export_job_done` and a new `send_job_done(token, connector_name,
+now_ms)` both call one private `commit(effects, label, now_ms)`: the history step through
+`Document::export_job(label, ..)` (labels `export_job` "Export job file" and `send_job` "Send
+job to machine" in `curvyo-ui-core/src/history_names.rs`; nothing committed when nothing differs,
+so an unchanged second send adds no step, S12), then the reserved `mark_test_grid_lasered`
+commit and the records as ADR 0064 §11 (2), (3); undo takes back the step only. Notices:
+`send_notice(page, connector, n)` beside `export_notice`, sharing `fit` and the second line.
+Tokens: the send token is held apart from export tokens (`Exports::send: Option<(u32,
+ExportEffects)>`), so an export during a send does not make it stale; at most one pending send
+per session (Send shows `Sending` on every laser page meanwhile); `send_job_failed(token)` drops
+it. An unknown or used token commits nothing.
+
+**B4. Commit at most once per job id, reconnect included** (S11, P19, P20). One pure struct in
+`curvyo-connector-core/src/send_watch.rs` ("follows one sent job until the connector has
+accepted or lost it"): `SendWatch::new(job_id)`, `transfer_ended()` and `observe(&Message) ->
+Option<Resolution>`, `Resolution = Accepted | Rejected(RejectReason) | NotReceived`.
+`JobAccepted`/`JobRejected` with its id decide at any time; a `Status` whose `job.job_id` is the
+id in `Ready`, `AwaitingLocalStart`, `Running`, `Paused` or `Done` is `Accepted` (P20: these
+carry the progress); while the transfer runs, any other `Status` is ignored (the watcher sees
+`Receiving`); after `transfer_ended()`, the next `Status` without the id (`Idle`, `Receiving` left
+by a dropped transfer, `NoController`, `Alarm`, another id) is `NotReceived`. After a
+`Some(..)` it answers `None` for ever, so a replayed status never commits twice (unit test).
+The app holds it: `ConnectorState` (`curvyo-app`) gets `pending: Mutex<Option<(profile id,
+SendWatch)>>`; the send command (new module `curvyo-app/src/connector_send.rs`, since
+`connector.rs` is past 500 lines) registers it before `SubmitJob`, feeds it the send's own
+answer, and the watcher's thread feeds it every `Status`; whoever gets the `Some` takes the entry
+under the mutex and reports it, the command in its return value, the watcher as one
+`connector-event` `{kind: "sendResolved", jobId, resolution}`. A connect failure before
+`SubmitJob` clears it ("Nothing answers at <address>"). A connection error after `SubmitJob`
+calls `transfer_ended()`, then one fresh `open_paired` whose first `Status` resolves it; if
+that fails too, the watcher's retries (B5) resolve it later in this run. The webview commits with
+`send_job_done` only on `Accepted` for the job id it holds, and calls `send_job_failed` on the
+others; the token is used once, a second guard. A send unresolved when the app quits commits
+nothing (accepted gap: such a job runs, the page is not Lasered). Known edge, accepted: a job
+accepted, then started from another app and in `Alarm` before the reconnect reads "Not received"
+(`Alarm` carries no job id).
+
+**B5. One status source** (S9, S13 to S15, Q14, Q16). Rust: one watcher per profile id
+(`ConnectorState.watcher` becomes a map; `connector_unwatch(profile_id)`), the standing
+connection of slice 2. It never sends `GetStatus` on a timer: the connector pushes on change
+at most 5 per second (A9), the watcher forwards each push unchanged, the app adds no limiter.
+`watch` retries every 5 s only while the last `Status` it saw was active (Receiving to Paused) or
+a send is pending; otherwise a drop or a failed first read is reported once and the watcher
+ends, and the next press or showing starts it again (no polling while idle). Frontend: one module
+`frontend/src/lib/connectorLink.ts` listens to `connector-event` once and keeps, per profile id
+and address, `{status, held, sending, lost, error}` with a consumer count: the first subscriber
+calls `connector_watch`, the last `connector_unwatch`. `useConnector` (Connector row) and the
+Output group's hook read the same entry, so both show equal values (S14 test on the store);
+`held` (job id, name, lines, bytes) is set by either send, so the row shows the page's job Ready
+with Start (S9). The status carries no job name (protocol 0), so a name is shown only for a job
+this app sent in this run, matched by id (S15).
+
+**B6. A non-ASCII page name in the header** (S7). Settled by ADR 0064 decision 2 and built:
+`job_write_grbl.rs` `comment` writes every character that is not printable ASCII (`0x21` to
+`0x7E`, or a space) as `_`, one per character, then cuts the line at 80 characters ("Küche" →
+`; Curvyo job: K_che`); `acceptance_0029_tester_core.rs` `c24_long_and_non_ascii_names_stay_ascii_lines`
+covers it. So the writer already meets P10 and Send does **not** sanitise: the bytes stay
+byte-identical to Export's (S6). No writer change, no golden change. `SubmitJob.name` is a JSON
+string and carries the page's name as it is ("Küche"); the connector checks only the text, and
+`jobs.log` turns control characters into a space (A10). S7's test asserts the header line above
+and an accepted send.
+
+**B7. App and webview** (ADR 0035, A8). The webview holds the document and its wasm session, the
+job bytes for the one call, the session token and job id of the pending send, statuses, names,
+counts and fingerprints. Rust holds the record (pin, token) in the credential store and process
+memory, every connection, the watcher and the `SendWatch`. The bytes reach Rust as the raw body of
+one command, `connector_send_page_job(profile_id, address, name)` (`raw_ipc`, as
+`write_job_export`); Rust never gets the document, the webview never gets the token. Browser
+build: no host command is called, `SendLink::Browser`, Export downloads as before (S5).
+
+**B8. Tests** (S16, S17). Unit: `send_button` (ui-core), `SendWatch` with replayed and
+reordered statuses (connector-core), `hand_out`/`commit` (editor-wasm: Send's bytes equal
+Export's; one step; Lasered kept by undo; no step for an unchanged second send). Integration:
+`curvyo-editor-wasm/tests/send_to_machine.rs` drives a session with a test grid and a fixture
+job, a `RunningServer` with the fake controller, pairing, `send_job` → `Connection::send_job`
+→ `SendWatch` → `send_job_done`, Start, Pause, Resume, Stop, a second send, and a dropped
+connection after the last chunk resolved by a fresh `Status`; waits by line counts and statuses,
+never by sleeps. Project fixtures saved before and after compare byte-identical (S16).
+
+**Spec checks against ADRs 0035, 0064 and slice 2** (fixed in `specs/0124-send-to-machine`, 2026-11-17):
+
+- S7 proposed `?` for a non-ASCII name and said `0029` does not settle it; ADR 0064 decision 2
+  already writes `_` and the writer is built that way (B6). S7 now says so.
+- S10 said the notice shows 3 s, criterion 27 of `0029` (which it reuses) shows 5 s with the
+  second line; S10 now says "3 s, 5 s with the second line".
+- S11 named only `Idle` and another id for "Not received"; `Receiving` left by a dropped
+  transfer, `NoController` and `Alarm` carry no id either (B4). S11 now lists them.
+- S13 and S15 asked for the name of a job sent by another app; `Status` has no name and the spec
+  forbids a protocol change. S15 now shows such a job's lines without the name and size (B5);
+  S13's words stand for the app's own job.
