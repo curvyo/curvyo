@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>02 · Handles on the shape and the entry boxes</title><style>:root{--canvas-bg:#E8E8EB;--pasteboard-bg:#B8B8BE;--toolbar-bg:#DCDCE0;--panel-bg:#DCDCE0;--toolbar-icon:#3A3A3F;
+--toolbar-icon-active-bg:#2F6FEE;--toolbar-icon-active-fg:#FFFFFF;--editor-accent:#2F6FEE;--accent:#2F6FEE;
+--editor-accent-hover:color-mix(in srgb,#2F6FEE 20%,transparent);--row-hover:color-mix(in srgb,#2F6FEE 8%,transparent);
+--cut:#C8102E;--engrave-hatch:#C46A1C;--lane-line:#7B7B7F;--field-border:color-mix(in srgb,#3A3A3F 60%,transparent);
+--field-invalid:#B3261E;--destructive:#B3261E;--destructive-soft:#F7D3CF;--panel-muted-fg:#5A5A5F;
+--field-placeholder:#6B6B6F;--value-fill:color-mix(in srgb,#2F6FEE 28%,white);--value-edge:#2F6FEE;
+--panel-elevation-shadow:0 2px 8px rgba(0,0,0,0.24);--line25:color-mix(in srgb,#3A3A3F 25%,transparent)}
+*{box-sizing:border-box}
+body{margin:0;background:#FFFFFF;color:var(--toolbar-icon);font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px}
+.sheet{padding:16px 20px 24px}
+.sheet h1{font-size:16px;margin:0 0 4px}
+.sheet .lead{font-size:12px;color:var(--panel-muted-fg);margin:0 0 14px;max-width:1240px;line-height:1.45}
+.cols{display:flex;gap:20px;align-items:flex-start}
+.stack{display:flex;flex-direction:column;gap:20px}
+figure{margin:0}
+figcaption{font-size:12px;font-weight:600;margin:0 0 6px;line-height:1.35;max-width:940px}
+figcaption span{display:block;font-weight:400;color:var(--panel-muted-fg)}
+.ann{font-size:11px;color:var(--panel-muted-fg);margin-top:6px;line-height:1.4;max-width:312px}
+.ann b{color:var(--toolbar-icon)}
+/* properties panel: strip + body */
+.pwrap{display:flex;align-items:stretch;border-radius:2px;overflow:hidden;flex:none}
+.strip{width:32px;background:var(--panel-bg);border-left:1px solid var(--line25);display:flex;flex-direction:column;align-items:center;padding-top:10px;gap:4px}
+.strip i{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:5px;position:relative}
+.strip i.on{background:var(--toolbar-icon-active-bg);color:#fff}
+.strip i.new::after{content:"";position:absolute;inset:-2px;border:1.5px dashed var(--panel-muted-fg);border-radius:6px}
+.strip .dv{width:16px;height:1px;background:var(--line25);margin:0}
+.panel{width:280px;background:var(--panel-bg);padding:12px 24px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.hdr{height:24px;display:flex;align-items:center;gap:8px}
+.hdr .t{font-size:14px}
+.hdr .s{font-size:12px;color:var(--panel-muted-fg);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-flex;align-items:center;gap:3px;font-size:12px;border:1px solid var(--line25);border-radius:6px;padding:0 4px;height:20px;flex:none}
+.sec{font-size:11px;font-weight:600;color:var(--panel-muted-fg);height:24px;display:flex;align-items:flex-end;padding-bottom:4px}
+.sec.line{border-top:1px solid var(--line25)}
+.list{display:flex;flex-direction:column}
+.row{min-height:40px;padding:2px 4px 2px 6px;border-radius:5px;position:relative}
+.row.sel{background:var(--value-fill)}
+.row.sel::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);border-radius:2px}
+.row.armed{background:var(--destructive-soft)}
+.row .l1{display:flex;align-items:center;gap:4px;height:24px}
+.row .name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.row .name.mono,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em}
+.row .acts{display:flex;gap:0;align-items:center}
+.row .acts i{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-style:normal}
+.row .acts i.tr{color:var(--panel-muted-fg)}
+.row .acts i.arm{background:var(--destructive);color:#fff;width:22px;height:22px;margin:1px;border-radius:5px}
+.row .acts .gap{width:8px}
+.row .l2{font-size:11px;color:var(--panel-muted-fg);padding-left:20px;height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;display:flex;gap:4px;align-items:center}
+.row .l2 b{font-weight:600;color:var(--toolbar-icon)}
+.cb{width:16px;height:16px;border:1.5px solid var(--toolbar-icon);border-radius:3px;display:flex;align-items:center;justify-content:center;flex:none;background:#fff}
+.cb.on,.cb.mixed{background:var(--toolbar-icon-active-bg);border-color:var(--toolbar-icon-active-bg);color:#fff}
+.rename{height:24px;background:#fff;border:1px solid var(--editor-accent);border-radius:4px;flex:1;font-size:13px;display:flex;align-items:center;padding:0 4px}
+.rename b{background:color-mix(in srgb,#2F6FEE 30%,white);font-weight:400}
+.body{margin:0 0 6px 0;border-left:3px solid var(--value-fill);padding:8px 0 8px 8px;display:flex;flex-direction:column;gap:6px}
+.h{font-size:11px;font-weight:600;color:var(--panel-muted-fg);min-height:16px;display:flex;align-items:center;gap:6px}
+.h .r{margin-left:auto;font-weight:400}
+.fields{display:flex;gap:4px;flex-wrap:wrap}
+.f{height:28px;background:#fff;border:1px solid var(--field-border);border-radius:5px;display:flex;align-items:center;padding:0 6px;gap:4px;font-variant-numeric:tabular-nums;flex:none}
+.f .lb{font-size:12px;color:var(--panel-muted-fg);flex:1;white-space:nowrap}
+.f .v{font-size:13px}
+.f .u{font-size:12px;color:var(--panel-muted-fg)}
+.f.focus{border:2px solid var(--editor-accent)}
+.f.ta{height:auto;min-height:48px;align-items:flex-start;padding:5px 6px;flex-direction:column;gap:2px}
+.f.ta .v{font-size:13px;line-height:1.35}
+.seg{display:flex;border:1px solid var(--lane-line);border-radius:5px;padding:2px;gap:2px;height:28px;flex:none}
+.seg span{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border-radius:3px;font-size:12px;color:var(--panel-muted-fg);white-space:nowrap;padding:0 7px}
+.seg span.on{background:var(--value-fill);color:var(--toolbar-icon);font-weight:600}
+.switch{width:32px;height:18px;border-radius:9px;background:var(--toolbar-icon-active-bg);position:relative;flex:none;display:inline-block}
+.switch::after{content:"";position:absolute;width:14px;height:14px;border-radius:7px;background:#fff;top:2px;right:2px}
+.switch.off{background:#fff;border:1.5px solid var(--toolbar-icon)}
+.switch.off::after{background:var(--toolbar-icon);left:2px;top:1.5px;right:auto;width:12px;height:12px}
+.sw{display:flex;align-items:center;gap:8px;font-size:13px;height:28px;justify-content:space-between}
+.btn{height:28px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px;border:1px solid var(--field-border);background:transparent;color:var(--toolbar-icon);padding:0 8px;white-space:nowrap;flex:none}
+.btn.pri{background:var(--toolbar-icon-active-bg);border-color:var(--toolbar-icon-active-bg);color:#fff}
+.btn.ib{width:28px;padding:0;border-color:transparent}
+.btn.w{width:100%}
+.btns{display:flex;gap:4px}
+.btns .btn{flex:1}
+.addg{display:flex;gap:4px}
+.addg .b{width:44px;height:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;border-radius:5px}
+.src{font-size:11px;color:var(--panel-muted-fg);display:flex;gap:4px;align-items:center;min-height:16px}
+.muted{color:var(--panel-muted-fg)}
+.sentence{font-size:12px;line-height:1.4}
+.empty{font-size:12px;color:var(--panel-muted-fg)}
+/* canvas mock */
+.cv{position:relative;background:var(--pasteboard-bg);overflow:hidden;border-radius:2px;flex:none}
+.cv svg.art{position:absolute;left:0;top:0}
+.rail{position:absolute;left:12px;top:12px;display:flex;gap:8px}
+.rail .col{display:flex;flex-direction:column;gap:8px;width:48px}
+.card{background:var(--toolbar-bg);border-radius:8px;box-shadow:var(--panel-elevation-shadow);padding:4px;display:flex;flex-direction:column;gap:4px;align-items:center}
+.card i{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:6px;position:relative}
+.card i.on{background:var(--toolbar-icon-active-bg);color:#fff}
+.card i.dim{opacity:.4}
+.card i.new::after{content:"";position:absolute;inset:-3px;border:1.5px dashed var(--panel-muted-fg);border-radius:8px}
+.bar{position:absolute;top:12px;background:var(--toolbar-bg);border-radius:8px;box-shadow:var(--panel-elevation-shadow);padding:0 8px;display:flex;flex-wrap:wrap;column-gap:25px;align-items:center}
+.bar .grp{display:flex;align-items:center;gap:4px;height:36px;position:relative;font-size:14px;white-space:nowrap}
+.bar .grp+.grp::before{content:"";position:absolute;left:-13px;top:8px;width:1px;height:20px;background:var(--line25)}
+.bar .grp.nl::before{display:none}
+.bar .grp.new{outline:1.5px dashed var(--panel-muted-fg);outline-offset:1px;border-radius:6px;padding:0 3px}
+.bar .lbl{font-size:12px;color:var(--panel-muted-fg)}
+.bar .f .v{font-size:14px}
+.bar .ib{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px}
+.bar .tb{height:28px;border:1px solid var(--field-border);border-radius:5px;display:flex;align-items:center;gap:6px;padding:0 8px;font-size:14px}
+.bar .tb.pressed{background:var(--toolbar-icon-active-bg);color:#fff;border-color:var(--toolbar-icon-active-bg)}
+.bar .row-break{flex-basis:100%;height:0}
+.sl{position:relative;width:112px;height:28px;flex:none}
+.sl .tr{position:absolute;left:7px;right:7px;top:12px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--toolbar-icon) 35%,transparent)}
+.sl .fill{position:absolute;left:7px;top:12px;height:4px;border-radius:2px;background:var(--editor-accent)}
+.sl .th{position:absolute;top:7px;width:14px;height:14px;border-radius:7px;background:#fff;border:2px solid var(--editor-accent)}
+.crumb{position:absolute;background:var(--toolbar-bg);border-radius:8px;height:28px;display:flex;align-items:center;gap:4px;padding:0 4px;font-size:12px;box-shadow:var(--panel-elevation-shadow)}
+.crumb .c{padding:0 8px;height:28px;display:flex;align-items:center}
+.crumb .cur{font-weight:600}
+.dd{position:absolute;background:var(--toolbar-bg);border-radius:8px;box-shadow:var(--panel-elevation-shadow);padding:4px;width:260px;font-size:13px}
+.dd div{height:32px;display:flex;align-items:center;gap:6px;padding:0 8px;border-radius:4px}
+.dd div.on{background:var(--value-fill)}
+.dd div .m{margin-left:auto;font-size:12px;color:var(--panel-muted-fg)}
+/* judge table */
+table.jt{border-collapse:separate;border-spacing:2px;font-size:11px;color:var(--panel-muted-fg);font-variant-numeric:tabular-nums}
+table.jt th{font-weight:400;height:16px;padding:0}
+table.jt th.rh{text-align:right;padding-right:4px;width:34px}
+table.jt td{padding:0}
+table.jt td div{width:36px;height:36px;border:1px solid var(--lane-line);border-radius:4px;display:flex;align-items:center;justify-content:center;background:#fff;font-size:10px;color:var(--panel-muted-fg)}
+table.jt td div.best{background:var(--value-fill);border:2px solid var(--editor-accent);color:var(--toolbar-icon)}
+table.jt td div.hov{background:var(--editor-accent-hover)}
+.photo{position:relative;width:244px;border-radius:4px;overflow:hidden;flex:none}
+.tg{width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--toolbar-icon);position:relative}
+.tg.on{background:var(--toolbar-icon-active-bg);color:var(--toolbar-icon-active-fg)}
+.tg.sm{width:20px;height:20px;border-radius:5px}
+.tip{position:absolute;z-index:5;background:#2A2A2E;color:#fff;font-size:12px;line-height:1;padding:5px 7px;border-radius:4px;white-space:nowrap;box-shadow:var(--panel-elevation-shadow)}
+.tag{font-size:11px;border:1px solid var(--line25);border-radius:4px;padding:0 4px;height:18px;display:inline-flex;align-items:center;gap:3px;color:var(--panel-muted-fg)}
+
+.cv .plabel{position:absolute;display:flex;gap:4px;align-items:center;font-size:12px}
+.gl{display:flex;gap:6px;align-items:flex-start;font-size:12px;line-height:16px;padding:2px 0}
+.gl svg{margin-top:0}
+.gl .tx{flex:1;min-width:0}
+.gl u{text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.blk{color:var(--destructive)}
+.mline{font-size:12px;line-height:16px}
+.mline b{font-weight:600}
+.run{min-height:40px;padding:2px 0;display:flex;flex-direction:column}
+.run .a{display:flex;align-items:center;gap:4px;height:22px;font-size:13px}
+.run .n{width:16px;height:16px;border-radius:8px;border:1.5px solid var(--toolbar-icon);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;background:#fff}
+.run .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.run .t{font-size:12px;font-variant-numeric:tabular-nums;color:var(--toolbar-icon)}
+.run .b{font-size:11px;color:var(--panel-muted-fg);padding-left:40px;line-height:14px;font-variant-numeric:tabular-nums}
+.run .b svg{vertical-align:-2px;margin-right:2px}
+.run .b em{font-style:normal;color:var(--toolbar-icon)}
+.run.off .nm,.run.off .t{color:var(--panel-muted-fg)}
+.tot{display:flex;flex-direction:column;gap:2px;font-size:12px;font-variant-numeric:tabular-nums}
+.tot .big{font-size:13px;font-weight:600}
+.btn.pri.dis{background:var(--field-disabled-bg,#D0D0D4);border-color:#D0D0D4;color:#58585D}
+.pick{height:28px;background:#fff;border:1px solid var(--field-border);border-radius:5px;display:flex;align-items:center;gap:6px;padding:0 6px;font-size:13px}
+.pick .lb{font-size:12px;color:var(--panel-muted-fg);white-space:nowrap}
+.pick .v{flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plist{background:#fff;border:1px solid var(--field-border);border-top:none;border-radius:0 0 5px 5px;margin-top:-4px;padding:4px 0}
+.plist div{height:28px;display:flex;align-items:center;gap:6px;padding:0 8px;font-size:13px}
+.plist div.on{background:var(--value-fill)}
+.plist div.dis{color:var(--panel-muted-fg)}
+.plist div .m{margin-left:auto;font-size:11px;color:var(--panel-muted-fg)}
+.hr{height:1px;background:var(--line25);margin:2px 0}
+.sw.dis{color:var(--panel-muted-fg)}
+.seg.dis span.on{background:#E4E4E8;color:var(--panel-muted-fg)}
+.scrub{position:absolute;background:var(--toolbar-bg);border-radius:8px;box-shadow:var(--panel-elevation-shadow);height:40px;display:flex;align-items:center;gap:10px;padding:0 12px 0 6px}
+.scrub.two{height:auto;flex-wrap:wrap;padding:6px 12px 6px 6px;row-gap:0}
+.scrub .ro{font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.scrub .ro span{color:var(--panel-muted-fg)}
+.scrub .slw{position:relative;flex:1;height:28px;min-width:120px}
+.scrub .slw .tr{position:absolute;left:7px;right:7px;top:12px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--toolbar-icon) 35%,transparent)}
+.scrub .slw .fill{position:absolute;left:7px;top:12px;height:4px;border-radius:2px;background:var(--editor-accent)}
+.scrub .slw .th{position:absolute;top:7px;width:14px;height:14px;border-radius:7px;background:#fff;border:2px solid var(--editor-accent);margin-left:-7px}
+.scrub .slw .th.focus{box-shadow:0 0 0 2px var(--toolbar-bg),0 0 0 4px var(--editor-accent)}
+.notice{position:absolute;background:var(--toolbar-bg);border-radius:8px;box-shadow:var(--panel-elevation-shadow);padding:6px 12px;font-size:12px;line-height:16px}
+.newo{outline:1.5px dashed var(--panel-muted-fg);outline-offset:2px;border-radius:6px}
+
+.row.r3{min-height:56px}
+.row .l2{padding-left:0;height:16px}
+.row .l2 .tm{margin-left:auto;color:var(--toolbar-icon);font-size:11px}
+.row .l3{font-size:11px;color:var(--panel-muted-fg);height:14px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.row .l3 em{font-style:normal;color:var(--toolbar-icon)}
+.row.off .name{color:var(--panel-muted-fg)}
+.rg{width:14px;height:14px;border-radius:7px;border:1.25px solid var(--toolbar-icon);font-size:9px;font-weight:600;color:var(--toolbar-icon);display:inline-flex;align-items:center;justify-content:center;flex:none;background:#fff;line-height:1}
+.grp{font-size:11px;font-weight:600;color:var(--panel-muted-fg);height:20px;display:flex;align-items:flex-end;padding:0 0 2px 4px}
+.fxh{height:28px;display:flex;align-items:center;gap:4px;font-size:14px}
+.fxh .r{margin-left:auto;font-size:11px;color:var(--panel-muted-fg);font-variant-numeric:tabular-nums}
+.fxrun{display:flex;flex-direction:column;padding:2px 4px}
+.fxrun .a{display:flex;align-items:center;gap:4px;height:16px;font-size:11px;color:var(--panel-muted-fg)}
+.fxrun .a .tm{margin-left:auto;color:var(--toolbar-icon);font-variant-numeric:tabular-nums}
+.fxrun .b{font-size:11px;color:var(--panel-muted-fg);height:14px;line-height:14px;font-variant-numeric:tabular-nums}
+.ubody{padding:4px 0 6px 12px;display:flex;flex-direction:column;gap:4px}
+.mrow{height:24px;display:flex;align-items:center;gap:4px;font-size:12px}
+.mrow .v{margin-left:auto;font-size:13px;color:var(--toolbar-icon)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.fgrid .f{width:auto}
+.fgrid .f .v{margin-left:auto}
+.cursor{position:absolute;width:14px;height:20px;z-index:6}
+.slot{height:28px;display:flex;align-items:center;font-size:12px;gap:4px}
+.slot .r{margin-left:auto;display:flex;gap:4px}
+.diffrow{outline:1.5px dashed var(--panel-muted-fg);outline-offset:1px;border-radius:4px}
+.bad{outline:2px solid var(--destructive);outline-offset:2px;border-radius:5px}
+.sw2{display:flex;align-items:center;font-size:13px;height:28px;justify-content:space-between}
+.sw2.left{justify-content:flex-start;gap:8px}
+.plist div .ck{width:16px;display:inline-flex}
+
+.sheet{padding:16px 20px 24px;max-width:1720px}
+.figs{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.ann{max-width:312px}
+.panel{min-height:200px}
+.newx{outline:1.5px dashed var(--panel-muted-fg);outline-offset:2px;border-radius:6px}
+.srow{display:flex;align-items:center;gap:8px;height:28px}
+.srow .lab{width:60px;font-size:12px;font-weight:600;flex:none}
+.rule{height:1px;background:var(--line25);margin:4px 0}
+.tgrp{display:flex;border:1px solid var(--field-border);border-radius:5px;overflow:hidden;height:28px;flex:none}
+.tgrp i{width:44px;height:26px;display:flex;align-items:center;justify-content:center;font-style:normal;color:var(--toolbar-icon)}
+.tgrp i+i{border-left:1px solid var(--field-border)}
+.tgrp i.on{background:var(--toolbar-icon-active-bg);color:#fff}
+.tgrp.w40 i{width:40px}
+.sw28{width:28px;height:28px;border-radius:5px;border:1px solid #8E8E93;box-shadow:inset 0 0 0 1px #fff;flex:none;position:relative;overflow:hidden;
+ background-image:linear-gradient(45deg,#C9C9CE 25%,transparent 25%,transparent 75%,#C9C9CE 75%),linear-gradient(45deg,#C9C9CE 25%,transparent 25%,transparent 75%,#C9C9CE 75%);
+ background-size:14px 14px;background-position:0 0,7px 7px;background-color:#fff}
+.sw28 b{position:absolute;inset:0}
+.sw28.mixed{background:repeating-linear-gradient(45deg,#fff 0 4px,#9A9AA0 4px 8px)}
+.sw28.btn28{border-color:var(--field-border)}
+.ib28{width:28px;height:28px;border:1px solid var(--field-border);border-radius:5px;display:flex;align-items:center;justify-content:center;flex:none;color:var(--toolbar-icon)}
+.ib24{width:24px;height:28px;display:flex;align-items:center;justify-content:center;flex:none;color:var(--toolbar-icon);border-radius:5px}
+.ib24.empty{visibility:hidden}
+.tf{height:28px;background:#fff;border:1px solid var(--field-border);border-radius:5px;display:flex;align-items:center;padding:0 6px;font-size:14px;font-variant-numeric:tabular-nums;flex:none;overflow:hidden;white-space:nowrap}
+.tf.focus{border:2px solid var(--editor-accent);padding:0 5px}
+.tf.ph{color:var(--field-placeholder)}
+.stxt{height:28px;display:flex;align-items:center;justify-content:flex-end;padding:0 7px;font-size:13px;color:var(--panel-muted-fg);font-variant-numeric:tabular-nums;flex:none}
+.f .v{margin-left:auto}
+.f.nolab .v{margin-left:auto}
+.f.ph .v{color:var(--field-placeholder)}
+.stop{display:flex;align-items:center;gap:4px;height:28px;position:relative}
+.stop.act::before{content:"";position:absolute;left:-8px;top:0;bottom:0;width:3px;border-radius:2px;background:var(--accent)}
+.stops{display:flex;flex-direction:column;gap:4px}
+.pk{display:flex;flex-direction:column;gap:8px}
+.area{height:96px;border-radius:4px;position:relative;background:linear-gradient(to top,#000,rgba(0,0,0,0)),linear-gradient(to right,#fff,hsl(var(--h),100%,50%))}
+.area .th{position:absolute;width:14px;height:14px;border-radius:7px;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.6);margin:-7px 0 0 -7px}
+.hue{height:12px;border-radius:6px;position:relative;margin:6px 0;background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}
+.hue .th{position:absolute;top:-2px;width:16px;height:16px;border-radius:8px;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.6);margin-left:-8px}
+.skip{font-size:12px;color:var(--panel-muted-fg);line-height:16px;margin:-4px 0 0 0}
+.state{font-size:12px;color:var(--panel-muted-fg);height:16px;display:flex;align-items:center}
+.ro{position:absolute;background:var(--toolbar-bg);border-radius:8px;padding:4px 8px;font-size:12px;font-variant-numeric:tabular-nums;box-shadow:var(--panel-elevation-shadow);white-space:nowrap}
+.ebox{position:absolute;background:var(--toolbar-bg);border-radius:8px;box-shadow:var(--panel-elevation-shadow);padding:6px;display:flex;flex-direction:column;gap:8px;z-index:4}
+.ebox .r{display:flex;gap:4px;align-items:center}
+.ebox .area{height:80px}
+.cvw{position:relative;flex:none;border-radius:2px;overflow:hidden;background:var(--pasteboard-bg)}
+.cvw>svg{position:absolute;left:0;top:0}
+.cvw canvas{position:absolute}
+.lbl2{position:absolute;font-size:12px;display:flex;gap:4px;align-items:center;color:var(--toolbar-icon)}
+.chip2{display:inline-flex;align-items:center;gap:3px;font-size:11px;border:1px solid var(--line25);border-radius:6px;padding:0 4px;height:18px;background:transparent}
+.cnotice{position:absolute;background:var(--toolbar-bg);border-radius:8px;box-shadow:var(--panel-elevation-shadow);padding:6px 12px;font-size:12px;line-height:18px}
+.f.w{width:100%}
+.legend{font-size:11px;color:var(--panel-muted-fg);margin-top:6px;max-width:420px;line-height:1.4}
+.hl{outline:1.5px dashed var(--panel-muted-fg);outline-offset:2px;border-radius:6px}
+</style></head><body><div class="sheet"><h1>02 · Handles on the shape and the entry boxes</h1><p class="lead">The handles on the shape, Select tool, real selection look (dashed accent box, white resize squares, casing under every accent line). Only the stop colours appear in the handles; the UI adds no colour. Notes: <code>specs/0124-gradient-fill/ux-notes.md</code> sections 6 to 8.</p><div class="figs"><figure style="width:420px"><figcaption>A · Default line, four stops, the 70 % stop active<span>Select tool. Start is a square (direction without colour), End a circle, inner stops smaller dots, all filled with their stop colour and ringed in the selection blue.</span></figcaption><div class="cvw" style="width:420px;height:300px"><svg width="420" height="300" viewBox="0 0 420 300"><defs><linearGradient id="ga" gradientUnits="userSpaceOnUse" x1="90" y1="150.0" x2="330" y2="150.0"><stop offset="0" stop-color="#1D2B53"/><stop offset="0.35" stop-color="#13795B"/><stop offset="0.7" stop-color="#E8A33D"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient></defs><rect x="20" y="20" width="380" height="260" fill="#E8E8EB"/><rect x="90" y="80" width="240" height="140" fill="url(#ga)"/><rect x="90" y="80" width="240" height="140" fill="none" stroke="#fff" stroke-width="3"/><rect x="90" y="80" width="240" height="140" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/><rect x="85.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="85.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><line x1="90" y1="150.0" x2="330" y2="150.0" stroke="#fff" stroke-width="3"/><line x1="90" y1="150.0" x2="330" y2="150.0" stroke="#2F6FEE" stroke-width="1"/><circle cx="174.0" cy="150.0" r="5.75" fill="#fff"/><circle cx="174.0" cy="150.0" r="4" fill="#13795B" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="258.0" cy="150.0" r="8.5" fill="none" stroke="#2F6FEE" stroke-width="2"/><circle cx="258.0" cy="150.0" r="5.75" fill="#fff"/><circle cx="258.0" cy="150.0" r="4" fill="#E8A33D" stroke="#2F6FEE" stroke-width="1.5"/><rect x="82.75" y="142.75" width="14.5" height="14.5" rx="3" fill="#fff"/><rect x="84.5" y="144.5" width="11" height="11" rx="2" fill="#1D2B53" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="330" cy="150.0" r="7.75" fill="#fff"/><circle cx="330" cy="150.0" r="6" fill="#FFFFFF" stroke="#2F6FEE" stroke-width="1.5"/></svg></div><p class="ann" style="max-width:420px">The left and right edge resize handles sit under the default ends: the gradient handles win and the covered shape handles are not drawn or hit (P14). Corners and top and bottom still resize; S types a size.</p></figure><figure style="width:420px"><figcaption>B · Dragging End with Shift<span>The angle locks to the 15° and 22.5° stops about Start; the readout shows the value only, no hint chip. Ctrl moves both ends (P17, not Alt).</span></figcaption><div class="cvw" style="width:420px;height:300px"><svg width="420" height="300" viewBox="0 0 420 300"><defs><linearGradient id="gb" gradientUnits="userSpaceOnUse" x1="114.73720558371174" y1="205.0" x2="305.2627944162883" y2="95.0"><stop offset="0" stop-color="#1D2B53"/><stop offset="0.35" stop-color="#13795B"/><stop offset="0.7" stop-color="#E8A33D"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient></defs><rect x="20" y="20" width="380" height="260" fill="#E8E8EB"/><rect x="90" y="80" width="240" height="140" fill="url(#gb)"/><rect x="90" y="80" width="240" height="140" fill="none" stroke="#fff" stroke-width="3"/><rect x="90" y="80" width="240" height="140" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/><rect x="85.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="85.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="85.5" y="145.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="145.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><line x1="114.73720558371174" y1="205.0" x2="305.2627944162883" y2="95.0" stroke="#fff" stroke-width="3"/><line x1="114.73720558371174" y1="205.0" x2="305.2627944162883" y2="95.0" stroke="#2F6FEE" stroke-width="1"/><circle cx="181.42116167511352" cy="166.5" r="5.75" fill="#fff"/><circle cx="181.42116167511352" cy="166.5" r="4" fill="#13795B" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="248.10511776651532" cy="128.0" r="5.75" fill="#fff"/><circle cx="248.10511776651532" cy="128.0" r="4" fill="#E8A33D" stroke="#2F6FEE" stroke-width="1.5"/><rect x="107.48720558371174" y="197.75" width="14.5" height="14.5" rx="3" fill="#fff"/><rect x="109.23720558371174" y="199.5" width="11" height="11" rx="2" fill="#1D2B53" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="305.2627944162883" cy="95.0" r="10.5" fill="none" stroke="#2F6FEE" stroke-width="2"/><circle cx="305.2627944162883" cy="95.0" r="7.75" fill="#fff"/><circle cx="305.2627944162883" cy="95.0" r="6" fill="#FFFFFF" stroke="#2F6FEE" stroke-width="1.5"/><path d="M307.2627944162883 97.0 l0 15 l4 -4 l3 6 l2 -1 l-3 -6 l5 0 z" fill="#111" stroke="#fff" stroke-width="1"/></svg><div class="ro" style="left:321px;top:65px">30.0°</div></div><p class="ann" style="max-width:420px">One drag is one step &quot;Edit gradient&quot;; Escape during the drag restores. All eight shape handles are back because nothing covers them.</p></figure><figure style="width:420px"><figcaption>C · Radial on an ellipse<span>Centre square, radius handle, the radius circle dashed 4 / 3 like the selection box, one inner stop.</span></figcaption><div class="cvw" style="width:420px;height:300px"><svg width="420" height="300" viewBox="0 0 420 300"><defs><radialGradient id="gc" gradientUnits="userSpaceOnUse" cx="185" cy="135" r="110"><stop offset="0" stop-color="#E8A33D"/><stop offset="0.6" stop-color="#13795B"/><stop offset="1" stop-color="#1D2B53"/></radialGradient><clipPath id="ce"><ellipse cx="210" cy="150" rx="130" ry="80"/></clipPath></defs><rect x="20" y="20" width="380" height="260" fill="#E8E8EB"/><ellipse cx="210" cy="150" rx="130" ry="80" fill="url(#gc)"/><rect x="80" y="70" width="260" height="160" fill="none" stroke="#fff" stroke-width="3"/><rect x="80" y="70" width="260" height="160" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/><rect x="75.5" y="65.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="335.5" y="65.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="75.5" y="225.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="335.5" y="225.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="65.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="225.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="75.5" y="145.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="335.5" y="145.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><circle cx="185" cy="135" r="110" fill="none" stroke="#fff" stroke-width="3"/><circle cx="185" cy="135" r="110" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/><line x1="185" y1="135" x2="295" y2="135" stroke="#fff" stroke-width="3"/><line x1="185" y1="135" x2="295" y2="135" stroke="#2F6FEE" stroke-width="1"/><circle cx="251.0" cy="135" r="8.5" fill="none" stroke="#2F6FEE" stroke-width="2"/><circle cx="251.0" cy="135" r="5.75" fill="#fff"/><circle cx="251.0" cy="135" r="4" fill="#13795B" stroke="#2F6FEE" stroke-width="1.5"/><rect x="177.75" y="127.75" width="14.5" height="14.5" rx="3" fill="#fff"/><rect x="179.5" y="129.5" width="11" height="11" rx="2" fill="#E8A33D" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="295" cy="135" r="7.75" fill="#fff"/><circle cx="295" cy="135" r="6" fill="#1D2B53" stroke="#2F6FEE" stroke-width="1.5"/></svg></div><p class="ann" style="max-width:420px">Dragging the centre moves the whole circle; dragging the radius handle changes the radius.</p></figure><figure style="width:420px"><figcaption>D · Double-click on End: the end entry box<span>Angle with its text selected, the stop's swatch button and hex. Enter commits one step; Escape or a press outside closes.</span></figcaption><div class="cvw" style="width:420px;height:300px"><svg width="420" height="300" viewBox="0 0 420 300"><defs><linearGradient id="gd" gradientUnits="userSpaceOnUse" x1="114.73720558371174" y1="205.0" x2="305.2627944162883" y2="95.0"><stop offset="0" stop-color="#1D2B53"/><stop offset="0.35" stop-color="#13795B"/><stop offset="0.7" stop-color="#E8A33D"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient></defs><rect x="20" y="20" width="380" height="260" fill="#E8E8EB"/><rect x="90" y="80" width="240" height="140" fill="url(#gd)"/><rect x="90" y="80" width="240" height="140" fill="none" stroke="#fff" stroke-width="3"/><rect x="90" y="80" width="240" height="140" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/><rect x="85.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="85.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="85.5" y="145.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="145.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><line x1="114.73720558371174" y1="205.0" x2="305.2627944162883" y2="95.0" stroke="#fff" stroke-width="3"/><line x1="114.73720558371174" y1="205.0" x2="305.2627944162883" y2="95.0" stroke="#2F6FEE" stroke-width="1"/><circle cx="181.42116167511352" cy="166.5" r="5.75" fill="#fff"/><circle cx="181.42116167511352" cy="166.5" r="4" fill="#13795B" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="248.10511776651532" cy="128.0" r="5.75" fill="#fff"/><circle cx="248.10511776651532" cy="128.0" r="4" fill="#E8A33D" stroke="#2F6FEE" stroke-width="1.5"/><rect x="107.48720558371174" y="197.75" width="14.5" height="14.5" rx="3" fill="#fff"/><rect x="109.23720558371174" y="199.5" width="11" height="11" rx="2" fill="#1D2B53" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="305.2627944162883" cy="95.0" r="10.5" fill="none" stroke="#2F6FEE" stroke-width="2"/><circle cx="305.2627944162883" cy="95.0" r="7.75" fill="#fff"/><circle cx="305.2627944162883" cy="95.0" r="6" fill="#FFFFFF" stroke="#2F6FEE" stroke-width="1.5"/></svg><div class="ebox" style="left:61px;top:111px"><div class="r"><div class="f focus" style="width:112px"><span class="lb">Angle</span><span class="v"><b style="font-weight:400;background:color-mix(in srgb,#2F6FEE 30%,white)">30.0</b></span><span class="u">°</span></div><span class="sw28 btn28"><b style="background:#FFFFFF"></b></span><span class="tf" style="width:92px">#FFFFFFFF</span></div></div></div><p class="ann" style="max-width:420px">The Transform entry chip surface, 16px off the handle, clamped and flipped as the Position handle entry box.</p></figure><figure style="width:420px"><figcaption>E · Double-click on an inner stop: the stop entry box, picker opened<span>Swatch button, hex, Position. The swatch button opens the 0017 picker inside the same box (0017 has no popover: delta D7).</span></figcaption><div class="cvw" style="width:420px;height:340px"><svg width="420" height="340" viewBox="0 0 420 340"><defs><linearGradient id="ge" gradientUnits="userSpaceOnUse" x1="90" y1="150.0" x2="330" y2="150.0"><stop offset="0" stop-color="#1D2B53"/><stop offset="0.35" stop-color="#13795B"/><stop offset="0.7" stop-color="#E8A33D"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient></defs><rect x="20" y="20" width="380" height="300" fill="#E8E8EB"/><rect x="90" y="80" width="240" height="140" fill="url(#ge)"/><rect x="90" y="80" width="240" height="140" fill="none" stroke="#fff" stroke-width="3"/><rect x="90" y="80" width="240" height="140" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/><rect x="85.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="85.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="325.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="75.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="205.5" y="215.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><line x1="90" y1="150.0" x2="330" y2="150.0" stroke="#fff" stroke-width="3"/><line x1="90" y1="150.0" x2="330" y2="150.0" stroke="#2F6FEE" stroke-width="1"/><circle cx="174.0" cy="150.0" r="5.75" fill="#fff"/><circle cx="174.0" cy="150.0" r="4" fill="#13795B" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="258.0" cy="150.0" r="8.5" fill="none" stroke="#2F6FEE" stroke-width="2"/><circle cx="258.0" cy="150.0" r="5.75" fill="#fff"/><circle cx="258.0" cy="150.0" r="4" fill="#E8A33D" stroke="#2F6FEE" stroke-width="1.5"/><rect x="82.75" y="142.75" width="14.5" height="14.5" rx="3" fill="#fff"/><rect x="84.5" y="144.5" width="11" height="11" rx="2" fill="#1D2B53" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="330" cy="150.0" r="7.75" fill="#fff"/><circle cx="330" cy="150.0" r="6" fill="#FFFFFF" stroke="#2F6FEE" stroke-width="1.5"/></svg><div class="ebox" style="left:118px;top:166px;width:248px"><div class="r"><span class="sw28 btn28"><b style="background:#E8A33D"></b></span><span class="tf focus" style="width:112px">#E8A33DFF</span><div class="f" style="width:92px"><span class="lb">Position</span><span class="v">70</span><span class="u">%</span></div></div><div class="pk"><div class="area" style="--h:37"><i class="th" style="left:73%;top:9%"></i></div><div class="hue"><i class="th" style="left:10%"></i></div></div></div></div></figure><figure style="width:420px"><figcaption>F · Open path and text<span>The open path's fill closes with the straight line from last to first node and is drawn; the handles live on its box. The text is shaded across its box, clipped to the glyphs.</span></figcaption><div class="cvw" style="width:420px;height:300px"><svg width="420" height="300" viewBox="0 0 420 300"><defs><linearGradient id="gf" gradientUnits="userSpaceOnUse" x1="60" y1="0" x2="230" y2="0"><stop offset="0" stop-color="#13795B"/><stop offset="1" stop-color="#E8A33D"/></linearGradient><linearGradient id="gt" gradientUnits="userSpaceOnUse" x1="250" y1="0" x2="390" y2="0"><stop offset="0" stop-color="#1D2B53"/><stop offset="0.5" stop-color="#13795B"/><stop offset="1" stop-color="#E8A33D"/></linearGradient></defs><rect x="20" y="20" width="380" height="260" fill="#E8E8EB"/><path d="M60 200 C 90 90, 150 90, 170 150 S 220 230, 230 110" fill="url(#gf)" stroke="#3A3A3F" stroke-width="2"/><rect x="60" y="103" width="170" height="108" fill="none" stroke="#fff" stroke-width="3"/><rect x="60" y="103" width="170" height="108" fill="none" stroke="#2F6FEE" stroke-width="1" stroke-dasharray="4 3"/><rect x="55.5" y="98.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="225.5" y="98.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="55.5" y="206.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="225.5" y="206.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="140.5" y="98.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><rect x="140.5" y="206.5" width="9" height="9" rx="2" fill="#fff" stroke="#2F6FEE" stroke-width="1"/><line x1="60" y1="157" x2="230" y2="157" stroke="#fff" stroke-width="3"/><line x1="60" y1="157" x2="230" y2="157" stroke="#2F6FEE" stroke-width="1"/><rect x="52.75" y="149.75" width="14.5" height="14.5" rx="3" fill="#fff"/><rect x="54.5" y="151.5" width="11" height="11" rx="2" fill="#13795B" stroke="#2F6FEE" stroke-width="1.5"/><circle cx="230" cy="157" r="7.75" fill="#fff"/><circle cx="230" cy="157" r="6" fill="#E8A33D" stroke="#2F6FEE" stroke-width="1.5"/><text x="252" y="190" font-family="ui-sans-serif,system-ui,sans-serif" font-weight="800" font-size="60" fill="url(#gt)">Oak</text></svg></div></figure></div></div></body></html>
