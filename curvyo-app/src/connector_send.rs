@@ -287,7 +287,7 @@ pub(crate) fn connector_send_page_job(
 mod tests {
     use super::*;
     use curvyo_connector_io::client::connect;
-    use curvyo_connector_io::hub::FakeSettings;
+    use curvyo_connector_io::hub::{ControllerChoice, FakeSettings};
     use curvyo_connector_io::pin_verifier::PinMode;
     use curvyo_connector_io::server::{RunningServer, ServerConfig};
 
@@ -298,7 +298,7 @@ mod tests {
         let server = RunningServer::start(&ServerConfig {
             listen: "127.0.0.1:0".parse().unwrap(),
             state_dir: dir.path().to_owned(),
-            fake: Some(FakeSettings {
+            controller: ControllerChoice::Fake(FakeSettings {
                 lines_per_second: 20,
                 alarm_at_line: None,
             }),
@@ -399,6 +399,7 @@ mod tests {
             }),
             position: None,
             alarm: None,
+            detail: None,
         };
         assert!(send_pending(&map, "p"));
         assert_eq!(

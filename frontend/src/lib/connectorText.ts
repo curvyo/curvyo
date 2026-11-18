@@ -14,6 +14,17 @@ export interface StatusMessage {
   job: { job_id: string; line: number; lines: number; elapsed_ms: number } | null;
   position: [number, number, number] | null;
   alarm: string | null;
+  /** The sentence that explains the state (`specs/0127`); absent when there is none. */
+  detail?: string | null;
+}
+
+/** What the controller reported (`ControllerInfo`, `specs/0127` G19). */
+export interface ControllerInfo {
+  name: string;
+  firmware: string;
+  port?: string | null;
+  baud?: number | null;
+  settings?: { laser_mode: boolean | null; s_max: number | null; travel: [number, number] | null } | null;
 }
 
 /** Why the connector could not be used (`LinkError` of the host). */
@@ -29,7 +40,15 @@ export type LinkError =
   | { kind: "other"; message: string };
 
 export type TestAnswer =
-  | { kind: "connected"; controller: string | null; protocol: number; version: string; connectorName: string; status: StatusMessage }
+  | {
+      kind: "connected";
+      controller: string | null;
+      controllerInfo: ControllerInfo | null;
+      protocol: number;
+      version: string;
+      connectorName: string;
+      status: StatusMessage;
+    }
   | { kind: "failed"; error: LinkError };
 
 export type PairAnswer =
@@ -138,6 +157,8 @@ const REFUSALS: Record<string, string> = {
   HashMismatch: "Hash mismatch",
   Busy: "Connector busy",
   NoController: "No controller",
+  LaserModeOff: "Laser mode is off ($32=0)",
+  LaserModeUnknown: "Laser mode unknown ($32 not read)",
 };
 
 /** The words of a refused job; the alarm explains a `Busy` (Q19). */
@@ -154,14 +175,17 @@ export function jobIsActive(state: JobState): boolean {
 }
 
 /** Whether a pushed status ends a shown refusal (UX notes §8, "A refusal stays until the next
- * Send, test or state change"): the job moved into another state that has a line count. A
- * refused send passes through Receiving back to Idle, and that late push must not clear it. */
+ * Send, test or state change"): the job moved into another state that has a line count, or the
+ * controller went into Alarm or away, whose line and Unlock button a refusal must not hide
+ * (`specs/0127` UX notes section 6). A refused send passes through Receiving back to Idle, and
+ * that late push must not clear it. */
 export function clearsRefusal(last: StatusMessage | null, next: StatusMessage): boolean {
   const changed =
     last === null ||
     last.state.name !== next.state.name ||
     (last.state.name === "Done" && next.state.name === "Done" && last.state.result !== next.state.result);
-  return changed && hasProgress(next);
+  const controllerChanged = next.state.name === "Alarm" || next.state.name === "NoController";
+  return changed && (hasProgress(next) || controllerChanged);
 }
 
 /** Which job buttons apply in a state (UX notes §7); `null` is "no status yet". */
@@ -257,16 +281,72 @@ export function jobStateLine(status: StatusMessage, held: HeldJob | null): Line 
         case "Stopped":
           return neutral(`Stopped at line ${formatCount(line)}`);
         case "Failed":
-          return failure(`Failed at line ${formatCount(line)}`);
+          return failure(status.detail ?? `Failed at line ${formatCount(line)}`);
       }
       return null;
     case "Alarm":
       return failure(`Alarm: ${status.alarm ?? ""}`);
     case "NoController":
-      return neutral("No controller");
+      return status.detail ? failure(status.detail) : neutral("No controller");
+    case "Idle":
+      // A lost job's sentence stays after the reconnect until the next job state (UX notes V7).
+      return isLossText(status.detail) ? failure(status.detail as string) : null;
     default:
       return null;
   }
+}
+
+/** Whether `detail` names a job the connector lost: a safety state, read out as an alert. */
+export function isLossText(detail: string | null | undefined): boolean {
+  return (
+    typeof detail === "string" &&
+    (detail.startsWith("Lost the controller") || detail.startsWith("Could not confirm the machine stopped"))
+  );
+}
+
+/** Whether the job line is an alert (UX notes section 9): an alarm or a lost job. */
+export function jobLineAlerts(status: StatusMessage | null): boolean {
+  return status !== null && (status.state.name === "Alarm" || isLossText(status.detail));
+}
+
+/** GRBL's own state word outside the job's states ("Door"), from "Controller state: Door". */
+export function controllerWord(status: StatusMessage | null): string | null {
+  const prefix = "Controller state: ";
+  return status?.detail?.startsWith(prefix) ? status.detail.slice(prefix.length) : null;
+}
+
+/** One decimal, never "-0.0" for a value that rounds to zero. */
+function tenths(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return (rounded === 0 ? 0 : rounded).toFixed(1);
+}
+
+/** One decimal, the decimal only when needed: "400", "406.4". */
+function millimetres(value: number): string {
+  const tenths = Math.round(value * 10) / 10;
+  return Number.isInteger(tenths) ? String(tenths) : tenths.toFixed(1);
+}
+
+/** The rows of the Controller block (`specs/0127` UX notes section 2); a value the controller did
+ * not report has no row. */
+export function controllerRows(info: ControllerInfo, status: StatusMessage | null): [string, string][] {
+  const rows: [string, string][] = [["Controller", `${info.name} ${info.firmware}`]];
+  if (info.port) {
+    rows.push(["Port", info.baud ? `${info.port}, ${info.baud} baud` : info.port]);
+  }
+  const word = controllerWord(status);
+  if (word !== null) rows.push(["State", word]);
+  const settings = info.settings;
+  if (settings?.laser_mode != null) rows.push(["Laser mode", settings.laser_mode ? "On" : "Off"]);
+  if (settings?.s_max != null) rows.push(["Max power", formatCount(Math.round(settings.s_max))]);
+  if (settings?.travel) {
+    rows.push(["Travel", `${millimetres(settings.travel[0])} × ${millimetres(settings.travel[1])} mm`]);
+  }
+  if (status?.position) {
+    const [x, y] = status.position;
+    rows.push(["Position", `X ${tenths(x)}, Y ${tenths(y)} mm`]);
+  }
+  return rows;
 }
 
 /** Whether the job block shows a progress bar and the counts (UX notes §8 table). */

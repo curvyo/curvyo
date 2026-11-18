@@ -2,6 +2,7 @@ import {
   CircleAlert,
   KeyRound,
   LoaderCircle,
+  LockOpen,
   Pause,
   Play,
   PlugZap,
@@ -10,7 +11,7 @@ import {
   Unlink,
   Upload,
 } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import { ICON_BUTTON } from "@/components/workbench/machineStyles";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -19,16 +20,19 @@ import { useArm } from "@/hooks/useArm";
 import {
   type Line,
   codeComplete,
+  controllerRows,
   fingerprintLines,
   formatCount,
   formatElapsed,
   hasProgress,
   jobButtons,
+  jobLineAlerts,
   jobStateLine,
   pairRowShown,
   typedCode,
 } from "@/lib/connectorText";
 import { isTauri } from "@/platform/host";
+import { controller_warnings } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 const GLYPH = { size: 16, strokeWidth: 1.5, absoluteStrokeWidth: true, "aria-hidden": true } as const;
 const SMALL = { size: 12, strokeWidth: 1.5, absoluteStrokeWidth: true, "aria-hidden": true } as const;
@@ -40,6 +44,9 @@ interface Props {
   address: string;
   /** The id of the "Only saved profiles have a connection." line, when it is shown. */
   reasonId?: string;
+  /** The page profile's Laser mode and Max power, for the Controller block's warning lines. */
+  profileLaserMode: boolean;
+  profileMaxPower: number;
 }
 
 /**
@@ -51,7 +58,7 @@ export function ConnectorGroup(props: Props) {
   return <ConnectorGroupFor key={`${props.profileId ?? ""}|${props.address}`} {...props} />;
 }
 
-function ConnectorGroupFor({ profileId, address, reasonId }: Props) {
+function ConnectorGroupFor({ profileId, address, reasonId, profileLaserMode, profileMaxPower }: Props) {
   const desktop = isTauri;
   const usable = desktop && profileId !== null;
   const model = useConnector(profileId, address, usable);
@@ -75,13 +82,18 @@ function ConnectorGroupFor({ profileId, address, reasonId }: Props) {
       {!desktop ? (
         <p className="text-xs text-[var(--panel-muted-fg)]">Needs the desktop app</p>
       ) : usable ? (
-        <ConnectorBody model={model} address={address} />
+        <ConnectorBody model={model} address={address} profile={{ laserMode: profileLaserMode, maxPower: profileMaxPower }} />
       ) : null}
     </section>
   );
 }
 
-function ConnectorBody({ model, address }: { model: ConnectorModel; address: string }) {
+interface ProfileValues {
+  laserMode: boolean;
+  maxPower: number;
+}
+
+function ConnectorBody({ model, address, profile }: { model: ConnectorModel; address: string; profile: ProfileValues }) {
   // Where the focus goes when a button unmounts: the Code field after Forget, Send job after Pair.
   const [focusCode, setFocusCode] = useState(false);
   const [focusSend, setFocusSend] = useState(false);
@@ -98,6 +110,7 @@ function ConnectorBody({ model, address }: { model: ConnectorModel; address: str
       {model.paired ? <TrustBlock model={model} onForget={() => { setFocusCode(true); setFocusSend(false); }} /> : null}
       {showPair ? <PairRow model={model} focusOnMount={focusCode} onPaired={() => setFocusSend(true)} /> : null}
       {model.paired ? <JobSection model={model} focusFirst={focusSend} /> : null}
+      {model.paired ? <ControllerBlock model={model} profile={profile} /> : null}
     </>
   );
 }
@@ -239,15 +252,35 @@ function PairRow({ model, focusOnMount, onPaired }: { model: ConnectorModel; foc
 }
 
 function JobSection({ model, focusFirst }: { model: ConnectorModel; focusFirst: boolean }) {
+  // Unlock leaves the tree when the alarm clears; a keyboard user who pressed it lands on the
+  // job toolbar's current button instead of the page body (Proposal).
+  const toolbar = useRef<HTMLDivElement>(null);
+  const unlockHadFocus = useRef(false);
+  const inAlarm = model.status?.state.name === "Alarm";
+  useEffect(() => {
+    if (inAlarm || !unlockHadFocus.current) return;
+    unlockHadFocus.current = false;
+    if (document.activeElement === null || document.activeElement === document.body) {
+      toolbar.current?.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus();
+    }
+  }, [inAlarm]);
   return (
     <>
-      <JobToolbar model={model} focusFirst={focusFirst} />
-      <JobBlock model={model} />
+      <JobToolbar model={model} focusFirst={focusFirst} toolbarRef={toolbar} />
+      <JobBlock model={model} onUnlockFocus={() => (unlockHadFocus.current = true)} />
     </>
   );
 }
 
-function JobToolbar({ model, focusFirst }: { model: ConnectorModel; focusFirst: boolean }) {
+function JobToolbar({
+  model,
+  focusFirst,
+  toolbarRef,
+}: {
+  model: ConnectorModel;
+  focusFirst: boolean;
+  toolbarRef: RefObject<HTMLDivElement | null>;
+}) {
   const buttons = jobButtons(model.status?.state ?? null);
   const idle = model.busy === null;
   const items: { key: string; name: string; enabled: boolean; busy: Busy; icon: ReactNode; press: () => void }[] = [
@@ -282,7 +315,7 @@ function JobToolbar({ model, focusFirst }: { model: ConnectorModel; focusFirst: 
     refs.current[target]?.focus();
   };
   return (
-    <div role="toolbar" aria-label="Job" className="flex gap-1">
+    <div ref={toolbarRef} role="toolbar" aria-label="Job" className="flex gap-1">
       {items.map((item, at) => (
         <SymbolButton
           key={item.key}
@@ -304,7 +337,7 @@ function JobToolbar({ model, focusFirst }: { model: ConnectorModel; focusFirst: 
   );
 }
 
-function JobBlock({ model }: { model: ConnectorModel }) {
+function JobBlock({ model, onUnlockFocus }: { model: ConnectorModel; onUnlockFocus: () => void }) {
   const { status, held, sendingName, refusal } = model;
   const sending = sendingName !== null && model.busy === "send";
   const line = sending
@@ -312,6 +345,7 @@ function JobBlock({ model }: { model: ConnectorModel }) {
     : refusal ?? (status ? jobStateLine(status, held) : null);
   if (line === null) return null;
   const alarm = status?.state.name === "Alarm" && refusal === null && !sending;
+  const alerts = jobLineAlerts(status) && refusal === null && !sending;
   const bar = status !== null && !sending && refusal === null && hasProgress(status);
   const lines = status?.job?.lines ?? 0;
   const done = status?.job?.line ?? 0;
@@ -321,12 +355,23 @@ function JobBlock({ model }: { model: ConnectorModel }) {
     <div className="flex flex-col gap-1">
       <div className="flex items-start justify-between gap-1 text-xs">
         <p
-          role={alarm ? "alert" : "status"}
-          className={`flex items-start gap-1 [overflow-wrap:anywhere] ${line.failure ? "text-[var(--destructive)]" : "text-[var(--toolbar-icon)]"}`}
+          role={alerts ? "alert" : "status"}
+          className={`flex items-start gap-1 [overflow-wrap:anywhere] ${alarm ? "pt-1.5" : ""} ${line.failure ? "text-[var(--destructive)]" : "text-[var(--toolbar-icon)]"}`}
         >
           {alarm ? <TriangleAlert {...SMALL} className="mt-0.5 shrink-0" /> : line.failure ? <CircleAlert {...SMALL} className="mt-0.5 shrink-0" /> : null}
           <span>{line.text}</span>
         </p>
+        {alarm ? (
+          <SymbolButton
+            name="Unlock"
+            enabled={model.busy === null}
+            busy={model.busy === "unlock"}
+            onFocus={onUnlockFocus}
+            onPress={() => model.command("unlock")}
+          >
+            <LockOpen {...GLYPH} />
+          </SymbolButton>
+        ) : null}
         {elapsed && status?.job ? (
           <span className="shrink-0 tabular-nums text-[var(--panel-muted-fg)]">
             <span className="sr-only">Elapsed </span>
@@ -357,6 +402,42 @@ function JobBlock({ model }: { model: ConnectorModel }) {
             {formatCount(done)} / {formatCount(lines)} lines
           </span>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** The Controller block (`specs/0127` UX notes section 2): what the connector's controller
+ * reported, after the job block so the job toolbar never moves; text only, no control. */
+function ControllerBlock({ model, profile }: { model: ConnectorModel; profile: ProfileValues }) {
+  const info = model.controller;
+  if (info === null || model.status === null || model.status.state.name === "NoController") return null;
+  const rows = controllerRows(info, model.status);
+  const warnings = controller_warnings(
+    profile.laserMode,
+    profile.maxPower,
+    info.settings?.laser_mode ?? undefined,
+    info.settings?.s_max ?? undefined,
+  );
+  return (
+    <div role="group" aria-label="Controller" className="mt-1 flex flex-col gap-1">
+      <dl className="grid select-text grid-cols-[80px_minmax(0,1fr)] gap-x-1 gap-y-1 text-xs">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-[var(--panel-muted-fg)]">{label}</dt>
+            <dd aria-live="off" className="m-0 tabular-nums text-[var(--toolbar-icon)] [overflow-wrap:anywhere]">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <div role="status" className="flex flex-col gap-1 text-xs text-[var(--toolbar-icon)]">
+        {warnings.map((text) => (
+          <p key={text} className="flex items-start gap-1">
+            <TriangleAlert {...SMALL} className="mt-0.5 shrink-0" />
+            <span>{text}</span>
+          </p>
+        ))}
       </div>
     </div>
   );

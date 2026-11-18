@@ -5,6 +5,7 @@
 // The host holds the pin and the token; this module only sees fingerprints, answers and statuses.
 // No React and no `@/` import, so the tests load it without a bundler.
 import {
+  type ControllerInfo,
   type Line,
   type LinkError,
   type StatusMessage,
@@ -65,6 +66,8 @@ export interface LinkEntry {
   noStore: boolean;
   keyChanged: { stored: string; presented: string } | null;
   status: StatusMessage | null;
+  /** What the connector's controller reported at its last identify (`specs/0127` G19). */
+  controller: ControllerInfo | null;
   /** The connection dropped while a job was in flight; the last values stay. */
   lost: boolean;
   held: HeldJob | null;
@@ -80,6 +83,7 @@ export interface LinkEntry {
 
 type Payload =
   | { profileId: string; kind: "status"; status: StatusMessage }
+  | { profileId: string; kind: "controller"; controller: ControllerInfo | null }
   | { profileId: string; kind: "sending"; name: string }
   | { profileId: string; kind: "lost" }
   | { profileId: string; kind: "failed"; error: LinkError }
@@ -114,6 +118,7 @@ const EMPTY: LinkEntry = {
   noStore: false,
   keyChanged: null,
   status: null,
+  controller: null,
   lost: false,
   held: null,
   pageJobId: null,
@@ -221,6 +226,9 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
       case "status":
         setStatus(profileId, payload.status);
         break;
+      case "controller":
+        patch(profileId, { controller: payload.controller });
+        break;
       case "sending":
         patch(profileId, { sendingName: payload.name });
         break;
@@ -290,6 +298,7 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
   const read = async (profileId: string, address: string): Promise<TestAnswer> => {
     const answer = await host.invoke<TestAnswer>("connector_test", { profileId, address });
     if (answer.kind === "connected") {
+      patch(profileId, { controller: answer.controllerInfo ?? null });
       setStatus(profileId, answer.status);
       void host.invoke("connector_watch", { profileId, address }).catch(() => undefined);
     } else {

@@ -488,6 +488,8 @@ function ConnectionGroup({
         profileId={readOnly ? null : (machine.profiles.find((row) => row.chosen)?.id ?? null)}
         address={address.trim()}
         reasonId={readOnly ? reason : undefined}
+        profileLaserMode={machine.copy.laser_mode}
+        profileMaxPower={machine.copy.max_power}
       />
     </section>
   );

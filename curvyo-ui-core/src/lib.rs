@@ -140,6 +140,7 @@ pub use page_membership::{PageMembership, Reach, page_contents, page_contents_wi
 mod edit_context;
 mod edit_context_text;
 mod step_scope;
+pub use controller_warnings::controller_warnings;
 pub use edit_context::{
     ActivePage, ContextKind, ContextPages, DoubleClickTarget, Home, Scope, double_click_target,
     in_context, scope,
@@ -151,6 +152,7 @@ pub use edit_context_text::{
 pub use send_button::{SendButton, SendCause, SendLink, connector_speaks, send_button};
 pub use step_scope::{EDIT_STEPS, FREE_STEPS, MOVE_STEPS, StepScope, step_scope};
 mod centre_lines_plan;
+mod controller_warnings;
 mod placement_view;
 mod poly_star_tool;
 pub mod presence;

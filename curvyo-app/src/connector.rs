@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-use curvyo_connector_core::{MAX_JOB_BYTES, Message, State as JobState};
+use curvyo_connector_core::{ControllerInfo, MAX_JOB_BYTES, Message, State as JobState};
 use curvyo_connector_io::Uuid;
 use curvyo_connector_io::client::{
     CONNECT_TIMEOUT, ClientError, DEFAULT_PORT, connect, open_paired_on,
@@ -168,6 +168,7 @@ fn run_test(address: &str, default_port: u16, record: &PairingRecord) -> TestAns
     ) {
         Ok((connection, status)) => TestAnswer::Connected {
             controller: TestAnswer::controller_name(connection.greeting.controller.clone()),
+            controller_info: connection.greeting.controller.clone().map(Box::new),
             protocol: connection.greeting.protocol,
             version: connection.greeting.version.clone(),
             connector_name: connection.greeting.name.clone(),
@@ -337,7 +338,7 @@ pub(crate) fn connector_send_job(
     }
 }
 
-/// Start, pause, resume or stop, over a fresh connection (Q15, Q16).
+/// Start, pause, resume, stop or unlock, over a fresh connection (Q15, Q16; `0127` G14).
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn connector_command(
@@ -369,6 +370,8 @@ pub(crate) fn connector_command(
         "pause" => Message::Pause,
         "resume" => Message::Resume,
         "stop" => Message::Stop,
+        // Leaves GRBL's alarm lock (`specs/0127` G14, Frage 239 B); only in `Alarm`.
+        "unlock" => Message::Unlock,
         _ => return CommandAnswer::WrongState,
     };
     match connection.command(&message, job_state(&status)) {
@@ -389,10 +392,20 @@ struct WatchPayload {
 #[derive(Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum WatchView {
-    Status { status: Message },
-    Sending { name: String },
+    Status {
+        status: Message,
+    },
+    /// The controller changed (`specs/0127`: identified after a reconnect, lost).
+    Controller {
+        controller: Option<ControllerInfo>,
+    },
+    Sending {
+        name: String,
+    },
     Lost,
-    Failed { error: LinkError },
+    Failed {
+        error: LinkError,
+    },
 }
 
 fn emit(app: &AppHandle, profile_id: &str, event: WatchView) {
@@ -457,6 +470,7 @@ pub(crate) fn connector_watch(
                         report_resolution(&app, &state.pending, &profile_id, &status);
                         return;
                     }
+                    WatchEvent::Controller(controller) => WatchView::Controller { controller },
                     WatchEvent::Lost => WatchView::Lost,
                     WatchEvent::Failed(e) => WatchView::Failed { error: e.into() },
                 };
@@ -476,7 +490,7 @@ pub(crate) fn connector_unwatch(state: State<'_, ConnectorState>, profile_id: St
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curvyo_connector_io::hub::FakeSettings;
+    use curvyo_connector_io::hub::{ControllerChoice, FakeSettings};
     use curvyo_connector_io::server::{RunningServer, ServerConfig};
 
     #[test]
@@ -498,7 +512,7 @@ mod tests {
         let server = RunningServer::start(&ServerConfig {
             listen: "127.0.0.1:0".parse().unwrap(),
             state_dir: dir.path().to_owned(),
-            fake: Some(FakeSettings {
+            controller: ControllerChoice::Fake(FakeSettings {
                 lines_per_second: 20,
                 alarm_at_line: None,
             }),
@@ -564,6 +578,7 @@ mod tests {
             }),
             position: None,
             alarm: None,
+            detail: None,
         }
     }
 
