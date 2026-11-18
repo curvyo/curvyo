@@ -13,11 +13,13 @@ use curvyo_render_core::{DrawList, checker_grid};
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 
+use crate::gpu_gradient_buffer::GradientAttributes;
 use crate::gpu_images::{GpuImages, ImageDraws};
 use crate::gpu_pipeline::{
     DEPTH_FORMAT, PipelineKind, ScreenTransform, TransformResources, create_depth_view,
     create_msaa_view, create_pipeline, create_transform_resources, gpu_vertices,
 };
+use crate::gpu_stops::{StopTable, create_stop_table_layout};
 use crate::session::FrameImages;
 
 /// `--pasteboard-bg` (`docs/design-system.md`): cleared behind every frame's
@@ -109,6 +111,10 @@ pub struct Gpu {
     overlay_pipeline: wgpu::RenderPipeline,
     /// The image objects' textures and pipeline (`specs/0058-bitmap-import`).
     images: GpuImages,
+    /// The gradient stop table, bind group 1 of the draw-list pipelines (ADR 0067 §2).
+    stops: StopTable,
+    /// Vertex buffer 1's zeros for frames without gradients (ADR 0067 §1).
+    gradient_attributes: GradientAttributes,
     transform_buffer: wgpu::Buffer,
     transform_bind_group: wgpu::BindGroup,
     /// The offscreen multisampled color target every frame actually
@@ -268,27 +274,22 @@ impl Gpu {
             bind_group: transform_bind_group,
         } = create_transform_resources(&device);
 
-        let artwork_pipeline = create_pipeline(
-            &device,
-            &transform_bind_group_layout,
-            config.format,
-            sample_count,
-            PipelineKind::Artwork,
-        );
-        let checker_pipeline = create_pipeline(
-            &device,
-            &transform_bind_group_layout,
-            config.format,
-            sample_count,
-            PipelineKind::Checker,
-        );
-        let overlay_pipeline = create_pipeline(
-            &device,
-            &transform_bind_group_layout,
-            config.format,
-            sample_count,
-            PipelineKind::Overlay,
-        );
+        let stop_table_layout = create_stop_table_layout(&device);
+        let pipeline = |kind| {
+            create_pipeline(
+                &device,
+                &transform_bind_group_layout,
+                &stop_table_layout,
+                config.format,
+                sample_count,
+                kind,
+            )
+        };
+        let artwork_pipeline = pipeline(PipelineKind::Artwork);
+        let checker_pipeline = pipeline(PipelineKind::Checker);
+        let overlay_pipeline = pipeline(PipelineKind::Overlay);
+        let stops = StopTable::new(&device, &queue, stop_table_layout);
+        let gradient_attributes = GradientAttributes::new(&device);
         let msaa_view = create_msaa_view(&device, &config, sample_count);
         let depth_view = create_depth_view(&device, &config, sample_count);
         let images = GpuImages::new(
@@ -307,6 +308,8 @@ impl Gpu {
             checker_pipeline,
             overlay_pipeline,
             images,
+            stops,
+            gradient_attributes,
             transform_buffer,
             transform_bind_group,
             msaa_view,
@@ -385,6 +388,7 @@ impl Gpu {
         // its own `f32` cast (`to_gpu_vertex`'s own doc comment).
         let origin = view.screen_to_document(0.0, 0.0);
         let vertices = gpu_vertices(draw_list, origin);
+        self.stops.sync(&self.device, &self.queue, draw_list);
         self.images.sync(&self.device, &self.queue, pictures);
         let image_draws = self.images.prepare(&self.device, draw_list, view, origin);
 
@@ -414,6 +418,11 @@ impl Gpu {
                 },
             )
         });
+        // Vertex buffer 1 goes with the vertices it belongs to (ADR 0067 §2); zeros kept across
+        // frames while nothing is shaded.
+        let gradient_buffer =
+            self.gradient_attributes
+                .prepare(&self.device, draw_list, vertices.len());
 
         let color_attachment = self.color_attachment(&view_texture);
 
@@ -440,9 +449,12 @@ impl Gpu {
                     draw_list.overlay_start() as u32,
                     vertices.len() as u32,
                 );
+                let gradient_buffer = gradient_buffer
+                    .as_ref()
+                    .unwrap_or_else(|| self.gradient_attributes.zeros());
                 self.record_draws(
                     &mut pass,
-                    vertex_buffer,
+                    (vertex_buffer, gradient_buffer),
                     (checker_end, overlay_start, end),
                     &image_draws,
                 );
@@ -508,12 +520,17 @@ impl Gpu {
     fn record_draws(
         &self,
         pass: &mut wgpu::RenderPass<'_>,
-        vertex_buffer: &wgpu::Buffer,
+        (vertex_buffer, gradient_buffer): (&wgpu::Buffer, &wgpu::Buffer),
         (checker_end, overlay_start, end): (u32, u32, u32),
         images: &ImageDraws,
     ) {
-        pass.set_bind_group(0, &self.transform_bind_group, &[]);
-        pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        let bind_list = |pass: &mut wgpu::RenderPass<'_>| {
+            pass.set_bind_group(0, &self.transform_bind_group, &[]);
+            pass.set_bind_group(1, self.stops.bind_group(), &[]);
+            pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            pass.set_vertex_buffer(1, gradient_buffer.slice(..));
+        };
+        bind_list(pass);
         if checker_end > 0 {
             pass.set_pipeline(&self.checker_pipeline);
             pass.draw(0..checker_end, 0..1);
@@ -526,8 +543,8 @@ impl Gpu {
                 pass.draw(start..split, 0..1);
             }
             self.images.draw(pass, images, index);
-            // The image quad bound its own vertices: the list's are bound again.
-            pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            // The image quad bound its own vertices and texture: the list's are bound again.
+            bind_list(pass);
             start = split;
         }
         if overlay_start > start {

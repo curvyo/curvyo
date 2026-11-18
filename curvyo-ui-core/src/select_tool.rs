@@ -992,6 +992,7 @@ mod tests {
         param_min_side_mm: 1e9,
         param_centre_yield_mm: 2.0,
         move_only: false,
+        yielded: crate::YieldedHandles::NONE,
     };
 
     #[test]

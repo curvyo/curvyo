@@ -65,6 +65,13 @@ mod format_form;
 mod format_list_view;
 mod fracture;
 mod glyph_table;
+#[cfg(test)]
+mod gradient_canvas_tests;
+mod gradient_drag;
+#[cfg(test)]
+mod gradient_follow_tests;
+mod gradient_handles;
+mod gradient_panel;
 mod grid;
 mod grid_arrange;
 mod group_box;
@@ -177,6 +184,7 @@ mod style_entry;
 mod style_panel;
 mod style_scope;
 mod svg_export;
+mod svg_export_gradient;
 mod svg_export_leaf;
 mod svg_export_notices;
 mod svg_export_parts;
@@ -189,6 +197,7 @@ mod svg_font_match;
 mod svg_import;
 mod svg_import_arcs;
 mod svg_import_faces;
+mod svg_import_gradient;
 mod svg_import_images;
 mod svg_import_match;
 mod svg_import_pages;
@@ -243,6 +252,7 @@ pub mod workspace_rows;
 pub mod workspace_share_text;
 pub mod workspace_text;
 pub mod workspace_tree_text;
+mod yielded_handles;
 
 pub use align_commit::{
     AlignInput, AlignOutcome, AlignReference, BoxedUnits, align_page, align_reference,
@@ -331,6 +341,12 @@ pub use format_form::{
 pub use format_list_view::{FormatGroupView, FormatListView, FormatRowView, format_list_view};
 pub use fracture::{FRACTURE_COMMIT_LABEL, plan_fracture};
 pub use glyph_table::{GlyphGroup, GlyphTable, MAX_GLYPH_QUERY_CHARS, NO_BLOCK, glyph_table};
+pub use gradient_drag::GradientDragStart;
+pub use gradient_handles::{
+    GRADIENT_END_HIT_PX, GRADIENT_LINE_HIT_PX, GRADIENT_STOP_HIT_PX, GradientHandle,
+    GradientLayout, gradient_layout,
+};
+pub use gradient_panel::{GradientPanel, GradientStopRow, gradient_panel, takes_gradient};
 pub use grid::{
     GridCandidate, GridFeature, GridLayout, GridLine, GridSnapInput, HeldGrid, grid_layout,
     snap_to_grid,
@@ -531,6 +547,7 @@ pub use svg_import::{
     SvgImport, SvgPlacement, import_svg_bytes, read_svg_drawing, svg_import, svg_page,
 };
 pub use svg_import_faces::{SvgFaceNeeds, substitute_face, svg_faces_needed};
+pub use svg_import_gradient::gradient_loss_lines;
 pub use svg_import_text::{
     FileKind, NEITHER_PROJECT_NOR_SVG, file_kind, import_layer_name, nothing_imported_notice,
     notice_file_name, svg_busy_notice, svg_refusal_text,
@@ -615,6 +632,7 @@ pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, SavedView, Viewport, Zoo
 pub use weld_plan::{
     WELD_COMMIT_LABEL, WeldAvailability, WeldPlan, WeldRefusal, plan_weld, weld_availability,
 };
+pub use yielded_handles::YieldedHandles;
 
 mod pages;
 pub use pages::PageViewState;

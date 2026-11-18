@@ -280,10 +280,9 @@ fn ac13_unsupported_content_is_left_out() {
     let DrawingNode::Primitive { style, .. } = all[0] else {
         panic!()
     };
-    assert_eq!(
-        style.fill.color.r, 0x80,
-        "a gradient becomes its middle colour"
-    );
+    // `specs/0124-gradient-fill` criterion 14: a gradient stays a gradient.
+    assert_eq!(style.fill.paint, curvyo_document_core::FillPaint::Gradient);
+    assert!(style.fill.gradient.is_some());
 }
 
 #[test]

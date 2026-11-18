@@ -242,6 +242,7 @@ mod tests {
             flow_align: FlowAlign::Start,
             paint: LeafStyle {
                 fill: None,
+                fill_gradient: None,
                 even_odd: false,
                 stroke: None,
                 stroke_width_mm: None,

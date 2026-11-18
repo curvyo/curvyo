@@ -25,9 +25,13 @@ impl Session {
                 self.view(),
                 self.device_pixel_ratio,
             );
-            list.extend(curvyo_render_core::build_artwork_with_guides(
+            // The leaves' homes are read from the current document (debt: a version's own
+            // pages, `docs/technical-debt.md`).
+            let laser = self.laser_gradient_ids(&version.objects);
+            list.extend(curvyo_render_core::build_artwork_greyed(
                 &version.objects,
                 &version.guides,
+                &|id| laser.contains(&id),
                 self.view(),
             ));
             return list;
@@ -55,15 +59,8 @@ impl Session {
                 .filter(|object| object.id() != subject)
                 .cloned()
                 .collect();
-            list.extend(curvyo_render_core::build_artwork_with_guides(
-                &others,
-                &self.document_read().guides,
-                self.view(),
-            ));
-            list.extend(curvyo_render_core::build_history_preview(
-                &version.objects,
-                self.view(),
-            ));
+            list.extend(self.shown_artwork(&others));
+            list.extend(self.shown_history_preview(&version.objects));
             list.extend(self.output_pages_overlay());
             return list;
         }

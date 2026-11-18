@@ -21,17 +21,24 @@ pub enum PaintTarget {
     /// The document background: the source of a pick over the empty document,
     /// and the target of the Background block's eyedropper.
     Background,
+    /// Stop `n` of the edited gradients (`specs/0124-gradient-fill` criterion 3): only a
+    /// target, never the source of a pick.
+    GradientStop(usize),
 }
 
 impl PaintTarget {
-    /// The target named by the host (`"stroke"`, `"fill"`).
+    /// The target named by the host (`"stroke"`, `"fill"`, `"background"`, `"stop-<n>"`).
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         match name {
             "stroke" => Some(Self::Stroke),
             "fill" => Some(Self::Fill),
             "background" => Some(Self::Background),
-            _ => None,
+            _ => name
+                .strip_prefix("stop-")
+                .filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+                .and_then(|n| n.parse().ok())
+                .map(Self::GradientStop),
         }
     }
 
@@ -42,16 +49,18 @@ impl PaintTarget {
             Self::Stroke => "Stroke",
             Self::Fill => "Fill",
             Self::Background => "Background",
+            Self::GradientStop(_) => "Gradient stop",
         }
     }
 
     /// The name the host reads.
     #[must_use]
-    pub const fn name(self) -> &'static str {
+    pub fn name(self) -> String {
         match self {
-            Self::Stroke => "stroke",
-            Self::Fill => "fill",
-            Self::Background => "background",
+            Self::Stroke => "stroke".to_owned(),
+            Self::Fill => "fill".to_owned(),
+            Self::Background => "background".to_owned(),
+            Self::GradientStop(n) => format!("stop-{n}"),
         }
     }
 }
@@ -399,9 +408,14 @@ mod tests {
             PaintTarget::Stroke,
             PaintTarget::Fill,
             PaintTarget::Background,
+            PaintTarget::GradientStop(0),
+            PaintTarget::GradientStop(41),
         ] {
-            assert_eq!(PaintTarget::from_name(target.name()), Some(target));
+            assert_eq!(PaintTarget::from_name(&target.name()), Some(target));
         }
-        assert_eq!(PaintTarget::from_name("both"), None);
+        assert_eq!(PaintTarget::GradientStop(2).name(), "stop-2");
+        for wrong in ["both", "stop-", "stop-x", "stop--1"] {
+            assert_eq!(PaintTarget::from_name(wrong), None, "{wrong}");
+        }
     }
 }

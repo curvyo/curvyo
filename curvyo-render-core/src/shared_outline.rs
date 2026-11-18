@@ -10,9 +10,10 @@ use std::collections::HashMap;
 
 use curvyo_document_core::{Affine, CloneSnapshot, PathSnapshot, Style, ViewTransform};
 
-use crate::artwork::{fill_layer, paint, solid_stroke_layer, stroke_params};
+use crate::artwork::{Shade, fill_layer, paint, solid_stroke_layer, stroke_params};
 use crate::color::RgbaColor;
 use crate::glyphs::DrawList;
+use crate::gradient_fill::StopRanges;
 use crate::stroke::OutlineRef;
 
 /// How far from orthonormal a rigid map may be.
@@ -38,12 +39,15 @@ thread_local! {
 
 impl SharedOutlines {
     /// Draws `clone` from its root's shared tessellation and returns `true`, or returns `false`
-    /// (nothing drawn) when the clone may not share it.
+    /// (nothing drawn) when the clone may not share it. A clone that paints a gradient shades the
+    /// mapped fill with `gradient`, placed in the clone's own box.
     pub(crate) fn draw(
         &mut self,
         list: &mut DrawList,
         clone: &CloneSnapshot,
         view: ViewTransform,
+        gradient: Option<Shade<'_>>,
+        stops: &mut StopRanges,
     ) -> bool {
         let root = &clone.chain.root_outline;
         let composed = clone.chain.composed;
@@ -65,6 +69,10 @@ impl SharedOutlines {
             {
                 list.extend_artwork_mapped(fill, composed, color);
             }
+        } else if let (Some(shade), Some(fill)) = (gradient, &layers.fill) {
+            let mut mapped = DrawList::default();
+            mapped.extend_artwork_mapped(fill, composed, RgbaColor::WHITE);
+            list.extend_gradient_artwork(mapped, shade.placed, shade.grey, stops);
         }
         if style.stroke.enabled {
             let color = paint(style.stroke.color, style.stroke.opacity);
@@ -339,10 +347,22 @@ mod tests {
         };
         let mut shared = SharedOutlines::default();
         let mut list = DrawList::default();
-        assert!(!shared.draw(&mut list, &clone.mapped_by(Affine::scale(2.0, 1.0)), view()));
+        assert!(!shared.draw(
+            &mut list,
+            &clone.mapped_by(Affine::scale(2.0, 1.0)),
+            view(),
+            None,
+            &mut StopRanges::default()
+        ));
         let mut restyled = clone.clone();
         restyled.resolved.style.stroke.width = curvyo_document_core::Length::from_mm(3.0);
-        assert!(!shared.draw(&mut list, &restyled, view()));
+        assert!(!shared.draw(
+            &mut list,
+            &restyled,
+            view(),
+            None,
+            &mut StopRanges::default()
+        ));
         d.edit_style(
             &[root],
             &StyleEdit::StrokeDash(curvyo_document_core::DashPattern::new(vec![2.0, 1.0]).unwrap()),
@@ -351,7 +371,7 @@ mod tests {
         let ObjectSnapshot::Clone(dashed) = d.object(scaled).unwrap() else {
             panic!("a clone")
         };
-        assert!(!shared.draw(&mut list, &dashed, view()));
+        assert!(!shared.draw(&mut list, &dashed, view(), None, &mut StopRanges::default()));
     }
 
     /// `0057` criterion 41: clones with own colours share the root's tessellation and draw as
@@ -397,7 +417,7 @@ mod tests {
         let mut list = DrawList::default();
         clone.resolved.style.fill.enabled = false;
         assert!(
-            !outlines.draw(&mut list, &clone, view()),
+            !outlines.draw(&mut list, &clone, view(), None, &mut StopRanges::default()),
             "another paint is on"
         );
     }

@@ -56,6 +56,7 @@ fn drawn_edit_handles(
     if tolerances.move_only {
         handles.retain(|(handle, _)| *handle == EditHandle::Move);
     }
+    handles.retain(|(handle, _)| !tolerances.yielded.contains(*handle));
     handles
 }
 

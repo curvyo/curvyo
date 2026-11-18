@@ -7,7 +7,34 @@
 
 use std::collections::HashMap;
 
-use curvyo_document_core::{NodeId, NodeRead, ObjectSnapshot, Opacity};
+use curvyo_document_core::{
+    Fill, GradientStop, GradientStops, NodeId, NodeRead, ObjectSnapshot, Opacity,
+};
+
+/// `fill` as a leaf faded by `factor` (`0..=1`) shows it: its opacity times `factor` and, as a
+/// gradient ignores the fill opacity (ADR 0066 §3), each stop's alpha times `factor` too.
+pub fn fade_fill(fill: &mut Fill, factor: f64) {
+    // invariant: a product of numbers in 0..=1 lies in 0..=1, so `new` cannot refuse it.
+    fill.opacity = Opacity::new(fill.opacity.get() * factor).unwrap_or(fill.opacity);
+    let Some(gradient) = fill.gradient.as_mut() else {
+        return;
+    };
+    let faded: Vec<GradientStop> = gradient
+        .stops
+        .as_slice()
+        .iter()
+        .map(|stop| {
+            // invariant: an alpha times a factor in 0..=1, rounded, lies in 0..=255.
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let alpha = (f64::from(stop.alpha) * factor.clamp(0.0, 1.0)).round() as u8;
+            GradientStop { alpha, ..*stop }
+        })
+        .collect();
+    // invariant: only the alphas changed, so the offsets still satisfy the list rules.
+    if let Ok(stops) = GradientStops::new(faded) {
+        gradient.stops = stops;
+    }
+}
 
 /// `object` with its fill and stroke opacity multiplied by `opacity`.
 #[must_use]
@@ -32,7 +59,7 @@ pub fn faded(object: &ObjectSnapshot, opacity: Opacity) -> ObjectSnapshot {
     let style = shown.style_mut();
     // invariant: a product of numbers in 0..=1 lies in 0..=1, so `new` cannot refuse it.
     let times = |paint: Opacity| Opacity::new(paint.get() * opacity.get()).unwrap_or(paint);
-    style.fill.opacity = times(style.fill.opacity);
+    fade_fill(&mut style.fill, opacity.get());
     style.stroke.opacity = times(style.stroke.opacity);
     shown
 }

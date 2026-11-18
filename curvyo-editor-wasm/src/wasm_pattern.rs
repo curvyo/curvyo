@@ -28,7 +28,7 @@ impl WasmSession {
         serde_json::to_string(&self.session.pattern_panel()).unwrap_or_default()
     }
 
-    /// The fill kind group: `"none"`, `"solid"` or `"pattern"`; one commit.
+    /// The fill kind group: `"none"`, `"solid"`, `"pattern"` or `"gradient"`; one commit.
     pub fn set_fill_kind(&mut self, kind: &str) -> bool {
         self.session.set_fill_kind(kind)
     }

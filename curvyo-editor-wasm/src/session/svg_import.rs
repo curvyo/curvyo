@@ -133,6 +133,7 @@ impl Session {
         self.saved = DocumentVersion::never();
         self.open_notice =
             (import.leaves == 0).then(|| nothing_imported_notice(&pending.file_name));
+        self.note_gradient_losses(&import);
         false
     }
 
@@ -224,6 +225,7 @@ impl Session {
             .map_err(|_| NEITHER_PROJECT_NOR_SVG.to_owned())?;
         self.layers.active = ActiveLayer::Chosen(Some(layer));
         self.drop_inert_selection();
+        self.note_gradient_losses(&import);
         Ok(SvgImportOutcome::Imported(import.leaves))
     }
 

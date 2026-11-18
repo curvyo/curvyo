@@ -1,0 +1,29 @@
+{
+  "handles": {
+    "ellipse": null,
+    "entry": null,
+    "handles": [],
+    "line": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "radial": false,
+    "readout": null,
+    "shown": false
+  },
+  "view": {
+    "activeStop": 0,
+    "angle": "",
+    "angleShown": false,
+    "kind": "",
+    "mixedGradients": false,
+    "offered": true,
+    "radius": "",
+    "radiusShown": false,
+    "shown": false,
+    "skip": "",
+    "stops": []
+  }
+}

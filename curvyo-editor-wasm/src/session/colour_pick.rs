@@ -1,7 +1,8 @@
 //! `Session`'s eyedropper (`specs/0017-style-panel-rework` criteria 22 to 27,
 //! `adrs.md` decision 3): while picking is on, a primary press on the canvas
 //! takes the colour under it (`curvyo_ui_core::pick_colour`) and writes it as
-//! the stroke or fill colour of the style scope in one commit; no tool sees
+//! the stroke or fill colour of the style scope, or as a gradient stop's colour
+//! (`specs/0124-gradient-fill` criterion 3), in one commit; no tool sees
 //! the press. Pan and zoom are navigation and keep working. The state is
 //! ephemeral: a tool change, Escape, a right press or the host ends it.
 
@@ -84,6 +85,10 @@ impl Session {
                 }
                 PaintTarget::Fill => {
                     self.apply_style_edit(&StyleEdit::FillRgba(picked.color, picked.opacity))
+                }
+                // One step "Edit gradient" on that stop of every edited gradient, alpha taken.
+                PaintTarget::GradientStop(index) => {
+                    self.set_gradient_stop_hex(index, &hex) == Ok(true)
                 }
                 // The colour controls exist only while the paint is Solid, so a pick
                 // keeps it (or makes it) Solid (`0040` criterion 37). A pick equal to

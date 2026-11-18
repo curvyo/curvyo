@@ -558,6 +558,8 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test sync_cpu_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test workspace_tree_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --lib frame_start_budget -- --nocapture
+          cargo test --release -p curvyo-editor-wasm --test gradient_budget -- --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --test acceptance_0124_tester_budget -- --nocapture --test-threads=1
 
   # Criterion 43 of specs/0016-boolean-operations: the golden results of the boolean kernel are
   # compared in the build that ships to the browser, run in Node by wasm-bindgen-test-runner

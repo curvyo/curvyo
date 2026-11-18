@@ -1,0 +1,88 @@
+{
+  "handles": {
+    "ellipse": [
+      226.7716535433071,
+      113.38582677165356,
+      188.9763779527559,
+      0.0,
+      0.0,
+      188.9763779527559
+    ],
+    "entry": {
+      "field": "radius",
+      "fieldText": "50",
+      "hex": "#FFFFFFFF",
+      "kind": "end",
+      "stop": 2,
+      "x": 415.74803149606305,
+      "y": 113.38582677165356
+    },
+    "handles": [
+      {
+        "active": false,
+        "hex": "#000000FF",
+        "hovered": false,
+        "kind": "centre",
+        "stop": 0,
+        "x": 226.7716535433071,
+        "y": 113.38582677165356
+      },
+      {
+        "active": true,
+        "hex": "#FFFFFFFF",
+        "hovered": false,
+        "kind": "radius",
+        "stop": 2,
+        "x": 415.74803149606305,
+        "y": 113.38582677165356
+      },
+      {
+        "active": false,
+        "hex": "#3366CC80",
+        "hovered": false,
+        "kind": "stop",
+        "stop": 1,
+        "x": 321.2598425196851,
+        "y": 113.38582677165356
+      }
+    ],
+    "line": [
+      226.7716535433071,
+      113.38582677165356,
+      415.74803149606305,
+      113.38582677165356
+    ],
+    "radial": true,
+    "readout": null,
+    "shown": true
+  },
+  "view": {
+    "activeStop": 2,
+    "angle": "",
+    "angleShown": false,
+    "kind": "radial",
+    "mixedGradients": false,
+    "offered": true,
+    "radius": "50",
+    "radiusShown": true,
+    "shown": true,
+    "skip": "",
+    "stops": [
+      {
+        "fixed": true,
+        "hex": "#000000FF",
+        "position": "0"
+      },
+      {
+        "fixed": false,
+        "hex": "#3366CC80",
+        "position": "50"
+      },
+      {
+        "fixed": true,
+        "hex": "#FFFFFFFF",
+        "position": "100"
+      }
+    ]
+  }
+}

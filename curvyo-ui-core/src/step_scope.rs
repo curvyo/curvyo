@@ -324,6 +324,14 @@ pub const EDIT_STEPS: &[&str] = &[
     "pattern_mode_shapes",
     "pattern_seed",
     "pattern_whole_pieces",
+    // `specs/0124-gradient-fill` criterion 18.
+    "fill_gradient",
+    "gradient_linear",
+    "gradient_radial",
+    "edit_gradient",
+    "add_gradient_stop",
+    "remove_gradient_stop",
+    "reverse_gradient",
     "trace_image",
     // `specs/0114-image-trace-mask`: the Trace tool's mask commands, as Create paths.
     "draw_trace_rectangle",

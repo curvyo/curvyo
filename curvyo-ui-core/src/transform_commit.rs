@@ -71,8 +71,10 @@ pub(crate) fn commit_gesture(
     modes: ScaleModes,
 ) {
     match handle {
+        // The carried gradient joins the step (`specs/0124-gradient-fill` criterion 15).
         EditHandle::Resize(_) => document.batch(RESIZE_PATH_COMMIT_LABEL, |document| {
             commit_resize(document, result.id(), result, modes.stroke);
+            document.write_carried_gradient(result);
         }),
         // A refusal here means the object is gone (see `commit_resize`).
         EditHandle::Rotate(_) => {
@@ -80,6 +82,7 @@ pub(crate) fn commit_gesture(
         }
         EditHandle::Skew(_) => document.batch(SKEW_PATH_COMMIT_LABEL, |document| {
             commit_resize(document, result.id(), result, StrokeScaling::Keep);
+            document.write_carried_gradient(result);
         }),
         EditHandle::Param(param) => commit_param(document, param, result),
         EditHandle::Move => {}

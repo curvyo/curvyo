@@ -9,8 +9,8 @@
 //! resize arithmetic is in [`crate::transform_primitive`].
 
 use curvyo_document_core::{
-    Angle, Corner, Document, Length, ObjectSnapshot, PathSnapshot, Point, PrimitiveSnapshot, Shape,
-    Vec2, effective_corner_radii,
+    Affine, Angle, Corner, Document, Length, ObjectSnapshot, PathSnapshot, Point,
+    PrimitiveSnapshot, Shape, Vec2, carry_gradient, effective_corner_radii,
 };
 
 use crate::ResizeDirection;
@@ -484,6 +484,7 @@ fn resize_by_box(
     resized: &ResizedBox,
     options: ResizeOptions,
 ) -> ObjectSnapshot {
+    let resized_box = resized;
     let ResizeOptions { shift, modes, .. } = options;
     let anchor_local = resize_anchor_local_position(start_box.min, start_box.max, direction, shift);
     let pivot = start_box.to_document(anchor_local);
@@ -549,7 +550,29 @@ fn resize_by_box(
     if modes.stroke == StrokeScaling::Proportional {
         scale_stroke(&mut resized, factor);
     }
+    // The gradient follows its shape (`specs/0124-gradient-fill` criterion 15).
+    let map = along_axes(
+        pivot,
+        start_box.angle,
+        Affine::scale(resized_box.sx, resized_box.sy),
+    );
+    carry_gradient(start, &mut resized, map);
     sane_or(start, resized)
+}
+
+/// The linear map `linear` applied along axes turned by `axes`, about `pivot`.
+fn along_axes(pivot: Point, axes: Angle, linear: Affine) -> Affine {
+    let to_pivot = Affine::translation(Vec2::new(-pivot.x, -pivot.y));
+    let back = Affine::translation(Vec2::new(pivot.x, pivot.y));
+    let turn = Affine::rotation_about(Point::new(0.0, 0.0), axes);
+    let unturn = Affine::rotation_about(
+        Point::new(0.0, 0.0),
+        Angle::from_radians(-axes.as_radians()),
+    );
+    back.compose(turn)
+        .compose(linear)
+        .compose(unturn)
+        .compose(to_pivot)
 }
 
 /// The object rotated by `delta` about `pivot` (criteria 12-17): the one
@@ -632,7 +655,15 @@ pub(crate) fn skewed_unchecked(
             return ObjectSnapshot::Text(Box::new(text.mapped_by(g)));
         }
     };
-    ObjectSnapshot::Path(path.sheared(frame.fixed_point, ku, kv))
+    let mut result = ObjectSnapshot::Path(path.sheared(frame.fixed_point, ku, kv));
+    // The gradient follows its shape (`specs/0124-gradient-fill` criterion 15).
+    let map = along_axes(
+        frame.fixed_point,
+        path.rotation,
+        Affine::new(1.0, kv, ku, 1.0, 0.0, 0.0),
+    );
+    carry_gradient(start, &mut result, map);
+    result
 }
 
 /// Scales `object`'s stroke width by `factor`, floored above zero.

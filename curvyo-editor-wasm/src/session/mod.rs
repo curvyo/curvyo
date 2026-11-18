@@ -124,6 +124,7 @@ pub use fixtures::{
 pub use materials::{MaterialWrite, MaterialsView};
 pub use output::{ExportedJob, OutputGroupView, PlayView, SendView, SentJobFile, send_notice};
 pub use test_grid::TestGridView;
+mod gradient;
 mod page_drag;
 mod page_tree_panel;
 mod pages;
@@ -612,6 +613,8 @@ pub struct Session {
     patterns: std::cell::RefCell<curvyo_ui_core::PatternCache>,
     /// Why the last pattern commit was refused over a limit, until the host takes it.
     pattern_refusal: Option<curvyo_ui_core::PatternError>,
+    /// The Gradient block's and the canvas gradient handles' state (`gradient/`).
+    gradient: gradient::GradientState,
     /// How each clone with own placement holds back a change of its original, kept for as long
     /// as the document read it was made for (`clone_view.rs`).
     held_clones: clone_view::HeldCache,
@@ -777,6 +780,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             patterns: std::cell::RefCell::default(),
             pattern_refusal: None,
+            gradient: gradient::GradientState::default(),
             held_clones: clone_view::HeldCache::default(),
             grouping_result: None,
             context_announcement: None,
@@ -892,6 +896,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             patterns: std::cell::RefCell::default(),
             pattern_refusal: None,
+            gradient: gradient::GradientState::default(),
             held_clones: clone_view::HeldCache::default(),
             grouping_result: None,
             context_announcement: None,
@@ -972,6 +977,8 @@ impl Session {
         }
         self.end_width_wheel();
         self.width_edit = None;
+        // A tool change closes a gradient entry box and ends the stop selection (`0124`).
+        self.gradient.forget_canvas();
         self.end_snapping_drag();
         self.recording_unguarded(|this| {
             // Flushes any pending ratio-slider preview against the
@@ -1156,7 +1163,9 @@ impl Session {
     fn tool_pointer_down(&mut self, point: Point, shift: bool) {
         match self.tool {
             Tool::Select => {
-                if !self.dimension_pointer_down(point, shift) {
+                // Gradient handles win over the shape's own (`specs/0124` criterion 6).
+                if !self.gradient_pointer_down(point) && !self.dimension_pointer_down(point, shift)
+                {
                     self.select_pointer_down(point, shift);
                 }
             }
@@ -1256,7 +1265,7 @@ impl Session {
         }
         match self.tool {
             Tool::Select => {
-                if !self.dimension_pointer_move(point) {
+                if !self.gradient_pointer_move(point) && !self.dimension_pointer_move(point) {
                     self.select_hover(point, self.held);
                 }
             }
@@ -1391,7 +1400,7 @@ impl Session {
             this.release_page_view(point);
             match this.tool {
                 Tool::Select => {
-                    if !this.dimension_pointer_up(point) {
+                    if !this.gradient_pointer_up() && !this.dimension_pointer_up(point) {
                         this.select_pointer_up(point, shift, constrain);
                     }
                 }
@@ -1483,6 +1492,11 @@ impl Session {
             // On a selected fixture's handle: its chip (`specs/0102-laser-fixtures` adrs.md
             // §6a.4).
             if this.tool == Tool::Select && this.open_fixture_entry_at_press() {
+                return DoubleClickHint::None;
+            }
+            // On a gradient handle its entry box; on the gradient line a new stop
+            // (`specs/0124-gradient-fill` criteria 6, 7).
+            if this.tool == Tool::Select && this.gradient_double_click(point) {
                 return DoubleClickHint::None;
             }
             match this.tool {

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use curvyo_document_core::{
     Affine, ManufacturingSnapshot, NodeId, ObjectSnapshot, Page, Point, Vec2, ViewTransform,
 };
-use curvyo_render_core::{DrawList, GridStroke, build_artwork};
+use curvyo_render_core::{DrawList, GridStroke};
 
 use super::super::Session;
 
@@ -83,7 +83,14 @@ impl Session {
                     let map = t.compose(to_plane.compose(map));
                     let tessellation =
                         ViewTransform::new(view.scale() * linear_scale(map), Point::new(0.0, 0.0));
-                    let mut art = build_artwork(&objects, tessellation);
+                    // A placed page lies on a laser page: its gradients show as grey
+                    // (`specs/0124-gradient-fill` criterion 10).
+                    let mut art = curvyo_render_core::build_artwork_greyed(
+                        &objects,
+                        &std::collections::HashSet::new(),
+                        &|_| true,
+                        tessellation,
+                    );
                     art.map_positions(|p| map.apply_point(p));
                     if faint {
                         for vertex in &mut art.triangles {

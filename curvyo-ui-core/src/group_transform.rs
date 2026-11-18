@@ -60,6 +60,21 @@ pub(crate) fn apply(
     modes: ScaleModes,
     converted: Option<&PathSnapshot>,
 ) -> ObjectSnapshot {
+    let mut result = apply_by_kind(object, map, modes, converted);
+    // The gradient follows its shape (`specs/0124-gradient-fill` criterion 15).
+    if object.style().fill.gradient.is_some() {
+        curvyo_document_core::carry_gradient(object, &mut result, map_affine(object.id(), map));
+    }
+    result
+}
+
+/// [`apply`] before the gradient is carried.
+fn apply_by_kind(
+    object: &ObjectSnapshot,
+    map: &GroupMap,
+    modes: ScaleModes,
+    converted: Option<&PathSnapshot>,
+) -> ObjectSnapshot {
     if let ObjectSnapshot::Clone(clone) = object {
         return crate::clone_gesture::map_clone(clone, map_affine(clone.id(), map), converted);
     }

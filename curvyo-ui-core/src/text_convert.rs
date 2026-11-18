@@ -161,6 +161,7 @@ pub fn build_text_conversions(
                 id: text.id,
                 name: names(text.id).unwrap_or_else(|| text.default_name()),
                 glyphs,
+                frame: text.gradient_box(),
             })
         })
         .collect())

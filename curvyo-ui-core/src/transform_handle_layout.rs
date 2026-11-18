@@ -16,6 +16,7 @@ use crate::oriented_box::OrientedBox;
 use crate::param_handles::{
     CENTRE_YIELD_PX, KNOB_INSET_PX, KNOB_PITCH_PX, PARAM_HIT_PX, PARAM_MIN_SIDE_PX, ParamHandle,
 };
+use crate::yielded_handles::YieldedHandles;
 
 /// The 8 resize handles a rectangle, ellipse or path shows (acceptance
 /// criterion 1).
@@ -152,6 +153,9 @@ pub struct TransformHandleTolerances {
     /// A group box shows only its centre move handle: no resize, rotate or skew handle is drawn
     /// or hit (a test grid's size comes from its fields, `specs/0028` `ux-notes.md` 6.5).
     pub move_only: bool,
+    /// The handles that yield to a gradient handle drawn within 8 px of them: neither drawn nor
+    /// hit (`specs/0124-gradient-fill` criterion 6).
+    pub yielded: YieldedHandles,
 }
 
 /// The dead zone radius of every Select-tool drag on the selected object, and
@@ -181,6 +185,7 @@ impl TransformHandleTolerances {
             param_min_side_mm: mm(PARAM_MIN_SIDE_PX),
             param_centre_yield_mm: mm(CENTRE_YIELD_PX),
             move_only: false,
+            yielded: YieldedHandles::NONE,
         }
     }
 }

@@ -7,66 +7,7 @@
 use curvyo_document_core::{Point, ViewTransform};
 use curvyo_render_core::{CHECKER_A, CHECKER_B, CheckerGrid, DrawList, RgbaColor};
 
-const SHADER_SOURCE: &str = r"
-struct ScreenTransform {
-    scale_x: f32,
-    offset_x: f32,
-    scale_y: f32,
-    offset_y: f32,
-    // The checkerboard of the document area (`specs/0040-document-background`): the
-    // document corner in device pixels, reduced to the pattern's period, the cell
-    // side in device pixels and the two tones.
-    checker_phase: vec2<f32>,
-    checker_cell: f32,
-    checker_pad: f32,
-    checker_a: vec4<f32>,
-    checker_b: vec4<f32>,
-};
-
-@group(0) @binding(0)
-var<uniform> transform: ScreenTransform;
-
-struct VertexInput {
-    @location(0) position: vec2<f32>,
-    @location(1) color: vec4<f32>,
-    @location(2) depth: f32,
-};
-
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
-    @location(0) color: vec4<f32>,
-};
-
-@vertex
-fn vs_main(input: VertexInput) -> VertexOutput {
-    var out: VertexOutput;
-    out.clip_position = vec4<f32>(
-        input.position.x * transform.scale_x + transform.offset_x,
-        input.position.y * transform.scale_y + transform.offset_y,
-        input.depth,
-        1.0,
-    );
-    out.color = input.color;
-    return out;
-}
-
-@fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return input.color;
-}
-
-// The tone is the parity of floor((p - corner) / cell) over both axes, even is
-// tone A: `curvyo_render_core::checker_tone` is the same formula. `position` is the
-// pixel centre in device pixels, so the cell edges fall on whole pixels.
-@fragment
-fn fs_checker(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
-    let cell = floor((frag.xy - transform.checker_phase) / transform.checker_cell);
-    if ((i32(cell.x) + i32(cell.y)) & 1) == 0 {
-        return transform.checker_a;
-    }
-    return transform.checker_b;
-}
-";
+use crate::gpu_shader::SHADER_SOURCE;
 
 /// One triangle-list vertex in the shape the GPU pipeline below expects:
 /// a clip-ready `f32` position (before the per-frame screen transform),
@@ -329,13 +270,29 @@ fn vertex_layout() -> wgpu::VertexBufferLayout<'static> {
     }
 }
 
+/// The layout of vertex buffer 1: per vertex `(u, v, first stop, signed count)`
+/// (`curvyo_render_core::DrawList::gradient_attributes`, ADR 0067 §2).
+fn gradient_layout() -> wgpu::VertexBufferLayout<'static> {
+    wgpu::VertexBufferLayout {
+        array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+        step_mode: wgpu::VertexStepMode::Vertex,
+        attributes: &[wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: 0,
+            shader_location: 3,
+        }],
+    }
+}
+
 /// Builds a render pipeline for the draw-list triangle list, transformed by
-/// the `transform_bind_group_layout` uniform, targeting `surface_format`, as the
-/// `kind` of pipeline. Split out of [`Gpu::attach`] for the same
-/// `clippy::too_many_lines` reason as [`create_transform_resources`].
+/// the `transform_bind_group_layout` uniform and reading the stop table of
+/// `stop_table_layout`, targeting `surface_format`, as the `kind` of pipeline.
+/// Split out of [`Gpu::attach`] for the same `clippy::too_many_lines` reason as
+/// [`create_transform_resources`].
 pub(super) fn create_pipeline(
     device: &wgpu::Device,
     transform_bind_group_layout: &wgpu::BindGroupLayout,
+    stop_table_layout: &wgpu::BindGroupLayout,
     surface_format: wgpu::TextureFormat,
     sample_count: u32,
     kind: PipelineKind,
@@ -348,7 +305,7 @@ pub(super) fn create_pipeline(
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("curvyo pipeline layout"),
-        bind_group_layouts: &[Some(transform_bind_group_layout)],
+        bind_group_layouts: &[Some(transform_bind_group_layout), Some(stop_table_layout)],
         immediate_size: 0,
     });
 
@@ -358,7 +315,7 @@ pub(super) fn create_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[Some(vertex_layout())],
+            buffers: &[Some(vertex_layout()), Some(gradient_layout())],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {

@@ -57,6 +57,10 @@ pub struct DrawList {
     /// The images of the artwork, each naming its own (empty) artwork layer
     /// (`crate::image_layer`).
     pub images: Vec<crate::image_layer::ImageQuad>,
+    /// The gradient-filled tessellations of the artwork (`crate::gradient_fill`).
+    pub(crate) gradients: Vec<crate::gradient_fill::GradientSpan>,
+    /// The stop table the gradient spans read.
+    pub(crate) gradient_stops: Vec<crate::gradient_fill::StopTexel>,
 }
 
 impl DrawList {
@@ -201,6 +205,15 @@ impl DrawList {
         );
         let base = self.triangles.len();
         let keeps_layers = self.overlay_start() == base;
+        // invariant: a table of more than `u32::MAX` stops cannot be allocated.
+        let stop_base = u32::try_from(self.gradient_stops.len()).unwrap_or(u32::MAX);
+        self.gradient_stops.extend(other.gradient_stops);
+        self.gradients.extend(
+            other
+                .gradients
+                .into_iter()
+                .map(|span| span.shifted(base, stop_base)),
+        );
         self.triangles.extend(other.triangles);
         if keeps_layers {
             let layer_base = self.layers.len();
