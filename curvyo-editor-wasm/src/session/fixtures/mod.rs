@@ -23,6 +23,7 @@ mod params;
 mod placed;
 mod placement;
 mod profile_sets;
+mod read_cache;
 mod row_lines;
 mod sets;
 mod shape;
@@ -93,6 +94,8 @@ pub(in crate::session) struct FixtureState {
     grid_cache: draw::GridCache,
     /// The page lists of the last frame for the inputs they were built from.
     lists_cache: draw::ListsCache,
+    /// The fixtures read from the document, until a fixture, a set or the page choice changes.
+    read_cache: read_cache::ReadCache,
     /// The last notice of a fixture command, until the host takes it.
     notice: Option<String>,
     /// A coarse pointer: the hit tolerance is 12 px instead of 4 (UX notes D12).
@@ -133,12 +136,10 @@ impl Session {
     /// The fixtures of the active page while it is a laser page with its extension on; its set
     /// fixtures keep their place while the profile is not editable here (criterion 46).
     fn active_fixtures(&self) -> Option<PageFixtures> {
-        let manufacturing = self.active_manufacturing()?;
-        if !self.process_enabled(&manufacturing.process) {
-            return None;
-        }
-        let mut fixtures = PageFixtures::read(&manufacturing)?;
-        if !matches!(self.sets_home(&manufacturing), SetsHome::Editable(_)) {
+        let read = self.active_read()?;
+        let (manufacturing, fixtures) = &*read;
+        let mut fixtures = fixtures.clone();
+        if !matches!(self.sets_home(manufacturing), SetsHome::Editable(_)) {
             for fixture in fixtures.fixtures.iter_mut().filter(|f| f.set.is_some()) {
                 fixture.read_only = true;
             }

@@ -116,13 +116,17 @@ impl WasmSession {
     /// What the chip's live region says next, or empty.
     pub fn take_pen_entry_announcement(&mut self) -> String {
         self.session
+            .untracked_mut()
             .take_pen_entry_announcement()
             .unwrap_or_default()
     }
 
     /// What the canvas notice slot shows next, or empty.
     pub fn take_pen_entry_notice(&mut self) -> String {
-        self.session.take_pen_entry_notice().unwrap_or_default()
+        self.session
+            .untracked_mut()
+            .take_pen_entry_notice()
+            .unwrap_or_default()
     }
 
     /// A secondary press: in the Pen it finishes the path in progress as Enter does (or does

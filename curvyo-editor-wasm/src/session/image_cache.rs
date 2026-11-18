@@ -102,6 +102,13 @@ impl Session {
         ready
     }
 
+    /// Whether the unreadable-image notice waits for the host to take it.
+    #[cfg(any(target_arch = "wasm32", test))]
+    #[must_use]
+    pub(crate) fn bad_asset_notice_pending(&self) -> bool {
+        self.images.bad_asset_pending
+    }
+
     /// "An image in this project could not be read." once per open, when a drawn image's asset
     /// could not be read; empty otherwise.
     pub fn take_bad_asset_notice(&mut self) -> String {

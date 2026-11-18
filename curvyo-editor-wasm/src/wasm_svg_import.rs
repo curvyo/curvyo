@@ -17,7 +17,7 @@ impl WasmSession {
         let mut session =
             Session::open_file(peer, bytes, file_name).map_err(|m| JsValue::from_str(&m))?;
         session.show_default_view();
-        Ok(Self { session, gpu: None })
+        Ok(Self::of(session))
     }
 
     /// Whether the project was opened from an SVG and exists in no saved file yet.

@@ -314,6 +314,7 @@ impl WasmSession {
     /// What the placement's live region says next, or empty.
     pub fn take_placement_announcement(&mut self) -> String {
         self.session
+            .untracked_mut()
             .take_placement_announcement()
             .unwrap_or_default()
     }

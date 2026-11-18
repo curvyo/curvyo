@@ -41,7 +41,7 @@ impl WasmSession {
 
     /// The host writes made since the last call, as a JSON array.
     pub fn take_machine_writes(&mut self) -> String {
-        self.session.take_machine_writes_json()
+        self.session.untracked_mut().take_machine_writes_json()
     }
 
     /// Picks the library profile `id` for the active manufacturing.

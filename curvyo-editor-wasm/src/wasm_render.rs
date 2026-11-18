@@ -1,12 +1,40 @@
 //! The canvas attachment and per-frame submission of `WasmSession`: the
-//! `wgpu` surface, resize and render. A further `impl WasmSession` block
+//! `wgpu` surface, resize and render, skipped while the frame generation
+//! (`frame_gate.rs`) shows nothing new. A further `impl WasmSession` block
 //! (`wasm_api.rs` holds the struct).
 
 use wasm_bindgen::prelude::*;
 use web_sys::HtmlCanvasElement;
 
+use crate::frame_gate::TrackedSession;
 use crate::gpu::Gpu;
+use crate::session::Session;
 use crate::wasm_api::WasmSession;
+
+impl WasmSession {
+    /// `session` with no canvas attached yet.
+    pub(crate) fn of(session: Session) -> Self {
+        Self {
+            session: TrackedSession::new(session),
+            gpu: None,
+        }
+    }
+
+    /// Builds the frame and submits it to `gpu`; recorded as drawn only when the submit worked,
+    /// so a lost surface is drawn again on the next frame.
+    fn submit(session: &mut TrackedSession, gpu: &mut Gpu) -> Result<(), JsValue> {
+        let frame = session.untracked_mut();
+        let mut draw_list = frame.frame_draw_list();
+        let pictures = frame.frame_images(&mut draw_list);
+        let result = gpu.render(&draw_list, frame.view(), &pictures);
+        if result.is_ok() {
+            session.frame_drawn();
+        } else {
+            session.force_frame();
+        }
+        result
+    }
+}
 
 #[wasm_bindgen]
 impl WasmSession {
@@ -32,6 +60,8 @@ impl WasmSession {
     ) -> Result<(), JsValue> {
         self.gpu = Some(Gpu::attach(canvas, width, height, device_pixel_ratio).await?);
         self.set_viewport_css_size(width, height, device_pixel_ratio);
+        // A new surface shows nothing yet.
+        self.session.force_frame();
         Ok(())
     }
 
@@ -79,12 +109,14 @@ impl WasmSession {
             return Ok(());
         };
         gpu.resize(width, height, device_pixel_ratio);
-        let mut draw_list = self.session.frame_draw_list();
-        let pictures = self.session.frame_images(&mut draw_list);
-        gpu.render(&draw_list, self.session.view(), &pictures)
+        // A reconfigured surface is drawn anew, whatever the session.
+        self.session.force_frame();
+        Self::submit(&mut self.session, gpu)
     }
 
-    /// Builds this frame's draw list and submits it. A no-op (not an
+    /// Builds this frame's draw list and submits it, unless the canvas
+    /// shows the session's present picture already (`specs/0126` phase 1:
+    /// an idle document builds and submits nothing). A no-op (not an
     /// error) before [`WasmSession::attach_canvas`] has completed.
     ///
     /// # Errors
@@ -94,8 +126,32 @@ impl WasmSession {
         let Some(gpu) = &mut self.gpu else {
             return Ok(());
         };
-        let mut draw_list = self.session.frame_draw_list();
-        let pictures = self.session.frame_images(&mut draw_list);
-        gpu.render(&draw_list, self.session.view(), &pictures)
+        if !self.session.needs_frame() {
+            return Ok(());
+        }
+        Self::submit(&mut self.session, gpu)
+    }
+
+    /// The render loop's one call per frame, as numbers: the frame
+    /// generation (changes with every change of the session), 1 when a
+    /// frame is to be drawn, the view's origin x and y and its scale, the
+    /// flags (1 a sync link, 2 a width notice, 4 the unreadable-image
+    /// notice waiting) and the frames submitted so far.
+    #[must_use]
+    pub fn frame_state(&self) -> Vec<f64> {
+        self.session.frame_state().to_vec()
+    }
+
+    /// The source lines of the session's changes since the last call,
+    /// `file:line count` one per line, for the performance probe
+    /// (`tools/perf/`): what keeps a document drawing.
+    pub fn take_change_sites(&mut self) -> String {
+        self.session.take_change_sites()
+    }
+
+    /// Draws the next frame even though the session did not change: the
+    /// page was hidden, or the host cannot tell what the canvas shows.
+    pub fn request_frame(&mut self) {
+        self.session.force_frame();
     }
 }

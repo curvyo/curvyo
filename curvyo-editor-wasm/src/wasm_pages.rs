@@ -100,7 +100,7 @@ impl WasmSession {
     /// The notice of the last cloning drop (guides left out, depth refusal), once; empty if
     /// none.
     pub fn take_clone_drop_notice(&mut self) -> String {
-        self.session.take_clone_drop_notice()
+        self.session.untracked_mut().take_clone_drop_notice()
     }
     /// Place page (`specs/0100` criterion 15): places drawing page `id` at the centre of the
     /// active laser page. Whether it did.

@@ -33,7 +33,7 @@ impl WasmSession {
 
     /// The polite status of the last kind press ("Cut 3 added."), once; empty when none.
     pub fn take_operations_status(&mut self) -> String {
-        self.session.take_operations_status()
+        self.session.untracked_mut().take_operations_status()
     }
 
     /// A press on operation row `id` (`specs/0111` criterion 17): it unfolds, or folds when it

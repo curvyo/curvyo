@@ -36,7 +36,10 @@ impl WasmSession {
 
     /// The notice of the last history key press, once (empty when there is none).
     pub fn take_history_notice(&mut self) -> String {
-        self.session.take_history_notice().unwrap_or_default()
+        self.session
+            .untracked_mut()
+            .take_history_notice()
+            .unwrap_or_default()
     }
 
     /// Whether the press would take long enough to show the long-operation state first: the step

@@ -196,7 +196,7 @@ impl WasmSession {
     /// instead of 0 (`0056` criterion 15), once; an empty string when there is none. Call
     /// after `pointer_up` and `commit_transform_entry`.
     pub fn take_transform_notice(&mut self) -> String {
-        self.session.take_transform_notice()
+        self.session.untracked_mut().take_transform_notice()
     }
 
     /// Whether the transform notice waiting to be taken is a refusal shown beside the pointer.
@@ -208,7 +208,7 @@ impl WasmSession {
     /// The polite announcement of the last release or Enter whose resize mirrored
     /// ("Resized. Mirrored left to right."), once; an empty string when there is none.
     pub fn take_transform_announcement(&mut self) -> String {
-        self.session.take_transform_announcement()
+        self.session.untracked_mut().take_transform_announcement()
     }
 
     /// Enter in the entry chip: `"committed"`, `"unchanged"` (both close the

@@ -86,6 +86,9 @@ impl WasmSession {
 
     /// The refusal of the last commit over the limit, once; empty when there is none.
     pub fn take_pattern_refusal(&mut self) -> String {
-        self.session.take_pattern_refusal().unwrap_or_default()
+        self.session
+            .untracked_mut()
+            .take_pattern_refusal()
+            .unwrap_or_default()
     }
 }

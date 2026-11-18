@@ -22,6 +22,6 @@ impl WasmSession {
 
     /// The refusal of an edit chord or the no-drawing-page notice, once; empty when none.
     pub fn take_context_notice(&mut self) -> String {
-        self.session.take_context_notice()
+        self.session.untracked_mut().take_context_notice()
     }
 }

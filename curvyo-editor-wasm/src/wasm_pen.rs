@@ -115,7 +115,8 @@ impl WasmSession {
 
     /// Takes the latest width edit failure, or an empty string.
     pub fn take_width_edit_notice(&mut self) -> String {
-        self.session.take_width_edit_notice()
+        // Taking a notice draws nothing new.
+        self.session.untracked_mut().take_width_edit_notice()
     }
 
     /// Takes the warning about a variable stroke that cannot be rendered yet.

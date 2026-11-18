@@ -70,6 +70,17 @@ fn measure(path: &PathSnapshot) -> Option<PathMeasure> {
 }
 
 impl Session {
+    /// Whether a notice of width editing waits for the host to take it.
+    #[cfg(any(target_arch = "wasm32", test))]
+    #[must_use]
+    pub(crate) fn width_notice_pending(&self) -> bool {
+        self.unsupported_width_notice.borrow().is_some()
+            || self
+                .width_edit
+                .as_ref()
+                .is_some_and(|state| state.notice.is_some())
+    }
+
     /// Takes the current notice about variable-stroke artwork.
     pub fn take_unsupported_width_notice(&self) -> String {
         self.unsupported_width_notice
