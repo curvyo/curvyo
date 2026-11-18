@@ -3,6 +3,7 @@
 // The host holds the pin and the token; this hook only sees fingerprints, answers and statuses.
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { linkStore, useLinkEntry } from "@/hooks/useLinkEntry";
 import {
   type CommandAnswer,
   type HeldJob,
@@ -11,18 +12,16 @@ import {
   type PairAnswer,
   type SendAnswer,
   type StatusMessage,
-  type TestAnswer,
   FORGET_FAILED_TEXT,
   UNKNOWN_JOB_TEXT,
   UNREADABLE_TEXT,
   clearsRefusal,
   errorLine,
-  jobIsActive,
   pairLine,
   refusalText,
   testLine,
 } from "@/lib/connectorText";
-import { invoke, listen } from "@/platform/host";
+import { invoke } from "@/platform/host";
 
 /** What the host knows of a stored pairing. */
 type PairingState =
@@ -30,12 +29,6 @@ type PairingState =
   | { kind: "paired"; connectorName: string; fingerprint: string }
   | { kind: "noStore" }
   | { kind: "failed"; message: string };
-
-type WatchPayload =
-  | { profileId: string; kind: "status"; status: StatusMessage }
-  | { profileId: string; kind: "sending"; name: string }
-  | { profileId: string; kind: "lost" }
-  | { profileId: string; kind: "failed"; error: LinkError };
 
 /** The buttons that run a command (the busy one shows a spinner). */
 export type Busy = "test" | "pair" | "send" | "start" | "resume" | "pause" | "stop" | null;
@@ -64,62 +57,58 @@ const LOST: Line = { text: "Connection lost", failure: true };
 
 /** The Connector group's model for one saved profile; `enabled` is false when the group is not
  * shown for it (browser, built-in profile, no address). The caller keys the component that uses it
- * on the profile and address, so a new pick starts from empty state. */
+ * on the profile and address, so a new pick starts from empty state. The pairing, the status and
+ * the held job live in the page's one link store, which the Output group reads too (`0125` S14). */
 export function useConnector(profileId: string | null, address: string, enabled: boolean): ConnectorModel {
-  const [paired, setPaired] = useState<ConnectorModel["paired"]>(null);
-  const [noStore, setNoStore] = useState(false);
-  const [keyChanged, setKeyChanged] = useState<ConnectorModel["keyChanged"]>(null);
   const [line, setLine] = useState<Line | null>(null);
   const [alert, setAlert] = useState("");
-  const [status, setStatus] = useState<StatusMessage | null>(null);
-  const [held, setHeld] = useState<HeldJob | null>(null);
-  const [sendingName, setSendingName] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<Line | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const generation = useRef(0);
-  const statusRef = useRef<StatusMessage | null>(null);
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
-
   const live = enabled && profileId !== null && address !== "";
+  const entry = useLinkEntry(profileId, address, live, false);
+  const lastStatus = useRef<StatusMessage | null>(null);
 
-  const fail = useCallback((error: LinkError, own: boolean) => {
-    const shown = errorLine(error);
-    if (error.kind === "keyChanged") {
-      setKeyChanged({ stored: error.stored, presented: error.presented });
-      setPaired(null);
-      setStatus(null);
-    } else if (error.kind === "noLongerPaired" || error.kind === "notPaired") {
-      setPaired(null);
-      setStatus(null);
-    }
-    if (error.kind === "noCredentialStore") setNoStore(true);
-    setLine(shown);
-    setAlert(own || error.kind === "keyChanged" ? shown.text : "");
-  }, []);
+  const fail = useCallback(
+    (error: LinkError, own: boolean) => {
+      if (profileId !== null) linkStore.linkFailure(profileId, error);
+      const shown = errorLine(error);
+      setLine(shown);
+      setAlert(own || error.kind === "keyChanged" ? shown.text : "");
+    },
+    [profileId],
+  );
 
-  const startWatch = useCallback(() => {
-    if (live) {
-      void invoke("connector_watch", { profileId, address }).catch(() => undefined);
+  // A refusal ends when the job moves into another state that has a line count.
+  useEffect(() => {
+    const next = entry.status;
+    if (next !== null && clearsRefusal(lastStatus.current, next)) setRefusal(null);
+    lastStatus.current = next;
+  }, [entry.status]);
+
+  // The watcher learned the pairing is gone or the key changed.
+  useEffect(() => {
+    if (entry.link === "key_changed" && entry.keyChanged) {
+      setLine(errorLine({ kind: "keyChanged", ...entry.keyChanged }));
+    } else if (entry.link === "no_longer_paired") {
+      setLine(errorLine({ kind: "noLongerPaired" }));
     }
-  }, [live, profileId, address]);
+  }, [entry.link, entry.keyChanged]);
 
   const read = useCallback(
     async (own: boolean, explain: boolean): Promise<void> => {
+      if (profileId === null) return;
       const mine = generation.current;
-      const answer = await invoke<TestAnswer>("connector_test", { profileId, address });
+      const answer = await linkStore.read(profileId, address);
       if (mine !== generation.current) return;
       if (answer.kind === "connected") {
-        setStatus(answer.status);
         setLine(explain ? testLine(answer) : null);
         setAlert("");
-        startWatch();
       } else {
         fail(answer.error, own);
       }
     },
-    [profileId, address, fail, startWatch],
+    [profileId, address, fail],
   );
 
   useEffect(() => {
@@ -128,44 +117,25 @@ export function useConnector(profileId: string | null, address: string, enabled:
     if (!enabled || profileId === null) {
       return;
     }
-    let unlisten: (() => void) | null = null;
-    void listen<WatchPayload>("connector-event", (event) => {
-      const payload = event.payload;
-      if (payload.profileId !== profileId || mine !== generation.current) return;
-      if (payload.kind === "sending") {
-        setSendingName(payload.name);
-      } else if (payload.kind === "status") {
-        if (clearsRefusal(statusRef.current, payload.status)) setRefusal(null);
-        statusRef.current = payload.status;
-        setStatus(payload.status);
-        setLine((now) => (now === LOST ? null : now));
-        if (payload.status.state.name !== "Receiving") setSendingName(null);
-      } else if (payload.kind === "lost") {
-        if (statusRef.current !== null && jobIsActive(statusRef.current.state)) setLine(LOST);
-      } else if (payload.error.kind === "keyChanged" || payload.error.kind === "noLongerPaired") {
-        fail(payload.error, false);
-      } else if (statusRef.current !== null && jobIsActive(statusRef.current.state)) {
-        setLine(LOST);
-      }
-    }).then((off) => {
-      if (mine === generation.current) unlisten = off;
-      else off();
-    });
     void (async () => {
       const stored = await invoke<PairingState>("connector_pairing", { profileId }).catch(
         (): PairingState => ({ kind: "failed", message: "The pairing could not be read" }),
       );
       if (mine !== generation.current) return;
       if (stored.kind === "paired") {
-        setPaired({ connectorName: stored.connectorName, fingerprint: stored.fingerprint });
+        linkStore.patch(profileId, {
+          link: "paired",
+          paired: { connectorName: stored.connectorName, fingerprint: stored.fingerprint },
+        });
         if (address !== "") {
           setLine({ text: "Testing", failure: false });
           await read(false, false);
         }
       } else if (stored.kind === "none") {
+        linkStore.patch(profileId, { link: "not_paired", paired: null });
         if (address !== "") setLine({ text: "Not paired", failure: false });
       } else {
-        if (stored.kind === "noStore") setNoStore(true);
+        if (stored.kind === "noStore") linkStore.patch(profileId, { link: "not_paired", noStore: true });
         setLine(
           stored.kind === "noStore"
             ? errorLine({ kind: "noCredentialStore" })
@@ -174,11 +144,10 @@ export function useConnector(profileId: string | null, address: string, enabled:
       }
     })();
     return () => {
-      unlisten?.();
-      void invoke("connector_unwatch").catch(() => undefined);
+      generation.current += 1;
     };
     // `read` and `fail` depend on the profile and address only.
-  }, [profileId, address, enabled, read, fail]);
+  }, [profileId, address, enabled, read]);
 
   const guard = <T,>(kind: Exclude<Busy, null>, run: () => Promise<T>) => {
     if (busy !== null || !live) return Promise.resolve(undefined);
@@ -200,8 +169,11 @@ export function useConnector(profileId: string | null, address: string, enabled:
       const answer = await invoke<PairAnswer>("connector_pair", { profileId, address, code });
       const shown = pairLine(answer);
       if (answer.kind === "paired") {
-        setPaired({ connectorName: answer.connectorName, fingerprint: answer.fingerprint });
-        setKeyChanged(null);
+        linkStore.patch(profileId as string, {
+          link: "paired",
+          paired: { connectorName: answer.connectorName, fingerprint: answer.fingerprint },
+          keyChanged: null,
+        });
         setLine(null);
         setAlert("");
         await read(false, false);
@@ -221,11 +193,16 @@ export function useConnector(profileId: string | null, address: string, enabled:
   const forget = () => {
     void invoke("connector_forget", { profileId }).then(
       () => {
-        setPaired(null);
-        setStatus(null);
-        setHeld(null);
+        linkStore.patch(profileId as string, {
+          link: "not_paired",
+          paired: null,
+          status: null,
+          held: null,
+          pageJobId: null,
+          keyChanged: null,
+          lost: false,
+        });
         setRefusal(null);
-        setKeyChanged(null);
         setAlert("");
         setLine({ text: "Not paired", failure: false });
       },
@@ -241,17 +218,18 @@ export function useConnector(profileId: string | null, address: string, enabled:
     void guard("send", async () => {
       setRefusal(null);
       setLine(null);
+      const id = profileId as string;
       const answer = await invoke<SendAnswer>("connector_send_job", { profileId, address });
-      setSendingName(null);
+      linkStore.patch(id, { sendingName: null });
       if (answer.kind === "ready") {
-        setHeld({ name: answer.name, lines: answer.lines, bytes: answer.bytes });
+        linkStore.patch(id, { held: { name: answer.name, lines: answer.lines, bytes: answer.bytes, jobId: null } });
         await read(false, false);
       } else if (answer.kind === "rejected") {
-        setHeld({ name: answer.name, lines: 0, bytes: 0 });
-        setRefusal({ text: refusalText(answer.reason, statusRef.current?.alarm ?? null), failure: true });
+        linkStore.patch(id, { held: { name: answer.name, lines: 0, bytes: 0, jobId: null } });
+        setRefusal({ text: refusalText(answer.reason, entry.status?.alarm ?? null), failure: true });
       } else if (answer.kind === "unreadable") {
         // The counts line names the chosen file, as for a refused job (UX notes §8).
-        setHeld({ name: answer.name, lines: 0, bytes: 0 });
+        linkStore.patch(id, { held: { name: answer.name, lines: 0, bytes: 0, jobId: null } });
         setRefusal({ text: UNREADABLE_TEXT, failure: true });
       } else if (answer.kind === "failed") {
         fail(answer.error, true);
@@ -278,5 +256,21 @@ export function useConnector(profileId: string | null, address: string, enabled:
     });
   };
 
-  return { paired, noStore, keyChanged, line, alert, status, held, sendingName, refusal, busy, test, pair, forget, send, command };
+  return {
+    paired: entry.paired,
+    noStore: entry.noStore,
+    keyChanged: entry.keyChanged,
+    line: entry.lost ? LOST : line,
+    alert,
+    status: entry.status,
+    held: entry.held,
+    sendingName: entry.sendingName,
+    refusal,
+    busy,
+    test,
+    pair,
+    forget,
+    send,
+    command,
+  };
 }

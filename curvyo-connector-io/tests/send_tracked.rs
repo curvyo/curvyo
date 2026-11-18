@@ -1,5 +1,5 @@
 //! Sending a job and following it by its id: accepted, refused, a connection that dies before the
-//! answer (resolved by a fresh status), a transfer cut mid-way (`specs/0124` S11, S19) and the
+//! answer (resolved by a fresh status), a transfer cut mid-way (`specs/0125` S11, S19) and the
 //! watcher that ends on an idle connector (B5). Waiting is by status, never by sleep.
 #![allow(clippy::unwrap_used)]
 

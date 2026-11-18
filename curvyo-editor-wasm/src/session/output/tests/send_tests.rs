@@ -1,5 +1,5 @@
 //! Send to machine: the button's state in the group view, the job handed out, and the commit
-//! after the connector accepted it (`specs/0124-send-to-machine` S1 to S6, S10 to S12, S16).
+//! after the connector accepted it (`specs/0125-send-to-machine` S1 to S6, S10 to S12, S16).
 
 use curvyo_document_core::NodeId;
 use curvyo_laser_core::{MachineProfile, new_profile_id, record_file_name, write_record};

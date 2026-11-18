@@ -105,7 +105,7 @@ pub(super) struct HandOut {
 
 impl Session {
     /// The active laser page's job and its effects, `None` on another page and while a block
-    /// disables Export; the one place Export and Send check the gate (`0124` B3).
+    /// disables Export; the one place Export and Send check the gate (`0125` B3).
     pub(super) fn hand_out(&self) -> Option<HandOut> {
         let job = self.laser_job()?;
         if !job.gate.export_allowed() {
@@ -151,7 +151,7 @@ impl Session {
         Some(export_notice(name, downloaded, jobs_on))
     }
 
-    /// The commit of an export or a send (`0124` B3): one history step `label` switching the
+    /// The commit of an export or a send (`0125` B3): one history step `label` switching the
     /// fixture jobs off and refreshing the stored numbers (nothing when nothing differs), then
     /// Lasered at `now_ms` on the test grids and their records, which an undo keeps. How many
     /// fixture jobs were switched off.

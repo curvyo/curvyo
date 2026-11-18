@@ -153,7 +153,7 @@ own entry when the customer schedules it.
 
 | Part of | What it would deliver | Status | Priority |
 |---|---|---|---|
-| [0124](0124-send-to-machine/) | `send-to-machine` | Slice 3 of `0064`: a Send to machine button beside Export job file in the Output group of a laser page sends the job (GRBL) to the profile's paired connector under the same checks as Export; the Connector row drives it and the group shows the state inline; an accepted send counts as Lasered like an export (Proposal). Drafted 2026-11-17, stacks on PR #375. | Done (PR #379) | Should | R-MFG-LASER-002, R-MFG-LASER-003, R-MFG-011 | - |
+| [0125](0125-send-to-machine/) | `send-to-machine` | Slice 3 of `0064`: a Send to machine button beside Export job file in the Output group of a laser page sends the job (GRBL) to the profile's paired connector under the same checks as Export; the Connector row drives it and the group shows the state inline; an accepted send counts as Lasered like an export (Proposal). Drafted 2026-11-17, stacks on PR #375. | Done (PR #379) | Should | R-MFG-LASER-002, R-MFG-LASER-003, R-MFG-011 | - |
 | 0016 `boolean-operations` | Hover preview of the result: the outline of the result drawn over the canvas while the pointer rests on a Boolean button (criteria P1 to P3 in the 0016 spec). A Proposal, never accepted; no numbered criterion of 0016 depends on it. | Not started | Should |
 
 ### Draft (waiting for the customer to schedule)

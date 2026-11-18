@@ -89,7 +89,7 @@ impl Connection {
     }
 
     /// [`Self::send_job`] with the id chosen by the caller, who follows the job by it
-    /// (`specs/0124` B4).
+    /// (`specs/0125` B4).
     ///
     /// # Errors
     /// As [`Self::send_job`].

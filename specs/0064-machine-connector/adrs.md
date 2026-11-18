@@ -304,7 +304,7 @@ lines to the handle). Q21's test drives `RunningServer` and `client` in one proc
 
 ## Addendum: third slice, Send to machine (architect, 2026-11-17)
 
-Covers `specs/0124-send-to-machine` criteria S1 to S18. No new ADR: ADR 0035 (protocol), ADR 0064
+Covers `specs/0125-send-to-machine` criteria S1 to S18. No new ADR: ADR 0035 (protocol), ADR 0064
 §11 (export effects) and addendum A1 to A12 above decide everything this slice reuses. Everything
 here is a **(Proposal)** unless it quotes an ADR.
 
@@ -423,7 +423,7 @@ job, a `RunningServer` with the fake controller, pairing, `send_job` → `Connec
 connection after the last chunk resolved by a fresh `Status`; waits by line counts and statuses,
 never by sleeps. Project fixtures saved before and after compare byte-identical (S16).
 
-**Spec checks against ADRs 0035, 0064 and slice 2** (fixed in `specs/0124-send-to-machine`, 2026-11-17):
+**Spec checks against ADRs 0035, 0064 and slice 2** (fixed in `specs/0125-send-to-machine`, 2026-11-17):
 
 - S7 proposed `?` for a non-ASCII name and said `0029` does not settle it; ADR 0064 decision 2
   already writes `_` and the writer is built that way (B6). S7 now says so.

@@ -1,5 +1,5 @@
 //! Send to machine from a laser page to the connector with the fake controller, without the UI
-//! (`specs/0124-send-to-machine` S6 to S12, S16, S17, S19): pair, send, Start, Pause, Resume,
+//! (`specs/0125-send-to-machine` S6 to S12, S16, S17, S19): pair, send, Start, Pause, Resume,
 //! Stop, a second send, a refused send, a transfer cut mid-way and a connection that died before
 //! the answer. Waits are on statuses, never on sleeps.
 

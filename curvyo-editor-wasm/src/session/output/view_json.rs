@@ -31,7 +31,7 @@ pub struct OutputGroupView {
     pub total: Option<TotalView>,
     /// The Export button.
     pub export: ExportView,
-    /// The Send to machine button; absent without a connector (`0124` S1).
+    /// The Send to machine button; absent without a connector (`0125` S1).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub send: Option<super::send::SendView>,
     /// Whether the page's Toolpath view is pressed.

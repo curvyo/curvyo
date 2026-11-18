@@ -1,4 +1,4 @@
-//! Send to machine (`specs/0124-send-to-machine`; architect addendum B2, B3): the job bytes for the
+//! Send to machine (`specs/0125-send-to-machine`; architect addendum B2, B3): the job bytes for the
 //! connector, the one pending send, and the commit after the connector accepted the job.
 
 use curvyo_laser_core::job::{ExportEffects, name as format_name, write};

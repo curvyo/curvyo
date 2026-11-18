@@ -264,6 +264,7 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   connector_command: () => notInTheBrowser("connector_command"),
   connector_watch: () => notInTheBrowser("connector_watch"),
   connector_unwatch: () => undefined,
+  connector_send_page_job: () => notInTheBrowser("connector_send_page_job"),
   list_machine_profiles: () => listBrowserRecords(MACHINES_PREFIX),
   write_machine_profile: (args) =>
     window.localStorage.setItem(`${MACHINES_PREFIX}${String(args?.id)}`, String(args?.text)),

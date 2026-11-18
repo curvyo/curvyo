@@ -1,4 +1,4 @@
-//! Decides whether Send to machine is enabled and why not (`specs/0124-send-to-machine`
+//! Decides whether Send to machine is enabled and why not (`specs/0125-send-to-machine`
 //! criteria S2 to S5, S8; architect addendum B2).
 
 use curvyo_laser_core::OutputFormat;

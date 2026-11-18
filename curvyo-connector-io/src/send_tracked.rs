@@ -1,5 +1,5 @@
 //! Sends one job and follows it until the connector has accepted or lost it, also across a
-//! dropped connection (`specs/0124` S11, S19; architect addendum B4).
+//! dropped connection (`specs/0125` S11, S19; architect addendum B4).
 
 use std::sync::{Mutex, PoisonError};
 use std::time::Instant;
