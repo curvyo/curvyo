@@ -3,16 +3,17 @@
 use std::io::BufRead as _;
 use std::sync::Arc;
 use std::sync::mpsc::Receiver;
+use std::thread::JoinHandle;
 
 use curvyo_connector_io::server::RunningServer;
 
-/// Prints every notice on its own line.
-pub fn print_notices(notices: Receiver<String>) {
+/// Prints every notice on its own line until the notices end.
+pub fn print_notices(notices: Receiver<String>) -> JoinHandle<()> {
     std::thread::spawn(move || {
         for line in notices {
             println!("{line}");
         }
-    });
+    })
 }
 
 /// Reads stdin: an empty line is the start press, `pair` prints a new code. Ends with stdin.

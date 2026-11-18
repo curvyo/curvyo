@@ -1,0 +1,281 @@
+//! Identifies GRBL after the port opens (`specs/0127` G2, G17; addendum C4): soft reset first,
+//! the banner within the limit, then `$I`, `$$` and one status report, one at a time.
+
+use std::time::Duration;
+
+use crate::grbl::reply::{Reply, Report};
+use crate::grbl::settings::Settings;
+
+/// GRBL's soft reset, a real-time byte.
+pub const RESET: u8 = 0x18;
+/// A banner that comes again during identify restarts it, at most this often.
+const MAX_RESTARTS: u8 = 2;
+/// How much of another program's text the terminal shows.
+const GOT_CHARS: usize = 40;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Step {
+    Banner,
+    Info,
+    Settings,
+    Report,
+}
+
+/// What identify found.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Identified {
+    /// The firmware version from the banner ("1.1h").
+    pub version: String,
+    /// `$$`.
+    pub settings: Settings,
+    /// The first status report.
+    pub report: Report,
+    /// The number of an `ALARM:<n>` seen during identify.
+    pub alarm: Option<u16>,
+    /// GRBL said `[MSG:'$H'|'$X' to unlock]`.
+    pub locked: bool,
+}
+
+/// Why identify failed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Failure {
+    /// No banner within the limit; `got` is the start of other text, if any came.
+    NoAnswer {
+        /// Up to 40 printable characters.
+        got: Option<String>,
+    },
+    /// A GRBL 0.9 banner.
+    Unsupported,
+}
+
+/// How identify stands after a reply or a tick.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Outcome {
+    /// Still waiting.
+    Waiting,
+    /// Identified.
+    Done(Box<Identified>),
+    /// Failed.
+    Failed(Failure),
+}
+
+/// The identify sequence.
+#[derive(Debug, Clone)]
+pub struct Identify {
+    step: Step,
+    limit: Duration,
+    deadline: Duration,
+    restarts: u8,
+    got: Option<String>,
+    version: String,
+    settings: Settings,
+    alarm: Option<u16>,
+    locked: bool,
+}
+
+impl Identify {
+    /// Starts at `at`: the soft reset goes into `out`; the banner must come within `limit`.
+    pub fn start(at: Duration, limit: Duration, out: &mut Vec<u8>) -> Self {
+        out.push(RESET);
+        Self {
+            step: Step::Banner,
+            limit,
+            deadline: at + limit,
+            restarts: 0,
+            got: None,
+            version: String::new(),
+            settings: Settings::default(),
+            alarm: None,
+            locked: false,
+        }
+    }
+
+    /// Takes one line of GRBL output; the next command goes into `out`.
+    pub fn on_reply(&mut self, reply: Reply, at: Duration, out: &mut Vec<u8>) -> Outcome {
+        match reply {
+            Reply::Banner(version) => return self.on_banner(version, at, out),
+            Reply::Alarm(n) => self.alarm = Some(n),
+            Reply::Message(text) if text.contains("to unlock") => self.locked = true,
+            Reply::Setting(n, value) if self.step == Step::Settings => self.settings.set(n, &value),
+            Reply::Ok | Reply::Error(_) if self.step == Step::Info => {
+                out.extend_from_slice(b"$$\n");
+                self.step = Step::Settings;
+            }
+            Reply::Ok | Reply::Error(_) if self.step == Step::Settings => {
+                out.push(b'?');
+                self.step = Step::Report;
+            }
+            Reply::Report(report) if self.step == Step::Report => {
+                return Outcome::Done(Box::new(Identified {
+                    version: std::mem::take(&mut self.version),
+                    settings: std::mem::take(&mut self.settings),
+                    report,
+                    alarm: self.alarm,
+                    locked: self.locked,
+                }));
+            }
+            Reply::Other(text) if self.step == Step::Banner && self.got.is_none() => {
+                let printable: String = text
+                    .chars()
+                    .filter(|c| c.is_ascii_graphic() || *c == ' ')
+                    .take(GOT_CHARS)
+                    .collect();
+                if !printable.trim().is_empty() {
+                    self.got = Some(printable);
+                }
+            }
+            _ => {}
+        }
+        Outcome::Waiting
+    }
+
+    fn on_banner(&mut self, version: String, at: Duration, out: &mut Vec<u8>) -> Outcome {
+        if version.starts_with("0.") {
+            return Outcome::Failed(Failure::Unsupported);
+        }
+        if self.step != Step::Banner {
+            if self.restarts >= MAX_RESTARTS {
+                return Outcome::Waiting;
+            }
+            self.restarts += 1;
+            self.settings = Settings::default();
+        }
+        self.version = version;
+        self.deadline = at + self.limit;
+        out.extend_from_slice(b"$I\n");
+        self.step = Step::Info;
+        Outcome::Waiting
+    }
+
+    /// Whether the limit has passed at `at`.
+    #[must_use]
+    pub fn on_time(&self, at: Duration) -> Outcome {
+        if at >= self.deadline {
+            Outcome::Failed(Failure::NoAnswer {
+                got: self.got.clone(),
+            })
+        } else {
+            Outcome::Waiting
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::grbl::reply::parse;
+
+    const LIMIT: Duration = Duration::from_secs(5);
+
+    fn feed(id: &mut Identify, lines: &[&str], at: Duration, out: &mut Vec<u8>) -> Outcome {
+        let mut last = Outcome::Waiting;
+        for line in lines {
+            last = id.on_reply(parse(line), at, out);
+        }
+        last
+    }
+
+    #[test]
+    fn reset_banner_info_settings_report() {
+        let mut out = Vec::new();
+        let mut id = Identify::start(Duration::ZERO, LIMIT, &mut out);
+        assert_eq!(out, [RESET]);
+        out.clear();
+        let t = Duration::from_millis(100);
+        feed(&mut id, &["Grbl 1.1h ['$' for help]"], t, &mut out);
+        assert_eq!(out, b"$I\n");
+        out.clear();
+        feed(
+            &mut id,
+            &["[VER:1.1h.20190825:]", "[OPT:V,15,128]", "ok"],
+            t,
+            &mut out,
+        );
+        assert_eq!(out, b"$$\n");
+        out.clear();
+        feed(&mut id, &["$30=1000", "$32=1", "ok"], t, &mut out);
+        assert_eq!(out, b"?");
+        let done = feed(
+            &mut id,
+            &["<Idle|MPos:0.000,0.000,0.000|FS:0,0>"],
+            t,
+            &mut out,
+        );
+        let Outcome::Done(found) = done else {
+            panic!("{done:?}")
+        };
+        assert_eq!(found.version, "1.1h");
+        assert_eq!(found.settings.s_max(), Some(1000));
+        assert_eq!(found.report.state, "Idle");
+        assert!(!found.locked);
+    }
+
+    #[test]
+    fn silence_or_other_text_fails_after_the_limit() {
+        let mut out = Vec::new();
+        let mut id = Identify::start(Duration::ZERO, LIMIT, &mut out);
+        feed(
+            &mut id,
+            &["AT+CGMI", "\u{1}\u{2}"],
+            Duration::from_secs(1),
+            &mut out,
+        );
+        assert_eq!(id.on_time(Duration::from_millis(4999)), Outcome::Waiting);
+        assert_eq!(
+            id.on_time(LIMIT),
+            Outcome::Failed(Failure::NoAnswer {
+                got: Some("AT+CGMI".into())
+            })
+        );
+        let silent = Identify::start(Duration::ZERO, LIMIT, &mut out);
+        assert_eq!(
+            silent.on_time(LIMIT),
+            Outcome::Failed(Failure::NoAnswer { got: None })
+        );
+    }
+
+    #[test]
+    fn grbl_0_9_is_refused() {
+        let mut out = Vec::new();
+        let mut id = Identify::start(Duration::ZERO, LIMIT, &mut out);
+        assert_eq!(
+            feed(
+                &mut id,
+                &["Grbl 0.9j ['$' for help]"],
+                Duration::ZERO,
+                &mut out
+            ),
+            Outcome::Failed(Failure::Unsupported)
+        );
+    }
+
+    #[test]
+    fn a_second_banner_restarts_and_the_lock_and_alarm_are_kept() {
+        let mut out = Vec::new();
+        let mut id = Identify::start(Duration::ZERO, LIMIT, &mut out);
+        let t = Duration::ZERO;
+        feed(
+            &mut id,
+            &[
+                "ALARM:3",
+                "Grbl 1.1h ['$' for help]",
+                "Grbl 1.1h ['$' for help]",
+            ],
+            t,
+            &mut out,
+        );
+        out.clear();
+        feed(
+            &mut id,
+            &["[MSG:'$H'|'$X' to unlock]", "ok", "ok"],
+            t,
+            &mut out,
+        );
+        let done = feed(&mut id, &["<Alarm|MPos:0.000,0.000,0.000>"], t, &mut out);
+        let Outcome::Done(found) = done else {
+            panic!("{done:?}")
+        };
+        assert!(found.locked);
+        assert_eq!(found.alarm, Some(3));
+    }
+}

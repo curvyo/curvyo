@@ -17,6 +17,13 @@ anyhow = "1"
 dirs = "7"
 thiserror.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+# SIGINT and SIGTERM by `sigwait`, no handler (addendum C11). MIT; already locked through `zip`.
+nix = { version = "0.31", default-features = false, features = ["signal"] }
+
 [dev-dependencies]
 tempfile = "3"
 uuid.workspace = true
+
+[target.'cfg(unix)'.dev-dependencies]
+nix = { version = "0.31", default-features = false, features = ["signal"] }

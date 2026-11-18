@@ -19,12 +19,14 @@ pub enum LogResult {
     Completed,
     /// The maker stopped it.
     Stopped,
-    /// The controller reported an error.
-    Failed,
+    /// The job failed, with the reason when the controller named one (`specs/0127` G7, G15).
+    Failed(Option<String>),
     /// The controller raised an alarm with this text.
     Alarm(String),
     /// The submit was refused for this reason.
     Rejected(String),
+    /// The app of this name sent `Unlock` in alarm (`specs/0127` G33); the line has no job name.
+    Unlock(String),
 }
 
 impl LogResult {
@@ -34,9 +36,11 @@ impl LogResult {
         match self {
             Self::Completed => "Completed".to_owned(),
             Self::Stopped => "Stopped".to_owned(),
-            Self::Failed => "Failed".to_owned(),
+            Self::Failed(None) => "Failed".to_owned(),
+            Self::Failed(Some(text)) => format!("Failed: {}", clean(text)),
             Self::Alarm(text) => format!("Alarm: {}", clean(text)),
             Self::Rejected(reason) => format!("Rejected: {}", clean(reason)),
+            Self::Unlock(client) => format!("Unlock: {}", clean(client)),
         }
     }
 }
@@ -110,7 +114,8 @@ mod tests {
             .unwrap();
         log.append(t(60), "coaster.gcode", &LogResult::Stopped)
             .unwrap();
-        log.append(t(120), "sign.nc", &LogResult::Failed).unwrap();
+        log.append(t(120), "sign.nc", &LogResult::Failed(None))
+            .unwrap();
         log.append(
             t(180),
             "sign.nc",
@@ -125,6 +130,27 @@ mod tests {
             &LogResult::Alarm("a\tb".into()),
         )
         .unwrap();
+        for (s, text) in [
+            (360, "line 12, No feed rate (error 22)"),
+            (420, "line 4, Contains !, ~ or ?"),
+            (480, "controller lost at line 120"),
+            (540, "could not confirm the machine stopped"),
+        ] {
+            log.append(
+                t(s),
+                "cut_line.gcode",
+                &LogResult::Failed(Some(text.into())),
+            )
+            .unwrap();
+        }
+        log.append(
+            t(600),
+            "cut_line.gcode",
+            &LogResult::Alarm("Hard limit hit, position may be lost (alarm 1)".into()),
+        )
+        .unwrap();
+        log.append(t(660), "", &LogResult::Unlock("Laptop".into()))
+            .unwrap();
         let text = std::fs::read_to_string(dir.path().join(JOB_LOG_FILE)).unwrap();
         assert_eq!(text, include_str!("../tests/fixtures/jobs.log"));
     }

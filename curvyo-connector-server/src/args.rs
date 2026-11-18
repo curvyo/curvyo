@@ -8,6 +8,10 @@ use curvyo_connector_io::client::DEFAULT_PORT;
 
 /// The default pace of the fake controller.
 pub const DEFAULT_LINES_PER_SECOND: u32 = 20;
+/// The default baud rate of `--serial` (`specs/0127` G1).
+pub const DEFAULT_BAUD: u32 = 115_200;
+/// The highest baud rate (the profile field's range, `0026`).
+pub const MAX_BAUD: u32 = 4_000_000;
 
 /// What the program was asked to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +41,10 @@ pub struct Args {
     pub fake_lines_per_second: u32,
     /// Its alarm line.
     pub fake_alarm_at_line: Option<u32>,
+    /// The serial port of a GRBL controller.
+    pub serial: Option<String>,
+    /// Its baud rate.
+    pub baud: u32,
     /// `Start` waits for Enter on this terminal.
     pub require_local_start: bool,
     /// Print a new pairing code at start.
@@ -56,6 +64,8 @@ Options:
   --fake-controller                attach a fake controller: no machine, nothing moves
   --fake-lines-per-second <n>      its pace (default 20; needs --fake-controller)
   --fake-alarm-at-line <n>         raise an alarm at line n (needs --fake-controller)
+  --serial <port>                  serial port of the GRBL controller, for example /dev/ttyUSB0
+  --baud <n>                       baud rate, 1 to 4000000 (default 115200; needs --serial)
   --require-local-start            a job starts only after Enter on this terminal
   --pair                           print a new pairing code at start
   --list-clients                   print the paired apps and exit
@@ -63,7 +73,14 @@ Options:
   --help                           print this text and exit
 
 While running: an empty line is the start press for a job that waits; the line `pair` prints a
-new pairing code.
+new pairing code. A GRBL alarm lock is left with Unlock in the app.
+
+Serial ports on Linux: the user must be in the group that owns the port (dialout on Debian, Ubuntu
+and Fedora, uucp on Arch; log in again after adding it) or a udev rule must grant access.
+ModemManager may probe ttyACM and ttyUSB devices and disturb the controller; the connector says so
+at start when it runs. See docs/guides/connector-serial-linux.md.
+
+SIGINT and SIGTERM stop a running job (feed hold, reset, M5, M9) before the connector exits.
 ";
 
 /// A command line that cannot be used; the program exits with code 2.
@@ -99,11 +116,14 @@ pub fn parse(
         fake_controller: false,
         fake_lines_per_second: DEFAULT_LINES_PER_SECOND,
         fake_alarm_at_line: None,
+        serial: None,
+        baud: DEFAULT_BAUD,
         require_local_start: false,
         pair: false,
     };
     let mut state_dir = None;
     let mut fake_option = None;
+    let mut baud_given = false;
     while let Some(flag) = args.next() {
         match flag.as_str() {
             "--help" | "-h" => parsed.command = Command::Help,
@@ -123,12 +143,30 @@ pub fn parse(
                 parsed.fake_alarm_at_line = Some(number(&value(&mut args, &flag)?, &flag)?);
                 fake_option = Some(flag);
             }
+            "--serial" => parsed.serial = Some(value(&mut args, &flag)?),
+            "--baud" => {
+                let text = value(&mut args, &flag)?;
+                parsed.baud = text
+                    .parse::<u32>()
+                    .ok()
+                    .filter(|n| (1..=MAX_BAUD).contains(n))
+                    .ok_or_else(|| UsageError("--baud must be 1 to 4000000".to_owned()))?;
+                baud_given = true;
+            }
             "--require-local-start" => parsed.require_local_start = true,
             "--pair" => parsed.pair = true,
             "--list-clients" => parsed.command = Command::ListClients,
             "--revoke" => parsed.command = Command::Revoke(value(&mut args, &flag)?),
             other => return Err(UsageError(format!("unknown option {other}"))),
         }
+    }
+    if parsed.serial.is_some() && parsed.fake_controller {
+        return Err(UsageError(
+            "--serial and --fake-controller cannot be used together".to_owned(),
+        ));
+    }
+    if baud_given && parsed.serial.is_none() {
+        return Err(UsageError("--baud needs --serial".to_owned()));
     }
     if let Some(flag) = fake_option.filter(|_| !parsed.fake_controller) {
         return Err(UsageError(format!("{flag} needs --fake-controller")));
@@ -209,6 +247,45 @@ mod tests {
     }
 
     #[test]
+    fn g1_serial_and_baud() {
+        let args = parse_args(&["--serial", "/dev/ttyUSB0"]).unwrap();
+        assert_eq!(
+            (args.serial.as_deref(), args.baud),
+            (Some("/dev/ttyUSB0"), 115_200)
+        );
+        let args = parse_args(&["--serial", "/dev/ttyACM0", "--baud", "4000000"]).unwrap();
+        assert_eq!(args.baud, 4_000_000);
+        assert_eq!(
+            parse_args(&["--serial", "x", "--baud", "1"]).unwrap().baud,
+            1
+        );
+        assert!(parse_args(&[]).unwrap().serial.is_none());
+        let table = [
+            (
+                &["--serial", "x", "--fake-controller"][..],
+                "--serial and --fake-controller cannot be used together",
+            ),
+            (&["--baud", "9600"], "--baud needs --serial"),
+            (
+                &["--serial", "x", "--baud", "0"],
+                "--baud must be 1 to 4000000",
+            ),
+            (
+                &["--serial", "x", "--baud", "4000001"],
+                "--baud must be 1 to 4000000",
+            ),
+            (
+                &["--serial", "x", "--baud", "fast"],
+                "--baud must be 1 to 4000000",
+            ),
+            (&["--serial"], "--serial needs a value"),
+        ];
+        for (line, message) in table {
+            assert_eq!(parse_args(line).unwrap_err().0, message, "{line:?}");
+        }
+    }
+
+    #[test]
     fn the_help_names_every_flag() {
         for flag in [
             "--listen",
@@ -221,6 +298,11 @@ mod tests {
             "--list-clients",
             "--revoke",
             "--help",
+            "--serial",
+            "--baud",
+            "dialout",
+            "uucp",
+            "ModemManager",
         ] {
             assert!(HELP.contains(flag), "{flag}");
         }

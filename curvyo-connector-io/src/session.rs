@@ -51,6 +51,8 @@ struct Session {
     submitted: bool,
     /// When the last frame came in.
     last_frame: Instant,
+    /// The paired app's name, for the log of `Unlock`.
+    client_name: String,
 }
 
 #[allow(clippy::result_large_err)] // the signature tungstenite's callback asks for
@@ -108,6 +110,7 @@ pub fn serve(stream: TcpStream, tls: &Arc<ServerConfig>, hub: Arc<Hub>, shutdown
         pairing: None,
         submitted: false,
         last_frame: Instant::now(),
+        client_name: String::new(),
     };
     session.run(&mut socket, deadline, shutdown);
     if session.submitted {
@@ -210,8 +213,15 @@ impl Session {
 
     fn flush_statuses(&mut self, socket: &mut Socket, now: Instant) -> bool {
         if let Some(updates) = &self.updates {
-            while let Ok(status) = updates.try_recv() {
-                self.limiter.push(status);
+            while let Ok(message) = updates.try_recv() {
+                if matches!(message, Message::Welcome { .. }) {
+                    // A changed controller goes out at once, before the status that follows.
+                    if !send(socket, message) {
+                        return false;
+                    }
+                } else {
+                    self.limiter.push(message);
+                }
             }
         }
         match self.limiter.due(now) {
@@ -276,6 +286,12 @@ impl Session {
                     error(ErrorCode::PairingRequired, "Pair or authenticate first."),
                 )
             }
+            Message::Unlock => {
+                let now = Instant::now();
+                let status = self.hub.unlock(&self.client_name, now);
+                self.limiter.answered(now);
+                send(socket, status)
+            }
             other => {
                 let now = Instant::now();
                 self.submitted |= matches!(other, Message::SubmitJob { .. });
@@ -295,6 +311,7 @@ impl Session {
                 error(ErrorCode::PairingRequired, "This token is not paired."),
             );
         }
+        self.client_name = self.hub.client_name(token).unwrap_or_default();
         self.become_authenticated();
         self.limiter.answered(Instant::now());
         send(socket, self.hub.status())
@@ -385,6 +402,7 @@ impl Session {
         {
             return Self::refuse(socket, RefusalReason::NoCode, 0);
         }
+        self.client_name.clone_from(&pairing.client_name);
         let confirmation = Frame::Io(IoFrame::PairSpake {
             round: 2,
             client_name: None,
