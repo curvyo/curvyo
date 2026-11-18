@@ -72,7 +72,8 @@ async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-build", action="store_true", help="reuse the last perf build")
     parser.add_argument("--out", default=str(ROOT / "target" / "perf"))
-    parser.add_argument("--timeout", type=int, default=150)
+    # Software rendering (Xvfb) is slow: wheel-zoom alone can take about a minute of wall time.
+    parser.add_argument("--timeout", type=int, default=600)
     args = parser.parse_args()
     if not args.no_build:
         build()
@@ -124,7 +125,18 @@ async def main():
         os.killpg(xvfb.pid, signal.SIGTERM)
         server.close()
     json.dump(procs, open(out / "procs.json", "w"))
+    if not state["done"].is_set():
+        print(f"timed out before scenario {unfinished(events)} (--timeout {args.timeout} s)")
     report(events, procs)
+
+
+SCENARIOS = ["idle-empty", "idle-5000", "wheel-zoom", "pan-drag"]
+
+
+def unfinished(events):
+    """The first scenario of the probe's list that sent no end event."""
+    ended = {e["name"] for e in events if e["event"] == "scenario" and e["state"] == "end"}
+    return next((name for name in SCENARIOS if name not in ended), "(all ended)")
 
 
 def report(events, procs):
@@ -154,6 +166,13 @@ def report(events, procs):
         a, b = window[0]["names"], window[-1]["names"]
         parts = ", ".join(f"{k} {100 * (b.get(k, 0) - a.get(k, 0)) / secs:.1f}%" for k in sorted(b) if b[k] - a.get(k, 0) > 0.01 * secs)
         print(f"  by process: {parts}")
+        sites = {}
+        for r in rows:
+            for site, count in r.get("sites", {}).items():
+                sites[site] = sites.get(site, 0) + count
+        if sites:
+            top = sorted(sites.items(), key=lambda kv: -kv[1])[:3]
+            print("  changes by: " + ", ".join(f"{site} {count / n:.1f}/s" for site, count in top))
 
 
 asyncio.run(main())
