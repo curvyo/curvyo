@@ -244,17 +244,17 @@ impl WasmSession {
     /// The notice of the last Delete key when it repaired clones, once: "Deleted 1 object. 1
     /// clone became a path."; empty otherwise.
     pub fn take_delete_notice(&mut self) -> String {
-        self.session.take_delete_notice()
+        self.session.untracked_mut().take_delete_notice()
     }
 
     /// The sentence the clone repair of the last command adds to its notice, once.
     pub fn take_clone_repair_notice(&mut self) -> String {
-        self.session.take_clone_repair_notice()
+        self.session.untracked_mut().take_clone_repair_notice()
     }
 
     /// The refusal of the last command because a linked clone would pass the limit, once.
     pub fn take_clone_limit_notice(&mut self) -> String {
-        self.session.take_clone_limit_notice()
+        self.session.untracked_mut().take_clone_limit_notice()
     }
 
     /// The notice of the orphan repair after the Open, once.
@@ -264,7 +264,10 @@ impl WasmSession {
 
     /// The DOM chips over the canvas as `[x, y, w, h, ...]` in canvas px: no clone tag meets one.
     pub fn set_clone_tag_obstacles(&mut self, flat: &[f64]) {
-        self.session.set_clone_tag_obstacles(flat);
+        // Reported after every change of the view: a frame only when the chips moved.
+        if self.session.untracked_mut().set_clone_tag_obstacles(flat) {
+            self.session.mark_changed();
+        }
     }
 
     /// The pointer or focus is on Select original (`"original"`), Select root original

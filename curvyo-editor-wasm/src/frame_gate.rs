@@ -8,7 +8,9 @@
 //! Shared access ([`Deref`]) never does. The few per-frame calls that need `&mut` but change
 //! nothing on the canvas (taking a notice, the sync frame start without remote records) go
 //! through [`TrackedSession::untracked_mut`]. A frame is skipped only when the generation it would
-//! draw was drawn already on the current GPU target; a replaced or lost target forces one.
+//! draw was drawn already on the current GPU target, twice: `WebKitGTK` shows a canvas one frame
+//! late, so the last frame of a change is repeated once or the screen keeps the one before it
+//! (seen under Xvfb, `specs/0126` phase 1). A replaced or lost target forces a frame.
 
 use std::ops::{Deref, DerefMut};
 use std::panic::Location;
@@ -33,6 +35,8 @@ pub(crate) struct TrackedSession {
     generation: u64,
     /// The generation the current GPU target shows, `None` when it shows nothing known.
     drawn: Option<u64>,
+    /// `drawn` was submitted twice in a row: the host shows it whatever its latency.
+    settled: bool,
     /// How many frames were submitted to the GPU, for the performance probe.
     submitted: u64,
     /// The source lines of the mutable accesses since the probe last asked, with their counts.
@@ -46,6 +50,7 @@ impl TrackedSession {
             session,
             generation: 0,
             drawn: None,
+            settled: false,
             submitted: 0,
             sites: Vec::new(),
         }
@@ -77,13 +82,31 @@ impl TrackedSession {
 
     /// Whether the current GPU target lacks the session's present picture.
     pub(crate) fn needs_frame(&self) -> bool {
-        self.drawn != Some(self.generation)
+        self.drawn != Some(self.generation) || !self.settled
     }
 
     /// Records that the present generation was submitted to the GPU target.
     pub(crate) fn frame_drawn(&mut self) {
+        self.settled = self.drawn == Some(self.generation);
         self.drawn = Some(self.generation);
         self.submitted = self.submitted.wrapping_add(1);
+    }
+
+    /// Counts a change made through [`TrackedSession::untracked_mut`] after all.
+    #[track_caller]
+    pub(crate) fn mark_changed(&mut self) {
+        self.changed_at(Location::caller());
+    }
+
+    /// Bumps the generation and counts `at` among the change sites.
+    fn changed_at(&mut self, at: &'static Location<'static>) {
+        self.generation = self.generation.wrapping_add(1);
+        if let Some((_, count)) = self.sites.iter_mut().find(|(site, _)| *site == at) {
+            *count = count.saturating_add(1);
+        } else if self.sites.len() < MAX_SITES {
+            // Bounded while no probe asks: the first lines are the telling ones.
+            self.sites.push((at, 1));
+        }
     }
 
     /// Forgets what the GPU target shows (a new canvas, a lost or reconfigured surface, a host
@@ -131,7 +154,7 @@ impl TrackedSession {
     pub(crate) fn sync_frame_start(&mut self) -> bool {
         let changed = self.document_moves(Session::sync_frame_start);
         if changed {
-            self.generation = self.generation.wrapping_add(1);
+            self.changed_at(Location::caller());
         }
         changed
     }
@@ -143,7 +166,7 @@ impl TrackedSession {
         let before = self.session.document_version();
         let result = step(&mut self.session);
         if self.session.document_version() != before {
-            self.generation = self.generation.wrapping_add(1);
+            self.changed_at(Location::caller());
         }
         result
     }
@@ -161,14 +184,7 @@ impl DerefMut for TrackedSession {
     /// A mutable access may change the picture: the next frame is drawn.
     #[track_caller]
     fn deref_mut(&mut self) -> &mut Session {
-        self.generation = self.generation.wrapping_add(1);
-        let at = Location::caller();
-        if let Some((_, count)) = self.sites.iter_mut().find(|(site, _)| *site == at) {
-            *count = count.saturating_add(1);
-        } else if self.sites.len() < MAX_SITES {
-            // Bounded while no probe asks: the first lines are the telling ones.
-            self.sites.push((at, 1));
-        }
+        self.changed_at(Location::caller());
         &mut self.session
     }
 }
@@ -187,8 +203,20 @@ mod tests {
         session.resize_viewport(800.0, 600.0);
         let mut tracked = TrackedSession::new(session);
         assert!(tracked.needs_frame(), "a new session draws its first frame");
-        tracked.frame_drawn();
+        settle(&mut tracked);
         tracked
+    }
+
+    /// Draws frames until none is needed, as the render loop does: two per change.
+    fn settle(tracked: &mut TrackedSession) {
+        let before = tracked.frames_submitted();
+        while tracked.needs_frame() {
+            tracked.frame_drawn();
+            assert!(
+                tracked.frames_submitted() - before <= 2,
+                "a change settles in two frames"
+            );
+        }
     }
 
     /// A rectangle drawn with the Rectangle tool, left selected.
@@ -222,15 +250,35 @@ mod tests {
             idle_frame(&mut tracked);
             assert!(!tracked.needs_frame(), "an idle frame draws nothing");
         }
-        assert_eq!(tracked.frames_submitted(), 1);
+        assert_eq!(
+            tracked.frames_submitted(),
+            2,
+            "the first frame and its repeat"
+        );
         assert_eq!(tracked.frame_state()[1], 0.0, "the loop is told so");
+    }
+
+    #[test]
+    fn a_change_is_drawn_twice_for_a_host_that_shows_the_canvas_one_frame_late() {
+        let mut tracked = drawn();
+        tracked.set_tool(Tool::Pen);
+        tracked.frame_drawn();
+        assert!(tracked.needs_frame(), "the repeat");
+        tracked.set_tool(Tool::Select);
+        tracked.frame_drawn();
+        assert!(
+            tracked.needs_frame(),
+            "a change during the repeat draws again"
+        );
+        tracked.frame_drawn();
+        assert!(!tracked.needs_frame());
     }
 
     #[test]
     fn a_drawn_document_stays_idle_too() {
         let mut tracked = drawn();
         rectangle(&mut tracked);
-        tracked.frame_drawn();
+        settle(&mut tracked);
         idle_frame(&mut tracked);
         assert!(!tracked.needs_frame());
     }
@@ -243,7 +291,7 @@ mod tests {
             ("document edit", |t| rectangle(t)),
             ("undo", |t| {
                 rectangle(t);
-                t.frame_drawn();
+                settle(t);
                 let _ = t.undo();
             }),
             ("wheel zoom", |t| {
@@ -255,9 +303,9 @@ mod tests {
             ("tool", |t| t.set_tool(Tool::Pen)),
             ("selection", |t| {
                 rectangle(t);
-                t.frame_drawn();
+                settle(t);
                 t.set_tool(Tool::Select);
-                t.frame_drawn();
+                settle(t);
                 t.pointer_down(Point::new(10.0, 10.0), false);
             }),
             ("hover", |t| {
@@ -265,7 +313,7 @@ mod tests {
             }),
             ("gesture", |t| {
                 t.set_tool(Tool::Rectangle);
-                t.frame_drawn();
+                settle(t);
                 t.pointer_down(Point::new(5.0, 5.0), false);
             }),
             ("caret blink", |t| t.set_text_caret_on(false)),
@@ -278,7 +326,7 @@ mod tests {
             let mut tracked = drawn();
             change(&mut tracked);
             assert!(tracked.needs_frame(), "{name} forces a frame");
-            tracked.frame_drawn();
+            settle(&mut tracked);
             assert!(!tracked.needs_frame(), "{name}: one frame, then idle");
         }
     }
@@ -288,7 +336,7 @@ mod tests {
         let mut tracked = drawn();
         tracked.document_moves(rectangle_in);
         assert!(tracked.needs_frame(), "the document moved on");
-        tracked.frame_drawn();
+        settle(&mut tracked);
         tracked.document_moves(|s| s.set_tool(Tool::Pen));
         assert!(
             !tracked.needs_frame(),
@@ -314,6 +362,22 @@ mod tests {
     }
 
     #[test]
+    fn moved_dom_chips_force_a_frame_and_the_same_chips_do_not() {
+        // As `WasmSession::set_clone_tag_obstacles`: the clone marks keep clear of the chips.
+        let mut tracked = drawn();
+        let report = |t: &mut TrackedSession, flat: &[f64]| {
+            if t.untracked_mut().set_clone_tag_obstacles(flat) {
+                t.mark_changed();
+            }
+        };
+        report(&mut tracked, &[10.0, 10.0, 40.0, 20.0]);
+        assert!(tracked.needs_frame(), "a chip appeared");
+        settle(&mut tracked);
+        report(&mut tracked, &[10.0, 10.0, 40.0, 20.0]);
+        assert!(!tracked.needs_frame(), "the same chips draw nothing");
+    }
+
+    #[test]
     fn a_lost_or_replaced_gpu_target_forces_a_frame_without_a_change() {
         let mut tracked = drawn();
         let generation = tracked.frame_generation();
@@ -324,7 +388,7 @@ mod tests {
             generation,
             "the session did not change"
         );
-        tracked.frame_drawn();
+        settle(&mut tracked);
         assert!(!tracked.needs_frame());
     }
 
@@ -337,7 +401,7 @@ mod tests {
         assert_eq!((state[2], state[3]), (origin.x, origin.y));
         assert_eq!(state[4], tracked.view().scale());
         assert_eq!(state[5], 0.0, "no sync link, no notice");
-        assert_eq!(state[6], 1.0, "one frame submitted");
+        assert_eq!(state[6], 2.0, "the first frame and its repeat");
         tracked.wheel(0.0, -120.0, 50.0, 50.0, false, true);
         let moved = tracked.frame_state();
         assert_ne!(moved[0], state[0]);
