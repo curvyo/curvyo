@@ -22,3 +22,4 @@ curvyo-app/gen/
 # ProjectAtlas runtime lock
 .projectatlas/repository-graph-stage.lock
 specs/*/spike/webview/gen/
+frontend/dist-perf/
