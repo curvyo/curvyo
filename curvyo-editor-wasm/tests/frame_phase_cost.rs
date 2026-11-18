@@ -1,6 +1,6 @@
 //! The CPU cost of a drawn frame by phase on the performance page of `tools/perf/` (5 000
-//! stroked paths, imported and fitted, `specs/0126-performance-pass` phase 4): the draw list,
-//! the pictures and the GPU vertices, at rest, zooming and panning. Thread CPU time
+//! stroked paths, imported and fitted, `specs/0126-performance-pass` phase 4): the draw list
+//! and the pictures (the wasm probe times the GPU vertices), at rest, zooming and panning. Thread CPU time
 //! (`CLAUDE.md` §5); the budgets are asserted in a release build only, a debug build prints.
 //! An integration test: the library's own test build checks every cached document read
 //! against a fresh one, which would be most of the time measured.
@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use cpu_time::cpu_time_of;
 
-use curvyo_editor_wasm::{Session, gpu_vertices};
+use curvyo_editor_wasm::Session;
 
 /// The page `frontend/src/lib/perfProbe.ts` imports: `nodes` stroked closed curves in rows
 /// of 100.
@@ -58,7 +58,6 @@ fn perf_session() -> Session {
 struct PhaseCost {
     draw_list: Duration,
     images: Duration,
-    vertices: Duration,
     layer_count: usize,
     vertex_count: usize,
 }
@@ -73,25 +72,21 @@ fn measure(
         step(session, frame);
         let (mut list, draw_list) = cpu_time_of(|| session.frame_draw_list());
         let (pictures, images) = cpu_time_of(|| session.frame_images(&mut list));
-        let origin = session.view().screen_to_document(0.0, 0.0);
-        let (gpu, vertices) = cpu_time_of(|| gpu_vertices(&list, origin));
         assert_eq!(pictures.len(), 0, "the perf page has no images");
         cost.draw_list += draw_list;
         cost.images += images;
-        cost.vertices += vertices;
         cost.layer_count = list.layers().len();
-        cost.vertex_count = gpu.len();
+        cost.vertex_count = list.triangles.len();
     }
     cost.draw_list /= frames;
     cost.images /= frames;
-    cost.vertices /= frames;
     cost
 }
 
 fn report(label: &str, cost: &PhaseCost, budget: Duration) {
     println!(
-        "{label}: draw list {:?}, pictures {:?}, GPU vertices {:?}; {} layers, {} vertices (draw-list budget {budget:?})",
-        cost.draw_list, cost.images, cost.vertices, cost.layer_count, cost.vertex_count
+        "{label}: draw list {:?}, pictures {:?}; {} layers, {} vertices (draw-list budget {budget:?})",
+        cost.draw_list, cost.images, cost.layer_count, cost.vertex_count
     );
     if !cfg!(debug_assertions) {
         assert!(
