@@ -17,9 +17,10 @@ use crate::gpu_gradient_buffer::GradientAttributes;
 use crate::gpu_images::{GpuImages, ImageDraws};
 use crate::gpu_pipeline::{
     DEPTH_FORMAT, PipelineKind, ScreenTransform, TransformResources, create_depth_view,
-    create_msaa_view, create_pipeline, create_transform_resources, gpu_vertices,
+    create_msaa_view, create_pipeline, create_transform_resources,
 };
 use crate::gpu_stops::{StopTable, create_stop_table_layout};
+use crate::gpu_vertex::gpu_vertices;
 use crate::session::FrameImages;
 
 /// `--pasteboard-bg` (`docs/design-system.md`): cleared behind every frame's
@@ -44,7 +45,7 @@ const CLEAR_COLOUR: wgpu::Color = wgpu::Color {
 /// assuming one. WebGL2 itself guarantees at least 4x (the spec's
 /// `MAX_SAMPLES` floor), but 8x is backend/driver-dependent — some
 /// downlevel GL stacks cap lower. `1` (no MSAA) is the last resort and
-/// is handled as a genuinely different code path ([`Gpu::render`] skips
+/// is handled as a genuinely different code path ([`Gpu::draw`] skips
 /// the offscreen multisampled target entirely when `sample_count == 1`,
 /// since `wgpu` refuses a multisampled texture with `sample_count: 1`).
 ///
@@ -118,13 +119,13 @@ pub struct Gpu {
     transform_buffer: wgpu::Buffer,
     transform_bind_group: wgpu::BindGroup,
     /// The offscreen multisampled color target every frame actually
-    /// renders into when `sample_count > 1`; [`Gpu::render`] resolves it
+    /// renders into when `sample_count > 1`; [`Gpu::draw`] resolves it
     /// down into the surface's own (single-sampled) texture. Recreated
     /// whenever the surface's size changes ([`Gpu::resize`]) — it must
     /// always match `config.width`/`height` exactly, or `wgpu` refuses
     /// the render pass. `None` when [`choose_sample_count`] found no
     /// multisampling support at all (see that function's own doc
-    /// comment); [`Gpu::render`] then renders directly into the surface
+    /// comment); [`Gpu::draw`] then renders directly into the surface
     /// texture.
     msaa_view: Option<wgpu::TextureView>,
     /// The depth attachment, with `sample_count` samples like the color
@@ -137,7 +138,7 @@ pub struct Gpu {
     /// `window.devicePixelRatio` at the last `attach`/`resize` — the
     /// surface's backing buffer is sized `css_size * device_pixel_ratio`
     /// (the host's job, see `useEditorSession.ts`'s attach effect and
-    /// resize observer), so this is what lets [`Gpu::render`] recover the
+    /// resize observer), so this is what lets [`Gpu::prepare`] recover the
     /// canvas's *CSS* pixel size (what `ScreenTransform` actually needs)
     /// from `config.width`/`height` (the physical buffer size).
     device_pixel_ratio: f64,
@@ -244,7 +245,7 @@ impl Gpu {
     /// host sizes this `css_size * device_pixel_ratio` (see
     /// `useEditorSession.ts`'s attach effect) so the canvas's actual
     /// resolution matches a `HiDPI` display instead of being upscaled and
-    /// softened; `device_pixel_ratio` is what lets [`Gpu::render`] map
+    /// softened; `device_pixel_ratio` is what lets [`Gpu::prepare`] map
     /// back to the canvas's CSS size for the clip-space transform.
     ///
     /// # Errors
@@ -353,29 +354,34 @@ impl Gpu {
         self.depth_view = create_depth_view(&self.device, &self.config, self.sample_count);
     }
 
-    /// Uploads `draw_list` and submits one frame, using `view` to build
-    /// this frame's screen transform against the canvas's current *CSS*
-    /// pixel size (`self.config.width`/`height`, the physical
-    /// backing-buffer size kept in sync by [`Gpu::resize`], divided back
-    /// down by `self.device_pixel_ratio`). Draws into the offscreen
-    /// multisampled target (`self.sample_count`) and resolves it into
-    /// the surface's own texture, which is what actually anti-aliases
-    /// every stroke/glyph edge — see [`choose_sample_count`]. Renders
-    /// directly into the surface texture instead, with no resolve step,
-    /// on the (practically unreachable, but handled) adapter that
-    /// supports no multisampling at all.
+    /// Uploads `draw_list` and submits one frame: [`Gpu::prepare`], then
+    /// [`Gpu::draw`].
     ///
     /// # Errors
-    /// Returns a `JsValue` error if the surface's current texture could
-    /// not be acquired (e.g. the surface was lost) — reported to the
-    /// host rather than panicking, since a dropped frame should not
-    /// crash the editor.
+    /// See [`Gpu::draw`].
     pub fn render(
         &mut self,
         draw_list: &DrawList,
         view: ViewTransform,
         pictures: &FrameImages,
     ) -> Result<(), JsValue> {
+        let prepared = self.prepare(draw_list, view, pictures);
+        self.draw(&prepared)
+    }
+
+    /// The upload half of a frame, timed apart from [`Gpu::draw`] by the
+    /// performance probe (`specs/0126-performance-pass` phase 4): uses `view` to build this frame's screen
+    /// transform against the canvas's current *CSS* pixel size
+    /// (`self.config.width`/`height`, the physical backing-buffer size kept in
+    /// sync by [`Gpu::resize`], divided back down by `self.device_pixel_ratio`),
+    /// converts the draw list to GPU vertices and uploads them, the gradient
+    /// attributes, the stop table and the pictures.
+    pub fn prepare(
+        &mut self,
+        draw_list: &DrawList,
+        view: ViewTransform,
+        pictures: &FrameImages,
+    ) -> PreparedFrame {
         let css_width = f64::from(self.config.width) / self.device_pixel_ratio;
         let css_height = f64::from(self.config.height) / self.device_pixel_ratio;
         let grid = checker_grid(view, self.device_pixel_ratio);
@@ -392,18 +398,7 @@ impl Gpu {
         self.images.sync(&self.device, &self.queue, pictures);
         let image_draws = self.images.prepare(&self.device, draw_list, view, origin);
 
-        let frame = self.acquire_frame()?;
-        let view_texture = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("curvyo frame encoder"),
-            });
-
-        // An empty document still needs its one clear pass below, or the
+        // An empty document still needs its one clear pass in `draw`, or the
         // canvas would show whatever the GPU happened to leave behind in
         // this texture rather than `--canvas-bg` — so the vertex buffer
         // (and the draw call using it) is only created/issued when there
@@ -423,6 +418,44 @@ impl Gpu {
         let gradient_buffer =
             self.gradient_attributes
                 .prepare(&self.device, draw_list, vertices.len());
+        #[allow(clippy::cast_possible_truncation)]
+        let ranges = (
+            draw_list.checker_end() as u32,
+            draw_list.overlay_start() as u32,
+            vertices.len() as u32,
+        );
+        PreparedFrame {
+            vertex_buffer,
+            gradient_buffer,
+            image_draws,
+            ranges,
+        }
+    }
+
+    /// The draw half of a frame: draws `prepared` into the offscreen
+    /// multisampled target (`self.sample_count`) and resolves it into the
+    /// surface's own texture, which is what actually anti-aliases every
+    /// stroke/glyph edge — see [`choose_sample_count`]. Renders directly
+    /// into the surface texture instead, with no resolve step, on the
+    /// (practically unreachable, but handled) adapter that supports no
+    /// multisampling at all. Submits and presents.
+    ///
+    /// # Errors
+    /// Returns a `JsValue` error if the surface's current texture could
+    /// not be acquired (e.g. the surface was lost) — reported to the
+    /// host rather than panicking, since a dropped frame should not
+    /// crash the editor.
+    pub fn draw(&mut self, prepared: &PreparedFrame) -> Result<(), JsValue> {
+        let frame = self.acquire_frame()?;
+        let view_texture = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("curvyo frame encoder"),
+            });
 
         let color_attachment = self.color_attachment(&view_texture);
 
@@ -442,21 +475,16 @@ impl Gpu {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            if let Some(vertex_buffer) = &vertex_buffer {
-                #[allow(clippy::cast_possible_truncation)]
-                let (checker_end, overlay_start, end) = (
-                    draw_list.checker_end() as u32,
-                    draw_list.overlay_start() as u32,
-                    vertices.len() as u32,
-                );
-                let gradient_buffer = gradient_buffer
+            if let Some(vertex_buffer) = &prepared.vertex_buffer {
+                let gradient_buffer = prepared
+                    .gradient_buffer
                     .as_ref()
                     .unwrap_or_else(|| self.gradient_attributes.zeros());
                 self.record_draws(
                     &mut pass,
                     (vertex_buffer, gradient_buffer),
-                    (checker_end, overlay_start, end),
-                    &image_draws,
+                    prepared.ranges,
+                    &prepared.image_draws,
                 );
             }
         }
@@ -465,6 +493,15 @@ impl Gpu {
         self.queue.present(frame);
         Ok(())
     }
+}
+
+/// One frame's uploaded buffers between [`Gpu::prepare`] and [`Gpu::draw`].
+pub struct PreparedFrame {
+    vertex_buffer: Option<wgpu::Buffer>,
+    gradient_buffer: Option<wgpu::Buffer>,
+    image_draws: ImageDraws,
+    /// The checker end, the overlay start and the vertex count.
+    ranges: (u32, u32, u32),
 }
 
 impl Gpu {

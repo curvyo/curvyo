@@ -104,6 +104,8 @@ pub struct DocumentPoint {
 pub struct WasmSession {
     pub(crate) session: crate::frame_gate::TrackedSession,
     pub(crate) gpu: Option<Gpu>,
+    /// The phase times of drawn frames for the performance probe; off by default.
+    pub(crate) phases: crate::frame_phases::FramePhases,
 }
 
 #[wasm_bindgen]

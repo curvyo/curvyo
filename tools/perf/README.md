@@ -54,7 +54,14 @@ generation changed (every change of the session: document, view, selection, tool
 `PageFrames` tick. `changes by` names the three source lines in `curvyo-editor-wasm` that changed the
 session most often (`WasmSession::take_change_sites`): what keeps a document drawing. `view` is the
 view (origin x, origin y, scale) at the scenario's start and end, and whether the canvas screenshot
-changed. Warnings: `render loop not running` when built/s is 0, `scenario did not move the view` when
+changed. `per drawn frame` splits the frames the session drew (`WasmSession::take_frame_phases`, timed
+only while the probe turned it on with `set_frame_phase_timing`) into `draw list`
+(`Session::frame_draw_list`, tessellation included), `pictures` (`frame_images`), `upload`
+(`Gpu::prepare`: GPU vertices and buffer uploads) and `submit` (`Gpu::draw`: encode, submit,
+present), with the artwork layers and vertices of a frame. Under Xvfb `submit` is software GL
+and much larger than on a GPU; `draw list` and the vertex building in `upload` are CPU work on
+any machine (`curvyo-editor-wasm/tests/frame_phase_cost.rs` measures them natively).
+Warnings: `render loop not running` when built/s is 0, `scenario did not move the view` when
 a zoom or pan scenario has changed/s = 0; `page error` lines carry uncaught errors of the page with file, line and stack.
 
 Seen once, not reproduced (2026-11-18): `page error in boot: TypeError: undefined is not an object (evaluating 'Q.__wbindgen_malloc')`. `Q` is the minified wasm instance of the bindings, undefined when a binding is called before `init` finished (or from bindings and page of different builds). Three runs on a fresh `build:wasm` (one full, two `--no-build`) had no page error and every scenario ran; the earlier run most likely used stale bindings. If it returns, the stack now names the caller.
