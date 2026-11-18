@@ -1,6 +1,6 @@
 //! The draw list in the GPU's vertex shape: positions relative to the view origin in `f32`,
-//! normalised colours and layer depths. Plain Rust, so the host can time it
-//! (`specs/0126-performance-pass` phase 4); `gpu.rs` uploads what it builds.
+//! normalised colours and layer depths. `gpu.rs` uploads what it builds; the wasm probe times it
+//! (`specs/0126-performance-pass` phase 4).
 
 use curvyo_document_core::Point;
 use curvyo_render_core::DrawList;
@@ -11,7 +11,7 @@ use curvyo_render_core::DrawList;
 #[repr(C)]
 #[derive(Clone, Copy)]
 #[cfg_attr(target_arch = "wasm32", derive(bytemuck::Pod, bytemuck::Zeroable))]
-pub struct GpuVertex {
+pub(crate) struct GpuVertex {
     position: [f32; 2],
     color: [f32; 4],
     depth: f32,
@@ -33,7 +33,11 @@ pub struct GpuVertex {
 /// [`ScreenTransform`]'s own offset no longer needs `origin` at all,
 /// since every vertex arrives already shifted.
 #[must_use]
-pub fn to_gpu_vertex(vertex: curvyo_render_core::Vertex, origin: Point, depth: f32) -> GpuVertex {
+pub(crate) fn to_gpu_vertex(
+    vertex: curvyo_render_core::Vertex,
+    origin: Point,
+    depth: f32,
+) -> GpuVertex {
     let relative_x = vertex.position.x - origin.x;
     let relative_y = vertex.position.y - origin.y;
     #[allow(clippy::cast_possible_truncation)]
@@ -55,7 +59,10 @@ pub fn to_gpu_vertex(vertex: curvyo_render_core::Vertex, origin: Point, depth: f
 /// document point at screen pixel (0, 0)) in `f64` before its own `f32` cast
 /// (`to_gpu_vertex`'s doc comment), tagged with its layer's depth.
 #[must_use]
-pub fn gpu_vertices(draw_list: &DrawList, origin: curvyo_document_core::Point) -> Vec<GpuVertex> {
+pub(crate) fn gpu_vertices(
+    draw_list: &DrawList,
+    origin: curvyo_document_core::Point,
+) -> Vec<GpuVertex> {
     draw_list
         .triangles
         .iter()
