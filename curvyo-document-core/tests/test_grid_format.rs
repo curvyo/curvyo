@@ -387,7 +387,8 @@ fn the_test_grid_golden_reads_back_every_recipe_tag_row_and_lasered_register() {
         pack(&golden_document(), "0.1.0").unwrap()
     });
     assert_eq!(format_of(&bytes), 46);
-    assert_eq!(CURRENT_FORMAT_VERSION, 48);
+    // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 49);
     let d = open_unchanged(&bytes);
     let ops = d.operations(d.manufacturings()[0].id).unwrap();
     assert_eq!(ops.len(), 26 + 5);
@@ -507,8 +508,8 @@ fn a_file_of_format_47_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 49,
-            supported: 48
+            found: 50,
+            supported: 49
         })
     ));
 }

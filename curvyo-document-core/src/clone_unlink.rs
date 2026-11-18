@@ -83,18 +83,7 @@ impl Document {
         let results: Vec<ObjectSnapshot> = leaves
             .iter()
             .filter_map(|&leaf| {
-                let object = self.object(leaf)?;
-                Some(match &object {
-                    ObjectSnapshot::Clone(inner) => {
-                        let mut mapped = inner.mapped_by(m);
-                        if let Some(&matrix) = matrices.get(&leaf) {
-                            mapped.chain.matrix = matrix;
-                        }
-                        ObjectSnapshot::Clone(mapped)
-                    }
-                    ObjectSnapshot::Primitive(_) => self.mapped_primitive(&object, m),
-                    _ => crate::clone_picture::map_leaf(&object, m),
-                })
+                Some(self.unlinked_leaf(&self.object(leaf)?, m, matrices.get(&leaf)))
             })
             .collect();
         self.uncommitted(|doc| doc.transform_objects(&results, false))
@@ -141,6 +130,29 @@ impl Document {
         crate::groups::remove_emptied_groups(&tree, &parents);
         let copy = clone.id();
         Ok(copy)
+    }
+
+    /// A copied leaf of the clone's root under the clone's matrix `m`, its gradient carried
+    /// (`specs/0124-gradient-fill` criterion 17); a nested clone takes `matrix` when given.
+    fn unlinked_leaf(
+        &self,
+        object: &ObjectSnapshot,
+        m: Affine,
+        matrix: Option<&Affine>,
+    ) -> ObjectSnapshot {
+        let mut result = match object {
+            ObjectSnapshot::Clone(inner) => {
+                let mut mapped = inner.mapped_by(m);
+                if let Some(&matrix) = matrix {
+                    mapped.chain.matrix = matrix;
+                }
+                return ObjectSnapshot::Clone(mapped);
+            }
+            ObjectSnapshot::Primitive(_) => self.mapped_primitive(object, m),
+            _ => crate::clone_picture::map_leaf(object, m),
+        };
+        crate::gradient_frame::carry_gradient(object, &mut result, m);
+        result
     }
 
     /// A copied primitive under `m`: still a primitive when `m` is a translation or a turn

@@ -446,16 +446,38 @@ impl Document {
         // is what the converted path keeps as its `rotation`, read before the
         // primitive keys go, so that its readout and box direction do not change.
         let read = self.conversion_reads(conversions)?;
-        for ((meta, (_, anchors)), (orientation, closed)) in
+        for ((meta, (id, anchors)), (orientation, closed)) in
             metas.into_iter().zip(conversions.iter()).zip(read)
         {
+            // The path continues the primitive's shade (ADR 0066 §6), read before the keys go.
+            let carried = self.converted_gradient(*id, anchors, closed, orientation);
             shape_codec::strip_primitive_keys(&meta);
             shape_codec::write_converted_path_fields(&meta, anchors, closed);
             if path_codec::read_rotation(&meta) != orientation.normalized() {
                 path_codec::write_rotation(&meta, orientation);
             }
+            crate::gradient_codec::write_carried_geometry(&meta, carried.as_ref());
         }
         Ok(())
+    }
+
+    /// The gradient of primitive `id` re-based into the box of the path it becomes; `None` when
+    /// it has none.
+    fn converted_gradient(
+        &self,
+        id: NodeId,
+        anchors: &[crate::path_model::NewAnchor],
+        closed: bool,
+        orientation: crate::units::Angle,
+    ) -> Option<crate::GradientFill> {
+        let object = self.object(id)?;
+        let gradient = object.style().fill.gradient.as_ref()?;
+        let old = object.gradient_box()?;
+        let new = crate::gradient_frame::rotated_outlines_box(
+            &[(anchors.to_vec(), closed)],
+            orientation,
+        )?;
+        Some(gradient.rebased(&old, &new))
     }
 
     /// Looks up a primitive's meta map, refusing unless it both exists

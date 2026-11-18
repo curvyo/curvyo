@@ -306,7 +306,8 @@ fn c28_the_format_has_no_bump_of_its_own() {
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
     // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
     // Format 48 since `specs/0029-laser-job-preview-and-output` (ADR 0065 §4).
-    assert_eq!(CURRENT_FORMAT_VERSION, 48);
+    // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 49);
 }
 
 #[test]

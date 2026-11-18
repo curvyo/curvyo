@@ -208,6 +208,15 @@ pub use test_grid_commands::{
 pub use test_grid_object::{
     DerivedPart, DerivedRow, GridStep, NewGridObject, PLACE_TEST_GRID_COMMIT_LABEL, TestGridWrite,
 };
+mod gradient_codec;
+mod gradient_commands;
+mod gradient_eval;
+pub(crate) mod gradient_frame;
+mod gradient_map;
+mod gradient_measure;
+mod gradient_model;
+mod gradient_stops;
+mod gradient_text;
 mod node_edit;
 mod node_move;
 mod node_read;
@@ -348,6 +357,13 @@ pub use images::{ImageInsertError, NewImage};
 mod trace_mask_codec;
 mod trace_mask_commands;
 mod trace_mask_model;
+pub use gradient_commands::EDIT_GRADIENT_LABEL;
+pub use gradient_eval::{GradientBox, PlacedGradient, PremultipliedRgba8, over_white_grey};
+pub use gradient_frame::{carry_gradient, outlines_gradient_box, primitive_gradient_box};
+pub use gradient_model::{
+    AxisRatio, BoxFraction, BoxPoint, GradientFill, GradientGeometry, GradientKind,
+    GradientParamError, GradientStop, GradientStops, StopOffset,
+};
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use layers::{DELETE_LAYER_COMMIT_LABEL, INITIAL_LAYER_NAME, NEW_LAYER_COMMIT_LABEL};
 pub use node_edit::{

@@ -108,7 +108,8 @@ fn ac31_the_format_is_40_and_a_new_file_says_so() {
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
     // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
     // Format 48 since `specs/0029-laser-job-preview-and-output` (ADR 0065 §4).
-    assert_eq!(CURRENT_FORMAT_VERSION, 48);
+    // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 49);
     let d = Document::new(1);
     let bytes = pack(&d, "0.1.0").unwrap();
     let mut zin = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
@@ -120,7 +121,7 @@ fn ac31_the_format_is_40_and_a_new_file_says_so() {
             f.read_to_string(&mut t).unwrap();
             if t.contains("\"format_version\"") {
                 assert!(
-                    t.contains("\"format_version\": 48") || t.contains("\"format_version\":48")
+                    t.contains("\"format_version\": 49") || t.contains("\"format_version\":49")
                 );
                 found = true;
             }
@@ -392,7 +393,7 @@ fn ac31_a_format_41_file_is_refused() {
     // Superseded by `0103` (format 41), `0110` (format 42), `0028` (format 43) and `0111`
     // (format 44), `0114` (format 45), `0112` (format 46) and `0113` (format 47): the next
     // number is refused.
-    let too_new = with_format(&bytes, 49);
+    let too_new = with_format(&bytes, 50);
     assert!(
         matches!(unpack(9, &too_new), Err(OpenError::FormatTooNew { .. })),
         "a format 48 file is refused by a format 47 build"

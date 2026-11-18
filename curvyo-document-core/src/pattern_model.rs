@@ -8,7 +8,7 @@ use crate::path_model::NodeId;
 use crate::pattern_schema::specs;
 use crate::units::{Angle, Length};
 
-/// What a fill paints when it is on: a solid colour or a pattern (`fill_paint`).
+/// What a fill paints when it is on: a solid colour, a pattern or a gradient (`fill_paint`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FillPaint {
@@ -17,6 +17,8 @@ pub enum FillPaint {
     Colour,
     /// The generated pattern.
     Pattern,
+    /// The gradient of `specs/0124-gradient-fill` (ADR 0066).
+    Gradient,
 }
 
 /// How the pieces are painted: stroked open lines or filled closed outlines (criterion 16).

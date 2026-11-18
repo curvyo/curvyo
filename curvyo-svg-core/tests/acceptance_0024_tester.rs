@@ -982,7 +982,8 @@ fn ac41_dash_rules() {
     assert_eq!(s.dash, [2.0, 1.0]);
 }
 
-/// Criterion 38: gradient middle colour, pattern grey, fallbacks.
+/// Criterion 38: pattern grey, fallbacks; a gradient is kept as a gradient with its first stop
+/// as the fill colour (`specs/0124-gradient-fill` criterion 14 replaces the middle colour).
 #[test]
 fn ac38_paint_servers() {
     let d = mm(r##"<defs>
@@ -999,14 +1000,19 @@ fn ac38_paint_servers() {
     assert_eq!(
         fills,
         [
-            Some([128, 128, 128]),
-            Some([128, 0, 128]),
+            Some([0, 0, 0]),
+            Some([255, 0, 0]),
             Some([128, 128, 128]),
             Some([0, 255, 0]),
             None,
             None
         ]
     );
+    let gradients: Vec<bool> = leaves(&d.nodes)
+        .iter()
+        .map(|(_, l)| l.style.fill_gradient.is_some())
+        .collect();
+    assert_eq!(gradients, [true, true, false, false, false, false]);
 }
 
 /// Criteria 37 and 39: colour forms and the opacity example of criterion 39.

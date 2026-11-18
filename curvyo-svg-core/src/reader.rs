@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 
-use kurbo::Affine;
+use kurbo::{Affine, Shape};
 use roxmltree::{Document, Node, NodeId};
 
 use crate::drawing::{InkscapeObject, LeafKind, NodeState, SvgLeaf, SvgNode};
@@ -67,6 +67,27 @@ pub(crate) struct Reader<'a, 'd, 'input> {
     pub(crate) before: Vec<SvgNode>,
     /// Whether the root declares the `curvyo:` profile v1 (criterion 57).
     pub(crate) profile: bool,
+    /// The gradients drawn with a lost feature, each counted once (`0124` criterion 27).
+    pub(crate) lost: GradientsLost,
+}
+
+/// The gradient elements, by node, that lost a feature when drawn.
+#[derive(Debug, Default)]
+pub(crate) struct GradientsLost {
+    repeats: std::collections::BTreeSet<u32>,
+    focal_points: std::collections::BTreeSet<u32>,
+    meshes: std::collections::BTreeSet<u32>,
+}
+
+impl GradientsLost {
+    /// The counts of the import notice.
+    pub(crate) fn counts(&self) -> crate::gradient_paint::GradientLosses {
+        crate::gradient_paint::GradientLosses {
+            repeats: self.repeats.len(),
+            focal_points: self.focal_points.len(),
+            meshes: self.meshes.len(),
+        }
+    }
 }
 
 impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
@@ -95,6 +116,7 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
             carriers: Vec::new(),
             before: Vec::new(),
             profile: false,
+            lost: GradientsLost::default(),
         }
     }
 
@@ -281,8 +303,46 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
             }
         };
         let scale = ctx.matrix.determinant().abs().sqrt();
-        let style = ctx.style.leaf_style(scale);
+        let mut style = ctx.style.leaf_style(scale);
+        self.place_fill_gradient(&mut style, ctx, &kind);
         Some(self.push_leaf(node, ctx, kind, style))
+    }
+
+    /// Places the gradient of the fill on the leaf of `kind` (`specs/0124-gradient-fill`
+    /// criterion 14) and notes what it loses; a gradient in box units on a box of no width or
+    /// height paints nothing, as SVG says.
+    fn place_fill_gradient(
+        &mut self,
+        style: &mut crate::drawing::LeafStyle,
+        ctx: &Ctx,
+        kind: &LeafKind,
+    ) {
+        let server = match ctx.style.fill {
+            crate::paint::PaintValue::Gradient(paint) => paint.server,
+            crate::paint::PaintValue::Mesh(mesh) => {
+                self.lost.meshes.insert(mesh.get());
+                return;
+            }
+            crate::paint::PaintValue::None | crate::paint::PaintValue::Colour(_) => return,
+        };
+        let Some(read) = self.doc.get_node(server).and_then(|node| {
+            crate::gradient::read_gradient(node, self.ids, &ctx.units, ctx.style.fill_opacity)
+        }) else {
+            return;
+        };
+        if read.repeats {
+            self.lost.repeats.insert(server.get());
+        }
+        if read.focal {
+            self.lost.focal_points.insert(server.get());
+        }
+        let bbox = kind
+            .outline_mm()
+            .map(|outline| (ctx.matrix.inverse() * outline).bounding_box());
+        style.fill_gradient = bbox.and_then(|bbox| read.placed(ctx.matrix, bbox));
+        if style.fill_gradient.is_none() {
+            style.fill = None;
+        }
     }
 
     /// Numbers a new leaf and records where it came from.

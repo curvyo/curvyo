@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use loro::LoroMap;
 
 use crate::document::{Document, OBJECTS_TREE};
+use crate::gradient_model::{GradientGeometry, GradientKind, GradientStops, StopOffset};
 use crate::path_codec::leaf_exists;
 use crate::path_model::{Color, NodeId};
 use crate::paths::tree_id_of;
@@ -110,6 +111,23 @@ pub enum StyleEdit {
     PatternReroll,
     /// Whole pieces only (criterion 29).
     PatternWholePieces(bool),
+    /// The Kind switch of a gradient (`specs/0124-gradient-fill` criterion 3): the stops stay and
+    /// the geometry is the new kind's default.
+    GradientKind(GradientKind),
+    /// The whole geometry of a gradient (a handle drag, an entry box).
+    GradientGeometry(GradientGeometry),
+    /// The colour and alpha of the stop at this index.
+    GradientStopColour(usize, Color, u8),
+    /// The position of the inner stop at this index, clamped between its neighbours.
+    GradientStopOffset(usize, f64),
+    /// The whole stop list (an entry box commit).
+    GradientStops(GradientStops),
+    /// A stop at this position in the shade's colour there, or in the middle of the widest gap.
+    AddGradientStop(Option<StopOffset>),
+    /// Removes the inner stop at this index (the ends stay).
+    RemoveGradientStop(usize),
+    /// Mirrors the stops' order and positions; the handles stay, so the shade flips.
+    ReverseGradient,
 }
 
 impl StyleEdit {
@@ -171,7 +189,12 @@ impl StyleEdit {
                 if *paint == FillPaint::Pattern && style.fill.pattern.is_none() {
                     style.fill.pattern = Some(Box::default());
                 }
+                if *paint == FillPaint::Gradient && style.fill.gradient.is_none() {
+                    style.fill.gradient =
+                        Some(crate::gradient_commands::first_gradient(&style.fill));
+                }
             }
+            edit if edit.is_gradient_edit() => edit.apply_to_gradient(&mut style.fill),
             _ => self.apply_to_pattern(style.fill.pattern.get_or_insert_with(Box::default))?,
         }
         Ok(())
@@ -230,6 +253,16 @@ impl StyleEdit {
             Self::PatternMode(PatternMode::Shapes) => "pattern_mode_shapes",
             Self::PatternSeed(_) | Self::PatternReroll => "pattern_seed",
             Self::PatternWholePieces(_) => "pattern_whole_pieces",
+            Self::FillPaint(FillPaint::Gradient) => "fill_gradient",
+            Self::GradientKind(GradientKind::Linear) => "gradient_linear",
+            Self::GradientKind(GradientKind::Radial) => "gradient_radial",
+            Self::GradientGeometry(_)
+            | Self::GradientStopColour(..)
+            | Self::GradientStopOffset(..)
+            | Self::GradientStops(_) => crate::gradient_commands::EDIT_GRADIENT_LABEL,
+            Self::AddGradientStop(_) => "add_gradient_stop",
+            Self::RemoveGradientStop(_) => "remove_gradient_stop",
+            Self::ReverseGradient => "reverse_gradient",
             _ => "edit_style",
         }
     }
@@ -247,6 +280,22 @@ impl StyleEdit {
                 | Self::PatternSeed(_)
                 | Self::PatternReroll
                 | Self::PatternWholePieces(_)
+        )
+    }
+
+    /// Whether the edit changes the gradient (not the paint switch).
+    #[must_use]
+    pub const fn is_gradient_edit(&self) -> bool {
+        matches!(
+            self,
+            Self::GradientKind(_)
+                | Self::GradientGeometry(_)
+                | Self::GradientStopColour(..)
+                | Self::GradientStopOffset(..)
+                | Self::GradientStops(_)
+                | Self::AddGradientStop(_)
+                | Self::RemoveGradientStop(_)
+                | Self::ReverseGradient
         )
     }
 
@@ -275,6 +324,7 @@ impl StyleEdit {
                 | Self::FillOpacity(_)
                 | Self::FillPaint(_)
         ) || self.is_pattern_edit()
+            || self.is_gradient_edit()
     }
 }
 
@@ -293,15 +343,7 @@ impl Document {
     pub fn edit_style(&self, ids: &[NodeId], edit: &StyleEdit) -> Result<(), StyleEditError> {
         // A linked clone owns a style only with own style; the others are left alone
         // (`specs/0057-clone-overrides` criterion 18).
-        let metas: Vec<(NodeId, LoroMap)> = self
-            .style_metas(ids)?
-            .into_iter()
-            .filter(|(_, meta)| {
-                (!crate::clone_codec::is_clone_meta(meta)
-                    || crate::clone_codec::read_overrides(meta).own_style)
-                    && crate::text_clone_commands::owns_style_keys(meta)
-            })
-            .collect();
+        let metas = self.owned_style_metas(ids)?;
         if edit.is_marker_edit()
             && metas.iter().any(|(_, meta)| {
                 !matches!(read_shape_tag_checked(meta), ShapeTag::Absent)
@@ -327,6 +369,26 @@ impl Document {
             self.commit_with_label(edit.commit_label());
         }
         Ok(())
+    }
+
+    /// Resolves each distinct id to its meta map and keeps the objects that own their style: a
+    /// linked clone only with own style (`specs/0057-clone-overrides` criterion 18).
+    ///
+    /// # Errors
+    /// [`StyleEditError::NoSuchObject`] for the first stale id.
+    pub(crate) fn owned_style_metas(
+        &self,
+        ids: &[NodeId],
+    ) -> Result<Vec<(NodeId, LoroMap)>, StyleEditError> {
+        Ok(self
+            .style_metas(ids)?
+            .into_iter()
+            .filter(|(_, meta)| {
+                (!crate::clone_codec::is_clone_meta(meta)
+                    || crate::clone_codec::read_overrides(meta).own_style)
+                    && crate::text_clone_commands::owns_style_keys(meta)
+            })
+            .collect())
     }
 
     /// Resolves one id to its meta map.

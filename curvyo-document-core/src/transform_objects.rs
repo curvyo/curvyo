@@ -20,6 +20,10 @@ use crate::style_codec::stroke_width_is_writable;
 use crate::subpath_codec::anchor_positions;
 use crate::units::Point;
 
+/// The commit label of [`Document::transform_objects`] and of the gradient writes that join its
+/// gesture's step.
+pub(crate) const TRANSFORM_OBJECTS_COMMIT_LABEL: &str = "transform_objects";
+
 /// One object of the call, resolved against the document before any write.
 enum Planned<'a> {
     Sketch {
@@ -180,6 +184,10 @@ impl Document {
                     if let ObjectSnapshot::Text(text) = result {
                         crate::text_clone_commands::write_transformed(&tree, meta, text);
                     }
+                    crate::gradient_codec::write_carried_geometry(
+                        meta,
+                        result.style().fill.gradient.as_ref(),
+                    );
                     if write_stroke_width {
                         write_stroke_width_if_changed(meta, Some(result.style().stroke.width));
                     }
@@ -241,12 +249,17 @@ impl Document {
             if path_codec::read_rotation(meta) != result.rotation().normalized() {
                 path_codec::write_rotation(meta, result.rotation());
             }
+            // The image of its gradient (ADR 0066 §5), which the result builder mapped.
+            crate::gradient_codec::write_carried_geometry(
+                meta,
+                result.style().fill.gradient.as_ref(),
+            );
             if write_stroke_width {
                 write_stroke_width_if_changed(meta, Some(result.style().stroke.width));
             }
         }
         self.write_hold(&tree, hold);
-        self.commit_with_label("transform_objects");
+        self.commit_with_label(TRANSFORM_OBJECTS_COMMIT_LABEL);
         Ok(())
     }
 }

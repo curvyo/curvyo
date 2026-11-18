@@ -110,6 +110,8 @@ impl Document {
                         *source,
                         &tree.get_meta(source_id).unwrap(),
                     );
+                    // The copy continues its source's shade (ADR 0066 §6).
+                    let style = self.offset_rebased(*source, style, geometry);
                     let created = create_object(&tree, geometry, &style);
                     let placed = if *below { &mut lowest } else { &mut highest };
                     let next_to = placed
@@ -131,6 +133,15 @@ impl Document {
                     // invariant: resolved above.
                     #[allow(clippy::unwrap_used)]
                     let meta = tree.get_meta(tree_id_of(*target)).unwrap();
+                    let carried = self
+                        .offset_rebased(
+                            *target,
+                            self.object(*target)
+                                .map_or_else(Default::default, |o| o.style().clone()),
+                            geometry,
+                        )
+                        .fill
+                        .gradient;
                     // A clone is consumed like any operand (`0049` criterion 33): it becomes a
                     // path in place with its effective style and opacity (`0057` criterion 30),
                     // and the clones behind it follow it.
@@ -145,12 +156,41 @@ impl Document {
                         crate::clone_write::write_opacity_register(&meta, opacity);
                     }
                     change_geometry(&meta, geometry);
+                    crate::gradient_codec::write_carried_geometry(&meta, carried.as_ref());
                     ids.push(*target);
                 }
             }
         }
         self.commit_with_label(label);
         Ok(ids)
+    }
+}
+
+impl Document {
+    /// `style` with its gradient re-based from `source`'s box into the box of `geometry`
+    /// (ADR 0066 §6); `source` is read only when the style has a gradient.
+    fn offset_rebased(
+        &self,
+        source: NodeId,
+        style: crate::style_model::Style,
+        geometry: &OffsetGeometry,
+    ) -> crate::style_model::Style {
+        let Some(gradient) = style.fill.gradient.as_ref() else {
+            return style;
+        };
+        let new = match geometry {
+            OffsetGeometry::Path(outlines) => crate::outlines_gradient_box(outlines),
+            OffsetGeometry::Primitive { shape, rotation } => Some(
+                crate::gradient_frame::primitive_gradient_box(shape, *rotation),
+            ),
+        };
+        let old = self.object(source).and_then(|object| object.gradient_box());
+        let (Some(old), Some(new)) = (old, new) else {
+            return style;
+        };
+        let mut style = style.clone();
+        style.fill.gradient = Some(gradient.rebased(&old, &new));
+        style
     }
 }
 

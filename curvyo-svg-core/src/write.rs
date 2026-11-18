@@ -34,6 +34,9 @@ pub(crate) struct Ids {
     pub(crate) keys: BTreeMap<usize, String>,
     /// The marker definitions in first-use order; `marker1` is the first.
     pub(crate) markers: Vec<MarkerDef>,
+    /// The gradient of every element with a gradient fill, in document order; `gradient-1` is
+    /// the first (`specs/0124-gradient-fill` criterion 13).
+    pub(crate) gradients: Vec<(crate::gradient_paint::SvgGradient, kurbo::Affine)>,
     /// Whether anything needs `xlink:href`.
     pub(crate) xlink: bool,
     counters: BTreeMap<&'static str, usize>,
@@ -45,6 +48,7 @@ impl Ids {
             nodes: Vec::new(),
             keys: BTreeMap::new(),
             markers: Vec::new(),
+            gradients: Vec::new(),
             xlink: false,
             counters: BTreeMap::new(),
         };
@@ -76,6 +80,10 @@ impl Ids {
                     if matches!(leaf.kind, ExportKind::Use { .. }) {
                         self.xlink = true;
                     }
+                    if let Some(gradient) = &leaf.style.fill_gradient {
+                        self.gradients
+                            .push((gradient.clone(), leaf.kind.element_transform()));
+                    }
                     if let Some(stroke) = &leaf.style.stroke {
                         for (shape, reversed) in [
                             (stroke.start, true),
@@ -92,6 +100,9 @@ impl Ids {
                     }
                 }
                 ExportNode::Text { text, .. } => {
+                    if let Some(gradient) = &text.style.fill_gradient {
+                        self.gradients.push((gradient.clone(), text.transform));
+                    }
                     if text.lines.iter().any(|l| l.on_path.is_some()) {
                         self.xlink = true;
                     }
@@ -160,6 +171,8 @@ pub(crate) struct Writer<'a> {
     pub(crate) ids: &'a Ids,
     /// The next node in walk order.
     pub(crate) at: usize,
+    /// How many gradient fills were written so far.
+    pub(crate) next_gradient: usize,
 }
 
 /// The SVG text of `drawing`: UTF-8 XML, the same bytes for the same input on every target
@@ -171,6 +184,7 @@ pub fn write_svg(drawing: &SvgExport) -> String {
         out: String::with_capacity(4096),
         ids: &ids,
         at: 0,
+        next_gradient: 0,
     };
     w.root(drawing);
     w.named_view(drawing);
@@ -333,7 +347,7 @@ impl Writer<'_> {
     }
 
     fn defs(&mut self) {
-        if self.ids.markers.is_empty() {
+        if self.ids.markers.is_empty() && self.ids.gradients.is_empty() {
             return;
         }
         self.indent(1);
@@ -381,6 +395,10 @@ impl Writer<'_> {
             self.out.push_str("/>\n");
             self.indent(2);
             self.out.push_str("</marker>\n");
+        }
+        let ids = self.ids;
+        for (i, (gradient, element)) in ids.gradients.iter().enumerate() {
+            self.gradient(&format!("gradient-{}", i + 1), gradient, *element);
         }
         self.indent(1);
         self.out.push_str("</defs>\n");

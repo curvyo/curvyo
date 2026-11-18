@@ -628,3 +628,43 @@ fn instances_of_a_patterned_source_carry_its_pattern_fill() {
         }
     }
 }
+
+#[test]
+fn a_mirrored_copy_carries_its_source_gradient() {
+    use curvyo_document_core::{BoxPoint, FillPaint, GradientGeometry, PlacedGradient, StyleEdit};
+    let d = Document::new(1);
+    let source = path(&d, 0.0, 1);
+    d.edit_style(&[source], &StyleEdit::FillPaint(FillPaint::Gradient))
+        .unwrap();
+    d.edit_style(
+        &[source],
+        &StyleEdit::GradientGeometry(GradientGeometry::Linear {
+            start: BoxPoint::new(0.1, 0.2).unwrap(),
+            end: BoxPoint::new(0.9, 0.7).unwrap(),
+        }),
+    )
+    .unwrap();
+    let mut copies = recipe(2, 1);
+    copies.result = TilingResult::Copies;
+    let mut req = request(None, vec![source], copies);
+    let mirror = Affine::new(-1.0, 0.0, 0.0, 1.0, 40.0, 0.0);
+    req.cells[0].affine = mirror;
+    let group = d.apply_tiling(&req, &mut minter()).unwrap().tiling;
+    let read = d.read_objects();
+    let placed = |object: &ObjectSnapshot| {
+        PlacedGradient::new(
+            object.style().fill.gradient.as_ref().unwrap(),
+            &object.gradient_box().unwrap(),
+        )
+    };
+    let before = placed(read.get(source).unwrap());
+    let after = placed(read.get(d.children(Some(group))[1]).unwrap());
+    for p in [
+        Point::new(0.0, 0.0),
+        Point::new(7.0, 3.0),
+        Point::new(10.0, 10.0),
+    ] {
+        let (tb, ta) = (before.t_at(p), after.t_at(mirror.apply_point(p)));
+        assert!((tb - ta).abs() < 1e-9, "at {p:?}: {tb} before, {ta} after");
+    }
+}

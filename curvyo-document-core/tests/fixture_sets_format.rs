@@ -275,7 +275,8 @@ fn the_round_trip_golden_keeps_every_set_fixture_grid_size_lock_output_and_tick(
         pack(&golden_document(), "0.1.0").unwrap()
     });
     assert_eq!(format_of(&bytes), 47);
-    assert_eq!(CURRENT_FORMAT_VERSION, 48);
+    // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 49);
     let opened = open_unchanged(&bytes);
     let read = page(&opened);
     assert_eq!(read, page(&golden_document()));

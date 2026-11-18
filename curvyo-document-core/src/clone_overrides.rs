@@ -240,11 +240,13 @@ fn live_clone_metas<'r>(
         .collect()
 }
 
-/// Removes every style key and `opacity` from a clone node, residue included. Uncommitted.
+/// Removes every style key and `opacity` from a clone node, residue included, except the
+/// gradient registers (`gradient_codec::KEPT_ON_RESET`). Uncommitted.
 pub(crate) fn clear_style_keys(meta: &LoroMap) {
     for key in crate::style_codec::ALL_STYLE_KEYS
         .iter()
         .copied()
+        .filter(|key| !crate::gradient_codec::KEPT_ON_RESET.contains(key))
         .chain([KEY_OPACITY])
     {
         if meta.get(key).is_some() {

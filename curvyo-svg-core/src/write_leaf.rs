@@ -226,7 +226,14 @@ impl Writer<'_> {
     /// (`6.1e-17`, `320.00000000000006`) is not written while every other value stays exact
     /// (`specs/0100-bring-content-in`, criterion 20; `0024` criterion 152 stability).
     pub(crate) fn matrix(&mut self, m: kurbo::Affine) {
-        self.out.push_str(" transform=\"matrix(");
+        self.matrix_attr("transform", m);
+    }
+
+    /// ` name="matrix(a b c d e f)"` with the numbers of [`Self::matrix`].
+    pub(crate) fn matrix_attr(&mut self, name: &str, m: kurbo::Affine) {
+        self.out.push(' ');
+        self.out.push_str(name);
+        self.out.push_str("=\"matrix(");
         for (i, v) in m.as_coeffs().iter().enumerate() {
             if i > 0 {
                 self.out.push(' ');
@@ -246,14 +253,21 @@ impl Writer<'_> {
     /// The presentation attributes of `style` (criterion 56), the marker references with
     /// `markers` (criterion 141 (b)).
     pub(crate) fn paint(&mut self, style: &ExportStyle, markers: bool) {
-        match style.fill {
-            Some(fill) => {
+        // A gradient fill names its definition; each stop has its own alpha, so no
+        // `fill-opacity` (`specs/0124-gradient-fill` criterion 13).
+        match (&style.fill_gradient, style.fill) {
+            (Some(_), _) => {
+                self.next_gradient += 1;
+                let id = format!("url(#gradient-{})", self.next_gradient);
+                self.attr("fill", &id);
+            }
+            (None, Some(fill)) => {
                 self.attr("fill", &hex(fill.rgb));
                 if fill.opacity < 1.0 {
                     self.attr_exact("fill-opacity", fill.opacity);
                 }
             }
-            None => self.attr("fill", "none"),
+            (None, None) => self.attr("fill", "none"),
         }
         match &style.stroke {
             None => self.attr("stroke", "none"),
@@ -278,7 +292,7 @@ impl Writer<'_> {
                 }
             }
         }
-        if style.fill.is_some() {
+        if style.fill.is_some() || style.fill_gradient.is_some() {
             self.attr("fill-rule", "nonzero");
         }
         if !markers {

@@ -757,7 +757,8 @@ fn c32_a_written_record_is_format_6_with_both_keys() {
 fn c32_project_format_48_and_the_page_registers_read() {
     use curvyo_document_core::{CURRENT_FORMAT_VERSION, unpack};
     use curvyo_laser_core::job::read_output_settings;
-    assert_eq!(CURRENT_FORMAT_VERSION, 48);
+    // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 49);
     let dir =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../curvyo-document-core/tests/fixtures");
     let bytes = std::fs::read(dir.join("laser_output_v48.curvyo")).unwrap();

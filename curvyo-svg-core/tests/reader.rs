@@ -367,7 +367,7 @@ fn ac37_to_ac41_paints_opacity_and_stroke_parts() {
     let d = mm(
         r##"<defs><linearGradient id="g"><stop offset="0" stop-color="#000"/><stop offset="1" stop-color="#fff"/></linearGradient></defs>
         <path fill="rgba(255,0,0,0.5)" fill-opacity="0.5" opacity="0.8" d="M0 0 H1"/>
-        <path fill="url(#g)" stroke="url(#nothing)" d="M0 0 H1"/>
+        <path fill="url(#g)" stroke="url(#nothing)" d="M0 0 H1 V1 Z"/>
         <path fill="none" stroke="#00f" stroke-linecap="round" stroke-linejoin="arcs" stroke-width="0.5" stroke-dasharray="2 1" d="M0 0 H1"/>
         <path fill="red" stroke="none" stroke-width="3" stroke-linecap="square" d="M0 0 H1"/>"##,
     );
@@ -378,7 +378,9 @@ fn ac37_to_ac41_paints_opacity_and_stroke_parts() {
         (fill.rgb, fill.opacity, state.opacity),
         ([255, 0, 0], 0.25, 0.8)
     );
-    assert_eq!(all[1].1.style.fill.unwrap().rgb, [0x80; 3]);
+    // A gradient is kept, its first stop the colour (`specs/0124-gradient-fill` criterion 14).
+    assert_eq!(all[1].1.style.fill.unwrap().rgb, [0; 3]);
+    assert!(all[1].1.style.fill_gradient.is_some());
     assert!(all[1].1.style.stroke.is_none());
     let s = &all[2].1.style;
     assert!(s.fill.is_none());

@@ -563,7 +563,25 @@ impl DocumentVersion {
 /// `output_format` this build does not know reads damaged and blocks the export (never written
 /// as GRBL); nothing is repaired on read. The laser extension reads every value. Goldens:
 /// `laser_output_v48.curvyo`, `laser_output_damaged_v48.curvyo`; the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 48;
+///
+/// Bumped to 49 in `gradient-fill` (ADR 0066, `specs/0124`): an object's style may carry
+/// `fill_paint = "gradient"` and two registers, each one compact text (ADR 0066 §1, amended
+/// 2026-11-18): `fill_gradient` (`linear X1 Y1 X2 Y2` or `radial CX CY RX RY [RATIO]`, points as
+/// box fractions) and `fill_gradient_stops` (`#RRGGBB[AA] OFFSET;...`); the labels
+/// `fill_gradient`, `gradient_linear`, `gradient_radial`, `edit_gradient`, `add_gradient_stop`,
+/// `remove_gradient_stop` and `reverse_gradient` are steps. A build that stops at 48 refuses
+/// `"gradient"` as a damaged `fill_paint`, the wrong message, and a build that knew the paint but
+/// not the registers would draw no fill or the Colour where the gradient is, so this build's files
+/// are refused by version (ADR 0033 §7). No migration: a file of 48 or lower has no gradient and
+/// opens unchanged; the legacy `fill_kind` / `fill_stops` of format 7 stay ignored. Damage (ADR
+/// 0066 §7): an unknown paint or kind, a register that is not a string, a wrong number of fields
+/// or a wrong separator, a fraction that is not a finite number of the grammar, a ratio on a
+/// linear or not above 0, a colour that is not `#` plus 6 or 8 hex digits, fewer than 2 stops,
+/// offsets out of [0, 1], unordered or not from 0 to 1, and a gradient paint without both
+/// registers refuse the file. Goldens: `gradient_fill_v49.curvyo` and
+/// `gradient_fill_damaged_{colour,fraction,one_stop,unordered,paint_without_gradient}_v49.curvyo`;
+/// the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 49;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
