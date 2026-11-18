@@ -1,6 +1,6 @@
 # Machine connector: a small program next to the machine that the app talks to, on the local network or through the sync service
 
-Status: First slice (protocol core) Done (PR #375); second slice (device I/O on the LAN with a fake controller) Done (PR #375; Fragen 1 to 3 and CONN-HINT stand as Proposal defaults); the spec as a whole stays open for the later slices (criteria 1 to 13 are not all covered; the rest stays a sketch)
+Status: First slice (protocol core) Done (PR #375); second slice (device I/O on the LAN with a fake controller) Done (PR #375; Fragen 1 to 3 and CONN-HINT stand as Proposal defaults); slice 4 (GRBL over serial, `0127`) Done (PR #386); the spec as a whole stays open for the later slices (criteria 1 to 13 are not all covered; the rest stays a sketch)
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated): "Machines are attached by a connector, which can be a very simple Rust service that compiles and runs from itself. It can then talk to a local instance in the network or via the sync service."
 
