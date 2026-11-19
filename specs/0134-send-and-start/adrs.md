@@ -17,7 +17,7 @@ below is a **(Proposal)** unless it quotes an ADR or a criterion. No customer qu
 - [`specs/0064-machine-connector/adrs.md`](../0064-machine-connector/adrs.md) B2 (`send_button` in
   `curvyo-ui-core`, no connector types there), B4 (`SendWatch`, commit at most once per job id),
   B5 (one status source per profile, `connectorLink.ts`), B7 (the webview never gets the token).
-- [`specs/0118-machine-control/adrs.md`](../0118-machine-control/adrs.md) (PR #399, open): the
+- `specs/0118-machine-control/adrs.md` (PR #399, open): the
   Machine controls group's Start (SS6), `Homing` refuses `SubmitJob` as `Busy` (M3). Start through
   `connector_command("start")` takes **whatever job is `Ready`** (`ready_job_id`). The page's
   start must not use it (S3 below).

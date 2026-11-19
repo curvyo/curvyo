@@ -17,7 +17,7 @@ criterion. No customer question.
   C3 (the pure GRBL part in `-io/src/grbl/`), C4 (the unconfirmed-Pause rule of G29, amended
   here by P4), C5 (core's confirmed controls), C6 (additive `Status` fields), C7 (laser off in a
   hold).
-- [`specs/0118-machine-control/adrs.md`](../0118-machine-control/adrs.md) (PR #399, open) M3, M4:
+- `specs/0118-machine-control/adrs.md` (PR #399, open) M3, M4:
   the state `Homing` is entered **only** by `Message::Home` in core's `machine/home.rs`; a job's own
   first-line `$H` (`0029` criterion 38) stays `Running` with the controller word `Home`. The 0129
   loss-clock pause (`during_homing`, commit `217ab6ec`) is unchanged.
