@@ -15,6 +15,7 @@ use web_sys::HtmlCanvasElement;
 
 use crate::gpu_gradient_buffer::GradientAttributes;
 use crate::gpu_images::{GpuImages, ImageDraws};
+use crate::gpu_info::describe;
 use crate::gpu_pipeline::{
     DEPTH_FORMAT, PipelineKind, ScreenTransform, TransformResources, create_depth_view,
     create_msaa_view, create_pipeline, create_transform_resources,
@@ -142,6 +143,9 @@ pub struct Gpu {
     /// canvas's *CSS* pixel size (what `ScreenTransform` actually needs)
     /// from `config.width`/`height` (the physical buffer size).
     device_pixel_ratio: f64,
+    /// The adapter and surface configuration chosen at attach, as text for the
+    /// performance probe ([`Gpu::info`]).
+    info: String,
 }
 
 /// The surface, its backing adapter-derived device/queue, the
@@ -155,6 +159,7 @@ struct SurfaceAndDevice {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     sample_count: u32,
+    info: String,
 }
 
 /// The non-sRGB twin of `default` when the surface supports it, else
@@ -217,7 +222,8 @@ async fn create_surface_and_device(
         .get_default_config(&adapter, width.max(1), height.max(1))
         .ok_or_else(|| JsValue::from_str("the surface has no usable default configuration"))?;
     config.alpha_mode = wgpu::CompositeAlphaMode::Opaque;
-    config.format = prefer_unorm_format(config.format, &surface.get_capabilities(&adapter).formats);
+    let capabilities = surface.get_capabilities(&adapter);
+    config.format = prefer_unorm_format(config.format, &capabilities.formats);
     surface.configure(&device, &config);
 
     // Queried from the real adapter rather than assumed: WebGL2
@@ -229,6 +235,7 @@ async fn create_surface_and_device(
         adapter.get_texture_format_features(config.format).flags,
         adapter.get_texture_format_features(DEPTH_FORMAT).flags,
     );
+    let info = describe(&adapter, &capabilities, &config, sample_count);
 
     Ok(SurfaceAndDevice {
         surface,
@@ -236,6 +243,7 @@ async fn create_surface_and_device(
         queue,
         config,
         sample_count,
+        info,
     })
 }
 
@@ -267,6 +275,7 @@ impl Gpu {
             queue,
             config,
             sample_count,
+            info,
         } = create_surface_and_device(canvas, width, height).await?;
 
         let TransformResources {
@@ -321,7 +330,15 @@ impl Gpu {
             } else {
                 1.0
             },
+            info,
         })
+    }
+
+    /// The adapter and surface configuration chosen at attach (adapter name,
+    /// backend, device type, driver, surface format, present and alpha mode,
+    /// sample count), one `key: value` per line, for the performance probe.
+    pub fn info(&self) -> &str {
+        &self.info
     }
 
     /// Reconfigures the surface (and its MSAA target) to `width`×`height`
