@@ -24,6 +24,17 @@ Origin: Customer, first laser test, 2026-11-18. First report, translated: "A mac
 - Suspect: the signs. The glyphs are `BookmarkCheck` (reads "saved") for Update and `RotateCcw` (reads "undo") for Reset, and neither the glyph nor the tooltip says which side is copied onto which. After a rename the stale side is the page, so Update (page to library) undoes the rename while Reset (library to page) "keeps" it; the maker, who sees the rename as the new truth, reads the pair the other way round.
 - The implementer first reproduces the steps in the running app (browser check) and records, per button, the value of name and work area in copy and library before and after. If any button does the other's job, the handler is the bug and is fixed; if both do as specified, the words and glyphs are the bug and Frage 260 (decided B) swaps position and glyphs.
 
+## Reproduction result (ux-engineer, 2026-11-19, headless Chromium on the browser build)
+
+Laser page, Save as profile ("Generic laser copy", 400 x 300 mm), rename the library row to "Kitchen laser": the page keeps "Generic laser copy" and shows "Differs from profile".
+
+| Press | Copy (page) after | Library after | State row |
+|---|---|---|---|
+| Update profile, twice (600 ms apart) | Generic laser copy, 400 x 300 | Generic laser copy, 400 x 300 (rename gone) | none |
+| Reset from profile (after renaming again) | Kitchen laser, 400 x 300 | Kitchen laser, 400 x 300 | none |
+
+Both handlers do what `0026` criterion 7 says (Update copies page to library, Reset library to page); criterion 2 has no handler defect, so the fix is the swap of criterion 2a and the arming colour of criterion 3. The full table of criterion 1 (name plus value, value only, built-in) stays with the tester.
+
 ## Decisions
 
 Frage 253 (PROFILE-RENAME): decided C by the customer (2026-11-18): keep as built. The name stays part of "Differs from profile"; renaming a library profile makes the copies that use it show Differs; Reset takes the new name, Update keeps the old one in the library. The earlier proposal that the name leaves the comparison is dropped.
