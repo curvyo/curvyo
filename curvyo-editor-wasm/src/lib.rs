@@ -49,6 +49,8 @@ mod gpu_gradient_buffer;
 #[cfg(target_arch = "wasm32")]
 mod gpu_images;
 #[cfg(target_arch = "wasm32")]
+mod gpu_info;
+#[cfg(target_arch = "wasm32")]
 mod gpu_pipeline;
 mod gpu_shader;
 #[cfg(target_arch = "wasm32")]

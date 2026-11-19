@@ -175,6 +175,17 @@ impl WasmSession {
         self.phases.take()
     }
 
+    /// The `wgpu` adapter and surface configuration of the attached canvas
+    /// (`Gpu::info`), empty before [`WasmSession::attach_canvas`] has
+    /// completed; for the performance probe (`tools/perf/`).
+    #[must_use]
+    pub fn gpu_info(&self) -> String {
+        self.gpu
+            .as_ref()
+            .map(|gpu| gpu.info().to_owned())
+            .unwrap_or_default()
+    }
+
     /// Draws the next frame even though the session did not change: the
     /// page was hidden, or the host cannot tell what the canvas shows.
     pub fn request_frame(&mut self) {
