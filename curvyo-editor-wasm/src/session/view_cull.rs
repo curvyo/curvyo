@@ -25,43 +25,70 @@ pub(super) struct VisibleRect {
     scale: f64,
 }
 
+/// What the cull reads of one object, whatever the view: nothing (the object is always drawn)
+/// or its outline box and the width its stroke reaches by.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum CullBox {
+    /// Never left out: an image, a picture, a pattern or gradient fill, a dimension, a text
+    /// not laid out, or bounds that cannot be computed.
+    Always,
+    /// The outline box and the clamped stroke width, in millimetres.
+    Outline {
+        low: Point,
+        high: Point,
+        stroke: f64,
+    },
+}
+
+/// The cull box of `object`. Only paths, shapes, clones of a path, sketches and laid-out texts
+/// without a pattern or gradient fill are ever left out; images keep their layer, pictures and
+/// patterns draw pieces of their own, and the frame's gradient spans and stop table carry every
+/// shaded leaf (`specs/0124` criterion 10 reads them).
+pub(super) fn cull_box(object: &ObjectSnapshot) -> CullBox {
+    let style = object.style();
+    let cullable = object.picture().is_none()
+        && style.fill.painted_pattern().is_none()
+        && style.fill.painted_gradient().is_none()
+        && match object {
+            ObjectSnapshot::Path(_)
+            | ObjectSnapshot::Primitive(_)
+            | ObjectSnapshot::Clone(_)
+            | ObjectSnapshot::Sketch(_) => true,
+            ObjectSnapshot::Text(text) => text.outline.is_some(),
+            ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_) => false,
+        };
+    if !cullable {
+        return CullBox::Always;
+    }
+    let width = style.stroke.width.as_mm();
+    let stroke = if style.stroke.enabled && width.is_finite() {
+        width.clamp(0.0, MAX_REACH_MM)
+    } else {
+        0.0
+    };
+    // Bounds that cannot be computed (a compound Spiro path) never cull: the object stays.
+    match curvyo_ui_core::try_object_outline_bounds(object) {
+        Some((low, high)) => CullBox::Outline { low, high, stroke },
+        None => CullBox::Always,
+    }
+}
+
 impl VisibleRect {
-    /// Whether `object` may draw a pixel inside the rectangle. Only paths, shapes, clones of
-    /// a path, sketches and laid-out texts without a pattern or gradient fill are ever left
-    /// out; images keep their layer, pictures and patterns draw pieces of their own, and the
-    /// frame's gradient spans and stop table carry every shaded leaf (`specs/0124` criterion
-    /// 10 reads them).
-    fn may_show(&self, object: &ObjectSnapshot) -> bool {
-        let style = object.style();
-        let cullable = object.picture().is_none()
-            && style.fill.painted_pattern().is_none()
-            && style.fill.painted_gradient().is_none()
-            && match object {
-                ObjectSnapshot::Path(_)
-                | ObjectSnapshot::Primitive(_)
-                | ObjectSnapshot::Clone(_)
-                | ObjectSnapshot::Sketch(_) => true,
-                ObjectSnapshot::Text(text) => text.outline.is_some(),
-                ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_) => false,
-            };
-        if !cullable {
+    /// Whether an object of cull box `cull` may draw a pixel inside the rectangle.
+    fn shows(&self, cull: CullBox) -> bool {
+        let CullBox::Outline { low, high, stroke } = cull else {
             return true;
-        }
-        let width = style.stroke.width.as_mm();
-        let stroke = if style.stroke.enabled && width.is_finite() {
-            width.clamp(0.0, MAX_REACH_MM)
-        } else {
-            0.0
         };
         let margin = STROKE_REACH * stroke + MARGIN_PX / self.scale;
-        // Bounds that cannot be computed (a compound Spiro path) never cull: the object stays.
-        let Some((low, high)) = curvyo_ui_core::try_object_outline_bounds(object) else {
-            return true;
-        };
         !(high.x + margin < self.min.x
             || low.x - margin > self.max.x
             || high.y + margin < self.min.y
             || low.y - margin > self.max.y)
+    }
+
+    /// Whether `object` may draw a pixel inside the rectangle.
+    fn may_show(&self, object: &ObjectSnapshot) -> bool {
+        self.shows(cull_box(object))
     }
 }
 
@@ -108,6 +135,54 @@ pub(super) fn in_view<'o>(
         return Cow::Borrowed(objects);
     }
     Cow::Owned(objects.iter().filter(|o| keep(o)).cloned().collect())
+}
+
+/// The cull boxes of every object of one read, measured once: the cull of a frame that draws the
+/// same read again (a pan, a zoom) is then a test of boxes, with the answer [`in_view`] gives.
+#[derive(Debug)]
+pub(super) struct CullBoxes {
+    boxes: Vec<CullBox>,
+    /// Whether any object paints a pattern (its pieces depend on more than the read).
+    patterned: bool,
+}
+
+impl CullBoxes {
+    /// The boxes of `objects`, in order.
+    pub(super) fn of(objects: &[ObjectSnapshot]) -> Self {
+        Self {
+            boxes: objects.iter().map(cull_box).collect(),
+            patterned: curvyo_ui_core::PatternCache::any_pattern(objects),
+        }
+    }
+
+    /// Whether any object paints a pattern.
+    pub(super) const fn patterned(&self) -> bool {
+        self.patterned
+    }
+
+    /// The indices of the objects [`in_view`] keeps of the read these boxes were measured
+    /// over, ascending; `objects` is that read (for the ids of the guides).
+    #[allow(clippy::implicit_hasher)]
+    pub(super) fn kept(
+        &self,
+        objects: &[ObjectSnapshot],
+        guides: &HashSet<NodeId>,
+        visible: Option<VisibleRect>,
+    ) -> Vec<usize> {
+        debug_assert_eq!(objects.len(), self.boxes.len(), "boxes of another read");
+        let Some(visible) = visible else {
+            return (0..objects.len()).collect();
+        };
+        self.boxes
+            .iter()
+            .zip(objects)
+            .enumerate()
+            .filter(|(_, (cull, object))| {
+                visible.shows(**cull) || (!guides.is_empty() && guides.contains(&object.id()))
+            })
+            .map(|(index, _)| index)
+            .collect()
+    }
 }
 
 #[cfg(test)]
