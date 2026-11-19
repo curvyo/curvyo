@@ -62,21 +62,53 @@ use tauri::Manager;
 
 use state::AppState;
 
-/// Whether `WEBKIT_DISABLE_DMABUF_RENDERER` still needs to be set in this
-/// process's own environment. Compiled on Linux (where `main` acts on a
-/// `true` result, since only `WebKitGTK` has the bug this variable works
-/// around) and under `#[cfg(test)]` on every platform, so the pure
-/// environment-reading logic stays plainly testable without needing a
-/// Linux runner — it would otherwise be genuinely dead code in a
-/// non-Linux, non-test build, since its only production caller is itself
-/// Linux-only.
+/// The environment variables the relaunch sets for `WebKitGTK`, or `None` when the
+/// process may go on as it is. Pure: the caller passes the environment lookup and
+/// whether the NVIDIA proprietary driver is present. Compiled on Linux and under
+/// `#[cfg(test)]` on every platform, so it is testable without a Linux runner.
+///
+/// A variable the user already set (either of the two) is never overridden: then
+/// `None`. Otherwise:
+/// - NVIDIA proprietary driver: `WEBKIT_DISABLE_DMABUF_RENDERER=0` and
+///   `WEBKIT_DMABUF_RENDERER_FORCE_SHM=1`. The DMA-BUF renderer stays on but uses
+///   shared-memory buffers instead of GBM buffers, which this driver cannot
+///   create (unset: grey canvas, "Failed to create GBM buffer"). Measured on
+///   Arch/X11, driver 580.178.04, `WebKitGTK` 2.54.2, `wry` 0.57: empty-page
+///   pan/zoom `rAF` p50 17 ms, 0 intervals over 33 ms, 55 frames/s. With
+///   `WEBKIT_DISABLE_DMABUF_RENDERER=1` the same run composites on the CPU:
+///   ~16 fps, `rAF` p50 36-63 ms.
+/// - Every other machine: `WEBKIT_DISABLE_DMABUF_RENDERER=1`, as before. No
+///   measurement exists for AMD, Intel or nouveau (`docs/technical-debt.md`).
 #[cfg(any(target_os = "linux", test))]
-fn webkit_dmabuf_env_var_is_unset() -> bool {
-    std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none()
+fn webkit_env_to_set(
+    var: impl Fn(&str) -> Option<std::ffi::OsString>,
+    nvidia_present: bool,
+) -> Option<&'static [(&'static str, &'static str)]> {
+    if var("WEBKIT_DISABLE_DMABUF_RENDERER").is_some()
+        || var("WEBKIT_DMABUF_RENDERER_FORCE_SHM").is_some()
+    {
+        return None;
+    }
+    Some(if nvidia_present {
+        &[
+            ("WEBKIT_DISABLE_DMABUF_RENDERER", "0"),
+            ("WEBKIT_DMABUF_RENDERER_FORCE_SHM", "1"),
+        ]
+    } else {
+        &[("WEBKIT_DISABLE_DMABUF_RENDERER", "1")]
+    })
+}
+
+/// Whether the NVIDIA proprietary kernel module is loaded (nouveau does not
+/// create these paths).
+#[cfg(target_os = "linux")]
+fn nvidia_proprietary_driver_present() -> bool {
+    std::path::Path::new("/proc/driver/nvidia/version").exists()
+        || std::path::Path::new("/sys/module/nvidia").exists()
 }
 
 /// Re-executes this same binary, replacing the current process image,
-/// with `WEBKIT_DISABLE_DMABUF_RENDERER=1` set in the *child's*
+/// with the variables of [`webkit_env_to_set`] set in the *child's*
 /// environment via [`std::process::Command::env`] — a safe API, unlike
 /// mutating the current process's own environment with
 /// `std::env::set_var` (`unsafe` as of this edition, and `CLAUDE.md` §5
@@ -85,20 +117,21 @@ fn webkit_dmabuf_env_var_is_unset() -> bool {
 ///
 /// `specs/0002-path-node-editing/adrs.md`'s canvas-perf spike measured that,
 /// on this stack (`WebKitGTK` 2.52.6 via `wry`/`tao`, NVIDIA proprietary
-/// driver), leaving this unset acquires a `WebGL2` context that reports
-/// success but renders **zero frames** — for `wgpu` and for hand-written
-/// `WebGL2` alike. The failure mode is a silent blank canvas, not an
-/// error, which is exactly why this is a tested startup step rather than
-/// a hope.
+/// driver), leaving the DMA-BUF variable unset acquires a `WebGL2` context that
+/// reports success but renders **zero frames** — for `wgpu` and for hand-written
+/// `WebGL2` alike. That stays true for the unset case; what changed is the
+/// workaround on NVIDIA, see [`webkit_env_to_set`]. The failure mode is a
+/// silent blank canvas, not an error, which is exactly why this is a tested
+/// startup step rather than a hope.
 ///
 /// Never returns on success: the process image is replaced in place, so
 /// the relaunched process continues exactly where this one left off
-/// (same argv, same working directory), just with the variable now set.
+/// (same argv, same working directory), just with the variables now set.
 /// Panics if the relaunch itself could not even be started — there is no
 /// sane fallback, since continuing would silently reproduce the blank-
 /// canvas bug this function exists to prevent.
 #[cfg(target_os = "linux")]
-fn relaunch_for_linux_webkit_env() -> ! {
+fn relaunch_for_linux_webkit_env(env: &[(&str, &str)]) -> ! {
     use std::os::unix::process::CommandExt;
 
     // invariant: a running process always has a resolvable path to its
@@ -108,9 +141,9 @@ fn relaunch_for_linux_webkit_env() -> ! {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let error = std::process::Command::new(exe)
         .args(args)
-        .env("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+        .envs(env.iter().copied())
         .exec();
-    panic!("failed to relaunch with WEBKIT_DISABLE_DMABUF_RENDERER set: {error}");
+    panic!("failed to relaunch with the WebKit environment set: {error}");
 }
 
 /// The event the connector watcher emits to the page (`0064`); named here with the other host
@@ -231,8 +264,11 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
 #[allow(clippy::expect_used)]
 fn main() {
     #[cfg(target_os = "linux")]
-    if webkit_dmabuf_env_var_is_unset() {
-        relaunch_for_linux_webkit_env();
+    if let Some(env) = webkit_env_to_set(
+        |name| std::env::var_os(name),
+        nvidia_proprietary_driver_present(),
+    ) {
+        relaunch_for_linux_webkit_env(env);
     }
 
     let app = tauri::Builder::default()
@@ -319,25 +355,49 @@ fn main() {
 
 #[cfg(test)]
 mod webkit_dmabuf_env_var_tests {
-    use super::webkit_dmabuf_env_var_is_unset;
+    use super::webkit_env_to_set;
+    use std::ffi::OsString;
 
-    /// `specs/0002-path-node-editing/adrs.md`'s prerequisite note: the failure
-    /// mode of leaving `WEBKIT_DISABLE_DMABUF_RENDERER` unset is a silent
-    /// blank canvas, not an error, so this needs a test rather than a
-    /// hope. This only pins the detection half (reading an environment
-    /// variable is safe); the relaunch itself
-    /// (`relaunch_for_linux_webkit_env`) replaces the current process
-    /// image on success and is exercised by running the built binary, not
-    /// by a unit test. Nothing else in this crate's test suite touches
-    /// this specific variable.
+    const DISABLE: &str = "WEBKIT_DISABLE_DMABUF_RENDERER";
+    const SHM: &str = "WEBKIT_DMABUF_RENDERER_FORCE_SHM";
+
+    fn set(names: &'static [&'static str]) -> impl Fn(&str) -> Option<OsString> {
+        move |n| names.contains(&n).then(|| OsString::from("x"))
+    }
+
+    /// The failure mode of leaving the DMA-BUF variable unset is a silent
+    /// blank canvas, so the decision is pinned here; the relaunch itself
+    /// replaces the process image and is exercised by running the binary.
     #[test]
-    fn is_unset_by_default_in_a_fresh_test_process() {
-        assert!(
-            webkit_dmabuf_env_var_is_unset(),
-            "WebKitGTK's DMA-BUF renderer must be disabled before any webview is created; \
-             this build does that by relaunching itself with the variable set, which this \
-             check decides is necessary"
+    fn nvidia_with_nothing_set_uses_shared_memory_buffers() {
+        assert_eq!(
+            webkit_env_to_set(set(&[]), true),
+            Some(&[(DISABLE, "0"), (SHM, "1")][..])
         );
+    }
+
+    #[test]
+    fn nvidia_respects_a_user_set_disable_variable() {
+        assert_eq!(webkit_env_to_set(set(&[DISABLE]), true), None);
+    }
+
+    #[test]
+    fn nvidia_respects_a_user_set_shm_variable() {
+        assert_eq!(webkit_env_to_set(set(&[SHM]), true), None);
+    }
+
+    #[test]
+    fn other_machines_keep_the_dmabuf_renderer_disabled() {
+        assert_eq!(
+            webkit_env_to_set(set(&[]), false),
+            Some(&[(DISABLE, "1")][..])
+        );
+    }
+
+    #[test]
+    fn user_set_both_means_no_relaunch() {
+        assert_eq!(webkit_env_to_set(set(&[DISABLE, SHM]), true), None);
+        assert_eq!(webkit_env_to_set(set(&[DISABLE, SHM]), false), None);
     }
 }
 

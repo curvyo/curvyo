@@ -595,6 +595,17 @@ measurement (`specs/0002-path-node-editing/adrs.md`). Performance itself passed:
    compositing path on *all* Linux systems to satisfy one driver family, and
    the failure mode if the variable is ever lost is a silent blank canvas.
 
+   **Update (2026-11):** on the NVIDIA proprietary driver the app now sets
+   `WEBKIT_DISABLE_DMABUF_RENDERER=0 WEBKIT_DMABUF_RENDERER_FORCE_SHM=1`
+   instead (renderer on, shared-memory buffers; the GBM buffers fail with
+   "Failed to create GBM buffer ... Invalid argument"). Measured on Arch/X11,
+   driver 580.178.04, WebKitGTK 2.54.2, wry 0.57, empty-page pan/zoom: rAF p50
+   17 ms and 55 frames/s, against ~16 fps (p50 36-63 ms) with
+   `WEBKIT_DISABLE_DMABUF_RENDERER=1`. **Open:** every other Linux machine
+   (AMD, Intel, nouveau) still gets `=1`; nothing is measured there. Run
+   `tools/perf` `--page-only` with `WEBKIT_DMABUF_RENDERER_FORCE_SHM=1` on such a
+   machine and, if it is smooth, drop the NVIDIA condition.
+
 2. **The web process segfaults in `libnvidia-eglcore` on webview teardown**
    whenever that webview held a WebGL2 context. Rendering completes normally
    first; the crash is in the process that is already exiting, so the host
