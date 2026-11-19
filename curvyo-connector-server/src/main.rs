@@ -64,9 +64,10 @@ fn controller(args: &Args) -> ControllerChoice {
 }
 
 fn run(args: &Args) -> Result<()> {
-    // First, before any thread starts, so that every thread inherits the mask (C11).
+    // First, so that no thread can ever take the default action of SIGINT or SIGTERM (C11).
     #[cfg(unix)]
-    let signals = signals::block().context("cannot block SIGINT and SIGTERM")?;
+    let mut signals =
+        signals::install().context("cannot install the SIGINT and SIGTERM handlers")?;
     let config = ServerConfig {
         listen: args.listen,
         state_dir: args.state_dir.clone(),
@@ -107,7 +108,7 @@ fn run(args: &Args) -> Result<()> {
     terminal::read_commands(Arc::clone(&server));
     #[cfg(unix)]
     {
-        signals::wait(&signals).context("cannot wait for a signal")?;
+        signals::wait(&mut signals);
         stop_for_exit(&server);
         // The serial thread's last write is done and every notice printed before "Exiting".
         server.close();
