@@ -36,7 +36,7 @@ Prefix `SS`.
 7. Given `JobAccepted`, then the Lasered commit of `0125` S10 to S12 happens on `Ready` exactly as today; it does not wait for the start and does not depend on it.
 8. Given the page's checks block, no connector is paired, the browser build or a send in progress, then the button is disabled with the same causes as `0125` S2 to S5, S8; the glyph stays Play, the cause is the tooltip.
 9. Given the tooltip and accessible name, then they read "Send to machine and start" when criterion 1's conditions hold at that moment (from the last status the app has; it is re-read at the press) and "Send to machine" otherwise; the press re-evaluates from a fresh status, never from the label.
-10. Given an owner on a free machine, when the press sends and starts, then it is one press: no confirmation, no popup (Frage 261 A, default).
+10. Given an owner on a free machine, when the press sends and starts, then it is one press: no confirmation, no popup (Frage 263 A, default).
 11. Given the decision functions (will it start, which cause), then they are pure with a table test over state x role x `--require-local-start` x list; the integration test runs the fake connector: free -> started, held -> sent only, member -> waiting, `$32` refused, start refused -> stays Ready, without wall-clock sleeps.
 12. Given the quality gate of `CLAUDE.md` §7, then it is green; `docs/design-system.md` row "Send to machine button" gets the Play glyph and the two names.
 
@@ -51,13 +51,13 @@ Customer decision of 2026-11-20:
 
 ## Questions
 
-Frage 261 (SEND-START-CONFIRM): Does the play press start the laser without a second confirmation?
+Frage 263 (SEND-START-CONFIRM): Does the play press start the laser without a second confirmation?
 - A: Yes, one press (the customer asked for "directly"); the safety rests on the checks, the connector's rules and Stop.
 - B: An armed press (`0081`): first press arms and names the job, second sends and starts.
 - C: A setting per machine profile, default as A.
 Recommendation A. Default if unanswered: A.
 
-Frage 262 (SEND-START-HELD): When the connector holds this app's own `Ready` job and the maker presses the play button on the same page, what happens?
+Frage 264 (SEND-START-HELD): When the connector holds this app's own `Ready` job and the maker presses the play button on the same page, what happens?
 - A: Today's rule: refused "Connector busy" (until `0132`), then added to the list; nothing starts.
 - B: The press starts the held job if it came from this page and is unchanged.
 - C: As B, for any held job of this app.
