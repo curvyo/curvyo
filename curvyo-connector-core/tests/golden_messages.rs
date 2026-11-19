@@ -55,7 +55,7 @@ fn controller() -> ControllerInfo {
     }
 }
 
-/// One value per golden file under `tests/fixtures/messages/`; the 16 types all appear.
+/// One value per golden file under `tests/fixtures/messages/`; the 18 types all appear.
 #[allow(clippy::too_many_lines)] // one flat table, a split would only hide a row
 fn all() -> Vec<(&'static str, Message)> {
     vec![
@@ -95,6 +95,8 @@ fn all() -> Vec<(&'static str, Message)> {
         ("pause", Message::Pause),
         ("resume", Message::Resume),
         ("stop", Message::Stop),
+        ("command_unlock", Message::Unlock),
+        ("command_home", Message::Home),
         (
             "welcome",
             Message::Welcome {
@@ -172,7 +174,7 @@ fn every_message_matches_its_golden_file_and_round_trips() {
 }
 
 #[test]
-fn the_goldens_cover_all_sixteen_types() {
+fn the_goldens_cover_all_eighteen_types() {
     let mut types: Vec<String> = all()
         .iter()
         .map(|(_, m)| {
@@ -182,7 +184,7 @@ fn the_goldens_cover_all_sixteen_types() {
         .collect();
     types.sort();
     types.dedup();
-    assert_eq!(types.len(), 16);
+    assert_eq!(types.len(), 18);
 }
 
 #[test]

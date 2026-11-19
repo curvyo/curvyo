@@ -208,6 +208,12 @@ fn in_state(state: State, text: &str) -> FakeController {
             });
             f
         }
+        // `specs/0118`: added so the match stays exhaustive; no table here lists it.
+        State::Homing => {
+            let mut f = idle();
+            f.send(Message::Home);
+            f
+        }
     }
 }
 

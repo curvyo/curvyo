@@ -1,6 +1,6 @@
 //! How the job machine takes the job controls and the events of the controller side.
 
-use super::{ControllerCommand, Event, Machine, Output, count};
+use super::{ControllerCommand, Event, Machine, Output, Waiting, count};
 use crate::message::{JobResult, Message, State};
 
 impl Machine {
@@ -40,6 +40,10 @@ impl Machine {
                         out,
                     );
                 }
+            }
+            (Message::Stop, State::Homing) => self.stop_homing(out),
+            (Message::Stop, State::AwaitingLocalStart) if self.waiting == Waiting::Home => {
+                self.end_homing(out);
             }
             (Message::Stop, State::Receiving | State::Ready | State::AwaitingLocalStart) => {
                 self.discard();
@@ -95,6 +99,12 @@ impl Machine {
                     out.messages.push(self.status());
                 }
             }
+            Event::LocalStartPressed
+                if self.state == State::AwaitingLocalStart && self.waiting == Waiting::Home =>
+            {
+                out.commands.push(ControllerCommand::Home);
+                self.set(State::Homing, out);
+            }
             Event::LocalStartPressed if self.state == State::AwaitingLocalStart => {
                 if let Some(h) = &self.held {
                     out.commands.push(ControllerCommand::Start {
@@ -102,6 +112,11 @@ impl Machine {
                     });
                 }
                 self.set(State::Running, out);
+            }
+            event @ (Event::Homed | Event::HomingFailed { .. } | Event::Stopped)
+                if self.state == State::Homing =>
+            {
+                self.on_homing(event, out);
             }
             other => self.on_job_event(other, out),
         }
@@ -115,7 +130,7 @@ impl Machine {
             State::Running | State::Paused => {
                 Some(format!("Lost the controller at line {}", count(line)))
             }
-            State::Receiving | State::Ready | State::AwaitingLocalStart => {
+            State::Receiving | State::Ready | State::AwaitingLocalStart | State::Homing => {
                 Some("Lost the controller".to_owned())
             }
             _ => None,
