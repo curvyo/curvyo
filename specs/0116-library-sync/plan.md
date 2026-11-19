@@ -160,7 +160,7 @@ One PR per slice at the end. **(Proposal)** marks my own choices, vetoable at th
      (`docs/design-system.md` "Library sync toggle", "Materials tab rows, sync placement", the
      Machine block note; `docs/technical-debt.md` P1 and P7). See P12 to P15.
 
-8. [ ] Tester acceptance run from the spec; the three-device journey (A, B, browser R) with the
+8. [~] Tester acceptance run from the spec (acceptance_0116_tester in three crates, green; a switch-off or delete now uploads the room snapshot after its ack, criteria 23 and 27); the three-device journey (A, B, browser R) with the
    relay data scan; UX and architect reviews; docs (design-system rows, technical debt).
 9. [ ] Slice-2 placeholders (fonts, criteria 16 to 20): `fonts.<sha-256> = {sync, file_name,
    tags, favourite, cuttable}` entries, blobs sealed as 4 MiB parts keyed by the face hash, the
