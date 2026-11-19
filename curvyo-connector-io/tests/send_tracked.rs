@@ -163,6 +163,7 @@ fn a_dead_connector_after_the_cut_leaves_the_send_unresolved_for_the_watcher() {
         position: None,
         alarm: None,
         detail: None,
+        pause_pending: false,
     };
     assert_eq!(
         observe_shared(&watch, &status),

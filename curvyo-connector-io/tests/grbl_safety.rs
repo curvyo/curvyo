@@ -379,25 +379,30 @@ fn g29_the_machine_reset_button_fails_the_job_and_nothing_resumes() {
 }
 
 #[test]
-fn g29_a_pause_grbl_does_not_confirm_is_dropped() {
-    let job = include_str!("../../curvyo-laser-core/tests/fixtures/output/grbl/home_first.gcode");
-    let mut bench = Bench::connected(SimConfig {
-        homing_steps: 600,
-        ..SimConfig::default()
+fn g29_a_pause_grbl_does_not_confirm_on_a_motion_line_is_dropped() {
+    // GRBL takes 4 s to decelerate, twice the hold limit: the request is dropped after 2 s, so
+    // a new Pause sends `!` again; a pause taken while `$H` runs is never dropped (`0133`).
+    let mut bench = running(SimConfig {
+        decel_steps: 400,
+        ..slow()
     });
-    bench.sim.set_setting(22, "1");
-    bench.start(job);
-    bench.run_for(Duration::from_millis(500));
+    let holds = |b: &Bench| b.sim.log.iter().filter(|&&x| x == b'!').count();
     bench.app(Message::Pause);
-    bench.run_for(Duration::from_secs(3));
+    bench.step();
+    assert_eq!(holds(&bench), 1);
+    bench.run_for(Duration::from_millis(1_900));
     assert_eq!(bench.state(), State::Running);
-    let done = State::Done {
-        result: JobResult::Completed,
-    };
-    assert!(
-        bench.run_until(|b| b.state() == done, 5_000),
-        "the job goes on"
-    );
+    bench.app(Message::Pause);
+    bench.step();
+    assert_eq!(holds(&bench), 1, "still requested: no second `!`");
+    bench.run_for(Duration::from_millis(500));
+    assert_eq!(bench.state(), State::Running);
+    bench.app(Message::Pause);
+    bench.step();
+    assert_eq!(holds(&bench), 2, "dropped: a new Pause sends `!` again");
+    // The hold GRBL then completes is taken as any hold (G10): paused, laser off.
+    assert!(bench.run_until(|b| b.state() == State::Paused, 500));
+    assert!(!bench.sim.laser_lit(), "laser off while held");
 }
 
 #[test]

@@ -179,6 +179,11 @@ impl GrblController {
             }
             return;
         };
+        if code.is_none() && !stopping && stream.send_deferred_hold() {
+            // The `$H` is done and GRBL idle: the pause taken while it homed holds now, before
+            // `fill` can send a further line (`specs/0133` P4).
+            self.out.push(crate::grbl::stop::HOLD);
+        }
         let (line, elapsed_ms) = (stream.answered(), stream.elapsed_ms());
         if stream.all_answered() {
             stream.finished_at_report = Some(reports);

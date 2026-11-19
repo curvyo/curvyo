@@ -11,8 +11,12 @@ use crate::grbl::prepare::is_system;
 pub enum Hold {
     /// Lines go out.
     Running,
-    /// `!` sent; `Paused` once GRBL reports `Hold:0`, dropped after the time.
-    Requested(Duration),
+    /// `Pause` arrived while the job's `$H` is in flight: nothing written, the hold is sent when
+    /// GRBL answers the `$H` (`specs/0133` P4).
+    Deferred,
+    /// `!` sent; `Paused` once GRBL reports `Hold:0`, dropped after the time if there is one
+    /// (`0127` G29); the `!` sent after `$H`'s answer has none and is never dropped.
+    Requested(Option<Duration>),
     /// GRBL holds; `spindle_stopped` when the connector sent Toggle Spindle Stop (`$32=0`).
     Held {
         /// The connector switched the spindle off for the hold.
@@ -100,6 +104,16 @@ impl Stream {
         }
     }
 
+    /// After GRBL answered `$H` with `ok`: a pause deferred while it homed is requested now, without
+    /// a drop limit, so `fill` sends nothing more; `true` means the caller writes `!` at once.
+    pub fn send_deferred_hold(&mut self) -> bool {
+        if self.hold != Hold::Deferred || self.homing() {
+            return false;
+        }
+        self.hold = Hold::Requested(None);
+        true
+    }
+
     /// GRBL answered the oldest line: its job line, `None` when none was in flight.
     pub fn answer(&mut self) -> Option<u32> {
         let line = self.flow.answer();
@@ -161,7 +175,7 @@ mod tests {
         stream.fill(0, &mut out);
         assert_eq!(out.len(), 120);
         assert_eq!(stream.answer(), Some(1));
-        stream.hold = Hold::Requested(Duration::from_secs(2));
+        stream.hold = Hold::Requested(Some(Duration::from_secs(2)));
         out.clear();
         stream.fill(0, &mut out);
         assert!(out.is_empty());
@@ -204,6 +218,26 @@ mod tests {
         stream.answer();
         stream.fill(0, &mut out);
         assert!(stream.homing());
+    }
+
+    #[test]
+    fn a_deferred_hold_writes_nothing_and_hands_over_once_after_homing() {
+        let mut stream = Stream::new(lines(&["$H", "G0X0", "G1X1"]), Duration::ZERO);
+        let mut out = Vec::new();
+        stream.fill(0, &mut out);
+        assert!(stream.homing());
+        stream.hold = Hold::Deferred;
+        assert!(!stream.send_deferred_hold(), "not while `$H` is in flight");
+        stream.fill(0, &mut out);
+        assert_eq!(out, b"$H\n");
+        assert_eq!(stream.answer(), Some(1));
+        stream.fill(0, &mut out);
+        assert_eq!(out, b"$H\n", "nothing while deferred");
+        assert!(stream.send_deferred_hold());
+        assert_eq!(stream.hold, Hold::Requested(None));
+        assert!(!stream.send_deferred_hold(), "exactly once");
+        stream.fill(0, &mut out);
+        assert_eq!(out, b"$H\n", "nothing while the hold is requested");
     }
 
     #[test]
