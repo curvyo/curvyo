@@ -9,6 +9,28 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 (each names its slice). An entry is removed when its resolution lands, or stays with the note that
 it is accepted for good.
 
+## A raster job at the dot limit is built on the main thread (`0123`, ADR 0069 §12, 2026-11-19)
+
+The sweeps of a raster job are worked in ticks of 300,000 dots on the main thread (one share per
+animation frame), and Export or the Toolpath view builds the rest at once. An item near the
+50,000,000-dot limit therefore takes about 170 ticks (a few seconds of shares) before its numbers
+settle, and pressing the Toolpath view or Export during that time blocks the frame for the whole
+remaining build (up to a few seconds in a release build). The edit frame itself stays within
+50 ms (criterion 37 d).
+
+**Resolution:** build the job in a worker (needs the session's inputs to cross the worker boundary,
+ADR 0001), or let the Toolpath view and Export wait for the ticks.
+
+## Each engraved image holds its grey pyramid beside the working image (`0123`, ADR 0068 §3, 2026-11-19)
+
+The job and the canvas now share one working image per asset (the canvas draws the copy the job
+decoded and the job takes the canvas's), and the job and the Operations view's preview share one
+grey pyramid per asset. The pyramid still adds about 1.3 bytes per pixel next to the RGBA working
+image (about 21 MB for a 16 Mpx picture), kept while the image is in an Engrave.
+
+**Resolution:** build the pyramid's first level from the decoded bytes and drop the working image
+of an image the canvas does not draw, or keep only the levels the Interval reads.
+
 ## Two devices aligning one profile's sets at once can leave duplicate set copies (`0113`, ADR 0059 §10, 2026-11-16)
 
 The set mirror of a page is aligned to its profile record by uid, creating a node for each set,

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>04 · The Image operation row</title>
+<link rel="stylesheet" href="kit.css"><script src="kit.js"></script></head>
+<body><div class="sheet">
+<h1>04 · The Image operation and its Dither strip</h1>
+<p class="lead">Customer feedback on PR #394: pictures get their own kind <b>Image</b>; Engrave is the vector hatch of 0111 again; Dither is an always-visible choice strip (the font tag strip's look), not a list that opens. Body column 232 px. A dashed outline marks a new or changed control. Notes: <code>specs/0123-raster-engraving/ux-notes.md</code> sections 2 and 11 (P36 to P46).</p>
+<div class="cols" id="cols"></div>
+</div>
+<script>
+const head = `<div class="hdr">Operations</div><div class="sw">Cuts last<span class="switch"></span></div><div class="sec">Marking</div>`;
+const engraveFolded = row({ kind: 'engrave', name: 'Engrave 1', digit: 1, count: '3 items', time: '2 min 3 s', line3: '35 %, 6,000 mm/min, 1 ×, 0.10 mm' });
+const cut = `<div class="sec">Cutting</div>` + row({ kind: 'cut', name: 'Cut 1', digit: 3, count: '1 item', time: '12 s', line3: '90 %, 600 mm/min, 2 ×' });
+function imageRow(mode, opts = {}) {
+  const line3 = { floyd: 'Floyd', threshold: 'Threshold', grey: 'Grey 10–35 %', ordered: 'Ordered', atkinson: 'Atkinson' }[mode] ?? '';
+  const body = `<div class="body">${upper}${imageSettings(mode, opts)}${lower('image')}</div>`;
+  return row({ kind: 'image', name: opts.name ?? 'Image 1', digit: 2, count: '2 items', time: opts.time ?? '7 min 12 s', line3: opts.damaged ? '' : `35 %, 6,000 mm/min, 1 ×, 0.10 mm · ${line3}`, sel: true, unf: true, body });
+}
+const screens = [
+  ['A · Image 1, unfolded (Floyd-Steinberg, the default)', 'Engrave\'s set, then the Image settings (always shown), then the lower part without Crosshatch. The strip: two fixed rows, the pressed cell solid blue as the font tag strip. Line 3 ends with the dither name.',
+    head + engraveFolded + imageRow('floyd', { mark: true }) + cut,
+    'Order: strip, Brightness and Contrast, Gamma and Invert. No heading (P19). No Crosshatch: it does nothing on dots (P40).'],
+  ['B · Threshold, chosen with the arrow keys', 'Focus ring on the pressed cell (one Tab stop). Each arrow selects and commits; the canvas redraws the dots (P38). The mode\'s own field is the last row of the group (P39): the strip and the fields above it never move.',
+    head + engraveFolded + imageRow('threshold', { focus: 'threshold', markLast: true }) + cut,
+    'Tooltip on every cell names the mode in full; only "Floyd" is shortened (P37).'],
+  ['C · Grey', 'Lowest power takes the last row; line 3 shows the range "Grey 10–35 %" (Lowest power to Power, P41).',
+    head + engraveFolded + imageRow('grey', { markLast: true }) + cut,
+    'On an M3 machine Grey stays selectable; the block line "Image 1 needs laser mode M4 for Grey." says why it cannot run.'],
+  ['D · Damaged dither value', 'No cell pressed and the word "Damaged" under the strip (P46); a press on any cell repairs it. Line 3 has no numbers, as built for damage.',
+    head + engraveFolded + imageRow(null, { damaged: true, time: '' }) + cut, ''],
+  ['E · Engrave 1, unfolded: 0111 again', 'Hatch only: Crosshatch, Bidirectional fill, Scan angle, Overscanning. No Image settings on Engrave any more.',
+    head + row({ kind: 'engrave', name: 'Engrave 1', digit: 1, count: '3 items', time: '2 min 3 s', line3: '35 %, 6,000 mm/min, 1 ×, 0.10 mm', sel: true, unf: true, body: `<div class="body">${upper}${lower('engrave')}</div>` })
+    + row({ kind: 'image', name: 'Image 1', digit: 2, count: '2 items', time: '7 min 12 s', line3: '35 %, 6,000 mm/min, 1 ×, 0.10 mm · Floyd' }) + cut, ''],
+];
+document.getElementById('cols').innerHTML = screens.map(([t, s, p, a]) =>
+  `<figure><figcaption>${t}<span>${s}</span></figcaption><div class="panel">${p}</div>${a ? `<div class="ann">${a}</div>` : ''}</figure>`).join('');
+// The tooltip of screen B, on the Floyd cell.
+const b = document.querySelectorAll('figure')[1];
+const floyd = [...b.querySelectorAll('.strip .c')].find((c) => c.textContent === 'Floyd');
+const fr = floyd.getBoundingClientRect(), br = b.getBoundingClientRect();
+b.style.position = 'relative';
+b.insertAdjacentHTML('beforeend', `<div class="tip" style="left:${fr.left - br.left - 40}px;top:${fr.top - br.top - 26}px">Floyd-Steinberg</div>`);
+floyd.classList.add('hov');
+</script>
+</body></html>

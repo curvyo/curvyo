@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>05 · Image kind on the canvas</title>
+<link rel="stylesheet" href="kit.css"><script src="kit.js"></script>
+<style>
+.glyphs{display:grid;grid-template-columns:repeat(6,auto);gap:6px 18px;align-items:center;font-size:11px;color:var(--panel-muted-fg);background:var(--toolbar-bg);padding:10px 12px;border-radius:8px}
+.glyphs div{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--toolbar-icon)}
+.lbl{position:absolute;font-size:11px;color:var(--panel-muted-fg);white-space:nowrap}
+canvas{position:absolute;image-rendering:pixelated}
+svg.ov{position:absolute;left:0;top:0;overflow:visible}
+</style></head>
+<body><div class="sheet">
+<h1>05 · The Image kind: Select bar, canvas, wrong kinds, clones, pending</h1>
+<p class="lead">The sixth kind button, its glyph, and what the Operations view draws: dots for what Image burns, the Not assigned look with a muted chip for what a kind cannot run, a linked clone with its own dots, and the first build before the dots are ready. Colours: pale orange <code>--engrave-hatch</code>, red <code>--cut</code>, ink, muted ink, the clone violet of 0049; nothing new. Notes: <code>ux-notes.md</code> sections 2.1, 2.2 and 3 (P36, P42 to P44).</p>
+<div class="cols">
+  <figure><figcaption>A · Select bar: the Operation group with Image<span>Six symbol-only buttons, Image appended last (no built button moves); tooltip "Image", no second line (P36). The group is 188 px and wraps as a whole.</span></figcaption>
+    <div style="position:relative;height:84px;width:470px">
+      <div class="bar" style="position:absolute;left:0;top:0">
+        <div class="grp"><span class="ph" style="width:110px"></span></div>
+        <div class="grp" id="kinds"></div>
+        <div class="grp"><span class="ph" style="width:64px"></span></div>
+      </div>
+      <div class="tip" id="tipImage" style="top:44px">Image</div>
+    </div>
+    <figcaption style="margin-top:6px">The six kind glyphs at 1x and 2x<span>Image: a dither ramp of 2 x 2 squares, columns of 4, 3, 2, 1 dots; filled ink, no stroke.</span></figcaption>
+    <div class="glyphs" id="sheet"></div>
+  </figure>
+  <figure><figcaption>C · The two wrong-kind check lines for screen B<span>Criterion 48's line, then its twin for an image in a vector kind (E9); one line per operation, the count is the button that selects the items.</span></figcaption>
+    <div class="panel" style="gap:6px">
+      <div class="sec" style="height:18px">Output</div>
+      <div class="checks">
+        <div><i class="w"></i><span><u>1 item</u> in Image 1 is not a picture and does not burn.</span></div>
+        <div><i class="w"></i><span><u>1 image</u> in Engrave 1 does not burn.</span></div>
+      </div>
+      <div style="font-size:13px;font-weight:600;margin-top:4px">About 9 min 40 s</div>
+      <div style="font-size:12px;color:var(--panel-muted-fg)">Runs 3 operations, 4 items.</div>
+    </div>
+  </figure>
+</div>
+<div class="cols" style="margin-top:20px">
+  <figure class="wide"><figcaption>B · Operations view: what runs, what does not<span>Image 1 holds Photo 1, a gradient ellipse and a grey-filled rectangle; Engrave 1 holds Photo 2 and a gradient rectangle; Cut 1 a circle. Dots where Image burns; the Not assigned look (dimmed, dashed) with the kind's chip in muted ink where a kind cannot run the item; a gradient shape in Engrave is hatched as a shape.</span></figcaption>
+    <div class="cv" id="cvB" style="width:800px;height:470px"><div class="page" style="left:20px;top:20px;width:760px;height:430px"></div></div>
+  </figure>
+</div>
+<div class="cols" style="margin-top:20px">
+  <figure><figcaption>D · A linked clone of Photo 1, turned 20°, selected<span>Each placement draws its own dots; the rows stay parallel to the Scan angle on the page, not turned with the clone (P43). The 0049 marks lie over the dots.</span></figcaption>
+    <div class="cv" id="cvD" style="width:560px;height:330px"><div class="page" style="left:20px;top:20px;width:520px;height:290px"></div></div>
+  </figure>
+  <figure><figcaption>E · Pending: first build, then ready<span>Before an item has dots (just assigned, page opened): its frame as a 1 px pale orange line and its chip; no spinner, no text (P44). After an edit the previous dots stay until the new ones are ready.</span></figcaption>
+    <div class="cv" id="cvE" style="width:500px;height:330px"><div class="page" style="left:20px;top:20px;width:460px;height:290px"></div></div>
+  </figure>
+</div>
+</div>
+<script>
+// A: kind buttons and the glyph sheet.
+const kinds = ['cut', 'score', 'engrave', 'engrave_outline', 'cut_out', 'image'];
+document.getElementById('kinds').innerHTML = kinds.map((k) => `<span class="ib${k === 'image' ? ' hov new' : ''}" title="${KIND_WORD[k]}">${glyph(k)}</span>`).join('');
+const imgBtn = document.querySelector('#kinds .new');
+const tip = document.getElementById('tipImage');
+requestAnimationFrame(() => { tip.style.left = `${imgBtn.offsetLeft + imgBtn.parentElement.offsetLeft + 8 + 14 - tip.offsetWidth / 2}px`; });
+document.getElementById('sheet').innerHTML =
+  kinds.map((k) => `<div>${glyph(k)}<span>${KIND_WORD[k]}</span></div>`).join('') +
+  kinds.map((k) => `<div>${glyph(k, 32)}</div>`).join('');
+document.querySelectorAll('.checks i.w').forEach((i) => { i.outerHTML = `<span style="flex:none;margin-top:1px">${ic('warn')}</span>`; });
+
+// Helpers for the canvases.
+function put(cv, el, x, y) { el.style.left = `${x}px`; el.style.top = `${y}px`; cv.appendChild(el); return el; }
+function canvasAt(cv, x, y) { const c = document.createElement('canvas'); return put(cv, c, x, y); }
+function chip(cv, kind, x, y, muted) {
+  const d = document.createElement('div'); d.className = 'chip';
+  d.innerHTML = glyph(kind, 16, muted ? 'var(--panel-muted-fg)' : undefined);
+  return put(cv, d, x, y);
+}
+function label(cv, text, x, y) { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = text; return put(cv, d, x, y); }
+function svg(cv, inner) { cv.insertAdjacentHTML('beforeend', `<svg class="ov" width="${cv.clientWidth}" height="${cv.clientHeight}">${inner}</svg>`); }
+const DASH = 'stroke="#7B7B7F" stroke-width="1" stroke-dasharray="4 3" fill="none"';
+
+// B.
+const B = document.getElementById('cvB');
+const P = photo(110, 80);
+paintDots(canvasAt(B, 50, 70), P, 110, 80, 'floyd', 2);
+chip(B, 'image', 280, 42);
+label(B, 'Photo 1 in Image 1: dots', 50, 236);
+const R = ramp(80, 80);
+const inEllipse = (x, y) => ((x - 39.5) / 40) ** 2 + ((y - 39.5) / 40) ** 2 <= 1;
+paintDots(canvasAt(B, 320, 70), R, 80, 80, 'floyd', 2, inEllipse);
+chip(B, 'image', 490, 42);
+label(B, 'Gradient ellipse in Image 1: dots', 320, 236);
+// The red-filled rectangle in Image: does not run.
+svg(B, `<rect x="560" y="80" width="170" height="110" fill="#3A3A3F" opacity="0.35"/><rect x="560.5" y="80.5" width="170" height="110" ${DASH}/>`);
+chip(B, 'image', 740, 52, true);
+label(B, 'Rectangle (Colour fill) in Image 1: does not run', 520, 200);
+// Photo 2 in Engrave: does not run.
+paintGrey(canvasAt(B, 50, 280), photo(90, 60), 90, 60, 2, 0.35);
+svg(B, `<rect x="50.5" y="280.5" width="180" height="120" ${DASH}/>`);
+chip(B, 'engrave', 240, 252, true);
+label(B, 'Photo 2 in Engrave 1: does not run', 50, 410);
+// Gradient rectangle in Engrave: hatched as a shape.
+let hatch = '';
+for (let k = -120; k < 180; k += 6) hatch += `<line x1="${320 + k}" y1="400" x2="${320 + k + 120}" y2="280" stroke="#C46A1C" stroke-width="1.5"/>`;
+svg(B, `<defs><clipPath id="cr"><rect x="320" y="280" width="180" height="120"/></clipPath></defs><g clip-path="url(#cr)">${hatch}</g>`);
+chip(B, 'engrave', 510, 252);
+label(B, 'Gradient rectangle in Engrave 1: hatch', 320, 410);
+// Circle in Cut.
+svg(B, `<circle cx="640" cy="340" r="58" stroke="#fff" stroke-width="3" fill="none"/><circle cx="640" cy="340" r="58" stroke="#C8102E" stroke-width="1" fill="none"/>`);
+chip(B, 'cut', 708, 262);
+label(B, 'Circle in Cut 1', 610, 410);
+
+// D: the original and a clone turned 20 degrees; the clone's dots on the page's rows.
+const D = document.getElementById('cvD');
+const W = 90, H = 64, px = 2;
+paintDots(canvasAt(D, 50, 90), photo(W, H), W, H, 'floyd', px);
+chip(D, 'image', 240, 62);
+const src = photo(W, H), a = (20 * Math.PI) / 180, cx = 380, cy = 160, bw = 140, bh = 120;
+// Page grid over the clone's box: sample the source through the inverse turn, then dither on the page grid.
+const gw = bw, gh = bh, page = new Float32Array(gw * gh).fill(255), mask = new Uint8Array(gw * gh);
+for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+  const dx = (x - gw / 2) * px, dy = (y - gh / 2) * px;
+  const sx = (Math.cos(-a) * dx - Math.sin(-a) * dy) / px + W / 2, sy = (Math.sin(-a) * dx + Math.cos(-a) * dy) / px + H / 2;
+  if (sx >= 0 && sy >= 0 && sx < W && sy < H) { page[y * gw + x] = src[Math.floor(sy) * W + Math.floor(sx)]; mask[y * gw + x] = 1; }
+}
+paintDots(canvasAt(D, cx - gw, cy - gh), page, gw, gh, 'floyd', px, (x, y) => mask[y * gw + x] === 1);
+const corners = [[-W, -H], [W, -H], [W, H], [-W, H]].map(([x, y]) => [cx + Math.cos(a) * x - Math.sin(a) * y, cy + Math.sin(a) * x + Math.cos(a) * y]);
+const poly = corners.map((p) => p.join(',')).join(' ');
+svg(D, `<polygon points="${poly}" fill="none" stroke="#fff" stroke-width="4"/><polygon points="${poly}" fill="none" stroke="#7B3FD6" stroke-width="2" stroke-dasharray="6 3"/>
+  <rect x="50" y="90" width="${W * px}" height="${H * px}" fill="none" stroke="#fff" stroke-width="4"/><rect x="50" y="90" width="${W * px}" height="${H * px}" fill="none" stroke="#7B3FD6" stroke-width="2"/>`);
+const tag = (text, x, y) => { const d = document.createElement('div'); d.className = 'ctag'; d.innerHTML = `${ic('link', 12)}${text}`; return put(D, d, x, y); };
+tag('Original', 50, 60);
+tag('Clone', 330, 36);
+chip(D, 'image', 490, 36);
+label(D, 'Clone dots: rows along the page, Scan angle 0°', 300, 290);
+
+// E: pending first build, then ready.
+const E = document.getElementById('cvE');
+svg(E, `<rect x="40.5" y="90.5" width="180" height="128" fill="none" stroke="#C46A1C" stroke-width="1"/>`);
+chip(E, 'image', 230, 62);
+label(E, 'First build: frame and chip', 40, 236);
+paintDots(canvasAt(E, 270, 90), photo(W, H), W, H, 'floyd', px);
+chip(E, 'image', 460, 62);
+label(E, 'Ready: the dots', 270, 236);
+</script>
+</body></html>

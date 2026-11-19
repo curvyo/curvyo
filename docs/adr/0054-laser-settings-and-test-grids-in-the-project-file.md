@@ -4,6 +4,8 @@
 
 **Note (ADR 0056, proposed 2026-11-12):** §1 and §2: `main` of `engrave` and of the hatch of `engrave_outline` may hold `interval_mm` (0.01 to 2.00); operation-only settings live in the new `op_options` register (0056 §5, §6).
 
+**Note (ADR 0069 §13, §14, with the `0123` story, 2026-11-19):** §2: an Image operation reads the material's **Image set** (Speed, Power, Passes, Interval), the fourth set per laser; Use material, the live link, the stored numbers and the refresh are unchanged, and a material without an Image set behaves as one without the kind's set ("Material has no Image set for this laser"), with no fallback to the Engrave set.
+
 ## Context
 
 `0101` and `0103` stored no power, speed or passes. `0028` adds them to the work operations, adds a generated test grid whose cells each run with their own numbers, and lets an operation take its numbers from a material in the maker's library, with numbers the maker types on top. Three things must hold for a laser: a set of numbers that runs was chosen by someone (never mixed from two concurrent edits); a project opened on a computer without the maker's library still runs with known numbers; the numbers that will run are visible before the run.

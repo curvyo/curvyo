@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>06 · Test grid with the Image kind</title>
+<link rel="stylesheet" href="kit.css"><script src="kit.js"></script>
+<style>canvas{position:absolute;image-rendering:pixelated}.lbl{position:absolute;font:11px ui-monospace,monospace;color:var(--toolbar-icon);letter-spacing:.08em}
+.mat{height:28px;border:1px solid var(--field-border);border-radius:5px;display:flex;align-items:center;gap:6px;padding:0 8px;font-size:14px;width:200px;background:transparent}
+.mat .n{flex:1;overflow:hidden;text-overflow:ellipsis}
+.tid{font:600 13px ui-monospace,monospace;letter-spacing:.08em;width:64px}</style></head>
+<body><div class="sheet">
+<h1>06 · Test grid: the Image kind with Dither</h1>
+<p class="lead">The grid's Kind gains a fourth segment, Image (the PO's default). Dither belongs to Image only; every Image cell is a black-to-white Gradient rectangle, so there is no Fill (spec criterion 44). Engrave is the 0112 grid again. Dither is six text segments in the bar's own segment look: no menu. Notes: <code>ux-notes.md</code> section 5 (P45).</p>
+<figure class="wide"><figcaption>A · Image grid, Dither Floyd-Steinberg, Interval across, Power down<span>Row 1: Kind, test id, material, shared values (no Crosshatch on Image), Dither, Cell size. Row 2 as built. Every cell is a black-to-white ramp, grey on the laser page and dots in the Operations view (here), finer with the finer Interval.</span></figcaption>
+  <div class="cv" id="cvA" style="width:1240px;height:520px"><div class="page" style="left:20px;top:100px;width:1200px;height:400px"></div></div>
+</figure>
+<div class="cols" style="margin-top:20px">
+  <figure><figcaption>B · The smallest window: a 356 px bar row<span>Row 1 wraps by whole items; Dither (334 px) goes whole to its own line, nothing inside it breaks. Row 2 not shown.</span></figcaption>
+    <div class="bar" id="barB" style="width:372px"></div>
+  </figure>
+  <figure><figcaption>C · Engrave grid: 0112 again<span>Hatch only: Crosshatch after the shared values, no Dither. The Kind switch keeps the shared values and axes; Dither stays stored on the grid.</span></figcaption>
+    <div class="bar" id="barC" style="width:900px"></div>
+  </figure>
+</div>
+</div>
+<script>
+const KIND = (on) => `<div class="segs" role="radiogroup" aria-label="Kind">${['cut', 'score', 'engrave', 'image'].map((k) =>
+  `<span class="${k === on ? 'on' : ''}${k === 'image' ? ' newseg' : ''}" style="min-width:68px">${glyph(k)}${KIND_WORD[k]}</span>`).join('')}</div>`;
+const mat = `<div class="mat">${ic('swatch')}<span class="n">Birch plywood 3 mm</span>${ic('chev', 10)}</div>`;
+const fill = `<div class="segs new" role="radiogroup" aria-label="Fill"><span style="width:36px" title="Solid"><svg width="16" height="16"><rect x="2" y="2" width="12" height="12" fill="#3A3A3F"/></svg></span><span class="on" style="width:36px" title="Gradient"><svg width="16" height="16"><defs><linearGradient id="gp"><stop offset="0" stop-color="#3A3A3F"/><stop offset="1" stop-color="#fff"/></linearGradient></defs><rect x="2" y="2" width="12" height="12" fill="url(#gp)" stroke="#3A3A3F" stroke-width="1"/></svg></span></div>`;
+const ditherSegs = (on, focus) => `<div class="segs new" role="radiogroup" aria-label="Dither">${MODES.filter(([id]) => id !== 'grey').map(([id, short, full]) =>
+  `<span class="${id === on ? 'on' : ''}${id === focus ? ' focus' : ''}" title="${full}">${short}</span>`).join('')}</div>`;
+const f = (lb, v, u, w) => field(lb, v, u, w);
+const cross = `<span class="ib">${ic('hash')}</span>`;
+const unit = (cap, params, on, min, max, count) => `<div class="grp"><span class="cap">${cap}</span><div class="segs">${params.map((p) => `<span class="${p === on ? 'on' : ''}" style="min-width:52px">${p}</span>`).join('')}</div>${f('Min', min[0], min[1], 128)}${f('Max', max[0], max[1], 128)}${f('Count', count, '', 76)}</div>`;
+
+// A: the full bar over the page.
+const A = document.getElementById('cvA');
+A.insertAdjacentHTML('beforeend', `<div class="bar" style="position:absolute;left:12px;top:12px;max-width:1216px">
+  <div class="grp">${KIND('image')}</div>
+  <div class="grp"><span class="tid">K7Q2M</span>${mat}</div>
+  <div class="grp">${f('Power', '50', '%', 104)}${f('Speed', '3000', 'mm/min', 160)}${f('Passes', '1', '×', 88)}</div>
+  <div class="grp">${ditherSegs('floyd')}</div>
+  <div class="grp">${f('Cell size', '10', 'mm', 120)}</div>
+  <div class="brk"></div>
+  ${unit('Columns', ['Power', 'Speed', 'Passes', 'Interval'], 'Interval', ['0.05', 'mm'], ['0.25', 'mm'], 5)}
+  ${unit('Rows', ['Power', 'Speed', 'Passes', 'Interval'], 'Power', ['20', '%'], ['80', '%'], 4)}
+</div>`);
+// Cells: 5 columns (Interval 0.05 .. 0.25 -> 1 .. 5 px per dot at this zoom), 4 rows (power by opacity of the burn is not drawn; dots only).
+const cell = 60, gap = 18, x0 = 80, y0 = 180;
+const lbl = document.createElement('div'); lbl.className = 'lbl'; lbl.textContent = 'K7Q2M'; lbl.style.left = `${x0}px`; lbl.style.top = `${y0 - 18}px`; A.appendChild(lbl);
+for (let c = 0; c < 5; c++) for (let r = 0; r < 4; r++) {
+  const px = c + 1, n = Math.floor(cell / px);
+  const cv = document.createElement('canvas');
+  cv.style.left = `${x0 + c * (cell + gap)}px`; cv.style.top = `${y0 + r * (cell + gap)}px`;
+  A.appendChild(cv);
+  paintDots(cv, ramp(n, n), n, n, 'floyd', px);
+}
+
+// B: narrow.
+document.getElementById('barB').innerHTML = `<div class="grp">${KIND('image')}</div>
+  <div class="grp nl"><span class="tid">K7Q2M</span>${mat}</div>
+  <div class="grp nl">${f('Power', '50', '%', 104)}${f('Speed', '3000', 'mm/min', 160)}${f('Passes', '1', '×', 88)}</div>
+  <div class="grp nl">${ditherSegs('floyd', 'floyd')}</div>
+  <div class="grp nl">${f('Cell size', '10', 'mm', 120)}</div>`;
+// C: Engrave kind.
+document.getElementById('barC').innerHTML = `<div class="grp">${KIND('engrave')}</div>
+  <div class="grp"><span class="tid">K7Q2M</span>${mat}</div>
+  <div class="grp">${f('Power', '50', '%', 104)}${f('Speed', '3000', 'mm/min', 160)}${f('Passes', '1', '×', 88)}${cross}</div>
+  <div class="grp">${f('Cell size', '10', 'mm', 120)}</div>`;
+// Mark the new Image segment.
+document.querySelectorAll('.newseg').forEach((s) => { s.style.outline = '1.5px dashed var(--panel-muted-fg)'; s.style.outlineOffset = '-3px'; });
+</script>
+</body></html>
