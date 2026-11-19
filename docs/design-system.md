@@ -545,6 +545,18 @@ values, not an implementation site, for those four rows.
   there (see the rule below). Also used for the node-tool's kind control
   (`path-merge-split-and-node-types`): Make corner / Make symmetric / Make
   asymmetric, icons being the node glyphs themselves (square/diamond/triangle).
+- **Choice strip (`PresetStrip`)** (customer, 2026-11-19, `0123` Dither): a set
+  of up to about eight named choices in the panel is an always-visible strip in
+  the font tag strip's look (1px ink-at-60 % border, cells 1px apart, 14px, 28px
+  rows, the pressed cell `--toolbar-icon-active-bg` / `-fg`), never a closed
+  pick with an inline list: a list that opens pushes everything under it and
+  reads as restless. Rows are fixed where the set is fixed (a break after a
+  named cell), so no platform font changes the rows; cells grow to fill their
+  row. A shortened name keeps its full name as tooltip and accessible name.
+  One Tab stop; arrows move and select (no wrap), each selection a commit. In a
+  bar the same choice is the bar's own segments (`--value-fill` pressed), so a
+  bar keeps one segment look. The inline list (`MaterialPick`, `OutputPick`)
+  stays for open-ended sets (materials, profiles).
 - **No popups in the properties panel** (customer, final, 2026-10-08,
   `style-panel-rework`). No control in the panel opens a popover, dropdown list,
   menu, dialog or any other layer over the canvas or over other panel content.
@@ -1723,6 +1735,19 @@ Decisions and reasoning: `specs/0100-bring-content-in/ux-notes.md`; sketches b, 
 | Width diamond | 16 px corner to corner, white fill (`--accent` when selected) in a 1.5 px `--node-stroke` ring and a 1.5 px white casing, so it reads on dark and light strokes and on the canvas; the ghost under the pointer has the same ring and casing with its fill at half opacity, so it reads on a light page. Hit radius 11 px | |
 | Typed width | Double-click on a diamond: the entry chip look (toolbar ground, panel shadow) 14 px below the diamond's centre (above it without room), its left edge 14 px left of the centre (its right edge 14 px right of it without room), kept inside the canvas; "Width [field] mm", the value selected; Enter sets it as one step, Escape or leaving cancels; an invalid value outlines the field and says "Must be 0 or more." on one line under it | Never up and right over the stroke |
 | Wheel over a diamond | 0.5 mm of full width per notch (Shift 0.1 mm), live; "Width 2.5 mm" in the entry chip look above the diamond (below without room), gone 800 ms after the last notch; a pause of 500 ms or a press ends the burst as one undo step; the canvas does not zoom | |
+
+## Laser operation kinds: Image (`0123`, 2026-11-19)
+
+Decisions: `specs/0123-raster-engraving/ux-notes.md` sections 2 and 3. The kind glyphs, chips and canvas looks of `0101` 13 and the Select-bar group of `0111` 3 are as their notes say; this section records only what `0123` adds.
+
+| Item | Value |
+|---|---|
+| Kinds | Six: Cut, Score, Engrave, Engrave + Outline, Cut-out, **Image** (Select-bar order; Image appended, no built button moved). Image is in the Marking section. Canvas chip order Cut, Cut-out, Score, Engrave, Engrave + Outline, Image |
+| Image glyph | `OperationGlyph` kind `image`: 16 x 16, ink, filled, no stroke; 2 x 2 squares on a 4-unit pitch, columns of 4, 3, 2, 1 dots (a dither ramp, dark at the left). Must read apart from Engrave's hatch and the Test grid's 3 x 3 outlined squares at 1x |
+| Image body | Engrave's set (material, Power, Passes, Speed, Interval), hairline, the Image settings, always shown (Dither choice strip in two fixed rows, Brightness and Contrast, Gamma and Invert, then Threshold or Lowest power last), hairline, Bidirectional fill, Scan angle, Overscanning, (Z offset); no Crosshatch |
+| Row line 3 | the set's numbers, then " · " and the dither's short name ("Floyd"; Grey with its range "Grey 10–35 %") |
+| Wrong kind | An item its kind cannot run (an image in Engrave or Engrave + Outline, a shape without a Gradient fill in Image): the Not assigned look (dimmed, 1px dashed 4 on 3 `--lane-line`) but its chip stays, in `--panel-muted-fg`; one warn line per operation in the checks |
+| Raster dots | `--engrave-hatch` dots on a transparent ground, at most one per device pixel; each placement (linked clone, placed page) draws its own dots on rows at the page's Scan angle; first build pending: a 1px `--engrave-hatch` frame and the chip |
 
 ## Keyboard shortcuts established so far
 

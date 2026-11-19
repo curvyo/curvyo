@@ -203,6 +203,11 @@ for the cost of one `lib.rs`: doing it now is a speculative crate
    > connector-io`. The first slot of §8 (machine/toolpath core and device `-io` crate) is filled
    > for the laser family by `curvyo-laser-core` and `curvyo-connector-io`.
 
+   > **Note 2026-11-19 ([ADR 0068](0068-raster-dot-values-and-dithering.md) §1, [ADR 0069](0069-raster-rows-output-and-settings.md), the `0123` story):**
+   > raster engraving adds modules to `curvyo-laser-core`, no crate; it now also depends on
+   > `curvyo-image-core` (the decoded working image, pure) and `libm` (a workspace dependency,
+   > bit-identical `pow`), both building for `wasm32-unknown-unknown`.
+
    **No `*-core` crate depends on `*-io`, on `*-app`, on `vecmanf-editor-wasm`
    or on the frontend, ever.** This is the `CLAUDE.md` §6 rule, and the crate
    graph is what enforces it.

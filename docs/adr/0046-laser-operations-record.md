@@ -4,6 +4,8 @@
 
 **Note (ADR 0056, proposed 2026-11-12):** §2 and §7: a group assignment also writes the keys of the group's inner nodes, and a key with a path of more than one id (`member.<clone>/<member>`) is legacy: kept, ignored, never written (0056 §1, §2).
 
+**Note (ADR 0069 §13, with the `0123` story, 2026-11-19):** §1: `op_kind` has a sixth value `image` ("Image", Marking section, named "Image 1"); document-core keeps the kind opaque. §7: an Image operation runs images, their linked clones, members of cloned groups and of placed pages, and gradient-filled leaves as raster; every other kind treats an image strictly as the rectangle of its frame (Cut and Score trace it, Cut-out cuts it, Engrave hatches it, Engrave + Outline hatches and traces it).
+
 ## Context
 
 A laser page (ADR 0042 output page, owned by its manufacturing, ADR 0032 §4) needs an ordered list of operations (Cut, Score, Engrave, Engrave + Outline, Cut-out). An item of the output page (an own object, a group, a linked clone, a member of a clone, a placed page, or a member row of a placed page) may be in any number of them. The list order is the run order, and the Cuts last switch keeps cutting after marking. The rules that matter for the file:
