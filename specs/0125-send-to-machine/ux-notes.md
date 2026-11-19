@@ -21,6 +21,7 @@ ux-engineer, 2026-11-17. Covers criteria S1 to S18 of `specification.md` and its
 - Look: a secondary (outline) button, not a second Primary: `--panel-bg` ground, 1px `--field-border`, glyph `--toolbar-icon`, hover `--editor-accent-hover`, focus ring 2px `--editor-accent` with 1px offset (Export's ring) (U2). One Primary per group stays the export.
 - Name, tooltip and accessible name "Send to machine" (S1). Tooltip: Radix, 400ms, `side="top"` like Export's, so it never covers Export.
 - Amended by 0134: glyph `CirclePlay` (the footer's Start keeps `Play`); name, tooltip and accessible name "Send to machine and start" when the next press will start, "Send to machine" otherwise (`specs/0134-send-and-start/ux-notes.md` sections 2 to 4).
+- Amended by 0134 (Frage 263 B, 2026-11-20): when the name is "Send to machine and start" the press is armed: the first press arms and sends nothing (filled `--armed-accent` with a white glyph, name and tooltip "Press again to send to machine and start"), the second sends and starts; never armed when it only sends (`specs/0134-send-and-start/ux-notes.md` section 4).
 - No label text, no shortcut text, no "..." (it opens nothing).
 
 ## 3. Disabled and busy states (S2 to S5, S8)
@@ -94,7 +95,7 @@ All failures use the failure look (`CircleAlert` 12px, `--destructive`, 4.8:1 on
 | Accepted | "Ready: <name>, <n> lines, <size>" (the result, no extra text) |
 
 - Focus after a send: a keyboard press keeps focus on Send (it is `aria-disabled` while sending, so it keeps focus and its Tab stop); a pointer press returns focus as Export does (`onReturnFocus`). Focus never jumps to the Connector row.
-- Amended by 0134: the button stays busy through the Start step (tooltip line 2 "Starting"); a Start that does not happen reads "Not started: <reason>" in the footer's job block (`specs/0134-send-and-start/ux-notes.md` sections 5, 6).
+- Amended by 0134: the button stays busy through the Start step (tooltip line 2 "Starting"); a Start that does not happen reads "Not started: <reason>" in the footer's job block (`specs/0134-send-and-start/ux-notes.md` sections 5, 6). The arming press keeps focus on the button (a return to the canvas would disarm it); the confirming press returns it as above (`specs/0134-send-and-start/ux-notes.md` section 8).
 - A page that has become blocked at the moment of the press (S6) sends nothing and shows nothing new: the button is already disabled with its cause.
 
 ## 6. Notice after an accepted send (S10)
@@ -112,6 +113,7 @@ All failures use the failure look (`CircleAlert` 12px, `--destructive`, 4.8:1 on
 
 - **Tab order in the Output group:** Start pick, each check's button, Export job file, Send to machine. Two separate Tab stops, no toolbar (Export is a word button); disabled ones keep their stop.
 - Enter or Space presses Send. No shortcut and no global chord (U12; a job reaching a machine from a stray key is worse than a Tab). Escape does nothing to a running send (it cannot be taken back halfway; the connector discards an incomplete job).
+  Amended by 0134: Enter or Space arms and confirms the armed press, a repeated keydown is ignored, Escape disarms an armed button (`specs/0134-send-and-start/ux-notes.md` sections 4, 8).
 - Tooltips appear on keyboard focus as on hover, with the cause line when disabled.
 - Hit target 32px (36 coarse).
 
@@ -127,7 +129,7 @@ All failures use the failure look (`CircleAlert` 12px, `--destructive`, 4.8:1 on
 ## 10. Design-system rows to add after acceptance
 
 - **"Send to machine button (`0125`)"**, after "Output group (`0029`)" (or after "Connector group (`0064`)" while that row is not yet in): sections 2, 3 and 8 (glyph `Upload`, secondary look 32 x 32 next to a `flex: 1` Export, disabled look of Export, two-line tooltip with the cause, the cause order, busy `LoaderCircle`).
-  Amended by 0134: glyph `CirclePlay`, the two names, "Starting" (`specs/0134-send-and-start/ux-notes.md` section 11).
+  Amended by 0134: glyph `CirclePlay`, the two names, the armed press and its look, "Starting" (`specs/0134-send-and-start/ux-notes.md` section 11).
 - **"Connector state line (`0125`)"**, after it: section 4 and 5 (one line, 70 characters, the bar of the Connector group, " · <name>" for another job, sr-only state-word live region, failures as alerts).
 - In "Hidden, not disabled", the Output tab exceptions gain: "Send to machine is `aria-disabled` with its cause in the tooltip's second line, also in the browser build (`0125`)".
 - No new token, no new glyph.
@@ -137,6 +139,7 @@ All failures use the failure look (`CircleAlert` 12px, `--destructive`, 4.8:1 on
 - **U1** Glyph `Upload`, the Connector row's "Send job..." glyph.
   Amended by 0134: `CirclePlay`.
 - **U2** Send is a secondary outline symbol button; Export stays the one Primary.
+  Amended by 0134: armed for at most 4 s it is filled `--armed-accent`, a state, not a second Primary (`specs/0134-send-and-start/ux-notes.md` section 4.1).
 - **U3** Disabled Send uses Export's disabled look, not 40% opacity.
 - **U4** One cause shown, in the order of section 3; tooltip line 2, sr-only description.
 - **U5** Job name cut at its end with an ellipsis so the line stays within 70 characters.
