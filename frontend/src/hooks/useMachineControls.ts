@@ -124,6 +124,8 @@ export function useMachineControls(profileId: string, address: string, enabled: 
   const command = (kind: Command) =>
     guard(kind, async () => {
       show(null);
+      // A Start of the footer ends the page's "Not started" line (`0134` UX notes section 6).
+      if (kind === "start") linkStore.patch(profileId, { notStarted: null });
       const answer = await invoke<CommandAnswer>("connector_command", { profileId, address, command: kind }).catch(
         (): CommandAnswer => ({ kind: "failed", error: { kind: "other", message: "Connector error" } }),
       );

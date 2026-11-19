@@ -4,6 +4,7 @@ import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useId, u
 import { GLYPH, SMALL } from "@/components/workbench/machineStyles";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
 import { type MachineControlsModel, useMachineControls } from "@/hooks/useMachineControls";
+import { notStartedLine } from "@/lib/connectorLink";
 import { formatCount, formatElapsed, jobButtons } from "@/lib/connectorText";
 import {
   type ControlsLine,
@@ -12,6 +13,7 @@ import {
   countsName,
   footerNotice,
   homeButton,
+  sendFailureBelow,
   pauseButton,
   pausePending,
 } from "@/lib/machineControls";
@@ -114,14 +116,31 @@ function ControlsBody({ model }: { model: MachineControlsModel }) {
   // The live regions stay in the tree while paired, so a line that appears with the job block
   // ("Homing" after Idle) is still read, and a polite line that turns into an alert is read once.
   const line = controlsLine(model.entry, model.own);
+  // Send and start (`specs/0134` UX P8): the in-between Ready is not said while the start step
+  // runs; a start that did not happen is said once with its Ready line, as an alert.
+  const notStarted = notStartedLine(model.entry);
+  // Quiet from the confirm until the started job leaves Ready (the start's answer can come first).
+  const startedJob = model.entry.startedJob;
+  const quiet =
+    status?.state.name === "Ready" && (model.entry.startStep || (startedJob !== null && startedJob === status.job?.job_id));
+  // A refused page send while a job is held reads under that job's line, said once (P17).
+  const refused = notStarted === null ? sendFailureBelow(model.entry) : null;
+  const polite = line !== null && !line.alerts && notStarted === null && refused === null && !quiet ? line.text : spoken;
+  const alert =
+    notStarted !== null ? `${line?.text ?? "Ready"}. ${notStarted}` : (refused ?? (line?.alerts ? line.text : ""));
   return (
     <>
-      <JobBlock model={model} line={line} onUnlockFocus={() => (unlockHadFocus.current = true)} />
+      <JobBlock
+        model={model}
+        line={line}
+        failure={notStarted ?? refused}
+        onUnlockFocus={() => (unlockHadFocus.current = true)}
+      />
       <p role="status" className="sr-only">
-        {line !== null && !line.alerts ? line.text : spoken}
+        {polite}
       </p>
       <p role="alert" className="sr-only">
-        {line?.alerts ? line.text : ""}
+        {alert}
       </p>
       <Toolbar model={model} toolbarRef={toolbar} />
     </>
@@ -151,7 +170,8 @@ function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRe
     {
       key: "start",
       name: buttons.startName,
-      enabled: buttons.start && idle,
+      // Greyed while the page's own Start is in flight (`0134` P6).
+      enabled: buttons.start && idle && !entry.startStep,
       busy: entry.busy === (resume ? "resume" : "start"),
       icon: <Play {...GLYPH} />,
       press: () => model.command(resume ? "resume" : "start"),
@@ -199,7 +219,18 @@ function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRe
   );
 }
 
-function JobBlock({ model, line, onUnlockFocus }: { model: MachineControlsModel; line: ControlsLine | null; onUnlockFocus: () => void }) {
+function JobBlock({
+  model,
+  line,
+  failure,
+  onUnlockFocus,
+}: {
+  model: MachineControlsModel;
+  line: ControlsLine | null;
+  /** "Not started: <reason>" or a refused page send, under the line in the failure look. */
+  failure: string | null;
+  onUnlockFocus: () => void;
+}) {
   const { entry, own } = model;
   if (line === null) return null;
   const status = entry.status;
@@ -234,6 +265,12 @@ function JobBlock({ model, line, onUnlockFocus }: { model: MachineControlsModel;
           </span>
         ) : null}
       </div>
+      {failure !== null ? (
+        <p data-line-failure className="flex items-start gap-1 text-xs text-[var(--destructive)] [overflow-wrap:anywhere]">
+          <CircleAlert {...SMALL} className="mt-0.5 shrink-0" />
+          <span>{failure}</span>
+        </p>
+      ) : null}
       {line.bar !== null ? (
         <div
           role="progressbar"

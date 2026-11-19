@@ -139,6 +139,11 @@ export interface SendButton {
   text: string | null;
   profileId: string;
   address: string;
+  /** A press also starts the job: the core's will-it-start rule over the last status (`0134`
+   * SS9). */
+  starts: boolean;
+  /** Changes whenever the job a press would send changes (`0134` UX P15). */
+  job: number;
 }
 
 /** The output group at the end of the Operations tab of a laser page (UX notes 6.3). */
@@ -344,7 +349,10 @@ function asSend(value: unknown): SendButton | null | undefined {
   ) {
     return undefined;
   }
-  return { enabled: value.enabled, cause, text, profileId: value.profile_id, address: value.address };
+  const starts = value.starts === undefined ? false : value.starts;
+  const job = value.job === undefined ? 0 : value.job;
+  if (typeof starts !== "boolean" || typeof job !== "number") return undefined;
+  return { enabled: value.enabled, cause, text, profileId: value.profile_id, address: value.address, starts, job };
 }
 
 /** The output group from its JSON value; `null` for `null` (another page) or a broken value. */

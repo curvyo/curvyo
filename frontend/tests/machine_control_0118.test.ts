@@ -225,7 +225,12 @@ test("a Home waiting for the local press carries no job: no bar and no counts", 
 test("UX §11 (review 2026-11-19): the line is read through two hidden regions that stay while paired", () => {
   const footer = source("components/panel/MachineControls.tsx");
   assert.doesNotMatch(footer, /role=\{line\.alerts/, "the visible line carries no live role");
-  assert.match(footer, /<p role="status" className="sr-only">\s*\{line !== null && !line\.alerts \? line\.text : spoken\}/);
-  assert.match(footer, /<p role="alert" className="sr-only">\s*\{line\?\.alerts \? line\.text : ""\}/);
+  // Amended by `0134` P8: the polite line also stays quiet during a send's start step, and a "Not
+  // started" is said with its Ready line as the alert; P17: a refused send under a held job is
+  // said once as the alert, the polite line stays quiet meanwhile.
+  assert.match(footer, /const polite = line !== null && !line\.alerts && notStarted === null && refused === null && !quiet \? line\.text : spoken;/);
+  assert.match(footer, /const alert =\s*notStarted !== null \? `\$\{line\?\.text \?\? "Ready"\}\. \$\{notStarted\}` : \(refused \?\? \(line\?\.alerts \? line\.text : ""\)\);/);
+  assert.match(footer, /<p role="status" className="sr-only">\s*\{polite\}/);
+  assert.match(footer, /<p role="alert" className="sr-only">\s*\{alert\}/);
   assert.doesNotMatch(footer, /empty:hidden/, "the warning's region stays in the accessibility tree");
 });
