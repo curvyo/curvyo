@@ -318,8 +318,8 @@ mod tests {
     fn an_incoming_text_from_a_newer_build_is_skipped() {
         let local = machine_text("ZQX-MACH-7731", 4);
         let newer = machine_text("ZQX-MACH-7731", 9).replacen(
-            "\"format_version\": 4",
-            "\"format_version\": 5",
+            "\"format_version\": 6",
+            "\"format_version\": 7",
             1,
         );
         assert_eq!(
@@ -330,8 +330,8 @@ mod tests {
         );
         let material = material_text("ZQX-MAT-7731", 4);
         let newer_material = material_text("ZQX-MAT-7731", 9).replacen(
-            "\"format_version\": 2",
             "\"format_version\": 3",
+            "\"format_version\": 4",
             1,
         );
         assert_eq!(
@@ -347,8 +347,8 @@ mod tests {
     #[test]
     fn a_local_text_from_a_newer_build_stays_untouched() {
         let newer_local = machine_text("ZQX-MACH-7731", 4).replacen(
-            "\"format_version\": 4",
-            "\"format_version\": 5",
+            "\"format_version\": 6",
+            "\"format_version\": 7",
             1,
         );
         let incoming = machine_text("ZQX-MACH-7731", 9);
@@ -359,8 +359,8 @@ mod tests {
             }
         );
         let newer_material = material_text("ZQX-MAT-7731", 4).replacen(
-            "\"format_version\": 2",
             "\"format_version\": 3",
+            "\"format_version\": 4",
             1,
         );
         let incoming_material = material_text("ZQX-MAT-7731", 9);
@@ -386,7 +386,7 @@ mod tests {
         );
         let material_incoming = material_text("ZQX-MAT-7731", 9);
         let older_local = material_text("ZQX-MAT-7731", 4).replacen(
-            "\"format_version\": 2",
+            "\"format_version\": 3",
             "\"format_version\": 1",
             1,
         );
@@ -397,7 +397,7 @@ mod tests {
             }
         );
         let older_incoming = material_text("ZQX-MAT-7731", 9).replacen(
-            "\"format_version\": 2",
+            "\"format_version\": 3",
             "\"format_version\": 1",
             1,
         );
