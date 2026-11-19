@@ -1,5 +1,6 @@
 import { createRulerRaster } from "@/lib/rulerRaster";
 import { useEffect, useRef } from "react";
+import { perfSpan, perfStart } from "@/lib/perfProbe";
 
 import type { EditorSession } from "@/hooks/useEditorSession";
 import {
@@ -221,7 +222,9 @@ export function Rulers({ editor, unit }: RulersProps) {
     };
     let frame = requestAnimationFrame(function loop() {
       frame = requestAnimationFrame(loop);
+      const probeStart = perfStart();
       repaintIfChanged();
+      perfSpan("Rulers tick", probeStart);
     });
     const resized = () => { readSizes(); repaintIfChanged(); };
     const observer = new ResizeObserver(resized);

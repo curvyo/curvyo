@@ -7,7 +7,12 @@ new crate, no new dependency (Python standard library only).
 python3 -I tools/perf/measure.py            # builds, runs about 3.5 minutes, prints the table
 python3 -I tools/perf/measure.py --no-build # reuse the last perf build
 python3 -I tools/perf/measure.py --timeout 900 # stop after 900 s (default 600)
+python3 -I tools/perf/measure.py --desktop     # on the real display and GPU instead of Xvfb
 ```
+
+`--desktop` starts the app on the current `DISPLAY` (no `xvfb-run`, no forced `GDK_BACKEND`): the
+numbers of a real GPU and the desktop compositor's pacing. It takes no screenshots (the window is
+wherever the window manager puts it), so the `lag` line is not measured there.
 
 When the page's `done` event does not arrive in time the runner prints `timed out before scenario X`
 and reports the scenarios that ended.
@@ -38,7 +43,10 @@ make the render loop throw on its first tick, so every column reads 0 and zoom a
 
 ## Scenarios
 
-`idle-empty` 15 s (empty document); then a generated SVG of 5 000 stroked paths is imported and fitted
+`idle-empty` 15 s (empty document); `empty-pan` (5 s, middle button, left and right at 8 px per
+16 ms tick, each tick a burst of 8 moves of 1 px, as a 500 Hz mouse sends; two screenshots per sweep
+mid-move, then one at rest); `empty-zoom` (5 s, Ctrl+wheel, each tick a burst of 4 quarter notches, 30
+ticks in, 30 out); then a generated SVG of 5 000 stroked paths is imported and fitted
 (**the whale and dolphin fixtures are trace inputs, not loadable documents, so a generated page is
 used**); `idle-5000` 30 s; `wheel-zoom` (5 s, Ctrl+wheel, 30 notches in, 30 out); `pan-drag` (5 s,
 middle button, pointer on a 150 px circle). The `s` column is wall time: when frames are slow the timers
@@ -61,6 +69,21 @@ only while the probe turned it on with `set_frame_phase_timing`) into `draw list
 present), with the artwork layers and vertices of a frame. Under Xvfb `submit` is software GL
 and much larger than on a GPU; `draw list` and the vertex building in `upload` are CPU work on
 any machine (`curvyo-editor-wasm/tests/frame_phase_cost.rs` measures them natively).
+Frame pacing (since the frame-pacing pass, per scenario): `rAF p50`, `p95` and `>33ms` in the table
+and the line `rAF interval ms` (the probe's own `requestAnimationFrame` loop: p50, p95, p99, max and
+the intervals over 20, 33 and 50 ms); `stalls` (WebKit has no `longtask` entries, the
+`long-task observer` line says so; a 4 ms timer chain that returns more than 50 ms late counts a
+main-thread stall instead); `React renders/s` of the editor (the `App` that holds
+`useEditorSession`) and `PageFrames`; the main-thread ms of every timed section (`wheel handler`,
+`pointermove handler (pan)`, the session call inside each, the render loop's `frame_state`,
+`render()`, clone/sketch tags and `syncEntry`, `editor render+commit` from the editor's render to its
+layout effect, the `Rulers` tick) per second, average and worst; `page-frame commits` inside the
+`PageFrames` animation frame or in a later task (painted one frame after the canvas draw of that
+frame); `view inputs` per second and per drawn frame with the ms from the first waiting input to the
+`render()` that drew it. `lag` compares the DOM page frame's outline with the canvas's page edge in
+the `empty-pan` screenshots: the offset change over the 8 px step is how many moves the canvas
+trails the outline (0 = the same view on the screen).
+
 Warnings: `render loop not running` when built/s is 0, `scenario did not move the view` when
 a zoom or pan scenario has changed/s = 0; `page error` lines carry uncaught errors of the page with file, line and stack.
 

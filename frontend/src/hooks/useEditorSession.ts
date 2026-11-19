@@ -6,7 +6,7 @@ import { viewTool } from "@/lib/viewTool";
 
 /** The wheel delta one press of the View card's Zoom stands for (one notch of a mouse wheel). */
 const ZOOM_STEP_DELTA = 100;
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
@@ -26,7 +26,7 @@ import {
   FRAME_SYNC_LINK,
   frameView,
 } from "@/lib/frameState";
-import { perfStart, renderTick, startPerfScenarios } from "@/lib/perfProbe";
+import { perfDrawn, perfInput, perfRender, perfSpan, perfStart, renderTick, startPerfScenarios } from "@/lib/perfProbe";
 import { renderPageThumbnail } from "@/lib/pageThumbnail";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
@@ -1002,6 +1002,11 @@ export interface EditorSession {
 export function useEditorSession(
   onCursorMove: (point: { x: number; y: number }) => void,
 ): EditorSession {
+  // The performance probe counts the editor's renders and times each from here to its commit
+  // (the layout effect below runs after the whole tree under the editor committed).
+  perfRender("editor (App)");
+  const renderStart = perfStart();
+  useLayoutEffect(() => perfSpan("editor render+commit", renderStart));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<WasmSession | null>(null);
@@ -1565,6 +1570,11 @@ export function useEditorSession(
     // adrs.md`'s frontend requirement) — a native, non-passive listener
     // is the only way to stop that.
     const onWheel = (event: WheelEvent) => {
+      const wheelStart = perfStart();
+      onWheelEvent(event);
+      perfSpan("wheel handler", wheelStart);
+    };
+    const onWheelEvent = (event: WheelEvent) => {
       event.preventDefault();
       const session = sessionRef.current;
       if (!session || !canvas) {
@@ -1602,7 +1612,10 @@ export function useEditorSession(
         }
         if (overWidthPoint) return;
       }
+      const applyStart = perfStart();
       session.wheel(deltaX, deltaY, x, y, event.shiftKey, event.ctrlKey || event.metaKey);
+      perfSpan("wheel: session.wheel", applyStart);
+      perfInput();
       setZoomPercent(session.zoom_percent());
       // A pan or zoom moves the document under a still pointer.
       onCursorMove(readDocumentPoint(session.screen_to_ruler(x, y)));
@@ -1637,7 +1650,9 @@ export function useEditorSession(
       const session = sessionRef.current;
       let state: Float64Array | null = null;
       if (session) {
+        const stateStart = perfStart();
         state = session.frame_state();
+        perfSpan("loop: frame_state", stateStart);
         // Fed every frame: "rested" follows from the time alone, with no change of the session.
         const moving = viewRest.update(frameView(state), performance.now());
         if (moving !== null) {
@@ -1657,7 +1672,10 @@ export function useEditorSession(
         const draw = state[FRAME_NEEDED] === 1;
         if (fresh || draw || (state[FRAME_FLAGS] & FRAME_NOTICES) !== 0) {
           if (draw) {
+            const drawStart = perfStart();
             session.render();
+            perfSpan("loop: render()", drawStart);
+            perfDrawn();
           }
           // The refusals of width editing show beside the pointer (UX review U8); a frame's
           // drawing can raise one, so they are read after it.
@@ -1675,14 +1693,18 @@ export function useEditorSession(
           const view = frameView(state);
           if (view !== tagView) {
             tagView = view;
+            const tagStart = perfStart();
             refreshClonesRef.current();
             refreshSketch();
+            perfSpan("loop: clone/sketch tags", tagStart);
           }
           // An open typed entry follows every pan, zoom and resize, whatever moved the view: the
           // chip stays where its placement rule puts it (`0047` UX review N1). A re-read that
           // changed nothing sets no state.
           if (entryOpenRef.current) {
+            const entryStart = perfStart();
             syncEntry(session);
+            perfSpan("loop: syncEntry", entryStart);
           }
           seenSession = session;
           seenGeneration = state[FRAME_GENERATION];
@@ -2479,6 +2501,7 @@ export function useEditorSession(
       if (releasePendingRef.current) {
         return;
       }
+      const moveStart = perfStart();
       syncTrackedModifiers(event);
       const session = sessionRef.current;
       const { x, y } = canvasPoint(event);
@@ -2487,7 +2510,10 @@ export function useEditorSession(
         onCursorMove(readDocumentPoint(session.screen_to_ruler(x, y)));
       }
       if (panningRef.current) {
+        const panStart = perfStart();
         session?.pan_to(x, y);
+        perfSpan("pan: session.pan_to", panStart);
+        perfInput();
         if (session) {
           // The pan moved the document under the pointer: read it again.
           onCursorMove(readDocumentPoint(session.screen_to_ruler(x, y)));
@@ -2498,6 +2524,7 @@ export function useEditorSession(
         if (session && followPlacementAfterView(session, x, y, event)) {
           refreshPlacement();
         }
+        perfSpan("pointermove handler (pan)", moveStart);
         return;
       }
       // A held-back second press that moves beyond the drag threshold is a drag, never a

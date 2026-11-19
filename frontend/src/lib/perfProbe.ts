@@ -8,8 +8,32 @@ import { frameView } from "@/lib/frameState";
 const target: string | undefined = import.meta.env.VITE_CURVYO_PERF;
 export const perfEnabled = typeof target === "string" && target.length > 0;
 
-type Counters = { built: number; submitted: number; changed: number; sites: Record<string, number>; renderMs: number; renderMax: number; pagesTicks: number; pagesChanged: number; pagesMs: number; pagesMax: number };
-const zero = (): Counters => ({ built: 0, submitted: 0, changed: 0, sites: {}, renderMs: 0, renderMax: 0, pagesTicks: 0, pagesChanged: 0, pagesMs: 0, pagesMax: 0 });
+type Counters = {
+  built: number; submitted: number; changed: number; sites: Record<string, number>; renderMs: number; renderMax: number;
+  pagesTicks: number; pagesChanged: number; pagesMs: number; pagesMax: number;
+  /** Main-thread time of named sections (input handlers, render-loop phases, chrome ticks):
+   * count, summed ms and worst ms. */
+  spans: Record<string, [number, number, number]>;
+  /** Renders of the components that follow the view (function bodies run). */
+  renders: Record<string, number>;
+  /** Intervals between two animation frames, ms (the probe's own `requestAnimationFrame` loop). */
+  intervals: number[];
+  /** Long tasks (`PerformanceObserver` 'longtask', or the gap detector below): count and ms. */
+  longTasks: number; longMs: number;
+  /** Timer gaps over 50 ms (a 4 ms `setTimeout` chain that came back late): count and ms. */
+  gaps: number; gapMs: number;
+  /** View inputs (wheel, pan moves) and the ms from the first unapplied one to the `render()`
+   * that drew it, one entry per drawn frame that had inputs waiting. */
+  inputs: number; inputToDraw: number[];
+  /** Page-frame commits inside the `PageFrames` animation-frame tick that read the new pages
+   * (painted with the canvas's draw of that frame) and after it, in a later task (painted a frame
+   * later). */
+  pagesInFrame: number; pagesLater: number;
+};
+const zero = (): Counters => ({
+  built: 0, submitted: 0, changed: 0, sites: {}, renderMs: 0, renderMax: 0, pagesTicks: 0, pagesChanged: 0, pagesMs: 0, pagesMax: 0,
+  spans: {}, renders: {}, intervals: [], longTasks: 0, longMs: 0, gaps: 0, gapMs: 0, inputs: 0, inputToDraw: [], pagesInFrame: 0, pagesLater: 0,
+});
 let counters = zero();
 let scenario = "boot";
 let lastGeneration = -1;
@@ -37,6 +61,38 @@ function start() {
   socket.onopen = () => {
     for (const text of queue.splice(0)) socket?.send(text);
   };
+  // The animation-frame cadence the page really gets, whatever the render loop does.
+  let lastFrame = 0;
+  const frames = (now: number) => {
+    if (lastFrame > 0) counters.intervals.push(Math.round((now - lastFrame) * 10) / 10);
+    lastFrame = now;
+    requestAnimationFrame(frames);
+  };
+  requestAnimationFrame(frames);
+  // Long tasks: WebKit has no 'longtask' entries (checked at start, sent as `observer`), so a
+  // 4 ms timer chain that comes back more than 50 ms late counts a main-thread stall either way.
+  const longTaskSupported = typeof PerformanceObserver !== "undefined" && (PerformanceObserver.supportedEntryTypes ?? []).includes("longtask");
+  send({ event: "observer", longtask: longTaskSupported, entryTypes: typeof PerformanceObserver !== "undefined" ? PerformanceObserver.supportedEntryTypes ?? [] : [] });
+  if (longTaskSupported) {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        counters.longTasks += 1;
+        counters.longMs += entry.duration;
+      }
+    }).observe({ type: "longtask", buffered: false });
+  }
+  let lastTimer = performance.now();
+  const gapTimer = () => {
+    const now = performance.now();
+    const late = now - lastTimer;
+    if (late > 50) {
+      counters.gaps += 1;
+      counters.gapMs += late;
+    }
+    lastTimer = now;
+    setTimeout(gapTimer, 4);
+  };
+  setTimeout(gapTimer, 4);
   let second = 0;
   setInterval(() => {
     // Frames, ms of draw list, pictures, upload and submit, layers and vertices (summed).
@@ -76,6 +132,54 @@ export function renderTick(t0: number, generation: number, submitted: number, si
   }
   counters.renderMs += ms;
   counters.renderMax = Math.max(counters.renderMax, ms);
+}
+
+/** Main-thread time of the section that started at `t0` (`perfStart`). */
+export function perfSpan(name: string, t0: number) {
+  if (!perfEnabled) return;
+  const ms = performance.now() - t0;
+  const span = (counters.spans[name] ??= [0, 0, 0]);
+  span[0] += 1;
+  span[1] += ms;
+  span[2] = Math.max(span[2], ms);
+}
+
+/** A render of a component that follows the view. */
+export function perfRender(name: string) {
+  if (!perfEnabled) return;
+  counters.renders[name] = (counters.renders[name] ?? 0) + 1;
+}
+
+// The time of the first view input the canvas has not drawn yet (0: none waiting).
+let inputWaiting = 0;
+
+/** A view input (a wheel event, a pan move) reached the session. */
+export function perfInput() {
+  if (!perfEnabled) return;
+  counters.inputs += 1;
+  if (inputWaiting === 0) inputWaiting = performance.now();
+}
+
+/** The render loop drew a frame: the inputs waiting for it are on the canvas now. */
+export function perfDrawn() {
+  if (!perfEnabled || inputWaiting === 0) return;
+  counters.inputToDraw.push(Math.round((performance.now() - inputWaiting) * 10) / 10);
+  inputWaiting = 0;
+}
+
+// Whether a `PageFrames` tick is running right now.
+let inPagesTick = false;
+
+/** A `PageFrames` tick starts or ends (`running`). */
+export function perfPagesTick(running: boolean) {
+  inPagesTick = running;
+}
+
+/** `PageFrames` committed new pages: inside its tick or in a later task. */
+export function perfPagesCommitted() {
+  if (!perfEnabled) return;
+  if (inPagesTick) counters.pagesInFrame += 1;
+  else counters.pagesLater += 1;
 }
 
 /** End of a PageFrames tick; `changed` when its pages JSON differed from the previous one. */
@@ -136,6 +240,48 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
     await sleep(1500);
   };
   await mark("idle-empty", () => sleep(15_000));
+  const empty = canvas.getBoundingClientRect();
+  const ex = empty.left + empty.width / 2;
+  const ey = empty.top + empty.height / 2;
+  // The empty page panned left and right at a constant 8 px per move, 60 moves per second, so a
+  // screenshot taken mid-sweep (`snap`) shows how far the canvas's page trails the DOM page frame:
+  // the offset over 8 px is the lag in moves (frames). The sweep keeps the page's left edge in view.
+  // Bursts: a real mouse or touchpad sends several events per frame (here 8 moves of 1 px and 4
+  // wheel events of a quarter notch per 16 ms tick), which the per-event cost has to survive.
+  await mark("empty-pan", async () => {
+    const step = 8;
+    const sweep = 40;
+    const at = (index: number) => {
+      const phase = index % (2 * sweep);
+      const offset = phase < sweep ? phase : 2 * sweep - phase;
+      return { clientX: ex - (sweep / 2) * step + offset * step, clientY: ey, pointerId: 1, pointerType: "mouse", isPrimary: true, bubbles: true, cancelable: true };
+    };
+    canvas.dispatchEvent(new PointerEvent("pointerdown", { ...at(0), button: 1, buttons: 4 }));
+    await every(16, 5, (index) => {
+      const from = at(Math.max(index - 1, 0)).clientX;
+      const to = at(index);
+      for (let part = 1; part <= 8; part += 1) {
+        canvas.dispatchEvent(new PointerEvent("pointermove", { ...to, clientX: from + ((to.clientX - from) * part) / 8, button: -1, buttons: 4 }));
+      }
+      const phase = index % (2 * sweep);
+      if (phase === sweep / 2 || phase === sweep + sweep / 2) {
+        send({ event: "snap", scenario: "empty-pan", index, step: phase < sweep ? step : -step, canvas: where() });
+      }
+    });
+    canvas.dispatchEvent(new PointerEvent("pointerup", { ...at(0), button: 1, buttons: 0 }));
+  });
+  // The still page after the pan: the offset between canvas and frame at rest.
+  send({ event: "snap", scenario: "empty-rest", index: 0, step: 0, canvas: where() });
+  await sleep(1000);
+  // The empty page, zoomed as `wheel-zoom` zooms the 5 000-path page.
+  await mark("empty-zoom", () =>
+    every(16, 5, (index) => {
+      const sign = Math.floor(index / 30) % 2 === 0 ? -1 : 1;
+      for (let part = 0; part < 4; part += 1) {
+        canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: (sign * 100) / 4, clientX: ex, clientY: ey, ctrlKey: true, bubbles: true, cancelable: true }));
+      }
+    }),
+  );
   const outcome = session.import_svg(new TextEncoder().encode(generatedSvg(5000)), "perf-5000.svg");
   send({ event: "loaded", outcome, document: "generated 5000 paths" });
   session.fit_document();
