@@ -99,6 +99,53 @@ the tessellation depends on the scale only), which helps the fit zoom; (3) level
 Note (Proposal): the per-frame dash and marker budgets are now spent on visible objects only, so
 a frame that used to exhaust them may draw more dashes or markers in view than before.
 
+## Frame pacing on the empty page (2026-11-19, `perf/frame-pacing`)
+
+The customer: after PRs #387 and #393 pan and zoom feel the same on the 5 000-path page, and on an
+**empty** page they are choppy, the white page trailing its frame. There `render()` costs about
+0.03 ms of Rust, so this is pacing, latency or main-thread stalls, not the draw list. New probe
+scenarios `empty-pan` and `empty-zoom` (bursts of 8 moves or 4 wheel events per 16 ms tick, as a fast
+mouse sends) and columns (`tools/perf/README.md`, "Frame pacing").
+
+Measured under Xvfb (software GL, so `render()` is about 9.5 ms of GL submit per frame and the
+animation frames run at about 40 per second instead of 60; the main-thread numbers of JS and React
+hold on any machine):
+
+| empty page | before | after (zoom: no React state per wheel event) |
+|---|---|---|
+| empty-zoom: editor (`App`) renders/s | 17.9 | 0 |
+| empty-zoom: editor render+commit ms per render, ms per s | 6.5, 110 | -, 0 |
+| empty-zoom: rAF interval p50 / p95 / p99 / max ms | 26 / 36 / 51 / 61 | 25 / 28 / 36 / 59 |
+| empty-zoom: intervals > 33 ms / > 50 ms (of about 290) | 31 / 3 | 4 / 1 |
+| empty-zoom: wheel events per drawn frame, event to `render()` p50 / p95 ms | 4.0, 10 / 13 | 4.0, 11 / 13 |
+| empty-pan: editor renders/s, rAF p50 / p95 ms, > 33 ms | 0.1, 26 / 32, 9 | 0.1, 25 / 32, 8 (unchanged) |
+| empty-pan: pointermove handler, moves per drawn frame | 0.014 ms, 8.0 | 0.021 ms, 8.0 |
+| wheel-zoom (5 000 paths): editor renders/s | 6.0 | 0 |
+
+What the measurement says:
+- **The zoom re-rendered the whole editor.** Every wheel event set `zoomPercent` React state in
+  `useEditorSession`, so React rendered `App` and everything under it (6.5 ms each here, about
+  110 ms of main thread per second of zoom, 18 renders per second); its only reader is the colour
+  pick chip's `viewKey`, which follows the wheel through its own listener. The pan never did this
+  (0.1 renders/s) and its handlers cost about 0.02 ms per move: there is nothing to coalesce on the
+  pan side; the eight moves of a frame already end in one `render()`.
+- **The page frame is committed a frame after the canvas draw.** `PageFrames` reads
+  `pages_json()` in its own animation frame but sets React state there, and React 19 commits it in a
+  later task: 0 of about 140 commits per scenario landed inside the frame, every one after it, so
+  the DOM outline is painted one frame after the canvas was drawn for the same view. The rulers
+  paint inside the frame. Whether that shows as a trailing page depends on how late the
+  compositor shows the canvas: under Xvfb (which shows the canvas a frame late, `frame_gate.rs`)
+  the screenshots mid-pan show outline and page edge together in one run (0 moves) and the
+  outline one move behind the page in 5 of 8 snapshots of another; the customer sees the opposite
+  order on a GPU, which Xvfb cannot show.
+- No long tasks exist in WebKit (`PerformanceObserver` has no `longtask`); the stall detector found
+  none on the empty page. Present mode and `desired_maximum_frame_latency` do nothing on the WebGL
+  backend (the page composites the canvas), so they are not a lever. The repeat draw of
+  `frame_gate.rs` happens once after motion stops (submit/s equals changed/s during a pan).
+- Next by data: draw the page frame in the same frame as the canvas (phase 2: commit it inside the
+  render loop's frame, or draw the outline in the wgpu list), then measure the trailing on the
+  customer's machine with `python3 -I tools/perf/measure.py --desktop --timeout 600`.
+
 - Memory (2 % of 64 GB = about 1.3 GB): measure wasm heap versus JS heap versus GPU buffers before
   touching anything; likely wgpu buffers and undo history, not a fix target by default.
 
