@@ -2,7 +2,7 @@
 """Measures the native Curvyo app (Tauri on WebKitGTK) under Xvfb: process CPU and RSS from /proc
 every second, joined with the frame counters of the page probe (`frontend/src/lib/perfProbe.ts`).
 Standard library only. See README.md. Usage: tools/perf/measure.py [--no-build] [--out DIR]
-[--desktop] [--ablate [VARIANT,...]]
+[--desktop] [--ablate [VARIANT,...] | --gl-bench]
 """
 import argparse, asyncio, base64, hashlib, json, os, signal, struct, subprocess, sys, time
 from pathlib import Path
@@ -41,21 +41,33 @@ def descendants(root_pid):
     return found
 
 
-def sample(root_pid):
-    """(cpu seconds, rss MiB, {process name: cpu seconds}) summed over the app's process tree."""
-    cpu, rss, by_name = 0.0, 0.0, {}
+def cpu_of(stat):
+    """(name, utime+stime seconds) of one /proc stat line."""
+    fields = stat[stat.rindex(")") + 2:].split()
+    return stat[stat.index("(") + 1:stat.rindex(")")], (int(fields[11]) + int(fields[12])) / TICKS
+
+
+def sample(root_pid, threads=False):
+    """(cpu seconds, rss MiB, {process name: cpu seconds}, {thread name: cpu seconds}) summed over
+    the app's process tree; the threads (of the WebKit web process only, named like
+    `WebProc/<thread>`, those of one name summed) only when `threads`."""
+    cpu, rss, by_name, by_thread = 0.0, 0.0, {}, {}
     for pid in descendants(root_pid):
         try:
-            stat = Path(f"/proc/{pid}/stat").read_text()
-            name = stat[stat.index("(") + 1:stat.rindex(")")]
-            fields = stat[stat.rindex(")") + 2:].split()
-            seconds = (int(fields[11]) + int(fields[12])) / TICKS
+            name, seconds = cpu_of(Path(f"/proc/{pid}/stat").read_text())
             cpu += seconds
             by_name[name] = by_name.get(name, 0.0) + seconds
             rss += int(Path(f"/proc/{pid}/statm").read_text().split()[1]) * PAGE / 2**20
+            if threads and name.startswith("WebKitWebProc"):
+                for task in os.listdir(f"/proc/{pid}/task"):
+                    try:
+                        thread, seconds = cpu_of(Path(f"/proc/{pid}/task/{task}/stat").read_text())
+                    except OSError:
+                        continue
+                    by_thread[thread] = by_thread.get(thread, 0.0) + seconds
         except OSError:
             pass
-    return cpu, rss, by_name
+    return cpu, rss, by_name, by_thread
 
 
 async def read_frame(reader):
@@ -82,10 +94,12 @@ def text_frame(message):
     return head + data
 
 
-async def launch(args, out, order, extra_env=None, interval=1.0, log_name="events.ndjson"):
-    """Starts the app once, hands the page `order` (`{"mode": "full"}` or one ablation variant),
-    samples the process tree every `interval` s until the page's `done` (or the timeout) and
-    returns (events, procs, done)."""
+async def launch(args, out, order, extra_env=None, interval=1.0, log_name="events.ndjson", threads=False, facts=None):
+    """Starts the app once, hands the page `order` (`{"mode": "full"}`, one ablation variant or
+    the GL bench), samples the process tree every `interval` s (its web process's threads too with
+    `threads`) until the page's `done` (or the timeout) and returns (events, procs, done). `facts`,
+    a dict, receives the web process's GL libraries and DRI devices once the page has sent its
+    platform strings."""
     events, procs, state = [], [], {"done": asyncio.Event(), "env": None}
     log = open(out / log_name, "w")
 
@@ -136,8 +150,10 @@ async def launch(args, out, order, extra_env=None, interval=1.0, log_name="event
             if tree and not state["env"] and not args.desktop:
                 state["env"] = display_env(tree)
             if tree:
-                cpu, rss, names = sample(tree)
-                procs.append({"wall": time.time(), "cpu": cpu, "rss": rss, "names": names})
+                cpu, rss, names, by_thread = sample(tree, threads)
+                procs.append({"wall": time.time(), "cpu": cpu, "rss": rss, "names": names, "threads": by_thread})
+                if facts is not None and "libs" not in facts and any(e["event"] == "platform" for e in events):
+                    facts.update(gl_facts(tree))
             await asyncio.sleep(interval)
     finally:
         os.killpg(xvfb.pid, signal.SIGTERM)
@@ -163,6 +179,8 @@ async def main():
     parser.add_argument("--desktop", action="store_true", help="run on the current DISPLAY instead of Xvfb")
     parser.add_argument("--ablate", nargs="?", const="all", metavar="VARIANT,...",
                         help="only the empty-page pan, once per variant (default: all): " + ", ".join(ABLATE_ORDER))
+    parser.add_argument("--gl-bench", action="store_true",
+                        help="GL micro benchmarks in one launch: our wgpu canvas, raw WebGL2, 2D and CSS-transform canvases at 1, 1/2, 1/4 size")
     args = parser.parse_args()
     if not args.no_build:
         build()
@@ -171,8 +189,13 @@ async def main():
     if args.ablate:
         await ablate(args, out)
         return
-    events, procs, done = await launch(args, out, {"mode": "full"})
+    if args.gl_bench:
+        await gl_bench(args, out)
+        return
+    facts = {}
+    events, procs, done = await launch(args, out, {"mode": "full"}, facts=facts)
     json.dump(procs, open(out / "procs.json", "w"))
+    print_platform(events, facts, args)
     if not done:
         print(f"timed out before scenario {unfinished(events)} (--timeout {args.timeout} s)")
     report(events, procs, out)
@@ -200,8 +223,12 @@ async def ablate(args, out):
     for variant in variants:
         page = "baseline" if variant in ABLATE_ENV or variant == "baseline-again" else variant
         print(f"ablate: {variant} ...", file=sys.stderr, flush=True)
+        facts = {}
         events, procs, done = await launch(args, out, {"mode": "ablate", "variant": page, "warmup": ABLATE_WARMUP, "seconds": ABLATE_SECONDS},
-                                           extra_env=ABLATE_ENV.get(variant), interval=0.25, log_name=f"ablate-{variant}.ndjson")
+                                           extra_env=ABLATE_ENV.get(variant), interval=0.25, log_name=f"ablate-{variant}.ndjson",
+                                           threads=True, facts=facts if not rows else None)
+        if not rows:
+            print_platform(events, facts, args)
         rows.append(ablation_row(variant, events, procs, done))
     json.dump(rows, open(out / "ablate.json", "w"), indent=1)
     print_ablation(rows, args)
@@ -234,6 +261,7 @@ def ablation_row(variant, events, procs, done):
         row["web"], row["gpu"] = share("WebKitWebProc"), share("WebKitGPUProc")
         row["total"] = (window[-1]["cpu"] - window[0]["cpu"]) * 100 / secs
         row["other"] = row["total"] - row["web"] - row["gpu"]
+        row["threads"] = top_threads(window)
     n = max(len(rows), 1)
     row["submit"] = sum(r["submitted"] for r in rows) / n
     row["changed"] = sum(r["changed"] for r in rows) / n
@@ -276,10 +304,181 @@ def print_ablation(rows, args):
     for r in rows:
         if r.get("applied") and r["variant"] not in ("baseline", "baseline-again") and r["variant"] not in ABLATE_ENV:
             print(f"  {r['variant']}: {r['applied']}")
+        if r.get("threads"):
+            print(f"  {r['variant']} web-process threads: {r['threads']}")
         for w in r["warnings"]:
             print(f"  WARNING {r['variant']}: {w}")
     print("web % = WebKitWebProcess, gpu % = WebKitGPUProcess (- or 0 when WebKit runs none), other % = the rest of the tree "
           "(curvyo-app, network process); all in % of one core over the measured window. Raw rows: ablate.json, ablate-<variant>.ndjson")
+
+
+def top_threads(window, count=4):
+    """The web process's busiest thread names over `window` (process samples), as text: `name
+    pct%` in % of one core, threads of one name summed (`llvmpipe-0..N` would mean Mesa's
+    software rasterizer)."""
+    if len(window) < 2 or not window[-1].get("threads"):
+        return ""
+    secs = window[-1]["wall"] - window[0]["wall"]
+    a, b = window[0]["threads"], window[-1]["threads"]
+    grouped = {}
+    for name, seconds in b.items():
+        key = name.rstrip("0123456789") + ("N" if name[-1:].isdigit() else "")
+        grouped[key] = grouped.get(key, 0.0) + seconds - a.get(name, 0.0)
+    top = sorted(grouped.items(), key=lambda kv: -kv[1])[:count]
+    return ", ".join(f"{name} {100 * seconds / secs:.0f}%" for name, seconds in top if seconds > 0.005 * secs)
+
+
+def gl_facts(tree):
+    """What the web process renders with, seen from outside: the GL, EGL, DRI and driver libraries
+    it mapped and the DRI devices it holds open (no `/dev/dri/renderD*` and a `swrast`/`llvmpipe`
+    library mean software GL; new Mesa maps `libgallium` for llvmpipe and hardware drivers
+    alike, so the threads line decides then)."""
+    libs, devices = set(), set()
+    pattern = ("libGL", "libEGL", "libgallium", "_dri.so", "dri_gbm", "libvulkan", "nvidia", "swrast", "llvmpipe", "libdrm_", "libgbm", "zink", "libLLVM")
+    for pid in descendants(tree):
+        try:
+            name = Path(f"/proc/{pid}/stat").read_text().split("(", 1)[1].rsplit(")", 1)[0]
+            if not name.startswith("WebKitWebProc") and not name.startswith("WebKitGPUProc"):
+                continue
+            for line in Path(f"/proc/{pid}/maps").read_text().splitlines():
+                path = line.split()[-1] if line.count("/") else ""
+                if any(p in path for p in pattern):
+                    libs.add(Path(path).name)
+            for fd in os.listdir(f"/proc/{pid}/fd"):
+                try:
+                    target = os.readlink(f"/proc/{pid}/fd/{fd}")
+                except OSError:
+                    continue
+                if target.startswith("/dev/dri") or "nvidia" in target:
+                    devices.add(target)
+        except OSError:
+            pass
+    return {"libs": sorted(libs), "devices": sorted(devices), "gpus": gpus(devices)}
+
+
+VENDORS = {"0x10de": "NVIDIA", "0x1002": "AMD", "0x8086": "Intel", "0x1af4": "virtio", "0x15ad": "VMware"}
+
+
+def gpus(devices):
+    """The GPUs behind the DRI nodes in `devices` (`/sys/class/drm/<node>/device`: PCI vendor,
+    device and kernel driver), or of every DRI card when none is open, so the run names the GPU
+    even where WebGL's strings are masked; plus the NVIDIA kernel driver's version if loaded."""
+    nodes = [Path(d).name for d in devices if d.startswith("/dev/dri/")]
+    if not nodes:
+        nodes = sorted(p.name for p in Path("/sys/class/drm").glob("card[0-9]")) if Path("/sys/class/drm").exists() else []
+    found = []
+    for node in nodes:
+        device = Path("/sys/class/drm") / node / "device"
+        try:
+            vendor = (device / "vendor").read_text().strip()
+            model = (device / "device").read_text().strip()
+            driver = os.path.basename(os.readlink(device / "driver"))
+        except OSError:
+            continue
+        found.append(f"{node}: {VENDORS.get(vendor, vendor)} {vendor}:{model} driver {driver}")
+    try:
+        found.append("nvidia kernel driver: " + Path("/proc/driver/nvidia/version").read_text().splitlines()[0])
+    except (OSError, IndexError):
+        pass
+    return found
+
+
+def lock_versions(*names):
+    """`name version` of each crate in `names` from the workspace's Cargo.lock (tauri, wry)."""
+    found, current = {}, None
+    try:
+        for line in (ROOT / "Cargo.lock").read_text().splitlines():
+            if line.startswith("name = "):
+                current = line.split('"')[1]
+            elif line.startswith("version = ") and current in names and current not in found:
+                found[current] = line.split('"')[1]
+    except OSError:
+        pass
+    return ", ".join(f"{name} {found.get(name, '?')}" for name in names)
+
+
+def webkit_version():
+    """The installed WebKitGTK version (pkg-config, else pacman), '?' without either: the user
+    agent of WebKitGTK carries a frozen WebKit version."""
+    for command in (["pkg-config", "--modversion", "webkit2gtk-4.1"], ["pacman", "-Q", "webkit2gtk-4.1"]):
+        try:
+            return subprocess.run(command, capture_output=True, text=True, check=True).stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            continue
+    return "?"
+
+
+def print_platform(events, facts, args):
+    """The header of the bench and the ablation: what renders, from the page and from outside."""
+    info = next((e for e in events if e["event"] == "platform"), None)
+    print(f"\nplatform ({'desktop' if args.desktop else 'Xvfb'}): WebKitGTK {webkit_version()}, {lock_versions('tauri', 'wry')}; session "
+          + ", ".join(f"{k}={os.environ[k]}" for k in ("XDG_SESSION_TYPE", "WAYLAND_DISPLAY", "DISPLAY", "GDK_BACKEND", "LIBGL_ALWAYS_SOFTWARE",
+                                                          "WEBKIT_DISABLE_COMPOSITING_MODE", "WEBKIT_DISABLE_DMABUF_RENDERER", "MESA_LOADER_DRIVER_OVERRIDE") if k in os.environ))
+    if not info:
+        print("  (the page sent no platform strings)")
+        return
+    print(f"  userAgent: {info['userAgent']}")
+    for label, strings in (("scratch WebGL2", info.get("scratch")), ("editor canvas (wgpu's context)", info.get("editor"))):
+        if not strings:
+            print(f"  {label}: no webgl2 context")
+            continue
+        print(f"  {label}: RENDERER {strings['unmaskedRenderer']!r}, VENDOR {strings['unmaskedVendor']!r} "
+              f"(masked {strings['renderer']!r} / {strings['vendor']!r}), {strings['version']}, {strings['glsl']}, MAX_SAMPLES {strings['maxSamples']}")
+        print(f"    context attributes: {json.dumps(strings['attributes'])}" + (", LOST" if strings.get("lost") else ""))
+    print("  wgpu: " + "; ".join(line for line in info.get("wgpu", "").splitlines()) if info.get("wgpu") else "  wgpu: (no adapter info)")
+    if facts:
+        print(f"  web process GL libraries: {', '.join(facts.get('libs', [])) or 'none found'}")
+        print(f"  web process DRI devices: {', '.join(facts.get('devices', [])) or 'none open (software GL?)'}")
+        label = "GPUs behind them" if facts.get("devices") else "GPUs of the machine (none open)"
+        print(f"  {label}: {'; '.join(facts.get('gpus', [])) or 'none found in /sys/class/drm'}")
+
+
+async def gl_bench(args, out):
+    """The GL micro benchmarks (`frontend/src/lib/perfGlBench.ts`) in one app launch: one row per
+    bench and size, its CPU from the process samples between the bench's start and end."""
+    facts = {}
+    events, procs, done = await launch(args, out, {"mode": "glbench"}, interval=0.25, log_name="glbench.ndjson", threads=True, facts=facts)
+    json.dump(procs, open(out / "glbench-procs.json", "w"))
+    print_platform(events, facts, args)
+    if not done:
+        print(f"WARNING: timed out after {args.timeout} s; the rows below are the benches that ended")
+    starts = {}
+    rows = []
+    for e in events:
+        if e["event"] != "bench":
+            continue
+        key = (e["name"], e["size"])
+        if e["state"] == "start":
+            starts[key] = e["wall"]
+            continue
+        start = starts.get(key)
+        window = [p for p in procs if start is not None and start <= p["wall"] <= e["wall"]]
+        row = {"name": e["name"], "size": e["size"], "backing": e["backing"], "css": e["css"], "note": e["note"], "frames": len(e["intervals"]),
+               "p50": quantile(e["intervals"], 0.5), "p95": quantile(e["intervals"], 0.95)}
+        if len(window) >= 2:
+            secs = window[-1]["wall"] - window[0]["wall"]
+            a, b = window[0]["names"], window[-1]["names"]
+            share = lambda prefix: sum(b[k] - a.get(k, 0) for k in b if k.startswith(prefix)) * 100 / secs
+            row["web"], row["gpu"] = share("WebKitWebProc"), share("WebKitGPUProc")
+            row["threads"] = top_threads(window, 3)
+        rows.append(row)
+    json.dump(rows, open(out / "glbench.json", "w"), indent=1)
+    mode = "desktop (real display)" if args.desktop else "Xvfb (software GL: checks that every bench runs; the numbers mean nothing)"
+    print(f"\nGL bench, 4 s of animation frames per row after 0.5 s settle; {mode}")
+    print(f"{'bench':<15} {'size':<8} {'backing':>10} {'Mpx':>5} {'css':>10} {'frames':>6} {'rAF p50':>7} {'p95':>6} {'web %':>6} {'gpu %':>6}  busiest web-process threads; note")
+    for r in rows:
+        cpu = lambda k: f"{r[k]:6.1f}" if k in r else f"{'-':>6}"
+        css = f"{r['css'][0]:.0f}x{r['css'][1]:.0f}"
+        print(f"{r['name']:<15} {r['size']:<8} {r['backing'][0]:>5}x{r['backing'][1]:<4} {r['backing'][0] * r['backing'][1] / 1e6:5.2f} {css:>10} {r['frames']:6d} "
+              f"{r['p50']:7.1f} {r['p95']:6.1f} {cpu('web')} {cpu('gpu')}  {r.get('threads', '')}; {r['note']}")
+    end = next((e for e in events if e["event"] == "platform-end"), None)
+    if end and end.get("editorLost"):
+        print("WARNING: the editor's WebGL context was lost by the end of the bench (too many contexts?)")
+    for e in events:
+        if e["event"] == "error":
+            print(f"page error in {e['scenario']}: {e['message'][:300]}")
+    print("size: 1, 1/2, 1/4 per side of the editor canvas, CSS box shrunk with it (1:1); `str`: that backing store stretched over the full CSS box. "
+          "web % / gpu % = WebKitWebProcess / WebKitGPUProcess in % of one core. Raw: glbench.json, glbench.ndjson, glbench-procs.json")
 
 
 SCENARIOS = ["idle-empty", "empty-pan", "empty-zoom", "idle-5000", "wheel-zoom", "pan-drag"]

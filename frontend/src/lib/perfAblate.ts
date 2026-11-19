@@ -23,6 +23,14 @@ export const ABLATIONS = [
 export type Ablation = (typeof ABLATIONS)[number];
 
 let active: Ablation = "baseline";
+// The GL bench's (`perfGlBench.ts`) extra factor on the backing store's ratio: 1, 1/2 or 1/4.
+let backingScale = 1;
+
+/** Sets the factor the GL bench scales the canvas's backing store by (the CSS box stays); the
+ * caller refits the canvas. */
+export function setPerfBackingScale(scale: number) {
+  backingScale = scale > 0 ? scale : 1;
+}
 
 /** The pixel ratio the canvas's backing store is sized with under `variant`: the window's own,
  * 1 (`dpr1`: the backing store is the CSS size) or half of it (`half-backing`: half the device
@@ -35,7 +43,7 @@ export function ablatedPixelRatio(variant: Ablation, raw: number): number {
 
 /** The ratio the editor sizes the canvas's backing store with (the raw one outside the perf build). */
 export function perfPixelRatio(raw: number): number {
-  return enabled ? ablatedPixelRatio(active, raw) : raw;
+  return enabled ? ablatedPixelRatio(active, raw) * backingScale : raw;
 }
 
 /** Whether the render loop skips `render()` (`no-draw`): the view still moves, nothing is drawn. */

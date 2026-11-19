@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { ablatedPixelRatio, ablationInput, perfPixelRatio, perfSkipDraw } from "../src/lib/perfAblate.ts";
+import { ablatedPixelRatio, ablationInput, perfPixelRatio, perfSkipDraw, setPerfBackingScale } from "../src/lib/perfAblate.ts";
 
 test("dpr1 sizes the backing store at CSS size, half-backing at half the device pixels", () => {
   assert.equal(ablatedPixelRatio("dpr1", 2), 1);
@@ -25,4 +25,10 @@ test("no-view hovers, idle sends nothing, every other variant pans", () => {
 test("outside the perf build the window's ratio is kept and every frame is drawn", () => {
   assert.equal(perfPixelRatio(2), 2);
   assert.equal(perfSkipDraw(), false);
+});
+
+test("outside the perf build the GL bench's backing-store factor is ignored", () => {
+  setPerfBackingScale(0.25);
+  assert.equal(perfPixelRatio(2), 2);
+  setPerfBackingScale(1);
 });

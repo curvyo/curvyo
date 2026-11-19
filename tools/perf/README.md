@@ -16,6 +16,11 @@ python3 -I tools/perf/measure.py --desktop --ablate        # the same on the rea
 python3 -I tools/perf/measure.py --no-build --ablate baseline,dpr1,no-rulers   # chosen variants only
 ```
 
+```text
+python3 -I tools/perf/measure.py --gl-bench                # GL micro benchmarks (below), one launch, about 3.5 minutes
+python3 -I tools/perf/measure.py --desktop --gl-bench --timeout 1200   # the same on the real display and GPU
+```
+
 `--desktop` starts the app on the current `DISPLAY` (no `xvfb-run`, no forced `GDK_BACKEND`): the
 numbers of a real GPU and the desktop compositor's pacing. It takes no screenshots (the window is
 wherever the window manager puts it), so the `lag` line is not measured there.
@@ -112,6 +117,81 @@ On a desktop: run `--desktop --ablate` from a terminal on that display and leave
 uncovered for the whole run (about 14 launches of 15-20 s each; WebKit may throttle a hidden or
 minimised view). The window manager places each launch, so its size can differ between rows: the
 `win` column shows it.
+
+## GL bench (`--gl-bench`)
+
+Separates the platform's cost of presenting a canvas from ours. The ablation showed the empty-page
+pan at 16 fps with the whole cost in presenting the freshly drawn wgpu canvas; this asks whether
+any WebGL (or 2D, or composited) canvas of that size costs the same in this webview. One app
+launch; the page (`frontend/src/lib/perfGlBench.ts`, perf build only) runs every bench for 0.5 s
+unrecorded (context creation, shader compile) and then 4 s of animation frames.
+
+Header (`platform`, printed by `--gl-bench`, `--ablate` and the full run): the installed WebKitGTK
+(`pkg-config`/`pacman`: the user agent carries a frozen `AppleWebKit/605.1.15`), the session
+variables (`XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, `GDK_BACKEND`, WebKit and Mesa flags), the
+`navigator.userAgent`, the `VENDOR`/`RENDERER`/`VERSION` strings (unmasked through
+`WEBGL_debug_renderer_info` when WebKit gives them; WebKitGTK 2.54 answers `Apple GPU` / `Apple
+Inc.`, so they say nothing there), `MAX_SAMPLES` and the context attributes of a scratch WebGL2
+canvas and of the editor canvas's own context (the one wgpu created: read-only calls only), wgpu's
+adapter and surface configuration (`WasmSession::gpu_info`: adapter, backend, device type, driver,
+surface format, present mode, alpha mode, sample count, what the surface offers), and from outside
+the web process: the GL/EGL/DRI/driver libraries it mapped, the `/dev/dri` devices it holds
+open and the GPU behind each (PCI vendor and device and kernel driver from `/sys/class/drm`; every
+card of the machine when none is open; the NVIDIA kernel driver's version if loaded), and the
+`tauri` and `wry` versions of `Cargo.lock`. The decisive line is the threads one: each row (and each `--ablate` row) names the web
+process's busiest threads; `llvmpipe-N` with a large share means Mesa renders WebGL in software
+(new Mesa maps `libgallium` for llvmpipe and hardware drivers alike, so the library list alone
+does not tell). No `/dev/dri/renderD*` open points the same way.
+
+Sizes: `1`, `1/2`, `1/4` per side of the editor canvas's backing store, the CSS box shrunk with
+it (1:1, no scaling); `1/2 str` and `1/4 str` that backing store stretched over the full CSS box,
+as `half-backing` did. If only the stretched rows are slow, the cost is WebKit's scaling path, not
+GL. Benches, in run order (ours first, while no scratch context has been made and dropped; every
+scratch WebGL context is freed with `WEBGL_lose_context` at once, since WebKit drops the oldest
+context beyond its limit, which would be the editor's):
+
+| bench | what draws per frame |
+|---|---|
+| `wgpu-pan` | our canvas, the empty page panned as in `--ablate` (its CSS box pinned in px and shrunk for 1:1, `perfAblate.ts`'s backing factor for `str`); the note has submits/s and flags a lost editor context |
+| `wgpu-pan+gl` | the same at full size plus a plain WebGL canvas of 1/4 size in the top right corner cleared each frame: does a second GL present cost the same? |
+| `gl-opaque` | a raw WebGL2 canvas over the editor canvas: `gl.clear` and one tiny triangle; `alpha:false`, no depth, no antialias |
+| `gl-alpha-pma` | the same, `alpha:true, premultipliedAlpha:true` |
+| `gl-alpha-nopma` | the same, `alpha:true, premultipliedAlpha:false` |
+| `gl-wgpu-ctx` | the same with the attributes wgpu creates its context with (only `antialias:false`: alpha, premultiplied alpha and depth true) |
+| `gl-wgpu-path` | that context plus wgpu's frame shape on WebGL (wgpu-hal `gles/web.rs`): clear and draw into a multisampled colour and depth target at wgpu's sample count, resolve into a texture, blit it Y-flipped into the canvas |
+| `2d-fill` | a 2D canvas, `fillRect` of the whole canvas in a new colour |
+| `css-transform` | a 2D canvas painted once; only its CSS `translateX` changes (the compositor's baseline) |
+
+`preserveDrawingBuffer` is false everywhere (as in wgpu). The table: bench, size, backing store
+and Mpx, CSS box, frames, `rAF p50`/`p95` of the bench's own `requestAnimationFrame` loop,
+`web %`/`gpu %` (WebKitWebProcess/WebKitGPUProcess, % of one core between the bench's start and
+end, `/proc` sampled every 0.25 s), the busiest web-process threads and a note (the context's real
+attributes). Raw: `target/perf/glbench.json`, `glbench.ndjson`, `glbench-procs.json`.
+
+Reading it: `gl-*` as slow as `wgpu-pan` at the same size means any GL present costs that much
+here (platform: software GL, a readback, the compositing path), not our frame; `gl-wgpu-path` slow
+while `gl-wgpu-ctx` is fast points at the MSAA target, resolve and blit (ours to change);
+`2d-fill` and `css-transform` slow too means presenting anything costs that much.
+
+Xvfb check (this machine, 2026-11-19, software GL, 944x776, numbers mean nothing): every bench
+ran, no context lost. Even here `gl-wgpu-path` at full size took 268 % (224 % in `llvmpipe`
+threads) against 88 % for `gl-wgpu-ctx` (the 8x MSAA target with depth, its resolve and the blit,
+on a software rasterizer), and the stretched `wgpu-pan` rows were slower than the 1:1 full size
+(p50 32-35 ms against 26, the web process's main thread at 92-97 %), as `half-backing` was on the
+customer's desktop.
+
+**On the customer's desktop**, from a terminal on that display, with the window left open and
+uncovered for the whole run:
+
+```text
+git switch perf/frame-pacing && git pull --ff-only
+python3 -I tools/perf/measure.py --desktop --gl-bench --timeout 1200
+```
+
+Send back the whole output (the `platform` header with the GL strings, libraries, DRI devices and
+wgpu lines, and the table). `--timeout 1200`: at 60 ms frames the run takes longer than the
+default 600 s allows for safety. Nothing else is needed (`glxinfo -B` from `mesa-utils` adds the
+Mesa driver's own name, optional).
 
 ## Columns
 
