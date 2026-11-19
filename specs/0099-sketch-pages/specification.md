@@ -1,6 +1,6 @@
 # Sketch pages: a sketch page holds only its sketch, and the sketch is used elsewhere as a linked clone
 
-Status: Done (PR #287; Frage 157 A and 158 A accepted with the PR)
+Status: Done (PR #287; Frage 157 A and 158 A accepted with the PR); revision 2026-11-19 (criteria 23 to 31, sketch instances with parameter handles) Draft (Frage 274 decided A; not Ready: architect addendum for the instance mechanism and `format_version`, UX notes for Expose and the handles missing)
 Priority: Should
 Origin: Customer (2026-11-05, translated): "The Sketch workbench moves to the same model: a Sketch is a page kind. [...] Sketches are positioned only via linked clone, they are fixed on their page." "Objects can be moved anywhere: pasteboard, over a laser page, over a sketch page. Moving always works; editing only in the context of an active vector page or a matching manufacturing page." Slice 2 of `specs/0063-manufacturing-workbenches/` (concept A, `concept-output-pages.md` §2.1, §2.7, §5 flow 9, §9; sketches f and i). Builds on the merged `0098` `page-kinds` (PR #279), which made Sketch a page kind, put the sketch tools on sketch pages and converts old files. Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 
@@ -74,6 +74,26 @@ The page-row drag out of the list onto the canvas (drag source, ghost, drop on a
 21. Given the whole slice, then there is no network access, no device I/O, no G-code and no telemetry (`R-SYS-002`, `R-SYS-007`).
 22. Given Place clone on, Select clones, Select original onto a sketch page and Convert to paths, when each is used with the mouse or the keyboard, then focus ends on the canvas, because the panel control belongs to a tab the new page does not have. This overrides the `0049` key rule (first control of the new body) for commands that change the page only; commands that stay on the page keep theirs (Unlink clone keeps its notice and focus on the first Style control).
 
+## Revision 2026-11-19 (customer): a sketch placed as an instance with its own parameters, dragged as handles
+
+Origin: Customer (2026-11-19, translated): a parametric sketch is placed as an **instance** on any page, and its parameters (radius, distance, ...) are dragged as handles on the instance. Decision of the product owner: this **extends `0099` and `0057`**, not a new entry: the placed thing is the linked clone of the sketch (`0049`, `0099` criteria 8 to 10) and what it gains is a third override beside "own placement" and "own style" of `0057`: **own parameter values**. Status of this revision: Draft, not built; the slice above stays Done. Everything marked **(Proposal)** is the product owner's and vetoable at the demo. The idea is also the base of the parametric generators of `0141` (the second kind of parametric instance).
+
+Words: **Exposed parameter:** a named parameter or a driving dimension of the sketch (`0066`) that the maker marked "Expose", so that clones may set their own value. The sketch's own value is the **default**.
+
+23. Given a sketch with a named parameter or a driving dimension, then the parameter's row in the sketch's Parameters list, and the dimension's editor, have an **Expose** switch (off by default **(Proposal)**; Frage 274 A: only exposed values); exposing stores the parameter's name, its unit kind (length, angle, count) and its limits (the minimum and maximum the maker typed, default unlimited) with the sketch; one undo step "Expose parameter".
+24. Given a linked clone of a sketch with exposed parameters (selected on a drawing, laser or sketch page), then its Style tab clone block (`0049`, `0057`) gets a third override row **Parameters** (Original's / Own, two-state, the look of the Placement and Style rows), and a list of the exposed parameters with a value field each; typing a value in one makes the row Own for that parameter; "Back to the sketch's value" per parameter and one for all. Nothing jumps on a switch (the rule of `0057`).
+25. Given such a clone selected, then each exposed **length or radius or diameter** parameter shows a **handle** on the clone: a small dot at the dimension's anchor point of the clone with the dimension's own arrow when dragged; dragging it sets this clone's own value live (blue new, black old preview of the design system), within the parameter's limits and snapping to whole mm with Shift **(Proposal: the step)**; an **angle** parameter shows a rotation handle on its arc; a **count** parameter (AC53 of `0066` revision 6) shows no handle, only the field. One undo step "Change parameter" per drag; Escape restores.
+26. Given a clone with its own parameter values, then the clone's geometry is the sketch **solved with those values** (the solver runs per distinct set of values; clones with the same set share one result), then placed by the clone's matrix as today; if the sketch with those values has no valid solution, the clone keeps its last valid geometry, is drawn in the warning style and its Parameters row says "No solution for these values"; the sketch itself and the other clones are unaffected (permit over refuse: the value stays, the maker sees why).
+27. Given the sketch changes (a constraint, a dimension, an exposed parameter's default), then every clone follows under the rules of `0049` and `0057` with its own parameter values kept; given an exposed parameter that was removed or renamed, then clones keep the values by parameter id (a rename follows) and a removed parameter's own value is dropped without notice **(Proposal)**.
+28. Given a linked clone of a clone (`0049`, chains up to 8), then the parameter overrides of the first clone apply to the chain's geometry and the later clones may carry their own (an own value wins).
+29. Given Convert to paths or Unlink clone on such a clone, then the paths are those of its own parameter values (not the sketch's default); given the output and SVG export, then the same geometry.
+30. Given save and reopen, then the exposed list is saved with the sketch and the own values with the clone; a file without them opens unchanged; `format_version` change by the architect (the minimum: an optional record on the sketch and on the clone, its clone matrix and override flags as of `0057`).
+31. Given a document with 200 clones of one sketch, each with a distinct own value, then changing a handle re-solves only the clone being dragged within 16 ms of thread CPU time per drag step and the other clones are untouched (tested in `curvyo-editor-wasm/tests/cpu_time/`).
+
+Decision (customer, 2026-11-19): **Frage 274 (INST-EXPOSE): A.** Only the values the maker marked Expose may be changed by a clone (a deliberate interface, no clutter of handles).
+
+Out of scope for this revision: a clone that adds or removes sketch entities, instance overrides of constraints, parameter animation, changing a parameter of the **sketch itself** from a clone's handle (the handle sets the clone's own value only), the parametric generators (`0141`).
+
 ## Changes to accepted specs
 
 This slice changes accepted criteria; the old text is superseded by the criterion named here.
@@ -85,6 +105,7 @@ This slice changes accepted criteria; the old text is superseded by the criterio
 | `0066` | 8 | Convert to paths replaces the sketch with paths on its page | the page also becomes a drawing page (15; Frage 157) |
 | `0066` | 9 | entering a clone's Sketch editing context opens the source page | double-click or Select original activates the sketch page (13) |
 | `0098` | 5 | a page's kind is fixed; no command changes it | fixed, except that Convert to paths turns a sketch page into a drawing page (15; Frage 157 A). A general kind change is `0104` |
+| `0057` | override rows | two overrides (Placement, Style) | a third, Parameters (24); the two others unchanged |
 | `0098` | 8 | a press inside a page's frame activates it | except a press on a drawing object lying over a sketch page while a drawing page is active (2) |
 
 ## Out of scope

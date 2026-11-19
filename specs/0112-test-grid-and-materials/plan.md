@@ -378,8 +378,8 @@ Tests first in every task. Each module's doc comment one sentence without "and".
 
 - [x] E1. Decoders `testGridView.ts`, `materialsView.ts`, `materialWrites.ts` check every field;
   tests decode each C9 fixture and reject a missing and a mistyped field (AC 3 to 6, 17 to 27).
-- [x] E2. `ToolRail.tsx`/`railCard.ts`: third button of "More tools", `TestGridGlyph`, dimmed with
-  "Laser pages only." off laser pages, no letter key (G1) (AC 1).
+- [x] E2. `ToolRail.tsx`/`railCard.ts`: third button of "More tools", `TestGridGlyph`, no letter key (G1) (AC 1).
+- [ ] E2a. Revision 2026-11-19: off laser pages the button is not rendered (no dimming, no "Laser pages only."); an active Test grid tool falls back to Select when the page stops being a laser page. Change `ToolRail.tsx` and the tests `frontend/tests/testGridBarSource.test.ts` and `frontend/tests/acceptance_0112_tester.test.ts` that assert the dimmed button.
 - [x] E3. `useTestGridTool.ts` (only caller of the grid bindings; camera and crop never in
   `useEditorSession.ts`) and `TestGridBar.tsx`: two rows per UX 4.1, mono id, Kind and parameter
   radiogroups, plain fields with units, Crosshatch toggle, whole-group wrapping and the one break
@@ -487,7 +487,7 @@ Tests first in every task. Each module's doc comment one sentence without "and".
 ## Demo path (desktop and browser)
 
 1. New project, laser page with Generic laser; Materials tab after Operations, empty but
-   "+ New material". On a drawing page the Test grid tool is dimmed, "Laser pages only.".
+   "+ New material". On a drawing page the Test grid tool is not in the card.
 2. Test grid tool: the outline follows the pointer; press: a 5 x 5 Cut grid at the press, one
    step "Add test grid", id in row 1, the Operations tab holds 26 rows ("... · K7Q2M",
    "K7Q2M labels"); the id, axis titles and values are on the canvas.

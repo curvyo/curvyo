@@ -1,6 +1,6 @@
 # Align and distribute: a row of symbol buttons in the Select bar
 
-Status: Done (PR #239, merged 2026-11-01)
+Status: Done (PR #239, merged 2026-11-01); revision 2026-11-19 (criteria 23 to 27, hover preview) Draft (Frage 285 decided A; not Ready: UX notes addendum for the dashed preview missing)
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated): "We definitely need it too, similar to Inkscape but user-friendly. Inkscape's features are good but not easy to operate, and it takes long to understand them."
 
@@ -42,6 +42,18 @@ Customer report: "distribute on page and align on page don't work yet". Customer
 20. Given the button pressed, then objects are placed in reading order (top to bottom, then left to right, by their position before the operation) into cells of the grid, filling rows first. All cells have the size of the largest object box in the selection; each object is centred in its cell; the horizontal and vertical distance between neighbouring cells is exactly Gap. The top-left corner of the whole grid is the top-left corner of the selection box before the operation. A test with 6 objects of different sizes, 2 rows, 3 columns and Gap 5 mm asserts every box centre within 1e-6 mm and that the order is the reading order.
 21. Given the grid operation, then it is one history step named "Arrange in a grid", undone as one; the selection stays; objects move whole (a group or compound path as one, criterion 2), linked clones through their own placement (criterion 11), locked objects keep their place and still occupy their cell (criterion 10). A grid that changes no position records no history step. The three fields keep their values until the selection changes.
 22. Given the grid group, then every control is reachable with Tab and Enter applies the fields on the button; no dialog or popup opens, and the group wraps to the second line of the Select bar when the bar is narrow, as the other groups (`0056`).
+
+### Revision 2026-11-19 (customer): hover preview of the result
+
+Origin: Customer (2026-11-19, translated): on hover over an align or distribute button a dashed preview of the result should show. Status of this revision: Draft, not built; the slice above stays Done. Everything marked **(Proposal)** is the product owner's and vetoable at the demo. The same idea for the Boolean buttons was proposed in `0016` (P1 to P3, "Specified but not built") and never accepted; this revision is the customer's request for the Align, Distribute and Arrange in a grid buttons and **shares one preview mechanism with `0016` P1 to P3 if both are built** (Proposal; the architect decides).
+
+23. Given a valid selection (or the page rule of criterion 15) and an enabled button of the Align, Distribute or Arrange in a grid groups, when the pointer has rested on the button for 100 ms (`0016` P1), or the button has keyboard focus that came from the keyboard, then every object that would move is drawn at its new position as a **dashed** hollow outline (1.5 px, the `--preview-new` colour of the design system's "Blue new, black old" rule, white casing), while the objects stay drawn where they are; objects that would not move get no preview. It disappears in the frame in which the pointer leaves the button or the button is pressed (the real result replaces it).
+24. Given the preview, then it uses the same function as the operation (criteria 2 to 8 and 14 to 20), so the dashed outlines equal the result of pressing within 0.01 mm; a test compares both for each of the 10 buttons plus Arrange in a grid.
+25. Given a selection of more than 500 objects or outlines of more than 20,000 nodes in total, then no preview is drawn and the button works as before (no notice, no hint: the preview is a convenience; `0016` P2 shows a note only in its tooltip, which this revision does not add **(Proposal)**).
+26. Given the typed gap field (criterion 8) or the grid's Rows, Columns and Gap fields, then the preview of Distribute and Arrange in a grid uses the values currently in the fields, also unapplied ones; a value that would change nothing draws no preview. Given a locked object (criterion 10), then it gets no preview (it does not move).
+27. Given the preview, then it is view state only: it creates no history step, no document change and no network or I/O; the compute budget is 16 ms of thread CPU time for 200 objects (tested in `curvyo-editor-wasm/tests/cpu_time/`).
+
+Decision (customer, 2026-11-19): **Frage 285 (ARRANGE-PREVIEW): A.** The preview shows on hover or keyboard focus of the button (criterion 23); no press-and-hold variant and no switch.
 
 ## Implementation interpretation (2026-10-30)
 

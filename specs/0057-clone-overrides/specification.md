@@ -237,6 +237,9 @@ Tab order as above; both groups reachable and operable without the mouse; mixed 
 
 ## Links
 
+Revision note 2026-11-19: `0099` (revision, criteria 23 to 31) adds a third override, own parameter values of a sketch clone, with handles; the two overrides of this spec stay unchanged.
+
+
 Requirements: R-EDIT-036 (`docs/requirements.md`); related R-EDIT-030, R-EDIT-012.
 Builds on: `specs/0049-linked-clone/` (built in PR #121, not merged; this spec extends its clone block, its matrix rules and `clone_link`), `specs/0017-style-panel-rework/` and `specs/0018-stroke-markers/` (what a style is), `specs/0019-multi-object-transform/` (group box), `specs/0050-layers-and-objects-panel/` (opacity, flags, row tooltips)
 Amends: see "Changes to accepted specs".
