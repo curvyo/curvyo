@@ -6,9 +6,12 @@ import { type Busy, type LinkEntry } from "./connectorLink.ts";
 import {
   type Line,
   type StatusMessage,
+  clearsRefusal,
   controllerWord,
   errorLine,
+  PAUSE_PENDING_TEXT,
   hasProgress,
+  jobButtons,
   jobLineAlerts,
   jobStateLine,
 } from "./connectorText.ts";
@@ -55,6 +58,29 @@ export function homeButton(entry: LinkEntry): HomeButton {
   }
   if (entry.busy !== null) return off(null);
   return { enabled: true, busy: false, cause: null };
+}
+
+/** What Pause shows: the same three things as Home. */
+export type PauseButton = HomeButton;
+
+/** Whether the connector keeps a Pause pending while the job homes (`specs/0133`). */
+export function pausePending(status: StatusMessage | null): boolean {
+  return status?.state.name === "Running" && status.pause_pending === true;
+}
+
+/** Pause in the toolbar: while pending it stays busy, driven by the status and without a time
+ * limit, with "Pause after homing" as its second line (`specs/0133` UX notes H3, H5). */
+export function pauseButton(entry: LinkEntry): PauseButton {
+  if (pausePending(entry.status)) return { enabled: false, busy: true, cause: PAUSE_PENDING_TEXT };
+  const pause = jobButtons(entry.status?.state ?? null).pause;
+  return { enabled: pause && entry.busy === null, busy: entry.busy === "pause", cause: null };
+}
+
+/** Whether the refusal of the maker's own press ends with `next`: when the job moves into another
+ * state with a line count (as built), or, for a refusal that holds only in the state it was given
+ * in (`refusedAt`: "No job to pause", `specs/0133` H8), at any other state. */
+export function refusalEnds(last: StatusMessage | null, next: StatusMessage, refusedAt: string | null): boolean {
+  return clearsRefusal(last, next) || (refusedAt !== null && next.state.name !== refusedAt);
 }
 
 /** The progress bar under the state line. */
@@ -155,8 +181,9 @@ export const SETTLES: Record<
 > = {
   start: { done: () => true, ms: 0 },
   home: { done: () => true, ms: 0 },
-  resume: { done: (s) => s?.state.name !== "Paused", ms: 3_000 },
-  pause: { done: (s) => s?.state.name !== "Running", ms: 3_000 },
+  // A pending pause is the connector's answer: from there the status drives Pause (`specs/0133`).
+  resume: { done: (s) => s?.state.name !== "Paused" && !pausePending(s), ms: 3_000 },
+  pause: { done: (s) => s?.state.name !== "Running" || pausePending(s), ms: 3_000 },
   stop: {
     done: (s) => !["Running", "Paused", "Homing"].includes(s?.state.name ?? ""),
     ms: 8_000,
