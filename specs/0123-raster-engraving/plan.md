@@ -247,12 +247,12 @@ first (a bug, also visible in Cut), then R2 to R9 in order, each green on its ow
   first read works 100,000 dots (AC 37 d, ADR 0069 §12); U3 to U9 and the nits (`KeyOnKind`,
   `libm` in the workspace, the 300 ms mark armed once per pending job); A7 `look.rs`,
   `input.rs`, `operation_image_options.rs` split; A5, A6, A8 docs.
-- [ ] E1. Full gate (`CLAUDE.md` §7); browser check of the demo path.
-- [ ] E2. Docs: notes on ADR 0011, 0046, 0054, 0056, 0057, 0058, 0064 (ADR 0069 §13's list; written
+- [x] E1. Full gate (`CLAUDE.md` §7); browser check of the demo path.
+- [x] E2. Docs: notes on ADR 0011, 0046, 0054, 0056, 0057, 0058, 0064 (ADR 0069 §13's list; written
   2026-11-19, F3); ADR 0068/0069 accepted with the PR;
-  `docs/requirements.md` R-MFG-LASER-001; spec `Status: Done (PR #n)`; `specs/README.md` row and
+  `docs/requirements.md` R-MFG-LASER-001; spec `Status: Done (PR #394)`; `specs/README.md` row and
   format plan.
-- [ ] E3. PR with "What changes in the demo" and the review guide.
+- [x] E3. PR with "What changes in the demo" and the review guide.
 
 ## Debt (sizes over the `CLAUDE.md` §5 limits, justified)
 

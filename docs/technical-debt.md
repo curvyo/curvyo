@@ -9,6 +9,22 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 (each names its slice). An entry is removed when its resolution lands, or stays with the note that
 it is accepted for good.
 
+## Test grid chips overlap the page label and the Operations toggle at the page top edge (older than `0123`, 2026-11-19)
+
+The chips of a test grid placed at the top edge of its page sit on the page label and the
+Operations toggle. Seen in the `0123` browser check; it predates that slice.
+
+**Resolution:** place the chips inside the grid's frame or move the page label and the toggle
+clear of them.
+
+## Home, End and the strip keys on the test grid bar (older than `0123`, 2026-11-19)
+
+Home and End and the strip keys (the arrow keys of a segmented strip) do not work on the test
+grid bar the way they do on the Dither strip and the other segmented pickers. Seen in the `0123`
+UX review; it predates that slice.
+
+**Resolution:** give the test grid bar the shared strip key handling.
+
 ## A raster job at the dot limit is built on the main thread (`0123`, ADR 0069 §12, 2026-11-19)
 
 The sweeps of a raster job are worked in ticks of 300,000 dots on the main thread (one share per
