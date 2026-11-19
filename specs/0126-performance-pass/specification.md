@@ -1,6 +1,6 @@
 # Performance pass: idle CPU, a draw only when something changed, and a view that stays glued to its frame
 
-Status: In progress (PRs #387, #393, #395, #419; remaining: selection decorations, tessellation reuse while panning)
+Status: In progress (PRs #387, #393, #395, #419, #422; remaining: the per-frame path copies of the node decorations, per-object tessellation reuse on very large pages)
 Priority: Should
 Origin: Customer (2026-11-18): about 8.5 % of one core and 2 % of 64 GB while idle; scroll, zoom and pan feel laggy, the white of the page trails the frame.
 
@@ -20,7 +20,8 @@ the drag without the page trailing behind its frame, on a laptop as on a worksta
 - Input (finding 3): #395, a wheel event no longer re-renders the editor; the pan already ended
   in one `render()` per frame.
 - Large pages: #393 tessellates only what the canvas shows; the selection's per-frame cost is in
-  `plan.md`, "Selection cost".
+  `plan.md`, "Selection cost" (#422); a pan that shows the same objects draws the artwork of the
+  frame before (`perf/pan-reuse`, `plan.md`, "Pan and zoom on large pages").
 
 ## Findings (read from the code on 2026-11-18, before the measurements)
 

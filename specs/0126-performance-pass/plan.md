@@ -200,6 +200,76 @@ lookups, not remove them. Next in line by data: reuse of the tessellation while 
 pans (the fit zoom draws everything, 13 ms), and below 500 selected units the member boxes are
 still measured every frame (`cached_oriented_bounds` per selected leaf).
 
+## Pan and zoom on large pages (2026-11-19, `perf/pan-reuse`)
+
+Step 1, measured first (`tests/frame_phase_cost.rs`, native release, thread CPU, the pointer over
+the canvas; new: a pan at the fit with the scale unchanged, the GPU vertex build in the shape
+`gpu_vertex.rs` builds, and a page of 20 000 paths, release build only). On the 20 000-path page
+"fit" is the page's fit (scale 3.78, the full width): the page is four times as tall, so 8 201
+paths are in view. Draw list split by laps with uncommitted instrumentation, nothing selected:
+
+| frame | 5 000 draw list | of it artwork (cull) | GPU vertices | 20 000 draw list | of it artwork (cull) | GPU vertices |
+|---|---|---|---|---|---|---|
+| rest (fit) | 12.6 | 9.5 (1.3) | 1.3 | 37.1 | 23.8 (6.4) | 2.5 |
+| pan at the fit | 12.7 | 9.7 (1.3) | 1.3 | 34.7 | 22.3 (6.1) | 2.3 |
+| zoom (ten notches) | 8.8 | 5.9 (1.4) | 0.7 | 22.8 | 11.2 (5.5) | 0.8 |
+| pan zoomed in | 3.9 | 2.1 (1.0) | 0.2 | 17.8 | 6.8 (5.3) | 0.2 |
+
+Upload and submit exist only in the wasm probe (5 000 paths, Xvfb, software GL): upload
+0.9-2.2 ms, submit 26-28 ms per drawn frame, the fixed cost of software GL. Choice by the data:
+(b) a level of detail would skip nothing here: at the fit every generated path is about 30 x 19
+px, none below 2 px; and it does nothing for a pan. (a) took the artwork of the pan frames
+(about 75 % of the fit pan) and the cull over every object (5 ms of each 20 000-path frame).
+
+Step 2, built (`session/artwork_memo.rs`, `session/view_cull.rs`), exact by construction:
+- The tessellation reads the view's scale, never its origin (unit test: the same objects at
+  the same scale and three origins give the same list bit for bit). The session keeps the
+  artwork of its own read (no live edit, style or text preview, pattern, operation look, remote
+  drag or tiling: any of them gives other objects than the read, which is never kept) from the
+  second frame of one key on, and draws it again while the cull keeps the same objects. The
+  key: the read and its guides (held, by identity), the laser set, the scale's bits, the tool,
+  the selection, the hover, the canvas size and the pixel ratio. A zoom's frames each have a
+  scale of their own and never copy their list.
+- The kept list is the frame list with the same objects, not a wider one: a margin of off-canvas
+  objects would spend the per-frame dash and marker budgets and the layer depths differently.
+  The GPU vertices are still built per frame relative to the view origin, no shader changed.
+- The cull boxes (outline box, stroke reach) of every object are measured once per read; the
+  cull of a pan or zoom frame is then a test of boxes with the answer `in_view` gives.
+- Tests: a pan draws the kept list and the frame equals a fresh build (triangles, layers, depths,
+  overlay); zoom, document edit, selection, tool, hover, canvas size and a style preview build
+  afresh; a property test over random zooms and pans compares every frame with a fresh build and
+  the kept path's artwork with the uncached one (dashes, arrow markers, a guide, a linked clone,
+  a gradient fill, objects across every canvas edge).
+
+| frame, draw list ms (native release) | 5 000 none before | after | 5 000 all selected before | after | 20 000 none before | after |
+|---|---|---|---|---|---|---|
+| pan at the fit (middle button) | 13.1 | 4.1 | 13.6 | 4.9 | 34.1 | 31.2 |
+| wheel or trackpad pan at the fit | - | 4.0 | - | 4.9 | - | 31.7 |
+| zoom | 8.8 | 7.4 | 8.9 | 8.4 | 22.8 | 18.3 |
+| pan zoomed in | 4.6 | 2.3 | 4.9 | 3.4 | 16.8 | 11.9 |
+| (repeat of one view, test only) | 13.3 | 6.2 | 14.5 | 6.9 | 37.0 | 18.7 |
+
+The last row is a frame drawn again for an unchanged view: the frame gate draws that only once
+after motion stops, so the user does not feel it. The wheel pan (`Session::wheel` without Ctrl)
+changes neither hover nor selection, so a trackpad pan draws the kept list as a drag does. A list
+is copied into the memo only when the key and the kept objects repeat, so a zoom or the
+20 000-path fit pan (new objects in every frame) never copies one.
+
+The probe (wasm under Xvfb, about 300 drawn frames, draw list per drawn frame): `pan-drag` 7.9
+-> 5.2 ms, `pan-drag-none` 6.9 -> 4.2 ms, `wheel-zoom` 10.3 -> 8.6 ms, `wheel-zoom-none` 8.7 ->
+7.1 ms; upload and submit unchanged (1.0-2.2, 26-28 ms). The canvas screenshots at the start and
+end of every scenario are pixel-identical to the run before (ImageMagick `compare`, 0 pixels).
+
+What is left, by data (not built here):
+- The 20 000-path pan at the fit is still 31 ms: objects enter and leave the view in every frame
+  (the page is taller than the canvas), so the kept list is never drawn. Reusing the
+  tessellation per object would need a render-core API (the layers of each object and what it
+  spent of the dash and marker budgets) to stay exact: an architect decision first.
+- About 7 ms of every 20 000-path frame (1.7 ms at 5 000), in every tool, pan and zoom alike, are
+  two full copies of every path (`live_node_drag_paths_in`, then `control_view` in
+  `Session::draw_list`) for the node decorations; next in line.
+- A hit copies the kept list into the frame (about 1 ms at 450 000 vertices).
+
 - Memory (2 % of 64 GB = about 1.3 GB): measure wasm heap versus JS heap versus GPU buffers before
   touching anything; likely wgpu buffers and undo history, not a fix target by default.
 
