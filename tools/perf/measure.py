@@ -2,9 +2,9 @@
 """Measures the native Curvyo app (Tauri on WebKitGTK) under Xvfb: process CPU and RSS from /proc
 every second, joined with the frame counters of the page probe (`frontend/src/lib/perfProbe.ts`).
 Standard library only. See README.md. Usage: tools/perf/measure.py [--no-build] [--out DIR]
-[--desktop] [--ablate [VARIANT,...] | --gl-bench]
+[--desktop] [--ablate [VARIANT,...] | --gpu-variants [VARIANT,...] | --gl-bench]
 """
-import argparse, asyncio, base64, hashlib, json, os, signal, struct, subprocess, sys, time
+import argparse, asyncio, base64, hashlib, json, os, re, signal, struct, subprocess, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -16,7 +16,9 @@ PAGE = os.sysconf("SC_PAGE_SIZE")
 def build():
     # `vite build` alone bundles whatever wasm `frontend/src/wasm-bindings` holds: bindings older
     # than the page leave the render loop dead (zero counters in every scenario).
-    subprocess.run(["npm", "run", "build:wasm"], cwd=ROOT / "frontend", check=True)
+    # The `perf` feature compiles in the GPU-path switches of `--gpu-variants`
+    # (`curvyo-editor-wasm/src/gpu_variant.rs`); without them every variant runs as baseline.
+    subprocess.run(["npm", "run", "build:wasm"], cwd=ROOT / "frontend", env=dict(os.environ, CURVYO_WASM_FEATURES="perf"), check=True)
     env = dict(os.environ, VITE_CURVYO_PERF=f"ws://127.0.0.1:{PORT}")
     subprocess.run(["npx", "vite", "build", "--outDir", "dist-perf", "--emptyOutDir"], cwd=ROOT / "frontend", env=env, check=True)
     env = dict(os.environ, TAURI_CONFIG=json.dumps({"build": {"frontendDist": "../frontend/dist-perf"}}))
@@ -179,6 +181,8 @@ async def main():
     parser.add_argument("--desktop", action="store_true", help="run on the current DISPLAY instead of Xvfb")
     parser.add_argument("--ablate", nargs="?", const="all", metavar="VARIANT,...",
                         help="only the empty-page pan, once per variant (default: all): " + ", ".join(ABLATE_ORDER))
+    parser.add_argument("--gpu-variants", nargs="?", const="all", metavar="VARIANT,...",
+                        help="only the empty-page pan, once per variant of our wgpu path (default: all): " + ", ".join(GPU_ORDER))
     parser.add_argument("--gl-bench", action="store_true",
                         help="GL micro benchmarks in one launch: our wgpu canvas, raw WebGL2, 2D and CSS-transform canvases at 1, 1/2, 1/4 size")
     args = parser.parse_args()
@@ -188,6 +192,9 @@ async def main():
     out.mkdir(parents=True, exist_ok=True)
     if args.ablate:
         await ablate(args, out)
+        return
+    if args.gpu_variants:
+        await gpu_variants(args, out)
         return
     if args.gl_bench:
         await gl_bench(args, out)
@@ -234,11 +241,12 @@ async def ablate(args, out):
     print_ablation(rows, args)
 
 
-def ablation_row(variant, events, procs, done):
+def ablation_row(variant, events, procs, done, config_event="ablation"):
     """One row of the matrix: pacing, CPU per process kind and the checks that the variant took
-    effect, from one launch's events and process samples."""
+    effect, from one launch's events and process samples (`config_event`: the page's event that
+    says what it applied, `ablation` or `gpu-variant`)."""
     row = {"variant": variant, "done": done, "warnings": []}
-    config = next((e for e in events if e["event"] == "ablation"), None)
+    config = next((e for e in events if e["event"] == config_event), None)
     start = next((e for e in events if e["event"] == "scenario" and e["name"] == "measure" and e["state"] == "start"), None)
     end = next((e for e in events if e["event"] == "scenario" and e["name"] == "measure" and e["state"] == "end"), None)
     for e in events:
@@ -267,7 +275,7 @@ def ablation_row(variant, events, procs, done):
     row["changed"] = sum(r["changed"] for r in rows) / n
     row["render"] = sum(r["renderMs"] for r in rows) / max(sum(r["built"] for r in rows), 1)
     # The checks that the variant did what it says.
-    page = config["variant"]
+    page = config.get("page", config["variant"])
     ratio = {"dpr1": 1, "half-backing": config["dpr"] / 2}.get(page, config["dpr"])
     expected = [round(config["css"][0] * ratio), round(config["css"][1] * ratio)]
     if any(abs(x - y) > 1 for x, y in zip(config["backing"], expected)):
@@ -277,7 +285,7 @@ def ablation_row(variant, events, procs, done):
     # A hover changes the session (and draws) without moving the view: only the view counts here.
     if page in ("no-view", "idle") and start.get("view") != end.get("view"):
         row["warnings"].append(f"the view moved ({start.get('view')} -> {end.get('view')})")
-    if page not in ("no-view", "idle") and start.get("view") == end.get("view") and row["changed"] < 1:
+    if page not in ("no-view", "idle") and config.get("input") != "redraw" and start.get("view") == end.get("view") and row["changed"] < 1:
         row["warnings"].append("the pan did not move the view")
     if " 0 " in f" {config['applied']} " or config["applied"].startswith("unknown"):
         row["warnings"].append(f"variant matched nothing: {config['applied']}")
@@ -310,6 +318,133 @@ def print_ablation(rows, args):
             print(f"  WARNING {r['variant']}: {w}")
     print("web % = WebKitWebProcess, gpu % = WebKitGPUProcess (- or 0 when WebKit runs none), other % = the rest of the tree "
           "(curvyo-app, network process); all in % of one core over the measured window. Raw rows: ablate.json, ablate-<variant>.ndjson")
+
+
+# The GPU-path variants in run order (`frontend/src/lib/perfGpuVariants.ts` splits a name into its
+# page part and its wasm part, `curvyo-editor-wasm/src/gpu_variant.rs`); `+` combines parts.
+# `redraw-static` and `page-no-draw` are the controls: the whole present path with no page change,
+# and the page's change with no present.
+GPU_ORDER = ["baseline", "samples-4", "samples-1", "ctx-no-depth", "ctx-opaque", "ctx-desync", "ctx-all", "no-fences",
+             "reuse-vertex-buffer", "cache-vertices", "draw-after-input", "redraw-static", "page-no-draw", "page-canvas-only",
+             "ctx-all+samples-1+no-fences+cache-vertices", "baseline-again"]
+
+
+async def gpu_variants(args, out):
+    """Runs the empty-page pan once per GPU-path variant, a fresh app each, and prints one table."""
+    variants = GPU_ORDER if args.gpu_variants == "all" else [v.strip() for v in args.gpu_variants.split(",") if v.strip()]
+    rows = []
+    for variant in variants:
+        page = "baseline" if variant == "baseline-again" else variant
+        print(f"gpu variant: {variant} ...", file=sys.stderr, flush=True)
+        facts = {}
+        safe = variant.replace("+", "_")
+        events, procs, done = await launch(args, out, {"mode": "gpu", "variant": page, "warmup": ABLATE_WARMUP, "seconds": ABLATE_SECONDS},
+                                           interval=0.25, log_name=f"gpu-{safe}.ndjson", threads=True, facts=facts if not rows else None)
+        if not rows:
+            print_platform(events, facts, args)
+        rows.append(gpu_row(variant, page, events, procs, done))
+    json.dump(rows, open(out / "gpu-variants.json", "w"), indent=1)
+    print_gpu_variants(rows, args)
+
+
+def gpu_row(variant, page_variant, events, procs, done):
+    """An ablation row plus what the GPU variant changed: the effective sample count, context
+    attributes and wgpu variant line, the per-frame phases and the vertex upload counts, with a
+    warning for every part that did not take effect."""
+    row = ablation_row(variant, events, procs, done, "gpu-variant")
+    config = next((e for e in events if e["event"] == "gpu-variant"), None)
+    end = next((e for e in events if e["event"] == "scenario" and e["name"] == "measure" and e["state"] == "end"), None)
+    if not config:
+        return row
+    info = config.get("gpu", "")
+    samples = re.search(r"sample count: (\d+)", info)
+    line = re.search(r"variant: (.*)", info)
+    row.update(samples=int(samples.group(1)) if samples else None, wgpu=line.group(1) if line else "(no variant line: wasm without the perf feature?)",
+               wasm=config.get("wasm"), context=config.get("context"), attributes=config.get("attributes"), counts=(end or {}).get("counts", []))
+    seconds = [e for e in events if e["event"] == "second" and e["scenario"] == "measure"]
+    phases = [r["phases"] for r in seconds if len(r.get("phases", [])) == 7]
+    frames = sum(p[0] for p in phases)
+    if frames:
+        row["phases"] = [sum(p[i] for p in phases) / frames for i in range(1, 5)]
+    parts = page_variant.split("+")
+    warn = row["warnings"].append
+    if str(config.get("wasm", "")).startswith("NOT APPLIED"):
+        warn(f"wasm part: {config['wasm']}")
+    if "NOT CREATED" in str(config.get("context")):
+        warn(f"context: {config['context']}")
+    if config.get("notTaken"):
+        warn(f"context attributes not taken: {', '.join(config['notTaken'])}")
+    if config.get("unknown"):
+        warn(f"unknown parts (ignored): {', '.join(config['unknown'])}")
+    asked = next((int(p.split('-')[1]) for p in parts if re.fullmatch(r"samples-\d+", p)), None)
+    if asked is not None and row["samples"] != asked:
+        warn(f"asked for {asked}x MSAA, the adapter runs {row['samples']}x")
+    if "no-fences" in parts and "fences=auto-finish" not in info:
+        warn("no-fences did not take (wgpu variant line without fences=auto-finish)")
+    counts = row["counts"]
+    if "cache-vertices" in parts and (len(counts) < 2 or counts[1] == 0):
+        warn(f"cache-vertices skipped no upload (written, skipped, created: {counts})")
+    if "reuse-vertex-buffer" in parts and len(counts) == 3 and counts[2] > max(frames, 1) / 2:
+        warn(f"reuse-vertex-buffer still created {counts[2]:.0f} buffers in {frames:.0f} frames")
+    if ("redraw-static" in parts or "draw-after-input" in parts) and row.get("submit", 0) < 1:
+        warn(f"{variant} drew nothing (submit/s {row.get('submit', 0):.1f})")
+    return row
+
+
+def context_flags(attributes):
+    """The context attributes that decide the present, short: `a` alpha, `d` depth, `s` stencil,
+    `aa` antialias, `pma` premultiplied alpha, `ds` desynchronized, 1 or 0 each."""
+    if not attributes:
+        return "-"
+    keys = (("a", "alpha"), ("d", "depth"), ("s", "stencil"), ("aa", "antialias"), ("pma", "premultipliedAlpha"), ("ds", "desynchronized"))
+    return " ".join(f"{short}{int(bool(attributes.get(key)))}" for short, key in keys)
+
+
+def print_gpu_variants(rows, args):
+    first = next((r for r in rows if "backing" in r), None)
+    mode = "desktop (real display)" if args.desktop else "Xvfb (software GL; compare rows, not absolute values)"
+    print(f"\nGPU-path variants of the empty-page pan: {ABLATE_WARMUP} s warm-up, {ABLATE_SECONDS} s measured per variant, one app launch each; {mode}")
+    if first:
+        print(f"canvas backing {first['backing'][0]}x{first['backing'][1]} device px (CSS {first['css'][0]}x{first['css'][1]}), "
+              f"devicePixelRatio {first['dpr']:g}, window {first['window'][0]}x{first['window'][1]} CSS px")
+    print(f"{'variant':<44} {'msaa':>4} {'rAF p50':>7} {'p95':>6} {'>33ms':>5} {'web %':>6} {'gpu %':>6} {'other %':>7} {'submit/s':>8} "
+          f"{'list ms':>7} {'upload':>6} {'submit':>6}  context")
+    for r in rows:
+        if "p50" not in r:
+            print(f"{r['variant']:<44} (no data)")
+            continue
+        cpu = lambda k: f"{r[k]:6.1f}" if k in r else f"{'-':>6}"
+        phases = r.get("phases")
+        ms = f"{phases[0]:7.2f} {phases[2]:6.2f} {phases[3]:6.2f}" if phases else f"{'-':>7} {'-':>6} {'-':>6}"
+        print(f"{r['variant']:<44} {str(r.get('samples', '-')):>4} {r['p50']:7.1f} {r['p95']:6.1f} {r['over33']:5d} {cpu('web')} {cpu('gpu')} {cpu('other'):>7} "
+              f"{r['submit']:8.1f} {ms}  {context_flags(r.get('attributes'))}")
+    for r in rows:
+        if r.get("wgpu"):
+            print(f"  {r['variant']}: wgpu {r['wgpu']}; context {r.get('context')}; uploads written/skipped/buffers created {r.get('counts')}")
+        if r.get("applied") and r["applied"] != "baseline":
+            print(f"  {r['variant']} page: {r['applied']}")
+        if r.get("threads"):
+            print(f"  {r['variant']} web-process threads: {r['threads']}")
+        for w in r["warnings"]:
+            print(f"  WARNING {r['variant']}: {w}")
+    measured = [r for r in rows if "p50" in r]
+    base = next((r for r in measured if r["variant"] == "baseline"), None)
+    if base and len(measured) > 1:
+        controls = lambda r: r["variant"] in ("baseline", "baseline-again", "redraw-static") or any(p.startswith("page-") for p in r["variant"].split("+"))
+        best = min((r for r in measured if not controls(r)), key=lambda r: r["p50"], default=None)
+        static = next((r for r in measured if r["variant"] == "redraw-static"), None)
+        nodraw = next((r for r in measured if r["variant"] == "page-no-draw"), None)
+        if static and nodraw:
+            print(f"controls: redraw-static (our present, no page change) {static['p50']:.1f} ms, page-no-draw (the page's change, no present) "
+                  f"{nodraw['p50']:.1f} ms, baseline (both) {base['p50']:.1f} ms; compare with gl-opaque of --gl-bench")
+        again = next((r for r in measured if r["variant"] == "baseline-again"), None)
+        noise = f", noise floor (baseline vs baseline-again) {abs(base['p50'] - again['p50']):.1f} ms" if again else ""
+        if best:
+            print(f"fastest drawing variant: {best['variant']} at rAF p50 {best['p50']:.1f} ms ({best['submit']:.1f} submits/s) against baseline "
+                  f"{base['p50']:.1f} ms ({base['submit']:.1f} submits/s){noise}; a row that submits fewer frames is no win by its p50 alone")
+    print("msaa = the sample count wgpu really runs; list/upload/submit = main-thread ms per drawn frame (Session::frame_draw_list, Gpu::prepare, "
+          "Gpu::draw: encode, submit, present; GPU and compositor time are not in them, rAF and web % are); context = the editor canvas's real "
+          "attributes (a alpha, d depth, s stencil, aa antialias, pma premultipliedAlpha, ds desynchronized). Raw rows: gpu-variants.json, gpu-<variant>.ndjson")
 
 
 def top_threads(window, count=4):

@@ -21,6 +21,11 @@ python3 -I tools/perf/measure.py --gl-bench                # GL micro benchmarks
 python3 -I tools/perf/measure.py --desktop --gl-bench --timeout 1200   # the same on the real display and GPU
 ```
 
+```text
+python3 -I tools/perf/measure.py --gpu-variants            # our wgpu path's variants (below), one launch each
+python3 -I tools/perf/measure.py --desktop --gpu-variants  # the same on the real display and GPU
+```
+
 `--desktop` starts the app on the current `DISPLAY` (no `xvfb-run`, no forced `GDK_BACKEND`): the
 numbers of a real GPU and the desktop compositor's pacing. It takes no screenshots (the window is
 wherever the window manager puts it), so the `lag` line is not measured there.
@@ -192,6 +197,94 @@ Send back the whole output (the `platform` header with the GL strings, libraries
 wgpu lines, and the table). `--timeout 1200`: at 60 ms frames the run takes longer than the
 default 600 s allows for safety. Nothing else is needed (`glxinfo -B` from `mesa-utils` adds the
 Mesa driver's own name, optional).
+
+## GPU-path variants (`--gpu-variants`)
+
+Which variant of our real wgpu path gets the empty-page pan closest to the plain WebGL floor
+(`gl-opaque` in `--gl-bench`). One app launch per variant, the measured window as in `--ablate`
+(3 s warm-up, 8 s measured, `/proc` every 0.25 s). The runner sends `{"mode": "gpu", "variant":
+...}`; in the perf build the first `attach_canvas` waits for that order (at most 10 s,
+`perfBeforeAttach` in `frontend/src/lib/perfProbe.ts`), so everything fixed at attach (context
+attributes, sample count, fences) is set before wgpu makes its context. A variant name is parts
+joined by `+`; `frontend/src/lib/perfGpuVariants.ts` splits it into the page's parts and the wasm's
+(`curvyo-editor-wasm/src/gpu_variant.rs`, compiled in only with the `perf` cargo feature, which
+`measure.py`'s build sets through `CURVYO_WASM_FEATURES=perf`; a normal build has no switch).
+
+```text
+python3 -I tools/perf/measure.py --desktop --gpu-variants      # all rows below
+python3 -I tools/perf/measure.py --no-build --gpu-variants baseline,ctx-no-depth,samples-1+ctx-no-depth
+```
+
+| variant | what it changes |
+|---|---|
+| `baseline` | nothing (8x MSAA where the adapter offers it, wgpu's own context) |
+| `samples-4`, `samples-1` | the sample count instead of the preference list (`gpu.rs` `PREFERRED_SAMPLE_COUNTS`). `samples-1` draws straight into wgpu's surface texture: no MSAA target, no resolve, so wgpu-hal's present blit is the only full-canvas copy (edges are not anti-aliased) |
+| `ctx-no-depth` | the editor canvas's WebGL2 context created first with `depth: false` (and wgpu's `antialias: false`); `getContext` hands wgpu that context (wgpu-hal `gles/web.rs` `create_surface_from_canvas`) |
+| `ctx-opaque` | the same with `alpha: false` |
+| `ctx-desync` | the same with `desynchronized: true` |
+| `ctx-all` | `alpha:false, antialias:false, depth:false, stencil:false, premultipliedAlpha:true, powerPreference:'high-performance', desynchronized:true, preserveDrawingBuffer:false` |
+| `no-fences` | wgpu's GL fences short-circuited (`GlFenceBehavior::AutoFinish`): no `fenceSync`/`getSyncParameter` per submit. wgpu-hal's `flush` after every submit (`gles/queue.rs`) cannot be switched off without patching wgpu-hal: it stays |
+| `reuse-vertex-buffer` | one vertex buffer kept and written into, instead of `create_buffer_init` per frame |
+| `cache-vertices` | the vertices kept relative to a fixed anchor (the view's shift goes into the transform uniform, `ScreenTransform::shifted`) and written only when they changed; the counts line says how many uploads it skipped |
+| `draw-after-input` | `render()` right after each input burst (in the probe's timer task), not in the render loop's `requestAnimationFrame` |
+| `redraw-static` | control: no input, a forced frame every animation frame: the whole wgpu present path with no page change (no page frames, rulers or tags moving) |
+| `page-no-draw` | control: the pan with `render()` skipped (the `no-draw` ablation): the page's change with no present. `page-<ablation>` works for every `--ablate` page variant |
+| `page-canvas-only` | the pan with everything but the canvas hidden |
+| `ctx-all+samples-1+no-fences+cache-vertices` | every switch at once |
+| `baseline-again` | `baseline` once more: the noise floor |
+
+Not variants, and why: removing wgpu's own depth attachment changes the picture (the artwork,
+checker and image pipelines depth-test with `less` and depth writes for single coverage per layer,
+`gpu_pipeline.rs` `depth_rule`, `gpu_images.rs`), unlike the context's `depth: false`, which only
+drops the default framebuffer's depth buffer that wgpu never draws into. A present without the
+Y-flipped blit is not possible with stock wgpu-hal: on a non-sRGB surface (`gpu.rs` keeps `Unorm`)
+`gles/web.rs` `Surface::present` always blits wgpu's surface texture into the canvas, the flip is
+only the blit's coordinates and costs nothing extra; `samples-1` is the variant with one copy. A
+surface at 0.75 of the backing store without CSS stretching is not possible either: a canvas shows
+its backing store over its CSS box, so a smaller surface is a stretched one (`half-backing`).
+
+The table: variant, `msaa` (the sample count wgpu really runs, from `WasmSession::gpu_info`),
+`rAF p50`/`p95`/`>33ms`, `web %`/`gpu %`/`other %` as in `--ablate`, `submit/s`, the main-thread ms
+per drawn frame of `list` (`Session::frame_draw_list`), `upload` (`Gpu::prepare`) and `submit`
+(`Gpu::draw`: encode, submit, present), and the editor context's real attributes (`a` alpha, `d`
+depth, `s` stencil, `aa` antialias, `pma` premultiplied alpha, `ds` desynchronized; 1 or 0). The
+phase ms are main-thread encode time only, not GPU or compositor time: compare `rAF p50` and `web
+%`. Under the table per row: wgpu's variant line, which context it got, the vertex uploads
+(written, skipped, buffers created), the busiest web-process threads, and a `WARNING` for every
+part that did not take effect (an attribute the context did not take, a sample count the adapter
+refused, fences not short-circuited, no upload skipped, a wasm built without the `perf` feature,
+an unknown part), then the two controls against `baseline`, and the fastest variant that pans and
+draws (controls and `page-*` rows left out) against `baseline` and the noise floor.
+Raw: `target/perf/gpu-variants.json`, `gpu-<variant>.ndjson`.
+
+Note: the build leaves the perf wasm (with the two `perf_*` exports) in
+`frontend/src/wasm-bindings` until the next `npm run build:wasm` (`npm run dev` and `npm run build`
+run it first). `--no-build` after a normal `build:wasm` runs every wasm part as baseline and says so
+in a `WARNING`.
+
+Xvfb check (this machine, 2026-11-19, software GL, 944x776; the numbers say nothing about a GPU):
+every part took effect: `samples-1` ran 1x (the rest 8x), `ctx-all` got `alpha`, `depth` and
+`stencil` false (WebKitGTK 2.54 reports no `desynchronized` at all: the row warns
+`desynchronized=true->undefined`), `no-fences` printed `fences=auto-finish`, `cache-vertices`
+skipped all 500 uploads of the pan (written 0), `draw-after-input` and `redraw-static` drew (29
+and 60 submits/s), `page-no-draw` none. Software GL makes 8x MSAA the cost here (`samples-1` p50 18
+ms against 26, llvmpipe 93 % against 193 %); `draw-after-input` read 15 ms but drew 29 frames/s
+against 36: compare `submit/s` before taking a lower p50 as a win.
+
+**On the customer's desktop**, from a terminal on that display, with the window left open and
+uncovered for the whole run (16 launches; at 60 ms frames the 11 s of probe ticks stretch to about
+40 s, so about 12-15 minutes):
+
+```text
+git switch perf/frame-pacing && git pull --ff-only
+python3 -I tools/perf/measure.py --desktop --gpu-variants
+```
+
+Reading it: `redraw-static` near the `gl-opaque` floor and `page-no-draw` far above `idle` means
+the extra cost of the pan is the page that moves with the view (page frames, rulers, tags, which
+WebKit repaints and composites on the CPU here), not our GL path, and no GPU variant can remove it.
+`redraw-static` well above the floor points at our present path; then the variant rows say which
+part.
 
 ## Columns
 

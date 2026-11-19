@@ -26,7 +26,7 @@ import {
   FRAME_SYNC_LINK,
   frameView,
 } from "@/lib/frameState";
-import { perfDrawn, perfInput, perfRender, perfSpan, perfStart, renderTick, startPerfScenarios } from "@/lib/perfProbe";
+import { perfBeforeAttach, perfDrawn, perfEnabled, perfInput, perfRender, perfSpan, perfStart, renderTick, startPerfScenarios } from "@/lib/perfProbe";
 import { renderPageThumbnail } from "@/lib/pageThumbnail";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
@@ -1509,6 +1509,9 @@ export function useEditorSession(
           sessionRef.current = session;
           return;
         }
+        // The perf build's GPU variant (context attributes, sample count) is set before wgpu
+        // makes its context; nothing outside the perf build.
+        if (perfEnabled) await perfBeforeAttach(canvas);
         const { width, height, devicePixelRatio } = backingBufferSize(
           canvas.clientWidth,
           canvas.clientHeight,

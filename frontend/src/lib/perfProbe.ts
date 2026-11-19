@@ -4,8 +4,17 @@
 // (`tools/perf/measure.py` does that); a normal build has no probe, no socket and no UI.
 import type { WasmSession } from "@/lib/editorSession";
 import { frameView } from "@/lib/frameState";
-import { ABLATIONS, type Ablation, ablationInput, applyAblation } from "@/lib/perfAblate";
+import { ABLATIONS, type Ablation, ablationInput, applyAblation, setPerfDrawElsewhere } from "@/lib/perfAblate";
 import { platform, runGlBench } from "@/lib/perfGlBench";
+import { attributesNotTaken, type GpuPlan, planGpuVariant } from "@/lib/perfGpuVariants";
+// The perf feature's two exports (`curvyo-editor-wasm/src/gpu_variant.rs`) exist only in a wasm
+// built by `tools/perf/measure.py`; read by name so the page type-checks against either build.
+import * as bindings from "@/wasm-bindings/curvyo_editor_wasm.js";
+
+const wasmPerf = bindings as unknown as {
+  perf_set_gpu_variant?: (variant: string) => string;
+  perf_take_gpu_counts?: () => Float64Array;
+};
 
 const target: string | undefined = import.meta.env.VITE_CURVYO_PERF;
 export const perfEnabled = typeof target === "string" && target.length > 0;
@@ -50,7 +59,11 @@ let second = 0;
 /** What the runner asked for on connecting: the full scenario list, one ablation variant
  * (`measure.py --ablate`) with its warm-up and measured seconds, or the GL micro benchmarks
  * (`measure.py --gl-bench`, `perfGlBench.ts`). */
-type Order = { mode: "full" } | { mode: "ablate"; variant: string; warmup: number; seconds: number } | { mode: "glbench" };
+type Order =
+  | { mode: "full" }
+  | { mode: "ablate"; variant: string; warmup: number; seconds: number }
+  | { mode: "gpu"; variant: string; warmup: number; seconds: number }
+  | { mode: "glbench" };
 let receiveOrder: (order: Order) => void = () => {};
 const order = new Promise<Order>((resolve) => {
   receiveOrder = resolve;
@@ -278,38 +291,120 @@ function sizes(canvas: HTMLCanvasElement) {
   };
 }
 
-/** One ablation run: the variant applied, then one continuous empty-page pan (or hover, or
- * nothing), its first `warmup` seconds as scenario `warmup`, the rest as `measure`. */
-async function runAblation(canvas: HTMLCanvasElement, session: WasmSession, refit: () => void, variant: string, warmup: number, seconds: number) {
-  const known = (ABLATIONS as readonly string[]).includes(variant);
-  const chosen = (known ? variant : "baseline") as Ablation;
-  const applied = known ? applyAblation(chosen, canvas, refit) : `unknown variant ${variant}, ran baseline`;
-  // Two frames: the resize and the hidden parts reach the screen before the clock starts.
-  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+/** Two animation frames: a resize or a hidden part reaches the screen before the clock starts. */
+const twoFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+/** The measured window of an ablation or GPU-variant run: one continuous empty-page pan (or a
+ * hover, nothing, or nothing with a forced redraw every animation frame), its first `warmup`
+ * seconds as scenario `warmup`, the rest as `measure`. `afterBurst` runs after each input burst,
+ * `atMeasure` when the measured part starts; `end` adds to the end event. */
+async function measureWindow(canvas: HTMLCanvasElement, session: WasmSession, input: "pan" | "hover" | "none" | "redraw", warmup: number, seconds: number,
+  hooks: { afterBurst?: () => void; atMeasure?: () => void; end?: () => object } = {}) {
   const view = () => frameView(session.frame_state());
-  send({ event: "ablation", variant, applied, ...sizes(canvas) });
-  const input = ablationInput(chosen);
   const switchTo = (name: string) => {
     flush();
     scenario = name;
+    if (name === "measure") hooks.atMeasure?.();
     send({ event: "scenario", name, state: "start", view: view() });
   };
   switchTo("warmup");
   const ticks = Math.round((warmup * 1000) / 16);
-  const marks = (index: number) => {
-    if (index === ticks) switchTo("measure");
-  };
-  if (input === "none") {
+  if (input === "none" || input === "redraw") {
+    let redrawing = input === "redraw";
+    const redraw = () => {
+      if (!redrawing) return;
+      session.request_frame();
+      requestAnimationFrame(redraw);
+    };
+    requestAnimationFrame(redraw);
     await sleep(warmup * 1000);
     switchTo("measure");
     await sleep(seconds * 1000);
+    redrawing = false;
   } else {
-    await sweep(canvas, warmup + seconds, input === "pan" ? 4 : 0, marks);
+    await sweep(canvas, warmup + seconds, input === "pan" ? 4 : 0, (index) => {
+      hooks.afterBurst?.();
+      if (index === ticks) switchTo("measure");
+    });
   }
   flush();
-  send({ event: "scenario", name: "measure", state: "end", view: view(), ...sizes(canvas) });
+  send({ event: "scenario", name: "measure", state: "end", view: view(), ...sizes(canvas), ...hooks.end?.() });
   scenario = "between";
   send({ event: "done" });
+}
+
+/** One ablation run: the variant applied, then the measured window. */
+async function runAblation(canvas: HTMLCanvasElement, session: WasmSession, refit: () => void, variant: string, warmup: number, seconds: number) {
+  const known = (ABLATIONS as readonly string[]).includes(variant);
+  const chosen = (known ? variant : "baseline") as Ablation;
+  const applied = known ? applyAblation(chosen, canvas, refit) : `unknown variant ${variant}, ran baseline`;
+  await twoFrames();
+  send({ event: "ablation", variant, applied, ...sizes(canvas) });
+  await measureWindow(canvas, session, ablationInput(chosen), warmup, seconds);
+}
+
+// The GPU variant `perfBeforeAttach` applied: its plan and what the wasm and the context said.
+let gpuApplied: { plan: GpuPlan; wasm: string; context: string } | null = null;
+let attachPrepared = false;
+
+/** Called once before the first `attach_canvas` (`useEditorSession.ts`); resolves at once in a
+ * normal build. In the perf build it waits for the runner's order (at most 10 s) and, for a GPU
+ * variant (`measure.py --gpu-variants`), sets the wasm's part (sample count, fences, vertex
+ * upload) and creates the editor canvas's WebGL2 context with the variant's attributes, which
+ * `getContext` then hands wgpu (wgpu-hal `gles/web.rs` asks with `antialias: false` only). */
+export async function perfBeforeAttach(canvas: HTMLCanvasElement | null): Promise<void> {
+  if (!perfEnabled || attachPrepared || !canvas) return;
+  attachPrepared = true;
+  const asked = await Promise.race([order, sleep(10_000).then(() => null)]);
+  if (!asked || asked.mode !== "gpu") return;
+  const plan = planGpuVariant(asked.variant);
+  let wasm = "baseline";
+  const set = wasmPerf.perf_set_gpu_variant;
+  if (!set) {
+    wasm = plan.wasm ? "NOT APPLIED: the wasm was built without the perf feature" : "baseline (wasm without the perf feature)";
+  } else {
+    try {
+      wasm = set(plan.wasm);
+    } catch (error) {
+      wasm = `NOT APPLIED: ${String(error)}`;
+    }
+  }
+  let context = "wgpu's own";
+  if (plan.context) {
+    context = canvas.getContext("webgl2", plan.context) ? `pre-created ${JSON.stringify(plan.context)}` : "NOT CREATED (getContext returned null)";
+  }
+  gpuApplied = { plan, wasm, context };
+}
+
+/** The vertex uploads since the last call: written, skipped, buffers created (zeros without the
+ * perf feature). */
+function takeGpuCounts(): number[] {
+  return wasmPerf.perf_take_gpu_counts ? Array.from(wasmPerf.perf_take_gpu_counts()) : [];
+}
+
+/** One GPU-variant run (`measure.py --gpu-variants`): the page parts of the variant applied (the
+ * wasm and context parts were applied before attach), what took effect sent, then the measured
+ * window. */
+async function runGpuVariant(canvas: HTMLCanvasElement, session: WasmSession, refit: () => void, variant: string, warmup: number, seconds: number) {
+  const plan = gpuApplied?.plan ?? planGpuVariant(variant);
+  const page = plan.page !== "baseline" ? applyAblation(plan.page, canvas, refit) : "baseline";
+  setPerfDrawElsewhere(plan.drawAfterInput);
+  await twoFrames();
+  const attributes = canvas.getContext("webgl2")?.getContextAttributes() ?? null;
+  send({
+    event: "gpu-variant", variant, page: plan.page, applied: page, wasm: gpuApplied?.wasm ?? "NOT APPLIED: no order before attach",
+    context: gpuApplied?.context ?? "wgpu's own", asked: plan.context, attributes, notTaken: attributesNotTaken(plan.context, attributes),
+    drawAfterInput: plan.drawAfterInput, input: plan.input, unknown: plan.unknown, gpu: session.gpu_info(), ...sizes(canvas),
+  });
+  const input = plan.input === "redraw" ? "redraw" : ablationInput(plan.page);
+  await measureWindow(canvas, session, input, warmup, seconds, {
+    afterBurst: plan.drawAfterInput ? () => {
+      session.render();
+      perfDrawn();
+    } : undefined,
+    atMeasure: () => void takeGpuCounts(),
+    end: () => ({ counts: takeGpuCounts() }),
+  });
 }
 
 async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | null, refit: () => void) {
@@ -329,6 +424,10 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
   }
   if (asked.mode === "ablate") {
     await runAblation(canvas, session, refit, asked.variant, asked.warmup, asked.seconds);
+    return;
+  }
+  if (asked.mode === "gpu") {
+    await runGpuVariant(canvas, session, refit, asked.variant, asked.warmup, asked.seconds);
     return;
   }
   // The view (origin x, origin y, scale) at a scenario's start and end: a zoom or pan that left

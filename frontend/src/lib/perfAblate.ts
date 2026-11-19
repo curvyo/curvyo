@@ -46,9 +46,19 @@ export function perfPixelRatio(raw: number): number {
   return enabled ? ablatedPixelRatio(active, raw) * backingScale : raw;
 }
 
-/** Whether the render loop skips `render()` (`no-draw`): the view still moves, nothing is drawn. */
+// The GPU variant `draw-after-input` (`perfGpuVariants.ts`): the probe draws after each input
+// burst, the render loop does not.
+let drawElsewhere = false;
+
+/** Makes the probe, not the render loop, call `render()` (`draw-after-input`). */
+export function setPerfDrawElsewhere(on: boolean) {
+  drawElsewhere = on;
+}
+
+/** Whether the render loop skips `render()`: `no-draw` (the view still moves, nothing is drawn)
+ * or `draw-after-input` (the probe draws). */
 export function perfSkipDraw(): boolean {
-  return enabled && active === "no-draw";
+  return enabled && (active === "no-draw" || drawElsewhere);
 }
 
 /** The input the measured scenario sends under `variant`: a middle-button pan, pointer moves with

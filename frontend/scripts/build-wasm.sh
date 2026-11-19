@@ -15,11 +15,13 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/../.." && pwd)"
 out_dir="${script_dir}/../src/wasm-bindings"
 
+# `CURVYO_WASM_FEATURES` (e.g. `perf`, set only by tools/perf/measure.py) adds cargo features.
 cargo build \
   --manifest-path "${repo_root}/Cargo.toml" \
   --target wasm32-unknown-unknown \
   --release \
-  -p curvyo-editor-wasm
+  -p curvyo-editor-wasm \
+  ${CURVYO_WASM_FEATURES:+--features "${CURVYO_WASM_FEATURES}"}
 
 wasm-bindgen \
   "${repo_root}/target/wasm32-unknown-unknown/release/curvyo_editor_wasm.wasm" \
