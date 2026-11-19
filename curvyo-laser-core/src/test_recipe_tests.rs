@@ -297,3 +297,79 @@ fn an_engrave_recipe_keeps_interval_and_crosshatch() {
     );
     assert_eq!(recipe.to_value(), value);
 }
+
+fn engrave_stored() -> Value {
+    let mut value = stored();
+    value["kind"] = json!("engrave");
+    value["fixed"] = json!({ "passes": 1, "interval_mm": 0.08 });
+    value
+}
+
+fn image_stored() -> Value {
+    let mut value = engrave_stored();
+    value["kind"] = json!("image");
+    value["crosshatch"] = json!(false);
+    value
+}
+
+#[test]
+fn an_image_recipe_keeps_its_dither_and_the_other_kinds_write_none() {
+    use crate::operation_image_options::Dither;
+    let mut value = image_stored();
+    value["dither"] = json!("atkinson");
+    let recipe = Recipe::from_value(&value).unwrap();
+    assert_eq!(recipe.test.kind(), SetKind::Image);
+    assert_eq!(recipe.test.dither(), Some(Dither::Atkinson));
+    assert_eq!(recipe.to_value(), value);
+    let absent = Recipe::from_value(&image_stored()).unwrap();
+    assert_eq!(absent.test.dither(), Some(Dither::FloydSteinberg), "absent");
+    let engrave = Recipe::from_value(&engrave_stored()).unwrap();
+    assert_eq!(engrave.test.dither(), None);
+    assert_eq!(engrave.to_value(), engrave_stored(), "the form of `0112`");
+    assert!(
+        Param::Interval.offered(SetKind::Image),
+        "an Image grid offers the Interval"
+    );
+}
+
+#[test]
+fn a_damaged_dither_or_a_fill_does_not_read() {
+    for dither in [json!("grey"), json!("halftone"), json!(3)] {
+        let mut bad = image_stored();
+        bad["dither"] = dither.clone();
+        assert_eq!(Recipe::from_value(&bad), None, "{dither}");
+    }
+    for kind in ["cut", "score", "engrave"] {
+        let mut bad = engrave_stored();
+        bad["kind"] = json!(kind);
+        bad["dither"] = json!("ordered");
+        assert_eq!(Recipe::from_value(&bad), None, "dither on {kind}");
+    }
+    for value in [engrave_stored(), image_stored()] {
+        let mut bad = value;
+        bad["fill"] = json!("gradient");
+        assert_eq!(Recipe::from_value(&bad), None, "fill left the recipe");
+    }
+    let mut crosshatch = image_stored();
+    crosshatch["crosshatch"] = json!(true);
+    assert_eq!(
+        Recipe::from_value(&crosshatch),
+        None,
+        "Crosshatch only on Engrave"
+    );
+}
+
+#[test]
+fn the_dither_is_the_image_grids_and_refuses_grey() {
+    use crate::operation_image_options::Dither;
+    let image = TestRecipe::new(&defaults()).with_kind(SetKind::Image, &defaults());
+    let stucki = image.with_dither(Dither::Stucki);
+    assert_eq!(stucki.dither(), Some(Dither::Stucki));
+    assert_eq!(stucki.with_dither(Dither::Grey), stucki);
+    let engrave = stucki.with_kind(SetKind::Engrave, &defaults());
+    assert_eq!(engrave.dither(), None);
+    assert_eq!(engrave.with_dither(Dither::Ordered), engrave);
+    assert!(!image.with_crosshatch(true).crosshatch());
+    // The axes never hold the dither (criterion 44): the parameters stay the four numbers.
+    assert!(Param::ALL.iter().all(|p| p.as_str() != "dither"));
+}

@@ -581,7 +581,26 @@ impl DocumentVersion {
 /// registers refuse the file. Goldens: `gradient_fill_v49.curvyo` and
 /// `gradient_fill_damaged_{colour,fraction,one_stop,unordered,paint_without_gradient}_v49.curvyo`;
 /// the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 49;
+///
+/// Bumped to 50 in `raster-engraving` (ADR 0069 §7, §8, §10, §13, `specs/0123`): the operation
+/// `kind` register may hold `"image"` (the Image kind, opaque here as every kind, ADR 0046 §1); an
+/// Image operation's `op_options` may hold the Image settings `dither` (`"threshold"`,
+/// `"ordered"`, `"floyd_steinberg"`, `"jarvis"`, `"atkinson"`, `"stucki"` or `"grey"`),
+/// `threshold_pct`, `brightness_pct`, `contrast_pct`, `gamma`, `invert` and `lowest_power_pct`, and
+/// a test grid recipe `x.curvyo.laser.test_grid` may be of kind `"image"` with `dither` (a binary
+/// mode); an Image grid's cells have a Gradient fill of format 49. No new label: the Image
+/// settings commit as `edit_operation_settings` ("Edit settings") and Dither as `edit_test_grid`
+/// ("Edit test grid"); no label is reserved. A build that stops at 49 reads `"image"` as an
+/// Unknown kind, the new `op_options` keys as damage (ADR 0056 §6) and the new recipe as damaged,
+/// so this build's files are refused by version (ADR 0033 §7). No migration: a file of 49 or
+/// lower opens unchanged and an operation without the keys reads their defaults. The document
+/// stores no pixel, dot or row (criterion 38). Damage (ADR 0069 §7, §13): an unknown `dither`, a
+/// value out of range or with too many decimals, an Image key on any kind but Image, or
+/// `crosshatch` on an Image is Damaged settings of that operation (it does not run; the file
+/// opens); a `dither` on a grid of another kind, Grey, or a `fill` key is a damaged recipe (ADR
+/// 0057 §6). The laser extension reads every value. Goldens: `raster_engraving_v50.curvyo` and
+/// `raster_engraving_damaged_v50.curvyo`; the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 50;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

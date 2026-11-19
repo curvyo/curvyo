@@ -54,7 +54,8 @@ impl Timeline {
             let block = job.blocks.get(m.block);
             let feed = |role| block.map_or(max_feed, |b| f64::from(b.of(role).feed.get()));
             let seconds = match m.kind {
-                MoveKind::Burn { role, .. } => {
+                // A sweep runs its short gaps at the burn feed too (ADR 0069 §4).
+                MoveKind::Burn { role, .. } | MoveKind::Sweep { role, .. } => {
                     burn += length;
                     length / feed(role) * 60.0
                 }
@@ -143,7 +144,7 @@ impl Timeline {
         let length = from.distance_mm(m.to) * part;
         let (burn, travel) = (before(&self.burn_mm, done), before(&self.travel_mm, done));
         let (burn, travel) = match m.kind {
-            MoveKind::Burn { .. } => (burn + length, travel),
+            MoveKind::Burn { .. } | MoveKind::Sweep { .. } => (burn + length, travel),
             MoveKind::Travel | MoveKind::RunOut(_) => (burn, travel + length),
             MoveKind::Z(_) => (burn, travel),
         };

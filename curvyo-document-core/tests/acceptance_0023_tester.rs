@@ -612,6 +612,8 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
             || name.starts_with("test_grid_")
             // `0111-laser-operation-tools` (format 44) is a later build: its golden holds a group.
             || name.starts_with("operation_tools_")
+            // `0123-raster-engraving` (format 50) is a later build: a test grid is a group.
+            || name.starts_with("raster_engraving_")
         {
             continue;
         }

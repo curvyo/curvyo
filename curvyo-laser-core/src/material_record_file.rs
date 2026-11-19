@@ -1,4 +1,4 @@
-//! Reads and writes one material record file of format 2 (ADR 0058 §2, §6).
+//! Reads and writes one material record file of format 3 (ADR 0058 §2, §6; ADR 0069 §8).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -19,8 +19,13 @@ use crate::record_envelope::is_machine_id;
 use crate::record_envelope::{EnvelopeError, is_record_id, open, pretty, record_id};
 use crate::test_id::TestId;
 
-/// The record format this build writes and the newest it reads.
-pub const RECORD_FORMAT_VERSION: u64 = 2;
+/// The record format this build writes and the newest it reads. Format 3 (`specs/0123`, Frage 237
+/// A; ADR 0069 §13, §14) lets a test's recipe carry the kind `image` with `dither`, a laser's sets
+/// an `image` set and a history entry the kind `image`; a format-2 record reads as is and is
+/// written back as format 3 at its next save (no migration), one holding any of these is damaged.
+pub const RECORD_FORMAT_VERSION: u64 = 3;
+/// The oldest record format this build reads; format 1 is skipped as older.
+const OLDEST_READ_FORMAT: u64 = 2;
 /// The largest record text that is read or written (ADR 0058 §6).
 pub const MAX_RECORD_TEXT: usize = 512 * 1024;
 /// The only machine family a material is for.
@@ -77,6 +82,8 @@ struct SetsJson {
     score: Option<SetJson>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     engrave: Option<SetJson>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    image: Option<SetJson>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -133,7 +140,7 @@ pub fn load_record(file_name: &str, text: &str) -> MaterialRead {
 /// The material the record file `file_name` holds.
 ///
 /// # Errors
-/// [`RecordFileError::Newer`] above format 2, [`RecordFileError::Older`] for format 1, and
+/// [`RecordFileError::Newer`] above format 3, [`RecordFileError::Older`] for format 1, and
 /// [`RecordFileError::Damaged`] with one reason for every damage of ADR 0055 §3 and ADR 0058 §6.
 /// Nothing is written on read.
 pub fn read_record(file_name: &str, text: &str) -> Result<Material, RecordFileError> {
@@ -145,17 +152,17 @@ pub fn read_record(file_name: &str, text: &str) -> Result<Material, RecordFileEr
                 damaged("The file is not a material record.")
             }
         })?;
-    if version < RECORD_FORMAT_VERSION {
+    if version < OLDEST_READ_FORMAT {
         return Err(RecordFileError::Older);
     }
     let record: RecordJson = serde_json::from_value(value).map_err(|e| shape_error(&e))?;
     let thickness = check_fields(file_name, &record)?;
-    let tests = read_tests(record.tests)?;
-    let lasers = read_lasers(record.lasers, &tests)?;
+    let tests = read_tests(record.tests, version)?;
+    let lasers = read_lasers(record.lasers, &tests, version)?;
     let history = record
         .history
         .into_iter()
-        .map(read_entry)
+        .map(|entry| read_entry(entry, version))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Material {
         id: record.id,
@@ -236,18 +243,41 @@ fn read_numbers(kind: SetKind, set: &NumbersJson) -> Result<SetNumbers, RecordFi
         passes: Passes::new(passes)
             .ok_or_else(|| damaged(format!("Passes {passes} are outside 1 to 20.")))?,
     };
-    let interval = match (kind, set.interval_mm) {
-        (SetKind::Engrave, Some(mm)) => Some(
+    let interval = match (kind.has_interval(), set.interval_mm) {
+        (true, Some(mm)) => Some(
             Interval::from_mm(mm)
                 .ok_or_else(|| damaged(format!("Interval {mm} is outside 0.01 to 2.00 mm.")))?,
         ),
-        (SetKind::Engrave, None) => return Err(damaged("An Engrave set has no interval.")),
-        (_, Some(_)) => {
+        (true, None) => {
+            return Err(damaged(format!(
+                "{} {} set has no interval.",
+                article(kind),
+                kind.label()
+            )));
+        }
+        (false, Some(_)) => {
             return Err(damaged(format!("A {} set has an interval.", kind.label())));
         }
-        (_, None) => None,
+        (false, None) => None,
     };
     Ok(SetNumbers { settings, interval })
+}
+
+/// "A" or "An" before the label of `kind`.
+const fn article(kind: SetKind) -> &'static str {
+    match kind {
+        SetKind::Engrave | SetKind::Image => "An",
+        SetKind::Cut | SetKind::Score => "A",
+    }
+}
+
+/// The damage of an Image set, entry or test in a record of format 2, which never had them
+/// (ADR 0069 §14).
+fn image_in_format_2(kind: SetKind, version: u64) -> Result<(), RecordFileError> {
+    if kind == SetKind::Image && version < 3 {
+        return Err(damaged("A format-2 record holds an Image set."));
+    }
+    Ok(())
 }
 
 fn read_source(value: &Value) -> Result<SetSource, RecordFileError> {
@@ -266,6 +296,7 @@ fn read_source(value: &Value) -> Result<SetSource, RecordFileError> {
 fn read_lasers(
     lasers: Vec<LaserJson>,
     tests: &[TestRecord],
+    version: u64,
 ) -> Result<Vec<LaserSets>, RecordFileError> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::with_capacity(lasers.len());
@@ -282,8 +313,10 @@ fn read_lasers(
             (SetKind::Cut, laser.sets.cut),
             (SetKind::Score, laser.sets.score),
             (SetKind::Engrave, laser.sets.engrave),
+            (SetKind::Image, laser.sets.image),
         ] {
             let Some(set) = set else { continue };
+            image_in_format_2(kind, version)?;
             let numbers = read_numbers(
                 kind,
                 &NumbersJson {
@@ -313,7 +346,7 @@ fn read_lasers(
     Ok(out)
 }
 
-fn read_entry(entry: EntryJson) -> Result<HistoryEntry, RecordFileError> {
+fn read_entry(entry: EntryJson, version: u64) -> Result<HistoryEntry, RecordFileError> {
     if !is_record_id(&entry.id) {
         return Err(damaged("A history entry has no valid id."));
     }
@@ -322,6 +355,7 @@ fn read_entry(entry: EntryJson) -> Result<HistoryEntry, RecordFileError> {
     }
     let kind = SetKind::parse(&entry.kind)
         .ok_or_else(|| damaged(format!("Unknown set kind {}.", entry.kind)))?;
+    image_in_format_2(kind, version)?;
     let event = match (entry.event.as_str(), entry.set, entry.source) {
         ("set", Some(set), Some(source)) => HistoryEvent::Set {
             numbers: read_numbers(kind, &set)?,
@@ -369,7 +403,7 @@ fn source_json(source: &SetSource) -> Value {
     }
 }
 
-/// The canonical text of `material` in record format 2 (key order of ADR 0058 §2, two-space
+/// The canonical text of `material` in record format 3 (key order of ADR 0058 §2, two-space
 /// indent, trailing newline), so read, write, read is the identity.
 #[must_use]
 pub fn write_record(material: &Material) -> String {
@@ -401,6 +435,7 @@ pub fn write_record(material: &Material) -> String {
                     cut: set(laser, SetKind::Cut),
                     score: set(laser, SetKind::Score),
                     engrave: set(laser, SetKind::Engrave),
+                    image: set(laser, SetKind::Image),
                 },
             })
             .collect(),

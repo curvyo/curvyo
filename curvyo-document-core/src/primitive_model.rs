@@ -359,6 +359,16 @@ impl ObjectSnapshot {
         }
     }
 
+    /// Beside each leaf of [`ObjectSnapshot::picture`], the leaf of the root's subtree it comes
+    /// from ([`crate::CloneChain::picture_members`]); `None` for every object without a picture.
+    #[must_use]
+    pub fn picture_members(&self) -> Option<&[NodeId]> {
+        match self {
+            Self::Clone(clone) => clone.chain.picture_members.as_deref(),
+            _ => None,
+        }
+    }
+
     /// The outline this object is drawn, hit and traced by when it has one of its own: a path's,
     /// a clone's resolved outline, a text's laid-out glyphs ([`TextSnapshot::outline`]); `None` for
     /// a primitive (drawn from its shape) and a text not laid out yet.

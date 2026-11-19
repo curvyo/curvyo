@@ -517,3 +517,95 @@ fn a_linked_engrave_without_an_interval_takes_the_one_of_its_laser_set() {
         "the set of another laser never runs"
     );
 }
+
+/// A material with an Engrave set at 30 % and, if `image`, an Image set at 45 % and 0.08 mm.
+fn engrave_and_image(modified: u64, image: bool) -> Material {
+    let mut sets = vec![(SetKind::Engrave, set(30.0, 6000, 1))];
+    if image {
+        sets.push((SetKind::Image, set(45.0, 9000, 2)));
+    }
+    let mut m = material("m1", modified, &sets);
+    for (kind, mm) in [(SetKind::Engrave, 0.1), (SetKind::Image, 0.08)] {
+        if let Some(set) = m.lasers[0].sets.get_mut(&kind) {
+            set.numbers.interval = Interval::from_mm(mm);
+        }
+    }
+    m
+}
+
+#[test]
+fn an_image_operation_reads_the_image_set_and_never_the_engrave_set() {
+    assert_eq!(main_set(OperationKind::Image), SetKind::Image);
+    let m = engrave_and_image(7, true);
+    let stored = use_material(&m, PROFILE, OperationKind::Image, &SettingsRead::None).unwrap();
+    assert_eq!(stored.main, set(45.0, 9000, 2));
+    assert_eq!(
+        stored.interval,
+        Interval::from_mm(0.08),
+        "the Image set's interval"
+    );
+    let library = [MaterialRead::Loaded(m.clone())];
+    let read = SettingsRead::Stored(stored.clone());
+    let SettingsState::Live { material, .. } =
+        resolve(&read, OperationKind::Image, &library, PROFILE)
+    else {
+        panic!("live")
+    };
+    assert_eq!(material.main, set(45.0, 9000, 2));
+    let engrave = use_material(&m, PROFILE, OperationKind::Engrave, &SettingsRead::None).unwrap();
+    assert_eq!(
+        engrave.main,
+        set(30.0, 6000, 1),
+        "Engrave keeps the Engrave set"
+    );
+    let without = engrave_and_image(7, false);
+    assert_eq!(
+        use_material(&without, PROFILE, OperationKind::Image, &SettingsRead::None),
+        Err(SetKind::Image),
+        "no fallback to the Engrave set: Use material skips"
+    );
+    let library = [MaterialRead::Loaded(without)];
+    let state = resolve(&read, OperationKind::Image, &library, PROFILE);
+    let SettingsState::Stored { reason, .. } = state else {
+        panic!("stored: {state:?}")
+    };
+    assert_eq!(reason, StoredReason::NoSet(SetKind::Image));
+    assert_eq!(
+        reason.text(),
+        "Material has no Image set for this laser, using stored numbers"
+    );
+    let own = SettingsRead::Stored(StoredSettings::own(
+        OperationKind::Image,
+        set(20.0, 3000, 1),
+        None,
+    ));
+    assert!(matches!(
+        resolve(&own, OperationKind::Image, &library, PROFILE),
+        SettingsState::Own(_)
+    ));
+}
+
+#[test]
+fn refresh_of_an_image_operation_follows_the_image_set() {
+    let old = engrave_and_image(5, true);
+    let stored = use_material(&old, PROFILE, OperationKind::Image, &SettingsRead::None).unwrap();
+    let read = SettingsRead::Stored(stored);
+    let mut edited = engrave_and_image(9, true);
+    edited.lasers[0]
+        .sets
+        .get_mut(&SetKind::Image)
+        .unwrap()
+        .numbers
+        .settings = set(55.0, 9000, 2);
+    let library = [MaterialRead::Loaded(edited)];
+    for guard in [false, true] {
+        let fresh = refresh(&read, OperationKind::Image, &library, PROFILE, guard).unwrap();
+        assert_eq!(fresh.main, set(55.0, 9000, 2), "guard {guard}");
+    }
+    let only_engrave = [MaterialRead::Loaded(engrave_and_image(9, false))];
+    assert_eq!(
+        refresh(&read, OperationKind::Image, &only_engrave, PROFILE, false),
+        None,
+        "no Image set: the stored numbers stay"
+    );
+}

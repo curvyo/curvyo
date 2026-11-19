@@ -356,6 +356,7 @@ fn outline_clones(
                     style_source,
                     root_outline,
                     picture: None,
+                    picture_members: None,
                 },
             );
             if let Some(style) = style {

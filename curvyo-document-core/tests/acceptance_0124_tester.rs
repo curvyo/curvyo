@@ -588,8 +588,8 @@ fn fixture(name: &str) -> Vec<u8> {
 
 #[test]
 fn c22_format_bump_and_the_good_golden_opens_with_every_kind() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 49, "format 49 (next free at merge)");
-    let name = format!("gradient_fill_v{CURRENT_FORMAT_VERSION}.curvyo");
+    assert_eq!(CURRENT_FORMAT_VERSION, 50, "format 49, then 50 by `0123`");
+    let name = "gradient_fill_v49.curvyo".to_owned();
     let d = unpack(3, &fixture(&name)).expect("the golden opens");
     let read = d.read_objects();
     let shaded: Vec<_> = read
@@ -613,14 +613,14 @@ fn c22_format_bump_and_the_good_golden_opens_with_every_kind() {
             .any(|(_, g)| matches!(g.geometry, GradientGeometry::Linear { .. }))
     );
     // An older format number is refused for this file (an old build must refuse it): the
-    // manifest says the current number.
+    // manifest says the number of `0124` (49; 50 is `0123`).
     let bytes = fixture(&name);
     let mut zip = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
     let mut manifest = String::new();
     std::io::Read::read_to_string(&mut zip.by_name("manifest.json").unwrap(), &mut manifest)
         .unwrap();
     let v: serde_json::Value = serde_json::from_str(&manifest).unwrap();
-    assert_eq!(v["format_version"], CURRENT_FORMAT_VERSION);
+    assert_eq!(v["format_version"], 49);
 }
 
 #[test]
@@ -632,7 +632,7 @@ fn c22_each_damaged_golden_is_refused() {
         "unordered",
         "paint_without_gradient",
     ] {
-        let name = format!("gradient_fill_damaged_{reason}_v{CURRENT_FORMAT_VERSION}.curvyo");
+        let name = format!("gradient_fill_damaged_{reason}_v49.curvyo");
         assert!(
             unpack(3, &fixture(&name)).is_err(),
             "{name} must be refused"

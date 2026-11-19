@@ -1357,17 +1357,18 @@ fn ac21_the_format_is_38_and_a_newer_file_is_refused() {
     // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
     // Format 48 since `specs/0029-laser-job-preview-and-output` (ADR 0065 §4).
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 49);
+    // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
+    assert_eq!(CURRENT_FORMAT_VERSION, 50);
     let f = fx();
     f.d.place_linked_clones(&[f.g], to_laser(&f)).unwrap();
     let bytes = pack(&f.d, "t").unwrap();
-    assert_eq!(manifest_version(&bytes), 49);
-    let newer = with_manifest_version(&bytes, 50);
+    assert_eq!(manifest_version(&bytes), 50);
+    let newer = with_manifest_version(&bytes, 51);
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew {
-            found: 50,
-            supported: 49
+            found: 51,
+            supported: 50
         })
     ));
 }

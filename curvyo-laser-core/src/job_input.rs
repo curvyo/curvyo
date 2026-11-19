@@ -1,8 +1,11 @@
 //! The input the session passes to the job builder (ADR 0064 §1): types only, every leaf already
 //! in page space, every block already in run order.
 
-use curvyo_document_core::{DocumentSize, Length, NodeId, Point};
+use std::sync::Arc;
+
+use curvyo_document_core::{AssetHash, DocumentSize, Length, NodeId, PlacedGradient, Point};
 use curvyo_geometry_core::OutlineTriple;
+use curvyo_image_core::WorkingImage;
 
 use crate::machine_profile::ProfileValues;
 use crate::operation_kind::KindRead;
@@ -87,10 +90,23 @@ pub struct LeafOutline {
 pub enum LeafGeometry {
     /// A path, text, primitive, clone or placed page member, resolved to page-space outlines.
     Outlines(Vec<LeafOutline>),
-    /// An image: its frame's four corners in drawing order.
+    /// An image: its frame's four corners in drawing order (the picture's top-left, top-right,
+    /// bottom-right, bottom-left) and its working image.
     Image {
         /// The frame corners.
         frame: [Point; 4],
+        /// The asset the pixels come from (the key of its grey pyramid).
+        asset: AssetHash,
+        /// The decoded working image; `None` when its bytes cannot be read (skipped, a warn).
+        pixels: Option<Arc<WorkingImage>>,
+    },
+    /// A path, text or primitive whose fill paint is a gradient (`specs/0123` criterion 3): its
+    /// outlines and the gradient placed on the page.
+    Gradient {
+        /// The outlines in page mm.
+        outlines: Vec<LeafOutline>,
+        /// The gradient in page mm.
+        gradient: PlacedGradient,
     },
 }
 

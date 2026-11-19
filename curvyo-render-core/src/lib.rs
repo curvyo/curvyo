@@ -110,7 +110,7 @@ pub use shape_preview::build_shape_live_preview;
 pub use text_edit_overlay::{TextEditOverlay, build_text_edit_overlay};
 pub use theme::{
     CANVAS_BG, CHECKER_A, CHECKER_B, GUIDE, OP_CHIP_GROUND, OP_CUT, OP_ENGRAVE_HATCH, OP_INK,
-    OP_LANE_LINE, PASTEBOARD_BG,
+    OP_LANE_LINE, OP_MUTED_INK, PASTEBOARD_BG,
 };
 pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
 pub use toolpath_look::{

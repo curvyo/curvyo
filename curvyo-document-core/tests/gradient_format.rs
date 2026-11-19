@@ -517,7 +517,7 @@ fn a_linked_clone_shows_its_originals_gradient_and_own_style_carries_its_own() {
 
 #[test]
 fn the_format_is_49() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 49);
+    assert_eq!(CURRENT_FORMAT_VERSION, 50);
 }
 
 fn font() -> FontRef {
@@ -664,9 +664,15 @@ fn the_golden_reads_back_every_gradient() {
     assert_eq!(gradient_of(&opened, g.clone).stops.len(), 3);
     assert_ne!(gradient_of(&opened, g.own), gradient_of(&opened, g.clone));
     let saved = pack(&opened, "0.1.0").unwrap();
+    // Saved by a build of format 50 (`0123`): the same content under its own version.
+    let json = |bytes: &[u8]| {
+        String::from_utf8(members(bytes)["document.json"].clone())
+            .unwrap()
+            .replacen("\"format_version\": 50,", "\"format_version\": 49,", 1)
+    };
     assert_eq!(
-        members(&saved)["document.json"],
-        members(&bytes)["document.json"],
+        json(&saved),
+        json(&bytes),
         "saved back with the same content"
     );
 }
@@ -747,13 +753,13 @@ fn each_damaged_golden_is_refused() {
     assert!(unpack(2, &base).is_ok(), "the undamaged base opens");
 }
 
-/// A build of format 49 refuses a format 50 file as saved by a newer version.
+/// This build refuses a file of the next format as saved by a newer version.
 #[test]
 fn a_newer_file_is_refused_by_version() {
     let bytes = read_or_write(GOLDEN, golden_bytes);
     let mut files = members(&bytes);
     let mut manifest: serde_json::Value = serde_json::from_slice(&files["manifest.json"]).unwrap();
-    manifest["format_version"] = serde_json::json!(50);
+    manifest["format_version"] = serde_json::json!(51);
     files.insert(
         "manifest.json".to_owned(),
         serde_json::to_vec(&manifest).unwrap(),
@@ -761,8 +767,8 @@ fn a_newer_file_is_refused_by_version() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 50,
-            supported: 49
+            found: 51,
+            supported: 50
         })
     ));
 }

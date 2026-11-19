@@ -388,7 +388,8 @@ fn the_test_grid_golden_reads_back_every_recipe_tag_row_and_lasered_register() {
     });
     assert_eq!(format_of(&bytes), 46);
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 49);
+    // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
+    assert_eq!(CURRENT_FORMAT_VERSION, 50);
     let d = open_unchanged(&bytes);
     let ops = d.operations(d.manufacturings()[0].id).unwrap();
     assert_eq!(ops.len(), 26 + 5);
@@ -508,8 +509,8 @@ fn a_file_of_format_47_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 50,
-            supported: 49
+            found: 51,
+            supported: 50
         })
     ));
 }

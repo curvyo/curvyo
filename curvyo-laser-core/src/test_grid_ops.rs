@@ -78,7 +78,8 @@ pub struct DerivedOperation {
     pub name: String,
     /// Its `op_settings`.
     pub settings: StoredSettings,
-    /// Its `op_options`, `None` for no register (only Engrave cells carry Crosshatch).
+    /// Its `op_options`, `None` for no register (only Engrave cells carry Crosshatch and, with a
+    /// Gradient fill, the dither).
     pub options: Option<OperationOptions>,
 }
 
@@ -98,6 +99,7 @@ const fn kind_of(set: SetKind) -> OperationKind {
         SetKind::Cut => OperationKind::Cut,
         SetKind::Score => OperationKind::Score,
         SetKind::Engrave => OperationKind::Engrave,
+        SetKind::Image => OperationKind::Image,
     }
 }
 
@@ -135,10 +137,20 @@ pub fn derived_operations(recipe: &Recipe, label_set: Option<&LabelSet>) -> Vec<
         options: None,
     });
     let kind = kind_of(test.kind());
-    let options = (test.kind() == SetKind::Engrave).then(|| OperationOptions {
-        crosshatch: test.crosshatch(),
-        ..OperationOptions::default()
-    });
+    // An Engrave grid's cells carry Crosshatch, an Image grid's its dither (`specs/0123`
+    // criterion 44).
+    let options = match test.kind() {
+        SetKind::Engrave => Some(OperationOptions {
+            crosshatch: test.crosshatch(),
+            ..OperationOptions::default()
+        }),
+        SetKind::Image => {
+            let mut options = OperationOptions::default();
+            options.image.dither = test.dither().unwrap_or_default();
+            Some(options)
+        }
+        SetKind::Cut | SetKind::Score => None,
+    };
     for row in 0..rows.count() {
         for column in 0..columns.count() {
             let numbers = test.cell_values(column, row);
@@ -170,7 +182,7 @@ mod tests {
     use crate::operation_settings::{SettingsRead, read_settings};
 
     fn recipe(kind: &str, count: u8) -> Recipe {
-        let fixed = if kind == "engrave" {
+        let fixed = if kind == "engrave" || kind == "image" {
             json!({ "passes": 1, "interval_mm": 0.08 })
         } else {
             json!({ "passes": 1 })
@@ -238,6 +250,33 @@ mod tests {
         assert_eq!(ops[1].kind, OperationKind::Engrave);
         assert_eq!(ops[1].settings.interval, Interval::from_hundredths(8));
         assert!(ops[1].options.unwrap().crosshatch);
+    }
+
+    #[test]
+    fn image_cells_are_image_operations_with_the_dither_and_engrave_cells_have_none() {
+        use crate::operation_image_options::Dither;
+        let engrave = derived_operations(&recipe("engrave", 2), None);
+        let stored = engrave[1].options.unwrap().to_value(OperationKind::Engrave);
+        assert!(
+            stored.get("dither").is_none(),
+            "the Engrave grid is the vector hatch grid"
+        );
+        let mut image = recipe("image", 2);
+        image.test = image.test.with_dither(Dither::Ordered);
+        let ops = derived_operations(&image, None);
+        assert_eq!(ops.len(), 5);
+        assert_eq!(ops[0].options, None, "the labels are unchanged");
+        assert_eq!(ops[0].kind, OperationKind::Engrave);
+        for cell in &ops[1..] {
+            assert_eq!(cell.kind, OperationKind::Image);
+            let options = cell.options.unwrap();
+            assert_eq!(options.image.dither, Dither::Ordered);
+            assert!(!options.crosshatch);
+            let stored = options.to_value(OperationKind::Image);
+            assert_eq!(stored["dither"], json!("ordered"));
+            assert!(stored.get("crosshatch").is_none());
+        }
+        assert_eq!(ops[1].settings.interval, Interval::from_hundredths(8));
     }
 
     #[test]

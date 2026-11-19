@@ -21,6 +21,9 @@ pub enum OperationLook {
     AreaFill,
     /// Engrave + Outline: the hatch, and a 1 px solid ink outline.
     AreaWithLine,
+    /// Image: no line and no hatch; the raster items are drawn as their dots (`specs/0123`
+    /// criterion 20).
+    Dots,
     /// Cut-out: a dashed red line, 2 px, dash 6 on 3, on the outer contour only.
     OuterLine,
     /// Not assigned, Unknown and Output off: a muted dashed outline, no hatch, no symbol.
@@ -59,7 +62,7 @@ pub fn look_style(look: OperationLook, view: ViewTransform) -> Style {
         OperationLook::SolidLine => line(px(1.0), &[], OP_CUT, LineCap::Butt),
         // Dots: a zero-length dash with round caps, one every 3 px (the width is 1.5 px).
         OperationLook::DashedLine => line(px(1.5), &[0.0, 2.0], OP_INK, LineCap::Round),
-        OperationLook::AreaFill => none_stroke,
+        OperationLook::AreaFill | OperationLook::Dots => none_stroke,
         OperationLook::AreaWithLine => line(px(1.0), &[], OP_INK, LineCap::Butt),
         // 6 px on, 3 px off, in units of the 2 px width.
         OperationLook::OuterLine => line(px(2.0), &[3.0, 1.5], OP_CUT, LineCap::Butt),

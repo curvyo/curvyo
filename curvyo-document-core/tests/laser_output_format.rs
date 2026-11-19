@@ -153,7 +153,8 @@ fn golden_bytes() -> Vec<u8> {
 #[test]
 fn the_format_moved_on_from_48() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 49);
+    // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
+    assert_eq!(CURRENT_FORMAT_VERSION, 50);
 }
 
 fn has_register(values: &serde_json::Map<String, serde_json::Value>, field: &str) -> bool {

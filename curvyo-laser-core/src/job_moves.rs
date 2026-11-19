@@ -1,11 +1,15 @@
-//! The job's format-neutral moves (ADR 0064 §7): burn, travel, run-out and Z moves in page µm,
-//! the blocks they run with, and the machine frame every writer maps them through.
+//! The job's format-neutral moves (ADR 0064 §7, ADR 0069 §1): burn, sweep, travel, run-out and
+//! Z moves in page µm, the blocks they run with, and the machine frame every writer maps them
+//! through.
+
+use std::sync::Arc;
 
 use curvyo_document_core::NodeId;
 
 use crate::job_input::{PointUm, Ring, um_of_mm};
 use crate::job_numbers::{BlockNumbers, RunNumbers};
 use crate::job_plan::Plan;
+use crate::job_raster_rows::Sweep;
 use crate::machine_profile::{OriginCorner, ProfileValues};
 use crate::operation_kind::OperationKind;
 use crate::operation_settings::Role;
@@ -24,6 +28,18 @@ pub enum MoveKind {
         role: Role,
         /// The leaf or Cut-out item.
         node: NodeId,
+    },
+    /// One raster sweep of `node` with the set of `role` (`specs/0123` criterion 14): the head
+    /// runs from the sweep's start to its end at the burn feed, its runs at their power.
+    Sweep {
+        /// The set.
+        role: Role,
+        /// The image or gradient-filled leaf.
+        node: NodeId,
+        /// That leaf's stacking place in its block (leaves of one clone share their node).
+        stacking: u32,
+        /// The sweep's index in [`Job::sweeps`].
+        sweep: u32,
     },
     /// Laser off at the machine's maximum feed.
     Travel,
@@ -144,6 +160,8 @@ pub struct Job {
     pub blocks: Vec<Block>,
     /// The moves; the last one is the travel back to [`Job::home`] when any move exists.
     pub moves: Vec<Move>,
+    /// The raster sweeps the `Sweep` moves point into; each pass reuses the same sweeps.
+    pub sweeps: Vec<Arc<Sweep>>,
 }
 
 impl Job {
@@ -152,18 +170,38 @@ impl Job {
     pub fn burns(&self) -> bool {
         self.moves
             .iter()
-            .any(|m| matches!(m.kind, MoveKind::Burn { .. }))
+            .any(|m| matches!(m.kind, MoveKind::Burn { .. } | MoveKind::Sweep { .. }))
     }
+
+    /// The sweep of a `Sweep` move.
+    #[must_use]
+    pub fn sweep(&self, index: u32) -> Option<&Sweep> {
+        self.sweeps
+            .get(usize::try_from(index).ok()?)
+            .map(AsRef::as_ref)
+    }
+}
+
+/// The moves of a job, where it starts and the sweeps its moves point into.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuiltMoves {
+    /// The moves.
+    pub moves: Vec<Move>,
+    /// The home.
+    pub home: PointUm,
+    /// The sweeps.
+    pub sweeps: Vec<Arc<Sweep>>,
 }
 
 /// Builds the moves of `blocks` with their plans (ADR 0064 §7): per block a Z move to its offset,
 /// its runs once per pass (Frage 223 A), the Z move back; Machine origin starts and ends at the
 /// origin (Home, then machine origin gives the same moves), Head position at the first point.
 #[must_use]
-pub fn build_moves(frame: Frame, start: Start, blocks: &[(Block, &Plan)]) -> (Vec<Move>, PointUm) {
+pub fn build_moves(frame: Frame, start: Start, blocks: &[(Block, &Plan)]) -> BuiltMoves {
     let origin = frame.origin();
     let mut moves = Moves {
         list: Vec::new(),
+        sweeps: Vec::new(),
         head: origin,
         frame,
         clamp: !start.relative(),
@@ -193,11 +231,16 @@ pub fn build_moves(frame: Frame, start: Start, blocks: &[(Block, &Plan)]) -> (Ve
             block: usize::MAX,
         });
     }
-    (list, home)
+    BuiltMoves {
+        moves: list,
+        home,
+        sweeps: moves.sweeps,
+    }
 }
 
 struct Moves {
     list: Vec<Move>,
+    sweeps: Vec<Arc<Sweep>>,
     head: PointUm,
     frame: Frame,
     clamp: bool,
@@ -217,6 +260,9 @@ impl Moves {
         for run in &plan.runs {
             let numbers = block.of(run.role);
             let run_out = run_out_um(block.numbers.options.overscan.percent(), numbers);
+            let first_sweep = self.sweeps.len();
+            self.sweeps
+                .extend(run.sweeps.iter().map(|s| Arc::clone(&s.sweep)));
             for _ in 0..numbers.passes.get() {
                 for path in &run.paths {
                     let Some(&first) = path.points.first() else {
@@ -249,10 +295,54 @@ impl Moves {
                         self.push(end, MoveKind::RunOut(run.role), index);
                     }
                 }
+                for (offset, planned) in run.sweeps.iter().enumerate() {
+                    let sweep = u32::try_from(first_sweep + offset).unwrap_or(u32::MAX);
+                    let kind = MoveKind::Sweep {
+                        role: run.role,
+                        node: planned.node,
+                        stacking: planned.stacking,
+                        sweep,
+                    };
+                    self.sweep(index, &planned.sweep, kind, run_out, &mut z_pending);
+                }
             }
         }
         if block.z.is_some() && z_pending.is_none() {
             self.push(self.head, MoveKind::Z(0), index);
+        }
+    }
+
+    /// The moves of one sweep: travel to its start (or to its run-in with Overscanning), the
+    /// sweep itself, the run-out after it.
+    fn sweep(
+        &mut self,
+        index: usize,
+        sweep: &Sweep,
+        kind: MoveKind,
+        run_out: f64,
+        z_pending: &mut Option<i64>,
+    ) {
+        let MoveKind::Sweep { role, .. } = kind else {
+            return;
+        };
+        let (lead_in, lead_out) = if run_out > 0.0 {
+            (
+                Some(self.extend(sweep.start, sweep.end, run_out)),
+                Some(self.extend(sweep.end, sweep.start, run_out)),
+            )
+        } else {
+            (None, None)
+        };
+        self.push(lead_in.unwrap_or(sweep.start), MoveKind::Travel, index);
+        if let Some(z) = z_pending.take() {
+            self.push(self.head, MoveKind::Z(z), index);
+        }
+        if lead_in.is_some() {
+            self.push(sweep.start, MoveKind::RunOut(role), index);
+        }
+        self.push(sweep.end, kind, index);
+        if let Some(end) = lead_out {
+            self.push(end, MoveKind::RunOut(role), index);
         }
     }
 

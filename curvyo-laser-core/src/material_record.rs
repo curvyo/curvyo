@@ -1,4 +1,4 @@
-//! The material record of format 2 in memory: one material for all lasers with sets per laser,
+//! The material record of format 3 in memory: one material for all lasers with sets per laser,
 //! tests and history (ADR 0058 §2, `specs/0112` criteria 18 to 26).
 
 use std::collections::BTreeMap;

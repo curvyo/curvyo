@@ -1,4 +1,4 @@
-//! The edits of one format-2 material record: sets per laser, tests, judging, note and photo
+//! The edits of one material record: sets per laser, tests, judging, note and photo
 //! (ADR 0058 §2, §3; `specs/0112` criteria 17 to 26).
 
 use crate::material::{
@@ -97,7 +97,7 @@ impl Material {
         set: Set,
         stamp: Stamp<'_>,
     ) -> Result<(), RecordRefusal> {
-        if set.numbers.interval.is_some() != (kind == SetKind::Engrave) {
+        if set.numbers.interval.is_some() != kind.has_interval() {
             return Err(RecordRefusal::WrongNumbers);
         }
         if self.set_for(&machine.id, kind) == Some(&set) {

@@ -3,8 +3,9 @@
 
 use std::hash::{Hash, Hasher};
 
-use crate::job_input::{BlockInput, BlockSource, LeafGeometry, LeafOutline};
+use crate::job_input::{BlockInput, BlockSource, LeafGeometry, LeafOutline, PointUm};
 use crate::job_numbers::BlockNumbers;
+use crate::job_raster_plan::RasterSettings;
 
 /// FNV-1a 64 as a [`Hasher`], so derived `Hash` impls (node ids) feed it.
 struct Fnv(u64);
@@ -22,8 +23,9 @@ impl Hasher for Fnv {
     }
 }
 
-/// The key of the plan of `block` with `numbers`: kind, interval, the hatch options, the Cut-out
-/// margin and every leaf's node, stacking order and coordinates. Power, speed, passes, overscan
+/// The key of the plan of `block` with `numbers`: kind, interval, the hatch options, the Image
+/// settings, the Cut-out margin and every leaf's node, stacking order, coordinates, asset and
+/// gradient. Power, speed, passes, overscan
 /// and the Z offset do not change a plan and are left out.
 #[must_use]
 pub fn plan_fingerprint(block: &BlockInput, numbers: &BlockNumbers) -> u64 {
@@ -33,6 +35,7 @@ pub fn plan_fingerprint(block: &BlockInput, numbers: &BlockNumbers) -> u64 {
     numbers.options.crosshatch.hash(&mut fnv);
     numbers.options.bidirectional.hash(&mut fnv);
     numbers.options.scan_angle.hash(&mut fnv);
+    numbers.options.image.hash(&mut fnv);
     if let BlockSource::Operation { margin, .. } = &block.source {
         margin.as_mm().to_bits().hash(&mut fnv);
     }
@@ -40,19 +43,7 @@ pub fn plan_fingerprint(block: &BlockInput, numbers: &BlockNumbers) -> u64 {
     for leaf in &block.leaves {
         leaf.node.hash(&mut fnv);
         leaf.stacking.hash(&mut fnv);
-        match &leaf.geometry {
-            LeafGeometry::Outlines(outlines) => {
-                0_u8.hash(&mut fnv);
-                outlines_hash(outlines, &mut fnv);
-            }
-            LeafGeometry::Image { frame } => {
-                1_u8.hash(&mut fnv);
-                for corner in frame {
-                    corner.x.to_bits().hash(&mut fnv);
-                    corner.y.to_bits().hash(&mut fnv);
-                }
-            }
-        }
+        geometry_hash(&leaf.geometry, &mut fnv);
     }
     block.cut_out.len().hash(&mut fnv);
     for item in &block.cut_out {
@@ -64,6 +55,58 @@ pub fn plan_fingerprint(block: &BlockInput, numbers: &BlockNumbers) -> u64 {
         }
     }
     fnv.finish()
+}
+
+/// The key of the sweeps of one raster item: its rings, its geometry (frame, asset or gradient)
+/// and the dot settings.
+pub(crate) fn raster_fingerprint(
+    rings: &[Vec<PointUm>],
+    geometry: &LeafGeometry,
+    settings: RasterSettings<'_>,
+) -> u64 {
+    let mut fnv = Fnv(0xcbf2_9ce4_8422_2325);
+    rings.hash(&mut fnv);
+    geometry_hash(geometry, &mut fnv);
+    settings.image.hash(&mut fnv);
+    settings.interval_um.hash(&mut fnv);
+    settings.angle_deg.to_bits().hash(&mut fnv);
+    settings.bidirectional.hash(&mut fnv);
+    fnv.finish()
+}
+
+fn geometry_hash(geometry: &LeafGeometry, fnv: &mut Fnv) {
+    match geometry {
+        LeafGeometry::Outlines(outlines) => {
+            0_u8.hash(fnv);
+            outlines_hash(outlines, fnv);
+        }
+        LeafGeometry::Image {
+            frame,
+            asset,
+            pixels,
+        } => {
+            1_u8.hash(fnv);
+            for corner in frame {
+                corner.x.to_bits().hash(fnv);
+                corner.y.to_bits().hash(fnv);
+            }
+            asset.hash(fnv);
+            pixels.as_ref().map(|p| (p.width, p.height)).hash(fnv);
+        }
+        LeafGeometry::Gradient { outlines, gradient } => {
+            2_u8.hash(fnv);
+            outlines_hash(outlines, fnv);
+            let map = gradient.to_gradient();
+            for value in [map.a, map.b, map.c, map.d, map.e, map.f] {
+                value.to_bits().hash(fnv);
+            }
+            gradient.is_radial().hash(fnv);
+            for stop in gradient.stops().as_slice() {
+                (stop.colour.r, stop.colour.g, stop.colour.b, stop.alpha).hash(fnv);
+                stop.offset.get().to_bits().hash(fnv);
+            }
+        }
+    }
 }
 
 fn outlines_hash(outlines: &[LeafOutline], fnv: &mut Fnv) {

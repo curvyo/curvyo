@@ -1,5 +1,5 @@
-//! The test grid recipe of record format 2 with its rules, defaults, field checks and stored form
-//! (ADR 0057 §1, ADR 0058 §2, `specs/0112` criteria 3 to 6, 24).
+//! The test grid recipe of record format 3 with its rules, defaults and field checks (ADR 0057
+//! §1, ADR 0058 §2, ADR 0069 §8, `specs/0112` criteria 3 to 6, 24, `specs/0123` criterion 44).
 
 use std::collections::BTreeMap;
 
@@ -7,6 +7,7 @@ use curvyo_document_core::Length;
 
 use crate::machine_profile::FeedRate;
 use crate::material::{SetKind, SetNumbers};
+use crate::operation_image_options::Dither;
 use crate::test_id::TestId;
 use crate::test_param::{Param, ParamValue, numbers_of};
 
@@ -128,6 +129,8 @@ pub struct TestRecipe {
     pub(crate) fixed: BTreeMap<Param, u32>,
     pub(crate) cell: Length,
     pub(crate) crosshatch: bool,
+    /// The dither of an Image grid's cells (a binary mode); kept but unused on another kind.
+    pub(crate) dither: Dither,
 }
 
 impl TestRecipe {
@@ -142,6 +145,7 @@ impl TestRecipe {
             fixed: BTreeMap::new(),
             cell: Length::from_mm(DEFAULT_CELL),
             crosshatch: false,
+            dither: Dither::FloydSteinberg,
         };
         recipe.fill_fixed(defaults);
         recipe
@@ -187,6 +191,13 @@ impl TestRecipe {
     #[must_use]
     pub const fn crosshatch(&self) -> bool {
         self.crosshatch
+    }
+
+    /// The dither the cells engrave with: `Some` for an Image grid only (`specs/0123`
+    /// criterion 44).
+    #[must_use]
+    pub fn dither(&self) -> Option<Dither> {
+        (self.kind == SetKind::Image).then_some(self.dither)
     }
 
     /// The numbers of the cell at `column`, `row`: its two axis values over the shared values
@@ -314,6 +325,17 @@ impl TestRecipe {
     pub fn with_crosshatch(&self, on: bool) -> Self {
         let mut next = self.clone();
         next.crosshatch = on && self.kind == SetKind::Engrave;
+        next
+    }
+
+    /// The recipe with the Dither `dither` (criterion 44); only an Image grid takes it, and only
+    /// a binary mode (never Grey).
+    #[must_use]
+    pub fn with_dither(&self, dither: Dither) -> Self {
+        let mut next = self.clone();
+        if self.kind == SetKind::Image && dither.is_binary() {
+            next.dither = dither;
+        }
         next
     }
 

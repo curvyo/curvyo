@@ -211,7 +211,8 @@ impl Default for Interval {
     }
 }
 
-/// The three kinds a set belongs to; also the kind of a test grid (spec "Words").
+/// The four kinds a set belongs to; also the kind of a test grid (spec "Words"; `specs/0123`
+/// Frage 270 B adds Image).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SetKind {
     /// Cut, for the Cut and Cut-out operations.
@@ -220,11 +221,19 @@ pub enum SetKind {
     Score,
     /// Engrave, for Engrave and the hatch of Engrave + Outline.
     Engrave,
+    /// Image, for the Image operation (ADR 0069 §14).
+    Image,
 }
 
 impl SetKind {
-    /// The three kinds in the order of the UI (Cut, Score, Engrave).
-    pub const ALL: [Self; 3] = [Self::Cut, Self::Score, Self::Engrave];
+    /// The four kinds in the order of the UI (Cut, Score, Engrave, Image).
+    pub const ALL: [Self; 4] = [Self::Cut, Self::Score, Self::Engrave, Self::Image];
+
+    /// Whether a set of the kind holds an interval: Engrave and Image (ADR 0069 §14).
+    #[must_use]
+    pub const fn has_interval(self) -> bool {
+        matches!(self, Self::Engrave | Self::Image)
+    }
 
     /// The stored text (a published file key).
     #[must_use]
@@ -233,6 +242,7 @@ impl SetKind {
             Self::Cut => "cut",
             Self::Score => "score",
             Self::Engrave => "engrave",
+            Self::Image => "image",
         }
     }
 
@@ -249,6 +259,7 @@ impl SetKind {
             Self::Cut => "Cut",
             Self::Score => "Score",
             Self::Engrave => "Engrave",
+            Self::Image => "Image",
         }
     }
 }
@@ -264,13 +275,14 @@ pub struct Settings {
     pub passes: Passes,
 }
 
-/// The four numbers of a set (ADR 0058 §2): power, speed, passes and, for Engrave, the interval;
+/// The four numbers of a set (ADR 0058 §2): power, speed, passes and, for Engrave and Image, the
+/// interval;
 /// also the numbers of one test grid cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SetNumbers {
     /// Power, speed and passes.
     pub settings: Settings,
-    /// The hatch interval, `Some` exactly for Engrave.
+    /// The interval, `Some` exactly for the kinds with an interval (Engrave, Image).
     pub interval: Option<Interval>,
 }
 

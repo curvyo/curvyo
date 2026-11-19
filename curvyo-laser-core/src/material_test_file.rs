@@ -1,10 +1,12 @@
-//! Reads and writes the tests of a format-2 material record (ADR 0058 §2, §6).
+//! Reads and writes the tests of a material record of format 2 or 3 (ADR 0058 §2, §6; ADR 0069
+//! §8).
 
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
 use crate::material::CellIndex;
+use crate::material::SetKind;
 use crate::material_record::{MAX_NOTE_CHARS, PhotoKind, TestRecord};
 use crate::material_record_file::{
     MachineJson, RecordFileError, damaged, machine_json, read_machine,
@@ -34,7 +36,11 @@ struct CellJson {
     row: u64,
 }
 
-pub(crate) fn read_tests(tests: Vec<TestJson>) -> Result<Vec<TestRecord>, RecordFileError> {
+/// The tests of a record of format `version`; a format-2 record holds no Image test.
+pub(crate) fn read_tests(
+    tests: Vec<TestJson>,
+    version: u64,
+) -> Result<Vec<TestRecord>, RecordFileError> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::with_capacity(tests.len());
     for test in tests {
@@ -51,6 +57,7 @@ pub(crate) fn read_tests(tests: Vec<TestJson>) -> Result<Vec<TestRecord>, Record
             return Err(damaged(format!("The recipe of test {id} is not valid.")));
         }
         let recipe = read_recipe(&test.recipe)
+            .filter(|recipe| version > 2 || recipe.kind() != SetKind::Image)
             .ok_or_else(|| damaged(format!("The recipe of test {id} is not valid.")))?;
         let best = match test.best {
             None => None,
