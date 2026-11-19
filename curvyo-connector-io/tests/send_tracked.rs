@@ -16,7 +16,9 @@ use curvyo_connector_core::{
 use curvyo_connector_io::client::{CONNECT_TIMEOUT, ClientError, Connection, open_paired};
 use curvyo_connector_io::job_send::new_job_id;
 use curvyo_connector_io::record::PairingRecord;
-use curvyo_connector_io::send_tracked::{SendEnd, SharedWatch, observe_shared, send_tracked};
+use curvyo_connector_io::send_tracked::{
+    SendEnd, SharedWatch, observe_shared, send_tracked, send_tracked_open,
+};
 use curvyo_connector_io::token::Token;
 use curvyo_connector_io::watch::{WatchEvent, watch};
 
@@ -113,8 +115,12 @@ fn a_connection_that_died_resolves_by_a_fresh_status_accepted_when_the_job_is_he
         }
         Ok((connection, status))
     };
-    let end = send_tracked(&mut open, &watch, "page", JOB, deadline()).unwrap();
+    let (end, connection) = send_tracked_open(&mut open, &watch, "page", JOB, deadline()).unwrap();
     assert_eq!(end, SendEnd::Resolved(Resolution::Accepted));
+    assert!(
+        connection.is_none(),
+        "an acceptance read from a fresh status hands back no connection: no Start (0134 S2)"
+    );
 }
 
 #[test]
@@ -242,4 +248,50 @@ fn b5_an_idle_watcher_reports_the_loss_once_and_ends() {
         assert!(matches!(seen.recv_timeout(WAIT).unwrap(), WatchEvent::Lost));
         handle.join().unwrap();
     });
+}
+
+#[test]
+fn the_accepting_connection_comes_back_open_and_a_refusal_hands_back_none() {
+    let rig = rig(20);
+    let record = rig.pair("Laptop");
+    let address = rig.address();
+    let id = new_job_id().unwrap();
+    let watch = shared(id);
+    let (end, connection) = send_tracked_open(
+        &mut opener(&address, &record),
+        &watch,
+        "page",
+        JOB,
+        deadline(),
+    )
+    .unwrap();
+    assert_eq!(end, SendEnd::Resolved(Resolution::Accepted));
+    let mut connection = connection.unwrap();
+    let answer = connection
+        .command(&Message::Start { job_id: id }, State::Ready)
+        .unwrap();
+    assert!(
+        matches!(
+            answer,
+            Some(Message::Status {
+                state: State::Running,
+                ..
+            })
+        ),
+        "{answer:?}"
+    );
+    let refused = shared(new_job_id().unwrap());
+    let (end, connection) = send_tracked_open(
+        &mut opener(&address, &record),
+        &refused,
+        "two",
+        JOB,
+        deadline(),
+    )
+    .unwrap();
+    assert_eq!(
+        end,
+        SendEnd::Resolved(Resolution::Rejected(RejectReason::Busy))
+    );
+    assert!(connection.is_none());
 }

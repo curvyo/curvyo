@@ -18,6 +18,7 @@
 mod connector;
 mod connector_link;
 mod connector_send;
+mod connector_start;
 mod device_keys;
 mod devices;
 mod dropped_fonts;

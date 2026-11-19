@@ -158,6 +158,20 @@ impl WasmSession {
         self.session.set_send_link(link);
     }
 
+    /// How the page's connector stands for a start (`0134` SS9): the last status's state
+    /// spelling (`""` before any status) and the controller's own word (`""` for none). Session
+    /// state, never saved.
+    pub fn set_send_machine(&mut self, state: &str, controller_word: &str) {
+        self.session.set_send_machine(state, controller_word);
+    }
+
+    /// Whether a press of Send to machine now also starts the job (`0134` UX P4), read at the
+    /// arming and at the confirming press.
+    #[must_use]
+    pub fn send_will_start(&self) -> bool {
+        self.session.send_will_start()
+    }
+
     /// The job of the active laser page for the connector; `undefined` unless Send is enabled
     /// (the checks are read again at this moment). Nothing is written to the project.
     pub fn send_job(&mut self) -> Option<WasmSentJob> {

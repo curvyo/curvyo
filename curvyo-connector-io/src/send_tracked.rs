@@ -61,19 +61,38 @@ pub fn send_tracked(
     text: &str,
     deadline: Instant,
 ) -> Result<SendEnd, ClientError> {
+    send_tracked_open(open, watch, name, text, deadline).map(|(end, _)| end)
+}
+
+/// [`send_tracked`], also handing back the connection that got `JobAccepted`, still open, so the
+/// caller can send `Start` for the job on it (`specs/0134` addendum S2); `None` on every other
+/// path, also when the acceptance was read from a fresh connection's status.
+///
+/// # Errors
+/// As [`send_tracked`].
+pub fn send_tracked_open(
+    open: &mut dyn FnMut() -> Result<(Connection, Message), ClientError>,
+    watch: &SharedWatch,
+    name: &str,
+    text: &str,
+    deadline: Instant,
+) -> Result<(SendEnd, Option<Connection>), ClientError> {
     let Some(job_id) = watched_job(watch) else {
-        return Ok(SendEnd::ResolvedElsewhere);
+        return Ok((SendEnd::ResolvedElsewhere, None));
     };
     let (mut connection, _) = open()?;
     match connection.send_job_with_id(job_id, name, text, deadline) {
-        Ok(_) => Ok(end_of(observe_shared(
-            watch,
-            &Message::JobAccepted { job_id },
-        ))),
-        Err(SendError::Rejected(reason)) => Ok(end_of(observe_shared(
-            watch,
-            &Message::JobRejected { job_id, reason },
-        ))),
+        Ok(_) => Ok((
+            end_of(observe_shared(watch, &Message::JobAccepted { job_id })),
+            Some(connection),
+        )),
+        Err(SendError::Rejected(reason)) => Ok((
+            end_of(observe_shared(
+                watch,
+                &Message::JobRejected { job_id, reason },
+            )),
+            None,
+        )),
         Err(SendError::Client(error)) => {
             drop(connection);
             if let Some(held) = watch
@@ -83,10 +102,13 @@ pub fn send_tracked(
             {
                 held.transfer_ended();
             }
-            Ok(match open() {
-                Ok((_, status)) => end_of(observe_shared(watch, &status)),
-                Err(_) => SendEnd::Unresolved(error),
-            })
+            Ok((
+                match open() {
+                    Ok((_, status)) => end_of(observe_shared(watch, &status)),
+                    Err(_) => SendEnd::Unresolved(error),
+                },
+                None,
+            ))
         }
     }
 }
