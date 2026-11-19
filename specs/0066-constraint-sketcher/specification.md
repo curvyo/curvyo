@@ -1,6 +1,6 @@
 # Constraint sketcher: construct geometry from constraints, dimensions and formulas
 
-Status: Done (PR #228, #237, #241; revision 5 merged 2026-11-01)
+Status: Done (PR #228, #237, #241; revision 5 merged 2026-11-01); revision 6 (2026-11-19, AC53 to AC63: count parameters, Repeat, Mirror axis) Draft (Fragen 275 and 276 decided A; not Ready: architect addendum and UX notes for the new tools missing)
 Priority: Should
 Origin: Customer (2026-10-17; expanded and accepted 2026-10-30).
 
@@ -198,6 +198,31 @@ Origin: Customer feedback on the revision 4 build (screenshots `target/0066-rev5
 
 - **R5-PICK:** point pick radius. A: 10 screen px (recommended). B: 6 px. C: 14 px. Default: A.
 - **R5-SYMCENTRE:** A: geometric centre for selection first, last pick for rail picks (recommended). B: last pick only. C: geometric rule only. Default: A.
+
+## Customer revision 6 (2026-11-19)
+
+Origin: Customer ideas of 2026-11-19 (translated): (5) count parameters, e.g. a Christmas tree with a parameterised number of tiers; (6) axis symmetry, so only one half is drawn. Decision of the product owner: both **extend this spec** (the sketch grows two features) and are not new entries; the tilings of `0069` and the pattern fill of `0071` are the nearest relatives and stay unchanged (they work on finished objects, these work inside the sketch under the solver). Status of this revision: Draft, not built. Everything marked **(Proposal)** is the product owner's and vetoable at the demo. The parameter handles on a placed instance are in `0099` (revision 2026-11-19, criteria 23 ff.).
+
+Words: **Repeat:** a sketch feature that repeats a chosen group of sketch entities (the **seed**) a number of times, each repeat shifted, turned and scaled by a fixed **step** from the previous one. **Count parameter:** a whole-number parameter (kind "count") that may drive a Repeat's count. **Mirror axis:** a sketch line or the X or Y axis that mirrors everything drawn on one side.
+
+53. (R6-COUNT) Given a named parameter, then its kind may be **Count** (whole number, 0 to 200, default 1; typed values are rounded to a whole number, above 200 clamped with a notice, below 0 become 0; permit over refuse). A count may be used in formulas like any parameter (`n - 1`, `n * 2`); a formula that gives a fraction for a count use is rounded to the nearest whole number.
+54. (R6-REPEAT) Given a selection of sketch entities (the seed) and the Repeat tool in the sketch rail (second constraint-card group or the geometry card **(Proposal)**), then the maker sets Count (a number or a count parameter or a formula), Offset X and Offset Y (mm), Rotation (degrees) and Scale per step (percent, default 100; 85 % gives a tree whose tiers shrink), applied step by step to the previous repeat; the repeats appear as generated geometry drawn like the seed, labelled with a small "x5" chip; one undo step "Add repeat". (Frage 275 A: offset, rotation and scale per step.)
+55. (R6-SEED) Given a Repeat, then only the **seed** is solved; each repeat is the solved seed transformed by the accumulated step, so the number of unknowns never grows with the count (the solver does not run per repeat). The seed's constraints and dimensions are the only ones the maker edits; constraints from outside to a repeat are refused with the named reason "Repeated geometry cannot be constrained" **(Proposal; no silent no-op)**.
+56. (R6-OUTLINE) Given a Repeat, then the repeats and the seed form the sketch's outline: an entity of one step that touches the next step within 0.01 mm joins into one closed or open chain with it (a Christmas tree of triangles that touch becomes one outline); entities that only overlap stay separate loops. A count of 0 shows no seed either, count 1 only the seed.
+57. (R6-DRIVE) Given a count parameter and the Repeat's Count field linked to it, then changing the parameter (typing, a clone's own value from `0099` criterion 24, a formula change) rebuilds the repeats within 16 ms of thread CPU time for 200 repeats of a seed of 20 entities (tested in `curvyo-editor-wasm/tests/cpu_time/`).
+58. (R6-SYMAXIS) Given a **Mirror axis** (a sketch line chosen with the Mirror tool, or the X or Y axis), then entities drawn on one side are mirrored to the other **live**: the mirrored side is generated geometry, drawn lighter, not editable, with a small mirror symbol on the axis; the maker draws and constrains only the **source side** (anything drawn on the far side of the axis is moved to the source side by reflection with a notice **(Proposal)**, so the maker never loses what he drew).
+59. (R6-SYMJOIN) Given a Mirror axis, then source entities whose end lies on the axis (within 0.01 mm) join their mirror image at that end into one chain, so a half outline closes into the whole outline; an open end that does not lie on the axis stays open on both sides. The mirror image is part of the sketch's outline for output, clones and Convert to paths.
+60. (R6-SYMFIX) Given a Mirror axis, then a point of the source side may be constrained to lie **on** the axis (Coincident point to line, `AC37`) and its mirror twin is then the same point; that is how the join of AC59 is kept exact when the maker drags it.
+61. (R6-SYMLIMIT) Given one sketch, then it has at most one Mirror axis and, per sketch, Repeat and Mirror combine in the order Repeat then Mirror **(Proposal)**; a second Mirror axis is not offered (hidden, not disabled).
+62. (R6-REALISE; **revisitable**, Frage 276 A built, customer unsure: C, the generated half without Make editable, is the cheaper fallback if this criterion proves costly) Given Mirror or Repeat, then a command **Make editable** turns the generated geometry into real sketch entities (with Symmetric constraints about the axis for a mirror) in one undo step; after it the feature is gone. **(Proposal)**
+63. (R6-SAVE) Given save and reopen, then count parameters, Repeats and the Mirror axis and their values survive; a file without them opens unchanged; `format_version` change by the architect.
+
+### Decisions (revision 6)
+
+Customer, 2026-11-19:
+
+- **Frage 275 (COUNT-STEP): A.** A Repeat's step carries offset, rotation and scale (AC54).
+- **Frage 276 (SYM-OUTPUT): A.** The mirrored half is generated and live, joined at the axis (AC58, AC59), with Make editable (AC62). Customer unsure ("maybe C is enough"): **revisitable**; build A, and if Make editable proves costly, C (A without Make editable) is the cheaper fallback.
 
 ## Model and solver readiness
 

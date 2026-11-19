@@ -493,7 +493,7 @@ values, not an implementation site, for those four rows.
   Path; Boolean moves there from column A in the first release that needs the
   room, row "Tool rail architecture"), always rendered once they exist, dimmed and not
   removed when a command does not apply (the one place where "Hidden, not
-  disabled" is reversed, because a fixed block must not move). The rail is
+  disabled" is reversed, because a fixed block must not move; **exception, 2026-11-19, `0112`:** the Test grid button, the last button of its card, is removed off laser pages because the customer wants it completely hidden, and no other button moves). The rail is
   capped at two columns and 22 buttons at 800 x 600; a command that would be
   the 23rd belongs in the Select bar or the Properties panel. Offset, the first operation with a value, is a tool with its own
   entry chip and canvas handles (rows "Offset entry chip", "Offset handles"; the Offset bar was removed 2026-10-13); there are no flyouts or popups from the rail. The panel's "no

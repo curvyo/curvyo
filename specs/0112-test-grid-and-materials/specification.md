@@ -1,6 +1,6 @@
 # Test grid and materials: a Test grid tool that resolves into ordinary operations, a Materials tab with one material shared by all lasers, tests judged and kept by id
 
-Status: Done (PR #353)
+Status: Done (PR #353); revision 2026-11-19 (Draft, not built): the Test grid button is hidden, not dimmed, off laser pages (criterion 1, Revision)
 Priority: Must
 Origin: Customer (laser redesign after the demo of PR #333, answers to Fragen 192 to 211, 2026-11-12; decisions in `docs/design-drafts/2026-11-laser-redesign/README.md`). Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
@@ -28,7 +28,7 @@ As a maker with a new sheet of material I want to place a test grid from one too
 
 ### Test grid tool
 
-1. Given a laser page, then the tool card of Offset and Measure has a third tool, Test grid. Its bar replaces the Select bar like the Trace bar does. On a page that is not a laser page the tool is dimmed with the tooltip "Laser pages only." (the rail's fixed cards dim, they do not remove).
+1. Given a laser page, then the tool card of Offset and Measure has a third tool, Test grid. Its bar replaces the Select bar like the Trace bar does. On a page that is not a laser page the tool is **not in the card at all** (hidden, not dimmed, no tooltip; the other buttons of the card keep their places) — *Revision 2026-11-19 (customer: "completely hidden instead"); it replaced "dimmed with the tooltip Laser pages only."*
 2. Given the tool, when the maker presses on the page, then one test grid is placed with the bar's values where the user pressed, with the first free spot of `0028` criterion 3 as the fallback when the press spot does not fit (one undo step "Add test grid") and selected; the bar then edits the selected grid live, one undo step per committed value.
 3. Given the bar, then row 1 holds, without captions: Kind (Cut, Score, Engrave), the test id (tooltip "Test id", read-only), the material pick, the parameters that sit on no axis and are shared by every cell (for example Passes, or Speed for an Engrave test), and Cell size (mm, 3 to 50, default 10). For Engrave it also holds the Crosshatch toggle (`#`, tooltip "Crosshatch"). Row 2 holds Columns and Rows, each one unit of caption, Parameter, Min, Max, Count (2 to 12, default 5). The gap between cells is 2 mm, constant, no field.
 4. Given a parameter switch of an axis, then Cut and Score offer Power, Speed and Passes, Engrave also offers Interval; every parameter is offered in both switches; choosing the parameter of the other axis swaps the two axes; the parameter on no axis moves to row 1. Plain number fields with the unit inside; no sliders.

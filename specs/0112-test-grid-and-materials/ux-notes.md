@@ -69,7 +69,7 @@ Symbols (Lucide at 16px, 1.5px absolute stroke, unless noted):
 ### 3.1 Rail button
 
 - Third button of the "More tools" card, after Measure: `TestGridGlyph` at 20px, tooltip and name "Test grid tool". No letter key (G1).
-- On a page that is not a laser page the button stays in the card, dimmed and `aria-disabled`, tooltip line 2 "Laser pages only." (the rail's "dimmed, not removed" rule for fixed blocks; criterion 1 says "not offered", section 14 M1).
+- **Revision 2026-11-19 (customer: the tool must be completely hidden off laser pages):** on a page that is not a laser page the button is **removed from the tree** (no dimming, no `aria-disabled`, no tooltip, no "Laser pages only."); the card has two buttons (Offset, Measure) there and three on a laser page. It is the third and last button, so no other button moves; the card's height changes with the page kind. If the Test grid tool is active when the active page changes to a non-laser page, the tool falls back to Select. This is a recorded exception to the rail's "dimmed, not removed" rule (design system, row "Tool rail architecture"). Replaces the 2026-11-12 text (dimmed, line 2 "Laser pages only.").
 - Pressed: the active tool look (`--toolbar-icon-active-bg`). Escape or another tool leaves it, as every tool.
 
 ### 3.2 On the canvas
@@ -312,7 +312,7 @@ No visible notice after placing, editing, picking, judging, adding or cropping (
 
 ## 14. Mismatches for the product owner
 
-- **M1** Criterion 1 "the tool is not offered" off laser pages: the rail's fixed cards dim a button instead of removing it (row "Tool rail architecture"); the notes dim it with "Laser pages only." in the tooltip.
+- **M1** Criterion 1 "the tool is not offered" off laser pages: first read as the rail's fixed cards dimming a button; **revised 2026-11-19 by the customer: hidden completely** (section 3.1).
 - **M2** Criterion 2 places at the first free spot; the notes place at the press (G2), first free spot as the fallback. Recommendation: amend criterion 2.
 - **M3** Criterion 4 "a parameter chosen for one axis is not offered for the other": screen 02 shows every parameter in both switches; the notes swap (G6).
 - **M4** Resolved: burned text is criterion 10 only (id, axis titles, values); the "<material> · <kind>" line of screen 02 is not burned unless the customer decides otherwise.
@@ -339,7 +339,7 @@ No visible notice after placing, editing, picking, judging, adding or cropping (
 
 ## 16. Implementer checklist
 
-- Rail: third button of "More tools", dimmed off laser pages; Escape leaves.
+- Rail: third button of "More tools", hidden (not rendered) off laser pages (revision 2026-11-19); Escape leaves.
 - Canvas: live outline under the pointer, place at the press, select an existing grid, box and centre move only, Move chip, duplicate gives a new id, Delete and moving off the page drop the rows.
 - Bar: two rows, no captions in row 1, mono test id with tooltip, material button and dropdown with "New material" first, shared values and the Crosshatch toggle for Engrave, Columns and Rows units with Min, Max, Count, swap of axes, whole-unit wrapping and the one break, invalid values kept with the notice, never clamped; each commit one "Edit test grid" that overwrites hand edits; new id after Lasered with sr status only.
 - Rows: names, order, cell rows without pick and with the source line, label row with the pick.
