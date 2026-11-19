@@ -742,9 +742,9 @@ export interface EditorSession {
   cancelTransformEntry: () => void;
   /** For linked fields: the text the other field takes. */
   transformEntryLinked: (field: number, text: string) => string | undefined;
-  /** The current zoom level's integer percentage read-out (acceptance
-   * criterion 9) — `StatusBar`'s new center segment. */
-  zoomPercent: number;
+  /** Changes with every zoom the canvas's own wheel listeners do not see (a key, a menu
+   * command, a fit): `ColourPickChip` reads the colour under the pointer again. */
+  zoomKey: number;
   /** Whether a drag-pan gesture (middle-mouse or Space+primary,
    * acceptance criteria 3, 4) is currently in flight — `Canvas`'s own
    * grabbing-cursor convention. */
@@ -1100,7 +1100,12 @@ export function useEditorSession(
     },
     [],
   );
-  const [zoomPercent, setZoomPercent] = useState(100);
+  // The zoom percent the session last had, and a key that changes when `syncFromSession` finds it
+  // changed. A wheel zoom only updates the number: setting React state on every wheel event
+  // rendered the whole editor up to 18 times per second during a zoom (`specs/0126` frame pacing),
+  // and the colour chip follows the wheel through its own listener.
+  const zoomPercentRef = useRef(100);
+  const [zoomKey, setZoomKey] = useState(0);
   const [isPanning, setIsPanning] = useState(false);
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
   const [selectionCount, setSelectionCount] = useState(0);
@@ -1221,7 +1226,11 @@ export function useEditorSession(
     setGuideState(readGuideState(session.guide_state()));
     const nextBar = readSelectBar(session.select_bar_state());
     setSelectBar((previous) => (sameSelectBar(previous, nextBar) ? previous : nextBar));
-    setZoomPercent(session.zoom_percent());
+    const zoom = session.zoom_percent();
+    if (zoom !== zoomPercentRef.current) {
+      zoomPercentRef.current = zoom;
+      setZoomKey((key) => key + 1);
+    }
     setSelectionCount(session.selection_count());
     // One polite message at a time: the context announcement wins over the selection one.
     setSelectionAnnouncement(contextAnnounced ? "" : session.selection_announcement());
@@ -1616,7 +1625,7 @@ export function useEditorSession(
       session.wheel(deltaX, deltaY, x, y, event.shiftKey, event.ctrlKey || event.metaKey);
       perfSpan("wheel: session.wheel", applyStart);
       perfInput();
-      setZoomPercent(session.zoom_percent());
+      zoomPercentRef.current = session.zoom_percent();
       // A pan or zoom moves the document under a still pointer.
       onCursorMove(readDocumentPoint(session.screen_to_ruler(x, y)));
       if (entryOpenRef.current) {
@@ -3214,7 +3223,7 @@ export function useEditorSession(
     transformEntryLinked,
     transformEntryMirrorLine,
     onContainerBlur,
-    zoomPercent,
+    zoomKey,
     isPanning,
     isSpaceHeld,
     setTool,

@@ -391,7 +391,7 @@ export function Canvas({
       <ColourPickChip
         active={editor.cursorHint === "eyedropper"}
         getSession={editor.getSession}
-        viewKey={editor.zoomPercent}
+        viewKey={editor.zoomKey}
         containerRef={editor.containerRef}
       />
       {editor.liveReadout && liveReadoutVisible(editor.liveReadout, overOperationRow) && (
