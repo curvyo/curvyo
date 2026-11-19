@@ -38,6 +38,7 @@ import { offsetKeyOutcome, offsetReadout } from "@/lib/offsetText";
 import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
+import { perfPixelRatio, perfSkipDraw } from "@/lib/perfAblate";
 import { ModifierTracker } from "@/lib/keyModifiers";
 import { isSecondPress, withheldPressIsDrag } from "@/lib/doubleClick";
 import { parseLayerNotice } from "@/lib/layerRows";
@@ -66,9 +67,9 @@ import type { ClosePathResult } from "@/lib/penText";
 import { type LineCode, type SideCode, type TextPathEntry, parseTextPathEntry } from "@/lib/textPathText";
 
 /** The canvas's backing-buffer size for a CSS size at the window's current
- * `devicePixelRatio` (`backingBufferFor`). */
+ * `devicePixelRatio` (`backingBufferFor`; the perf build's ablation can lower the ratio). */
 function backingBufferSize(cssWidth: number, cssHeight: number): BackingBuffer {
-  return backingBufferFor(cssWidth, cssHeight, window.devicePixelRatio);
+  return backingBufferFor(cssWidth, cssHeight, perfPixelRatio(window.devicePixelRatio));
 }
 
 /** Which tool is active (`specification.md`'s tool rail: Select is first
@@ -1653,7 +1654,7 @@ export function useEditorSession(
     // generation.
     let seenSession: WasmSession | null = null;
     let seenGeneration = -1;
-    startPerfScenarios(canvas ?? null, () => sessionRef.current);
+    startPerfScenarios(canvas ?? null, () => sessionRef.current, fitCanvas);
     let frame = requestAnimationFrame(function renderLoop() {
       const probeStart = perfStart();
       const session = sessionRef.current;
@@ -1680,7 +1681,7 @@ export function useEditorSession(
         const fresh = session !== seenSession || state[FRAME_GENERATION] !== seenGeneration;
         const draw = state[FRAME_NEEDED] === 1;
         if (fresh || draw || (state[FRAME_FLAGS] & FRAME_NOTICES) !== 0) {
-          if (draw) {
+          if (draw && !perfSkipDraw()) {
             const drawStart = perfStart();
             session.render();
             perfSpan("loop: render()", drawStart);

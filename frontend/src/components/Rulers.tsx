@@ -256,6 +256,7 @@ export function Rulers({ editor, unit }: RulersProps) {
     <>
       <div
         ref={cornerRef}
+        data-rulers=""
         aria-hidden="true"
         className="flex cursor-default items-center justify-center text-xs select-none"
         style={{
@@ -269,12 +270,12 @@ export function Rulers({ editor, unit }: RulersProps) {
       >
         {unit}
       </div>
-      <div aria-hidden="true" className="min-w-0 cursor-default" {...swallow}>
+      <div data-rulers="" aria-hidden="true" className="min-w-0 cursor-default" {...swallow}>
         {/* As long as the drawing's canvas, under a side pane too: the split never resizes it
          * (`specs/0077-font-preview` criterion 2). */}
         <canvas ref={horizontalRef} className="block h-full w-[calc(100%+var(--canvas-overhang,0px))] max-w-none" />
       </div>
-      <div aria-hidden="true" className="min-h-0 cursor-default" {...swallow}>
+      <div data-rulers="" aria-hidden="true" className="min-h-0 cursor-default" {...swallow}>
         <canvas ref={verticalRef} className="block size-full" />
       </div>
     </>

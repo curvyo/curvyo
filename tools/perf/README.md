@@ -10,6 +10,12 @@ python3 -I tools/perf/measure.py --timeout 900 # stop after 900 s (default 600)
 python3 -I tools/perf/measure.py --desktop     # on the real display and GPU instead of Xvfb
 ```
 
+```text
+python3 -I tools/perf/measure.py --ablate                  # the ablation matrix (below), about 5 minutes
+python3 -I tools/perf/measure.py --desktop --ablate        # the same on the real display and GPU
+python3 -I tools/perf/measure.py --no-build --ablate baseline,dpr1,no-rulers   # chosen variants only
+```
+
 `--desktop` starts the app on the current `DISPLAY` (no `xvfb-run`, no forced `GDK_BACKEND`): the
 numbers of a real GPU and the desktop compositor's pacing. It takes no screenshots (the window is
 wherever the window manager puts it), so the `lag` line is not measured there.
@@ -51,6 +57,61 @@ ticks in, 30 out); then a generated SVG of 5 000 stroked paths is imported and f
 used**); `idle-5000` 30 s; `wheel-zoom` (5 s, Ctrl+wheel, 30 notches in, 30 out); `pan-drag` (5 s,
 middle button, pointer on a 150 px circle). The `s` column is wall time: when frames are slow the timers
 fall behind, so a 5 s scenario can take longer.
+
+## Ablation matrix (`--ablate`)
+
+Which part of the page makes WebKit burn a core while the empty page pans. The runner starts the app
+once per variant (nothing of one variant carries into the next), hands the page the variant over the
+probe's WebSocket (its first message: `{"mode": "ablate", "variant": ...}`; the full run gets
+`{"mode": "full"}`), and the page (`frontend/src/lib/perfAblate.ts`, active only in the perf build)
+applies it before one continuous middle-button pan of the empty page as in `empty-pan` (no
+screenshots): the first 3 s are a warm-up, the next 8 s are measured. `/proc` is sampled every
+0.25 s. Variants, in run order:
+
+| variant | what it changes |
+|---|---|
+| `baseline` | nothing |
+| `no-rulers` | ruler strips' canvases `display: none`, their cells `visibility: hidden` (the grid keeps its cells, so the canvas keeps its size; the ruler JS still runs) |
+| `no-pageframes` | the `PageFrames` layer (`[data-page-frames]`) `display: none` |
+| `no-overlays` | every `position: absolute/fixed` element over the canvas that is not its ancestor `display: none` (page frames, placed-page tags, fixture labels, presence, measure, tool bars, rail) |
+| `canvas-only` | everything but the canvas `visibility: hidden` (not `display: none`: the canvas keeps its size and backing store) |
+| `dpr1` | the canvas's backing store at its CSS size (pixel ratio 1) |
+| `half-backing` | the backing store at half the device pixels in each direction (ratio dpr/2) |
+| `no-effects` | opacity, transform, will-change, box-shadow, filter, mix-blend-mode, backdrop-filter, clip-path, mask, isolation, transition-duration, animation-name, contain, perspective reset on the canvas and every ancestor; the row lists what it found (`color-mix` cannot be found this way: computed style resolves it to a colour; it is a paint cost, not a compositing trigger) |
+| `no-draw` | the render loop skips `render()`: the view still pans, rulers and page frames follow, the canvas keeps its last frame |
+| `no-view` | the same pointer moves without a button: no view change, the hover and the rulers' pointer marks still follow |
+| `idle` | no input at all |
+| `no-compositing` | the page as `baseline`, `WEBKIT_DISABLE_COMPOSITING_MODE=1` |
+| `no-dmabuf` | the page as `baseline`, `WEBKIT_DISABLE_DMABUF_RENDERER=1` |
+| `baseline-again` | `baseline` once more: its spread from the first row is the noise floor of every other row |
+
+The header names the canvas backing store in device pixels, its CSS size, `devicePixelRatio`, the
+window and the screen (a HiDPI or 4K display gives a large backing store: `canvasSize.ts` sizes it
+at CSS size times `devicePixelRatio`). Each row has the backing store and window of its own launch,
+the measured seconds and frames, `rAF p50`, `p95` and `>33ms`, CPU in % of one core of
+`WebKitWebProcess` (`web %`), `WebKitGPUProcess` (`gpu %`, 0 when WebKit runs none) and the rest
+of the tree (`other %`: `curvyo-app`, the network process), `submit/s` and the `render()` ms. Under
+each table: what each variant matched and a `WARNING` for a variant that took no effect (backing
+store not the expected size, `no-draw` still submitting, `no-view`/`idle` moving the view, a pan that
+did not move it, a hide that matched nothing). Raw data: `target/perf/ablate.json` and
+`target/perf/ablate-<variant>.ndjson`.
+
+The measured window is 500 ticks of the probe's 16 ms timer, not 8 s of wall time: WebKit runs
+the timers about once per frame, so when frames are slow the window stretches (the `s` column) and
+`frames` stays near 500; compare `rAF p50` and the CPU columns, not `frames`. Under Xvfb the
+pixel ratio is 1, so `dpr1` equals `baseline` there; on a HiDPI display it is the backing-store row.
+`no-view` still draws: a hover changes the session (about one submit per frame on the empty page).
+
+First run (this machine, 2026-11-19, Xvfb, software GL, 944x776 canvas): every page variant but
+three is within the noise of `baseline`/`baseline-again` (rAF p50 25-27 ms, WebKitWebProcess about
+260 %); `no-draw` 17 ms and 57 %, `idle` 16 ms and 9.5 %, `no-overlays` 17 ms at 326 %,
+`half-backing` 35 ms at 132 %. Software GL makes `render()` (9 ms) the main cost here, which the
+customer's GPU does not have; the matrix is meant for `--desktop`.
+
+On a desktop: run `--desktop --ablate` from a terminal on that display and leave the window open and
+uncovered for the whole run (about 14 launches of 15-20 s each; WebKit may throttle a hidden or
+minimised view). The window manager places each launch, so its size can differ between rows: the
+`win` column shows it.
 
 ## Columns
 
@@ -143,8 +204,8 @@ showed 0.0 in every column with a 7 s zoom was a stale wasm build, not the frame
 
 ## Not done / could not run
 
-- No GPU: Xvfb gives software drawing only. Numbers on a real GPU need the same script on a desktop
-  session (`DISPLAY` set, drop `xvfb-run`), which is not wired yet.
+- No GPU: Xvfb gives software drawing only. `--desktop` gives a real GPU's numbers on a desktop
+  session.
 - `tauri-driver` needs `WebKitWebDriver`, which is missing here; not used (events are synthetic).
 - No Chromium comparison or Chrome trace yet; no whale/dolphin documents (see above).
 - The split of a drawn frame into draw list, pictures, upload and submit exists since phase 4

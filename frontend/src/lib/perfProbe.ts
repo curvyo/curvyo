@@ -4,6 +4,7 @@
 // (`tools/perf/measure.py` does that); a normal build has no probe, no socket and no UI.
 import type { WasmSession } from "@/lib/editorSession";
 import { frameView } from "@/lib/frameState";
+import { ABLATIONS, type Ablation, ablationInput, applyAblation } from "@/lib/perfAblate";
 
 const target: string | undefined = import.meta.env.VITE_CURVYO_PERF;
 export const perfEnabled = typeof target === "string" && target.length > 0;
@@ -43,6 +44,15 @@ let scenariosStarted = false;
 const queue: string[] = [];
 // The session whose drawn frames are timed by phase (`WasmSession::take_frame_phases`).
 let timed: WasmSession | null = null;
+let second = 0;
+
+/** What the runner asked for on connecting: the full scenario list, or one ablation variant
+ * (`measure.py --ablate`) with its warm-up and measured seconds. */
+type Order = { mode: "full" } | { mode: "ablate"; variant: string; warmup: number; seconds: number };
+let receiveOrder: (order: Order) => void = () => {};
+const order = new Promise<Order>((resolve) => {
+  receiveOrder = resolve;
+});
 
 function send(message: object) {
   if (!perfEnabled) return;
@@ -61,6 +71,7 @@ function start() {
   socket.onopen = () => {
     for (const text of queue.splice(0)) socket?.send(text);
   };
+  socket.onmessage = (event) => receiveOrder(JSON.parse(String(event.data)) as Order);
   // The animation-frame cadence the page really gets, whatever the render loop does.
   let lastFrame = 0;
   const frames = (now: number) => {
@@ -93,13 +104,15 @@ function start() {
     setTimeout(gapTimer, 4);
   };
   setTimeout(gapTimer, 4);
-  let second = 0;
-  setInterval(() => {
-    // Frames, ms of draw list, pictures, upload and submit, layers and vertices (summed).
-    const phases = timed ? Array.from(timed.take_frame_phases()) : [];
-    send({ event: "second", scenario, second: second++, ...counters, phases });
-    counters = zero();
-  }, 1000);
+  setInterval(flush, 1000);
+}
+
+/** Sends the counters since the last flush (tagged with the running scenario) and starts anew. */
+function flush() {
+  // Frames, ms of draw list, pictures, upload and submit, layers and vertices (summed).
+  const phases = timed ? Array.from(timed.take_frame_phases()) : [];
+  send({ event: "second", scenario, second: second++, ...counters, phases });
+  counters = zero();
 }
 
 /** Start of a render-loop tick: the time stamp `renderTick` closes (0 when the probe is off). */
@@ -216,26 +229,105 @@ async function every(ms: number, seconds: number, step: (index: number) => void)
   }
 }
 
-async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | null) {
+/** The canvas's place in device pixels of the window (left, top, width, height), which the
+ * runner crops its screenshots to. */
+function where(canvas: HTMLCanvasElement) {
+  const box = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio;
+  return [box.left, box.top, box.width, box.height].map((value) => Math.round(value * ratio));
+}
+
+/** The empty page's pan: middle button held, left and right at a constant 8 px per 16 ms tick,
+ * each tick a burst of 8 moves of 1 px, as a 500 Hz mouse sends (`buttons` 0: the same moves as a
+ * hover, no press). `tick` runs after each burst. */
+async function sweep(canvas: HTMLCanvasElement, seconds: number, buttons: 0 | 4, tick: (index: number, phase: number) => void = () => {}) {
+  const box = canvas.getBoundingClientRect();
+  const ex = box.left + box.width / 2;
+  const ey = box.top + box.height / 2;
+  const step = 8;
+  const half = 40;
+  const at = (index: number) => {
+    const phase = index % (2 * half);
+    const offset = phase < half ? phase : 2 * half - phase;
+    return { clientX: ex - (half / 2) * step + offset * step, clientY: ey, pointerId: 1, pointerType: "mouse", isPrimary: true, bubbles: true, cancelable: true };
+  };
+  if (buttons) canvas.dispatchEvent(new PointerEvent("pointerdown", { ...at(0), button: 1, buttons }));
+  await every(16, seconds, (index) => {
+    const from = at(Math.max(index - 1, 0)).clientX;
+    const to = at(index);
+    for (let part = 1; part <= 8; part += 1) {
+      canvas.dispatchEvent(new PointerEvent("pointermove", { ...to, clientX: from + ((to.clientX - from) * part) / 8, button: -1, buttons }));
+    }
+    tick(index, index % (2 * half));
+  });
+  if (buttons) canvas.dispatchEvent(new PointerEvent("pointerup", { ...at(0), button: 1, buttons: 0 }));
+}
+
+/** The sizes that decide the canvas's cost: its backing store and CSS box, the pixel ratio and
+ * the window. */
+function sizes(canvas: HTMLCanvasElement) {
+  return {
+    backing: [canvas.width, canvas.height],
+    css: [canvas.clientWidth, canvas.clientHeight],
+    dpr: window.devicePixelRatio,
+    window: [window.innerWidth, window.innerHeight],
+    screen: [window.screen.width, window.screen.height],
+  };
+}
+
+/** One ablation run: the variant applied, then one continuous empty-page pan (or hover, or
+ * nothing), its first `warmup` seconds as scenario `warmup`, the rest as `measure`. */
+async function runAblation(canvas: HTMLCanvasElement, session: WasmSession, refit: () => void, variant: string, warmup: number, seconds: number) {
+  const known = (ABLATIONS as readonly string[]).includes(variant);
+  const chosen = (known ? variant : "baseline") as Ablation;
+  const applied = known ? applyAblation(chosen, canvas, refit) : `unknown variant ${variant}, ran baseline`;
+  // Two frames: the resize and the hidden parts reach the screen before the clock starts.
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const view = () => frameView(session.frame_state());
+  send({ event: "ablation", variant, applied, ...sizes(canvas) });
+  const input = ablationInput(chosen);
+  const switchTo = (name: string) => {
+    flush();
+    scenario = name;
+    send({ event: "scenario", name, state: "start", view: view() });
+  };
+  switchTo("warmup");
+  const ticks = Math.round((warmup * 1000) / 16);
+  const marks = (index: number) => {
+    if (index === ticks) switchTo("measure");
+  };
+  if (input === "none") {
+    await sleep(warmup * 1000);
+    switchTo("measure");
+    await sleep(seconds * 1000);
+  } else {
+    await sweep(canvas, warmup + seconds, input === "pan" ? 4 : 0, marks);
+  }
+  flush();
+  send({ event: "scenario", name: "measure", state: "end", view: view(), ...sizes(canvas) });
+  scenario = "between";
+  send({ event: "done" });
+}
+
+async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | null, refit: () => void) {
   while (!getSession()) await sleep(200);
   await sleep(1500);
   const session = getSession() as WasmSession;
   session.set_frame_phase_timing(true);
   timed = session;
+  const asked = await order;
+  if (asked.mode === "ablate") {
+    await runAblation(canvas, session, refit, asked.variant, asked.warmup, asked.seconds);
+    return;
+  }
   // The view (origin x, origin y, scale) at a scenario's start and end: a zoom or pan that left
-  // it unchanged did not reach the session. `canvas` is the canvas in device pixels of the
-  // window, which the runner crops its screenshots to.
+  // it unchanged did not reach the session.
   const view = () => frameView(session.frame_state());
-  const where = () => {
-    const box = canvas.getBoundingClientRect();
-    const ratio = window.devicePixelRatio;
-    return [box.left, box.top, box.width, box.height].map((value) => Math.round(value * ratio));
-  };
   const mark = async (name: string, body: () => Promise<void>) => {
     scenario = name;
-    send({ event: "scenario", name, state: "start", view: view(), canvas: where() });
+    send({ event: "scenario", name, state: "start", view: view(), canvas: where(canvas) });
     await body();
-    send({ event: "scenario", name, state: "end", view: view(), canvas: where() });
+    send({ event: "scenario", name, state: "end", view: view(), canvas: where(canvas) });
     scenario = "between";
     await sleep(1500);
   };
@@ -248,30 +340,15 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
   // the offset over 8 px is the lag in moves (frames). The sweep keeps the page's left edge in view.
   // Bursts: a real mouse or touchpad sends several events per frame (here 8 moves of 1 px and 4
   // wheel events of a quarter notch per 16 ms tick), which the per-event cost has to survive.
-  await mark("empty-pan", async () => {
-    const step = 8;
-    const sweep = 40;
-    const at = (index: number) => {
-      const phase = index % (2 * sweep);
-      const offset = phase < sweep ? phase : 2 * sweep - phase;
-      return { clientX: ex - (sweep / 2) * step + offset * step, clientY: ey, pointerId: 1, pointerType: "mouse", isPrimary: true, bubbles: true, cancelable: true };
-    };
-    canvas.dispatchEvent(new PointerEvent("pointerdown", { ...at(0), button: 1, buttons: 4 }));
-    await every(16, 5, (index) => {
-      const from = at(Math.max(index - 1, 0)).clientX;
-      const to = at(index);
-      for (let part = 1; part <= 8; part += 1) {
-        canvas.dispatchEvent(new PointerEvent("pointermove", { ...to, clientX: from + ((to.clientX - from) * part) / 8, button: -1, buttons: 4 }));
+  await mark("empty-pan", () =>
+    sweep(canvas, 5, 4, (index, phase) => {
+      if (phase === 20 || phase === 60) {
+        send({ event: "snap", scenario: "empty-pan", index, step: phase < 40 ? 8 : -8, canvas: where(canvas) });
       }
-      const phase = index % (2 * sweep);
-      if (phase === sweep / 2 || phase === sweep + sweep / 2) {
-        send({ event: "snap", scenario: "empty-pan", index, step: phase < sweep ? step : -step, canvas: where() });
-      }
-    });
-    canvas.dispatchEvent(new PointerEvent("pointerup", { ...at(0), button: 1, buttons: 0 }));
-  });
+    }),
+  );
   // The still page after the pan: the offset between canvas and frame at rest.
-  send({ event: "snap", scenario: "empty-rest", index: 0, step: 0, canvas: where() });
+  send({ event: "snap", scenario: "empty-rest", index: 0, step: 0, canvas: where(canvas) });
   await sleep(1000);
   // The empty page, zoomed as `wheel-zoom` zooms the 5 000-path page.
   await mark("empty-zoom", () =>
@@ -307,10 +384,11 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
   send({ event: "done" });
 }
 
-/** Called once by the editor hook when the canvas exists; a no-op in a normal build. */
-export function startPerfScenarios(canvas: HTMLCanvasElement | null, getSession: () => WasmSession | null) {
+/** Called once by the editor hook when the canvas exists; a no-op in a normal build. `refit`
+ * sizes the canvas's backing store again (after an ablation changed its pixel ratio). */
+export function startPerfScenarios(canvas: HTMLCanvasElement | null, getSession: () => WasmSession | null, refit: () => void) {
   if (!perfEnabled || !canvas || scenariosStarted) return;
   scenariosStarted = true;
   start();
-  void run(canvas, getSession);
+  void run(canvas, getSession, refit);
 }
