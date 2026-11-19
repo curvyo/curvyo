@@ -5,6 +5,7 @@
 //! `select_view.rs` and `select_cursor.rs`; this is a child module of `session`.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, Point};
 use curvyo_render_core::{
@@ -12,7 +13,7 @@ use curvyo_render_core::{
 };
 use curvyo_ui_core::{
     EditHandle, GroupBoxShape, GroupSelection, OrientedBox, SelectTool, format_degrees,
-    group_handles, is_corner, is_drawn_group_handle, signed_size_text,
+    group_handles, hit_group_handle, is_corner, is_drawn_group_handle, signed_size_text,
 };
 
 use super::select_readout::skew_readout;
@@ -54,7 +55,42 @@ pub(super) fn merged_corners(corners: &[[Point; 4]]) -> Option<[Point; 4]> {
 /// count of the selection, so panning and zooming never change it.
 const PER_OBJECT_BOX_LIMIT: usize = 500;
 
+/// The group of the selection over one read of the objects, kept while neither changes: a pan or
+/// a zoom changes neither, and the box is a pass over every selected outline, read several times
+/// a frame (`specs/0126-performance-pass`). The read is held, so its slice cannot be another's.
+#[derive(Debug, Default)]
+pub(super) struct GroupMemo {
+    held: Option<HeldGroup>,
+}
+
+/// The read the group was measured over, the selected ids and the group.
+type HeldGroup = (Arc<[ObjectSnapshot]>, Vec<NodeId>, Option<GroupSelection>);
+
 impl Session {
+    /// The group of the selection over `objects`, in every tool; kept in [`GroupMemo`] when
+    /// `objects` is the session's own read, computed afresh over any other (a live edit's).
+    fn group_of(&self, objects: &[ObjectSnapshot]) -> Option<GroupSelection> {
+        let compute = || {
+            SelectTool::group_of_with_artwork(objects, &self.selection, &|path| {
+                self.width_artwork(path)
+            })
+        };
+        let read = self.objects();
+        if !std::ptr::eq(objects, &raw const *read) {
+            return compute();
+        }
+        let ids = self.selection.ids();
+        if let Some((held, held_ids, group)) = self.group_memo.borrow().held.as_ref()
+            && Arc::ptr_eq(held, &read)
+            && held_ids[..] == ids[..]
+        {
+            return group.clone();
+        }
+        let group = compute();
+        self.group_memo.borrow_mut().held = Some((read, ids.to_vec(), group.clone()));
+        group
+    }
+
     /// The group of the selection over `objects`, in the Select tool only.
     fn group_in(&self, objects: &[ObjectSnapshot]) -> Option<GroupSelection> {
         // The Test grid tool keeps the dashed box of the grid it placed or edits (`specs/0112`
@@ -63,9 +99,7 @@ impl Session {
         if !self.select_box_tool() && !grid_tool {
             return None;
         }
-        SelectTool::group_of_with_artwork(objects, &self.selection, &|path| {
-            self.width_artwork(path)
-        })
+        self.group_of(objects)
     }
 
     /// The group box as drawn this frame: the box at the press turned by the live
@@ -91,12 +125,22 @@ impl Session {
         let group = self.group_in(objects)?;
         let box_ = self.group_box_shown(&group);
         let units = self.units();
-        let selected_units = units.selected(self.selection.ids());
+        // Counted before the units are built: past the limit nothing of them is needed, and
+        // building them copies every selected leaf each frame.
+        let mut seen = HashSet::new();
+        let over_limit = self
+            .selection
+            .ids()
+            .iter()
+            .any(|&leaf| seen.insert(units.unit_of(leaf)) && seen.len() > PER_OBJECT_BOX_LIMIT);
+        let selected_units = if over_limit {
+            Vec::new()
+        } else {
+            units.selected(self.selection.ids())
+        };
         // One selected group draws its box only (`0023`, "Group selection box"); several objects
         // draw one lighter box each, a group's being the box around all its leaves.
-        let members = if selected_units.len() > PER_OBJECT_BOX_LIMIT
-            || (selected_units.len() == 1 && selected_units[0].is_group)
-        {
+        let members = if over_limit || (selected_units.len() == 1 && selected_units[0].is_group) {
             Vec::new()
         } else {
             // One pass over the objects: each selected leaf adds its box to its unit.
@@ -145,15 +189,12 @@ impl Session {
             return None;
         }
         let point = self.pointer_position?;
-        SelectTool::group_handle_at_with_artwork(
-            objects,
-            &self.selection,
-            point,
-            self.transform_handle_tolerances(),
-            self.held.shift,
-            true,
-            &|path| self.width_artwork(path),
-        )
+        // `SelectTool::group_handle_at_with_artwork` over the kept group.
+        let group = self.group_of(objects)?;
+        let tolerances = self.transform_handle_tolerances();
+        let handles = group_handles(&group, group.bounds(), &tolerances, self.held.shift);
+        let hit = hit_group_handle(&group, &handles, group.bounds(), point, &tolerances, true)?;
+        Some((group, hit))
     }
 
     /// The handles of the group box, the pivot marker and the skew guide for

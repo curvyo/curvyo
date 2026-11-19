@@ -564,6 +564,8 @@ pub struct Session {
     spiro_cache: std::cell::RefCell<spiro_cache::SpiroCache>,
     /// The variable-width outlines, memoised on their exact sources (`width_outlines.rs`).
     width_outlines: std::cell::RefCell<width_outlines::WidthOutlines>,
+    /// The group box of the selection over the session's read of the objects (`group_view.rs`).
+    group_memo: std::cell::RefCell<group_view::GroupMemo>,
     /// The open Find centre lines bar with its preview (`centre_lines.rs`).
     centre: Option<centre_lines_bar::CentreBar>,
     /// `window.devicePixelRatio` as of the last attach or resize, so the
@@ -765,6 +767,7 @@ impl Session {
             object_cache: object_cache::ObjectCache::default(),
             spiro_cache: std::cell::RefCell::default(),
             width_outlines: std::cell::RefCell::default(),
+            group_memo: std::cell::RefCell::default(),
             centre: None,
             device_pixel_ratio: 1.0,
             button_down: false,
@@ -881,6 +884,7 @@ impl Session {
             object_cache: object_cache::ObjectCache::default(),
             spiro_cache: std::cell::RefCell::default(),
             width_outlines: std::cell::RefCell::default(),
+            group_memo: std::cell::RefCell::default(),
             centre: None,
             device_pixel_ratio: 1.0,
             button_down: false,
