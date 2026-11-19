@@ -8,6 +8,7 @@ Release `curvyo_editor_wasm_bg.wasm` after wasm-bindgen, no wasm-opt, as built b
 
 | Date (UTC) | Commit | PR | Ref | Bytes | gzip -9 | Bytes change |
 |---|---|---|---|---|---|---|
+| 2026-11-19 | `88ce077` | #421 | main | 28,505,989 | 9,079,017 | +0 |
 | 2026-11-19 | `56f870e` | #419 | main | 28,505,989 | 9,079,017 | +0 |
 | 2026-11-19 | `7c289c5` | #399 | main | 28,505,989 | 9,079,017 | +0 |
 | 2026-11-19 | `289b98b` | #418 | main | 28,505,989 | 9,079,017 | +1,231 |
