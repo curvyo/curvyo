@@ -2698,7 +2698,8 @@ for satin stitch (embroidery family) rather than here.
   fonts (512 MiB) plus derived AI results (512 MiB, ADR 0077 §6) are held in the editor's
   memory in the browser build. **Resolution:** when an out-of-memory is measured, page assets
   from IndexedDB or the container on demand instead of holding the store.
-- **Running the model host is an operating duty if Frage 280 is A.** A domain, a bucket and an
-  upload per model version (ADR 0076) must be kept alive for the AI tools to download; the app
+- **Operating the model origin and CDN is a customer operating duty (Frage 280 A, 2026-11-19).**
+  A domain, an origin bucket and a CDN in front, plus an upload per model version (ADR 0076),
+  must be kept alive for the AI tools to download on demand (models are never bundled); the app
   does not work around a lost host except through stored results. **Resolution:** a documented
-  runbook with the model upload, or bundling the models (option C) if the duty is not wanted.
+  runbook with the model upload and CDN settings; bundling was rejected by the customer.
