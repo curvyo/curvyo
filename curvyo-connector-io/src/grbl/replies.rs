@@ -6,6 +6,7 @@ use std::time::Duration;
 use curvyo_connector_core::{Event, Millimetres};
 
 use crate::grbl::controller::GrblController;
+use crate::grbl::home::Owed;
 use crate::grbl::identify::RESET;
 use crate::grbl::reply::Report;
 use crate::grbl::stream::Hold;
@@ -108,7 +109,7 @@ impl GrblController {
             return false;
         };
         let held = self.rx_size.saturating_sub(free);
-        held > stream.in_flight() + self.owed.iter().sum::<usize>() + BF_SLACK
+        held > stream.in_flight() + self.owed_bytes() + BF_SLACK
     }
 
     fn on_job_report(&mut self, report: &Report) {
@@ -160,7 +161,10 @@ impl GrblController {
 
     /// `ok` (`code` `None`) or `error:<code>`.
     pub(super) fn on_answer(&mut self, code: Option<u16>, at: Duration) {
-        if self.owed.pop_front().is_some() {
+        if let Some(owed) = self.owed.pop_front() {
+            if owed == Owed::Home {
+                self.on_home_answer(code);
+            }
             return;
         }
         let stopping = self.stop.is_some();
@@ -186,9 +190,14 @@ impl GrblController {
         }
     }
 
-    /// `ALARM:<n>`: the first alarm's number stands.
+    /// `ALARM:<n>`: the first alarm's number stands, except that a homing alarm while the Home
+    /// command's `$H` is in flight supersedes the power-up lock (`specs/0118` M4).
     pub(super) fn on_alarm_line(&mut self, code: u16) {
-        if self.alarmed {
+        let homing = self.home_in_flight();
+        if homing {
+            self.home_alarmed = true;
+        }
+        if self.alarmed && !homing {
             return;
         }
         self.alarm_code = Some(code);
@@ -246,7 +255,7 @@ impl GrblController {
             return;
         };
         self.out.extend_from_slice(b"M5\nM9\n");
-        self.owed.extend([3, 3]);
+        self.owed.extend([Owed::Line(3), Owed::Line(3)]);
         let elapsed_ms = self.stream.take().map_or(0, |s| s.elapsed_ms());
         self.events.push(match stop.failure {
             Some(detail) => Event::JobFailedWith { elapsed_ms, detail },

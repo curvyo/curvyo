@@ -8,6 +8,7 @@ use curvyo_connector_core::{ControllerCommand, ControllerInfo, Event, Job};
 
 use crate::controller::{Advance, Controller};
 use crate::grbl::Timing;
+use crate::grbl::home::Owed;
 use crate::grbl::identify::{Failure, Identify, Outcome};
 use crate::grbl::prepare::prepare;
 use crate::grbl::reply::{Lines, Reply, parse};
@@ -53,8 +54,10 @@ pub struct GrblController {
     pub(super) alarmed: bool,
     pub(super) alarm_code: Option<u16>,
     pub(super) locked: bool,
-    /// Bytes of non-job lines (`M5`, `M9`, `$X`) whose answers are owed, oldest first.
-    pub(super) owed: VecDeque<usize>,
+    /// Non-job lines (`M5`, `M9`, `$X`, the Home command's `$H`) whose answers are owed.
+    pub(super) owed: VecDeque<Owed>,
+    /// An alarm came while the Home command's `$H` was in flight: its `ok` ends nothing.
+    pub(super) home_alarmed: bool,
     pub(super) stream: Option<Stream>,
     pub(super) stop: Option<Stop>,
     /// An alarm raised during the stop, shown after `Stopped` (G9).
@@ -93,6 +96,7 @@ impl GrblController {
             alarm_code: None,
             locked: false,
             owed: VecDeque::new(),
+            home_alarmed: false,
             stream: None,
             stop: None,
             deferred_alarm: false,
@@ -191,7 +195,7 @@ impl GrblController {
     }
 
     fn poll_period(&self) -> Duration {
-        if self.stream.is_some() || self.stop.is_some() || self.alarmed {
+        if self.stream.is_some() || self.stop.is_some() || self.alarmed || self.home_in_flight() {
             self.timing.poll_fast
         } else {
             self.timing.poll_slow
@@ -238,15 +242,20 @@ impl GrblController {
         self.identify.is_none() && at.saturating_sub(self.last_report) >= self.timing.loss
     }
 
-    /// While `$H` is in flight: GRBL 1.1's homing loop answers no `?` until the cycle ends
-    /// (`specs/0129`), so the silence is no loss and the loss clock restarts when homing ends;
-    /// a port error still is one, and the stop of G12 keeps its own banner limit. The state
-    /// word reads `Home` meanwhile, as the reports of a GRBL that does answer show it.
+    /// While `$H` is in flight, a job's or the Home command's: GRBL 1.1's homing loop answers no
+    /// `?` until the cycle ends (`specs/0129`, `specs/0118` M4), so the silence is no loss and the
+    /// loss clock restarts when homing ends; a port error still is one, and the stop of G12 keeps
+    /// its own banner limit. In a job the state word reads `Home` meanwhile, as the reports of a
+    /// GRBL that does answer show it; the Home command has a state of its own.
     fn during_homing(&mut self, at: Duration) {
-        if !self.stream.as_ref().is_some_and(Stream::homing) {
+        let in_job = self.stream.as_ref().is_some_and(Stream::homing);
+        if !in_job && !self.home_in_flight() {
             return;
         }
         self.last_report = at;
+        if !in_job {
+            return;
+        }
         if self.word.as_deref() != Some("Home") {
             self.word = Some("Home".to_owned());
             self.notices.push("Controller state: Home".to_owned());
@@ -263,8 +272,8 @@ impl GrblController {
         }
     }
 
-    fn owed_bytes(&self) -> usize {
-        self.owed.iter().sum()
+    pub(super) fn owed_bytes(&self) -> usize {
+        self.owed.iter().map(|owed| owed.bytes()).sum()
     }
 
     fn start(&mut self, job: Option<&Job>, at: Duration) {
@@ -320,17 +329,21 @@ impl GrblController {
         }
     }
 
-    /// Starts the stop of G12 for the maker's Stop (`failure` `None`) or a failing job.
+    /// Starts the stop of G12 for the maker's Stop (`failure` `None`) or a failing job; also for
+    /// the Home command's homing, which GRBL ends by the reset alone (G9).
     pub(super) fn begin_stop(&mut self, failure: Option<String>, at: Duration) {
-        let Some(stream) = self.stream.as_ref() else {
-            return;
-        };
         if self.stop.is_some() {
             return;
         }
-        let held = matches!(stream.hold, Hold::Held { .. });
-        let homing = stream.system_in_flight() || self.word.as_deref() == Some("Home");
-        let hold_sent = matches!(stream.hold, Hold::Requested(_));
+        let (held, homing, hold_sent) = match self.stream.as_ref() {
+            Some(stream) => (
+                matches!(stream.hold, Hold::Held { .. }),
+                stream.system_in_flight() || self.word.as_deref() == Some("Home"),
+                matches!(stream.hold, Hold::Requested(_)),
+            ),
+            None if self.home_in_flight() => (false, true, false),
+            None => return,
+        };
         let limits = (self.timing.hold, self.timing.banner);
         self.stop = Some(Stop::start(
             held,
@@ -371,7 +384,7 @@ impl GrblController {
         if self.alarmed {
             self.out.extend_from_slice(b"$X\n");
             // The hub prints "Unlock sent by <client>"; G33 asks for no second line.
-            self.owed.push_back(3);
+            self.owed.push_back(Owed::Line(3));
         }
     }
 }
@@ -399,6 +412,7 @@ impl Controller for GrblController {
             ControllerCommand::Resume => self.resume(),
             ControllerCommand::Stop => self.begin_stop(None, at),
             ControllerCommand::Unlock => self.unlock(),
+            ControllerCommand::Home => self.home(),
         }
         std::mem::take(&mut self.events)
     }
@@ -432,11 +446,11 @@ impl Controller for GrblController {
         if !self.closed {
             self.on_time(at);
         }
+        let owed = self.owed_bytes();
         if !self.closed
             && self.stop.is_none()
             && let Some(stream) = self.stream.as_mut()
         {
-            let owed = self.owed.iter().sum();
             let before = stream.answered();
             stream.fill(owed, &mut self.out);
             if stream.answered() != before {

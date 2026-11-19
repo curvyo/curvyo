@@ -27,6 +27,8 @@ pub enum LogResult {
     Rejected(String),
     /// The app of this name sent `Unlock` in alarm (`specs/0127` G33); the line has no job name.
     Unlock(String),
+    /// The app of this name sent `Home` and the connector took it (`specs/0118` M8); no job name.
+    Home(String),
 }
 
 impl LogResult {
@@ -41,6 +43,7 @@ impl LogResult {
             Self::Alarm(text) => format!("Alarm: {}", clean(text)),
             Self::Rejected(reason) => format!("Rejected: {}", clean(reason)),
             Self::Unlock(client) => format!("Unlock: {}", clean(client)),
+            Self::Home(client) => format!("Home: {}", clean(client)),
         }
     }
 }
@@ -150,6 +153,8 @@ mod tests {
         )
         .unwrap();
         log.append(t(660), "", &LogResult::Unlock("Laptop".into()))
+            .unwrap();
+        log.append(t(720), "", &LogResult::Home("Laptop".into()))
             .unwrap();
         let text = std::fs::read_to_string(dir.path().join(JOB_LOG_FILE)).unwrap();
         assert_eq!(text, include_str!("../tests/fixtures/jobs.log"));

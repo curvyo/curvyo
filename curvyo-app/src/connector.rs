@@ -338,7 +338,25 @@ pub(crate) fn connector_send_job(
     }
 }
 
-/// Start, pause, resume, stop or unlock, over a fresh connection (Q15, Q16; `0127` G14).
+/// The message a job button sends; `None` for an unknown command or a Start with no Ready job.
+fn command_message(command: &str, status: &Message) -> Option<Message> {
+    Some(match command {
+        "start" => Message::Start {
+            job_id: ready_job_id(status)?,
+        },
+        "pause" => Message::Pause,
+        "resume" => Message::Resume,
+        "stop" => Message::Stop,
+        // Leaves GRBL's alarm lock (`specs/0127` G14, Frage 239 B); only in `Alarm`.
+        "unlock" => Message::Unlock,
+        // The homing cycle (`specs/0118`); the connector refuses it while a job runs.
+        "home" => Message::Home,
+        _ => return None,
+    })
+}
+
+/// Start, pause, resume, stop, unlock or home, over a fresh connection (Q15, Q16; `0127` G14;
+/// `0118`).
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn connector_command(
@@ -362,17 +380,8 @@ pub(crate) fn connector_command(
         Ok(opened) => opened,
         Err(e) => return CommandAnswer::Failed { error: e.into() },
     };
-    let message = match command.as_str() {
-        "start" => match ready_job_id(&status) {
-            Some(job_id) => Message::Start { job_id },
-            None => return CommandAnswer::WrongState,
-        },
-        "pause" => Message::Pause,
-        "resume" => Message::Resume,
-        "stop" => Message::Stop,
-        // Leaves GRBL's alarm lock (`specs/0127` G14, Frage 239 B); only in `Alarm`.
-        "unlock" => Message::Unlock,
-        _ => return CommandAnswer::WrongState,
+    let Some(message) = command_message(&command, &status) else {
+        return CommandAnswer::WrongState;
     };
     match connection.command(&message, job_state(&status)) {
         Ok(_) => CommandAnswer::Done,
@@ -588,5 +597,33 @@ mod tests {
         assert_eq!(ready_job_id(&status(JobState::Ready, Some(id))), Some(id));
         assert_eq!(ready_job_id(&status(JobState::Idle, None)), None);
         assert_eq!(ready_job_id(&status(JobState::Running, Some(id))), None);
+    }
+
+    #[test]
+    fn home_maps_to_the_home_message_in_any_state_and_unknown_words_to_none() {
+        for state in [
+            JobState::Idle,
+            JobState::Ready,
+            JobState::Alarm,
+            JobState::Running,
+        ] {
+            assert_eq!(
+                command_message("home", &status(state, None)),
+                Some(Message::Home)
+            );
+        }
+        let id = Uuid::nil();
+        assert_eq!(
+            command_message("start", &status(JobState::Ready, Some(id))),
+            Some(Message::Start { job_id: id })
+        );
+        assert_eq!(
+            command_message("start", &status(JobState::Idle, None)),
+            None
+        );
+        assert_eq!(
+            command_message("reboot", &status(JobState::Idle, None)),
+            None
+        );
     }
 }

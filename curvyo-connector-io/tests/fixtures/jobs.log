@@ -10,3 +10,4 @@
 2023-11-14T22:22:20Z	cut_line.gcode	Failed: could not confirm the machine stopped
 2023-11-14T22:23:20Z	cut_line.gcode	Alarm: Hard limit hit, position may be lost (alarm 1)
 2023-11-14T22:24:20Z		Unlock: Laptop
+2023-11-14T22:25:20Z		Home: Laptop
