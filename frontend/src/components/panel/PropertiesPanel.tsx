@@ -551,7 +551,6 @@ export function PropertiesPanel({
                       view={manufacturing}
                       workbenches={workbenches}
                       unit={doc.view.unit}
-                      fixtures={fixtures}
                       library={devicesForTabs.library}
                       onReturnFocus={returnFocus}
                     />
