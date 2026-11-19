@@ -226,3 +226,53 @@ fn s10_a_send_marks_its_test_grid_lasered_and_undo_keeps_it() {
         "a second send of an unchanged grid adds no step"
     );
 }
+
+#[test]
+fn ss9_the_button_starts_only_on_a_free_machine_and_only_while_enabled() {
+    let (mut s, _) = paired_page();
+    assert_eq!(send_of(&s)["starts"], false, "no status read yet");
+    assert!(!s.send_will_start());
+    s.set_send_machine("Idle", "");
+    assert_eq!(send_of(&s)["starts"], true);
+    assert!(s.send_will_start());
+    s.set_send_machine("Done", "");
+    assert!(s.send_will_start());
+    for (state, word) in [
+        ("Ready", ""),
+        ("Running", ""),
+        ("Homing", ""),
+        ("Idle", "Door"),
+    ] {
+        s.set_send_machine(state, word);
+        assert_eq!(send_of(&s)["starts"], false, "{state} {word}");
+        assert!(!s.send_will_start(), "{state} {word}");
+    }
+    s.set_send_machine("Idle", "");
+    let sent = s.send_job().unwrap();
+    assert_eq!(
+        send_of(&s)["starts"],
+        false,
+        "a send in progress disables the button"
+    );
+    s.send_job_failed(sent.token);
+    s.set_send_link("not_paired");
+    assert_eq!(
+        send_of(&s)["starts"],
+        false,
+        "a disabled button never starts"
+    );
+}
+
+#[test]
+fn ss13_the_job_number_changes_with_the_job_and_not_with_the_status() {
+    let (mut s, _) = paired_page();
+    let before = send_of(&s)["job"].clone();
+    s.set_send_machine("Idle", "");
+    assert_eq!(send_of(&s)["job"], before, "a status is not a job change");
+    assert!(s.set_start("current_position") || s.set_start("machine_origin"));
+    assert_ne!(
+        send_of(&s)["job"],
+        before,
+        "the Start pick changes the job (P15)"
+    );
+}

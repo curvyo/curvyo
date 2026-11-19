@@ -1,7 +1,8 @@
 //! Send to machine (`specs/0125-send-to-machine`; architect addendum B4, B5, B7): the job bytes of a
 //! laser page reach the connector as the raw body of one command, and the send is followed by its
 //! job id until the connector has accepted or lost it, also across a dropped connection. The
-//! webview never gets the token; it gets the job id, counts and the resolution.
+//! webview never gets the token; it gets the job id, counts and the resolution. A press that asked
+//! for it also starts the job it sent (`specs/0134`, `connector_start`).
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -12,7 +13,7 @@ use curvyo_connector_io::client::{CONNECT_TIMEOUT, DEFAULT_PORT, open_paired_on}
 use curvyo_connector_io::job_send::new_job_id;
 use curvyo_connector_io::record::PairingRecord;
 use curvyo_connector_io::send_tracked::{
-    SendEnd, SharedWatch, observe_shared, send_tracked, watched_job,
+    SendEnd, SharedWatch, observe_shared, send_tracked_open, watched_job,
 };
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Request;
@@ -20,6 +21,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::connector::{ConnectorState, load_record};
 use crate::connector_link::{LinkError, reject_name};
+use crate::connector_start::{StartView, start_own_job, starts_after_send};
 use crate::device_keys::OpenStore;
 use crate::raw_ipc::call_args;
 
@@ -74,9 +76,17 @@ pub(crate) enum PageSendAnswer {
     Resolved {
         job_id: String,
         resolution: ResolutionView,
+        /// What the start step did, when the press asked for it and the job was accepted on a
+        /// free machine (`0134` SS1).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        start: Option<StartView>,
     },
-    /// The watcher got the answer first; its `sendResolved` event carries it.
-    ResolvedElsewhere,
+    /// The watcher got the answer first; its `sendResolved` event carries it. The start step
+    /// still ran when this call saw `JobAccepted` itself.
+    ResolvedElsewhere {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        start: Option<StartView>,
+    },
     /// The connection dropped and could not be re-read; the watcher resolves the send later.
     Unresolved { error: LinkError },
     /// Nothing was sent.
@@ -164,41 +174,63 @@ pub(crate) fn report_resolution(
 }
 
 /// The send itself, without a window: opens fresh connections to `address`, sends `text` and
-/// follows the job of `held`.
+/// follows the job of `held`. With `start`, and when the send's own first status says the machine
+/// is free (`0134` UX P4), `Start` for this job id follows `JobAccepted` on the same connection.
 fn run_send(
     address: &str,
     default_port: u16,
     record: &PairingRecord,
     held: &Pending,
-    name: &str,
-    text: &str,
+    job: (&str, &str),
+    start: bool,
 ) -> PageSendAnswer {
+    let (name, text) = job;
     let job_id = watched_job(&held.watch);
+    let mut first: Option<Message> = None;
     let mut open = || {
-        open_paired_on(
+        let opened = open_paired_on(
             address,
             default_port,
             record.spki,
             &record.token,
             CONNECT_TIMEOUT,
-        )
+        );
+        if let Ok((_, status)) = &opened
+            && first.is_none()
+        {
+            first = Some(status.clone());
+        }
+        opened
     };
-    match send_tracked(
+    let tracked = send_tracked_open(
         &mut open,
         &held.watch,
         name,
         text,
         Instant::now() + SEND_TIMEOUT,
-    ) {
-        Err(error) => PageSendAnswer::Failed {
-            error: error.into(),
-        },
-        Ok(SendEnd::Resolved(resolution)) => PageSendAnswer::Resolved {
+    );
+    let (end, accepted_on) = match tracked {
+        Err(error) => {
+            return PageSendAnswer::Failed {
+                error: error.into(),
+            };
+        }
+        Ok(tracked) => tracked,
+    };
+    let started = match (accepted_on, job_id) {
+        (Some(mut connection), Some(id)) if starts_after_send(start, first.as_ref()) => {
+            Some(start_own_job(&mut connection, id))
+        }
+        _ => None,
+    };
+    match end {
+        SendEnd::Resolved(resolution) => PageSendAnswer::Resolved {
             job_id: job_id.map(|id| id.to_string()).unwrap_or_default(),
             resolution: resolution.into(),
+            start: started,
         },
-        Ok(SendEnd::ResolvedElsewhere) => PageSendAnswer::ResolvedElsewhere,
-        Ok(SendEnd::Unresolved(error)) => PageSendAnswer::Unresolved {
+        SendEnd::ResolvedElsewhere => PageSendAnswer::ResolvedElsewhere { start: started },
+        SendEnd::Unresolved(error) => PageSendAnswer::Unresolved {
             error: error.into(),
         },
     }
@@ -211,6 +243,10 @@ struct SendArgs {
     profile_id: String,
     address: String,
     name: String,
+    /// The press asked for a start: the name the maker saw and the page's fresh status said so
+    /// (`0134` SS9, SS13).
+    #[serde(default)]
+    start: bool,
 }
 
 /// Send to machine: the raw body is the job text of the page (the file Export would write).
@@ -241,6 +277,7 @@ pub(crate) fn connector_send_page_job(
             resolution: ResolutionView::Rejected {
                 reason: reject_name(RejectReason::NotAscii),
             },
+            start: None,
         };
     };
     let Ok(job_id) = new_job_id() else {
@@ -270,8 +307,8 @@ pub(crate) fn connector_send_page_job(
         DEFAULT_PORT,
         &record,
         &held,
-        &args.name,
-        &text,
+        (&args.name, &text),
+        args.start,
     );
     if !matches!(answer, PageSendAnswer::Unresolved { .. }) {
         state
@@ -338,14 +375,15 @@ mod tests {
             DEFAULT_PORT,
             &record,
             &held,
-            "page",
-            JOB,
+            ("page", JOB),
+            false,
         );
         assert_eq!(
             answer,
             PageSendAnswer::Resolved {
                 job_id: id,
-                resolution: ResolutionView::Accepted
+                resolution: ResolutionView::Accepted,
+                start: None,
             }
         );
     }
@@ -354,9 +392,26 @@ mod tests {
     fn a_second_send_is_refused_busy_with_the_reason_name() {
         let (server, _dir, record) = rig();
         let address = server.addr().to_string();
-        run_send(&address, DEFAULT_PORT, &record, &pending(), "one", JOB);
-        let answer = run_send(&address, DEFAULT_PORT, &record, &pending(), "two", JOB);
-        let PageSendAnswer::Resolved { resolution, .. } = answer else {
+        run_send(
+            &address,
+            DEFAULT_PORT,
+            &record,
+            &pending(),
+            ("one", JOB),
+            false,
+        );
+        let answer = run_send(
+            &address,
+            DEFAULT_PORT,
+            &record,
+            &pending(),
+            ("two", JOB),
+            true,
+        );
+        let PageSendAnswer::Resolved {
+            resolution, start, ..
+        } = answer
+        else {
             panic!("{answer:?}");
         };
         assert_eq!(
@@ -365,6 +420,7 @@ mod tests {
                 reason: "Busy".to_owned()
             }
         );
+        assert_eq!(start, None, "a held job is never started (SS2)");
     }
 
     #[test]
@@ -372,7 +428,7 @@ mod tests {
         let (server, _dir, record) = rig();
         let port = server.addr().port();
         drop(server);
-        let answer = run_send("127.0.0.1", port, &record, &pending(), "page", JOB);
+        let answer = run_send("127.0.0.1", port, &record, &pending(), ("page", JOB), true);
         assert!(
             matches!(
                 answer,
@@ -419,6 +475,7 @@ mod tests {
             resolution: ResolutionView::Rejected {
                 reason: "Busy".to_owned(),
             },
+            start: None,
         })
         .unwrap();
         assert_eq!(
@@ -428,3 +485,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "connector_send_start_tests.rs"]
+mod start_tests;

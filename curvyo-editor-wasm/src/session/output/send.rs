@@ -2,7 +2,7 @@
 //! connector, the one pending send, and the commit after the connector accepted the job.
 
 use curvyo_laser_core::job::{ExportEffects, name as format_name, write};
-use curvyo_ui_core::{SendCause, SendLink, send_button};
+use curvyo_ui_core::{SendCause, SendLink, SendMachine, send_button};
 use serde::Serialize;
 
 use super::super::Session;
@@ -24,6 +24,10 @@ pub struct SendView {
     pub profile_id: String,
     /// The connector's address as the profile stores it.
     pub address: String,
+    /// Whether a press also starts the job, from the connector's last status (`0134` SS9).
+    pub starts: bool,
+    /// A number that changes whenever the job a press would send changes (`0134` UX P15).
+    pub job: u64,
 }
 
 /// A job handed to the host for the connector.
@@ -49,6 +53,7 @@ pub(super) struct SendState {
     timed_out: Option<(u32, ExportEffects)>,
     next: u32,
     link: SendLink,
+    machine: SendMachine,
 }
 
 /// The notice after an accepted send: only the fixture jobs it switched off, `None` for none
@@ -75,6 +80,22 @@ impl Session {
         self.output.send.link = SendLink::parse(spelling);
     }
 
+    /// How the page's connector stands for a start (`0134` SS9), set by the frontend from its
+    /// link store's last status: the state spelling and the controller's own word (`""` for
+    /// none); an empty state for no status.
+    pub fn set_send_machine(&mut self, state: &str, controller_word: &str) {
+        self.output.send.machine = SendMachine::parse(state, controller_word);
+    }
+
+    /// Whether a press of Send to machine now also starts the job (`0134` SS9, UX P4): the
+    /// check made at the arming and at the confirming press, after [`Self::set_send_machine`].
+    #[must_use]
+    pub fn send_will_start(&self) -> bool {
+        self.output_group_view()
+            .and_then(|view| view.send)
+            .is_some_and(|send| send.starts)
+    }
+
     /// The profile id and connector address of the active page, `None` without an address.
     fn connector_of_page(&self) -> Option<(String, String)> {
         let id = self.active_copy()?.read.copy.id?;
@@ -92,7 +113,8 @@ impl Session {
         let (profile_id, address) = self.connector_of_page()?;
         let format = hand.input.machine.values.output_format;
         let sending = self.output.send.pending.is_some();
-        let button = send_button(&hand.gate, format, self.output.send.link, sending);
+        let state = &self.output.send;
+        let button = send_button(&hand.gate, format, state.link, sending, state.machine);
         let (cause, text) = match button.cause {
             None => (None, None),
             Some(SendCause::Blocked) => (Some("blocked"), blocked),
@@ -115,6 +137,8 @@ impl Session {
             text,
             profile_id,
             address,
+            starts: button.starts,
+            job: hand.generation,
         })
     }
 
@@ -125,7 +149,8 @@ impl Session {
         let HandOut { job, effects } = self.hand_out()?;
         let format = job.input.machine.values.output_format;
         let state = &mut self.output.send;
-        if !send_button(&job.gate, format, state.link, state.pending.is_some()).enabled {
+        let sending = state.pending.is_some();
+        if !send_button(&job.gate, format, state.link, sending, state.machine).enabled {
             return None;
         }
         let token = state.next;
