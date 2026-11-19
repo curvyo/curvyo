@@ -1,6 +1,6 @@
 # 0133 Pause while homing: UX notes
 
-ux-engineer, 2026-11-19. Covers criteria PH1 to PH11 of `specification.md` and its "Needed before Ready" item for the ux-engineer: the pending Pause state, the words "Pause after homing" in the state line, the exact look of criterion 8. Checked against `specs/0118-machine-control/ux-notes.md` (on `story/machine-control`, PR #399: footer, toolbar, Home causes, state line texts, live regions, Frage 262 A), `specs/0064-machine-connector/ux-notes.md` sections 3, 7, 8 (symbol buttons, buttons per state, job block), `specs/0127-connector-grbl-serial/ux-notes.md` section 7 (Pause busy until "Paused"; homing first reads "Running", line 0), `specs/0125-send-to-machine/ux-notes.md`, the built `frontend/src/components/panel/MachineControls.tsx` and `frontend/src/lib/connectorText.ts` (PR #399), and `docs/design-system.md` (rows "Machine controls (Operations tab) (`0118`)" as proposed, "Connector group (`0064`)", "Hidden, not disabled"; Interaction conventions "No notice after a success", "Nothing moves under the pointer"). Customer rules applied: no popups, no dialog, labels that name a control or a state only, no operating tips (2026-10-16), no notice after a success (2026-10-31). Choices marked (Proposal) are vetoable at the demo; section 8 lists them as H1 to H8. No question for the customer.
+ux-engineer, 2026-11-19. Covers criteria PH1 to PH11 of `specification.md` and its "Needed before Ready" item for the ux-engineer: the pending Pause state, the words "Pause after homing" in the state line, the exact look of criterion 8. Checked against `specs/0118-machine-control/ux-notes.md` (on `story/machine-control`, PR #399: footer, toolbar, Home causes, state line texts, live regions, Frage 262 A), `specs/0064-machine-connector/ux-notes.md` sections 3, 7, 8 (symbol buttons, buttons per state, job block), `specs/0127-connector-grbl-serial/ux-notes.md` section 7 (Pause busy until "Paused"; homing first reads "Running", line 0), `specs/0125-send-to-machine/ux-notes.md`, the built `frontend/src/components/panel/MachineControls.tsx` and `frontend/src/lib/connectorText.ts` (PR #399), and `docs/design-system.md` (rows "Machine controls (Operations tab) (`0118`)" as proposed, "Connector group (`0064`)", "Hidden, not disabled"; Interaction conventions "No notice after a success", "Nothing moves under the pointer"). Customer rules applied: no popups, no dialog, labels that name a control or a state only, no operating tips (2026-10-16), no notice after a success (2026-10-31). Choices marked (Proposal) are vetoable at the demo; section 8 lists them as H1 to H9. No question for the customer.
 
 ## 1. Where it shows
 
@@ -12,14 +12,15 @@ The job block of `0118` section 5 (`0064` section 8 form: state words at the lef
 
 | When | State line | Elapsed, bar, counts line |
 |---|---|---|
-| A job's `$H` runs, no pause pressed | "Running" (as built, `0127` section 7: line 0) | as built: elapsed runs, bar at 0, "0 / 412 lines" |
-| The connector reports `pause_pending: true` | **"Pause after homing"** | unchanged from the row above: elapsed runs, bar and count as reported |
+| A job's `$H` runs, no pause pressed | "Running" (as built, `0127` section 7: line 0) | as built: elapsed "0:00", bar at 0, "0 / 412 lines" |
+| The connector reports `pause_pending: true` | **"Pause after homing"** | unchanged from the row above: elapsed "0:00", bar and count as reported |
 | GRBL ends homing, the connector holds | "Paused" (the footer's built word) | elapsed held, bar held, count the line after `$H` |
 | Resume while pending | back to "Running" | unchanged |
 | Stop while pending | the Stop result as built: "Stopped at line <n>", or on GRBL "Alarm: Reset during homing (alarm 6)" | as built |
 | Homing fails while pending (PH6) | the built failure: "Alarm: Homing did not find the switch (alarm 9)", "Alarm: Homing pull-off did not clear the switch (alarm 8)", "Failed at line <n>: Homing is not enabled (error 5)", "Lost the controller at line <n>" | as built |
 | Connection lost while pending | "Connection lost" (as built, last values kept) | last values |
 
+- **Elapsed while `$H` runs (H9, amended at the UX review).** The connector reports the elapsed time with each line GRBL acknowledges (`0127` G8), and GRBL acknowledges `$H` only when homing ends, so the footer reads "0:00" for the whole homing, with or without a pending pause (as built since `0127`, not caused by `0133`). With the `ok` the time jumps to the homing time ("Paused", "0:15"), which counts towards the job as before. The footer shows the reported value and keeps no clock of its own (`0064`: the status is the one source).
 - **Words (H1).** "Pause after homing", 18 characters, well within the 70-character line; neutral look (`--toolbar-icon`, no glyph), it is a state, not a failure. It names what will happen and when; no "Please wait", no "Homing cannot be paused", no instruction. It replaces "Running" (or "Homing", if the architect has the connector report a job's `$H` as `Homing`) for as long as the status carries `pause_pending`.
 - **Read from the status only (PH8).** The line, the Pause look and the Resume slot follow `pause_pending` in the last `Status`; the app keeps no memory of its own press. A second app watching the same connector shows the same line and look. A restarted connector or a lost controller (PH9) reports no pending pause, so the line follows without a text of its own.
 - **A dropped pending pause has no text of its own (H2).** When Stop, a homing failure or a lost controller ends the job, the result line says what happened; "Pause cancelled" would only repeat that the job ended. Resume cancels it by the maker's own press, and the line returning to "Running" is the answer.
@@ -49,7 +50,7 @@ The job block of `0118` section 5 (`0064` section 8 form: state words at the lef
 ## 5. "No job to pause" (PH3)
 
 - While the connector reports Homing from the Home button (with or without a Ready job), Pause is greyed in place as built (`0118` section 3), with its name-only tooltip "Pause". The app never sends Pause there.
-- The refusal still reaches the app when the state changes between the last status and the press (another app pressed Home), or from `curvyo-connector-ctl`. Then the footer's state line reads **"No job to pause"** (15 characters) in the failure look (`CircleAlert` 12px, `--destructive`), as a hidden `role="alert"` (it answers the maker's own press), until the next command or state change, the rule of "Homing is not enabled (error 5)" in `0118` section 5. Homing goes on; nothing is remembered.
+- The refusal still reaches the app when the state changes between the last status and the press (another app pressed Home), or from `curvyo-connector-ctl`. Then the footer's state line reads **"No job to pause"** (15 characters) in the failure look (`CircleAlert` 12px, `--destructive`), as a hidden `role="alert"` (it answers the maker's own press), until the next command or state change, the rule of "Homing is not enabled (error 5)" in `0118` section 5. Unlike the other refusals of the maker's own presses, which end only at a state with a line count, it ends at any state after the one it was given in: when the Home button's homing ends, "Idle" or the Ready line replaces it (fixed at the UX review). Homing goes on; nothing is remembered.
 - Words: a state, not an instruction; no "Wait for homing to end", no "Use Stop".
 
 ## 6. Live regions and screen reader (PH8)
@@ -79,6 +80,7 @@ The two hidden regions of `0118` section 11 (`role="status"` and `role="alert"`,
 - **H6** While pending, Stop and Resume are enabled; only the press wait greys the other buttons, as built.
 - **H7** Pause is enabled while a job runs its own `$H`; it stays greyed while the Home button homes.
 - **H8** "No job to pause" reads in the footer's state line in the failure look, as an alert, until the next command or state change.
+- **H9** While a job's `$H` runs, the elapsed time reads "0:00" (as built: the connector counts it with acknowledged lines) and jumps to the homing time when homing ends; no clock of the footer's own.
 
 ## 9. For the product owner, the architect and the lead
 

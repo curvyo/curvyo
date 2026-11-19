@@ -44,7 +44,7 @@ Prefix `PH`. Tests use the simulator of `0127` G22 with the silent homing it has
 
 ## Needed before Ready
 
-Done: architect addendum (`adrs.md`: PH1, PH2 and the test preamble fixed) and UX notes (`ux-notes.md`, H1 to H8, vetoable at the demo; they follow Frage 262 A: the footer's line is the state line). No open question.
+Done: architect addendum (`adrs.md`: PH1, PH2 and the test preamble fixed) and UX notes (`ux-notes.md`, H1 to H9, vetoable at the demo; they follow Frage 262 A: the footer's line is the state line). No open question.
 
 ## UX notes must change
 
