@@ -1,4 +1,4 @@
-import { CircleAlert, Crosshair, Download, TriangleAlert } from "lucide-react";
+import { Crosshair, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { OutputChecks } from "@/components/panel/OutputChecks";
@@ -8,11 +8,9 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useLinkEntry } from "@/hooks/useLinkEntry";
 import type { OutputApi } from "@/hooks/useOutput";
 import { sendLinkOf } from "@/lib/connectorLink";
-import { formatCount } from "@/lib/connectorText";
 import type { OperationId } from "@/lib/operationsView";
 import { EXPORT_NAME, START_DAMAGED, machineLineParts } from "@/lib/outputText";
 import type { Check, StartValue } from "@/lib/outputView";
-import { alertAfter, stateLine } from "@/lib/sendLine";
 import { sendCauseText } from "@/lib/sendText";
 import { isTauri } from "@/platform/host";
 
@@ -48,16 +46,6 @@ export function OutputGroup({
   useEffect(() => {
     if (sendProfile !== null) applyLink(sendProfile, spelling);
   }, [sendProfile, spelling, applyLink]);
-  const line = isTauri && send !== null ? stateLine(entry) : null;
-  // The hidden alert follows changes seen while the group is shown, never what it finds (UX §4).
-  const pressedHere = useRef(false);
-  const seen = useRef(entry);
-  const [alertText, setAlertText] = useState("");
-  useEffect(() => {
-    const next = alertAfter(seen.current, entry, pressedHere.current);
-    seen.current = entry;
-    if (next !== null) setAlertText(next);
-  }, [entry]);
   if (view === null) return null;
   const machine = machineLineParts(view.machine);
   const press = (check: Check) => {
@@ -163,10 +151,7 @@ export function OutputGroup({
             enabled={send.enabled}
             cause={sendCauseText(send)}
             sending={send.cause === "sending"}
-            onPress={() => {
-              pressedHere.current = true;
-              return api.send.press();
-            }}
+            onPress={() => api.send.press()}
             onReturnFocus={onReturnFocus}
           />
         )}
@@ -176,50 +161,6 @@ export function OutputGroup({
           {view.export.tooltip}
         </span>
       )}
-      {isTauri && send !== null ? (
-        <>
-          <p role="status" className="sr-only" data-send-status>
-            {line?.spoken ?? ""}
-          </p>
-          <p role="alert" className="sr-only">
-            {alertText}
-          </p>
-          {line === null ? null : (
-            <>
-              <p
-                aria-live="off"
-                data-send-line
-                className={`-mt-0.5 flex items-start gap-1 text-xs [overflow-wrap:anywhere] ${line.failure ? "text-[var(--destructive)]" : "text-[var(--toolbar-icon)]"}`}
-              >
-                {line.alarm ? (
-                  <TriangleAlert size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="mt-0.5 shrink-0" />
-                ) : line.failure ? (
-                  <CircleAlert size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="mt-0.5 shrink-0" />
-                ) : null}
-                <span>{line.text}</span>
-              </p>
-              {line.bar === null ? null : (
-                <div
-                  role="progressbar"
-                  aria-label="Job progress"
-                  aria-valuemin={0}
-                  aria-valuemax={line.bar.lines}
-                  aria-valuenow={line.bar.line}
-                  aria-valuetext={`${formatCount(line.bar.line)} of ${formatCount(line.bar.lines)} lines`}
-                  className="-mt-1 h-1.5 w-full overflow-hidden rounded-full border border-[var(--field-border)] bg-white"
-                >
-                  <div
-                    className={`h-full ${line.bar.failure ? "bg-[var(--destructive)]" : "bg-[var(--editor-accent)]"}`}
-                    style={{
-                      width: `${line.bar.lines === 0 ? 0 : Math.min(100, (line.bar.line / line.bar.lines) * 100)}%`,
-                    }}
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </>
-      ) : null}
     </section>
   );
 }

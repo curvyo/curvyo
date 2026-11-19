@@ -1,13 +1,16 @@
-// `specs/0125-send-to-machine`: the words of Send to machine, the state line and bar of the Output
-// group, the decoded `send` of the group view, and the shared link store (commit once, one status
-// source for the Connector row and the Output group).
+// `specs/0125-send-to-machine`: the words of Send to machine, the state line and bar of a send,
+// the decoded `send` of the group view, and the shared link store (commit once, one status source).
+// Since `specs/0118` (Frage 262 A, amending S13 to S15) the one state line of the Operations tab is
+// the Machine controls footer's (`controlsLine`), in the `0064` form: "Running" with the bar and the
+// counts line, no " · <name>" suffix.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { type LinkHost, type Resolution, UNRESOLVED_SEND_MS, createLinkStore, sendLinkOf } from "../src/lib/connectorLink.ts";
 import type { JobState, StatusMessage } from "../src/lib/connectorText.ts";
 import { decodeOutputGroup } from "../src/lib/outputView.ts";
-import { LINE_CHARS, alertAfter, stateLine, withName } from "../src/lib/sendLine.ts";
+import { controlsLine as stateLine } from "../src/lib/machineControls.ts";
+import { LINE_CHARS, withName } from "../src/lib/sendLine.ts";
 import { sendCauseText } from "../src/lib/sendText.ts";
 
 const JOB = "11111111-1111-4111-8111-111111111111";
@@ -94,20 +97,20 @@ test("S13: the state line follows the table", () => {
   const line = (s: StatusMessage | null, extra: object = {}) => stateLine(entry(s, extra));
   assert.equal(line(null), null);
   assert.equal(line(status({ name: "Idle" })), null);
-  assert.equal(line(status({ name: "NoController" })), null);
+  assert.equal(line(status({ name: "NoController" }))?.text, "No controller", "the footer's line names it (0118 §4)");
   assert.equal(line(status({ name: "Ready" }, { id: JOB, line: 0, lines: 412 }), { held, pageJobId: JOB })?.text, "Ready: Coaster, 412 lines, 9.2 KiB");
-  assert.equal(line(status({ name: "Ready" }, { id: OTHER, line: 0, lines: 412 }), { held, pageJobId: JOB })?.text, "Ready, 412 lines");
+  assert.equal(line(status({ name: "Ready" }, { id: OTHER, line: 0, lines: 412 }), { held, pageJobId: JOB })?.text, "Ready");
   const running = line(status({ name: "Running" }, { id: JOB, line: 120, lines: 412 }), { held, pageJobId: JOB });
-  assert.equal(running?.text, "Running 120 / 412");
+  assert.equal(running?.text, "Running", "the counts are in the counts line (`0118` §6)");
   assert.deepEqual(running?.bar, { line: 120, lines: 412, failure: false });
-  assert.equal(running?.spoken, "Running", "counts are not read out");
-  assert.equal(line(status({ name: "Paused" }, { id: JOB, line: 120, lines: 412 }), { held, pageJobId: JOB })?.text, "Paused at line 120");
+  assert.equal(line(status({ name: "Paused" }, { id: JOB, line: 120, lines: 412 }), { held, pageJobId: JOB })?.text, "Paused");
   assert.equal(line(status({ name: "AwaitingLocalStart" }, { id: JOB, line: 0, lines: 412 }), { held, pageJobId: JOB })?.text, "Waiting for the start at the machine");
   const done = line(status({ name: "Done", result: "Completed" }, { id: JOB, line: 412, lines: 412 }), { held, pageJobId: JOB });
   assert.equal(done?.text, "Completed, 412 lines");
   assert.equal(done?.bar?.line, 412);
   assert.equal(line(status({ name: "Done", result: "Stopped" }, { id: JOB, line: 7, lines: 412 }), { held, pageJobId: JOB })?.text, "Stopped at line 7");
   const failed = line(status({ name: "Done", result: "Failed" }, { id: JOB, line: 7, lines: 412 }), { held, pageJobId: JOB });
+  assert.equal(failed?.alerts, false, "a failed job is a polite status");
   assert.equal(failed?.text, "Failed at line 7");
   assert.equal(failed?.failure, true);
   assert.equal(failed?.bar?.failure, true);
@@ -120,12 +123,15 @@ test("S13: the state line follows the table", () => {
   assert.equal(lost?.bar?.line, 120, "the last values stay");
 });
 
-test("S15: a job of another send adds its name, one of another app shows none", () => {
+test("S15 (amended by 0118): one line for every job; a Ready of another app names no job of this app", () => {
   const base = createLinkStore(fakeHost()).get("x");
   const manual = { name: "layer-test.gcode", lines: 5, bytes: 90, jobId: OTHER };
   const running = status({ name: "Running" }, { id: OTHER, line: 120, lines: 412 });
-  assert.equal(stateLine({ ...base, status: running, held: manual, pageJobId: JOB })?.text, "Running 120 / 412 · layer-test.gcode");
-  assert.equal(stateLine({ ...base, status: running, held: null })?.text, "Running 120 / 412");
+  assert.equal(stateLine({ ...base, status: running, held: manual, pageJobId: JOB })?.text, "Running");
+  assert.equal(stateLine({ ...base, status: running, held: null })?.text, "Running");
+  const ready = status({ name: "Ready" }, { id: OTHER, line: 0, lines: 412 });
+  assert.equal(stateLine({ ...base, status: ready, held: { ...manual, jobId: JOB } })?.text, "Ready");
+  assert.equal(stateLine({ ...base, status: ready, held: manual })?.text, "Ready: layer-test.gcode, 5 lines, 90 B");
 });
 
 test("S13: the job name is cut so a line stays within 70 characters", () => {
@@ -261,7 +267,7 @@ test("S14: a dropped connection keeps the last values with Connection lost, and 
   host.emit({ profileId: "p", kind: "lost" });
   assert.equal(stateLine(store.get("p"))?.text, "Connection lost");
   host.emit({ profileId: "p", kind: "status", status: status({ name: "Running" }, { id: JOB, line: 6, lines: 10 }) });
-  assert.equal(stateLine(store.get("p"))?.text, "Running 6 / 10");
+  assert.equal(stateLine(store.get("p"))?.text, "Running");
   host.emit({ profileId: "p", kind: "status", status: status({ name: "Idle" }) });
   host.emit({ profileId: "p", kind: "lost" });
   assert.equal(store.get("p").lost, false, "an idle connector is not 'lost'");
@@ -338,19 +344,15 @@ test("S7/S8: a resolution before the bound cancels it, a new send replaces a tim
   assert.deepEqual(settled, [false], "the old job id commits nothing any more");
 });
 
-test("UX §4: the hidden alert carries changes seen in the group, never what it finds when shown", () => {
+test("UX §4 (amended by 0118): a send's failure and an alarm are alerts of the one line, a plain state is not", () => {
   const empty = createLinkStore(fakeHost()).get("x");
   const idle = { ...empty, status: status({ name: "Idle" }) };
   const alarm = { ...empty, status: status({ name: "Alarm" }, null, "Hard limit") };
   const busy = { ...idle, sendFailure: { text: "Connector busy", atState: "Idle" } };
-  // The first status read brings an alarm: no alert; an alarm that arrives later is one.
-  assert.equal(alertAfter(empty, alarm, false), null);
-  assert.equal(alertAfter(idle, alarm, false), "Alarm: Hard limit");
-  assert.equal(alertAfter(alarm, alarm, false), null, "an alarm already shown is not repeated");
-  // A failure is an alert only when it answers a press made in this group.
-  assert.equal(alertAfter(idle, busy, true), "Connector busy");
-  assert.equal(alertAfter(idle, busy, false), null);
-  assert.equal(alertAfter(busy, busy, true), null, "the same failure found again keeps the text");
-  // Nothing left to alert: the text empties.
-  assert.equal(alertAfter(busy, idle, true), "");
+  assert.equal(stateLine(alarm)?.alerts, true);
+  assert.equal(stateLine(busy)?.text, "Connector busy");
+  assert.equal(stateLine(busy)?.alerts, true);
+  assert.equal(stateLine(idle), null, "nothing to say, nothing read out");
+  const ready = { ...empty, status: status({ name: "Ready" }, { id: JOB, line: 0, lines: 4 }) };
+  assert.equal(stateLine(ready)?.alerts, false);
 });

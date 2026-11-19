@@ -1,6 +1,7 @@
 // The one source of the connector's state in the page (`specs/0125-send-to-machine` S14; architect
-// addendum B5): per machine profile the pairing, the last status, the job this app sent, a send
-// that is running and its outcome. The Connector row and the Output group read the same entry, so
+// addendum B5; `specs/0118` M11): per machine profile the pairing, the last status, the job this
+// app sent, a send that is running and its outcome, and the one press that waits for its answer.
+// The Machine block, the Output group and the Machine controls footer read the same entry, so
 // they always show equal values; the first reader starts the host's watcher, the last one ends it.
 // The host holds the pin and the token; this module only sees fingerprints, answers and statuses.
 // No React and no `@/` import, so the tests load it without a bundler.
@@ -14,6 +15,10 @@ import {
   jobIsActive,
   refusalText,
 } from "./connectorText.ts";
+
+/** The one press of a profile's connector controls that waits for its answer; the others of the
+ * Machine block and the Machine controls footer are greyed meanwhile (`specs/0118` M11). */
+export type Busy = "test" | "pair" | "send" | "start" | "resume" | "pause" | "stop" | "unlock" | "home";
 
 /** What the page knows of the pairing of a profile; `unknown` until it was read. */
 export type Link = "unknown" | "paired" | "not_paired" | "no_longer_paired" | "key_changed";
@@ -79,6 +84,12 @@ export interface LinkEntry {
   pageSend: { token: number; name: string } | null;
   /** How the last page send failed, until the next send or a state change. */
   sendFailure: { text: string; atState: string | null } | null;
+  /** The press that waits for its answer, in either place. */
+  busy: Busy | null;
+  /** A status read runs. */
+  reading: boolean;
+  /** Why the last status read failed; `null` after a read that connected. */
+  readError: LinkError | null;
 }
 
 type Payload =
@@ -125,6 +136,9 @@ const EMPTY: LinkEntry = {
   sendingName: null,
   pageSend: null,
   sendFailure: null,
+  busy: null,
+  reading: false,
+  readError: null,
 };
 
 /** The text of a send that ended without an accepted job (S7, S11). */
@@ -296,7 +310,11 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
 
   /** A connection test: the status, or why the connector cannot be used. */
   const read = async (profileId: string, address: string): Promise<TestAnswer> => {
-    const answer = await host.invoke<TestAnswer>("connector_test", { profileId, address });
+    patch(profileId, { reading: true });
+    const answer = await host
+      .invoke<TestAnswer>("connector_test", { profileId, address })
+      .catch((): TestAnswer => ({ kind: "failed", error: { kind: "other", message: "Connector error" } }));
+    patch(profileId, { reading: false, readError: answer.kind === "connected" ? null : answer.error });
     if (answer.kind === "connected") {
       patch(profileId, { controller: answer.controllerInfo ?? null });
       setStatus(profileId, answer.status);
@@ -317,6 +335,17 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
     setStatus,
     linkFailure,
     read,
+    /** Marks `kind` as the press of `profileId` that waits for its answer; `false` (and nothing
+     * changes) while another press waits. */
+    claim(profileId: string, kind: Busy): boolean {
+      if (get(profileId).busy !== null) return false;
+      patch(profileId, { busy: kind });
+      return true;
+    },
+    /** The waiting press got its answer. */
+    release(profileId: string): void {
+      patch(profileId, { busy: null });
+    },
     /** Counts a reader of `profileId`; `bootstrapping` readers also read the pairing and a status
      * once. The last release ends the host's watcher. */
     acquire(profileId: string, address: string, bootstrapping: boolean): () => void {

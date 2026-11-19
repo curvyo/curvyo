@@ -2,6 +2,7 @@ import { Frame, TriangleAlert } from "lucide-react";
 import { selectedRow } from "@/lib/fixturesView";
 import { FixturesTab } from "@/components/workbench/FixturesTab";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
+import { MachineControls } from "@/components/panel/MachineControls";
 import { OperationsSection } from "@/components/panel/OperationsSection";
 import { OutputGroup } from "@/components/panel/OutputGroup";
 import type { OutputApi } from "@/hooks/useOutput";
@@ -659,6 +660,18 @@ export function PropertiesPanel({
           </TabsContent>
         </div>
         )}
+        {!aboutActive && doc.view.content === "operations" && output.view?.send ? (
+          // The fixed footer under the column's scroll: Stop is never scrolled away (`specs/0118` W1).
+          <MachineControls
+            profileId={output.view.send.profileId}
+            address={output.view.send.address}
+            profile={
+              manufacturing?.machine
+                ? { laserMode: manufacturing.machine.copy.laser_mode, maxPower: manufacturing.machine.copy.max_power }
+                : null
+            }
+          />
+        ) : null}
       </aside>
     </Tabs>
     </div>

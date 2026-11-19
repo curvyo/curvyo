@@ -17,7 +17,8 @@ import {
   jobStateLine,
   refusalText,
 } from "../src/lib/connectorText.ts";
-import { LINE_CHARS, alertAfter, stateLine } from "../src/lib/sendLine.ts";
+import { controlsLine as stateLine } from "../src/lib/machineControls.ts";
+import { LINE_CHARS } from "../src/lib/sendLine.ts";
 
 const JOB = "11111111-1111-4111-8111-111111111111";
 
@@ -58,16 +59,17 @@ test("G15, G12: a lost job and an unconfirmed stop are alerts and stay after the
     assert.equal(stateLine(entry(back))?.bar, null, "no bar with a loss");
     assert.ok(text.length <= LINE_CHARS);
   }
-  const before = entry(status({ name: "Running" }));
   const after = entry(status({ name: "NoController" }, "Lost the controller at line 120"));
-  assert.equal(alertAfter(before, after, false), "Lost the controller at line 120");
+  assert.equal(stateLine(after)?.text, "Lost the controller at line 120");
+  assert.equal(stateLine(after)?.alerts, true);
 });
 
-test("G2, G3: why there is no controller shows in the row, not in the Output group", () => {
+test("G2, G3: why there is no controller shows in the footer's one line (since 0118 §4 row 5)", () => {
   const open = status({ name: "NoController" }, "Port /dev/ttyUSB0 not found");
   assert.deepEqual(jobStateLine(open, null), { text: "Port /dev/ttyUSB0 not found", failure: true });
   assert.equal(jobLineAlerts(open), false);
-  assert.equal(stateLine(entry(open)), null);
+  assert.equal(stateLine(entry(open))?.text, "Port /dev/ttyUSB0 not found");
+  assert.equal(stateLine(entry(open))?.alerts, false, "polite");
   assert.deepEqual(jobStateLine(status({ name: "NoController" }), null), { text: "No controller", failure: false });
   assert.equal(jobStateLine(status({ name: "Idle" }), null), null);
 });
