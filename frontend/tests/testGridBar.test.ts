@@ -31,7 +31,14 @@ test("every Rust state decodes, and nothing else is in the folder", () => {
     .filter((file) => file.endsWith(".json"))
     .map((file) => file.slice(0, -".json".length))
     .sort();
-  assert.deepEqual(names, ["does_not_fit", "engrave_crosshatch", "invalid_value", "lasered", "no_material"]);
+  assert.deepEqual(names, [
+    "does_not_fit",
+    "engrave_crosshatch",
+    "image_ordered",
+    "invalid_value",
+    "lasered",
+    "no_material",
+  ]);
   for (const name of names) assert.ok(decodeTestGridText(raw(name)), name);
 });
 
@@ -126,4 +133,20 @@ test("the dropdown filters by name", () => {
   ];
   assert.deepEqual(filterMaterials(list, " WAL ").map((one) => one.id), ["b"]);
   assert.equal(filterMaterials(list, "").length, 2);
+});
+
+test("an Image grid reads its Dither strip of six modes; Engrave and Cut have none (specs/0123 AC 44)", () => {
+  const image = decodeTestGridText(raw("image_ordered"));
+  assert.equal(image?.kind, "image");
+  assert.equal(image?.dither?.value, "ordered");
+  assert.deepEqual(
+    image?.dither?.modes.map((mode) => mode.value),
+    ["threshold", "ordered", "floyd_steinberg", "jarvis", "atkinson", "stucki"],
+  );
+  assert.equal(image?.crosshatch, null, "no Crosshatch on an Image grid");
+  assert.equal(decodeTestGridText(raw("engrave_crosshatch"))?.dither, null, "an Engrave grid has no Dither");
+  assert.equal(decodeTestGridText(raw("no_material"))?.dither, null, "a Cut grid has no Dither");
+  const grey = parsed("image_ordered") as { dither: { modes: unknown[] } };
+  grey.dither.modes.push({ value: "grey", label: "Grey" });
+  assert.equal(decodeTestGridText(JSON.stringify(grey)), null, "Grey is no grid mode");
 });

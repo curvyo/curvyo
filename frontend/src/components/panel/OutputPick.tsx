@@ -30,10 +30,13 @@ export function OutputPick({
   onPick,
   onReturnFocus,
   dataName,
+  onPreview,
+  pointerKeepsFocus = false,
 }: {
   /** The accessible name and the label inside: "Start", "Fixture jobs run with". */
   label: string;
-  Icon: LucideIcon;
+  /** The symbol at the left; the Dither pick has none (`specs/0123` P21). */
+  Icon?: LucideIcon;
   /** The id of the picked option. */
   value: string;
   /** The words at the button's right. */
@@ -45,6 +48,13 @@ export function OutputPick({
   onPick: (id: string) => void;
   onReturnFocus: () => void;
   dataName: string;
+  /**
+   * The row the keyboard focuses in the open list, previewed without a step; `null` when the
+   * list closes (`specs/0123` UX P23). Absent: no preview.
+   */
+  onPreview?: (id: string | null) => void;
+  /** A pointer pick keeps the focus on the button instead of handing it to the canvas. */
+  pointerKeepsFocus?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [stop, setStop] = useState(0);
@@ -69,11 +79,14 @@ export function OutputPick({
     const at = focusRow.current;
     if (at === null || !open) return;
     focusRow.current = null;
-    listRef.current?.querySelector<HTMLElement>(`[data-choice="${at}"]`)?.focus();
+    // A list low in the panel scrolls fully into view (UX review U8).
+    listRef.current?.scrollIntoView?.({ block: "nearest" });
+    listRef.current?.querySelector<HTMLElement>(`[data-choice="${at}"]`)?.focus({ preventScroll: true });
   });
 
   const close = (refocus: boolean) => {
     setOpen(false);
+    onPreview?.(null);
     if (refocus) buttonRef.current?.focus();
   };
   const choose = (option: PickOption, pointer: boolean) => {
@@ -81,8 +94,9 @@ export function OutputPick({
     onPick(option.id);
     // A press hands the focus back to the canvas, as the other panel controls do; a key keeps it
     // on the button.
-    close(!pointer);
-    if (pointer) onReturnFocus();
+    const handBack = pointer && !pointerKeepsFocus;
+    close(!handBack);
+    if (handBack) onReturnFocus();
   };
   const onListKey = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key === "Escape") {
@@ -92,10 +106,15 @@ export function OutputPick({
       return;
     }
     const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
-    if (step === 0) return;
+    const edge = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : null;
+    if (step === 0 && edge === null) return;
     event.preventDefault();
-    const next = Math.min(options.length - 1, Math.max(0, stop + step));
+    // Inside an operation row the list's own arrow keys would move to the next row.
+    event.stopPropagation();
+    const next = edge ?? Math.min(options.length - 1, Math.max(0, stop + step));
     setStop(next);
+    const focused = options[next];
+    if (focused?.pickable) onPreview?.(focused.id);
     listRef.current?.querySelector<HTMLElement>(`[data-choice="${next}"]`)?.focus();
   };
   const Chevron = open ? ChevronUp : ChevronDown;
@@ -116,9 +135,16 @@ export function OutputPick({
           aria-label={`${label}, ${valueText}`}
           {...{ [dataName]: "" }}
           onClick={() => setOpen((was) => !was)}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown" && !open) {
+              event.preventDefault();
+              event.stopPropagation();
+              setOpen(true);
+            }
+          }}
           className="flex h-7 w-full items-center gap-1.5 rounded-[5px] border border-[var(--field-border)] bg-white px-1.5 text-[13px] text-[var(--toolbar-icon)] outline-none hover:border-[var(--editor-accent)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         >
-          <Icon size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />
+          {Icon ? <Icon size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" /> : null}
           <span className="shrink-0 text-xs text-[var(--panel-muted-fg)]">{label}</span>
           <span className="min-w-0 flex-1 truncate text-right">{valueText}</span>
           <Chevron size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />

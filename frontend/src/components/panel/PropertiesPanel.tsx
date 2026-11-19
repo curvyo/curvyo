@@ -606,13 +606,22 @@ export function PropertiesPanel({
                     api={output}
                     onReturnFocus={returnFocus}
                     onFixturePick={() => setFixturePickRequest((count) => count + 1)}
-                    onOpenOperation={(id) => {
+                    onUnfoldOperation={(id) => operationTools.reveal(id)}
+                    onOpenOperation={(id, focus) => {
                       // A check's operation: its row selected, unfolded and scrolled into view in the
                       // list above; the focus goes to its first field once it is drawn.
                       operationTools.reveal(id);
                       window.requestAnimationFrame(() =>
                         window.requestAnimationFrame(() =>
-                          document.querySelector<HTMLElement>("[data-row-body] input")?.focus(),
+                          document
+                            .querySelector<HTMLElement>(
+                              focus === "dither"
+                                ? '[data-image-dither] [role="radio"][aria-checked="true"], [data-image-dither] [role="radio"]'
+                                : focus === "lowest_power"
+                                  ? '[data-image-field="lowest_power"] input'
+                                  : "[data-row-body] input",
+                            )
+                            ?.focus(),
                         ),
                       );
                     }}

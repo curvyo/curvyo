@@ -13,7 +13,7 @@ test("each button is named by its kind word and nothing else (AC 2)", () => {
   const view = decodeOperationsView(JSON.parse(readFileSync(new URL("select_bar_kinds.json", DIR), "utf8")));
   assert.deepEqual(
     view?.selectBarKinds?.map((button) => kindButtonName(button.kind)),
-    ["Cut", "Score", "Engrave", "Engrave + Outline", "Cut-out"],
+    ["Cut", "Score", "Engrave", "Engrave + Outline", "Cut-out", "Image"],
   );
 });
 

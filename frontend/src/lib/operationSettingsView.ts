@@ -7,7 +7,7 @@
  */
 
 /** The kinds of a material's set. */
-export const SET_KINDS = ["cut", "score", "engrave"] as const;
+export const SET_KINDS = ["cut", "score", "engrave", "image"] as const;
 
 /** One kind of set. */
 export type SetKind = (typeof SET_KINDS)[number];
@@ -84,11 +84,52 @@ export interface OperationOptions {
   hatch: HatchOptions | null;
   /** The stored Z offset in mm (kept even while hidden). */
   zOffsetMm: number;
+  /** The Image settings group of an Image operation, always (`specs/0123` criterion 11);
+   * `null` for every other kind. */
+  image: ImageSettings | null;
+}
+
+/** The Dither modes in the strip's order (`specs/0123` criterion 11). */
+export const DITHER_MODES = ["threshold", "ordered", "floyd_steinberg", "jarvis", "atkinson", "stucki", "grey"] as const;
+
+/** One Dither mode. */
+export type DitherMode = (typeof DITHER_MODES)[number];
+
+/** One mode of the Dither strip. */
+export interface DitherOption {
+  value: DitherMode;
+  label: string;
+}
+
+/** The names `edit_operation_option` takes for the Image settings numbers. */
+export type ImageFieldName = "threshold" | "lowest_power" | "brightness" | "contrast" | "gamma";
+
+/** One number field of the Image settings group. */
+export interface ImageField {
+  field: ImageFieldName;
+  label: string;
+  value: number;
+  /** "%", empty for Gamma. */
+  unit: string;
+  /** The chip text of a value out of range. */
+  range: string;
+}
+
+/** The Image settings group (UX notes 2.4): the Dither strip, Brightness, Contrast, Gamma, Invert,
+ * and the mode's own field last (Threshold or Lowest power, `null` for the other modes). */
+export interface ImageSettings {
+  /** `null` for a damaged dither: no cell is pressed (UX P46). */
+  dither: DitherMode | null;
+  modes: DitherOption[];
+  modeField: ImageField | null;
+  fields: ImageField[];
+  invert: boolean;
 }
 
 /** The four hatch options. */
 export interface HatchOptions {
-  crosshatch: boolean;
+  /** `null` on an Image operation: crosshatch would do nothing there. */
+  crosshatch: boolean | null;
   bidirectional: boolean;
   scanAngleDeg: number;
   overscanPct: number;
@@ -193,7 +234,7 @@ function asHatch(value: unknown): HatchOptions | null | undefined {
   if (value === null) return null;
   if (!isObject(value)) return undefined;
   if (
-    typeof value.crosshatch !== "boolean" ||
+    (value.crosshatch !== null && typeof value.crosshatch !== "boolean") ||
     typeof value.bidirectional !== "boolean" ||
     !finite(value.scan_angle_deg) ||
     !whole(value.overscan_pct)
@@ -208,12 +249,71 @@ function asHatch(value: unknown): HatchOptions | null | undefined {
   };
 }
 
+function asDither(value: unknown): DitherMode | null {
+  return (DITHER_MODES as readonly unknown[]).includes(value) ? (value as DitherMode) : null;
+}
+
+/** One mode of a Dither strip; `null` when wrong. */
+export function decodeDitherOption(value: unknown): DitherOption | null {
+  if (!isObject(value) || !text(value.label)) return null;
+  const mode = asDither(value.value);
+  return mode === null ? null : { value: mode, label: value.label };
+}
+
+const IMAGE_FIELDS: readonly unknown[] = ["threshold", "lowest_power", "brightness", "contrast", "gamma"];
+
+function asImageField(value: unknown): ImageField | null {
+  if (
+    !isObject(value) ||
+    !IMAGE_FIELDS.includes(value.field) ||
+    !text(value.label) ||
+    !finite(value.value) ||
+    typeof value.unit !== "string" ||
+    !text(value.range)
+  ) {
+    return null;
+  }
+  return {
+    field: value.field as ImageFieldName,
+    label: value.label,
+    value: value.value,
+    unit: value.unit,
+    range: value.range,
+  };
+}
+
+function asImage(value: unknown): ImageSettings | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value) || !Array.isArray(value.modes) || !Array.isArray(value.fields)) return undefined;
+  const dither = value.dither === null ? null : asDither(value.dither);
+  const modeField = value.mode_field === null ? null : asImageField(value.mode_field);
+  const modes = value.modes.map(decodeDitherOption);
+  const fields = value.fields.map(asImageField);
+  if (
+    (value.dither !== null && dither === null) ||
+    (value.mode_field !== null && modeField === null) ||
+    typeof value.invert !== "boolean" ||
+    modes.some((m) => m === null) ||
+    fields.some((f) => f === null)
+  ) {
+    return undefined;
+  }
+  return {
+    dither,
+    modes: modes as DitherOption[],
+    modeField,
+    fields: fields as ImageField[],
+    invert: value.invert,
+  };
+}
+
 function asOptions(value: unknown): OperationOptions | null | undefined {
   if (value === null) return null;
   if (!isObject(value)) return undefined;
   const hatch = asHatch(value.hatch);
-  if (hatch === undefined || !finite(value.z_offset_mm)) return undefined;
-  return { hatch, zOffsetMm: value.z_offset_mm };
+  const image = asImage(value.image);
+  if (hatch === undefined || image === undefined || !finite(value.z_offset_mm)) return undefined;
+  return { hatch, zOffsetMm: value.z_offset_mm, image };
 }
 
 const STATES: readonly unknown[] = ["no_settings", "damaged", "own", "live", "stored"];

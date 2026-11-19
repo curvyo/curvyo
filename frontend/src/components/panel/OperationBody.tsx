@@ -1,6 +1,7 @@
 import { SwatchBook } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 
+import { ImageSettingsGroup } from "@/components/panel/ImageSettingsGroup";
 import { OperationOptionsPart, OptionFieldView } from "@/components/panel/OperationOptionsPart";
 import { OperationSettingsBlock } from "@/components/panel/OperationSettingsBlock";
 import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
@@ -39,6 +40,7 @@ export function OperationBody({ row, pick, settings, tools, onEditMaterial, onRe
     observer.observe(element);
     return () => observer.disconnect();
   }, [onHeight, rowKey]);
+  const image = row.settings?.options?.image ?? null;
   const intervalMm = row.settings?.intervalMm ?? null;
   const interval =
     intervalMm === null ? undefined : (
@@ -79,6 +81,7 @@ export function OperationBody({ row, pick, settings, tools, onEditMaterial, onRe
           <span>{row.source.text}</span>
         </p>
       ) : null}
+      {image ? <ImageSettingsGroup row={row} image={image} tools={tools} onReturnFocus={onReturnToRow} /> : null}
       <OperationOptionsPart row={row} tools={tools} onReturnFocus={onReturnToRow} />
     </div>
   );

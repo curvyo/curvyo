@@ -35,6 +35,8 @@ export interface OperationToolsApi {
   unfold: (id: OperationId) => boolean;
   /** Types `value` into an option field or presses a toggle; the chip text, empty when taken. */
   edit: (id: OperationId, option: string, value: number) => string;
+  /** A pick of the Dither mode of Image row `id` (`specs/0123`); whether it was written. */
+  setDither: (id: OperationId, mode: string) => boolean;
   /** The Operations view toggle in the label of laser page `page`. */
   toggleView: (page: string) => boolean;
   /** A check's operation button of the Output tab (`specs/0029`): the row is selected and stays
@@ -86,6 +88,10 @@ export function useOperationTools(editor: OperationToolsEditor): OperationToolsA
       run("", (s) => s.edit_operation_option(operationIdText(id), option, value)),
     [run],
   );
+  const setDither = useCallback(
+    (id: OperationId, mode: string) => run(false, (s) => s.set_operation_dither(operationIdText(id), mode)),
+    [run],
+  );
   const reveal = useCallback(
     (id: OperationId) => {
       const done = run(false, (s) => s.reveal_operation_row(operationIdText(id)));
@@ -105,5 +111,5 @@ export function useOperationTools(editor: OperationToolsEditor): OperationToolsA
     [run],
   );
 
-  return { press, pressed, status, unfold, edit, toggleView, reveal, leaveGroup };
+  return { press, pressed, status, unfold, edit, setDither, toggleView, reveal, leaveGroup };
 }

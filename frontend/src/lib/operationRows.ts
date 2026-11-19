@@ -24,6 +24,7 @@ export const KIND_WORDS: Record<OperationKind, string> = {
   engrave: "Engrave",
   engrave_outline: "Engrave + Outline",
   cut_out: "Cut-out",
+  image: "Image",
   unknown: "Unknown operation",
 };
 

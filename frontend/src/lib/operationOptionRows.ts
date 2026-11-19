@@ -83,11 +83,10 @@ export function lowerPart(kind: OperationKind, settings: OperationSettings): Low
   const toggles: OptionToggle[] = [];
   const fields: ShownField[] = [];
   const hatch = options.hatch;
-  if ((kind === "engrave" || kind === "engrave_outline") && hatch !== null) {
-    toggles.push(
-      { option: "crosshatch", pressed: hatch.crosshatch },
-      { option: "bidirectional", pressed: hatch.bidirectional },
-    );
+  if ((kind === "engrave" || kind === "engrave_outline" || kind === "image") && hatch !== null) {
+    // Crosshatch is `null` on Image: it would do nothing there, so the toggle is absent.
+    if (hatch.crosshatch !== null) toggles.push({ option: "crosshatch", pressed: hatch.crosshatch });
+    toggles.push({ option: "bidirectional", pressed: hatch.bidirectional });
     fields.push(
       { ...OPTION_FIELDS[0], shown: optionText(hatch.scanAngleDeg) },
       { ...OPTION_FIELDS[1], shown: optionText(hatch.overscanPct) },

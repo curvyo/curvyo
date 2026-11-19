@@ -38,6 +38,7 @@ test("the Rust states decode, and nothing else is in the folder", () => {
     "cut_and_engrave",
     "empty",
     "fixture_no_material",
+    "raster_checks",
     "start_damaged",
     "start_head_position",
     "start_home_then_origin",
@@ -167,4 +168,18 @@ test("the total's fixture line decodes with its button; a work line may be absen
   assert.equal(view.total.runs, null);
   assert.equal(view.total.fixtures?.button + (view.total.fixtures?.after ?? ""), "1 fixture job runs.");
   assert.equal(decodeOutputGroup({ ...raw, total: { ...total, fixtures: { ...fixtures, ids: "1:7" } } }), null);
+});
+
+test("the raster checks keep their order and the Lowest power line focuses its field (specs/0123 AC 32 b, 35, 36)", () => {
+  const { output } = fixture("raster_checks");
+  const view = decodeOutputGroup(output);
+  assert.ok(view);
+  const texts = view.checks.map((c) => c.text);
+  const at = (text: string) => texts.indexOf(text);
+  assert.ok(at("1 image is coarser than its Interval.") >= 0, texts.join(" | "));
+  assert.ok(at("1 image is coarser than its Interval.") < at("1 image cannot be read and is skipped."));
+  assert.ok(at("1 image cannot be read and is skipped.") < at("Image 1: Lowest power is above Power."));
+  const lowest = view.checks[at("Image 1: Lowest power is above Power.")];
+  assert.ok(lowest && lowest.target.kind === "operations");
+  assert.equal(lowest.target.focus, "lowest_power");
 });

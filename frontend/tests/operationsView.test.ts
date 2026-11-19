@@ -28,6 +28,7 @@ test("the five Rust states decode, and nothing else is in the folder", () => {
     "options_cut_z_hidden",
     "options_damaged",
     "options_engrave",
+    "options_image",
     "placed_and_clone_rows",
     "select_bar_kinds",
     "unknown_and_clone_members",
@@ -42,7 +43,8 @@ test("the five kinds and the unknown kind decode with their section", () => {
   assert.ok(view);
   assert.equal(view.cutsLast, true);
   const kinds = view.rows.map((row) => row.kind);
-  assert.deepEqual(new Set(kinds), new Set(OPERATION_KINDS));
+  // The fixture has the five older kinds; Image has its own fixture (`options_image`).
+  assert.deepEqual(new Set(kinds), new Set(OPERATION_KINDS.filter((kind) => kind !== "image")));
   for (const row of view.rows) {
     if (row.kind === "cut" || row.kind === "cut_out") assert.equal(row.section, "cutting", row.name);
     else assert.equal(row.section, "marking", row.name);
@@ -133,7 +135,7 @@ test("the kind buttons decode in bar order with their descriptions (AC 1, 2)", (
   assert.ok(view?.selectBarKinds);
   assert.deepEqual(
     view.selectBarKinds.map((button) => button.kind),
-    ["cut", "score", "engrave", "engrave_outline", "cut_out"],
+    ["cut", "score", "engrave", "engrave_outline", "cut_out", "image"],
   );
   assert.equal(view.selectBarKinds[2].description, "Assigns to Engrave 1");
   assert.equal(view.selectBarKinds[0].description, "Creates Cut 1");
@@ -172,6 +174,7 @@ test("Interval, the hatch options and the Z offset capability decode (AC 19 to 2
   assert.deepEqual(engrave.options, {
     hatch: { crosshatch: true, bidirectional: false, scanAngleDeg: 15, overscanPct: 5 },
     zOffsetMm: 1.5,
+    image: null,
   });
   const cut = decodeOperationsView(fixture("options_cut_z_hidden"))?.rows[0].settings;
   assert.equal(cut?.options?.hatch, null);
@@ -225,6 +228,7 @@ test("a view with a new field missing or of the wrong type is refused", () => {
 // The settings part of `specs/0028-material-test-library`: the `settings_*` fixtures hold a row's
 // `settings` and the `pick` list, and the five older fixtures carry them too.
 import { decodePick, decodeSettings } from "../src/lib/operationSettingsView.ts";
+import { lowerPart } from "../src/lib/operationOptionRows.ts";
 
 function settingsRows(name: string): { name: string; settings: unknown }[] {
   return (fixture(name) as { rows: { name: string; settings: unknown }[] }).rows;
@@ -305,4 +309,42 @@ test("a whole view without pick, or with a damaged row settings, is refused", ()
   assert.equal(decodeOperationsView({ ...raw, rows }), null);
   const withSettings = decodeOperationsView(raw);
   assert.ok(withSettings?.rows.some((row) => row.settings !== null));
+});
+
+test("an Image row shows the Image settings group in its options (specs/0123 AC 11)", () => {
+  const view = decodeOperationsView(fixture("options_image"));
+  assert.ok(view);
+  const image = view.rows[0]?.settings?.options?.image;
+  assert.ok(image);
+  assert.equal(image.dither, "grey");
+  assert.equal(image.modes.length, 7);
+  assert.equal(image.modeField?.field, "lowest_power", "Lowest power in Threshold's row");
+  assert.equal(image.modeField?.value, 12.5);
+  assert.deepEqual(
+    image.fields.map((f) => [f.field, f.value, f.unit]),
+    [
+      ["brightness", -10, "%"],
+      ["contrast", 20, "%"],
+      ["gamma", 1.5, ""],
+    ],
+  );
+  assert.equal(image.invert, true);
+  const plain = decodeOperationsView(fixture("options_engrave"));
+  assert.equal(plain?.rows[0]?.settings?.options?.image, null, "an Engrave: never the group");
+});
+
+test("an Image row has no Crosshatch toggle, and a damaged dither decodes to no pressed cell (specs/0123 P40, P46)", () => {
+  const raw = fixture("options_image") as Raw;
+  const view = decodeOperationsView(raw);
+  const row = view?.rows[0];
+  assert.ok(row?.settings);
+  assert.equal(row.settings.options?.hatch?.crosshatch, null);
+  assert.deepEqual(
+    lowerPart(row.kind, row.settings)?.toggles.map((toggle) => toggle.option),
+    ["bidirectional"],
+  );
+  const damaged = structuredClone(raw) as Raw;
+  const settings = damaged.rows[0].settings as { options: { image: Record<string, unknown> } };
+  settings.options.image.dither = null;
+  assert.equal(decodeOperationsView(damaged)?.rows[0].settings?.options?.image?.dither, null);
 });
