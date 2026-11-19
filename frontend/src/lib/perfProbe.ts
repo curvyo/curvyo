@@ -56,11 +56,13 @@ const queue: string[] = [];
 let timed: WasmSession | null = null;
 let second = 0;
 
-/** What the runner asked for on connecting: the full scenario list, one ablation variant
+/** What the runner asked for on connecting: the full scenario list, only the empty page's three
+ * scenarios (`measure.py --page-only`, also on Windows and macOS), one ablation variant
  * (`measure.py --ablate`) with its warm-up and measured seconds, or the GL micro benchmarks
  * (`measure.py --gl-bench`, `perfGlBench.ts`). */
 type Order =
   | { mode: "full" }
+  | { mode: "page-only" }
   | { mode: "ablate"; variant: string; warmup: number; seconds: number }
   | { mode: "gpu"; variant: string; warmup: number; seconds: number }
   | { mode: "glbench" };
@@ -437,7 +439,7 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
     scenario = name;
     send({ event: "scenario", name, state: "start", view: view(), canvas: where(canvas) });
     await body();
-    send({ event: "scenario", name, state: "end", view: view(), canvas: where(canvas) });
+    send({ event: "scenario", name, state: "end", view: view(), canvas: where(canvas), ...sizes(canvas) });
     scenario = "between";
     await sleep(1500);
   };
@@ -469,6 +471,10 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
       }
     }),
   );
+  if (asked.mode === "page-only") {
+    send({ event: "done" });
+    return;
+  }
   const outcome = session.import_svg(new TextEncoder().encode(generatedSvg(5000)), "perf-5000.svg");
   send({ event: "loaded", outcome, document: "generated 5000 paths" });
   session.fit_document();

@@ -43,6 +43,52 @@ The build step runs `npm run build:wasm` first. `vite build` alone bundles whate
 make the render loop throw on its first tick, so every column reads 0 and zoom and pan end in about
 6 s instead of 35 s (seen 2026-11-18 after PR #387). `--no-build` keeps that risk.
 
+## Windows and macOS: `--page-only`
+
+The empty-page pan jank (rAF p50 63 ms on Linux, NVIDIA, WebKitGTK) may be Linux-specific. Only
+`--page-only` runs off Linux: the three empty-page scenarios (`idle-empty` 15 s, `empty-pan` 5 s,
+`empty-zoom` 5 s; the 5 000-path import is skipped), one table, about 1.5 minutes after the build.
+Python 3 standard library only; the build avoids bash (`build-wasm.sh` is replaced by the same two
+commands in Python), `npm`/`npx` are found via `shutil.which` (`npm.cmd` on Windows). On Linux it
+also works (under Xvfb, or with `--desktop`).
+
+Prerequisites on the machine (once):
+
+- Rust toolchain (rustup) with `rustup target add wasm32-unknown-unknown`.
+- The `wasm-bindgen` CLI at exactly the version in `Cargo.lock` (the script checks and prints the
+  command): `cargo install wasm-bindgen-cli --version 0.2.129` (look at `name = "wasm-bindgen"` in
+  `Cargo.lock` if that changed).
+- Node.js (LTS) and Python 3.9 or newer; then `cd frontend && npm ci`.
+- Windows: Visual Studio Build Tools (C++ workload, for rustc) and the WebView2 runtime (ships with
+  Windows 11 and current Windows 10).
+- macOS: Xcode command line tools (`xcode-select --install`).
+
+Steps (a normal desktop session, window visible, no other heavy app, laptop on mains power; do not
+touch the mouse while it runs, the pan is synthetic but the window must not be minimised):
+
+```text
+git fetch origin && git switch chore/perf-page-only    # or the branch you were given
+cd <the checkout>
+python tools/perf/measure.py --page-only                # Windows (PowerShell or cmd)
+python3 tools/perf/measure.py --page-only               # macOS
+```
+
+The first build takes a while (full Rust build of the app); a repeat run with `--no-build` reuses it.
+The app window opens and closes by itself. Send back the whole printed output: the `platform:` block
+(OS, user agent, WebGL RENDERER, wgpu adapter) and the table, or the file `target/perf/page-only.ndjson`
+if the table did not print. A hung run ends after `--timeout` (600 s); the app is then killed
+(`taskkill /T` on Windows, SIGTERM to its process group on macOS).
+
+CPU columns: Windows reads the process tree through PowerShell's `Get-CimInstance Win32_Process`
+(the app and WebView2's `msedgewebview2.exe` children), macOS through `ps -A -o pid,ppid,cputime,rss,comm`
+(the app plus the `com.apple.WebKit.*` helper processes that appeared after the launch, since WebKit's
+web, GPU and network processes are not children of the app on macOS); where that fails the column
+reads `n/a` and the run goes on. The app's `main.rs` relaunches itself with a WebKitGTK variable only
+under `cfg(target_os = "linux")`, so Windows and macOS start it directly.
+
+Not verified: the Windows and macOS branches (process table, `taskkill`, `.exe` path, the build steps on
+those systems) were written on Linux and only the macOS `ps` parsing was run there.
+
 ## How it works
 
 1. `npm run build:wasm`, then `vite build` with `VITE_CURVYO_PERF=ws://127.0.0.1:47126` into `frontend/dist-perf/` (git-ignored),
