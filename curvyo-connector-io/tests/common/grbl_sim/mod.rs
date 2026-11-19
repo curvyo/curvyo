@@ -221,7 +221,11 @@ impl GrblSim {
         self.rx.last().is_some_and(|b| *b != b'\n')
     }
 
-    fn moving(&self) -> bool {
+    pub(crate) fn in_hold(&self) -> bool {
+        self.hold.is_some()
+    }
+
+    pub(crate) fn moving(&self) -> bool {
         self.homing.is_some()
             || (!self.planner.is_empty() && !self.hold.is_some_and(|h| h.complete))
     }

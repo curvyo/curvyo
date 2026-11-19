@@ -48,7 +48,10 @@ impl GrblSim {
                 }
             }
             "$H" => {
-                if !self.start_homing() {
+                if self.moving() || self.in_hold() {
+                    // GRBL's "not idle": `$H` only in Idle and Alarm (`specs/0118` M7).
+                    self.print("error:8");
+                } else if !self.start_homing() {
                     self.print("error:5");
                 }
                 return; // `ok` when homing ends

@@ -51,7 +51,7 @@ struct Session {
     submitted: bool,
     /// When the last frame came in.
     last_frame: Instant,
-    /// The paired app's name, for the log of `Unlock`.
+    /// The paired app's name, for the log of `Unlock` and `Home`.
     client_name: String,
 }
 
@@ -285,6 +285,12 @@ impl Session {
                     socket,
                     error(ErrorCode::PairingRequired, "Pair or authenticate first."),
                 )
+            }
+            Message::Home => {
+                let now = Instant::now();
+                let answers = self.hub.home(&self.client_name, now);
+                self.limiter.answered(now);
+                answers.into_iter().all(|m| send(socket, m))
             }
             Message::Unlock => {
                 let now = Instant::now();

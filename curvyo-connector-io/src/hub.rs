@@ -212,6 +212,29 @@ impl Hub {
         inner.machine.status()
     }
 
+    /// `Home` from the app `client` (`specs/0118` M8): one `jobs.log` line and one terminal line
+    /// when the connector takes it; the answers for that app alone, the status when there is no
+    /// other answer (in `Homing` a second Home changes nothing).
+    pub fn home(&self, client: &str, now: Instant) -> Vec<Message> {
+        let mut inner = self.lock();
+        self.turn(&mut inner, &[], now);
+        let before = inner.machine.state();
+        let mut direct = Vec::new();
+        self.apply(&mut inner, Event::Message(Message::Home), now, &mut direct);
+        let after = inner.machine.state();
+        if after != before && matches!(after, State::Homing | State::AwaitingLocalStart) {
+            let _ = inner.notices.send(format!("Home sent by {client}"));
+            let result = LogResult::Home(client.to_owned());
+            if let Err(e) = self.job_log.append(OffsetDateTime::now_utc(), "", &result) {
+                let _ = inner.notices.send(format!("Cannot write the job log: {e}"));
+            }
+        }
+        if direct.is_empty() {
+            direct.push(inner.machine.status());
+        }
+        direct
+    }
+
     /// A message of a paired app; the answers for that app alone (statuses go to everyone
     /// subscribed, `GetStatus` is answered directly).
     pub fn handle_message(&self, message: Message, now: Instant) -> Vec<Message> {
@@ -350,7 +373,12 @@ impl Hub {
         if inner.machine.state() != State::AwaitingLocalStart {
             return None;
         }
-        let name = inner.job_name.clone();
+        let homing = matches!(inner.machine.status(), Message::Status { job: None, .. });
+        let name = if homing {
+            "Home".to_owned()
+        } else {
+            inner.job_name.clone()
+        };
         self.apply(&mut inner, Event::LocalStartPressed, now, &mut Vec::new());
         let _ = inner.notices.send(format!("Started {name}"));
         Some(name)
@@ -432,9 +460,12 @@ impl Hub {
             let _ = inner.notices.send(line);
         }
         if after == State::AwaitingLocalStart {
-            let _ = inner
-                .notices
-                .send(format!("Press Enter to start {}", inner.job_name));
+            // A waiting Home carries no job (`specs/0118` M5).
+            let name = match status {
+                Message::Status { job: None, .. } => "Home",
+                _ => inner.job_name.as_str(),
+            };
+            let _ = inner.notices.send(format!("Press Enter to start {name}"));
         }
     }
 

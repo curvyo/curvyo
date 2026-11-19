@@ -8,6 +8,9 @@ use curvyo_connector_core::{ControllerCommand, ControllerInfo, Event, Job};
 
 use crate::controller::{Advance, Controller};
 
+/// How long the fake controller's homing cycle takes (`specs/0118` M6).
+pub const FAKE_HOMING: Duration = Duration::from_secs(2);
+
 /// The text of the alarm the fake controller raises.
 #[must_use]
 pub fn alarm_text(line: u32) -> String {
@@ -30,6 +33,8 @@ pub struct FakeController {
     lines_per_second: u32,
     alarm_at_line: Option<u32>,
     run: Option<Run>,
+    /// When the homing cycle ends; `None` while not homing.
+    homing_until: Option<Duration>,
 }
 
 impl FakeController {
@@ -41,6 +46,7 @@ impl FakeController {
             lines_per_second,
             alarm_at_line,
             run: None,
+            homing_until: None,
         }
     }
 
@@ -88,14 +94,22 @@ impl FakeController {
                     run.paused = false;
                 }
             }
-            ControllerCommand::Stop => self.run = None,
+            ControllerCommand::Stop => {
+                self.run = None;
+                self.homing_until = None;
+            }
             ControllerCommand::Unlock => {}
+            ControllerCommand::Home => self.homing_until = Some(at + FAKE_HOMING),
         }
     }
 
-    /// Lets time pass and returns the events that happened: progress, the end of the job, or the
-    /// alarm, after which the stream stops by itself.
+    /// Lets time pass and returns the events that happened: the end of a homing, progress, the
+    /// end of the job, or the alarm, after which the stream stops by itself.
     pub fn run_until(&mut self, at: Duration) -> Vec<Event> {
+        if self.homing_until.is_some_and(|until| at >= until) {
+            self.homing_until = None;
+            return vec![Event::Homed];
+        }
         let Some(mut run) = self.run else {
             return Vec::new();
         };
@@ -239,6 +253,34 @@ mod tests {
             c.run_until(ms(1)),
             vec![Event::JobFinished { elapsed_ms: 1 }]
         );
+    }
+
+    #[test]
+    fn home_takes_two_seconds_of_the_passed_time() {
+        let mut c = FakeController::new(20, None);
+        c.take(&ControllerCommand::Home, 0, ms(1000));
+        assert_eq!(c.run_until(ms(2999)), Vec::new());
+        assert_eq!(c.run_until(ms(3000)), vec![Event::Homed]);
+        assert_eq!(c.run_until(ms(9000)), Vec::new(), "homed once");
+    }
+
+    #[test]
+    fn stop_during_home_cancels_it() {
+        let mut c = FakeController::new(20, None);
+        c.take(&ControllerCommand::Home, 0, ms(0));
+        c.run_until(ms(500));
+        c.take(&ControllerCommand::Stop, 0, ms(500));
+        assert_eq!(c.run_until(ms(5000)), Vec::new());
+    }
+
+    #[test]
+    fn home_after_its_alarm_ends_in_homed() {
+        let mut c = FakeController::new(20, Some(2));
+        start(&mut c, 10, ms(0));
+        let events = c.run_until(ms(1000));
+        assert!(matches!(events.last(), Some(Event::Alarm { .. })));
+        c.take(&ControllerCommand::Home, 0, ms(1000));
+        assert_eq!(c.run_until(ms(3000)), vec![Event::Homed]);
     }
 
     #[test]

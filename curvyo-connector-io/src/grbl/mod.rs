@@ -3,6 +3,7 @@
 
 pub mod controller;
 pub mod flow;
+pub mod home;
 pub mod identify;
 pub mod prepare;
 mod replies;

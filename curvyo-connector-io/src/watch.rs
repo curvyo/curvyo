@@ -40,7 +40,8 @@ fn pause(period: Duration, stop: &AtomicBool) {
     }
 }
 
-/// Whether `status` is a state in which a job is in flight (`Receiving` to `Paused`).
+/// Whether `status` is a state in which a job or a homing is in flight (`Receiving` to `Paused`,
+/// `Homing`).
 fn is_active(status: &Message) -> bool {
     matches!(
         status,
@@ -48,6 +49,7 @@ fn is_active(status: &Message) -> bool {
             state: State::Receiving
                 | State::Ready
                 | State::AwaitingLocalStart
+                | State::Homing
                 | State::Running
                 | State::Paused,
             ..
