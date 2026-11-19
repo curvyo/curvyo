@@ -1,6 +1,6 @@
 # Send and start: the page's button starts the job when nothing else is on the machine
 
-Status: Ready (the build waits for PR #399, Homing and Machine controls, to be merged)
+Status: Done (PR #428)
 Priority: Should
 Origin: Customer, test of PR #399 on the real laser, 2026-11-19; decisions of 2026-11-20 applied (Frage 263 B, Frage 264 A, glyph accepted). Translated: "I'd like it so that if you are the owner yourself and send the job first, with no other job in the list, it goes directly to play; I would also show the Send to machine button for the page as a play symbol." Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
