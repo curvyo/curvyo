@@ -2,6 +2,7 @@
 """Measures the native Curvyo app (Tauri on WebKitGTK) under Xvfb: process CPU and RSS from /proc
 every second, joined with the frame counters of the page probe (`frontend/src/lib/perfProbe.ts`).
 Standard library only. See README.md. Usage: tools/perf/measure.py [--no-build] [--out DIR]
+[--desktop] [--ablate [VARIANT,...]]
 """
 import argparse, asyncio, base64, hashlib, json, os, signal, struct, subprocess, sys, time
 from pathlib import Path
@@ -71,28 +72,29 @@ async def read_frame(reader):
     return opcode, bytes(data)
 
 
-async def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--no-build", action="store_true", help="reuse the last perf build")
-    parser.add_argument("--out", default=str(ROOT / "target" / "perf"))
-    # Software rendering (Xvfb) is slow: wheel-zoom alone can take about a minute of wall time.
-    parser.add_argument("--timeout", type=int, default=600)
-    # On the real display (a GPU, the compositor's own pacing) instead of Xvfb's software GL; no
-    # screenshots, since the window is wherever the window manager puts it.
-    parser.add_argument("--desktop", action="store_true", help="run on the current DISPLAY instead of Xvfb")
-    args = parser.parse_args()
-    if not args.no_build:
-        build()
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    events, procs, state = [], [], {"pid": None, "done": asyncio.Event(), "env": None}
-    log = open(out / "events.ndjson", "w")
+def text_frame(message):
+    """One unmasked WebSocket text frame from the runner to the page."""
+    data = json.dumps(message).encode()
+    if len(data) < 126:
+        head = bytes([0x81, len(data)])
+    else:
+        head = bytes([0x81, 126]) + struct.pack(">H", len(data))
+    return head + data
+
+
+async def launch(args, out, order, extra_env=None, interval=1.0, log_name="events.ndjson"):
+    """Starts the app once, hands the page `order` (`{"mode": "full"}` or one ablation variant),
+    samples the process tree every `interval` s until the page's `done` (or the timeout) and
+    returns (events, procs, done)."""
+    events, procs, state = [], [], {"done": asyncio.Event(), "env": None}
+    log = open(out / log_name, "w")
 
     async def on_client(reader, writer):
         request = (await reader.readuntil(b"\r\n\r\n")).decode()
         key = next(l.split(": ")[1] for l in request.split("\r\n") if l.lower().startswith("sec-websocket-key"))
         accept = base64.b64encode(hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode()
         writer.write(f"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n".encode())
+        writer.write(text_frame(order))
         await writer.drain()
         try:
             while True:
@@ -107,7 +109,7 @@ async def main():
                     log.flush()
                     if event["event"] == "done":
                         state["done"].set()
-                    if event["event"] == "scenario" and state["env"]:
+                    if event["event"] == "scenario" and state["env"] and "canvas" in event:
                         await screenshot(state["env"], out / f"{event['name']}-{event['state']}.png", event.get("canvas"))
                     if event["event"] == "snap" and state["env"]:
                         snaps = state.setdefault("snaps", {})
@@ -121,10 +123,10 @@ async def main():
     app = ROOT / "target" / "debug" / "curvyo-app"
     # xvfb-run keeps Xvfb alive for the app's lifetime; the app is its direct child.
     command = [str(app)] if args.desktop else ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", str(app)]
-    xvfb = subprocess.Popen(command, cwd=ROOT, start_new_session=True,
-                            env=os.environ if args.desktop else dict(os.environ, GDK_BACKEND="x11", WEBKIT_DISABLE_COMPOSITING_MODE=os.environ.get("WEBKIT_DISABLE_COMPOSITING_MODE", "0")))
+    env = dict(os.environ) if args.desktop else dict(os.environ, GDK_BACKEND="x11", WEBKIT_DISABLE_COMPOSITING_MODE=os.environ.get("WEBKIT_DISABLE_COMPOSITING_MODE", "0"))
+    env.update(extra_env or {})
+    xvfb = subprocess.Popen(command, cwd=ROOT, start_new_session=True, env=env)
     t0 = time.time()
-    last = None
     try:
         while not state["done"].is_set() and time.time() - t0 < args.timeout:
             if xvfb.poll() is not None:
@@ -136,16 +138,148 @@ async def main():
             if tree:
                 cpu, rss, names = sample(tree)
                 procs.append({"wall": time.time(), "cpu": cpu, "rss": rss, "names": names})
-            await asyncio.sleep(1)
+            await asyncio.sleep(interval)
     finally:
         os.killpg(xvfb.pid, signal.SIGTERM)
         server.close()
+        await server.wait_closed()
+        log.close()
+    # The app's process group is gone before the next launch takes the port and the display.
+    for _ in range(50):
+        if xvfb.poll() is not None:
+            break
+        await asyncio.sleep(0.1)
+    return events, procs, state["done"].is_set()
+
+
+async def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--no-build", action="store_true", help="reuse the last perf build")
+    parser.add_argument("--out", default=str(ROOT / "target" / "perf"))
+    # Software rendering (Xvfb) is slow: wheel-zoom alone can take about a minute of wall time.
+    parser.add_argument("--timeout", type=int, default=600)
+    # On the real display (a GPU, the compositor's own pacing) instead of Xvfb's software GL; no
+    # screenshots, since the window is wherever the window manager puts it.
+    parser.add_argument("--desktop", action="store_true", help="run on the current DISPLAY instead of Xvfb")
+    parser.add_argument("--ablate", nargs="?", const="all", metavar="VARIANT,...",
+                        help="only the empty-page pan, once per variant (default: all): " + ", ".join(ABLATE_ORDER))
+    args = parser.parse_args()
+    if not args.no_build:
+        build()
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    if args.ablate:
+        await ablate(args, out)
+        return
+    events, procs, done = await launch(args, out, {"mode": "full"})
     json.dump(procs, open(out / "procs.json", "w"))
-    if not state["done"].is_set():
+    if not done:
         print(f"timed out before scenario {unfinished(events)} (--timeout {args.timeout} s)")
     report(events, procs, out)
     if args.desktop:
         print("lag: not measured in desktop mode (no screenshots)")
+
+
+# The ablation variants in run order: the page's own (`frontend/src/lib/perfAblate.ts`), then two
+# that only set WebKit environment flags and run the page as `baseline`. `baseline` runs first and
+# again last (`baseline-again`): the spread of the two is the noise floor of every other row.
+ABLATE_PAGE = ["baseline", "no-rulers", "no-pageframes", "no-overlays", "canvas-only", "dpr1", "half-backing",
+               "no-effects", "no-draw", "no-view", "idle"]
+ABLATE_ENV = {"no-compositing": {"WEBKIT_DISABLE_COMPOSITING_MODE": "1"}, "no-dmabuf": {"WEBKIT_DISABLE_DMABUF_RENDERER": "1"}}
+ABLATE_ORDER = ABLATE_PAGE + list(ABLATE_ENV) + ["baseline-again"]
+ABLATE_WARMUP, ABLATE_SECONDS = 3, 8
+
+
+async def ablate(args, out):
+    """Runs the empty-page pan once per variant, a fresh app each, and prints one table."""
+    variants = ABLATE_ORDER if args.ablate == "all" else [v.strip() for v in args.ablate.split(",") if v.strip()]
+    unknown = [v for v in variants if v not in ABLATE_ORDER]
+    if unknown:
+        sys.exit(f"unknown variant(s): {', '.join(unknown)}; known: {', '.join(ABLATE_ORDER)}")
+    rows = []
+    for variant in variants:
+        page = "baseline" if variant in ABLATE_ENV or variant == "baseline-again" else variant
+        print(f"ablate: {variant} ...", file=sys.stderr, flush=True)
+        events, procs, done = await launch(args, out, {"mode": "ablate", "variant": page, "warmup": ABLATE_WARMUP, "seconds": ABLATE_SECONDS},
+                                           extra_env=ABLATE_ENV.get(variant), interval=0.25, log_name=f"ablate-{variant}.ndjson")
+        rows.append(ablation_row(variant, events, procs, done))
+    json.dump(rows, open(out / "ablate.json", "w"), indent=1)
+    print_ablation(rows, args)
+
+
+def ablation_row(variant, events, procs, done):
+    """One row of the matrix: pacing, CPU per process kind and the checks that the variant took
+    effect, from one launch's events and process samples."""
+    row = {"variant": variant, "done": done, "warnings": []}
+    config = next((e for e in events if e["event"] == "ablation"), None)
+    start = next((e for e in events if e["event"] == "scenario" and e["name"] == "measure" and e["state"] == "start"), None)
+    end = next((e for e in events if e["event"] == "scenario" and e["name"] == "measure" and e["state"] == "end"), None)
+    for e in events:
+        if e["event"] == "error":
+            row["warnings"].append(f"page error: {e['message'][:160]}")
+    if not config or not start or not end:
+        row["warnings"].append("no measure window (timed out or the page sent no ablation events)")
+        return row
+    row.update(applied=config["applied"], backing=config["backing"], css=config["css"], dpr=config["dpr"],
+               window=config["window"], screen=config["screen"], backing_end=end.get("backing"))
+    window = [p for p in procs if start["wall"] <= p["wall"] <= end["wall"]]
+    rows = [e for e in events if e["event"] == "second" and e["scenario"] == "measure"]
+    intervals = [i for r in rows for i in r.get("intervals", [])]
+    row.update(seconds=end["wall"] - start["wall"], frames=len(intervals), p50=quantile(intervals, 0.5), p95=quantile(intervals, 0.95),
+               over33=sum(1 for i in intervals if i > 33))
+    if len(window) >= 2:
+        secs = window[-1]["wall"] - window[0]["wall"]
+        a, b = window[0]["names"], window[-1]["names"]
+        share = lambda prefix: sum(b[k] - a.get(k, 0) for k in b if k.startswith(prefix)) * 100 / secs
+        row["web"], row["gpu"] = share("WebKitWebProc"), share("WebKitGPUProc")
+        row["total"] = (window[-1]["cpu"] - window[0]["cpu"]) * 100 / secs
+        row["other"] = row["total"] - row["web"] - row["gpu"]
+    n = max(len(rows), 1)
+    row["submit"] = sum(r["submitted"] for r in rows) / n
+    row["changed"] = sum(r["changed"] for r in rows) / n
+    row["render"] = sum(r["renderMs"] for r in rows) / max(sum(r["built"] for r in rows), 1)
+    # The checks that the variant did what it says.
+    page = config["variant"]
+    ratio = {"dpr1": 1, "half-backing": config["dpr"] / 2}.get(page, config["dpr"])
+    expected = [round(config["css"][0] * ratio), round(config["css"][1] * ratio)]
+    if any(abs(x - y) > 1 for x, y in zip(config["backing"], expected)):
+        row["warnings"].append(f"backing {config['backing']} is not css {config['css']} x {ratio:g}")
+    if page == "no-draw" and row["submit"] > 0.5:
+        row["warnings"].append(f"no-draw still submitted {row['submit']:.1f}/s")
+    # A hover changes the session (and draws) without moving the view: only the view counts here.
+    if page in ("no-view", "idle") and start.get("view") != end.get("view"):
+        row["warnings"].append(f"the view moved ({start.get('view')} -> {end.get('view')})")
+    if page not in ("no-view", "idle") and start.get("view") == end.get("view") and row["changed"] < 1:
+        row["warnings"].append("the pan did not move the view")
+    if " 0 " in f" {config['applied']} " or config["applied"].startswith("unknown"):
+        row["warnings"].append(f"variant matched nothing: {config['applied']}")
+    return row
+
+
+def print_ablation(rows, args):
+    first = next((r for r in rows if "backing" in r), None)
+    mode = "desktop (real display)" if args.desktop else "Xvfb (software GL; compare rows, not absolute values)"
+    print(f"\nablation of the empty-page pan: {ABLATE_WARMUP} s warm-up, {ABLATE_SECONDS} s measured per variant, one app launch each; {mode}")
+    if first:
+        print(f"canvas backing {first['backing'][0]}x{first['backing'][1]} device px (CSS {first['css'][0]}x{first['css'][1]}), "
+              f"devicePixelRatio {first['dpr']:g}, window {first['window'][0]}x{first['window'][1]} CSS px, screen {first['screen'][0]}x{first['screen'][1]}")
+    print(f"{'variant':<15} {'backing':>10} {'win':>9} {'s':>4} {'frames':>6} {'rAF p50':>7} {'p95':>6} {'>33ms':>5} {'web %':>6} {'gpu %':>6} {'other %':>7} {'submit/s':>8} {'render ms':>9}")
+    for r in rows:
+        if "p50" not in r:
+            print(f"{r['variant']:<15} (no data)")
+        else:
+            backing = f"{r['backing'][0]}x{r['backing'][1]}"
+            win = f"{r['window'][0]}x{r['window'][1]}"
+            cpu = lambda k: f"{r[k]:6.1f}" if k in r else f"{'-':>6}"
+            print(f"{r['variant']:<15} {backing:>10} {win:>9} {r['seconds']:4.1f} {r['frames']:6d} {r['p50']:7.1f} {r['p95']:6.1f} {r['over33']:5d} "
+                  f"{cpu('web')} {cpu('gpu')} {cpu('other'):>7} {r['submit']:8.1f} {r['render']:9.2f}")
+    for r in rows:
+        if r.get("applied") and r["variant"] not in ("baseline", "baseline-again") and r["variant"] not in ABLATE_ENV:
+            print(f"  {r['variant']}: {r['applied']}")
+        for w in r["warnings"]:
+            print(f"  WARNING {r['variant']}: {w}")
+    print("web % = WebKitWebProcess, gpu % = WebKitGPUProcess (- or 0 when WebKit runs none), other % = the rest of the tree "
+          "(curvyo-app, network process); all in % of one core over the measured window. Raw rows: ablate.json, ablate-<variant>.ndjson")
 
 
 SCENARIOS = ["idle-empty", "empty-pan", "empty-zoom", "idle-5000", "wheel-zoom", "pan-drag"]
