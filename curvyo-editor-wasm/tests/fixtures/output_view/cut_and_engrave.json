@@ -25,7 +25,8 @@
               "peer": "1"
             }
           ],
-          "kind": "items"
+          "kind": "items",
+          "unfold": null
         },
         "text": "1 item is not assigned."
       },
@@ -42,7 +43,8 @@
               "peer": "1"
             }
           ],
-          "kind": "items"
+          "kind": "items",
+          "unfold": null
         },
         "text": "Score 1 has Output off."
       }

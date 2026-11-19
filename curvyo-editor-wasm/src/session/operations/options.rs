@@ -1,12 +1,13 @@
 //! The edits of an unfolded row that no material touches (`specs/0111-laser-operation-tools`
-//! criteria 19 to 24; ADR 0056 §5, §6): Interval in `op_settings.main` and the operation-only
-//! settings in `op_options`, each typed value or toggle one step "Edit settings".
+//! criteria 19 to 24, `specs/0123` criteria 11 to 13; ADR 0056 §5, §6, ADR 0069 §7): Interval in
+//! `op_settings.main` and the operation-only settings in `op_options`, each typed value, toggle or
+//! pick one step "Edit settings".
 
 use curvyo_document_core::{NodeId, ProfileChange, SettingsStep, SettingsWrite};
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    Interval, OptionEdit, Overscan, ScanAngle, SettingsRead, ZOffset, edit_interval, hatches,
-    read_options,
+    Dither, ImageEdit, ImageField, Interval, OptionEdit, Overscan, ScanAngle, SettingsRead,
+    ZOffset, edit_interval, read_options,
 };
 
 use super::super::Session;
@@ -20,6 +21,10 @@ enum OptionField {
     ScanAngle,
     Overscan,
     ZOffset,
+    /// A number of the Image settings group (`specs/0123` criterion 11).
+    Image(ImageField),
+    /// The Invert toggle of the Image settings group.
+    Invert,
 }
 
 impl OptionField {
@@ -32,6 +37,12 @@ impl OptionField {
             "scan_angle" => Self::ScanAngle,
             "overscan" => Self::Overscan,
             "z_offset" => Self::ZOffset,
+            "threshold" => Self::Image(ImageField::Threshold),
+            "brightness" => Self::Image(ImageField::Brightness),
+            "contrast" => Self::Image(ImageField::Contrast),
+            "gamma" => Self::Image(ImageField::Gamma),
+            "lowest_power" => Self::Image(ImageField::LowestPower),
+            "invert" => Self::Invert,
             _ => return None,
         })
     }
@@ -47,6 +58,8 @@ impl OptionField {
             Self::ScanAngle => ScanAngle::typed(value).map(OptionEdit::ScanAngle),
             Self::Overscan => Overscan::typed(value).map(OptionEdit::Overscan),
             Self::ZOffset => ZOffset::typed(value).map(OptionEdit::ZOffset),
+            Self::Image(field) => field.typed(value).map(OptionEdit::Image),
+            Self::Invert => Ok(OptionEdit::Image(ImageEdit::Invert(value != 0.0))),
         })
     }
 }
@@ -74,8 +87,10 @@ impl Session {
     }
 
     /// Types `value` into the field `option` of operation `id`'s unfolded row (`interval`,
-    /// `scan_angle`, `overscan`, `z_offset`), or presses the toggle `option` (`crosshatch`,
-    /// `bidirectional`) on (`value` non-zero) or off (criteria 19, 20, 24). One step "Edit
+    /// `scan_angle`, `overscan`, `z_offset`; the Image settings `threshold`, `brightness`,
+    /// `contrast`, `gamma`, `lowest_power`), or presses the toggle `option` (`crosshatch`,
+    /// `bidirectional`, `invert`) on (`value` non-zero) or off (criteria 19, 20, 24; `specs/0123`
+    /// criteria 11, 12). One step "Edit
     /// settings"; the whole `op_options` map is written. `Ok(false)` when nothing is written: the
     /// same value, a field the row does not show (a hatch option on a Cut, Z offset without a
     /// motorised Z axis, Interval with No settings, which waits in the draft), damaged settings or another page.
@@ -98,25 +113,42 @@ impl Session {
         if field == OptionField::ZOffset && !self.active_motorised_z() {
             return Ok(false);
         }
+        Ok(self.write_option_edit(id, edit))
+    }
+
+    /// Picks the Dither mode `mode` (`threshold`, `ordered`, `floyd_steinberg`, `jarvis`,
+    /// `atkinson`, `stucki`, `grey`) of Engrave operation `id` (`specs/0123` criteria 11, 12): one
+    /// step "Edit settings"; `false` when nothing is written (the same mode, an unknown one,
+    /// another kind, damaged settings or another page).
+    pub fn set_operation_dither(&mut self, id: NodeId, mode: &str) -> bool {
+        self.operations.notice = None;
+        Dither::from_key(mode).is_some_and(|dither| {
+            self.write_option_edit(id, OptionEdit::Image(ImageEdit::Dither(dither)))
+        })
+    }
+
+    /// Writes `edit` into the `op_options` of operation `id` as one step "Edit settings";
+    /// whether it was written.
+    fn write_option_edit(&mut self, id: NodeId, edit: OptionEdit) -> bool {
         let Some(active) = self.active_operations() else {
-            return Ok(false);
+            return false;
         };
         let Some(op) = active.operations.iter().find(|op| op.id == id && !op.grid) else {
-            return Ok(false);
+            return false;
         };
         let Some(kind) = op.kind.as_deref().and_then(OperationKind::parse) else {
-            return Ok(false);
+            return false;
         };
         let Ok(options) = read_options(op.options.as_ref(), kind) else {
-            return Ok(false);
+            return false;
         };
         let Some(next) = options.with(kind, edit) else {
-            return Ok(false);
+            return false;
         };
         let serde_json::Value::Object(map) = next.to_value(kind) else {
-            return Ok(false);
+            return false;
         };
-        Ok(self.recording_unguarded(|this| {
+        self.recording_unguarded(|this| {
             let done = this
                 .document
                 .write_operation_options(id, &map)
@@ -126,7 +158,7 @@ impl Session {
                 this.renew_lasered_grids_of(&[id]);
             }
             done
-        }))
+        })
     }
 
     /// A typed Interval (criterion 19): written to `main.interval_mm` of the operation, never as
@@ -137,7 +169,7 @@ impl Session {
             return false;
         };
         if target.read == SettingsRead::None {
-            return hatches(target.kind) && self.type_interval_into_draft(id, interval);
+            return target.kind.has_interval() && self.type_interval_into_draft(id, interval);
         }
         let Some(next) = edit_interval(&target.read, target.kind, interval) else {
             return false;

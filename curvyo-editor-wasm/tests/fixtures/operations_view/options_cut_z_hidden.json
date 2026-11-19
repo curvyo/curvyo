@@ -41,6 +41,7 @@
         "needs": "cut",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 1.5
         },
         "over_feed": null,

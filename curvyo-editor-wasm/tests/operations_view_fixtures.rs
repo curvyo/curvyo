@@ -172,6 +172,58 @@ fn state_options_engrave() -> Document {
     d
 }
 
+/// An Image operation holding a 20 x 10 mm image in Grey with every Image setting set
+/// (`specs/0123` criteria 11 to 13, 47): the unfolded row shows the Image settings group, Lowest
+/// power last, and no Crosshatch.
+fn state_options_image() -> Document {
+    let (d, laser, o) = document();
+    let m = manufacturing(&d, &laser);
+    let image = d
+        .add_images(&[curvyo_document_core::NewImage {
+            bytes: std::sync::Arc::from(tiny_png().as_slice()),
+            placement: Affine::new(20.0, 0.0, 0.0, 10.0, o.x + 10.0, o.y + 10.0),
+            name: "Photo 1".to_owned(),
+        }])
+        .unwrap()[0];
+    let raster = add(&d, m, "image", "Image 1", &[vec![image]]);
+    settings(
+        &d,
+        raster,
+        &json!({"main": {"power_pct": 40.0, "speed_mm_min": 3000, "passes": 1,
+                         "interval_mm": 0.1}}),
+    );
+    d.write_operation_options(
+        raster,
+        &map(
+            &json!({"dither": "grey", "threshold_pct": 40, "brightness_pct": -10,
+                     "contrast_pct": 20, "gamma": 1.5, "invert": true,
+                     "lowest_power_pct": 12.5}),
+        ),
+    )
+    .unwrap();
+    d
+}
+
+/// A 4 x 2 grey picture.
+fn tiny_png() -> Vec<u8> {
+    curvyo_image_core::encode_png(&curvyo_image_core::WorkingImage {
+        width: 4,
+        height: 2,
+        pixels: [
+            [0, 0, 0, 255],
+            [128, 128, 128, 255],
+            [255, 255, 255, 255],
+            [64, 64, 64, 255],
+        ]
+        .repeat(2)
+        .concat(),
+        original_size: (4, 2),
+        truncated: false,
+        animated: false,
+    })
+    .unwrap()
+}
+
 /// A Cut with a Z offset stored while the machine has no motorised Z axis (`specs/0111`
 /// criterion 21): the value is kept, the field not shown; the row is unfolded.
 fn state_options_cut_z_hidden() -> Document {
@@ -286,6 +338,7 @@ fn states() -> Vec<(&'static str, Document, Setup)> {
             state_options_engrave(),
             motorised_and_unfolded,
         ),
+        ("options_image", state_options_image(), unfold_first),
         (
             "options_cut_z_hidden",
             state_options_cut_z_hidden(),

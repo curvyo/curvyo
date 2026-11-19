@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use curvyo_document_core::{Affine, NodeId, OperationSnapshot, Point, Vec2};
+use curvyo_document_core::{Affine, AssetHash, NodeId, OperationSnapshot, Point, Vec2};
 use curvyo_laser_core::GENERIC_LASER_ID;
 use curvyo_laser_core::job::{
     BlockInput, BlockSource, CutOutItem, GateFacts, JobInput, LeafGeometry, LeafInput, LeafOutline,
@@ -18,9 +18,9 @@ use curvyo_laser_core::settings::{OperationOptions, SettingsRead, read_options, 
 
 use super::super::Session;
 use super::super::fixtures::FixtureRun;
+use super::super::manufacturing::ActiveCopy;
 use super::super::object_cache::DocumentRead;
 use super::super::operations::index::{IndexedLeaf, LeafSource};
-use super::super::operations::items::item_lists_of;
 use super::leaf_geometry::{leaf_geometry, polygon};
 
 /// The job input of one laser page and the facts of its gate.
@@ -47,7 +47,7 @@ struct GeometryEntry {
 
 /// The id a check line selects for a leaf: the first node of its chain (a clone member selects
 /// its clone, a placed page's member its source object).
-fn select_id(leaf: &IndexedLeaf) -> Option<NodeId> {
+pub(super) fn select_id(leaf: &IndexedLeaf) -> Option<NodeId> {
     leaf.chain.first().and_then(|key| key.first().copied())
 }
 
@@ -97,12 +97,20 @@ fn geometry_of(
     match leaf.source {
         LeafSource::Own(at) => leaf_geometry(read.leaves.get(at)?, own),
         LeafSource::CloneMember { clone, member } => {
-            let picture = read.leaves.get(clone)?.picture()?;
-            leaf_geometry(picture.iter().find(|o| o.id() == member)?, own)
+            leaf_geometry(read.leaves.get(clone)?.picture()?.get(member)?, own)
         }
+        LeafSource::NotDrawn => None,
         LeafSource::PlacedMember { index, placement } => {
             leaf_geometry(read.leaves.get(index)?, placement_map(placement)?)
         }
+        LeafSource::PlacedCloneMember {
+            clone,
+            member,
+            placement,
+        } => leaf_geometry(
+            read.leaves.get(clone)?.picture()?.get(member)?,
+            placement_map(placement)?,
+        ),
         LeafSource::PlacedFrame(placement) => {
             let snapshot = manufacturing
                 .placements
@@ -149,6 +157,22 @@ impl Session {
         geometry
     }
 
+    /// The working image of `asset` the job decoded already, so the canvas draws that copy.
+    pub(in crate::session) fn job_decoded_image(
+        &self,
+        asset: &AssetHash,
+    ) -> Option<Arc<curvyo_image_core::WorkingImage>> {
+        self.output.pixels.held(asset)
+    }
+
+    /// The working image of `asset` for the job (`pixels.rs`): the canvas's when decoded, else
+    /// decoded once; `None` when its bytes cannot be read.
+    fn job_pixels(&self, asset: &AssetHash) -> Option<Arc<curvyo_image_core::WorkingImage>> {
+        self.output
+            .pixels
+            .working(&self.document, asset, || self.decoded_working_image(asset))
+    }
+
     /// The job input of the active laser page, `None` on another page or with its extension off.
     pub(super) fn page_input(&self) -> Option<PageInput> {
         let active = self.active_operations()?;
@@ -187,39 +211,38 @@ impl Session {
             block.ring = ring;
             blocks.push(block);
         }
-        let profile = &copy.read.copy;
+        self.retain_job_pixels(&blocks);
         Some(PageInput {
             manufacturing: manufacturing.id,
             input: JobInput {
                 name: page.name.clone(),
-                machine: MachineInput {
-                    profile_id: profile
-                        .id
-                        .clone()
-                        .unwrap_or_else(|| GENERIC_LASER_ID.to_owned()),
-                    values: profile.values.clone(),
-                    bed: copy.page,
-                    damaged: copy.read.output_format_damaged,
-                },
+                machine: machine_input(&copy),
                 start: settings.start,
                 start_damaged: settings.start_damaged,
                 fixture_material: settings.fixture_material,
                 blocks,
             },
-            facts: gate_facts(&active.operations, &list, &leaves, &statuses),
+            facts: super::gate_facts::gate_facts(&active.operations, &list, &leaves, &statuses),
         })
     }
 
-    /// The block of operation `op` holding the leaves at `rows`, ringed with the digit 0 (the
-    /// caller sets the row's digit).
-    pub(in crate::session) fn operation_block(
-        &self,
-        op: &OperationSnapshot,
-        rows: impl Iterator<Item = usize>,
-        leaves: &[IndexedLeaf],
-        geometry: &[Option<LeafGeometry>],
-        statuses: &[LeafStatus],
-    ) -> BlockInput {
+    /// Keeps the working images the leaves of `blocks` name; unreadable ones stay held too, so
+    /// they are not hashed and decoded again.
+    fn retain_job_pixels(&self, blocks: &[BlockInput]) {
+        let assets: HashSet<&AssetHash> = blocks
+            .iter()
+            .flat_map(|block| &block.leaves)
+            .filter_map(|leaf| match &leaf.geometry {
+                LeafGeometry::Image { asset, .. } => Some(asset),
+                _ => None,
+            })
+            .collect();
+        self.output.pixels.retain(&assets);
+    }
+
+    /// Operation `op`'s block with no leaves yet: its kind, settings, options and grid, ringed with
+    /// the digit 0 (the caller sets the row's digit).
+    fn empty_block(&self, op: &OperationSnapshot) -> BlockInput {
         let kind = KindRead::of(op.kind.as_deref());
         let (settings, options) = kind.known().map_or(
             (SettingsRead::None, Ok(OperationOptions::default())),
@@ -230,7 +253,7 @@ impl Session {
                 )
             },
         );
-        let mut block = BlockInput {
+        BlockInput {
             id: op.id,
             ring: Ring::Operation(0),
             name: op.name.clone(),
@@ -246,8 +269,26 @@ impl Session {
             },
             leaves: Vec::new(),
             cut_out: Vec::new(),
-        };
+        }
+    }
+
+    /// The block of operation `op` holding the leaves at `rows`, ringed with the digit 0 (the
+    /// caller sets the row's digit).
+    pub(in crate::session) fn operation_block(
+        &self,
+        op: &OperationSnapshot,
+        rows: impl Iterator<Item = usize>,
+        leaves: &[IndexedLeaf],
+        geometry: &[Option<LeafGeometry>],
+        statuses: &[LeafStatus],
+    ) -> BlockInput {
+        let mut block = self.empty_block(op);
+        let kind = block.kind;
         let cut_out = kind.known() == Some(OperationKind::CutOut);
+        // Only an Image operation reads pixels, so a page of pictures in no Image operation
+        // decodes nothing for the job (`specs/0123` criterion 37 g); every other kind sees an
+        // image as its frame rectangle and a gradient shape as its outlines (ADR 0069 §13).
+        let rasters = kind.known() == Some(OperationKind::Image);
         let mut items: HashMap<NodeId, usize> = HashMap::new();
         for at in rows {
             let (Some(node), Some(shape)) = (select_id(&leaves[at]), geometry[at].clone()) else {
@@ -255,10 +296,19 @@ impl Session {
             };
             let stacking = u32::try_from(at).unwrap_or(u32::MAX);
             if !cut_out {
+                let geometry = match shape {
+                    LeafGeometry::Image { frame, asset, .. } if rasters => LeafGeometry::Image {
+                        pixels: self.job_pixels(&asset),
+                        frame,
+                        asset,
+                    },
+                    other if rasters => other,
+                    other => vector_geometry(other),
+                };
                 block.leaves.push(LeafInput {
                     node,
                     stacking,
-                    geometry: shape,
+                    geometry,
                 });
                 continue;
             }
@@ -269,6 +319,16 @@ impl Session {
             add_cut_out(&mut block.cut_out, &mut items, (item, stacking), shape);
         }
         block
+    }
+}
+
+/// `geometry` as every kind but Image runs it (Frage 271 A): an image as the one closed ring of
+/// its frame, a gradient-filled leaf as its outlines.
+fn vector_geometry(geometry: LeafGeometry) -> LeafGeometry {
+    match geometry {
+        LeafGeometry::Image { frame, .. } => LeafGeometry::Outlines(vec![polygon(&frame, true)]),
+        LeafGeometry::Gradient { outlines, .. } => LeafGeometry::Outlines(outlines),
+        outlines @ LeafGeometry::Outlines(_) => outlines,
     }
 }
 
@@ -298,8 +358,8 @@ fn add_cut_out(
     shape: LeafGeometry,
 ) {
     let outlines = match shape {
-        LeafGeometry::Outlines(outlines) => outlines,
-        LeafGeometry::Image { frame } => vec![polygon(&frame, true)],
+        LeafGeometry::Outlines(outlines) | LeafGeometry::Gradient { outlines, .. } => outlines,
+        LeafGeometry::Image { frame, .. } => vec![polygon(&frame, true)],
     };
     if let Some(&i) = items.get(&item) {
         out[i].leaves.push(outlines);
@@ -310,6 +370,20 @@ fn add_cut_out(
             stacking,
             leaves: vec![outlines],
         });
+    }
+}
+
+/// The machine of a laser page's job from its profile copy.
+fn machine_input(copy: &ActiveCopy) -> MachineInput {
+    let profile = &copy.read.copy;
+    MachineInput {
+        profile_id: profile
+            .id
+            .clone()
+            .unwrap_or_else(|| GENERIC_LASER_ID.to_owned()),
+        values: profile.values.clone(),
+        bed: copy.page,
+        damaged: copy.read.output_format_damaged,
     }
 }
 
@@ -375,27 +449,4 @@ fn fixture_blocks(runs: &[FixtureRun], to_page: Option<Affine>) -> Vec<BlockInpu
             Some(block)
         })
         .collect()
-}
-
-/// What the gate knows beside the job (criterion 5): items Not assigned, items that run while
-/// hidden, operations with Output off that hold items and their items; the item lists are the
-/// `0101` summary's (`item_lists_of`), so a check's button selects what the count counts.
-fn gate_facts(
-    operations: &[OperationSnapshot],
-    list: &OperationList,
-    leaves: &[IndexedLeaf],
-    statuses: &[LeafStatus],
-) -> GateFacts {
-    let items = item_lists_of(list, leaves, statuses);
-    GateFacts {
-        not_assigned: items.not_assigned,
-        hidden_running: items.runs_while_hidden,
-        output_off: operations
-            .iter()
-            .filter(|op| !op.output && !op.members.is_empty())
-            .filter(|op| KindRead::of(op.kind.as_deref()).known().is_some())
-            .map(|op| op.id)
-            .collect(),
-        output_off_items: items.output_off,
-    }
 }

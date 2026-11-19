@@ -1,21 +1,17 @@
 //! The output group's view of the gate (`specs/0029` criteria 1 to 7, 10, 25, 38, 39; UX notes §6;
-//! ADR 0064 §8, §10), with the per-job `TabFacts` the Operations tab reads from the same gate; the
+//! ADR 0064 §8, §10); the
 //! shared fixtures in `curvyo-editor-wasm/tests/fixtures/output_view/` pin its JSON.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use curvyo_document_core::{NodeId, OperationSnapshot};
+use curvyo_document_core::NodeId;
 use curvyo_laser_core::job::{
-    Cause, CheckText, Issue, Names, NumbersContext, NumbersLine, Ring, RunFacts, Severity, Start,
-    Targets, block_numbers, check_text, duration_text, estimate_text, extension, file_type,
-    lengths_text, machine_line, numbers_lines, numbers_text, read_output_settings, start_text,
+    Cause, CheckText, Issue, Names, NumbersLine, RunFacts, Severity, Start, Targets, check_text,
+    duration_text, estimate_text, extension, file_type, lengths_text, machine_line, numbers_text,
+    read_output_settings, start_text,
 };
-use curvyo_laser_core::operations::{KindRead, Summary};
+use curvyo_laser_core::operations::Summary;
 use serde::Serialize;
 
 use super::super::Session;
-use super::super::operations::ActiveOperations;
 use super::job_cache::PageJob;
 
 /// The output group of the Operations tab of the active laser page (UX notes §6.3 to §6.6).
@@ -77,11 +73,16 @@ pub enum CheckTargetView {
     Items {
         /// The items.
         ids: Vec<NodeId>,
+        /// The operation whose row unfolds too (the line of `specs/0123` criterion 48), if any.
+        unfold: Option<NodeId>,
     },
     /// Selects these operations; one unfolds and scrolls its row.
     Operations {
         /// The operations.
         ids: Vec<NodeId>,
+        /// The field of the unfolded row the line focuses (`dither`, `lowest_power`;
+        /// `specs/0123` UX notes 4), `None` for the row itself.
+        focus: Option<&'static str>,
     },
     /// Expands the Fixture jobs section and focuses its pick.
     FixturePick,
@@ -163,31 +164,6 @@ pub struct ExportView {
     pub extension: &'static str,
 }
 
-/// What the Operations tab reads of one job beyond its gate: built once per job, so a frame of
-/// the tab reads it instead of resolving every row's numbers and the summary again (criterion
-/// 36 d).
-#[derive(Debug)]
-pub(in crate::session) struct TabFacts {
-    /// The run of each operation row that runs: its digit and time (line 2).
-    pub runs: HashMap<NodeId, RowRunView>,
-    /// The numbers of each operation row (line 3), `None` for an Unknown kind or damaged
-    /// settings.
-    pub numbers: HashMap<NodeId, Option<Vec<NumbersLineView>>>,
-    /// The operation names the checks name.
-    names: Names,
-    /// The `0101` summary the total's work line counts.
-    summary: Option<Summary>,
-}
-
-/// The run of one operation row (line 2, UX notes §6.1).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct RowRunView {
-    /// The ring's digit: the row's digit (P26).
-    pub digit: u32,
-    /// The run's time ("3 min 21 s"; "–" with No settings).
-    pub time: String,
-}
-
 /// The stored word of a typed field.
 const fn field_word(field: curvyo_laser_core::settings::Field) -> &'static str {
     use curvyo_laser_core::settings::Field;
@@ -209,16 +185,46 @@ pub(in crate::session) fn numbers_view(lines: &[NumbersLine]) -> Vec<NumbersLine
         .collect()
 }
 
+/// The time words of a run while its job is still being built (ADR 0069 §12; UX notes E5).
+pub(in crate::session) const STALE_TIME: &str = "…";
+
+/// The total of a stale job: its time and lengths in the words of [`STALE_TIME`].
+fn stale_total(total: TotalView) -> TotalView {
+    TotalView {
+        time: format!("About {STALE_TIME}"),
+        lengths: format!("Burn {STALE_TIME} · travel {STALE_TIME}"),
+        ..total
+    }
+}
+
 /// A run's time text: "–" with No settings.
 pub(super) fn time_text(run: &RunFacts) -> String {
     run.time_s.map_or_else(|| "–".to_owned(), duration_text)
 }
 
-fn target_view(targets: &Targets) -> CheckTargetView {
-    match targets {
+/// The field of the unfolded row a line of `cause` focuses (`specs/0123` UX notes 4, P28).
+const fn focus_of(cause: &Cause) -> Option<&'static str> {
+    match cause {
+        Cause::GreyNeedsM4 { .. } => Some("dither"),
+        Cause::LowestPowerAbovePower { .. } => Some("lowest_power"),
+        _ => None,
+    }
+}
+
+fn target_view(issue: &Issue) -> CheckTargetView {
+    match &issue.targets {
         Targets::None => CheckTargetView::None,
-        Targets::Items(ids) => CheckTargetView::Items { ids: ids.clone() },
-        Targets::Operations(ids) => CheckTargetView::Operations { ids: ids.clone() },
+        Targets::Items(ids) => CheckTargetView::Items {
+            ids: ids.clone(),
+            unfold: match issue.cause {
+                Cause::NotPictures { op } => Some(op),
+                _ => None,
+            },
+        },
+        Targets::Operations(ids) => CheckTargetView::Operations {
+            ids: ids.clone(),
+            focus: focus_of(&issue.cause),
+        },
         Targets::FixturePick => CheckTargetView::FixturePick,
         Targets::StartPick => CheckTargetView::StartPick,
     }
@@ -239,7 +245,7 @@ fn check_view(issue: &Issue, names: &Names) -> CheckView {
         target: if button.is_empty() {
             CheckTargetView::None
         } else {
-            target_view(&issue.targets)
+            target_view(issue)
         },
         before,
         button,
@@ -253,7 +259,7 @@ impl Session {
     /// off.
     #[must_use]
     pub fn output_group_view(&self) -> Option<OutputGroupView> {
-        let job = self.job_with_facts(None)?;
+        let (job, stale) = self.job_with_facts(None)?;
         let facts = job.tab.get()?;
         let manufacturing = self.document.manufacturing(job.manufacturing)?;
         let settings = read_output_settings(&manufacturing);
@@ -276,7 +282,9 @@ impl Session {
                     .collect(),
             },
             checks: gate.issues.iter().map(|i| check_view(i, names)).collect(),
-            total: self.total_view(&job, facts.summary.as_ref()),
+            total: self
+                .total_view(&job, facts.summary.as_ref())
+                .map(|total| if stale { stale_total(total) } else { total }),
             export: ExportView {
                 enabled: gate.export_allowed(),
                 tooltip: first_block,
@@ -308,127 +316,6 @@ impl Session {
     pub fn output_group_json(&self) -> String {
         serde_json::to_string(&self.output_group_view()).unwrap_or_else(|_| "null".to_owned())
     }
-
-    /// The active laser page's job with its [`TabFacts`] built, `None` on another page or with
-    /// its extension off.
-    /// `active` is the page's operations when the caller holds them already.
-    pub(in crate::session) fn job_with_facts(
-        &self,
-        active: Option<&ActiveOperations>,
-    ) -> Option<Arc<PageJob>> {
-        let job = self.laser_job()?;
-        if job.tab.get().is_none() {
-            let fetched;
-            let active = if let Some(active) = active {
-                active
-            } else {
-                fetched = self.active_operations()?;
-                &fetched
-            };
-            let operations = &active.operations;
-            let _ = job.tab.set(TabFacts {
-                runs: row_runs(&job),
-                numbers: self.all_row_numbers(&job, operations),
-                names: Names::of(operations.iter().map(|op| (op.id, op.name.clone()))),
-                summary: self.summary_of(active),
-            });
-        }
-        Some(job)
-    }
-
-    /// The numbers of every operation row of the active laser page: a block the job holds keeps
-    /// the numbers it was built with, any other row (Output off) is read with the same function.
-    fn all_row_numbers(
-        &self,
-        job: &PageJob,
-        operations: &[OperationSnapshot],
-    ) -> HashMap<NodeId, Option<Vec<NumbersLineView>>> {
-        let built: HashMap<NodeId, &curvyo_laser_core::job::NumbersRead> = job
-            .input
-            .blocks
-            .iter()
-            .zip(&job.built.numbers)
-            .filter(|(block, _)| matches!(block.ring, Ring::Operation(_)))
-            .map(|(block, read)| (block.id, read))
-            .collect();
-        let context = NumbersContext {
-            materials: self.materials().reads(),
-            profile_id: &job.input.machine.profile_id,
-            fixture_material: job.input.fixture_material.as_deref(),
-            max_feed: job.input.machine.values.max_feed,
-        };
-        operations
-            .iter()
-            .map(|op| {
-                let numbers = KindRead::of(op.kind.as_deref()).known().and_then(|_| {
-                    let read = built.get(&op.id).map_or_else(
-                        || {
-                            let block = self.operation_block(op, std::iter::empty(), &[], &[], &[]);
-                            block_numbers(&block, context)
-                        },
-                        |read| (*read).clone(),
-                    );
-                    row_numbers_view(&read)
-                });
-                (op.id, numbers)
-            })
-            .collect()
-    }
-
-    /// The effective numbers of operation `op` as its row's line 3 shows them, running or not
-    /// (criterion 3), on a page without a job: the same functions the job runs. `None` for an Unknown kind or damaged
-    /// settings (no line 3); empty for "No settings".
-    pub(in crate::session) fn row_numbers(
-        &self,
-        op: &OperationSnapshot,
-    ) -> Option<Vec<NumbersLineView>> {
-        KindRead::of(op.kind.as_deref()).known()?;
-        let copy = self.active_copy()?;
-        let manufacturing = self.active_manufacturing()?;
-        let profile = &copy.read.copy;
-        let profile_id = profile
-            .id
-            .clone()
-            .unwrap_or_else(|| curvyo_laser_core::GENERIC_LASER_ID.to_owned());
-        let fixture_material = read_output_settings(&manufacturing).fixture_material;
-        let block = self.operation_block(op, std::iter::empty(), &[], &[], &[]);
-        let read = block_numbers(
-            &block,
-            NumbersContext {
-                materials: self.materials().reads(),
-                profile_id: &profile_id,
-                fixture_material: fixture_material.as_deref(),
-                max_feed: profile.values.max_feed,
-            },
-        );
-        row_numbers_view(&read)
-    }
-}
-
-/// The run of each operation row of `job` that runs, by operation id.
-fn row_runs(job: &PageJob) -> HashMap<NodeId, RowRunView> {
-    job.gate
-        .runs
-        .iter()
-        .filter_map(|run| match run.ring {
-            Ring::Operation(digit) => Some((
-                run.block,
-                RowRunView {
-                    digit,
-                    time: time_text(run),
-                },
-            )),
-            Ring::Fixture => None,
-        })
-        .collect()
-}
-
-/// Line 3 of a row from its numbers, `None` for damaged settings.
-fn row_numbers_view(read: &curvyo_laser_core::job::NumbersRead) -> Option<Vec<NumbersLineView>> {
-    if matches!(read, curvyo_laser_core::job::NumbersRead::Damaged) {
-        return None;
-    }
-    Some(numbers_view(&numbers_lines(read)))
 }
 
 /// "Runs 3 operations, 16 items." (`specs/0101` criterion 17's words), "16 items" the button.

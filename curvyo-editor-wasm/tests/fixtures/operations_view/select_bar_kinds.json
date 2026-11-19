@@ -51,6 +51,7 @@
             "overscan_pct": 2,
             "scan_angle_deg": 0.0
           },
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -97,6 +98,10 @@
     {
       "description": "Creates Cut-out 1",
       "kind": "cut_out"
+    },
+    {
+      "description": "Creates Image 1",
+      "kind": "image"
     }
   ]
 }

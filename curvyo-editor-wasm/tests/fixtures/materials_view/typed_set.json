@@ -27,7 +27,8 @@
         },
         "missing": [
           "score",
-          "engrave"
+          "engrave",
+          "image"
         ],
         "open": true,
         "sets": [

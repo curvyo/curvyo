@@ -11,7 +11,7 @@ use curvyo_laser_core::grids::{
     write_test_grid_choice,
 };
 use curvyo_laser_core::library::{RecordRefusal, TestRecord};
-use curvyo_laser_core::settings::SetKind;
+use curvyo_laser_core::settings::{Dither, SetKind};
 
 use super::super::Session;
 use super::super::materials::MaterialWrite;
@@ -307,6 +307,30 @@ impl Session {
             |_, current| Ok((current.test.with_crosshatch(on), current.material.clone())),
             "crosshatch",
             if on { "on" } else { "off" },
+            EDIT_TEST_GRID_COMMIT_LABEL,
+        )
+    }
+
+    /// The Dither strip of an Image grid (`specs/0123` criterion 44): one of the six binary
+    /// modes, one step "Edit test grid". `Ok(false)` for Grey, an unknown mode, a grid of another
+    /// kind or the same mode.
+    ///
+    /// # Errors
+    /// The bed cause.
+    pub fn set_test_grid_dither(&mut self, mode: &str) -> Result<bool, String> {
+        let Some(dither) = Dither::from_key(mode).filter(|d| d.is_binary()) else {
+            return Ok(false);
+        };
+        if self
+            .bar_view_recipe()
+            .is_none_or(|(_, recipe, _)| recipe.test.dither().is_none())
+        {
+            return Ok(false);
+        }
+        self.bar_commit(
+            |_, current| Ok((current.test.with_dither(dither), current.material.clone())),
+            "dither",
+            mode,
             EDIT_TEST_GRID_COMMIT_LABEL,
         )
     }

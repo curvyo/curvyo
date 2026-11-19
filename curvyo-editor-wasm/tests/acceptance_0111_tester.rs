@@ -28,6 +28,16 @@ use serde_json::Value;
 
 const LASER: &str = "curvyo.laser";
 const KINDS: [&str; 5] = ["cut", "score", "engrave", "engrave_outline", "cut_out"];
+/// Superseded by the Image kind rework (2026-11-19): the Select bar has a sixth button, Image,
+/// last (`specs/0123` criterion 47).
+const BAR_KINDS: [&str; 6] = [
+    "cut",
+    "score",
+    "engrave",
+    "engrave_outline",
+    "cut_out",
+    "image",
+];
 /// The Cut red (`--cut`, `0101` ux-notes 13.1).
 const CUT_RED: (u8, u8, u8) = (0xC8, 0x10, 0x2E);
 
@@ -278,7 +288,7 @@ fn c1_five_kinds_in_order_for_a_laser_selection_and_none_without() {
     assert_eq!(f.s.selected_object_count(), 1);
     assert_eq!(
         bar_kinds(&f.s).unwrap(),
-        KINDS.map(str::to_owned).to_vec(),
+        BAR_KINDS.map(str::to_owned).to_vec(),
         "Cut, Score, Engrave, Engrave + Outline, Cut-out"
     );
 }
@@ -869,7 +879,7 @@ fn c11_the_kind_buttons_work_inside_and_handles_are_absent() {
     press_on(&mut f.s, a);
     assert_eq!(
         bar_kinds(&f.s).unwrap(),
-        KINDS.map(str::to_owned).to_vec(),
+        BAR_KINDS.map(str::to_owned).to_vec(),
         "the bar holds the kind buttons"
     );
 }

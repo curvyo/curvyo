@@ -51,6 +51,7 @@
             "overscan_pct": 5,
             "scan_angle_deg": 15.0
           },
+          "image": null,
           "z_offset_mm": 1.5
         },
         "over_feed": null,

@@ -7,10 +7,13 @@
 mod assign;
 mod commands;
 mod grid_look;
+pub(in crate::session) mod image_view;
 pub(in crate::session) mod index;
 pub(in crate::session) mod items;
 mod kind_press;
 mod look;
+mod look_overlay;
+mod look_picture;
 mod options;
 mod settings;
 mod settings_view;

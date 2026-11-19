@@ -1,9 +1,12 @@
 //! Session tests of `specs/0029-laser-job-preview-and-output` Part C, one file per criterion group;
 //! this module holds their shared laser page builders.
 
+mod clone_raster_tests;
 mod export_tests;
 mod group_tests;
+mod image_kind_tests;
 mod play_tests;
+mod raster_tests;
 mod send_tests;
 mod toolpath_tests;
 

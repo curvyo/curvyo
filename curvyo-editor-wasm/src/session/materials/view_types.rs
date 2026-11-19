@@ -79,6 +79,8 @@ pub enum SetKindView {
     Score,
     /// Engrave.
     Engrave,
+    /// Image (`specs/0123` Frage 270 B).
+    Image,
 }
 
 impl From<SetKind> for SetKindView {
@@ -87,6 +89,7 @@ impl From<SetKind> for SetKindView {
             SetKind::Cut => Self::Cut,
             SetKind::Score => Self::Score,
             SetKind::Engrave => Self::Engrave,
+            SetKind::Image => Self::Image,
         }
     }
 }

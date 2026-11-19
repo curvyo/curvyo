@@ -106,6 +106,52 @@ fn state_blocked() -> (Document, String) {
     (d, laser)
 }
 
+/// An image of `w` x `h` mm named `name` at `(x, y)` from the page's origin, of `bytes`.
+fn image(
+    d: &Document,
+    o: Point,
+    name: &str,
+    (x, y, w, h): (f64, f64, f64, f64),
+    bytes: &[u8],
+) -> NodeId {
+    d.add_images(&[curvyo_document_core::NewImage {
+        bytes: std::sync::Arc::from(bytes),
+        placement: Affine::new(w, 0.0, 0.0, h, o.x + x, o.y + y),
+        name: name.to_owned(),
+    }])
+    .unwrap()[0]
+}
+
+/// An Image operation in Grey with Lowest power above Power over a coarse picture, and an image whose
+/// bytes cannot be read (`specs/0123` criteria 32 b, 35, 36): the raster warns in their order,
+/// the operation's line focuses Lowest power.
+fn state_raster_checks() -> (Document, String) {
+    let (d, laser, m, o) = document();
+    let png = curvyo_image_core::encode_png(&curvyo_image_core::WorkingImage {
+        width: 4,
+        height: 2,
+        pixels: [[0, 0, 0, 255], [128, 128, 128, 255]].repeat(4).concat(),
+        original_size: (4, 2),
+        truncated: false,
+        animated: false,
+    })
+    .unwrap();
+    let coarse = image(&d, o, "Photo 1", (10.0, 10.0, 20.0, 10.0), &png);
+    let broken = image(&d, o, "Photo 2", (40.0, 10.0, 20.0, 10.0), b"not a picture");
+    let raster = add(&d, m, "image", "Image 1", &[vec![coarse], vec![broken]]);
+    settings(
+        &d,
+        raster,
+        &json!({"main": {"power_pct": 40.0, "speed_mm_min": 6000, "passes": 1,
+            "interval_mm": 0.1}}),
+    );
+    let Value::Object(options) = json!({"dither": "grey", "lowest_power_pct": 60.0}) else {
+        panic!("an object")
+    };
+    d.write_operation_options(raster, &options).unwrap();
+    (d, laser)
+}
+
 /// A Cut that runs with Start `start`.
 fn state_start(start: &str) -> (Document, String) {
     let (d, laser, m, o) = document();
@@ -182,6 +228,7 @@ fn states() -> Vec<(&'static str, Document, String, Option<f64>)> {
     let (played, played_page) = state_start("machine_origin");
     let (damaged, damaged_page) = state_start_damaged();
     let (fixture, fixture_page) = state_fixture_no_material();
+    let (raster, raster_page) = state_raster_checks();
     vec![
         ("empty", empty, laser, None),
         ("cut_and_engrave", cut, cut_page, None),
@@ -191,6 +238,7 @@ fn states() -> Vec<(&'static str, Document, String, Option<f64>)> {
         ("toolpath_half", played, played_page, Some(0.5)),
         ("start_damaged", damaged, damaged_page, None),
         ("fixture_no_material", fixture, fixture_page, None),
+        ("raster_checks", raster, raster_page, None),
     ]
 }
 

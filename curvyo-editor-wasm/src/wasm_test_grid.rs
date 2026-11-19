@@ -54,6 +54,11 @@ impl WasmSession {
         text_of(self.session.set_test_grid_crosshatch(on))
     }
 
+    /// The Dither strip of an Image grid (a binary mode's spelling, `specs/0123` criterion 44).
+    pub fn set_test_grid_dither(&mut self, mode: &str) -> String {
+        text_of(self.session.set_test_grid_dither(mode))
+    }
+
     /// The material dropdown (`id` empty: no material).
     pub fn pick_test_grid_material(&mut self, id: &str) -> String {
         text_of(

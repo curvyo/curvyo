@@ -119,7 +119,13 @@ impl Session {
         let touched: Vec<_> = row.objects.iter().map(|o| (o.shape, o.role)).collect();
         let shapes = summary_shapes(&row.label, &touched);
         let custom = self.history.stack.custom_name(row.step);
-        let (name, known, class, summary) = row_words(row, custom, objects_summary(&shapes));
+        let summary = self
+            .history
+            .stack
+            .custom_summary(row.step)
+            .map(str::to_owned)
+            .or_else(|| objects_summary(&shapes));
+        let (name, known, class, summary) = row_words(row, custom, summary);
         let objects: Vec<Value> = row
             .objects
             .iter()

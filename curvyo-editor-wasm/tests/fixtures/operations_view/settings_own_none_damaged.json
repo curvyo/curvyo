@@ -21,7 +21,6 @@
   ],
   "rows": [
     {
-      "source": null,
       "kind": "engrave",
       "name": "engrave 2",
       "settings": {
@@ -42,6 +41,7 @@
             "overscan_pct": 2,
             "scan_angle_deg": 0.0
           },
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -61,10 +61,10 @@
         ],
         "state": "no_settings",
         "z_offset_shown": false
-      }
+      },
+      "source": null
     },
     {
-      "source": null,
       "kind": "score",
       "name": "score 3",
       "settings": {
@@ -80,6 +80,7 @@
         "needs": "score",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -88,10 +89,10 @@
         "sets": [],
         "state": "damaged",
         "z_offset_shown": false
-      }
+      },
+      "source": null
     },
     {
-      "source": null,
       "kind": "cut",
       "name": "cut 1",
       "settings": {
@@ -102,6 +103,7 @@
         "needs": "cut",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -121,7 +123,8 @@
         ],
         "state": "own",
         "z_offset_shown": false
-      }
+      },
+      "source": null
     }
   ]
 }

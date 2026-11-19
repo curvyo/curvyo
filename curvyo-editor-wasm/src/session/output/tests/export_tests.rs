@@ -163,11 +163,12 @@ fn criterion_28_c_an_export_marks_its_test_grid_lasered_and_undo_keeps_it() {
     assert_eq!(lasered(&s), Some(1_762_948_800_000));
 }
 
-/// `specs/0124-gradient-fill` criterion 12: a Gradient fill changes nothing in a laser job; the
-/// fill paint never counts.
+/// `specs/0124-gradient-fill` criterion 12 as `specs/0123` criterion 3 changes it: a Gradient
+/// fill changes nothing in a Cut or an Engrave job (the fill paint never counts there; Engrave
+/// hatches it solid); in Image the shape becomes a raster item and runs as dots.
 #[test]
-fn a_gradient_fill_changes_nothing_in_the_job() {
-    for kind in ["cut", "engrave"] {
+fn a_gradient_fill_changes_nothing_in_cut_and_engrave_and_rasters_in_image() {
+    for kind in ["cut", "engrave", "image"] {
         let (mut s, square) = laser_with_square();
         s.selection.set(&[square]);
         s.set_fill_paint(true);
@@ -177,11 +178,21 @@ fn a_gradient_fill_changes_nothing_in_the_job() {
         s.edit_operation_setting(id, "main", "power", 60.0).unwrap();
         s.edit_operation_setting(id, "main", "speed", 600.0)
             .unwrap();
-        let colour = s.export_job("x").unwrap().bytes;
+        // A Colour-filled shape in Image burns nothing (criterion 48): no file.
+        let colour = s.export_job("x").map(|e| e.bytes);
         s.selection.set(&[square]);
         assert!(s.set_fill_kind("gradient"));
         assert!(s.set_gradient_kind("radial"));
         s.selection.set(&[]);
-        assert_eq!(s.export_job("x").unwrap().bytes, colour, "{kind}");
+        let gradient = s.export_job("x").map(|e| e.bytes);
+        assert!(gradient.is_some(), "{kind}");
+        if kind == "image" {
+            assert_ne!(
+                gradient, colour,
+                "{kind}: dots; a Colour fill burns nothing"
+            );
+        } else {
+            assert_eq!(gradient, colour, "{kind}");
+        }
     }
 }

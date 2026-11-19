@@ -54,6 +54,9 @@ pub(super) struct HistoryState {
     /// The name of the steps the running command writes, when its label's name is too general
     /// ("Assign to Cut 1", `specs/0111` criteria 3 to 5 and 10).
     step_name: Option<String>,
+    /// The objects summary of those steps, when their touched nodes do not tell it ("1 image" for
+    /// an assignment, which writes only its operation; UX review U8 of `specs/0123`).
+    step_summary: Option<String>,
     /// The folded and unfolded branches of the History list (`history_list.rs`).
     pub(super) list: super::history_list::ListState,
     /// The Mode switch and the version a preview shows (`history_preview.rs`).
@@ -68,6 +71,7 @@ impl HistoryState {
             clock: wall_clock,
             notice: None,
             step_name: None,
+            step_summary: None,
             list: super::history_list::ListState::default(),
             preview: super::history_preview::PreviewState::default(),
         }
@@ -182,6 +186,20 @@ impl Session {
         result
     }
 
+    /// As [`Session::recording_named`], with the objects summary `summary` the maker reads for
+    /// the steps (the History row, the undo notice) instead of their touched nodes'.
+    pub(super) fn recording_named_counting<R>(
+        &mut self,
+        name: String,
+        summary: Option<String>,
+        body: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.history.step_summary = summary;
+        let result = self.recording_named(name, body);
+        self.history.step_summary = None;
+        result
+    }
+
     /// Whether the command running now has written a step that is not on the undo stack
     /// yet: something was committed.
     pub(super) fn has_unrecorded_steps(&self) -> bool {
@@ -208,10 +226,10 @@ impl Session {
                 format!("{verb} {}", operation_name(reverted))
             });
             let name = name.or_else(|| self.history.step_name.clone());
-            self.history.stack.record_named(
+            self.history.stack.record_described(
                 step.step,
                 &step.label,
-                name,
+                (name, self.history.step_summary.clone()),
                 before.clone(),
                 after.clone(),
             );
@@ -411,7 +429,12 @@ impl Session {
         }
         let touched: Vec<_> = report.objects.iter().map(|o| (o.shape, o.role)).collect();
         let shapes = summary_shapes(&target.label, &touched);
-        let summary = objects_summary(&shapes);
+        let summary = self
+            .history
+            .stack
+            .custom_summary(target.step)
+            .map(str::to_owned)
+            .or_else(|| objects_summary(&shapes));
         let off_screen = report.wrote && self.selection_is_off_screen();
         // In a shared document an own step whose objects a participant deleted is skipped with
         // who did it (`specs/0092-cooperative-editing` criterion 22, at most 70 characters).

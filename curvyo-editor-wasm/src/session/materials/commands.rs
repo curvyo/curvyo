@@ -33,7 +33,7 @@ pub(in crate::session) fn set_kind(kind: &str) -> Result<SetKind, String> {
 }
 
 /// The numbers a new set starts with (UX G7): 50 %, 3000 mm/min or the maximum feed, 1 pass and
-/// for Engrave 0.10 mm (Proposal: a record set holds no empty numbers).
+/// for Engrave and Image 0.10 mm (Proposal: a record set holds no empty numbers).
 fn new_set_numbers(kind: SetKind, max_feed: FeedRate) -> SetNumbers {
     // invariant: 50 % and at least 1 mm/min are valid.
     #[allow(clippy::expect_used)]
@@ -43,7 +43,7 @@ fn new_set_numbers(kind: SetKind, max_feed: FeedRate) -> SetNumbers {
             speed: FeedRate::new(u64::from(max_feed.get().min(3000))).expect("valid speed"),
             passes: Passes::ONE,
         },
-        interval: (kind == SetKind::Engrave).then_some(Interval::DEFAULT),
+        interval: kind.has_interval().then_some(Interval::DEFAULT),
     }
 }
 
@@ -350,7 +350,7 @@ impl Session {
             "power" => Some(Field::Power),
             "speed" => Some(Field::Speed),
             "passes" => Some(Field::Passes),
-            "interval" if kind == SetKind::Engrave => None,
+            "interval" if kind.has_interval() => None,
             _ => return Err("Enter a number.".to_owned()),
         };
         match typed {

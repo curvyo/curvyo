@@ -11,12 +11,13 @@ use curvyo_laser_core::library::MaterialRead;
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
     Field, Interval, OperationOptions, Role, SetKind, SetOverride, Settings, SettingsRead,
-    SettingsState, hatches, main_set, read_options, resolve,
+    SettingsState, hatches, main_set, read_options, resolve, scans,
 };
 use serde::Serialize;
 
 use super::super::Session;
 use super::super::materials::{NumbersView, SetKindView};
+use super::image_view::{ImageSettingsView, image_settings_view};
 
 /// The state of an operation's settings (criterion 26), shown by symbol and text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -153,19 +154,22 @@ pub struct SettingsView {
 }
 
 /// The lower part of an unfolded row (`specs/0111` criterion 20).
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct OptionsView {
     /// The hatch options, for Engrave and Engrave + Outline only.
     pub hatch: Option<HatchOptionsView>,
     /// The stored Z offset in mm (shown only with `z_offset_shown`, kept either way).
     pub z_offset_mm: f64,
+    /// The Image settings group, only while the Engrave operation holds a raster item
+    /// (`specs/0123` criterion 11); the settings stay stored while it is `None`.
+    pub image: Option<ImageSettingsView>,
 }
 
 /// The four hatch options.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct HatchOptionsView {
-    /// Crosshatch.
-    pub crosshatch: bool,
+    /// Crosshatch, Engrave kinds only (`None` on Image, ADR 0069 §13).
+    pub crosshatch: Option<bool>,
     /// Bidirectional fill.
     pub bidirectional: bool,
     /// Scan angle in degrees.
@@ -176,8 +180,9 @@ pub struct HatchOptionsView {
 
 fn options_view(options: OperationOptions, kind: OperationKind) -> OptionsView {
     OptionsView {
-        hatch: hatches(kind).then(|| HatchOptionsView {
-            crosshatch: options.crosshatch,
+        image: (kind == OperationKind::Image).then(|| image_settings_view(&options.image)),
+        hatch: scans(kind).then(|| HatchOptionsView {
+            crosshatch: hatches(kind).then_some(options.crosshatch),
             bidirectional: options.bidirectional,
             scan_angle_deg: options.scan_angle.degrees(),
             overscan_pct: options.overscan.percent(),
@@ -246,7 +251,7 @@ pub(super) fn pick_views(session: &Session) -> Vec<PickView> {
                 id: material.id.clone(),
                 name: material.name.clone(),
                 thickness_mm: material.thickness.mm(),
-                kinds: [SetKind::Cut, SetKind::Score, SetKind::Engrave]
+                kinds: SetKind::ALL
                     .into_iter()
                     .filter(|&kind| material.set_for(&profile, kind).is_some())
                     .map(SetKindView::from)
@@ -329,9 +334,9 @@ fn interval_view(
     kind: OperationKind,
 ) -> Option<f64> {
     let interval = match state {
-        SettingsState::NoSettings => {
-            hatches(kind).then(|| session.draft_interval(id).unwrap_or(Interval::DEFAULT))
-        }
+        SettingsState::NoSettings => kind
+            .has_interval()
+            .then(|| session.draft_interval(id).unwrap_or(Interval::DEFAULT)),
         _ => state.run().and_then(|run| run.interval),
     };
     interval.map(Interval::mm)

@@ -93,7 +93,11 @@ fn criteria_18_to_21_sets_per_laser_a_set_adds_its_laser() {
     let body = view.unfolded.unwrap();
     assert!(body.lasers[0].this_page);
     assert_eq!(body.lasers[0].sets[0].source, "Typed");
-    assert_eq!(body.lasers[0].missing.len(), 1, "Score is missing");
+    assert_eq!(
+        body.lasers[0].missing.len(),
+        2,
+        "Score and Image are missing (`specs/0123` Frage 270 B)"
+    );
     s.delete_material_set(&id, &laser, "cut", &random(7))
         .unwrap();
     assert_eq!(undo_label(&mut s), "Delete set");
@@ -295,4 +299,77 @@ fn a_material_record_over_512_kib_is_refused_with_its_notice() {
     );
     assert!(s.materials().text(&id).unwrap().len() < MAX_RECORD_TEXT);
     assert!(matches!(s.materials().reads()[0], MaterialRead::Loaded(_)));
+}
+
+/// `specs/0123` Frage 270 B (ADR 0069 §14): an Image operation reads the Image set, follows its
+/// edit in the same step, and names a missing Image set; the tab shows four sets, Image last.
+#[test]
+fn raster_an_image_operation_follows_the_image_set_and_names_a_missing_one() {
+    let mut s = laser_with_fonts();
+    let id = s.add_material("Slate", 5.0, &random(1)).unwrap();
+    let laser = s.active_profile_id().unwrap();
+    s.add_material_set(&id, &laser, "engrave", &random(2))
+        .unwrap();
+    s.add_material_set(&id, &laser, "image", &random(3))
+        .unwrap();
+    assert_eq!(undo_label(&mut s), "Add set");
+    assert_eq!(
+        s.edit_material_set(&id, &laser, "image", "power", 35.0, &random(4)),
+        Ok(true)
+    );
+    assert_eq!(
+        s.edit_material_set(&id, &laser, "image", "interval", 0.08, &random(5)),
+        Ok(true)
+    );
+    let op = s.add_test_operation("image").unwrap();
+    assert!(s.use_material_on(&[op], &id));
+    let stored = |s: &Session| {
+        let row = s
+            .document
+            .operations(s.active_manufacturing().unwrap().id)
+            .unwrap()
+            .into_iter()
+            .find(|o| o.id == op)
+            .unwrap();
+        row.settings.unwrap()
+    };
+    assert_eq!(stored(&s)["main"]["power_pct"], 35.0, "the Image set");
+    assert_eq!(stored(&s)["main"]["interval_mm"], 0.08);
+    let steps = s.undo_len();
+    assert_eq!(
+        s.edit_material_set(&id, &laser, "image", "power", 40.0, &random(6)),
+        Ok(true)
+    );
+    assert_eq!(
+        s.undo_len(),
+        steps + 1,
+        "the material edit and the refresh: one step"
+    );
+    assert_eq!(
+        stored(&s)["main"]["power_pct"],
+        40.0,
+        "the linked operation follows"
+    );
+    s.unfold_material(Some(&id));
+    let view = serde_json::to_value(s.materials_view().unwrap()).unwrap();
+    let kinds: Vec<&str> = view["unfolded"]["lasers"][0]["sets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|set| set["kind"].as_str().unwrap())
+        .collect();
+    assert_eq!(kinds, ["engrave", "image"], "Image last");
+    s.delete_material_set(&id, &laser, "image", &random(7))
+        .unwrap();
+    let rows: serde_json::Value = serde_json::from_str(&s.operations_view_json()).unwrap();
+    let text = rows.to_string();
+    assert!(
+        text.contains("Material has no Image set for this laser, using stored numbers"),
+        "{text}"
+    );
+    assert_eq!(
+        stored(&s)["main"]["power_pct"],
+        40.0,
+        "the stored numbers stay"
+    );
 }

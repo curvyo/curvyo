@@ -8,6 +8,7 @@
         "count": 1,
         "severity": "block",
         "target": {
+          "focus": null,
           "ids": [
             {
               "counter": 35,
@@ -31,7 +32,8 @@
               "peer": "1"
             }
           ],
-          "kind": "items"
+          "kind": "items",
+          "unfold": null
         },
         "text": "1 item lies outside the 400 × 300 mm bed."
       },

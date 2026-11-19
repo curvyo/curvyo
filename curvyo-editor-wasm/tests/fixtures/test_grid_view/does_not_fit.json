@@ -12,6 +12,7 @@
     "param": "power"
   },
   "crosshatch": null,
+  "dither": null,
   "fit": "Grid is 639.7 mm wide, the bed is 400 mm.",
   "group": null,
   "height_mm": 266.0,

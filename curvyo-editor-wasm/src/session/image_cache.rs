@@ -43,6 +43,14 @@ impl ImageCache {
         }
     }
 
+    /// The working image of `hash` when it is decoded already; no decode.
+    fn ready(&self, hash: &AssetHash) -> Option<Arc<WorkingImage>> {
+        match self.entries.get(hash) {
+            Some(Entry::Ready(working)) => Some(Arc::clone(working)),
+            _ => None,
+        }
+    }
+
     fn working(&mut self, document: &Document, hash: &AssetHash) -> Option<Arc<WorkingImage>> {
         let entry = self.entries.entry(hash.clone()).or_insert_with(|| {
             document
@@ -77,6 +85,11 @@ impl Session {
         self.images.size_of(hash)
     }
 
+    /// The working image of `hash` when the canvas holds it decoded already; no decode.
+    pub(super) fn decoded_working_image(&self, hash: &AssetHash) -> Option<Arc<WorkingImage>> {
+        self.images.ready(hash)
+    }
+
     /// The working image of `hash`, decoded when it is not cached (the Trace tool's pixels).
     pub(super) fn working_image(&mut self, hash: &AssetHash) -> Option<Arc<WorkingImage>> {
         self.images.working(&self.document, hash)
@@ -89,6 +102,17 @@ impl Session {
         let quads = list.images.clone();
         let mut ready = Vec::new();
         for quad in &quads {
+            // A raster item's dot picture is the session's own, never a document asset
+            // (`specs/0123` criterion 20).
+            if let Some(dots) = self.raster_picture_image(&quad.asset) {
+                ready.push((quad.asset.clone(), dots));
+                continue;
+            }
+            if self.images.ready(&quad.asset).is_none()
+                && let Some(held) = self.job_decoded_image(&quad.asset)
+            {
+                self.images.insert(quad.asset.clone(), held);
+            }
             match self.images.working(&self.document, &quad.asset) {
                 Some(working) => ready.push((quad.asset.clone(), working)),
                 None => list.extend(curvyo_render_core::build_unreadable_frame(

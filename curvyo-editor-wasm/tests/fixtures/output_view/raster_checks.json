@@ -1,0 +1,126 @@
+{
+  "output": {
+    "checks": [
+      {
+        "after": "",
+        "before": "The machine is Generic laser; its limits may not match yours.",
+        "button": "",
+        "count": 1,
+        "severity": "warn",
+        "target": {
+          "kind": "none"
+        },
+        "text": "The machine is Generic laser; its limits may not match yours."
+      },
+      {
+        "after": " is coarser than its Interval.",
+        "before": "",
+        "button": "1 image",
+        "count": 1,
+        "severity": "warn",
+        "target": {
+          "ids": [
+            {
+              "counter": 17,
+              "peer": "1"
+            }
+          ],
+          "kind": "items",
+          "unfold": null
+        },
+        "text": "1 image is coarser than its Interval."
+      },
+      {
+        "after": " cannot be read and is skipped.",
+        "before": "",
+        "button": "1 image",
+        "count": 1,
+        "severity": "warn",
+        "target": {
+          "ids": [
+            {
+              "counter": 22,
+              "peer": "1"
+            }
+          ],
+          "kind": "items",
+          "unfold": null
+        },
+        "text": "1 image cannot be read and is skipped."
+      },
+      {
+        "after": ": Lowest power is above Power.",
+        "before": "",
+        "button": "Image 1",
+        "count": 1,
+        "severity": "warn",
+        "target": {
+          "focus": "lowest_power",
+          "ids": [
+            {
+              "counter": 27,
+              "peer": "1"
+            }
+          ],
+          "kind": "operations"
+        },
+        "text": "Image 1: Lowest power is above Power."
+      }
+    ],
+    "export": {
+      "enabled": true,
+      "extension": "gcode",
+      "file_type": "GRBL G-code",
+      "tooltip": null
+    },
+    "machine": "Generic laser · GRBL",
+    "start": {
+      "damaged": false,
+      "options": [
+        {
+          "label": "Machine origin",
+          "value": "machine_origin"
+        },
+        {
+          "label": "Head position",
+          "value": "head_position"
+        },
+        {
+          "label": "Home, then machine origin",
+          "value": "home_then_origin"
+        }
+      ],
+      "value": "machine_origin"
+    },
+    "toolpath_view": false,
+    "total": {
+      "fixtures": null,
+      "lengths": "Burn 2.00 m · travel 600 mm",
+      "runs": {
+        "after": ".",
+        "before": "Runs 1 operation, ",
+        "button": "2 items",
+        "text": "Runs 1 operation, 2 items."
+      },
+      "time": "About 26 s"
+    }
+  },
+  "play": null,
+  "ring_labels": [],
+  "rows": [
+    {
+      "accessible_name": "Image 1, run 1, 23 s",
+      "name": "Image 1",
+      "numbers": [
+        {
+          "text": "40 %, 6,000 mm/min, 1 ×, 0.1 mm · Grey 60–40 %",
+          "typed": []
+        }
+      ],
+      "run": {
+        "digit": 1,
+        "time": "23 s"
+      }
+    }
+  ]
+}

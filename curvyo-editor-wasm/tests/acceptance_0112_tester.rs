@@ -1738,7 +1738,8 @@ fn c30_format2_record_loads_and_writes_back_format_2() {
     let w = writes(&mut s);
     let rec = w.iter().find(|x| x["op"] == "write").unwrap();
     let back: Value = serde_json::from_str(rec["text"].as_str().unwrap()).unwrap();
-    assert_eq!(back["format_version"], 2);
+    // Since `specs/0123` (Frage 237 A) a format-2 record is written back as format 3.
+    assert_eq!(back["format_version"], 3);
     assert_eq!(back["name"], "Birch renamed");
     assert_eq!(back["tests"], v["tests"]);
     assert_eq!(back["lasers"], v["lasers"]);

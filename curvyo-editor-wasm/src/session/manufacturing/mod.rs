@@ -5,6 +5,7 @@
 mod commands;
 pub(super) mod frame;
 mod machine;
+pub(in crate::session) use machine::ActiveCopy;
 mod machine_view;
 mod placed_drag;
 #[cfg(test)]

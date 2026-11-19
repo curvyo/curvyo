@@ -15,7 +15,7 @@ fn criterion_20_and_24_an_option_is_one_step_and_out_of_range_is_refused() {
     let view = row(&f.s, "Engrave 1").settings.unwrap();
     let options = view.options.unwrap();
     let hatch = options.hatch.unwrap();
-    assert!(!hatch.crosshatch && hatch.bidirectional);
+    assert!(hatch.crosshatch == Some(false) && hatch.bidirectional);
     assert_eq!((hatch.scan_angle_deg, hatch.overscan_pct), (0.0, 2));
     assert!(!view.z_offset_shown);
     let steps = f.s.undo_len();
@@ -45,7 +45,7 @@ fn criterion_20_and_24_an_option_is_one_step_and_out_of_range_is_refused() {
         .unwrap()
         .hatch
         .unwrap();
-    assert!(hatch.crosshatch);
+    assert_eq!(hatch.crosshatch, Some(true));
     assert_eq!(hatch.scan_angle_deg, 15.0);
     assert_eq!(
         f.s.edit_operation_option(engrave, "scan_angle", 15.0),
