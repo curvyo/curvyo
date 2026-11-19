@@ -5,6 +5,7 @@
 import type { WasmSession } from "@/lib/editorSession";
 import { frameView } from "@/lib/frameState";
 import { ABLATIONS, type Ablation, ablationInput, applyAblation } from "@/lib/perfAblate";
+import { platform, runGlBench } from "@/lib/perfGlBench";
 
 const target: string | undefined = import.meta.env.VITE_CURVYO_PERF;
 export const perfEnabled = typeof target === "string" && target.length > 0;
@@ -46,9 +47,10 @@ const queue: string[] = [];
 let timed: WasmSession | null = null;
 let second = 0;
 
-/** What the runner asked for on connecting: the full scenario list, or one ablation variant
- * (`measure.py --ablate`) with its warm-up and measured seconds. */
-type Order = { mode: "full" } | { mode: "ablate"; variant: string; warmup: number; seconds: number };
+/** What the runner asked for on connecting: the full scenario list, one ablation variant
+ * (`measure.py --ablate`) with its warm-up and measured seconds, or the GL micro benchmarks
+ * (`measure.py --gl-bench`, `perfGlBench.ts`). */
+type Order = { mode: "full" } | { mode: "ablate"; variant: string; warmup: number; seconds: number } | { mode: "glbench" };
 let receiveOrder: (order: Order) => void = () => {};
 const order = new Promise<Order>((resolve) => {
   receiveOrder = resolve;
@@ -221,9 +223,10 @@ function generatedSvg(nodes: number): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="${height}" viewBox="0 0 1040 ${height}">${paths.join("")}</svg>`;
 }
 
-async function every(ms: number, seconds: number, step: (index: number) => void) {
+/** `step` every `ms` for `seconds` worth of ticks, or until `stop` says so. */
+async function every(ms: number, seconds: number, step: (index: number) => void, stop: () => boolean = () => false) {
   const total = Math.round((seconds * 1000) / ms);
-  for (let index = 0; index < total; index += 1) {
+  for (let index = 0; index < total && !stop(); index += 1) {
     step(index);
     await sleep(ms);
   }
@@ -240,7 +243,7 @@ function where(canvas: HTMLCanvasElement) {
 /** The empty page's pan: middle button held, left and right at a constant 8 px per 16 ms tick,
  * each tick a burst of 8 moves of 1 px, as a 500 Hz mouse sends (`buttons` 0: the same moves as a
  * hover, no press). `tick` runs after each burst. */
-async function sweep(canvas: HTMLCanvasElement, seconds: number, buttons: 0 | 4, tick: (index: number, phase: number) => void = () => {}) {
+async function sweep(canvas: HTMLCanvasElement, seconds: number, buttons: 0 | 4, tick: (index: number, phase: number) => void = () => {}, stop?: () => boolean) {
   const box = canvas.getBoundingClientRect();
   const ex = box.left + box.width / 2;
   const ey = box.top + box.height / 2;
@@ -259,7 +262,7 @@ async function sweep(canvas: HTMLCanvasElement, seconds: number, buttons: 0 | 4,
       canvas.dispatchEvent(new PointerEvent("pointermove", { ...to, clientX: from + ((to.clientX - from) * part) / 8, button: -1, buttons }));
     }
     tick(index, index % (2 * half));
-  });
+  }, stop);
   if (buttons) canvas.dispatchEvent(new PointerEvent("pointerup", { ...at(0), button: 1, buttons: 0 }));
 }
 
@@ -316,6 +319,14 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
   session.set_frame_phase_timing(true);
   timed = session;
   const asked = await order;
+  // The renderer strings, the editor context's attributes and wgpu's adapter, in every mode.
+  const info = platform(canvas, session);
+  send({ event: "platform", ...info });
+  if (asked.mode === "glbench") {
+    await runGlBench(canvas, session, { send, refit, pan: (seconds, stop) => sweep(canvas, seconds, 4, undefined, stop) }, info);
+    send({ event: "done" });
+    return;
+  }
   if (asked.mode === "ablate") {
     await runAblation(canvas, session, refit, asked.variant, asked.warmup, asked.seconds);
     return;
