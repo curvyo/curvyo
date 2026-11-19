@@ -26,12 +26,16 @@ export function OutputGroup({
   api,
   onReturnFocus,
   onOpenOperation,
+  onUnfoldOperation,
   onFixturePick,
 }: {
   api: OutputApi;
   onReturnFocus: () => void;
   /** A check's operation: its row selected, unfolded and scrolled into view in the list above. */
-  onOpenOperation: (id: OperationId) => void;
+  /** `focus` names the row's field the check points at (`dither`, `lowest_power`), else `null`. */
+  onOpenOperation: (id: OperationId, focus: "dither" | "lowest_power" | null) => void;
+  /** Unfolds an operation's row in the list above, the focus kept (a line that selects items). */
+  onUnfoldOperation: (id: OperationId) => void;
   /** The "Fixture jobs" check: expand the section and focus its pick. */
   onFixturePick: () => void;
 }) {
@@ -50,8 +54,11 @@ export function OutputGroup({
   const machine = machineLineParts(view.machine);
   const press = (check: Check) => {
     const target = check.target;
-    if (target.kind === "items") api.selectItems(target.ids);
-    else if (target.kind === "operations" && target.ids.length > 0) onOpenOperation(target.ids[0]);
+    if (target.kind === "items") {
+      api.selectItems(target.ids);
+      if (target.unfold !== null) onUnfoldOperation(target.unfold);
+    }
+    else if (target.kind === "operations" && target.ids.length > 0) onOpenOperation(target.ids[0], target.focus);
     else if (target.kind === "fixture_pick") onFixturePick();
     else if (target.kind === "start_pick") setStartRequest((count) => count + 1);
   };

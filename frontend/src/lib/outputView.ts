@@ -46,8 +46,19 @@ export interface FixturePick {
 /** What a check's button does. */
 export type CheckTarget =
   | { kind: "none" }
-  | { kind: "items"; ids: OperationId[] }
-  | { kind: "operations"; ids: OperationId[] }
+  | {
+      kind: "items";
+      ids: OperationId[];
+      /** The operation whose row unfolds too (`specs/0123` criterion 48), or `null`. */
+      unfold: OperationId | null;
+    }
+  | {
+      kind: "operations";
+      ids: OperationId[];
+      /** The unfolded row's field the line focuses (`dither`, `lowest_power`; `specs/0123`
+       * UX notes 4), `null` for the row itself. */
+      focus: "dither" | "lowest_power" | null;
+    }
   | { kind: "fixture_pick" }
   | { kind: "start_pick" };
 
@@ -219,7 +230,7 @@ export function asPick(value: unknown): FixturePick | null | undefined {
   return { material, name, options };
 }
 
-function asTarget(value: unknown): CheckTarget | null {
+export function asTarget(value: unknown): CheckTarget | null {
   if (!isObject(value)) return null;
   switch (value.kind) {
     case "none":
@@ -228,10 +239,17 @@ function asTarget(value: unknown): CheckTarget | null {
       return { kind: "fixture_pick" };
     case "start_pick":
       return { kind: "start_pick" };
-    case "items":
+    case "items": {
+      const ids = asList(value.ids, asId);
+      const unfold = value.unfold === null ? null : asId(value.unfold);
+      if (ids === null || (value.unfold !== null && unfold === null)) return null;
+      return { kind: "items", ids, unfold };
+    }
     case "operations": {
       const ids = asList(value.ids, asId);
-      return ids === null ? null : { kind: value.kind, ids };
+      const focus = value.focus;
+      if (ids === null || (focus !== null && focus !== "dither" && focus !== "lowest_power")) return null;
+      return { kind: "operations", ids, focus };
     }
     default:
       return null;

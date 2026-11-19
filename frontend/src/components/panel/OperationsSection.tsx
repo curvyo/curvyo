@@ -272,7 +272,9 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   const openIndex = openKey === null ? -1 : indexOfKey(view, openKey);
   // The unfolded row is one tall item: the list grows to hold it and the row after it, up to
   // 520 px; a list that fits in 520 px (section headings included) shows whole.
-  const listHeight = entries.reduce((sum, entry) => sum + entry.height, 0);
+  // Rounded up with 1 px to spare: fractional row heights summed below the content's own height
+  // would show a horizontal scrollbar and clip the last row ("mm/min", UX review U4).
+  const listHeight = Math.ceil(entries.reduce((sum, entry) => sum + entry.height, 0)) + 1;
   const viewport =
     openBodyKey === null
       ? VIEWPORT
@@ -366,7 +368,8 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
 
 
   const onListKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.altKey) return;
+    // The arrows inside a choice strip of an unfolded row (Dither) are the strip's, not the list's.
+    if (event.altKey || (event.target as HTMLElement).closest("[role=radiogroup]")) return;
     const current = (event.target as HTMLElement).closest<HTMLElement>("li[data-row-index]");
     const index = current ? Number(current.dataset.rowIndex) : stop;
     const next = nextFocusIndex(view.rows.length, index, event.key);
@@ -401,7 +404,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
           onKeyDown={onListKey}
           onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
           style={{ maxHeight: viewport }}
-          className="flex flex-col overflow-y-auto"
+          className="flex flex-col overflow-y-auto overflow-x-hidden"
         >
           <div aria-hidden style={{ height: range.before }} />
           {sectionRuns(entries.slice(range.first, range.last), view.cutsLast).map((run, runIndex) => {

@@ -32,16 +32,16 @@ function view(name: string): OperationsView {
 
 const NO_MODS = { ctrl: false, shift: false };
 
-test("c1 c2: five kind buttons in bar order, each named by its kind word only", () => {
+test("c1 c2: six kind buttons in bar order, each named by its kind word only", () => {
   const v = view("select_bar_kinds.json");
   assert.ok(v.selectBarKinds);
   assert.deepEqual(
     v.selectBarKinds.map((k) => k.kind),
-    ["cut", "score", "engrave", "engrave_outline", "cut_out"],
+    ["cut", "score", "engrave", "engrave_outline", "cut_out", "image"],
   );
   assert.deepEqual(
     v.selectBarKinds.map((k) => kindButtonName(k.kind)),
-    ["Cut", "Score", "Engrave", "Engrave + Outline", "Cut-out"],
+    ["Cut", "Score", "Engrave", "Engrave + Outline", "Cut-out", "Image"],
   );
   assert.equal(view("options_engrave.json").selectBarKinds, null, "no selection: no buttons");
   assert.equal(enteredBarShown(null), false);

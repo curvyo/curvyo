@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 
 import { useJobExport, type JobExportEditor } from "@/hooks/useJobExport";
+import { useJobTicks } from "@/hooks/useJobTicks";
 import { useSendJob, type SendApi } from "@/hooks/useSendJob";
 import type { WasmSession } from "@/lib/editorSession";
 import { operationIdText, type OperationId } from "@/lib/operationsView";
@@ -43,6 +44,7 @@ export function useOutput(
   onError: (message: string, title: string) => void,
 ): OutputApi {
   const { getSession, sync, syncRevision } = editor;
+  useJobTicks(getSession, sync, syncRevision);
   const view = useMemo(() => {
     void syncRevision; // The session's state changed: read the view again.
     const session = getSession();

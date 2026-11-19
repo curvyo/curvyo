@@ -1,12 +1,13 @@
 import { Hash } from "lucide-react";
-import { useId, useRef, type KeyboardEvent } from "react";
+import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
 import { Divider, useRowStarts } from "@/components/SelectToolbar";
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
+import { Tooltip } from "@/components/ui/tooltip";
 import { TestGridMaterialMenu } from "@/components/TestGridMaterialMenu";
 import type { TestGridToolApi } from "@/hooks/useTestGridTool";
-import type { SetKind } from "@/lib/operationSettingsView";
+import type { DitherMode, SetKind } from "@/lib/operationSettingsView";
 import {
   CELL_STEP,
   PARAM_STEP,
@@ -29,6 +30,7 @@ const KINDS: readonly { kind: SetKind; word: string }[] = [
   { kind: "cut", word: "Cut" },
   { kind: "score", word: "Score" },
   { kind: "engrave", word: "Engrave" },
+  { kind: "image", word: "Image" },
 ];
 
 /** A bar row: its groups wrap whole, 25 px apart with the 1 px divider between them (UX 4.1);
@@ -38,10 +40,16 @@ const ROW_CLASS = "flex min-w-0 flex-wrap items-start gap-x-[25px] gap-y-0";
 /** The segments' ground: 28 px, 1 px ink at 60 %, rounded 5 px (the preset strip look). */
 const GROUP_CLASS = "flex h-7 shrink-0 overflow-hidden rounded-[5px] outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/60";
 
+/** The Dither's ground: the same look, its two halves side by side or, when the bar row is too
+ * narrow for the six, one under the other (two rows of three). */
+const HALVES_CLASS = "flex min-w-0 max-w-full flex-wrap overflow-hidden rounded-[5px] outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/60";
+
 interface SegmentOption<T extends string> {
   value: T;
   label: string;
   glyph?: SetKind;
+  /** A symbol instead of the label: the label is then its tooltip and accessible name. */
+  symbol?: ReactNode;
   width: number;
 }
 
@@ -51,44 +59,71 @@ function Segments<T extends string>({
   options,
   value,
   onPick,
+  halves = false,
 }: {
   label: string;
   options: readonly SegmentOption<T>[];
   value: T;
   onPick: (value: T) => void;
+  /** The Dither (`specs/0123` UX notes 5): Home and End move and select too, and the segments
+   * stand in two halves that wrap into two rows when the row is too narrow for one. */
+  halves?: boolean;
 }) {
   const keys = (event: KeyboardEvent<HTMLDivElement>) => {
     const at = options.findIndex((option) => option.value === value);
+    const ends = halves && (event.key === "Home" || event.key === "End");
     const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
-    if (step === 0) return;
+    if (step === 0 && !ends) return;
     event.preventDefault();
-    const next = options[Math.min(options.length - 1, Math.max(0, at + step))];
+    const next = ends
+      ? options[event.key === "Home" ? 0 : options.length - 1]
+      : options[Math.min(options.length - 1, Math.max(0, at + step))];
     onPick(next.value);
+    // React clears `currentTarget` after the handler: keep the group for the next frame.
+    const group = event.currentTarget;
     window.requestAnimationFrame(() => {
-      (event.currentTarget.querySelector(`[data-segment="${next.value}"]`) as HTMLElement | null)?.focus();
+      (group.querySelector(`[data-segment="${next.value}"]`) as HTMLElement | null)?.focus();
     });
   };
+  const segment = (option: SegmentOption<T>) => {
+    const on = option.value === value;
+    const button = (
+      <button
+        key={option.value}
+        type="button"
+        role="radio"
+        aria-checked={on}
+        aria-label={option.symbol ? option.label : undefined}
+        data-segment={option.value}
+        tabIndex={on ? 0 : -1}
+        onClick={() => onPick(option.value)}
+        style={{ minWidth: option.width }}
+        className={`flex shrink-0 items-center justify-center gap-1 px-1.5 text-[13px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${on ? "bg-[var(--value-fill)]" : ""}`}
+      >
+        {option.glyph ? <OperationGlyph kind={option.glyph} /> : null}
+        {option.symbol ?? option.label}
+      </button>
+    );
+    return option.symbol ? (
+      <Tooltip key={option.value} side="bottom" content={option.label}>
+        {button}
+      </Tooltip>
+    ) : (
+      button
+    );
+  };
+  if (halves) {
+    const half = Math.ceil(options.length / 2);
+    return (
+      <div role="radiogroup" aria-label={label} className={HALVES_CLASS} onKeyDown={keys}>
+        <div className="flex h-7">{options.slice(0, half).map(segment)}</div>
+        <div className="flex h-7">{options.slice(half).map(segment)}</div>
+      </div>
+    );
+  }
   return (
     <div role="radiogroup" aria-label={label} className={GROUP_CLASS} onKeyDown={keys}>
-      {options.map((option) => {
-        const on = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            data-segment={option.value}
-            tabIndex={on ? 0 : -1}
-            onClick={() => onPick(option.value)}
-            style={{ minWidth: option.width }}
-            className={`flex shrink-0 items-center justify-center gap-1 px-1.5 text-[13px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${on ? "bg-[var(--value-fill)]" : ""}`}
-          >
-            {option.glyph ? <OperationGlyph kind={option.glyph} /> : null}
-            {option.label}
-          </button>
-        );
-      })}
+      {options.map(segment)}
     </div>
   );
 }
@@ -207,7 +242,7 @@ interface TestGridBarProps {
 /**
  * The Test grid bar (`specs/0112-test-grid-and-materials` `ux-notes.md` 4): two rows, always both
  * shown. Row 1: Kind, the test id and the material, the shared values (Power, Speed, Passes,
- * Interval, Crosshatch for Engrave) and Cell size; row 2: the Columns and the Rows unit. Plain
+ * Interval, Crosshatch for Engrave, the Dither strip for Image) and Cell size; row 2: the Columns and the Rows unit. Plain
  * fields with their units inside, no sliders and no captions in row 1. Row 1 wraps by whole
  * groups; each unit of row 2 is one wrap item. A value the grid did not take stays as typed with
  * its cause; nothing is clamped.
@@ -294,6 +329,25 @@ export function TestGridBar({ tool, view, onNewMaterial, onReturnFocus }: TestGr
               </button>
             ) : null}
           </div>
+          {view.dither !== null ? (
+            <div className="group/row relative flex min-w-0 max-w-full items-center">
+              <Divider />
+              <div className="flex min-h-9 min-w-0 max-w-full items-center py-1">
+                <Segments<DitherMode>
+                  halves
+                  label="Dither"
+                  value={view.dither.value}
+                  options={view.dither.modes.map((mode) => ({
+                    value: mode.value,
+                    label: mode.label,
+                    ...(mode.label === "Floyd-Steinberg" ? { symbol: "Floyd" } : {}),
+                    width: 56,
+                  }))}
+                  onPick={(mode) => tool.setDither(mode)}
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="group/row relative">
             <Divider />
             <BarField

@@ -6,7 +6,7 @@
  * pin both sides.
  */
 import { asId, type OperationId } from "./operationsView.ts";
-import { asSetKind, isObject, type SetKind } from "./operationSettingsView.ts";
+import { asSetKind, decodeDitherOption, type DitherMode, type DitherOption, isObject, type SetKind } from "./operationSettingsView.ts";
 
 /** The four parameters a grid varies or shares. */
 export const PARAMS = ["power", "speed", "passes", "interval"] as const;
@@ -43,6 +43,21 @@ export interface BarInvalid {
   cause: string;
 }
 
+/** The Dither strip of an Image grid (`specs/0123` criterion 44): the mode and the six binary modes. */
+export interface BarDither {
+  value: DitherMode;
+  modes: DitherOption[];
+}
+
+function barDither(value: unknown): BarDither | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value) || !Array.isArray(value.modes)) return undefined;
+  const mode = decodeDitherOption({ value: value.value, label: "-" });
+  const modes = value.modes.map(decodeDitherOption);
+  if (mode === null || modes.some((d) => d === null || d.value === "grey")) return undefined;
+  return { value: mode.value, modes: modes as DitherOption[] };
+}
+
 /** The bar of the selected grid, or of the tool's draft (`group` and `id` are `null`). */
 export interface TestGridBarView {
   group: OperationId | null;
@@ -54,6 +69,8 @@ export interface TestGridBarView {
   shared: SharedValue[];
   /** `null` unless the kind is Engrave. */
   crosshatch: boolean | null;
+  /** The Dither strip, `null` unless the kind is Image (`specs/0123` criterion 44). */
+  dither: BarDither | null;
   cellMm: number;
   columns: AxisFields;
   rows: AxisFields;
@@ -143,7 +160,9 @@ export function decodeTestGridView(value: unknown): TestGridBarView | null {
   const columns = axis(value.columns);
   const rows = axis(value.rows);
   const bad = invalid(value.invalid);
+  const dither = barDither(value.dither);
   if (
+    dither === undefined ||
     (value.group !== null && group === null) ||
     (value.id !== null && typeof value.id !== "string") ||
     typeof value.lasered !== "boolean" ||
@@ -172,6 +191,7 @@ export function decodeTestGridView(value: unknown): TestGridBarView | null {
     materials: list,
     shared: values,
     crosshatch: value.crosshatch as boolean | null,
+    dither,
     cellMm: value.cell_mm,
     columns,
     rows,

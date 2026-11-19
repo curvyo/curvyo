@@ -32,6 +32,8 @@ export interface TestGridToolApi {
   setKind: (kind: SetKind) => string;
   setAxis: (side: "columns" | "rows", param: Param) => string;
   setCrosshatch: (on: boolean) => string;
+  /** A segment of the Dither strip of an Image grid. */
+  setDither: (mode: string) => string;
   /** A pick of the dropdown, `""` for none; the cause, empty when taken. */
   pickMaterial: (id: string) => string;
   /** Re-reads the view after the canvas changed it (a press, a selection). */
@@ -113,7 +115,8 @@ export function useTestGridTool(
   const setKind = useCallback((kind: SetKind) => run((s) => s.set_test_grid_kind(kind)), [run]);
   const setAxis = useCallback((side: "columns" | "rows", param: Param) => run((s) => s.set_test_grid_axis(side, param)), [run]);
   const setCrosshatch = useCallback((on: boolean) => run((s) => s.set_test_grid_crosshatch(on)), [run]);
+  const setDither = useCallback((mode: string) => run((s) => s.set_test_grid_dither(mode)), [run]);
   const pickMaterial = useCallback((id: string) => run((s) => s.pick_test_grid_material(id)), [run]);
 
-  return { available, view, pressNotice, status, placeAtFreeSpot, setField, setKind, setAxis, setCrosshatch, pickMaterial, refresh: sync };
+  return { available, view, pressNotice, status, placeAtFreeSpot, setField, setKind, setAxis, setCrosshatch, setDither, pickMaterial, refresh: sync };
 }

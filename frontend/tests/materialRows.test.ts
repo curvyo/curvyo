@@ -42,6 +42,7 @@ test("every Rust state decodes, and nothing else is in the folder", () => {
     "damaged_record",
     "empty",
     "format1_record",
+    "image_set",
     "test_with_photo",
     "test_without_photo",
     "two_lasers",
@@ -59,7 +60,7 @@ test("two lasers: the page's laser first and open, sets, missing kinds and tests
   assert.ok(body);
   assert.equal(body.lasers.length, 2);
   assert.equal(body.lasers[0].thisPage, true);
-  assert.deepEqual(body.lasers[0].missing, ["cut", "engrave"]);
+  assert.deepEqual(body.lasers[0].missing, ["cut", "engrave", "image"]);
   assert.equal(body.lasers[1].sets[1].intervalMm, 0.08);
   assert.equal(body.lasers[1].sets[0].source, "Test 7K2QX");
   assert.deepEqual(body.tests.map((t) => t.id), ["4H8ZP", "8PL4D", "7K2QX"]);

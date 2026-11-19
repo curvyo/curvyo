@@ -86,6 +86,13 @@ export function numbersParts(text: string, typed: readonly string[]): NumberPart
   }));
 }
 
+/** A numbers line as one text, each typed number followed by "typed": the title of a line the
+ * ellipsis cuts (`specs/0123` UX review U7). */
+export function numbersTitle(text: string, typed: readonly string[], prefix = ""): string {
+  const parts = numbersParts(text, typed).map((part) => `${part.text}${part.typed ? " typed" : ""}`);
+  return `${prefix}${parts.join(", ")}`;
+}
+
 /** The name of the profile at the front of the machine line ("Diode 10 W"), and the rest. */
 export function machineLineParts(line: string): { name: string; rest: string } {
   const at = line.indexOf(" · ");

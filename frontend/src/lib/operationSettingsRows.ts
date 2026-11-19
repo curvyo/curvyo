@@ -15,7 +15,7 @@ import type {
 } from "./operationSettingsView.ts";
 
 /** The set kind word of a material kind. */
-export const SET_WORDS: Record<SetKind, string> = { cut: "Cut", score: "Score", engrave: "Engrave" };
+export const SET_WORDS: Record<SetKind, string> = { cut: "Cut", score: "Score", engrave: "Engrave", image: "Image" };
 
 /** With more than this many materials the pick shows a Filter field (Proposal). */
 export const PICK_FILTER_ABOVE = 8;

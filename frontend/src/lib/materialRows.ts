@@ -26,10 +26,10 @@ export const NOTICE_NAME_MAX = 24;
 export const NOTE_MAX = 500;
 
 /** The words of the three kinds. */
-export const KIND_WORD: Record<SetKind, string> = { cut: "Cut", score: "Score", engrave: "Engrave" };
+export const KIND_WORD: Record<SetKind, string> = { cut: "Cut", score: "Score", engrave: "Engrave", image: "Image" };
 
 /** The kinds in a laser block's order. */
-export const KIND_ORDER: readonly SetKind[] = ["cut", "score", "engrave"];
+export const KIND_ORDER: readonly SetKind[] = ["cut", "score", "engrave", "image"];
 
 /** A name cut with an ellipsis where a notice would run over 70 characters. */
 export function shortName(name: string): string {
@@ -222,7 +222,7 @@ export function numberText(value: number): string {
 
 /** The fields a set of `kind` shows. */
 export function setFields(kind: SetKind): SetField[] {
-  return kind === "engrave" ? ["power", "passes", "speed", "interval"] : ["power", "passes", "speed"];
+  return kind === "engrave" || kind === "image" ? ["power", "passes", "speed", "interval"] : ["power", "passes", "speed"];
 }
 
 /** The set heading's accessible name: "Cut set of Diode 20 W, Test K7Q2M". */

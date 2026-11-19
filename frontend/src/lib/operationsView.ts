@@ -20,8 +20,8 @@ export interface OperationId {
   counter: number;
 }
 
-/** The five kinds a row can have. */
-export const OPERATION_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out"] as const;
+/** The six kinds a row can have. */
+export const OPERATION_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out", "image"] as const;
 
 /** A row's kind; `unknown` for a kind this build does not know (criterion 26). */
 export type OperationKind = (typeof OPERATION_KINDS)[number] | "unknown";
@@ -229,7 +229,7 @@ function asRow(value: unknown): OperationRow | null {
   };
 }
 
-const BUTTON_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out"] as const;
+const BUTTON_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out", "image"] as const;
 
 function asKindButtons(value: unknown): KindButton[] | null | undefined {
   if (value === null) return null;

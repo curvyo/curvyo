@@ -2,6 +2,15 @@ import { CircleHelp } from "lucide-react";
 
 import type { OperationKind } from "@/lib/operationsView";
 
+/** The dot ramp of Image (`ux-notes.md` 2.1): 2 x 2 squares on a 4-unit pitch, four columns
+ * falling in density, 4, 3, 2 and 1 dots. */
+const IMAGE_DOTS: readonly (readonly [number, number])[] = [
+  [1, 1], [1, 5], [1, 9], [1, 13],
+  [5, 1], [5, 5], [5, 13],
+  [9, 1], [9, 9],
+  [13, 5],
+];
+
 /**
  * The kind glyphs of the Operations tab (`specs/0101-laser-operations` `ux-notes.md` section 3):
  * 16 px, `currentColor`, 1.5 px stroke. The shape carries the kind; only Cut and Cut-out are red
@@ -53,6 +62,14 @@ export function OperationGlyph({ kind, size = 16 }: { kind: OperationKind; size?
       return (
         <svg {...common} style={{ color: "var(--cut)" }}>
           <rect x="2.25" y="2.25" width="11.5" height="11.5" strokeDasharray="4 2" />
+        </svg>
+      );
+    case "image":
+      return (
+        <svg {...common} fill="currentColor" stroke="none">
+          {IMAGE_DOTS.map(([x, y]) => (
+            <rect key={`${x}-${y}`} x={x} y={y} width="2" height="2" />
+          ))}
         </svg>
       );
     case "unknown":
