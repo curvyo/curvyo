@@ -649,6 +649,13 @@ exits 0; with no job it exits at once. The spike above checked `thread_block` an
 send the signal to the child with `nix::sys::signal::kill` (dev-dependency, same crate). SIGHUP
 (the terminal closed) is not in G16; the same path would cover it (for the product owner).
 
+**C11 amendment (fix/flaky-g16-signal-tests).** Block plus `sigwait` is not safe with `serialport`:
+its `ppoll` runs with an empty signal mask, which unblocks SIGINT and SIGTERM in the serial thread,
+and the default action then killed the process without the G16 stop (found by a flaky test; the
+spindle could stay on). `-server` now installs a handler with `signal-hook` 0.4.6 (MIT OR
+Apache-2.0, `cargo deny` green; no `unsafe` in our code) that only wakes the main thread; the rest of
+C11 is unchanged. The 6 s of G16 stays the product's `EXIT_STOP`; tests assert the stop, not the speed.
+
 **C12. `unsafe`.** None in our code: `TTYPort::pair`, `sigwait`, the gid and `/proc` reads are
 safe APIs; `-io` and `-server` add `#![forbid(unsafe_code)]` (the workspace already denies it).
 `serialport` and `nix` contain `unsafe` in their own crates, like `ring` and `rustls`; that needs

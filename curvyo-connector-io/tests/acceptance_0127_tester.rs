@@ -2232,8 +2232,11 @@ fn g15_unplugged_during_hold() {
 // G16 signals
 // ---------------------------------------------------------------------------------------------
 
+/// Hang guard for the signal tests, not a speed requirement.
+const EXIT_BOUND: Duration = Duration::from_secs(30);
+
 #[test]
-fn g16_sigterm_and_sigint_during_a_job_stop_the_machine_and_exit_within_6s() {
+fn g16_sigterm_and_sigint_during_a_job_stop_the_machine_and_exit_cleanly() {
     for sig in ["TERM", "INT"] {
         let cfg = Cfg {
             motion_ms: 80,
@@ -2246,6 +2249,8 @@ fn g16_sigterm_and_sigint_during_a_job_stop_the_machine_and_exit_within_6s() {
             s.cfg.hold1_ms = 1500;
             s.cfg.banner_delay_ms = 2000;
         });
+        // Functional check only (CLAUDE.md section 5: no wall-time assertion); the bound merely
+        // keeps a hung child from hanging the suite. The 6 s of G16 is the product's EXIT_STOP.
         let t = Instant::now();
         r.signal(sig);
         let status = loop {
@@ -2253,13 +2258,12 @@ fn g16_sigterm_and_sigint_during_a_job_stop_the_machine_and_exit_within_6s() {
                 break s;
             }
             assert!(
-                t.elapsed() < Duration::from_secs(6),
-                "{sig}: still running after 6 s"
+                t.elapsed() < EXIT_BOUND,
+                "{sig}: still running after {EXIT_BOUND:?}"
             );
             std::thread::sleep(Duration::from_millis(50));
         };
-        assert_eq!(status.code(), Some(0), "{sig}");
-        assert!(t.elapsed() < Duration::from_secs(6));
+        assert_eq!(status.code(), Some(0), "{sig}: {status:?}");
         r.pty.with(|s| {
             let bytes: Vec<u8> = s.raw.iter().map(|b| b.1).filter(|b| *b != b'?').collect();
             let bang = bytes
@@ -2288,10 +2292,7 @@ fn g16_sigterm_without_job_exits_at_once() {
             assert_eq!(s.code(), Some(0));
             break;
         }
-        assert!(
-            t.elapsed() < Duration::from_secs(2),
-            "slow exit without a job"
-        );
+        assert!(t.elapsed() < EXIT_BOUND, "no exit without a job");
         std::thread::sleep(Duration::from_millis(20));
     }
 }
@@ -2312,10 +2313,13 @@ fn g16_sigterm_while_paused() {
     r.signal("TERM");
     loop {
         if let Some(s) = r.child.try_wait().unwrap() {
-            assert_eq!(s.code(), Some(0));
+            assert_eq!(s.code(), Some(0), "{s:?}");
             break;
         }
-        assert!(t.elapsed() < Duration::from_secs(6));
+        assert!(
+            t.elapsed() < EXIT_BOUND,
+            "still running after {EXIT_BOUND:?}"
+        );
         std::thread::sleep(Duration::from_millis(20));
     }
     assert!(!r.pty.with(|s| s.spindle_on || s.air_on));

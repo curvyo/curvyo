@@ -18,8 +18,10 @@ dirs = "7"
 thiserror.workspace = true
 
 [target.'cfg(unix)'.dependencies]
-# SIGINT and SIGTERM by `sigwait`, no handler (addendum C11). MIT; already locked through `zip`.
-nix = { version = "0.31", default-features = false, features = ["signal"] }
+# SIGINT and SIGTERM through a handler that only wakes the main thread (addendum C11): `serialport`
+# waits in `ppoll` with an empty signal mask, so a blocked-and-`sigwait` design lets the default
+# action kill the process. MIT OR Apache-2.0; its `signal-hook-registry` is already locked.
+signal-hook = "0.4.6"
 
 [dev-dependencies]
 tempfile = "3"
