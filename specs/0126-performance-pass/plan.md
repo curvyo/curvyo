@@ -3,6 +3,8 @@
 Rule: measure first, one change per PR, each PR shows its before/after numbers. No speculative caches.
 
 ## Phase 0: harness and measurement (one `chore/` PR, no behaviour change)
+
+**Done** (PRs #385, #388; frame pacing, ablation, GL bench and GPU variants #418, #421).
 The app is the native Tauri shell, which runs on WebKitGTK on Linux, so WebKit is the main
 measurement; headless Chromium (Playwright) is only a comparison.
 - **Process meter** (`tools/perf/`, a script): starts the built `curvyo-app` (or `cargo tauri dev`)
@@ -21,7 +23,7 @@ measurement; headless Chromium (Playwright) is only a comparison.
 
 ## Phase 1: stop idle work (`fix/`, expected biggest win)
 
-**Status 2026-11-18: built on `fix/idle-frame-skip`.** Every mutable access to the `Session` of a
+**Done (PR #387).** Every mutable access to the `Session` of a
 `WasmSession` bumps the frame generation (`curvyo-editor-wasm/src/frame_gate.rs`, `DerefMut`), so no
 trigger list can miss a call; per-frame hand-outs (notices, write queues, sync actions) are taken
 untracked, and the sync clock and frame start count only when they move the document. `render()`
@@ -40,6 +42,13 @@ unchanged (table in `tools/perf/README.md`).
 - Gate: criterion 1; goldens unchanged.
 
 ## Phase 2: one clock for canvas and chrome (`fix/`)
+
+**Not built, not needed (2026-11-19).** The trailing page on the customer's machine was the
+platform: on the NVIDIA proprietary driver WebKitGTK composited the canvas on the CPU (about 16
+fps on the empty page, `tools/perf/README.md` ablation and GL bench). PR #419 starts the app with
+WebKit's shared-memory DMA-BUF path there and the empty page pans and zooms at 60 fps. The DOM
+page frame still commits one frame after the canvas draw (below, "Frame pacing"); at 60 fps the
+customer sees no trailing, so the items below stay unbuilt until a measurement asks for them.
 - `PageFrames`, rulers, clone tags and sketch chips are drawn from the same frame generation: either
   inside the render loop after `render()` (same rAF callback, same view), or by moving the page
   frames into the wgpu draw list (preferred if the label and toggle buttons can stay DOM).
@@ -49,6 +58,10 @@ unchanged (table in `tools/perf/README.md`).
   artwork edge during a scripted pan).
 
 ## Phase 3: input coalescing (`fix/`)
+
+**Done as far as measured (PR #395).** A wheel zoom no longer renders the whole editor (18 React
+renders per second to 0); the pan already drew one `render()` per frame for its eight moves and
+its handlers cost 0.02 ms per move, so nothing else is coalesced.
 - Wheel and pointer-move events store the latest delta; one `apply` per frame (`latestPerFrame`),
   panels sync once per frame and only when the selection or document changed.
 - Gate: criterion 2 on the 5 000 node page.
@@ -57,7 +70,7 @@ unchanged (table in `tools/perf/README.md`).
 - Draw-list cost of large pages: culling by view rectangle, level of detail for tiny nodes, reuse of
   tessellation between frames while only the view moves (the trace tool already does this with `ViewRest`).
 
-**Status 2026-11-18: culling built on `perf/draw-list-cost`.** Step 1 split a drawn frame into four
+**Culling done (PR #393).** Step 1 split a drawn frame into four
 phases (`WasmSession::take_frame_phases`, read by the probe; native twin
 `curvyo-editor-wasm/tests/frame_phase_cost.rs`, thread CPU time). Step 2 left the objects out of
 the tessellation whose outline box, grown by three stroke widths and 4 px, misses the canvas
@@ -142,9 +155,50 @@ What the measurement says:
   none on the empty page. Present mode and `desired_maximum_frame_latency` do nothing on the WebGL
   backend (the page composites the canvas), so they are not a lever. The repeat draw of
   `frame_gate.rs` happens once after motion stops (submit/s equals changed/s during a pan).
-- Next by data: draw the page frame in the same frame as the canvas (phase 2: commit it inside the
-  render loop's frame, or draw the outline in the wgpu list), then measure the trailing on the
-  customer's machine with `python3 -I tools/perf/measure.py --desktop --timeout 600`.
+- Outcome on the customer's machine (`--desktop --ablate`, `--gl-bench`): every WebGL present cost
+  the same as ours, WebKitGTK composited on the CPU on the NVIDIA proprietary driver; PR #419
+  (shared-memory DMA-BUF buffers there) brought the empty page to 60 fps. Phase 2 stays unbuilt.
+
+## Selection cost (2026-11-19, `perf/selection-cost`)
+
+The probe's import leaves all 5 000 paths selected, and that selection cost most of a zoomed or
+panned frame. Lapped per step of `Session::draw_list` (native release build), the time was not the
+decoration geometry (above 500 objects no member box is drawn, `0019` criterion 5, and the handles
+are the group's eight) but lookups over the selection, run every frame whatever the view:
+
+| step, per frame, all selected, pointer on the canvas | before ms | after ms |
+|---|---|---|
+| carrier lines of selected texts on path: a scan of every leaf per selected id | 12.4 | 0 |
+| handle tolerances, twice: the test-grid check walked the tree up from every selected id | 2 x 3.7 | 0 |
+| group box of the selection, three to four times: a pass over every outline | 3-4 x 1.1 | 0 (kept while the read and selection stay) |
+| selected units built (a list per leaf) only to learn there are more than 500 | 0.5 | 0 |
+
+Changes: the carrier lookup goes through the read's id index; the whole-grid check starts from the
+first selected id only (a whole grid holds it, so its grid is the only candidate: same answer);
+the group box is kept in `GroupMemo` (`group_view.rs`) while the session's read of the objects and
+the selection are unchanged, a live edit's objects are always measured afresh; the units are
+counted up to the limit before they are built. The pictures are the same: only how the same
+inputs are found changed.
+
+Draw list per frame, native release build (`tests/frame_phase_cost.rs`, thread CPU, the pointer
+over the canvas as in the app; the probe columns `wheel-zoom`/`pan-drag` and their `-none` twins):
+
+| frame | all selected before | after | none selected |
+|---|---|---|---|
+| rest (fit, everything in view) | 42 | 13 | 13 |
+| zoom (ten notches) | 39 | 9 | 9 |
+| pan (zoomed in) | 36 | 5 | 4 |
+
+The probe (`tools/perf/measure.py`, wasm under Xvfb, draw list per drawn frame, about 300 frames):
+`wheel-zoom` 51.4 -> 10.4 ms (`wheel-zoom-none` 9.0), `pan-drag` 43.9 -> 8.1 ms (`pan-drag-none`
+7.1). The `submit` column moved between the two runs as well (software GL on a loaded machine), so
+compare the draw list, not the whole tick.
+
+Not done, and why: culling decorations by view would remove nothing here (the decorations of a
+large selection are one box and its handles); caching the decoration geometry would hide the
+lookups, not remove them. Next in line by data: reuse of the tessellation while only the view
+pans (the fit zoom draws everything, 13 ms), and below 500 selected units the member boxes are
+still measured every frame (`cached_oriented_bounds` per selected leaf).
 
 - Memory (2 % of 64 GB = about 1.3 GB): measure wasm heap versus JS heap versus GPU buffers before
   touching anything; likely wgpu buffers and undo history, not a fix target by default.
