@@ -159,9 +159,11 @@ impl MaterialsState {
     /// A number that changes with every change of the library (ADR 0064 §9).
     pub(in crate::session) const fn library_generation(&self) -> u64 {
         self.library.generation
+    }
+
     /// The library, mutable for a library sync arrival (`specs/0116-library-sync`).
     pub(in crate::session) fn library_mut(&mut self) -> &mut Library {
-        &mut self.library
+        self.library.get_mut()
     }
 
     /// Whether `id` is taken: a live test id of the library or a retired one (ADR 0058 §4).
