@@ -12,6 +12,11 @@ crate-type = ["cdylib", "rlib"]
 [lints]
 workspace = true
 
+[features]
+# The GPU-path switches of `tools/perf/measure.py --gpu-variants` (`src/gpu_variant.rs`): set only
+# by that tool's build (`CURVYO_WASM_FEATURES=perf`); a normal build has no switch.
+perf = []
+
 [dependencies]
 curvyo-sketch-core = { path = "../curvyo-sketch-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
