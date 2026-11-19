@@ -246,6 +246,12 @@ Least privilege puts it in a room of its own.
   proxy: jobs travel inside the Noise channel and records are sealed, so the LAN sees the
   metadata of decision 4, not the content. The browser build needs `wss://` and a proxy in front
   (ADR 0031). The connector binary carries `tokio` and `axum`.
+- Note 2026-11-18: [ADR 0071](0071-connector-api-ctl-and-maintenance-mode.md) (Accepted 2026-11-18)
+  amends what starts an enrolment (an owner's `curvyoctl enrol` instead of a code at first start),
+  what "the press at the machine" is (an owner's confirmation, so presence at the laser is no
+  longer implied), the LAN start rule and decision 9's flags, and inserts a slice "connector API,
+  `curvyoctl` and maintenance mode" before the relay slice (relay becomes slice 6, sharing 7).
+  The decision text above is unchanged.
 
 ## Concepts this touches
 
