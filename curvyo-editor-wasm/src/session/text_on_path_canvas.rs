@@ -119,19 +119,19 @@ impl Session {
             return list;
         }
         let read = self.document_read();
+        // By the read's index: a scan of the leaves per selected id made a large selection
+        // cost quadratic time every frame (`specs/0126-performance-pass`).
         let selected: Vec<Arc<CarrierCurve>> = self
             .selection
             .ids()
             .iter()
             .chain(self.text.edit.as_ref().and_then(edit_id).iter())
-            .filter_map(|id| {
-                read.leaves.iter().find_map(|o| match o {
-                    ObjectSnapshot::Text(t) if t.id == *id => {
-                        t.on_path.as_ref().and_then(|p| p.curve.clone())
-                    }
+            .filter_map(
+                |id| match read.clones.objects.get(*read.clones.index.get(id)?)? {
+                    ObjectSnapshot::Text(t) => t.on_path.as_ref().and_then(|p| p.curve.clone()),
                     _ => None,
-                })
-            })
+                },
+            )
             .collect();
         let curves: Vec<&CarrierCurve> = selected.iter().map(AsRef::as_ref).collect();
         list.extend(curvyo_render_core::build_carrier_lines(&curves, view));

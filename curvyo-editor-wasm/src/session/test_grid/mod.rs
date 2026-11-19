@@ -130,6 +130,7 @@ impl Session {
     }
 
     /// The grid the canvas selection is or lies in.
+    #[cfg(test)]
     pub(in crate::session) fn selected_test_grid(&self) -> Option<NodeId> {
         self.selection
             .ids()
@@ -146,11 +147,10 @@ impl Session {
     /// The one grid selected as a whole (all its items), with a readable recipe: the Select bar
     /// is its bar then (UX G3).
     pub(in crate::session) fn whole_selected_grid(&self) -> Option<NodeId> {
+        // A whole grid holds the first selected id, so that id's grid is the only candidate: a
+        // walk up from every selected id cost a large selection milliseconds per frame.
         let ids = self.selection.ids();
-        if ids.is_empty() {
-            return None;
-        }
-        let group = self.selected_test_grid()?;
+        let group = self.test_grid_above(*ids.first()?)?;
         let leaves = self.document.leaves_of(group);
         let whole = ids.len() == leaves.len() && ids.iter().all(|id| leaves.contains(id));
         (whole && self.grid_object(group).is_some()).then_some(group)
