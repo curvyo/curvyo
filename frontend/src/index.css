@@ -157,6 +157,10 @@
     /* The ground of an armed Inline delete confirm row or strip cell (`docs/design-system.md`,
      * `specs/0081-inline-delete-confirm`); the filled --destructive trash carries the state. */
     --destructive-soft: #F7D3CF;
+    /* The fill of an armed press that keeps the maker's values instead of losing them: Update
+     * profile only (`docs/design-system.md`, "Armed action"; `specs/0130` Frage 254 A). White glyph
+     * 4.5:1 on it. Every other armed press fills --destructive. */
+    --armed-accent: var(--editor-accent);
     /* The violet of the marks of a selected linked clone and of what it follows
      * (`docs/design-system.md`, "Linked clone marks"; `specs/0049-linked-clone` criterion 60). */
     --clone-link: #7B3FD6;

@@ -1,7 +1,7 @@
 import { CircleAlert, KeyRound, PlugZap, Unlink } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
-import { GLYPH, ICON_BUTTON, SMALL } from "@/components/workbench/machineStyles";
+import { ARMED_DESTRUCTIVE_BUTTON, GLYPH, ICON_BUTTON, SMALL } from "@/components/workbench/machineStyles";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { type ConnectorLinkModel, useConnectorLink } from "@/hooks/useConnectorLink";
@@ -159,7 +159,7 @@ function TrustBlock({ model, onForget }: { model: ConnectorLinkModel; onForget: 
             type="button"
             aria-label={name}
             {...arm.control}
-            className={arm.armed ? ICON_BUTTON.replace("hover:bg-[var(--editor-accent-hover)]", "bg-[var(--destructive)] text-white") : ICON_BUTTON}
+            className={arm.armed ? ARMED_DESTRUCTIVE_BUTTON : ICON_BUTTON}
             onClick={() =>
               arm.press(() => {
                 onForget();
