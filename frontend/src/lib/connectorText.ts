@@ -1,10 +1,13 @@
-// The texts and rules of the Connector group in the Machine block (`specs/0064-machine-connector`
-// UX notes §3 to §9): what each answer of the host says, which job buttons apply in which state,
-// and the number formats. Pure, so the tests load it without a bundler.
+// The texts and rules of the connector's controls (`specs/0064-machine-connector` UX notes §3 to
+// §9; since `specs/0118` the job buttons live in the Machine controls footer): what each answer of
+// the host says, which job buttons apply in which state, and the number formats. Pure, so the
+// tests load it without a bundler.
 
 /** The state of the connector's job, as the protocol sends it (`State` in `curvyo-connector-core`). */
 export type JobState =
-  | { name: "NoController" | "Idle" | "Receiving" | "Ready" | "AwaitingLocalStart" | "Running" | "Paused" | "Alarm" }
+  | {
+      name: "NoController" | "Idle" | "Receiving" | "Ready" | "AwaitingLocalStart" | "Homing" | "Running" | "Paused" | "Alarm";
+    }
   | { name: "Done"; result: "Completed" | "Stopped" | "Failed" };
 
 /** The `Status` message. */
@@ -169,9 +172,10 @@ export function refusalText(reason: string, alarm: string | null): string {
   return REFUSALS[reason] ?? reason;
 }
 
-/** The states in which a job is in flight: a dropped connection is then "Connection lost". */
+/** The states in which a job or a homing is in flight: a dropped connection is then "Connection
+ * lost" (`specs/0118` M9). */
 export function jobIsActive(state: JobState): boolean {
-  return ["Receiving", "Ready", "AwaitingLocalStart", "Running", "Paused"].includes(state.name);
+  return ["Receiving", "Ready", "AwaitingLocalStart", "Homing", "Running", "Paused"].includes(state.name);
 }
 
 /** Whether a pushed status ends a shown refusal (UX notes §8, "A refusal stays until the next
@@ -209,6 +213,8 @@ export function jobButtons(state: JobState | null): JobButtons {
     case "Ready":
       return { ...none, start: true, stop: true };
     case "AwaitingLocalStart":
+    case "Homing":
+      // Stop ends a homing too and never asks (`specs/0118` criterion 5).
       return { ...none, stop: true };
     case "Running":
       return { ...none, pause: true, stop: true };
@@ -265,11 +271,15 @@ export function jobStateLine(status: StatusMessage, held: HeldJob | null): Line 
     case "Receiving":
       return neutral(held ? `Sending ${held.name}` : "Receiving a job");
     case "Ready":
+      // A refused homing keeps the job and names its cause until the next state (`0118` §5).
+      if (stateFailure(status) !== null) return failure(stateFailure(status) as string);
       return neutral(
         held ? `Ready: ${held.name}, ${formatCount(held.lines)} lines, ${formatSize(held.bytes)}` : "Ready",
       );
     case "AwaitingLocalStart":
       return neutral("Waiting for the start at the machine");
+    case "Homing":
+      return neutral("Homing");
     case "Running":
       return neutral("Running");
     case "Paused":
@@ -288,9 +298,12 @@ export function jobStateLine(status: StatusMessage, held: HeldJob | null): Line 
       return failure(`Alarm: ${status.alarm ?? ""}`);
     case "NoController":
       return status.detail ? failure(status.detail) : neutral("No controller");
-    case "Idle":
-      // A lost job's sentence stays after the reconnect until the next job state (UX notes V7).
-      return isLossText(status.detail) ? failure(status.detail as string) : null;
+    case "Idle": {
+      // A lost job's sentence stays after the reconnect until the next job state (UX notes V7);
+      // a refused homing names its cause ("Homing is not enabled (error 5)", `0118` §5).
+      const text = stateFailure(status);
+      return text === null ? null : failure(text);
+    }
     default:
       return null;
   }
@@ -304,9 +317,20 @@ export function isLossText(detail: string | null | undefined): boolean {
   );
 }
 
-/** Whether the job line is an alert (UX notes section 9): an alarm or a lost job. */
+/** The sentence of a failure in `Idle` or `Ready`: a lost job or a refused homing; never the
+ * controller's own state word ("Controller state: Door"), never the "Stopping" of a stop. */
+export function stateFailure(status: StatusMessage): string | null {
+  const detail = status.detail ?? null;
+  if (detail === null || detail === "" || detail === "Stopping" || controllerWord(status) !== null) return null;
+  return detail;
+}
+
+/** Whether the job line is an alert (UX notes section 9): an alarm, a lost job, or a refused
+ * homing, which answers the maker's press (`specs/0118` UX notes section 5). */
 export function jobLineAlerts(status: StatusMessage | null): boolean {
-  return status !== null && (status.state.name === "Alarm" || isLossText(status.detail));
+  if (status === null) return false;
+  const failed = (status.state.name === "Idle" || status.state.name === "Ready") && stateFailure(status) !== null;
+  return status.state.name === "Alarm" || isLossText(status.detail) || failed;
 }
 
 /** GRBL's own state word outside the job's states ("Door"), from "Controller state: Door". */

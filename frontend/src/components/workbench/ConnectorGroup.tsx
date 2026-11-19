@@ -1,42 +1,13 @@
-import {
-  CircleAlert,
-  KeyRound,
-  LoaderCircle,
-  LockOpen,
-  Pause,
-  Play,
-  PlugZap,
-  Square,
-  TriangleAlert,
-  Unlink,
-  Upload,
-} from "lucide-react";
-import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+import { CircleAlert, KeyRound, PlugZap, Unlink } from "lucide-react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
-import { ICON_BUTTON } from "@/components/workbench/machineStyles";
+import { GLYPH, ICON_BUTTON, SMALL } from "@/components/workbench/machineStyles";
+import { SymbolButton } from "@/components/workbench/SymbolButton";
 import { Tooltip } from "@/components/ui/tooltip";
-import { type Busy, type ConnectorModel, useConnector } from "@/hooks/useConnector";
+import { type ConnectorLinkModel, useConnectorLink } from "@/hooks/useConnectorLink";
 import { useArm } from "@/hooks/useArm";
-import {
-  type Line,
-  codeComplete,
-  controllerRows,
-  fingerprintLines,
-  formatCount,
-  formatElapsed,
-  hasProgress,
-  jobButtons,
-  jobLineAlerts,
-  jobStateLine,
-  pairRowShown,
-  typedCode,
-} from "@/lib/connectorText";
+import { type Line, codeComplete, controllerRows, fingerprintLines, pairRowShown, typedCode } from "@/lib/connectorText";
 import { isTauri } from "@/platform/host";
-import { controller_warnings } from "@/wasm-bindings/curvyo_editor_wasm.js";
-
-const GLYPH = { size: 16, strokeWidth: 1.5, absoluteStrokeWidth: true, "aria-hidden": true } as const;
-const SMALL = { size: 12, strokeWidth: 1.5, absoluteStrokeWidth: true, "aria-hidden": true } as const;
-const OFF = "aria-disabled:opacity-40 aria-disabled:hover:bg-transparent";
 
 interface Props {
   /** The chosen saved profile's id; `null` for the built-in profile or a profile not in the library. */
@@ -44,25 +15,25 @@ interface Props {
   address: string;
   /** The id of the "Only saved profiles have a connection." line, when it is shown. */
   reasonId?: string;
-  /** The page profile's Laser mode and Max power, for the Controller block's warning lines. */
-  profileLaserMode: boolean;
-  profileMaxPower: number;
 }
 
 /**
- * The Connector group of the Machine block (`specs/0064-machine-connector` UX notes §2 to §10):
- * test, pair, forget, send job and the job controls for the connector on the machine. Desktop only.
+ * The Connector group of the Machine block (`specs/0064-machine-connector` UX notes §2 to §10;
+ * `specs/0118` UX notes §9): test, pair and forget the connector, and what its controller
+ * reported. The job buttons live in the Operations tab's Machine controls. Desktop only.
  */
 export function ConnectorGroup(props: Props) {
   // A new profile or address starts from empty state.
   return <ConnectorGroupFor key={`${props.profileId ?? ""}|${props.address}`} {...props} />;
 }
 
-function ConnectorGroupFor({ profileId, address, reasonId, profileLaserMode, profileMaxPower }: Props) {
+function ConnectorGroupFor({ profileId, address, reasonId }: Props) {
   const desktop = isTauri;
   const usable = desktop && profileId !== null;
-  const model = useConnector(profileId, address, usable);
+  const model = useConnectorLink(profileId, address, usable);
   const ready = usable && address !== "";
+  // After pairing the focus goes to Test connection (W11).
+  const testButton = useRef<HTMLButtonElement | null>(null);
   return (
     <section aria-label="Connector" className="mt-1 flex flex-col gap-1">
       <div className="flex h-7 items-center justify-between">
@@ -73,6 +44,9 @@ function ConnectorGroupFor({ profileId, address, reasonId, profileLaserMode, pro
             enabled={ready && model.busy === null}
             busy={model.busy === "test"}
             describedBy={usable ? undefined : reasonId}
+            buttonRef={(node) => {
+              testButton.current = node;
+            }}
             onPress={model.test}
           >
             <PlugZap {...GLYPH} />
@@ -82,21 +56,23 @@ function ConnectorGroupFor({ profileId, address, reasonId, profileLaserMode, pro
       {!desktop ? (
         <p className="text-xs text-[var(--panel-muted-fg)]">Needs the desktop app</p>
       ) : usable ? (
-        <ConnectorBody model={model} address={address} profile={{ laserMode: profileLaserMode, maxPower: profileMaxPower }} />
+        <ConnectorBody model={model} address={address} testButton={testButton} />
       ) : null}
     </section>
   );
 }
 
-interface ProfileValues {
-  laserMode: boolean;
-  maxPower: number;
-}
-
-function ConnectorBody({ model, address, profile }: { model: ConnectorModel; address: string; profile: ProfileValues }) {
-  // Where the focus goes when a button unmounts: the Code field after Forget, Send job after Pair.
+function ConnectorBody({
+  model,
+  address,
+  testButton,
+}: {
+  model: ConnectorLinkModel;
+  address: string;
+  testButton: RefObject<HTMLButtonElement | null>;
+}) {
+  // Where the focus goes when a button unmounts: the Code field after Forget.
   const [focusCode, setFocusCode] = useState(false);
-  const [focusSend, setFocusSend] = useState(false);
   if (address === "") {
     return <p className="text-xs text-[var(--panel-muted-fg)]">No connector address</p>;
   }
@@ -107,10 +83,11 @@ function ConnectorBody({ model, address, profile }: { model: ConnectorModel; add
       {model.keyChanged ? (
         <KeyBlock rows={[["Stored key", model.keyChanged.stored], ["Presented key", model.keyChanged.presented]]} />
       ) : null}
-      {model.paired ? <TrustBlock model={model} onForget={() => { setFocusCode(true); setFocusSend(false); }} /> : null}
-      {showPair ? <PairRow model={model} focusOnMount={focusCode} onPaired={() => setFocusSend(true)} /> : null}
-      {model.paired ? <JobSection model={model} focusFirst={focusSend} /> : null}
-      {model.paired ? <ControllerBlock model={model} profile={profile} /> : null}
+      {model.paired ? <TrustBlock model={model} onForget={() => setFocusCode(true)} /> : null}
+      {showPair ? (
+        <PairRow model={model} focusOnMount={focusCode} onPaired={() => testButton.current?.focus({ preventScroll: true })} />
+      ) : null}
+      {model.paired ? <ControllerBlock model={model} /> : null}
     </>
   );
 }
@@ -161,7 +138,7 @@ function KeyRow({ label, fingerprint, children }: { label: string; fingerprint: 
   );
 }
 
-function TrustBlock({ model, onForget }: { model: ConnectorModel; onForget: () => void }) {
+function TrustBlock({ model, onForget }: { model: ConnectorLinkModel; onForget: () => void }) {
   const arm = useArm("forget-connector");
   const paired = model.paired;
   if (paired === null) return null;
@@ -200,7 +177,7 @@ function TrustBlock({ model, onForget }: { model: ConnectorModel; onForget: () =
   );
 }
 
-function PairRow({ model, focusOnMount, onPaired }: { model: ConnectorModel; focusOnMount: boolean; onPaired: () => void }) {
+function PairRow({ model, focusOnMount, onPaired }: { model: ConnectorLinkModel; focusOnMount: boolean; onPaired: () => void }) {
   const [code, setCode] = useState("");
   const field = useRef<HTMLInputElement>(null);
   const pairing = model.busy === "pair";
@@ -251,174 +228,31 @@ function PairRow({ model, focusOnMount, onPaired }: { model: ConnectorModel; foc
   );
 }
 
-function JobSection({ model, focusFirst }: { model: ConnectorModel; focusFirst: boolean }) {
-  // Unlock leaves the tree when the alarm clears; a keyboard user who pressed it lands on the
-  // job toolbar's current button instead of the page body (Proposal).
-  const toolbar = useRef<HTMLDivElement>(null);
-  const unlockHadFocus = useRef(false);
-  const inAlarm = model.status?.state.name === "Alarm";
-  useEffect(() => {
-    if (inAlarm || !unlockHadFocus.current) return;
-    unlockHadFocus.current = false;
-    if (document.activeElement === null || document.activeElement === document.body) {
-      toolbar.current?.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus();
-    }
-  }, [inAlarm]);
-  return (
-    <>
-      <JobToolbar model={model} focusFirst={focusFirst} toolbarRef={toolbar} />
-      <JobBlock model={model} onUnlockFocus={() => (unlockHadFocus.current = true)} />
-    </>
-  );
-}
-
-function JobToolbar({
-  model,
-  focusFirst,
-  toolbarRef,
-}: {
-  model: ConnectorModel;
-  focusFirst: boolean;
-  toolbarRef: RefObject<HTMLDivElement | null>;
-}) {
-  const buttons = jobButtons(model.status?.state ?? null);
-  const idle = model.busy === null;
-  const items: { key: string; name: string; enabled: boolean; busy: Busy; icon: ReactNode; press: () => void }[] = [
-    { key: "send", name: "Send job...", enabled: buttons.send && idle, busy: "send", icon: <Upload {...GLYPH} />, press: model.send },
-    {
-      key: "start",
-      name: buttons.startName,
-      enabled: buttons.start && idle,
-      busy: buttons.startName === "Resume" ? "resume" : "start",
-      icon: <Play {...GLYPH} />,
-      press: () => model.command(buttons.startName === "Resume" ? "resume" : "start"),
-    },
-    { key: "pause", name: "Pause", enabled: buttons.pause && idle, busy: "pause", icon: <Pause {...GLYPH} />, press: () => model.command("pause") },
-    { key: "stop", name: "Stop", enabled: buttons.stop && idle, busy: "stop", icon: <Square {...GLYPH} />, press: () => model.command("stop") },
-  ];
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [rover, setRover] = useState(0);
-  useEffect(() => {
-    // After pairing the focus goes to Send job..., the first stop.
-    if (focusFirst) refs.current[0]?.focus({ preventScroll: true });
-  }, [focusFirst]);
-  const move = (event: KeyboardEvent, at: number) => {
-    const target =
-      event.key === "ArrowLeft" ? Math.max(0, at - 1)
-      : event.key === "ArrowRight" ? Math.min(items.length - 1, at + 1)
-      : event.key === "Home" ? 0
-      : event.key === "End" ? items.length - 1
-      : null;
-    if (target === null) return;
-    event.preventDefault();
-    setRover(target);
-    refs.current[target]?.focus();
-  };
-  return (
-    <div ref={toolbarRef} role="toolbar" aria-label="Job" className="flex gap-1">
-      {items.map((item, at) => (
-        <SymbolButton
-          key={item.key}
-          name={item.name}
-          enabled={item.enabled}
-          busy={model.busy === item.busy}
-          tabIndex={rover === at ? 0 : -1}
-          buttonRef={(node) => {
-            refs.current[at] = node;
-          }}
-          onFocus={() => setRover(at)}
-          onKeyDown={(event) => move(event, at)}
-          onPress={item.press}
-        >
-          {item.icon}
-        </SymbolButton>
-      ))}
-    </div>
-  );
-}
-
-function JobBlock({ model, onUnlockFocus }: { model: ConnectorModel; onUnlockFocus: () => void }) {
-  const { status, held, sendingName, refusal } = model;
-  const sending = sendingName !== null && model.busy === "send";
-  const line = sending
-    ? ({ text: `Sending ${sendingName}`, failure: false } as Line)
-    : refusal ?? (status ? jobStateLine(status, held) : null);
-  if (line === null) return null;
-  const alarm = status?.state.name === "Alarm" && refusal === null && !sending;
-  const alerts = jobLineAlerts(status) && refusal === null && !sending;
-  const bar = status !== null && !sending && refusal === null && hasProgress(status);
-  const lines = status?.job?.lines ?? 0;
-  const done = status?.job?.line ?? 0;
-  const name = sending ? sendingName : held?.name;
-  const elapsed = status?.state.name === "Running" || status?.state.name === "Paused" || status?.state.name === "Done";
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-start justify-between gap-1 text-xs">
-        <p
-          role={alerts ? "alert" : "status"}
-          className={`flex items-start gap-1 [overflow-wrap:anywhere] ${alarm ? "pt-1.5" : ""} ${line.failure ? "text-[var(--destructive)]" : "text-[var(--toolbar-icon)]"}`}
-        >
-          {alarm ? <TriangleAlert {...SMALL} className="mt-0.5 shrink-0" /> : line.failure ? <CircleAlert {...SMALL} className="mt-0.5 shrink-0" /> : null}
-          <span>{line.text}</span>
-        </p>
-        {alarm ? (
-          <SymbolButton
-            name="Unlock"
-            enabled={model.busy === null}
-            busy={model.busy === "unlock"}
-            onFocus={onUnlockFocus}
-            onPress={() => model.command("unlock")}
-          >
-            <LockOpen {...GLYPH} />
-          </SymbolButton>
-        ) : null}
-        {elapsed && status?.job ? (
-          <span className="shrink-0 tabular-nums text-[var(--panel-muted-fg)]">
-            <span className="sr-only">Elapsed </span>
-            {formatElapsed(status.job.elapsed_ms)}
-          </span>
-        ) : null}
-      </div>
-      {bar ? (
-        <div
-          role="progressbar"
-          aria-label="Job progress"
-          aria-valuemin={0}
-          aria-valuemax={lines}
-          aria-valuenow={done}
-          aria-valuetext={`${formatCount(done)} of ${formatCount(lines)} lines`}
-          className="h-1.5 w-[244px] max-w-full overflow-hidden rounded-full border border-[var(--field-border)] bg-white"
-        >
-          <div
-            className={`h-full ${alarm || line.failure ? "bg-[var(--destructive)]" : "bg-[var(--editor-accent)]"}`}
-            style={{ width: `${lines === 0 ? 0 : Math.min(100, (done / lines) * 100)}%` }}
-          />
-        </div>
-      ) : null}
-      <div aria-live="off" className="flex items-center justify-between gap-1 text-xs">
-        <JobName name={name ?? ""} />
-        {bar ? (
-          <span className="shrink-0 tabular-nums text-[var(--toolbar-icon)]">
-            {formatCount(done)} / {formatCount(lines)} lines
-          </span>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 /** The Controller block (`specs/0127` UX notes section 2): what the connector's controller
- * reported, after the job block so the job toolbar never moves; text only, no control. */
-function ControllerBlock({ model, profile }: { model: ConnectorModel; profile: ProfileValues }) {
+ * reported; text only, no control. Without a controller one "Controller" row names why
+ * (`specs/0118` W10); the settings warnings sit in the Machine controls footer (W9). */
+function ControllerBlock({ model }: { model: ConnectorLinkModel }) {
+  const status = model.status;
+  if (status === null) return null;
+  if (status.state.name === "NoController") {
+    const failure = status.detail !== null && status.detail !== undefined && status.detail !== "";
+    return (
+      <div role="group" aria-label="Controller" className="mt-1 flex flex-col gap-1">
+        <dl className="grid select-text grid-cols-[80px_minmax(0,1fr)] gap-x-1 gap-y-1 text-xs">
+          <dt className="text-[var(--panel-muted-fg)]">Controller</dt>
+          <dd
+            role="status"
+            className={`m-0 [overflow-wrap:anywhere] ${failure ? "text-[var(--destructive)]" : "text-[var(--toolbar-icon)]"}`}
+          >
+            {failure ? status.detail : "No controller"}
+          </dd>
+        </dl>
+      </div>
+    );
+  }
   const info = model.controller;
-  if (info === null || model.status === null || model.status.state.name === "NoController") return null;
-  const rows = controllerRows(info, model.status);
-  const warnings = controller_warnings(
-    profile.laserMode,
-    profile.maxPower,
-    info.settings?.laser_mode ?? undefined,
-    info.settings?.s_max ?? undefined,
-  );
+  if (info === null) return null;
+  const rows = controllerRows(info, status);
   return (
     <div role="group" aria-label="Controller" className="mt-1 flex flex-col gap-1">
       <dl className="grid select-text grid-cols-[80px_minmax(0,1fr)] gap-x-1 gap-y-1 text-xs">
@@ -431,65 +265,6 @@ function ControllerBlock({ model, profile }: { model: ConnectorModel; profile: P
           </div>
         ))}
       </dl>
-      <div role="status" className="flex flex-col gap-1 text-xs text-[var(--toolbar-icon)]">
-        {warnings.map((text) => (
-          <p key={text} className="flex items-start gap-1">
-            <TriangleAlert {...SMALL} className="mt-0.5 shrink-0" />
-            <span>{text}</span>
-          </p>
-        ))}
-      </div>
     </div>
-  );
-}
-
-/** The job's name, cut in the middle so the extension stays (UX notes §8). */
-function JobName({ name }: { name: string }) {
-  const dot = name.lastIndexOf(".");
-  const [stem, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
-  return (
-    <span className="flex min-w-0 text-[var(--panel-muted-fg)]" title={name || undefined}>
-      <span className="truncate">{stem}</span>
-      <span className="shrink-0">{extension}</span>
-    </span>
-  );
-}
-
-interface SymbolButtonProps {
-  name: string;
-  enabled: boolean;
-  busy?: boolean;
-  describedBy?: string;
-  tabIndex?: number;
-  buttonRef?: (node: HTMLButtonElement | null) => void;
-  onFocus?: () => void;
-  onKeyDown?: (event: KeyboardEvent) => void;
-  onPress: () => void;
-  children: ReactNode;
-}
-
-/** A 28 px symbol button; when it does not apply it is greyed and keeps its place, its tab stop and
- * its tooltip, and a press does nothing (UX notes §3). */
-function SymbolButton({ name, enabled, busy = false, describedBy, tabIndex, buttonRef, onFocus, onKeyDown, onPress, children }: SymbolButtonProps) {
-  return (
-    <Tooltip side="left" content={name}>
-      <button
-        type="button"
-        ref={buttonRef}
-        aria-label={name}
-        aria-disabled={!enabled}
-        aria-busy={busy || undefined}
-        aria-describedby={describedBy}
-        tabIndex={tabIndex}
-        className={`${ICON_BUTTON} ${OFF}`}
-        onFocus={onFocus}
-        onKeyDown={onKeyDown}
-        onClick={() => {
-          if (enabled) onPress();
-        }}
-      >
-        {busy ? <LoaderCircle {...GLYPH} className="animate-spin" /> : children}
-      </button>
-    </Tooltip>
   );
 }

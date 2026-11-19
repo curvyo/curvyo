@@ -1,25 +1,20 @@
-// The state of the Connector group in the Machine block (`specs/0064-machine-connector`, UX notes
-// §4, §7 to §9): the stored pairing, the link line, the last status, the held job and the commands.
-// The host holds the pin and the token; this hook only sees fingerprints, answers and statuses.
+// The link of the Connector group in the Machine block (`specs/0064-machine-connector`, UX notes
+// §4 to §6; `specs/0118` M11): the stored pairing, Test connection, Pair, Forget pairing and the
+// link line. The job buttons are the Machine controls footer's (`useMachineControls`). The host
+// holds the pin and the token; this hook only sees fingerprints, answers and statuses.
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { linkStore, useLinkEntry } from "@/hooks/useLinkEntry";
+import { type Busy } from "@/lib/connectorLink";
 import {
-  type CommandAnswer,
   type ControllerInfo,
-  type HeldJob,
   type Line,
   type LinkError,
   type PairAnswer,
-  type SendAnswer,
   type StatusMessage,
   FORGET_FAILED_TEXT,
-  UNKNOWN_JOB_TEXT,
-  UNREADABLE_TEXT,
-  clearsRefusal,
   errorLine,
   pairLine,
-  refusalText,
   testLine,
 } from "@/lib/connectorText";
 import { invoke } from "@/platform/host";
@@ -31,21 +26,7 @@ type PairingState =
   | { kind: "noStore" }
   | { kind: "failed"; message: string };
 
-/** The buttons that run a command (the busy one shows a spinner). */
-export type Busy = "test" | "pair" | "send" | "start" | "resume" | "pause" | "stop" | "unlock" | null;
-
-/** A job command and when its button stops being busy: the state the press waits for
- * (`specs/0127` UX notes sections 6 and 7), or the time limit. */
-type Command = "start" | "resume" | "pause" | "stop" | "unlock";
-const SETTLES: Record<Command, { done: (s: StatusMessage | null) => boolean; ms: number }> = {
-  start: { done: () => true, ms: 0 },
-  resume: { done: (s) => s?.state.name !== "Paused", ms: 3_000 },
-  pause: { done: (s) => s?.state.name !== "Running", ms: 3_000 },
-  stop: { done: (s) => s?.state.name !== "Running" && s?.state.name !== "Paused", ms: 8_000 },
-  unlock: { done: (s) => s?.state.name !== "Alarm", ms: 5_000 },
-};
-
-export interface ConnectorModel {
+export interface ConnectorLinkModel {
   paired: { connectorName: string; fingerprint: string } | null;
   /** This computer has no credential store: pairing cannot work, so the Pair row is not shown. */
   noStore: boolean;
@@ -56,32 +37,26 @@ export interface ConnectorModel {
   status: StatusMessage | null;
   /** What the controller reported at its last identify. */
   controller: ControllerInfo | null;
-  held: HeldJob | null;
-  sendingName: string | null;
-  refusal: Line | null;
-  busy: Busy;
+  /** The press that waits for its answer, here or in the Machine controls footer. */
+  busy: Busy | null;
   test: () => void;
   pair: (code: string) => Promise<boolean>;
   forget: () => void;
-  send: () => void;
-  command: (kind: Command) => void;
 }
 
 const LOST: Line = { text: "Connection lost", failure: true };
 
-/** The Connector group's model for one saved profile; `enabled` is false when the group is not
+/** The Connector group's link for one saved profile; `enabled` is false when the group is not
  * shown for it (browser, built-in profile, no address). The caller keys the component that uses it
  * on the profile and address, so a new pick starts from empty state. The pairing, the status and
- * the held job live in the page's one link store, which the Output group reads too (`0125` S14). */
-export function useConnector(profileId: string | null, address: string, enabled: boolean): ConnectorModel {
+ * the busy press live in the page's one link store, which the Output group and the Machine
+ * controls footer read too (`0125` S14, `0118` M11). */
+export function useConnectorLink(profileId: string | null, address: string, enabled: boolean): ConnectorLinkModel {
   const [line, setLine] = useState<Line | null>(null);
   const [alert, setAlert] = useState("");
-  const [refusal, setRefusal] = useState<Line | null>(null);
-  const [busy, setBusy] = useState<Busy>(null);
   const generation = useRef(0);
   const live = enabled && profileId !== null && address !== "";
   const entry = useLinkEntry(profileId, address, live, false);
-  const lastStatus = useRef<StatusMessage | null>(null);
 
   const fail = useCallback(
     (error: LinkError, own: boolean) => {
@@ -92,13 +67,6 @@ export function useConnector(profileId: string | null, address: string, enabled:
     },
     [profileId],
   );
-
-  // A refusal ends when the job moves into another state that has a line count.
-  useEffect(() => {
-    const next = entry.status;
-    if (next !== null && clearsRefusal(lastStatus.current, next)) setRefusal(null);
-    lastStatus.current = next;
-  }, [entry.status]);
 
   // The watcher learned the pairing is gone or the key changed.
   useEffect(() => {
@@ -163,16 +131,14 @@ export function useConnector(profileId: string | null, address: string, enabled:
     // `read` and `fail` depend on the profile and address only.
   }, [profileId, address, enabled, read]);
 
-  const guard = <T,>(kind: Exclude<Busy, null>, run: () => Promise<T>) => {
-    if (busy !== null || !live) return Promise.resolve(undefined);
-    setBusy(kind);
-    return run().finally(() => setBusy(null));
+  const guard = <T,>(kind: Busy, run: () => Promise<T>) => {
+    if (!live || profileId === null || !linkStore.claim(profileId, kind)) return Promise.resolve(undefined);
+    return run().finally(() => linkStore.release(profileId));
   };
 
   const test = () => {
     void guard("test", async () => {
       setLine({ text: "Testing", failure: false });
-      setRefusal(null);
       await read(true, true);
     });
   };
@@ -216,7 +182,6 @@ export function useConnector(profileId: string | null, address: string, enabled:
           keyChanged: null,
           lost: false,
         });
-        setRefusal(null);
         setAlert("");
         setLine({ text: "Not paired", failure: false });
       },
@@ -228,72 +193,6 @@ export function useConnector(profileId: string | null, address: string, enabled:
     );
   };
 
-  const send = () => {
-    void guard("send", async () => {
-      setRefusal(null);
-      setLine(null);
-      const id = profileId as string;
-      const answer = await invoke<SendAnswer>("connector_send_job", { profileId, address });
-      linkStore.patch(id, { sendingName: null });
-      if (answer.kind === "ready") {
-        linkStore.patch(id, { held: { name: answer.name, lines: answer.lines, bytes: answer.bytes, jobId: null } });
-        await read(false, false);
-      } else if (answer.kind === "rejected") {
-        linkStore.patch(id, { held: { name: answer.name, lines: 0, bytes: 0, jobId: null } });
-        setRefusal({ text: refusalText(answer.reason, entry.status?.alarm ?? null), failure: true });
-      } else if (answer.kind === "unreadable") {
-        // The counts line names the chosen file, as for a refused job (UX notes §8).
-        linkStore.patch(id, { held: { name: answer.name, lines: 0, bytes: 0, jobId: null } });
-        setRefusal({ text: UNREADABLE_TEXT, failure: true });
-      } else if (answer.kind === "failed") {
-        fail(answer.error, true);
-      }
-    });
-  };
-
-  /** Resolves once the entry's status satisfies `done`, or after `ms`. */
-  const settle = (done: (s: StatusMessage | null) => boolean, ms: number) =>
-    new Promise<void>((resolve) => {
-      const id = profileId as string;
-      let off = () => {};
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const finish = () => {
-        off();
-        if (timer !== undefined) clearTimeout(timer);
-        resolve();
-      };
-      if (ms === 0 || done(linkStore.get(id).status) || linkStore.get(id).lost) {
-        resolve();
-        return;
-      }
-      timer = setTimeout(finish, ms);
-      off = linkStore.subscribe(() => {
-        const entry = linkStore.get(id);
-        if (done(entry.status) || entry.lost) finish();
-      });
-    });
-
-  const command = (kind: Command) => {
-    void guard(kind, async () => {
-      setRefusal(null);
-      const answer = await invoke<CommandAnswer>("connector_command", {
-        profileId,
-        address,
-        command: kind,
-      });
-      if (answer.kind === "failed") {
-        fail(answer.error, true);
-      } else if (answer.kind === "unknownJob") {
-        setRefusal({ text: UNKNOWN_JOB_TEXT, failure: true });
-      } else {
-        // The connector's status says what changed; a fresh read also covers a lost connection.
-        await read(false, false);
-        // A real machine confirms later: the button stays busy until it does (`0127` G10 to G12).
-        await settle(SETTLES[kind].done, SETTLES[kind].ms);
-      }
-    });
-  };
-
   return {
     paired: entry.paired,
     noStore: entry.noStore,
@@ -302,14 +201,9 @@ export function useConnector(profileId: string | null, address: string, enabled:
     alert,
     status: entry.status,
     controller: entry.controller,
-    held: entry.held,
-    sendingName: entry.sendingName,
-    refusal,
-    busy,
+    busy: entry.busy,
     test,
     pair,
     forget,
-    send,
-    command,
   };
 }
