@@ -56,8 +56,10 @@ pub enum State {
     Receiving,
     /// A job is assembled and waits for `Start`.
     Ready,
-    /// Started, waiting for the button on the connector's host.
+    /// Started, waiting for the button on the connector's host; a waiting `Home` carries no job.
     AwaitingLocalStart,
+    /// The controller runs its homing cycle (`Home`); a kept `Ready` job is carried along.
+    Homing,
     /// The controller is running the job.
     Running,
     /// The job is paused.
@@ -213,6 +215,9 @@ pub enum Message {
     Stop,
     /// Leaves the controller's alarm lock (GRBL `$X`); only in `Alarm` (`specs/0127` G14).
     Unlock,
+    /// Runs the controller's homing cycle (GRBL `$H`), from `Idle`, `Ready`, `Done` or `Alarm`
+    /// (`specs/0118`); never sent on its own by the app or the connector.
+    Home,
     /// Answer to `Hello` once accepted.
     Welcome {
         /// The connector's name.

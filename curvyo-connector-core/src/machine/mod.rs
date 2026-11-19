@@ -1,6 +1,7 @@
 //! The job state machine of one connector: events in, new state and messages out, no clock.
 
 mod controls;
+mod home;
 
 use uuid::Uuid;
 
@@ -81,6 +82,13 @@ pub enum Event {
     LaserModeOff(bool),
     /// Whether the controller's laser mode could not be read: jobs are refused while so (G34).
     LaserModeUnknown(bool),
+    /// The controller ended its homing cycle (GRBL's `ok` to `$H`, `specs/0118` M2).
+    Homed,
+    /// The controller refused the homing cycle and stays where it was (GRBL `error:<n>` to `$H`).
+    HomingFailed {
+        /// The sentence the app shows ("Homing is not enabled (error 5)").
+        detail: String,
+    },
 }
 
 /// What the transport has to tell the controller.
@@ -99,6 +107,8 @@ pub enum ControllerCommand {
     Stop,
     /// Leave the controller's alarm lock.
     Unlock,
+    /// Run the controller's homing cycle.
+    Home,
 }
 
 /// The result of one event.
@@ -108,6 +118,15 @@ pub struct Output {
     pub messages: Vec<Message>,
     /// Commands for the controller, in order.
     pub commands: Vec<ControllerCommand>,
+}
+
+/// What `AwaitingLocalStart` waits to start.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Waiting {
+    /// The held job.
+    Start,
+    /// A homing cycle (`specs/0118` M5).
+    Home,
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +161,10 @@ pub struct Machine {
     laser_off: bool,
     /// The controller's laser mode is unknown: `SubmitJob` is refused.
     laser_unknown: bool,
+    /// What `AwaitingLocalStart` waits to start.
+    waiting: Waiting,
+    /// The state a homing started from (`Idle`, `Ready` or `Alarm`), and returns to.
+    homed_from: State,
 }
 
 /// Controller states in which no job may start (`specs/0127` G4): the door, check mode, sleep.
@@ -178,6 +201,8 @@ impl Machine {
             stop_pending: false,
             laser_off: false,
             laser_unknown: false,
+            waiting: Waiting::Start,
+            homed_from: State::Idle,
         }
     }
 
@@ -207,6 +232,10 @@ impl Machine {
         if self.stop_pending {
             return Some("Stopping".to_owned());
         }
+        if self.state == State::Homing {
+            // The state says it; the controller's `Home` word is not repeated (`specs/0118` M3).
+            return None;
+        }
         self.detail.clone().or_else(|| {
             self.word
                 .as_ref()
@@ -223,12 +252,15 @@ impl Machine {
                 | State::Running
                 | State::Paused
                 | State::AwaitingLocalStart
+                | State::Homing
                 | State::Done { .. }
         );
+        // A waiting Home starts no job, so it names none.
+        let waits_home = self.state == State::AwaitingLocalStart && self.waiting == Waiting::Home;
         let job = self
             .held
             .as_ref()
-            .filter(|_| carries_job)
+            .filter(|_| carries_job && !waits_home)
             .map(|h| Progress {
                 job_id: h.job.job_id,
                 line: h.line,
@@ -239,7 +271,7 @@ impl Machine {
             state: self.state,
             job,
             position: self.position,
-            alarm: self.alarm.clone(),
+            alarm: self.alarm.clone().filter(|_| self.state != State::Homing),
             detail: self.shown_detail(),
         }
     }
@@ -279,7 +311,7 @@ impl Machine {
     }
 
     fn enter(&mut self, state: State, out: &mut Output) {
-        if !matches!(state, State::Running | State::Paused) {
+        if !matches!(state, State::Running | State::Paused | State::Homing) {
             self.stop_pending = false;
         }
         self.state = state;
@@ -332,6 +364,7 @@ impl Machine {
                 out.commands.push(ControllerCommand::Unlock);
             }
             Message::Unlock => {}
+            Message::Home => self.home(out),
             _ => Self::error(
                 out,
                 ErrorCode::UnexpectedMessage,
@@ -435,6 +468,7 @@ impl Machine {
         } else if held_id != Some(job_id) {
             Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
         } else if self.options.require_local_start {
+            self.waiting = Waiting::Start;
             self.set(State::AwaitingLocalStart, out);
         } else {
             out.commands.push(ControllerCommand::Start { job_id });

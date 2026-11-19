@@ -81,6 +81,7 @@ const fn holds_progress(state: State) -> bool {
         state,
         State::Ready
             | State::AwaitingLocalStart
+            | State::Homing
             | State::Running
             | State::Paused
             | State::Done { .. }
