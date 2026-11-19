@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>01 · Adjustments: Preset and Strength</title>
+<link rel="stylesheet" href="../2026-11-raster/kit.css"><link rel="stylesheet" href="adjust.css">
+<script src="../2026-11-raster/kit.js"></script><script src="adjust.js"></script></head>
+<body><div class="sheet">
+<h1>01 · The picture's own Adjustments: Preset, Strength, Make editable</h1>
+<p class="lead">A selected image shows its Adjustments in its own <b>Style tab</b> (the object's settings, like stroke and fill for a shape); the Image operation row is unchanged. Column 256 px. Preset is a fixed two-row choice strip (no list that opens); every cell's tooltip names the dither it sets. Strength is the one slider in the app's panels, with its percent field. A dashed outline marks a new control. Notes: <code>specs/0135-image-optimisation/ux-notes.md</code> sections 3 and 4.</p>
+<div class="cols" id="cols"></div>
+</div>
+<script>
+const hdr = '<div class="hdr">Style</div>';
+const derived = (s) => {
+  const lerp = (a, b) => Math.round(a + ((b - a) * s) / 100);
+  return `<div class="muted">From preset Photo, Strength ${s} %</div>
+  <div class="steps">
+    ${step({ kind: 'denoise', ro: true, nums: `Strength ${lerp(10, 40)} %, Detail kept ${lerp(70, 50)} %` })}
+    ${step({ kind: 'levels', ro: true, nums: `Black ${(0.2 + (1.8 * s) / 100).toFixed(0)} %, White ${100 - Math.round(0.2 + (1.8 * s) / 100)} %, Gamma ${(0.95 - s * 0.002).toFixed(2)}` })}
+    ${step({ kind: 'local_contrast', ro: true, nums: `Radius 10.0 mm, Amount ${lerp(10, 90)} %` })}
+    ${step({ kind: 'sharpen', ro: true, nums: `Radius 0.10 mm, Amount ${lerp(40, 200)} %, Threshold 0 %` })}
+  </div>
+  <div class="btn full">Make editable</div>`;
+};
+const levelsBody = () => {
+  const src = flatPhoto(120, 80);
+  return `${levelsGraph(src, 37, 72, 0.88)}
+    <div class="fr">${field('Black', '37', '%', 112)}${field('White', '72', '%', 112)}</div>
+    <div class="fr">${field('Gamma', '0.88', '', 112)}<span class="ib" title="Stretch to the picture's range">${ic('stretch')}</span></div>`;
+};
+const screens = [
+  ['A · A new picture: Expert, nothing changed', 'Preset Expert (no Strength: hidden, its value kept), no steps, the add toolbar. Restore original is greyed: nothing to restore. Not in an Image operation yet: the state line says so.',
+    hdr + `<div class="col">${groupHeader({ restoreOff: true })}<div class="muted">Not engraved yet</div>${presetStrip('expert', { mark: true })}<div class="hair"></div>${addBar()}</div>`,
+    'The dots equal those of 0123 byte for byte (criterion 1). Copy and Paste adjustments come with slice 2; AI buttons with slice 3.'],
+  ['B · Photo picked (tooltip on hover)', 'One press, one step "Edit adjustments"; it also sets Jarvis in the picture\'s Image operation. Strength appears at 50 %. The derived steps are read-only rows with their resolved numbers; Make editable turns them into ordinary steps.',
+    hdr + `<div class="col">${groupHeader()}${presetStrip('photo', { hover: 'photo' })}${strength(50, { mark: true })}<div class="hair"></div>${derived(50)}<div class="hair"></div>${addBar({ preset: true })}</div>`,
+    'With a preset the tone and detail buttons are hidden (P8): those steps would not run. Crop, Resize and the AI steps always run, so they stay.'],
+  ['C · Strength dragged to 80 %', 'Keyboard: arrows 1, Page Up and Down 10, Home 0, End 100. The field and the slider show the same value; the numbers of the derived rows follow live; press to release is one undo step.',
+    hdr + `<div class="col">${groupHeader()}${presetStrip('photo')}${strength(80, { focus: true })}<div class="hair"></div>${derived(80)}<div class="hair"></div>${addBar({ preset: true })}</div>`,
+    'Gentle and Strong are the slider\'s end labels (names, not tips). The field refuses 120 with "Between 0 and 100 %".'],
+  ['D · After Make editable: ordinary steps', 'Preset is Expert again, the four steps are the manual stack with the numbers they had (dots identical). Levels unfolded: the histogram of the picture before Levels, the three handles, the fields; Stretch is a symbol button.',
+    hdr + `<div class="col">${groupHeader()}${presetStrip('expert')}<div class="hair"></div>${addBar()}<div class="steps">
+      ${step({ kind: 'denoise', nums: 'Strength 25 %, Detail kept 60 %', up: false })}
+      ${step({ kind: 'levels', body: levelsBody(), cls: 'new' })}
+      ${step({ kind: 'local_contrast', nums: 'Radius 10.0 mm, Amount 50 %' })}
+      ${step({ kind: 'sharpen', nums: 'Radius 0.10 mm, Amount 120 %, Threshold 0 %', down: false })}</div></div>`,
+    'A press on a name folds or unfolds its row (several may be open). Fields: plain fields with units inside; the graph is a readout with handles.'],
+  ['E · Graphics preset over a manual stack', 'A Crop (always runs) and a manual Levels the maker had before: with a preset it is kept but does not run, line 2 says "Preset in use". Remove background (slice 3) always runs, last. The bands are split by hairlines; arrows stop at a band\'s edge.',
+    hdr + `<div class="col">${groupHeader()}${presetStrip('graphics')}${strength(50)}<div class="hair"></div>
+      <div class="muted">From preset Graphics, Strength 50 %</div><div class="steps">
+      ${step({ kind: 'denoise', ro: true, nums: 'Strength 40 %, Detail kept 80 %' })}
+      ${step({ kind: 'levels', ro: true, nums: 'Black 1 %, White 99 %, Gamma 1.00' })}
+      ${step({ kind: 'sharpen', ro: true, nums: 'Radius 0.10 mm, Amount 50 %, Threshold 8 %' })}</div>
+      <div class="btn full">Make editable</div><div class="hair"></div>${addBar({ preset: true })}
+      <div class="steps">${step({ kind: 'crop', nums: 'Left 10 %, Top 0 %, Width 80 %, Height 100 %', up: false, down: false })}<div class="band"></div>
+      ${step({ kind: 'levels', off: true, nums: 'Preset in use · Black 5 %, White 90 %', up: false, down: false })}<div class="band"></div>
+      ${step({ kind: 'remove_background', nums: 'Edge softness 5 %, Threshold 50 %', up: false, down: false })}</div></div>`,
+    'Make editable here would replace the manual Levels by the derived steps (criterion 29); the notes say how (5.4).'],
+  ['F · Reorder by drag and by arrows; armed trash', 'Levels is dragged below Local contrast: ghost at the pointer, 2 px accent insertion line, landing only inside the tone band. Sharpen\'s trash is armed (first press): the row turns pale red, the trash a filled red square; the second press removes it.',
+    hdr + `<div class="col">${groupHeader()}${presetStrip('expert')}<div class="hair"></div>${addBar()}<div class="steps">
+      ${step({ kind: 'resize', nums: 'Width 1,200 px', up: false, down: false })}<div class="band"></div>
+      ${step({ kind: 'denoise', nums: 'Strength 25 %, Detail kept 60 %', up: false })}
+      ${step({ kind: 'levels', nums: 'Black 37 %, White 72 %, Gamma 0.88', cls: 'hold' })}
+      ${step({ kind: 'local_contrast', nums: 'Radius 10.0 mm, Amount 50 %' })}<div class="ins"></div>
+      ${step({ kind: 'sharpen', nums: 'Radius 0.10 mm, Amount 120 %, Threshold 0 %', down: false, armed: true })}</div></div>`,
+    'Alt+Up and Alt+Down move the focused row; Delete arms, Delete or Enter removes. Each move or removal is one "Edit adjustments" step.'],
+];
+figures('cols', screens);
+const figs = document.querySelectorAll('figure');
+// The tooltip of screen B on the Photo cell.
+tipAt(figs[1], figs[1].querySelector('.strip [data-p="photo"]'), presetTip('photo'));
+// The drag ghost of screen F.
+const f = figs[5]; f.style.position = 'relative';
+const held = f.querySelector('.st.hold'), r = held.getBoundingClientRect(), fr = f.getBoundingClientRect();
+f.insertAdjacentHTML('beforeend', `<div class="st ghost" style="position:absolute;width:256px;left:${r.left - fr.left + 40}px;top:${r.top - fr.top + 40}px">${held.innerHTML}</div>`);
+</script>
+</body></html>

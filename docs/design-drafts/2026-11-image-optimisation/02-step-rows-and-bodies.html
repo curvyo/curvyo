@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>02 · Adjustment steps: glyphs and bodies</title>
+<link rel="stylesheet" href="../2026-11-raster/kit.css"><link rel="stylesheet" href="adjust.css">
+<script src="../2026-11-raster/kit.js"></script><script src="adjust.js"></script>
+<style>.gs{display:grid;grid-template-columns:120px 24px 40px;gap:6px 10px;align-items:center;font-size:13px}.gs .x2{color:var(--toolbar-icon)}
+.f.bad{border-color:var(--field-invalid);border-width:1.5px}.f.der .v{color:var(--field-derived-fg)}</style></head>
+<body><div class="sheet">
+<h1>02 · Steps: glyphs, the add toolbar and every step's body</h1>
+<p class="lead">One row look for every step, the operation row's anatomy: glyph, name (press folds), power (on or off), armed trash, then the up and down arrows. Folded, line 2 shows the numbers; unfolded, the plain fields with units inside. Graphs are readouts with handles, in ink and muted ink only. Body column 228 px. Notes: <code>ux-notes.md</code> sections 3.5 to 3.8 and 6.</p>
+<div class="cols" id="cols"></div>
+</div>
+<script>
+const sheet = `<div class="gs">${Object.keys(STEP_NAME).map((k) => `<span>${STEP_NAME[k]}</span><span class="x2">${sg(k)}</span><span class="x2">${sg(k, 32)}</span>`).join('')}</div>
+  <div class="hair"></div><div class="lab12">Add toolbar, all slices (one Tab stop, arrows)</div>${addBar()}`;
+const src = flatPhoto(120, 80);
+const curves = `<div class="fr" style="align-items:flex-start;gap:4px">${curvesGraph([[0, 0], [25, 16], [70, 82], [100, 100]], 1)}
+  <div style="display:flex;flex-direction:column;gap:4px;width:104px">${field('In', '25', '%', 104)}${field('Out', '16', '%', 104)}
+  <div class="fr"><span class="muted" style="flex:1">Point 2 of 4</span><span class="ib" title="Straight curve">${ic('straight')}</span></div></div></div>`;
+const channel = `<div class="strip" role="radiogroup" aria-label="Channel preset"><span class="c">Luminance</span><span class="c on">Red</span><span class="c">Green</span><span class="c">Blue</span></div>
+  <div class="fr">${field('Red', '100', '%', 74)}${field('Green', '0', '%', 74)}${field('Blue', '0', '%', 72)}</div>`;
+const crop = `<div class="fr">${field('Left', '10', '%', 112)}${field('Top', '0', '%', 112)}</div>
+  <div class="fr">${field('Width', '80', '%', 112)}${field('Height', '100', '%', 112)}</div>
+  <div class="fr"><span class="ib" title="Crop on the canvas">${ic('crop')}</span></div>`;
+const resize = `<div class="fr">${field('Width', '1200', 'px', 96)}<span class="tg on" title="Keep the ratio">${ic('link2')}</span>
+  <div class="f der" style="width:96px"><span class="lb">Height</span><span class="v">900</span><span class="u">px</span></div></div>
+  <div class="muted">Working image 2,400 × 1,800 px</div>`;
+const screens = [
+  ['A · Step glyphs (1x, 2x) and the add toolbar', 'Custom 16 px glyphs at 1.5 px in ink; the three AI steps carry the small four-point spark at the top right, nothing else marks them. Row 1 of the add toolbar: tone and detail in pipeline order; row 2: frame, gap, AI.',
+    sheet, 'Each button: tooltip and name "Add Levels"; a press inserts the step at its pipeline place, unfolded, focus on its first field.'],
+  ['B · Curves, Sharpen, Local contrast', 'Curves: the 120 px graph with the identity dashed, points as square handles (the selected one filled), the selected point\'s In and Out beside it. Click on the curve adds a point, Delete on a focused point removes it. Sharpen and Local contrast: two or three fields.',
+    `<div class="col"><div class="steps">${step({ kind: 'curves', body: curves, up: false })}
+      ${step({ kind: 'local_contrast', body: `<div class="fr">${field('Radius', '3.0', 'mm', 112)}${field('Amount', '50', '%', 112)}</div>` })}
+      ${step({ kind: 'sharpen', body: `<div class="fr">${field('Radius', '0.10', 'mm', 112)}${field('Amount', '100', '%', 112)}</div><div class="fr">${field('Threshold', '0', '%', 112)}</div>`, down: false })}</div></div>`,
+    'Radii are mm of the page; the step converts them with the picture\'s pixel pitch. No sliders.'],
+  ['C · Denoise, Contours, Resize; a step turned off', 'Contours is off: the power glyph struck through, the name muted and line 2 starts with "Off"; the picture is as if it were absent, the fields kept. Resize: width in px, the lock keeps the ratio, the height follows (derived ink).',
+    `<div class="col"><div class="steps">${step({ kind: 'resize', body: resize, up: false, down: false })}<div class="band"></div>
+      ${step({ kind: 'denoise', body: `<div class="fr">${field('Strength', '30', '%', 112)}${field('Detail kept', '60', '%', 112)}</div>`, up: false })}
+      ${step({ kind: 'contours', off: true, nums: 'Off · Line width 0.30 mm, Sensitivity 50 %', down: false })}</div></div>`,
+    'Resize only reduces: a width above the working image is refused, "Between 16 and 2,400 px".'],
+  ['D · Channel mix, Crop, a refused value, an unknown step', 'Channel mix: the four presets as a strip that sets the three fields (none pressed when the fields match none). Crop: four % fields and the symbol button that opens the Crop bar on the canvas (screen 03). Levels with 120 typed: refused, the range under the field.',
+    `<div class="col"><div class="steps">${step({ kind: 'crop', body: crop, up: false })}
+      ${step({ kind: 'channel_mix', body: channel, down: false })}<div class="band"></div>
+      ${step({ kind: 'levels', body: `${levelsGraph(src, 4, 96, 1)}<div class="fr"><div class="f bad" style="width:112px"><span class="lb">Black</span><span class="v">120</span><span class="u">%</span></div>${field('White', '96', '%', 112)}</div><div class="alert" role="alert">Between 0 and 94 %</div><div class="fr">${field('Gamma', '1.00', '', 112)}<span class="ib" title="Stretch to the picture's range">${ic('stretch')}</span></div>`, up: false, down: false })}
+      <div class="band"></div>
+      <div class="st"><div class="a1"><span class="gl">${sg('unknown')}</span><span class="nm">Unknown step</span><i class="tr" title="Remove Unknown step">${ic('trash')}</i><span class="g"></span><i></i><i></i></div><div class="a2">Not run · from a newer Curvyo</div></div></div></div>`,
+    'An unknown step keeps its place and data, has no power and no arrows, and adds the check line "1 step in the Adjustments of photo.jpg could not run."'],
+];
+figures('cols', screens);
+</script>
+</body></html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>03 · Crop on the canvas, Before and after</title>
+<link rel="stylesheet" href="../2026-11-raster/kit.css"><link rel="stylesheet" href="adjust.css">
+<script src="../2026-11-raster/kit.js"></script><script src="adjust.js"></script>
+<style>.cv canvas{position:absolute}.wash{position:absolute;background:rgba(255,255,255,.65)}
+.frame{position:absolute;border:1px solid var(--accent);box-shadow:0 0 0 1px #fff}
+.div{position:absolute;top:0;bottom:0;width:7px;margin-left:-3px;cursor:col-resize}
+.div::after{content:"";position:absolute;left:2px;top:0;bottom:0;width:3px;background:var(--editor-accent)}
+.vsep{position:absolute;top:0;bottom:0;width:1px;background:var(--line25)}
+.zr{font-size:12px;font-variant-numeric:tabular-nums;width:44px;text-align:right}</style></head>
+<body><div class="sheet">
+<h1>03 · Crop on the canvas, and Before and after at the real dot size</h1>
+<p class="lead">Crop is edited where the picture is: its own bar replaces the Select bar (as the Trace bar does) and the frame has rectangle handles with entry chips. Before and after is the canvas side pane of the font preview (0077): the original against the dots that will burn, at the operation's Interval, dither and Scan angle; zoom and pan locked. Notes: <code>ux-notes.md</code> sections 3.9 and 7.</p>
+<figure class="wide"><figcaption>A · Crop bar and crop handles<span>Opened by the Crop step's symbol button (or by adding Crop). The whole picture shows, the part that goes is washed out; handles as a rectangle's, drag inside moves the frame. Every release is one step "Edit adjustments"; Done (Enter) or Escape leaves. A double-click on a handle opens its entry chip (here the right side's).</span></figcaption>
+  <div class="cv" id="cvA" style="width:1240px;height:420px"><div class="page" style="left:20px;top:20px;width:1200px;height:380px"></div></div></figure>
+<figure class="wide" style="margin-top:20px"><figcaption>B · Before and after, Split (default), one Image operation<span>Opened by the Adjustments header's symbol button (pressed while open). Left of the divider the original, right the dots that burn, here Photo at Strength 50 %, Jarvis, 0.10 mm, at 200 % (one dot = 2 screen px). The divider (shown in its hover look) drags: 7 px hit, 1 px ink at rest, 3 px accent on hover, drag and focus; Left and Right move it.</span></figcaption>
+  <div class="cv" id="cvB" style="width:1240px;height:440px"></div></figure>
+<figure class="wide" style="margin-top:20px"><figcaption>C · Side by side, full view, a picture in two Image operations<span>The pick names the operation whose Interval and dither show (default the first in the Operations list). Image 2 burns at 0.20 mm: the preset rescales its radii, the dots are twice as large. Both halves zoom and pan together.</span></figcaption>
+  <div class="cv" id="cvC" style="width:1240px;height:400px"></div></figure>
+<figure class="wide" style="margin-top:20px"><figcaption>D · On the canvas: Select view and Operations view, with Remove background<span>Select view: the adjusted picture in grey (no extra symbol on the object, P15). A removed background shows the transparency checkerboard (it burns nothing). Operations view: the dots, none where the mask took the background.</span></figcaption>
+  <div class="cv" id="cvD" style="width:1240px;height:300px"><div class="page" style="left:20px;top:20px;width:1200px;height:260px"></div></div></figure>
+</div>
+<script>
+const W = 150, H = 100, src = flatPhoto(W, H);
+const put = (host, el, x, y) => { el.style.left = `${x}px`; el.style.top = `${y}px`; host.appendChild(el); return el; };
+// A
+const A = document.getElementById('cvA');
+A.insertAdjacentHTML('beforeend', `<div class="bar" style="position:absolute;left:12px;top:12px" role="toolbar" aria-label="Crop">
+  <div class="grp"><span style="display:flex">${sg('crop')}</span><span style="font-size:14px">Crop</span></div>
+  <div class="grp new">${field('Left', '10', '%', 96)}${field('Top', '0', '%', 96)}${field('Width', '80', '%', 104)}${field('Height', '100', '%', 112)}</div>
+  <div class="grp"><span class="ib" title="Done (Enter)">${ic('check')}</span></div></div>`);
+const px = 2.4, ix = 420, iy = 80;
+const ca = put(A, document.createElement('canvas'), ix, iy); paintGrey(ca, src, W, H, px);
+const iw = W * px, ih = H * px, cl = ix + iw * 0.1, cw = iw * 0.8;
+A.insertAdjacentHTML('beforeend', `<div class="wash" style="left:${ix}px;top:${iy}px;width:${iw * 0.1}px;height:${ih}px"></div><div class="wash" style="left:${cl + cw}px;top:${iy}px;width:${iw * 0.1}px;height:${ih}px"></div>
+  <div class="frame" style="left:${cl}px;top:${iy}px;width:${cw}px;height:${ih}px"></div>`);
+for (const [fx, fy] of [[0, 0], [0.5, 0], [1, 0], [1, 0.5], [1, 1], [0.5, 1], [0, 1], [0, 0.5]]) A.insertAdjacentHTML('beforeend', `<div class="handle" style="left:${cl + fx * cw}px;top:${iy + fy * ih}px"></div>`);
+A.insertAdjacentHTML('beforeend', `<div class="echip" style="left:${cl + cw + 18}px;top:${iy + ih / 2 - 18}px">${field('Width', '80', '%', 104)}</div>`);
+// B
+const B = document.getElementById('cvB');
+B.insertAdjacentHTML('beforeend', `<div class="page" style="left:20px;top:20px;width:620px;height:400px"></div>`);
+const cb = put(B, document.createElement('canvas'), 120, 120); paintGrey(cb, src, W, H, 1.4);
+B.insertAdjacentHTML('beforeend', `<div class="frame" style="left:120px;top:120px;width:${W * 1.4}px;height:${H * 1.4}px"></div>`);
+const pane = document.createElement('div'); pane.className = 'pane'; pane.style.width = '560px'; pane.setAttribute('role', 'region');
+pane.innerHTML = `<div class="phead"><div class="strip new" style="width:auto"><span class="c on">Split</span><span class="c">Side by side</span></div>
+  <span class="sub" style="flex:1">photo.jpg · Image 1 · Jarvis · 0.10 mm</span><span class="zr">200 %</span><span class="ib" title="Full view">${ic('max')}</span><span class="ib" title="Close Before and after">${ic('x')}</span></div>
+  <div style="position:relative;flex:1;overflow:hidden" id="bodyB"></div>`;
+B.appendChild(pane);
+const bodyB = pane.querySelector('#bodyB');
+const adj = photoPreset(src, W, H, 50), dots = dither(adj, W, H, 'jarvis');
+const bx = 50, by = 30, split = 0.45;
+const before = put(bodyB, document.createElement('canvas'), bx, by); paintGrey(before, src, W, H, 2);
+const after = put(bodyB, document.createElement('canvas'), bx, by); paintMap(after, dots, W, H, 2);
+after.style.clipPath = `inset(0 0 0 ${split * 100}%)`; before.style.clipPath = `inset(0 ${(1 - split) * 100}% 0 0)`;
+bodyB.insertAdjacentHTML('beforeend', `<div class="div" style="left:${bx + W * 2 * split}px"></div><div class="htag" style="left:${bx + 6}px;top:${by + 6}px">Before</div><div class="htag" style="left:${bx + W * 2 - 46}px;top:${by + 6}px">After</div>`);
+// C
+const C = document.getElementById('cvC');
+const paneC = document.createElement('div'); paneC.className = 'pane'; paneC.style.left = '0';
+paneC.innerHTML = `<div class="phead"><div class="strip" style="width:auto"><span class="c">Split</span><span class="c on">Side by side</span></div>
+  <div class="strip new" style="width:auto" role="radiogroup" aria-label="Operation"><span class="c">Image 1</span><span class="c on">Image 2</span></div>
+  <span class="sub" style="flex:1">photo.jpg · Image 2 · Jarvis · 0.20 mm</span><span class="zr">200 %</span><span class="ib" title="Split view">${ic('min')}</span><span class="ib" title="Close Before and after">${ic('x')}</span></div>
+  <div style="position:relative;flex:1;overflow:hidden" id="bodyC"></div>`;
+C.appendChild(paneC);
+const bodyC = paneC.querySelector('#bodyC');
+const sb = put(bodyC, document.createElement('canvas'), 160, 30); paintGrey(sb, src, W, H, 2);
+const W2 = W / 2, H2 = H / 2, src2 = flatPhoto(W2, H2), d2 = dither(photoPreset(src2, W2, H2, 50), W2, H2, 'jarvis');
+const sa = put(bodyC, document.createElement('canvas'), 780, 30); paintMap(sa, d2, W2, H2, 4);
+bodyC.insertAdjacentHTML('beforeend', `<div class="vsep" style="left:620px"></div><div class="htag" style="left:166px;top:36px">Before</div><div class="htag" style="left:786px;top:36px">After</div>`);
+// D
+const D = document.getElementById('cvD');
+const inside = (x, y) => ((x - W * 0.5) / (W * 0.36)) ** 2 + ((y - H * 0.55) / (H * 0.42)) ** 2 < 1;
+D.insertAdjacentHTML('beforeend', `<div class="chk" style="position:absolute;left:120px;top:40px;width:${W * 1.6}px;height:${H * 1.6}px"></div>`);
+const dS = put(D, document.createElement('canvas'), 120, 40); paintGrey(dS, adj, W, H, 1.6, 1, inside);
+D.insertAdjacentHTML('beforeend', `<div class="frame" style="left:120px;top:40px;width:${W * 1.6}px;height:${H * 1.6}px"></div><div class="lbl" style="position:absolute;left:120px;top:222px;font-size:12px">Select view</div>`);
+const dO = put(D, document.createElement('canvas'), 520, 40); paintDots(dO, adj, W, H, 'jarvis', 1.6, inside);
+D.insertAdjacentHTML('beforeend', `<div class="chip" style="left:${520 + W * 1.6 - 26}px;top:44px">${glyph('image')}</div><div style="position:absolute;left:520px;top:222px;font-size:12px">Operations view</div>`);
+</script>
+</body></html>

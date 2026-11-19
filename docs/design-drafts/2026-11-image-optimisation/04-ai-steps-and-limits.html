@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>04 · AI steps, model download, stored results</title>
+<link rel="stylesheet" href="../2026-11-raster/kit.css"><link rel="stylesheet" href="adjust.css">
+<script src="../2026-11-raster/kit.js"></script><script src="adjust.js"></script>
+<style>.consent{display:flex;flex-direction:column;gap:8px;padding:8px;border:1px solid var(--field-border);border-radius:5px}
+.two{display:flex;gap:8px}.two .btn{flex:1}.btn.focus{box-shadow:0 0 0 2px var(--editor-accent)}</style></head>
+<body><div class="sheet">
+<h1>04 · AI steps (slice 3): Run, the one-time model download, stored results and their limits</h1>
+<p class="lead">An AI step is a step row like any other, with one more thing in its body: the <b>Run</b> button (the Apply look) and one state line under it. Nothing runs while editing; the first Run of a model asks once, in place, before anything is downloaded. All states are words in ink or muted ink, the warn triangle of the checks, refusals in the field-invalid red. Notes: <code>ux-notes.md</code> section 8.</p>
+<div class="cols" id="cols"></div>
+</div>
+<script>
+const rb = (fields, line, { run = 'Run', extra = '', runFocus = false } = {}) => `${fields}
+  <div class="fr"><span class="btn apply${runFocus ? ' focus' : ''}" style="width:72px">${run}</span>${extra}</div>${line}`;
+const bgFields = `<div class="fr">${field('Edge softness', '5', '%', 124)}${field('Threshold', '50', '%', 100)}</div>`;
+const upFields = (on) => `<div class="strip" role="radiogroup" aria-label="Factor" style="width:120px"><span class="c${on === 2 ? ' on' : ''}">2×</span><span class="c${on === 4 ? ' on' : ''}">4×</span></div>`;
+const dnFields = `<div class="fr">${field('Strength', '50', '%', 112)}</div>`;
+const prog = (p, text) => `<div class="prog"><b style="width:${p}%"></b></div><div class="fr"><span class="muted" style="flex:1">${text}</span><span class="btn">Cancel</span></div>`;
+const warn = (t) => `<div class="warnl"><span style="display:flex;margin-top:0">${ic('warn')}</span><span>${t}</span></div>`;
+const head = `<div class="hdr">Style</div><div class="col">${groupHeader()}${presetStrip('expert')}<div class="hair"></div>${addBar()}`;
+const screens = [
+  ['A · Remove background, model not on this device', 'Line under Run: the size it will fetch. Edge softness and Threshold refine the mask afterwards without the model.',
+    `${head}<div class="steps">${step({ kind: 'remove_background', name: 'Remove background', body: rb(bgFields, '<div class="muted">Model not downloaded yet (38 MB).</div>'), up: false, down: false })}</div></div>`,
+    'The name ellipsis in the row is the operation row\'s rule; the tooltip and accessible name are whole.'],
+  ['B · First Run: the consent, in place of Run', 'The Run row is replaced by the sentence and two buttons, Cancel and Download (Apply look); focus on Cancel. Asked once per model; Escape, Cancel, another selection cancel without a download.',
+    `${head}<div class="steps">${step({ kind: 'remove_background', name: 'Remove background', body: `${bgFields}<div class="consent new" role="group"><div style="font-size:12px;line-height:16px">Downloads the Background model (38 MB) once from models.curvyo.app. Your picture does not leave this computer.</div><div class="two"><span class="btn focus">Cancel</span><span class="btn apply">Download</span></div></div>`, up: false, down: false })}</div></div>`,
+    'The host name is the ADR\'s (criterion 63). No other network use exists; this is the only consent in the app.'],
+  ['C · Downloading, then running', 'One progress line per step: a 4 px bar, the words and Cancel. Download and run are in a worker: the panel and the canvas stay live; other steps can be edited meanwhile (the run uses the input at its start).',
+    `${head}<div class="steps">${step({ kind: 'upscale', body: `${upFields(2)}${prog(62, 'Running · 62 %')}<div class="muted">1,200 × 900 px to 2,400 × 1,800 px</div>`, up: false })}
+      ${step({ kind: 'ai_denoise', body: `${dnFields}${prog(32, 'Downloading 21 of 64 MB')}`, down: false })}<div class="band"></div>
+      ${step({ kind: 'remove_background', name: 'Remove background', nums: 'Edge softness 5 %, Threshold 50 %', up: false, down: false })}</div></div>`,
+    'Cancel stops at once and keeps the previous stored result, if any; a partial download is never used.'],
+  ['D · Host not reachable; a bad checksum', 'No network or no host: one sentence and Try again; stored results still burn. A file that fails its pinned SHA-256 is deleted, never run.',
+    `${head}<div class="steps">${step({ kind: 'upscale', body: rb(upFields(2), '<div class="muted">Model host not reachable. Everything else keeps working and stored results still burn.</div>', { run: 'Try again' }), up: false })}
+      ${step({ kind: 'ai_denoise', body: rb(dnFields, '<div class="alert" role="alert">The downloaded model did not match its checksum and was removed.</div>', { run: 'Try again' }), down: false })}</div></div>`,
+    'Try again is the Run button relabelled: one place, one press.'],
+  ['E · Stored results: up to date, out of date, the budget', 'A run result is stored in the project (PNG). An upstream change marks it "Out of date" (warn triangle, line 2); the job keeps the stored result until Run. The group\'s last line is the budget.',
+    `${head}<div class="steps">${step({ kind: 'ai_denoise', nums: '⚠ Out of date · Strength 50 %', body: rb(dnFields, warn('Out of date. The stored result still burns.'), { extra: '<span class="btn">Remove stored result</span>' }), up: false })}<div class="band"></div>
+      ${step({ kind: 'remove_background', name: 'Remove background', body: rb(bgFields, '<div class="muted">Stored result 2.1 MB</div>', { extra: '<span class="btn">Remove stored result</span>' }), up: false, down: false })}</div>
+      <div class="hair"></div><div class="muted">Stored results 120 MB of 512 MB</div></div>`,
+    'Run again over an up-to-date result reruns (same input, same model: the same PNG).'],
+  ['F · Limits: the working limit, one result, the document', 'Upscale 4× over the 16 Mpx working limit is refused before it runs. A result over 64 MB, or a document over 512 MB, is refused with the limit named and Remove stored result offered. From 384 MB the budget line warns.',
+    `${head}<div class="steps">${step({ kind: 'upscale', body: rb(upFields(4), '<div class="alert" role="alert">4× would be 9,600 × 7,200 px, over the working limit of 16 megapixels.</div>'), up: false })}
+      ${step({ kind: 'ai_denoise', body: rb(dnFields, '<div class="alert" role="alert">This result would be 70 MB; one stored result can be at most 64 MB.</div>', { extra: '<span class="btn">Remove stored result</span>' }), down: false })}</div>
+      <div class="hair"></div>${warn('Stored results 400 MB of 512 MB')}</div>`,
+    'These limits are separate from the 512 KiB material record and the 1 MiB test photo.'],
+];
+figures('cols', screens);
+</script>
+</body></html>

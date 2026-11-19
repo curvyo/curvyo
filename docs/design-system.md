@@ -557,6 +557,14 @@ values, not an implementation site, for those four rows.
   bar the same choice is the bar's own segments (`--value-fill` pressed), so a
   bar keeps one segment look. The inline list (`MaterialPick`, `OutputPick`)
   stays for open-ended sets (materials, profiles).
+- **Plain fields, not sliders, in the panel** (customer, `0123`, 2026-11-18; recorded
+  2026-11-19): a number in the Properties panel is a field with its unit inside (the bar
+  number field or the Value field), never a slider. Graphs (Levels, Curves) are readouts
+  with handles beside the same values in fields. **The one exception** is the **Strength**
+  slider of a picture's preset (`0135` criterion 26; the customer asked for it explicitly):
+  a slider with its percent field beside it (section "Image adjustments"). No other panel
+  slider is added on its strength; a second one needs the customer. The bars' Ratio
+  sliders and the font preview's Size slider are outside the panel and predate the rule.
 - **No popups in the properties panel** (customer, final, 2026-10-08,
   `style-panel-rework`). No control in the panel opens a popover, dropdown list,
   menu, dialog or any other layer over the canvas or over other panel content.
@@ -1749,6 +1757,32 @@ Decisions: `specs/0123-raster-engraving/ux-notes.md` sections 2 and 3. The kind 
 | Wrong kind | An item its kind cannot run (an image in Engrave or Engrave + Outline, a shape without a Gradient fill in Image): the Not assigned look (dimmed, 1px dashed 4 on 3 `--lane-line`) but its chip stays, in `--panel-muted-fg`; one warn line per operation in the checks |
 | Raster dots | `--engrave-hatch` dots on a transparent ground, at most one per device pixel; each placement (linked clone, placed page) draws its own dots on rows at the page's Scan angle; first build pending: a 1px `--engrave-hatch` frame and the chip |
 
+## Image adjustments (`0135`, draft 2026-11-19)
+
+Draft until `0135` is Done: `specs/0135-image-optimisation/ux-notes.md`, drafts `docs/design-drafts/2026-11-image-optimisation/`. No new colour or token.
+
+| Item | Value |
+|---|---|
+| Place | The Style tab of exactly one selected image or image clone (the object's own settings); not dimmed for an image. The Image operation row holds no preset or stack. Selecting an image switches no tab |
+| Group order | Header (28: "Adjustments" 14px semibold; Before and after `Columns2` toggle, Copy adjustments `Copy`, Paste adjustments `ClipboardPaste`, Restore original `RotateCcw`, 28 x 28 symbol buttons; Restore greyed while nothing to restore), state line ("Not engraved yet"), Preset strip, Strength, hairline, derived rows and Make editable, hairline, add toolbar, step list, budget line |
+| Preset strip | `PresetStrip`, `radiogroup` "Preset", two fixed rows: Photo, Graphics, Black and white / Line art, Dots, Newspaper, Expert. Every cell's tooltip "<full name> · Dither: <mode>" (above, 400ms); accessible name the full name. No list, no description line |
+| Strength slider | **The panel's one slider** (row "Plain fields, not sliders, in the panel"). Shown while the Preset is not Expert. Row 1: slider 144 x 24 target (4px track ink 25 %, fill `--accent`, 14px white thumb with a 1.5px `--accent` ring), 8, field "Strength 50 %" 104px. Row 2: "Gentle" and "Strong" 12px muted under the slider's ends. Keys: arrows 1, Page Up/Down 10, Home 0, End 100; one drag or key run is one step; no tooltip |
+| Derived rows | Read-only step rows (glyph, name, line 2 the resolved numbers), under "From preset Photo, Strength 50 %" 12px muted; then **Make editable**, 256 x 28 outline text button |
+| Add toolbar | `toolbar` "Add adjustment", 28 x 28 step-glyph buttons 4px apart, one Tab stop. Row 1: Channel mix, Denoise, Levels, Curves, Local contrast, Contours, Sharpen (hidden while a preset is active). Row 2: Crop, Resize, 8, Upscale, AI denoise, Remove background. Inserts at the pipeline place, unfolded, focus on the first field |
+| Step glyphs | 16 x 16, ink, 1.5px, custom (draft 02 sheet); the three AI steps carry a small four-point spark at the top right, nothing else marks them |
+| Step row | The operation row's anatomy without eye and rename: glyph, name (press folds, `aria-expanded`), power `Power`/`PowerOff` ("Use Levels", `aria-pressed`), armed trash, 4, up and down arrows. Line 2 (11px muted): numbers; "Off · ", "Preset in use · ", "Out of date · " prefixes with the name muted. Unknown kind: "Unknown step", "Not run · from a newer Curvyo", trash only |
+| Bands | A Crop, Resize, Upscale, AI denoise; B Channel mix, Denoise, Levels, Curves, Local contrast, Contours, Sharpen; C Remove background. 1px ink-25 % hairline between bands; arrows absent at a band's ends; the `0101` reorder drag lands only inside the source band (else `not-allowed`, nothing written); Alt+Up and Alt+Down |
+| Step body | Body column 228px (20px indent), bar number fields 28px with units inside, usually two of 112px per row. Levels graph 228 x 64, Curves graph 120 x 120 (white ground, 1px field border, bars and identity in muted ink, curve ink, handles `--accent`) |
+| Crop bar | Replaces the Select bar in place (as the Trace bar), `toolbar` "Crop": Crop glyph and word, Left 96, Top 96, Width 104, Height 112 (%), Done `Check` "Done (Enter)". Canvas: outside the crop washed white 65 %, frame 1px `--accent` with casing, eight Parameter handles, entry chips by double-click; every release one step; Enter, Escape, Done leave |
+| Before and after pane | `CanvasArea` side pane, 50 % of the area, `SplitDivider`, closes the font preview. Header: Split \| Side by side strip, Operation strip (two or more Image operations), subject line "photo.jpg · Image 1 · Jarvis · 0.10 mm", zoom readout, Full view, Close. Before = original cut to the crop; After = the job's dots in `--engrave-hatch`; tags "Before", "After" (20px, bar ground, 1px `--lane-line`); split divider 1px ink 60 %, 3px `--editor-accent` on hover, drag, focus |
+| AI step body | Fields, **Run** (Apply look, 72 x 28), one state line: "Model not downloaded yet (38 MB).", progress (4px `--accent` bar on ink 20 %, "Downloading 21 of 64 MB" / "Running · 62 %", Cancel), "Model host not reachable. ..." with Try again, checksum alert, "Stored result 2.1 MB" with Remove stored result, `TriangleAlert` "Out of date. The stored result still burns." |
+| Model consent | Replaces the Run row in place: 1px field-border box, 8px padding, the sentence 12px, Cancel \| Download (Apply look, 400ms guard), focus on Cancel; once per model per device. The app's only network consent |
+| Stored results line | Last line of the group while the document has a stored AI result: "Stored results 120 MB of 512 MB" 12px muted; from 75 % `TriangleAlert` and ink |
+| Mask look | Select view: masked-out pixels as the `--checker-a`/`--checker-b` checkerboard (burns nothing); no dots there in the Operations view and in After |
+| Clone override | A third `0057` override row for image clones: **Adjustments**, Original's \| Own. The first edit with Original's makes it Own in the same step; pressing Original's is "Follow original". Tag "Clone, own adjustments" |
+| Dither (amends `0123`) | Nine modes: a third fixed strip row Halftone \| Lines (tooltips "Halftone dots", "Line screen"); fields Cell size or Line pitch 124 (mm) and Angle 104 (°) as the last row; line 3 "Halftone 0.80 mm". The test grid's Dither segments stay at six |
+| Test grid (amends `0123` 5) | Row 1: Picture segments Ramp \| Selected picture; with a picture that has a Preset, the axis parameters gain Strength (Min 0, Max 100 %, Count 5) |
+
 ## Keyboard shortcuts established so far
 
 | Action | Shortcut | Notes |
@@ -1810,6 +1844,7 @@ Decisions: `specs/0123-raster-engraving/ux-notes.md` sections 2 and 3. The kind 
 | Show the History tab | `Shift+Ctrl+H` (`Cmd`) | `0043`, `0020`; Inkscape's Undo History key. Expands the panel, activates History, focus on the list. Ignored during a drag |
 | Show the Layers tab | `Shift+Ctrl+L` (`Cmd`) | `0050`; Inkscape's key for Layers and Objects. Expands the panel, activates Layers, focus on the list, the first selected row scrolled into view. Ignored during a drag. Check in the browser build that Safari (Show Sidebar) and Firefox let `preventDefault` stop the browser action, as for Shift+Ctrl+D and Shift+Ctrl+H |
 | Reorder in the Layers list | `Alt+Up`/`Alt+Down` one place, `Alt+Home`/`Alt+End` to the front or back, `Alt+Left` out of the container, `Alt+Right` into the container in front | `0050`; list focus only; one step each, announced. Browser Back, Forward and Home page share Alt+Left, Alt+Right, Alt+Home on Windows and Linux: checked at build, else `Shift+Alt+` the same keys on that platform |
+| Adjustment steps (`0135`, draft) | Up, Down, Home, End between rows; Enter or Space folds; `Alt+Up`/`Alt+Down` move inside the step's band; `Delete` arms, `Delete` or `Enter` removes; Strength: arrows 1, Page Up/Down 10, Home 0, End 100 | List focus or slider focus only; no letter, no chord |
 | Rename, delete in the Layers list | `F2`, `Delete` on a focused row | `0050`; Delete on a layer row deletes the layer at once, no confirm (Ctrl+Z restores it, criterion 36) |
 | Bring to front, send to back | `Home`, `End`; one place: `Page Up`, `Page Down` (Select tool, selection, canvas focused) | `0050` criterion 33, kept as proposed by the customer on 2026-10-11 (all shortcuts get one overall review at the end, `README.md`); Inkscape's keys; gated like every letter shortcut, `preventDefault` when handled |
 | Linked clone, Select original, Select root original, Select clones, Unlink clone | none; the Linked clone button of the Select bar and the buttons of the Style tab (Tab, Space or Enter) | `0049`; no key (Alt+D is the browser address bar, Question 6). The customer kept it so on 2026-10-11; the overall review of all shortcuts decides again. The marks of a selected clone have no key and take no focus |
