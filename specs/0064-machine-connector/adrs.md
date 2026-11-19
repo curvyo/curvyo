@@ -29,6 +29,15 @@ relay), CONN-REMOTE-START C.
   press at the machine; `--host-relay` runs the `curvyo-sync-server` library inside the connector
   binary, so a workshop needs no other service; the LAN mode of this branch stays (PR #375).
   Covers criteria 7, 8 and the relay part of 2, 3, 4, 9.
+- [ADR 0071](../../docs/adr/0071-connector-api-ctl-and-maintenance-mode.md) (Accepted
+  2026-11-18, Frage 243 to 246 all A; asked by Frage 242's answer): the connector as a
+  service set up from the API side like `talosctl`: without `connector.toml` it is in maintenance
+  mode (unauthenticated, only `Hello`, `ListPorts`, `ApplyConfig`; serial closed; 30 minutes
+  after start; local addresses only); the first configuration makes its sender owner; owner calls
+  are core messages on the existing WebSocket; pairing codes are issued on an owner's request; a
+  member's start waits for an owner's confirmation (presence at the laser no longer implied);
+  reset wipes and stops; systemd unit; new crate `curvyo-connector-ctl` (`curvyoctl`). Covers
+  criterion 1 and the service part of 2 and 9.
 - [ADR 0064](../../docs/adr/0064-laser-job-builder-and-output-writers.md) and
   [ADR 0065](../../docs/adr/0065-laser-output-settings-and-air-assist.md) (`0029`, accepted
   2026-11-17): the job text is `job::write(output_format, &job)` of `curvyo-laser-core`; the
@@ -36,6 +45,12 @@ relay), CONN-REMOTE-START C.
 
 ## Feature-local decisions
 
+- 2026-11-18 (ADR 0071, accepted with Frage 243 to 246 all A): **slice order updated.** Slice 3 (Send to machine) is merged and slice 4 (GRBL over serial) is PR #386, both
+  unchanged. A new **slice 5, connector API, `curvyoctl` and maintenance mode** (ADR 0071's
+  "Slice order") comes before the relay; the slice called 5 below becomes **6** (enrolment
+  started by `curvyoctl enrol`, code and check words shown there) and slice 6 becomes **7** (the
+  press at the machine is an owner's confirmation, ADR 0071 decision 7). Slice 5 needs PR #386
+  merged, a spec from the product owner and UX notes; not `0096` or `0097`.
 - 2026-11-17 (after ADR 0070's acceptance, **Proposal**): **slice order for the rest of `0064`.**
   Each slice is demoable end to end and is one PR from `main` (slices 1 and 2 are this branch's
   PR #375). Order question: Frage 222 below; the list is its recommended answer A.
@@ -683,3 +698,391 @@ ModemManager check).
   (C5). G21 now lists them.
 - No other conflict. Not in the spec, decided here: the foreign-`ok` and reset-button rules (C4),
   the unconfirmed-Pause rule (C4), the ModemManager terminal line (C10).
+
+## Addendum: fifth slice, connector API, `curvyoctl` and maintenance mode (architect, 2026-11-18)
+
+Covers `specs/0128-connector-api-and-ctl` criteria A1 to A33. **No new ADR**: ADR 0071 (Accepted
+2026-11-18) decides modes, owners, messages, reset, the unit and the new crate; this section
+fixes what it leaves to the slice. Items are numbered D (C is slice 4's addendum, PR #386; on
+rebase both addenda stay, C before D). Everything here is a **(Proposal)** unless it quotes an
+ADR. Built on top of PR #386 (its `Controller` trait, `ControllerChoice`, C11's signals).
+`A<n>` names a criterion of `0128`; an item of the second slice's addendum is written
+"addendum A<n>".
+
+**D1. What does not change.** No new external crate (dry run below), no new trait, no
+`format_version` change of the project file; protocol stays 0, additive only: every existing
+golden of `curvyo-connector-core` and `-io` decodes and re-encodes byte for byte, except
+`errors/codes.json` (it lists every code, so it grows) and `jobs.log` (D9). SPAKE2, the pin, the
+token and the app's credential record (addendum A4 to A8) stay as built; the app pairs exactly as today.
+
+**D2. Crates and edges.**
+- `curvyo-connector-ctl` (new, ADR 0071 decision 10): a binary crate with a library target, so
+  the tests drive it in process. `src/main.rs` (three lines: args, `run`, exit code) and
+  `src/lib.rs` with `pub fn run(args: &[String], ctx: &mut Context, out: &mut dyn Write) ->
+  ExitCode`; `Context` holds the config directory and an open `CredentialStore`. Modules, one
+  responsibility each: `args` (hand-parsed, exit 2), `known` (`curvyoctl.toml`), `secrets`
+  (opening the store, D12), `connect` (insecure first contact or pinned with `Auth`),
+  `setup` (`identify`, `ports`, `apply-config`, `get-config`), `jobs` (`status`, `jobs`,
+  `confirm-start`, `stop`, `unlock`), `people` (`pair`, `clients`, `revoke`), `audit`, `reset`,
+  `texts` (the words of the UX notes). Edges: `-core`; `-io` with `default-features = false`;
+  `curvyo-storage-io` (credential store); `anyhow` (only in `main.rs`; the library has a
+  `thiserror` `CtlError` whose variants map to exit codes 1 and 2, `CLAUDE.md` §5); `dirs` 7;
+  workspace `toml`, `serde`; `zeroize`; on unix `rustix` with `termios` (D12).
+- **No serial in the ctl: `-io` gets one Cargo feature `serial`, on by default**, gating
+  `serial_link` and the `serialport` dependency (PR #386's C1). `-server` keeps the default;
+  `-ctl` takes `default-features = false`; `curvyo-app` should take it too in this slice (it
+  never opens a port; removes C1's "links `serialport` without calling it"). Not speculative: two
+  real configurations exist today. The GRBL modules stay unconditional (pure, no dependency).
+  Checked at architect review with `cargo tree -p curvyo-connector-ctl -e normal --target all
+  -i serialport` (prints nothing); `cargo nextest --workspace` unifies features, so the pty tests
+  keep running. Rejected: the ctl on core plus its own TLS and WebSocket code (a second copy of
+  `PinVerifier`, security code twice); splitting `-io` into client and server crates (a new
+  crate needs an ADR; not worth one for one dependency).
+- **The credential store costs 63 crates.** ADR 0071 decision 10 names `curvyo-storage-io`;
+  measured 2026-11-18 on a scratch crate with the planned edges (Linux, normal edges): 145
+  crates with `storage-io`, 82 with `keyring` alone (`storage-io` brings `curvyo-text-core`,
+  `fontdb`, `zip`, `trash`). Taken as decided: the passphrase fallback (ADR 0007 §1) and the
+  slot logic exist only there, and the linker drops what the ctl never calls. If build time or
+  binary size bites, `credentials` moves to a crate of its own with an ADR; not now.
+- `-io` gains the workspace `toml` (D8, `config_file`), already locked. `-core` stays on its five
+  dependencies (`core::net::SocketAddr` parses addresses).
+- Dry run 2026-11-18: scratch crate named `curvyo-connector-ctl` outside the workspace with the
+  workspace's `Cargo.lock` and `deny.toml` plus the crate's `[[licenses.exceptions]]`
+  (AGPL-3.0-or-later): `cargo deny check licenses bans sources advisories` all green (local
+  advisory database), **no crate new in the lock** (`rustix` 1.1.6, Apache-2.0 WITH
+  LLVM-exception OR Apache-2.0 OR MIT, gains only the `termios` feature). The real `deny.toml`
+  entry lands in the commit that creates the crate. Run on `main`'s `-io` (without
+  `serialport`); C1's own dry run covers that crate.
+
+**D3. Wire additions** (`curvyo-connector-core`, `message.rs`; ADR 0071 decision 4). New
+`Role { Owner, Member }` and `LogName { Jobs, Admin }` (PascalCase like the other enums).
+Requests: `ListPorts`, `ApplyConfig { config: ConnectorConfig, client_name }`, `GetConfig`,
+`IssueCode { client_name, role }`, `ListClients`, `RevokeClient { name }`, `GetLog { log,
+last }` (`last` clamped to 1 to 1,000, so the answer stays below `MAX_FRAME_BYTES`), `Reset {
+connector_name }`. Answers: `Ports { paths }`, `ConfigApplied { token: Option<String> }`,
+`Config { config }`, `CodeIssued { code, expires_in_s }`, `Clients { clients: [{ name, role,
+paired_at }] }`, `ClientRevoked { name }`, `LogLines { lines }`, `ResetDone`, and one not in the
+ADR's table: **`Authenticated { client_name, role }`**, sent after `Paired` and after a valid
+`Auth`, before the `Status`, so the app and the ctl learn their role (A26, A27) without storing
+it. `Welcome` gains `mode: Option<ConnectorMode>` (`default`, omitted when `None`):
+`{"name":"Maintenance","closes_in_s":1680}`, `{"name":"Configured","owner":"Marc's workshop"}`,
+or `{"name":"Foreground"}` (a third value beside the ADR's two, so a client can say what it
+reached); `connector_name` is the configuration's `name`, else the host name as today (A17).
+`Status` gains `requested_by: Option<String>` (`default`, omitted when `None`). `ErrorCode` gains
+`Maintenance`, `MaintenanceClosed`, `InvalidConfig`, `OwnerRequired` (the ADR's four) and
+`UnknownName` (a `Reset` whose name differs, a `RevokeClient` of nobody); `ALL` grows to 14. The
+code in `CodeIssued` and the token in `ConfigApplied` get a redacted `Debug` by a wrapper type, so
+no log line can print them. Goldens in `tests/fixtures/messages/`: one per new message,
+`welcome_maintenance.json`, `welcome_configured.json`, `welcome_foreground.json`,
+`config_applied_no_token.json`, `status_awaiting_confirmation.json`; one per new code in
+`errors/`; `config/connector_grbl.json`, `config/connector_fake.json` and
+`config_failures.txt` (one invalid configuration per line with the expected field, like
+`chunk_failures.txt`). An older connector's `UnknownType` (A25) is a ctl test against a stub
+server answering it.
+
+**D4. Who may send what: one pure table in core**, `access.rs` ("decides whether a peer may send
+a message in a mode"): `admit(mode: Mode, peer: Option<Role>, message: &Message) -> Result<(),
+ErrorCode>`, `Mode = Maintenance { window_open } | Configured | Foreground`. `-io`'s session
+calls it for every decoded frame (the `-io` `PairSpake` frame is checked as `Pair`), so the LAN
+and, later, the relay channel share one rule. Unit test: the whole table.
+
+| Message | Maintenance | Configured, not logged in | Member | Owner | Foreground, paired |
+|---|---|---|---|---|---|
+| `Hello` | yes | yes | yes | yes | yes |
+| `ListPorts` | yes | `OwnerRequired` | `OwnerRequired` | yes | `OwnerRequired` |
+| `ApplyConfig` | yes while open, else `MaintenanceClosed` | `OwnerRequired` ("already configured", A7) | `OwnerRequired` | yes | `OwnerRequired` |
+| `Pair`, `PairSpake`, `Auth` | `Maintenance` | as addendum A6, A7 | – | – | as slice 2 |
+| job and control messages, `GetStatus`, `Unlock` | `Maintenance` | `PairingRequired` | yes | yes | yes |
+| `GetConfig`, `IssueCode`, `ListClients`, `RevokeClient`, `GetLog`, `Reset` | `Maintenance` | `PairingRequired` | `OwnerRequired` | yes | `OwnerRequired` |
+
+Foreground mode has no owners: its pairings are written as `member` and owner calls are
+refused; it keeps the terminal, `--list-clients` and `--revoke`. The role is never carried in the
+token: `Auth` looks the token's hash up in `clients.json` (re-read on every `Auth`, addendum A7) and the
+session keeps the role for its lifetime; a role change (re-pairing a name, D7) counts from the
+next connection.
+
+**D5. The start rule and the confirmation in core** (A12 to A14; ADR 0071 decision 7).
+`Options.require_local_start: bool` becomes `Options.start_rule: StartRule`: `Immediate`
+(foreground without the flag), `LocalPress` (foreground with `--require-local-start`, Enter as
+built) and `OwnerConfirms` (configured mode). `Event::Message(Message)` becomes
+`Event::Message(Message, Peer)`, `Peer { name: String, role: Role }`; core's test rig sends as an
+owner, so the P and G tests keep their expectations (literals change as G20 allowed).
+Under `OwnerConfirms`, a member's `Start` in `Ready` or `Resume` in `Paused` goes to
+`AwaitingLocalStart` with `requested_by`; the machine remembers internally whether a start or a
+resume waits (not on the wire). An owner's `Start { job_id }` for the held job, or `Resume` for a
+waiting resume, sends `ControllerCommand::Start` or `Resume` and gives `Running`; any other
+`Start` id is `UnknownJob`; a second request meanwhile is `WrongState`. `Stop` from anyone: a
+waiting start is discarded (`Idle`, as built); **a waiting resume is a paused job and stops
+through the controller (`Done { Stopped }`, `specs/0127` G12)**. `Pause` and `Stop` need no
+confirmation (Frage 249 A). `Output` gains `confirmed: Option<Confirmation { job_id,
+requested_by, confirmed_by: Option<String>, resume: bool }>` (`None` for `confirmed_by` is the
+terminal's Enter), from which `-io` writes `admin.log`. The held job carries `sent_by`,
+`started_by` and `confirmed_by` (`Machine::people()`) for the `jobs.log` line (D9). The last-owner
+rule (Frage 248 A) and Frage 249's rule need **no core state**: the first is a check in `-io`'s
+`admin` on `clients.json`, the second is the table above.
+
+**D6. Maintenance mode in `-io`** (A1 to A7; module `maintenance`, pure parts unit-tested).
+- *Listener:* the same acceptor and port as configured mode (`--listen`, default
+  `0.0.0.0:7447`, IPv4 only; `[::]:7447` is dual-stack on Linux's default `bindv6only=0`, which
+  std cannot set, so the guide names it). No second listener.
+- *Peer check:* `is_local(ip: IpAddr) -> bool` on `TcpStream::peer_addr()` right after accept, in
+  maintenance only (configured mode keeps today's rule: anyone may try, the token decides).
+  IPv4: `is_loopback`, `is_private`, `is_link_local`, and 100.64.0.0/10 by mask (std's
+  `is_shared` is unstable). IPv6: `::1`, `is_unique_local` (fc00::/7), `is_unicast_link_local`
+  (fe80::/10); an IPv4-mapped address (`::ffff:a.b.c.d`, `to_ipv4_mapped`) is judged as IPv4;
+  everything else (global, NAT64 `64:ff9b::/96`, 6to4, Teredo) is not local. A refused peer is
+  closed before TLS. Test: the table, and in-crate tests calling `session::serve` with an
+  injected peer on a loopback stream (A4).
+- *Caveat, for the guide:* the check sees the TCP peer. Anything that relays TCP on the
+  connector's host or LAN (nginx `stream`, HAProxy, `ssh -R`, Tailscale Funnel or `serve`,
+  `cloudflared`, `frp`, Docker's userland proxy) makes every peer look local; a router port
+  forward keeps the public source and is refused, but a router that also rewrites the source
+  (SNAT, "NAT loopback") does not. 100.64.0.0/10 is a tailnet, and also an ISP's carrier-grade
+  NAT when the host sits directly on it. No PROXY-protocol support (no trusted-proxy option, §5):
+  the guide says "set the connector up before exposing it through a proxy or tunnel".
+- *Window:* `MaintenanceWindow { opened: Instant, length: Duration }`, `is_open(now)` and
+  `closes_in(now)` take `now` from the caller (A5's fake clock: tests pass made-up `Instant`s).
+  Opened when the server starts in maintenance mode, before it listens; monotonic, so a Pi
+  without a real-time clock whose wall clock jumps at NTP sync keeps its 30 minutes, while the
+  printed "until HH:MM UTC" may be off before the sync (said in the guide). `length` is
+  `ServerTiming.maintenance_window` (30 min), shortened by end-to-end tests like C8's timing.
+- *First-config race and the switch:* one `Hub::apply_config(config, client, peer, now)` under
+  the hub's mutex: mode is `Maintenance` and the window open, else the error of D4; validate
+  (D8); drop `owner` entries left in `clients.json` (they belong to no configuration: a crash
+  between the two writes, or a hand-deleted `connector.toml`), add the sender as owner with a
+  fresh token; **write `clients.json` first, then `connector.toml`**, each temp file, `sync_all`,
+  rename, then `sync_all` of the directory (an SD card that loses power keeps either the old or
+  the new state; `connector.toml` is the commit point); set mode `Configured`, bump the hub's
+  maintenance epoch. A second `ApplyConfig` waiting on the mutex then sees `Configured` and gets
+  `OwnerRequired` "already configured"; stdout names the claiming client and address (A7).
+  After the unlock: the applying connection is **promoted to an owner session** (it can go on
+  with `GetConfig` without reconnecting); every other maintenance session sees the new epoch at
+  its next 50 ms turn and closes (A6); the controller supervisor (D14) opens the controller.
+
+**D7. Owners, members and `clients.json` format 2** (A8 to A11, Frage 246 A).
+`{"format":2,"clients":[{"name":"Laptop","role":"owner","token_sha256":"<64 hex>","paired_at":"<RFC 3339 UTC>"}]}`,
+`role` lower-case as ADR 0071 writes it (the file's own enum in `-io`, mapped to core's `Role`).
+Format 1 reads with every entry as `member` and is written as format 2 at the next change (A8,
+A27); a format above 2 is "damaged (written by a newer connector)" and refuses the start, as
+any damaged file. Owners: the `ApplyConfig` sender (D6) and apps paired with an owner code.
+`IssueCode { client_name, role }` binds the one valid code (addendum A5's rules: replaces a valid code, ten
+minutes, one use, three tries) to that name and role; the pairing is recorded under **the
+issued name** (the owner decides the list), replacing an entry of the same name, so `pair
+--owner --name Laptop` turns a slice-2 member "Laptop" into an owner. Last owner (Frage 248 A):
+`RevokeClient` of the only owner, and an `IssueCode` that would turn the only owner's name into a
+member, answer `WrongState` (printed `Laptop is the last owner of workshop-laser`, A11, no operating tip). The
+host-side `--revoke` (physical access) may remove it. `RevokeClient` rewrites the file and sets
+the close flag of that client's sessions (the hub keeps one `Arc<AtomicBool>` per authenticated
+session, checked every 50 ms turn), so A11's "closes its connection" holds in process; `--revoke`
+from a second process still counts from the next connection (addendum A7). Goldens:
+`clients.json` (format 1, the existing file) and `clients_v2.json`.
+
+**D8. `connector.toml` and how it combines with flags** (A16, A28, A31; ADR 0071 decisions 5, 9).
+```toml
+format = 1
+name = "Workshop laser"            # 1 to 64 characters, no control characters
+owner = "Marc's workshop"          # 1 to 64 characters, no control characters
+listen = "0.0.0.0:7447"            # optional
+[controller]
+kind = "grbl-serial"               # or "fake"
+port = "/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0"   # 1 to 255 bytes, no control characters
+baud = 115200                      # 1 to 4,000,000 (G1)
+# kind = "fake": lines_per_second = 20 (1 to 10,000), alarm_at_line = 3 (optional, at least 1)
+```
+`ConnectorConfig` in core (`config.rs`, "the connector's configuration and its validation"):
+serde with `deny_unknown_fields` on every struct and on the `kind`-tagged controller enum
+(`rename_all = "kebab-case"`; the slice's first test checks that serde refuses an unknown field
+inside a tagged variant), `validate() -> Result<(), ConfigError { field, reason }>`, the field as a
+dotted path (`controller.baud`) for `InvalidConfig`'s message. JSON on the wire, TOML on disk
+through `-io/src/config_file.rs` (parse, write, golden `connector_grbl.toml` and
+`connector_fake.toml`); the ctl reads the maker's file with the same module. **The rule (A31):**
+`--state-dir` names the directory and no file can (the file lives in it); **a value set in
+`connector.toml` wins over a flag; a value the file leaves out takes the flag, else the
+default.** Only `listen` overlaps (`--listen`), and stdout says when the flag was ignored. The
+controller flags are foreground mode and are refused with exit 2 when `connector.toml` exists
+(A28). No `--config <file>` flag (spec checks below). A later owner `ApplyConfig` replaces the file
+whole: refused with `WrongState` while a job is held or running (`Receiving` to `Paused`);
+otherwise a controller change is applied in process by the supervisor (D14), a `name` or `owner`
+change shows in the next `Welcome`, and a `listen` change counts from the next start (the
+listener is not rebound; the ctl says so). A `connector.toml` that is unreadable, damaged or
+invalid **refuses the start** (exit 1, the field named), never falls back to maintenance mode.
+
+**D9. `admin.log`, `jobs.log`, file modes** (A15, A18).
+- `admin.log`, `0600`, append only, one line per event, tab-separated, five fields:
+  `<RFC 3339 UTC, whole seconds> TAB <event> TAB <by> TAB <subject> TAB <detail>`, control
+  characters as a space (as `jobs.log`). Events: `configured` (by: the client, detail: the peer
+  IP), `config-changed` (detail: changed top-level fields, `controller, name`), `code-issued`
+  (subject: the name, detail: `owner`/`member`; never the code), `paired` (by: the name, detail:
+  role), `revoked` (subject: the name, detail: role), `unlocked`, `start-confirmed` (by: the
+  owner, subject: the requester, detail: `<job name> <job id>`, plus ` resume` for a resume).
+  `by` empty means "on the host" (terminal Enter, `--revoke`). `reset` is printed on stdout only:
+  the reset deletes the log (A18 fixed). Golden `admin.log`.
+- `jobs.log` lines gain three fields: `<time> TAB <job name> TAB <result> TAB <sent by> TAB
+  <started by> TAB <confirmed by>` (empty when not applicable; `confirmed by` is empty for a
+  start that ran at once and for the terminal's Enter). G33's `Unlock: <name>` line keeps its
+  result text with the new fields empty, and `unlocked` also goes to `admin.log`. Old files keep
+  their three-field lines (append only; `GetLog` returns raw lines, nothing parses them). The
+  `jobs.log` golden is rewritten with the new fields (a local file, not released).
+- `GetLog` reads the last `n` lines backwards in 64 KiB blocks. No rotation (debt entry).
+- Modes: state directory `0700`; `connector.toml`, `clients.json`, `identity.pem`, `jobs.log`,
+  `admin.log`, `lock` `0600`, set at creation (`OpenOptions::mode`), not by umask.
+
+**D10. Lock, single instance, reset** (A19 to A21; ADR 0071 decision 8).
+- `<state dir>/lock`: opened (created `0600`) at start in every mode and held with
+  `std::fs::File::try_lock()` (std, stable since 1.89; MSRV 1.90) until exit; held elsewhere:
+  "Another connector runs on <dir>", exit 1. One process per state directory; two on one port
+  fail at bind as today.
+- `--fingerprint --state-dir <dir>`: prints the fingerprint of an existing `identity.pem` and
+  exits 0; no file: exit 1, nothing created (a pure read, no race with a starting service). No
+  lock needed; `--list-clients` and `--revoke` stay as built.
+- `--reset --state-dir <dir>`: `try_lock`; held: refuse, exit 1 (A21); else **empty the
+  directory** and exit 0. Not the directory itself: under `DynamicUser=yes` it is
+  `/var/lib/private/curvyo-connector`, made and owned by systemd. Order: `connector.toml` first (a
+  half-done reset is maintenance mode, never a configured connector without its owners), then the
+  rest, `lock` last.
+- `Reset { connector_name }` over the network: name compared exactly with the configuration's
+  `name`, else `UnknownName`; the hub stops a running job as C11 does on SIGTERM (the session
+  thread waits for G16's 6 s at most), sends **`ResetDone`, then** asks the main thread to exit
+  (ADR 0071 decision 4's order; A19 fixed); the main thread shuts the server down (every
+  connection closed, every thread joined), empties the directory as `--reset` does and exits 0
+  (exit 1 with the file named if a deletion fails; systemd then restarts it and what remains
+  decides the mode). C11's main-thread `sigwait` moves to a small signal thread; the main thread
+  waits on one channel fed by the signal thread and by `Reset`, so no self-signal is needed.
+
+**D11. The unit** (A30; ADR 0071 decision 9), `curvyo-connector-server/dist/curvyo-connector.service`:
+```ini
+[Unit]
+Description=Curvyo machine connector
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/curvyo-connector-server --state-dir %S/curvyo-connector
+DynamicUser=yes
+StateDirectory=curvyo-connector
+StateDirectoryMode=0700
+UMask=0077
+SupplementaryGroups=dialout
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+DevicePolicy=closed
+DeviceAllow=char-ttyUSB rw
+DeviceAllow=char-ttyACM rw
+
+[Install]
+WantedBy=multi-user.target
+```
+`StateDirectoryMode=0700` is needed: systemd's default is `0755`. `%S` is `/var/lib`. Port 7447
+needs no capability. Exit 0 after a reset is not a failure, so the service stays stopped until
+the next boot or `systemctl start` (A19). Arch has no `dialout` group and the unit then fails to
+start ("Failed to resolve group"): the guide's drop-in sets `SupplementaryGroups=` (empty, which
+resets) and `SupplementaryGroups=uucp`. A Raspberry Pi's own UART (`/dev/ttyAMA0`, `/dev/serial0`)
+is neither listed by `ListPorts` (A2's patterns) nor allowed by the unit; the guide names the
+drop-in line `DeviceAllow=char-ttyAMA rw` for it. ModemManager: unchanged from C10 (the `udev`
+line `ENV{ID_MM_DEVICE_IGNORE}="1"`; the `/proc/*/comm` check works because the unit sets no
+`ProtectProc`). `ListPorts` reads `/dev/serial/by-id/` and `/dev` by name prefix (`ttyUSB`,
+`ttyACM`), sorted, an empty list when none or off Linux; `DevicePolicy` limits opening, not
+listing. Verification: `systemd-analyze verify` (needs the binary at the `ExecStart` path, so the
+customer's box, A30) and one install, reboot and `curvyoctl identify` on Debian and on Arch.
+
+**D12. `curvyoctl`: local state, trust, credentials** (A22 to A25; ADR 0071 decision 10, ADR
+0007 §1). Directory `<config dir>/curvyoctl/` (`dirs::config_dir()`; Linux
+`~/.config/curvyoctl/`), apart from the app's `org.curvyo.desktop` (the ADR's
+`curvyo/curvyoctl.toml` would share a folder with the app; a folder of its own keeps the
+credential slot and key file apart). `curvyoctl.toml`, golden in the crate's `tests/fixtures/`:
+`format = 1` and `[[connectors]]` with `name` (the connector's `name`, the handle in commands),
+`address`, `spki_sha256` (64 hex, the full pin of addendum A4). The token lives in the credential store
+under `curvyoctl/<spki_sha256>` as `{"format":1,"token":"<64 hex>"}`: keyed by the key, not the
+name, so a rename changes nothing and a reset (new key) orphans nothing silently (the ctl removes
+the entry when it meets "key changed"). Store: `CredentialStore::keychain(credential_slot(dir))`;
+no keychain (a headless Linux) and stdin a terminal: the passphrase file of ADR 0007 in the same
+folder, the passphrase read with echo off through `rustix::termios` (safe API); not a terminal:
+exit 1, never plaintext. Tests build `Context` with `CredentialStore::file(tmp, "test")` and
+assert the token's hex is absent from every file in the folder except the encrypted key file (A24).
+Trust: `identify --insecure <addr>` and `apply-config --insecure <addr>` connect with
+`PinVerifier::Capture`; `--fingerprint F` is normalised (case, `-`, spaces) and compared with
+the 16-byte display form before any message is sent (A23; 64 bits compared, the full 32 bytes
+pinned afterwards); without `F` the key of the first contact is remembered for that address
+(`identify` too, so a key that changes between `identify` and `apply-config` is refused). Every
+later call uses `Expect`. Exit codes: 0, 1 (refused, unreachable, `UnknownType` = "connector too
+old"), 2 (usage). `ports` is a command beside decision 10's list (it is how `ListPorts` is used,
+A22 fixed); `enrol` waits for slice 6. A second `curvyoctl` on another computer becomes an owner with `login` (Frage 252 B, below).
+
+**D13. The app** (A26, A27). The record of addendum A8 stays format 1: the role is **not stored**, it comes
+with every connection's `Authenticated`, and the owner label with `Welcome.mode`; the watcher
+forwards both as `connector-event`s (`kind: "session"`, `role`, `clientName`; the owner label with
+the `Welcome` it already forwards). An owner's Start on a waiting job is the existing `Start {
+job_id }` command; no new host command, no owner calls in the app in this slice.
+
+**D14. Threads** (addendum A1 and C9 unchanged: blocking std threads, no async runtime). Acceptor; one
+thread per connection (at most 8; maintenance connections count, and the 10 s idle limit of
+unauthenticated connections bounds a LAN host holding them); a **controller supervisor** thread
+that owns the fake streamer or C9's serial thread and replaces it on a message from the hub
+(first configuration, controller change): it stops and joins the old one before starting the
+new, so a port is never open twice; the signal thread (D10); the main thread waiting on the exit
+channel. The ctl is single-threaded and blocking (`-io`'s client `Connection`, which gains one
+`request(&Message, deadline) -> Result<Message, ClientError>` that skips pushed `Status` frames).
+
+**D15. `unsafe` and errors.** `#![forbid(unsafe_code)]` in both targets of the ctl, as in core,
+`-io` and `-server` (C12). `thiserror` in `-core`, `-io` and the ctl's library, `anyhow` only in
+the two `main.rs` (`CLAUDE.md` §5).
+
+**D16. Tests without hardware** (A3, A29, "Tests without hardware"). Core: the D4 table, the D5
+rules (start, resume, stop of each, confirmation output, wrong id), `ConnectorConfig` goldens and
+`config_failures.txt`. `-io`: `is_local`, `MaintenanceWindow` with made-up instants,
+`clients.json` migration, `admin.log` and `jobs.log` goldens, `ListPorts` on a temp directory;
+in-crate tests with a **recording controller** (a `Controller` test double that records every
+command and write, given to the hub by a `#[cfg(test)]` constructor) for "nothing reaches a
+controller in maintenance"; and a Linux pty test (C8's `TTYPort::pair()`, the simulator): a
+configuration naming the pty is applied only after the refused messages, and the pty master has
+read **zero bytes** until then (A3 end to end). The ctl's tests run `run(..)` against a
+`RunningServer` in a temp state directory with the fake controller: identify, apply-config,
+pair `--owner` and member, member send and start, confirm, jobs, audit, revoke, last owner,
+reset (the server handle reports the exit request instead of exiting the test process).
+
+**D17. Outside this file, for the lead.**
+- `CLAUDE.md` §6 and the mirror line in `AGENTS.md` (line 106), the customer amends: "- Crate
+  suffixes `-core`, `-app`, `-io`, plus `-wasm` (ADR 0001), `-server` (ADR 0004) and `-ctl`
+  (ADR 0071)."
+- ADR 0011's connector note (§3) gains `curvyo-connector-ctl` (`→ connector-core, connector-io,
+  storage-io`) in the slice's PR; `deny.toml` the crate's exception.
+- `docs/technical-debt.md`: foreground mode and `--require-local-start` (A28); the open setup
+  window and the TCP-proxy caveat (D6); no log rotation (D9); `credentials` inside
+  `storage-io` costs the ctl 63 crates (D2).
+
+**Spec checks against ADR 0071, ADR 0035, ADR 0070 and `CLAUDE.md` §5** (fixed in
+`specs/0128-connector-api-and-ctl`, 2026-11-18):
+
+- A14 discarded every waiting job on `Stop`; a waiting resume is a paused job that GRBL holds, and
+  `specs/0127` G12 stops it through the controller. A14 now says so (D5).
+- A16 answered `Busy` while a job runs; `Busy` is a reject reason, not an `ErrorCode`, and ADR
+  0071 decision 4 lists the new codes. A16 now answers `WrongState` (D8).
+- A18 listed `reset` in `admin.log`, which A19's wipe deletes at once; A18 now prints it on stdout.
+- A19 deleted the state, then sent `ResetDone`; ADR 0071 decision 4 says `ResetDone`, then wipe
+  and exit. A19 and A21 now follow it, and both empty the directory instead of deleting it (A30's
+  `DynamicUser` state directory belongs to systemd).
+- A22 said the list follows decision 10 exactly but adds `ports`; it now says decision 10's list
+  plus `ports`.
+- A31 added a `--config <file>` naming the state directory and listen address: not in ADR 0071
+  decision 9 and a second file without a story (`CLAUDE.md` §5, no speculative options). A31 now
+  states D8's rule.
+- No other conflict. Decided here, not in the spec: `Authenticated`, `Welcome`'s `Foreground`
+  value and `UnknownName` (D3); the issued name wins at pairing (D7); `listen` changes count from
+  the next start (D8); the ctl's folder and store key (D12).
+
+Frage 252 (CONN-CTL-SECOND): decided by the customer 2026-11-18: **B**. A second computer manages
+the connector with `curvyoctl login <address> --code <code>`, the code from `curvyoctl pair
+--owner`. Spec A35 to A38, UX notes 4.13. What the ctl stores is exactly D12's: the entry (name,
+address, `spki_sha256`) in `curvyoctl.toml`, one per address, file `0600` in a `0700` folder, the
+token in the credential store under `curvyoctl/<spki_sha256>`; `login` adds nothing else and never
+the code. It runs the app's SPAKE2 pairing client in `-io` (`PinVerifier::Capture`, the key the
+run confirmed is pinned afterwards), issues no call the connector lacks (the code comes from
+`IssueCode`), and the new client is named `curvyoctl@<host name>`. A stored key that differs is
+refused before a code is sent (D12's `Expect`); `logout` is local, so a lost connector or a reset
+connector is left by it alone. **No new dependency** and no protocol change beyond slice 2's
+pairing.
