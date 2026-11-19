@@ -98,6 +98,7 @@ impl DeviceGroupGlue {
     /// synced writes nothing (criterion 4, P4).
     pub fn library_switch_off(&mut self, kind: LibraryKind, id: &str) {
         if self.library.entry(kind, id).is_some() && self.library.switch_off(kind, id).is_ok() {
+            self.snapshot_after_ack = true;
             self.files_changed = true;
             self.bump();
         }
@@ -110,6 +111,7 @@ impl DeviceGroupGlue {
     pub fn library_delete(&mut self, kind: LibraryKind, id: &str) {
         if self.library.entry(kind, id).is_some() {
             let _ = self.library.remove(kind, id);
+            self.snapshot_after_ack = true;
             self.files_changed = true;
             self.bump();
         }

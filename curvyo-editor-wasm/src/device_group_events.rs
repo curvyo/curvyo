@@ -66,6 +66,13 @@ impl DeviceGroupGlue {
                 if let Some(version) = self.library_pushed.remove(&client_id) {
                     self.library_synced = version;
                     self.files_changed = true;
+                    if self.snapshot_after_ack && self.library_pushed.is_empty() {
+                        self.snapshot_after_ack = false;
+                        if !self.newer_list && !self.newer_library {
+                            let covers_seq = self.client.cursor();
+                            self.upload_group_snapshot(covers_seq);
+                        }
+                    }
                 }
                 if let Some(version) = self.pushed.remove(&client_id) {
                     self.synced = version;

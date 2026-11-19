@@ -91,6 +91,9 @@ pub struct DeviceGroupGlue {
     library_exported: DocumentVersion,
     library_synced: DocumentVersion,
     library_pushed: BTreeMap<u64, DocumentVersion>,
+    /// A switch-off or delete was pushed: the room's snapshot follows its ack, so the server's
+    /// record history no longer holds the item's text (criteria 23 and 27).
+    snapshot_after_ack: bool,
     /// Library entries that changed and wait for the page's session to apply them.
     library_arrivals: VecDeque<LibraryArrival>,
     /// The framed room snapshot being assembled, with the sequence of its first part.
@@ -241,6 +244,7 @@ impl DeviceGroupGlue {
             library_exported: DocumentVersion::never(),
             library_synced: DocumentVersion::never(),
             library_pushed: BTreeMap::new(),
+            snapshot_after_ack: false,
             library_arrivals: VecDeque::new(),
             assembling: None,
             pushed: BTreeMap::new(),
