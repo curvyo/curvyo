@@ -1,12 +1,12 @@
 import { ListTree, Route } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 import { OPERATIONS_VIEW_NAME, TOOLPATH_VIEW_NAME, operationsToggle, readPages, toolpathToggle } from "@/lib/pages";
 import { PlayBar } from "@/components/PlayBar";
 import { RingLabels } from "@/components/RingLabels";
 import { Tooltip } from "@/components/ui/tooltip";
 import { KindChip } from "@/components/KindChip";
-import { pagesTick, perfStart } from "@/lib/perfProbe";
+import { pagesTick, perfPagesCommitted, perfPagesTick, perfRender, perfStart } from "@/lib/perfProbe";
 /** Screen-sized page chrome above the un-clipped drawing. Geometry comes from Rust. */
 export function PageFrames({
   getSession,
@@ -22,18 +22,22 @@ export function PageFrames({
   /** The Toolpath view toggle of a laser page's label (`specs/0029` criterion 8). */
   onToggleToolpathView?: (page: string) => void;
 }) {
+  perfRender("PageFrames");
   const [json, setJson] = useState("[]");
+  useLayoutEffect(() => perfPagesCommitted(), [json]);
   useEffect(() => {
     let frame = 0;
     let previous = "";
     const tick = () => {
       const probeStart = perfStart();
+      perfPagesTick(true);
       const next = getSession()?.pages_json() ?? "[]";
       const changed = next !== previous;
       if (changed) {
         previous = next;
         setJson(next);
       }
+      perfPagesTick(false);
       pagesTick(probeStart, changed);
       frame = requestAnimationFrame(tick);
     };
