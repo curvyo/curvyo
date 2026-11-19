@@ -588,6 +588,7 @@ mod tests {
             position: None,
             alarm: None,
             detail: None,
+            pause_pending: false,
         }
     }
 

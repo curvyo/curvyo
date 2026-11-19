@@ -33,6 +33,7 @@ fn status(
         position: position.map(|p| p.map(Millimetres)),
         alarm: alarm.map(str::to_owned),
         detail: None,
+        pause_pending: false,
     }
 }
 

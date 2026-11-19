@@ -47,6 +47,7 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                 position: Some([Millimetres(12.5), Millimetres(0.0), Millimetres(0.0)]),
                 alarm: None,
                 detail: Some("Failed at line 12: No feed rate (error 22)".into()),
+                pause_pending: false,
             },
         ),
         (
@@ -57,6 +58,7 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                 position: None,
                 alarm: None,
                 detail: Some("Lost the controller at line 120".into()),
+                pause_pending: false,
             },
         ),
         (
@@ -67,6 +69,7 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                 position: Some([Millimetres(120.0), Millimetres(45.25), Millimetres(0.0)]),
                 alarm: None,
                 detail: Some("Controller state: Door".into()),
+                pause_pending: false,
             },
         ),
         (
