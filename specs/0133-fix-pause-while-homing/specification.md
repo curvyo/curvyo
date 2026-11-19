@@ -1,6 +1,6 @@
 # Fix: a Pause pressed while the machine homes is forgotten
 
-Status: Draft
+Status: Ready (the build waits for PR #399, Homing and Machine controls, to be merged)
 Kind: Bug (branch `fix/pause-while-homing`)
 Priority: Must (safety: a Pause the maker pressed must never be lost)
 Origin: Customer, test of PR #399 on the real laser, 2026-11-19. Translated: "When you home and press pause, it forgets the pause. Expectation: it should go directly into pause."
@@ -28,7 +28,7 @@ Prefix `PH`. Tests use the simulator of `0127` G22 with the silent homing it has
 5. Given `pause_pending`, when `Stop` arrives, then it works as in `0127` G9 (soft reset without a feed hold, `Done { Stopped }`) and the pending pause is cleared; Stop is never held back by a pending pause.
 6. Given `pause_pending` and homing fails (`ALARM:8`/`ALARM:9`, `error:5`, a reset, a lost controller), then the pending pause is dropped, the job ends as `0129` criterion 2 says (`Failed` or `Alarm` with the cause) and the state is never `Paused`.
 7. Given a pause pressed in a normal run (not homing), then it works as before (`!`, `Hold:0`, `0127` G12); the 2 s hold limit of `0127` G29 applies only to lines other than `$H`: a `Pause` is never dropped for homing.
-8. Given the app, then after the press the Pause button shows the pending state (UX notes) and the state line reads "Pause after homing"; when the connector reports `Paused` the line reads "Paused at line <n>" as always; Resume is enabled in both. The same holds for a second app watching the status (it reads `pause_pending` from `Status`, no local memory).
+8. Given the app, then after the press the Pause button shows the pending state (UX notes) and the footer's state line (Machine controls group; the Output state line was removed by Frage 262 A) reads "Pause after homing"; when the connector reports `Paused` it reads "Paused" (the line number is in the counts line); Resume is enabled in both. The same holds for a second app watching the status (it reads `pause_pending` from `Status`, no local memory).
 9. Given the connector is restarted or the controller connection is lost while a pause is pending, then the pending pause is gone with the job's run (`0127` G15).
 10. Given the cause, then the PR names it in one sentence and the test of criterion 2 fails on the code before the fix. Cause unknown: the implementer reproduces with the simulator first; a fix that cannot be reproduced first is not accepted.
 11. Given the quality gate of `CLAUDE.md` §7, then it is green. 🟢 is claimed only after the customer repeats the run on the real laser; until then 🟡.
@@ -44,8 +44,11 @@ Prefix `PH`. Tests use the simulator of `0127` G22 with the silent homing it has
 
 ## Needed before Ready
 
-- `ux-engineer`: the pending Pause state and the words "Pause after homing" in the state line (`0118` Machine controls group, `0125` S13 Output line), exact criterion 8 look.
-- `architect`: confirm `pause_pending` as an additive `Status` field (protocol 0, golden), the core state machine (`curvyo-connector-core`: pending flag, transition table), and where the `Homing` state is entered.
+Done: architect addendum (`adrs.md`: PH1, PH2 and the test preamble fixed) and UX notes (`ux-notes.md`, H1 to H8, vetoable at the demo; they follow Frage 262 A: the footer's line is the state line). No open question.
+
+## UX notes must change
+
+None for this spec's criteria. Open items outside it: the UX notes of `0118` (branch `story/machine-control`) gain the three amendments listed in `ux-notes.md` section 9, and the design-system row "Machine controls (Operations tab) (`0118`)" lands with the build.
 
 ## Links
 
