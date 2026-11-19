@@ -15,6 +15,7 @@ import {
   jobIsActive,
   refusalText,
 } from "./connectorText.ts";
+import { notStartedText } from "./sendText.ts";
 
 /** The one press of a profile's connector controls that waits for its answer; the others of the
  * Machine block and the Machine controls footer are greyed meanwhile (`specs/0118` M11). */
@@ -84,6 +85,14 @@ export interface LinkEntry {
   pageSend: { token: number; name: string } | null;
   /** How the last page send failed, until the next send or a state change. */
   sendFailure: { text: string; atState: string | null } | null;
+  /** A page send that asked for a start runs, from the press to the host's answer (`0134`). */
+  startStep: boolean;
+  /** Why the page's job was accepted but not started; shown only while that job is `Ready`
+   * (`0134` SS6, architect S3). */
+  notStarted: { jobId: string; text: string } | null;
+  /** The page's job whose start the connector took, while the status still reads it `Ready`: its
+   * Ready line is not said in between (`0134` UX P8). */
+  startedJob: string | null;
   /** The press that waits for its answer, in either place. */
   busy: Busy | null;
   /** A status read runs. */
@@ -104,10 +113,13 @@ type Payload =
 /** How a sent job ended its way to the connector (`ResolutionView` of the host). */
 export type Resolution = { kind: "accepted" } | { kind: "rejected"; reason: string } | { kind: "notReceived" };
 
+/** What the start step of a page send did (`StartView` of the host, `0134`). */
+export type StartAnswer = { kind: "started" } | { kind: "notStarted"; reason: string } | { kind: "noAnswer" };
+
 /** The answer of `connector_send_page_job`. */
 export type PageSendAnswer =
-  | { kind: "resolved"; jobId: string; resolution: Resolution }
-  | { kind: "resolvedElsewhere" }
+  | { kind: "resolved"; jobId: string; resolution: Resolution; start?: StartAnswer }
+  | { kind: "resolvedElsewhere"; start?: StartAnswer }
   | { kind: "unresolved"; error: LinkError }
   | { kind: "failed"; error: LinkError };
 
@@ -136,6 +148,9 @@ const EMPTY: LinkEntry = {
   sendingName: null,
   pageSend: null,
   sendFailure: null,
+  startStep: false,
+  notStarted: null,
+  startedJob: null,
   busy: null,
   reading: false,
   readError: null,
@@ -199,7 +214,11 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
         ? { ...now.held, jobId }
         : now.held;
     const changed = now.status?.state.name !== status.state.name;
+    const ours = status.state.name === "Ready" && jobId !== null && jobId === now.notStarted?.jobId;
+    const started = status.state.name === "Ready" && jobId !== null && jobId === now.startedJob;
     patch(profileId, {
+      notStarted: ours ? now.notStarted : null,
+      startedJob: started ? now.startedJob : null,
       status,
       held,
       lost: false,
@@ -372,7 +391,7 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
     async sendPage(
       profileId: string,
       address: string,
-      job: { token: number; name: string; bytes: Uint8Array },
+      job: { token: number; name: string; bytes: Uint8Array; start?: boolean },
       settleSend: (accepted: boolean) => void,
       timedOut?: () => void,
     ): Promise<void> {
@@ -387,17 +406,31 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
         settle: settleSend,
         timedOut,
       });
-      patch(profileId, { pageSend: { token: job.token, name: job.name }, sendingName: job.name, sendFailure: null });
+      const start = job.start === true;
+      patch(profileId, {
+        pageSend: { token: job.token, name: job.name },
+        sendingName: job.name,
+        sendFailure: null,
+        startStep: start,
+        notStarted: null,
+        startedJob: null,
+      });
       let answer: PageSendAnswer;
       try {
         answer = await host.invoke<PageSendAnswer>(
           "connector_send_page_job",
-          { profileId, address, name: job.name },
+          { profileId, address, name: job.name, start },
           job.bytes,
         );
       } catch {
         answer = { kind: "failed", error: { kind: "other", message: "Connector error" } };
       }
+      const jobId = sends.get(profileId)?.jobId ?? (answer.kind === "resolved" ? answer.jobId : get(profileId).pageJobId);
+      const took = answer.kind === "resolved" || answer.kind === "resolvedElsewhere" ? answer.start?.kind === "started" : false;
+      const shown = get(profileId).status;
+      const stillReady = shown?.state.name === "Ready" && jobId !== null && shown.job?.job_id === jobId;
+      const startedJob = start && took && stillReady ? jobId : null;
+      patch(profileId, { startStep: false, notStarted: notStartedOf(start, answer, jobId), startedJob });
       if (answer.kind === "resolved") {
         settle(profileId, answer.jobId || null, answer.resolution);
       } else if (answer.kind === "failed") {
@@ -439,6 +472,22 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
       return send !== undefined && !send.late;
     },
   };
+}
+
+/** Why a page send that asked for a start left its job `Ready` (`0134` SS6), or `null`. A dropped
+ * connection after the transfer reads "Connection lost": no start follows it. */
+export function notStartedOf(asked: boolean, answer: PageSendAnswer, jobId: string | null): LinkEntry["notStarted"] {
+  if (!asked || jobId === null || jobId === "") return null;
+  if (answer.kind === "unresolved") return { jobId, text: notStartedText("ConnectionLost") };
+  if (answer.kind !== "resolved" && answer.kind !== "resolvedElsewhere") return null;
+  return answer.start?.kind === "notStarted" ? { jobId, text: notStartedText(answer.start.reason) } : null;
+}
+
+/** "Not started: <reason>" while the page's job it names is still `Ready` (`0134` architect S3). */
+export function notStartedLine(entry: LinkEntry): string | null {
+  const status = entry.status;
+  const shown = entry.notStarted !== null && status?.state.name === "Ready" && status.job?.job_id === entry.notStarted.jobId;
+  return shown ? (entry.notStarted?.text ?? null) : null;
 }
 
 /** The failure line of a stored send failure, in the look of the link line. */

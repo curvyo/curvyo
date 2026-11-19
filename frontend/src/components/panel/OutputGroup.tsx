@@ -46,10 +46,13 @@ export function OutputGroup({
   const entry = useLinkEntry(send?.profileId ?? null, send?.address ?? "", isTauri && send !== null, true);
   const spelling = isTauri ? sendLinkOf(entry) : "browser";
   const sendProfile = send?.profileId ?? null;
-  const applyLink = api.send.applyLink;
+  const { applyLink, applyMachine, willStart } = api.send;
   useEffect(() => {
     if (sendProfile !== null) applyLink(sendProfile, spelling);
   }, [sendProfile, spelling, applyLink]);
+  useEffect(() => {
+    if (sendProfile !== null) applyMachine(entry);
+  }, [sendProfile, entry, applyMachine]);
   if (view === null) return null;
   const machine = machineLineParts(view.machine);
   const press = (check: Check) => {
@@ -158,7 +161,11 @@ export function OutputGroup({
             enabled={send.enabled}
             cause={sendCauseText(send)}
             sending={send.cause === "sending"}
-            onPress={() => api.send.press()}
+            starting={entry.startStep}
+            starts={send.starts}
+            job={send.job}
+            onSend={(start) => api.send.press(start)}
+            willStart={() => willStart(send.profileId)}
             onReturnFocus={onReturnFocus}
           />
         )}

@@ -128,7 +128,7 @@ export function controlsLine(entry: LinkEntry, own: OwnPress = NO_PRESS): Contro
     return pressed({ text: `Sending ${entry.sendingName}`, failure: false });
   }
   if (own.failure !== null) return pressed(own.failure);
-  if (entry.sendFailure !== null) return pressed({ text: entry.sendFailure.text, failure: true });
+  if (entry.sendFailure !== null && !holdsJob(entry)) return pressed({ text: entry.sendFailure.text, failure: true });
   if (entry.pageSend !== null) return pressed({ text: withName("Sending ", entry.pageSend.name), failure: false });
   const status = entry.status;
   if (status === null) return null;
@@ -140,6 +140,22 @@ export function controlsLine(entry: LinkEntry, own: OwnPress = NO_PRESS): Contro
   const bar = barOf(status, line);
   if (entry.lost) return { text: "Connection lost", failure: true, alarm: false, alerts: false, bar };
   return { ...line, alarm: status.state.name === "Alarm", alerts: jobLineAlerts(status), bar };
+}
+
+/** The states in which the connector holds or waits for a job (`specs/0134` SS2). */
+const HOLDING = ["Receiving", "Ready", "AwaitingLocalStart", "Running", "Paused"];
+
+/** Whether the connector holds a job whose line a refused page send must not hide. */
+function holdsJob(entry: LinkEntry): boolean {
+  const status = entry.status;
+  return !entry.lost && status !== null && status.job !== null && HOLDING.includes(status.state.name);
+}
+
+/** A page send's failure while the connector holds a job: it reads under the job's line, which
+ * stays with its bar ("Waiting for the start at the machine", "Running"; `specs/0134` UX notes
+ * section 6, P17); `null` when there is none or it is the line itself. */
+export function sendFailureBelow(entry: LinkEntry): string | null {
+  return entry.sendFailure !== null && holdsJob(entry) ? entry.sendFailure.text : null;
 }
 
 /** The job's name on the counts line (`0064` UX notes section 8): the job being sent, the job the

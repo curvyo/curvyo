@@ -82,6 +82,8 @@ test("S1: the group view decodes the send button and its absence", () => {
     text: null,
     profileId: "p1",
     address: "192.168.1.20:7447",
+    starts: false,
+    job: 0,
   });
   assert.equal(decodeOutputGroup({ ...view, send: { ...send, cause: "nonsense" } }), null, "a broken value shows nothing");
 });
