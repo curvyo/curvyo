@@ -808,7 +808,7 @@ async def gl_bench(args, out):
           "web % / gpu % = WebKitWebProcess / WebKitGPUProcess in % of one core. Raw: glbench.json, glbench.ndjson, glbench-procs.json")
 
 
-SCENARIOS = ["idle-empty", "empty-pan", "empty-zoom", "idle-5000", "wheel-zoom", "pan-drag"]
+SCENARIOS = ["idle-empty", "empty-pan", "empty-zoom", "idle-5000", "wheel-zoom", "pan-drag", "wheel-zoom-none", "pan-drag-none"]
 
 
 def display_env(pid):
@@ -943,7 +943,7 @@ def report(events, procs, out):
     if not procs or not marks:
         print("no data: the page sent no scenario events (see target/perf/events.ndjson)")
         return
-    print(f"{'scenario':<12} {'s':>5} {'cpu %core':>9} {'peak RSS MiB':>12} {'built/s':>8} {'submit/s':>9} {'changed/s':>9} {'render ms avg':>13} {'max':>6} {'pages/s':>8} {'pages ms avg':>12}"
+    print(f"{'scenario':<15} {'s':>5} {'cpu %core':>9} {'peak RSS MiB':>12} {'built/s':>8} {'submit/s':>9} {'changed/s':>9} {'render ms avg':>13} {'max':>6} {'pages/s':>8} {'pages ms avg':>12}"
           f" {'rAF p50':>7} {'p95':>5} {'>33ms':>5}")
     for name, m in marks.items():
         if "end" not in m:
@@ -959,7 +959,7 @@ def report(events, procs, out):
         total = lambda k: sum(r[k] for r in rows)
         built = total("built")
         intervals = [i for r in rows for i in r.get("intervals", [])]
-        print(f"{name:<12} {secs:5.0f} {cpu:9.1f} {rss:12.0f} {built / n:8.1f} {total('submitted') / n:9.1f} {total('changed') / n:9.1f} "
+        print(f"{name:<15} {secs:5.0f} {cpu:9.1f} {rss:12.0f} {built / n:8.1f} {total('submitted') / n:9.1f} {total('changed') / n:9.1f} "
               f"{total('renderMs') / max(built, 1):13.2f} {max((r['renderMax'] for r in rows), default=0):6.1f} {total('pagesTicks') / n:8.1f} {total('pagesMs') / max(total('pagesTicks'), 1):12.2f}"
               f" {quantile(intervals, 0.5):7.1f} {quantile(intervals, 0.95):5.1f} {sum(1 for i in intervals if i > 33):5d}")
         a, b = window[0]["names"], window[-1]["names"]
@@ -988,6 +988,12 @@ def report(events, procs, out):
         elif not name.startswith("idle") and total("changed") == 0:
             print(f"  WARNING: scenario did not move the view ({name}: changed/s = 0)")
     lag(events, out)
+    selections = [e for e in events if e["event"] == "selection"]
+    if selections:
+        print("selected objects: " + ", ".join(
+            f"{e['selected']}" + (f" after Escape ({e['escape']})" if "escape" in e else " (wheel-zoom, pan-drag)") for e in selections))
+        if any("escape" in e and e["selected"] != 0 for e in selections):
+            print("  WARNING: Escape left objects selected: the -none scenarios are not without a selection")
     for e in events:
         if e["event"] == "observer":
             print(f"long-task observer: {'yes' if e['longtask'] else 'no (gap detector only)'}; entry types {e['entryTypes']}")
