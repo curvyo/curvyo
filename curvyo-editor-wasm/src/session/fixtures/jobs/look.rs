@@ -35,6 +35,8 @@ fn kind_look(kind: OperationKind) -> OperationLook {
         OperationKind::Engrave => OperationLook::AreaFill,
         OperationKind::EngraveOutline => OperationLook::AreaWithLine,
         OperationKind::CutOut => OperationLook::OuterLine,
+        // A fixture job offers no Image kind; a stored one runs nothing (ADR 0069 §14).
+        OperationKind::Image => OperationLook::MutedDashed,
     }
 }
 
@@ -46,6 +48,7 @@ fn glyph(look: OperationLook) -> Option<Glyph> {
         OperationLook::DashedLine => Some(Glyph::Score),
         OperationLook::AreaFill => Some(Glyph::Engrave),
         OperationLook::AreaWithLine => Some(Glyph::EngraveOutline),
+        OperationLook::Dots => Some(Glyph::Image),
         OperationLook::MutedDashed => None,
     }
 }
@@ -396,6 +399,7 @@ fn part_chip(geometry: &PartGeometry, looks: &[OperationLook]) -> Option<ChipIte
     (!glyphs.is_empty()).then_some(ChipItem {
         bounds: (min, max),
         glyphs,
+        muted: Vec::new(),
     })
 }
 

@@ -5,10 +5,12 @@
 use curvyo_document_core::NodeId;
 use curvyo_laser_core::grids::{Param, Recipe, Side, fit_bed};
 use curvyo_laser_core::library::MaterialRead;
+use curvyo_laser_core::settings::Dither;
 use serde::Serialize;
 
 use super::super::Session;
 use super::super::materials::SetKindView;
+use super::super::operations::image_view::{DitherOptionView, dither_options};
 
 /// The bar of the selected grid, or of the tool's draft.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -29,6 +31,8 @@ pub struct TestGridView {
     pub shared: Vec<ValueView>,
     /// Crosshatch, Engrave only.
     pub crosshatch: Option<bool>,
+    /// The Dither strip, Image only (`specs/0123` criterion 44).
+    pub dither: Option<DitherStripView>,
     /// Cell size in mm.
     pub cell_mm: f64,
     /// The Columns unit.
@@ -45,6 +49,23 @@ pub struct TestGridView {
     pub invalid: Option<InvalidView>,
     /// Why the grid does not fit the bed ("Grid is 260 mm wide, the bed is 200 mm.").
     pub fit: Option<String>,
+}
+
+/// The Dither strip of an Image grid (`specs/0123` criterion 44; UX 2.5): the six binary modes,
+/// one selected.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DitherStripView {
+    /// The selected mode's stored spelling.
+    pub value: &'static str,
+    /// The strip's six modes in order (no Grey).
+    pub modes: Vec<DitherOptionView>,
+}
+
+fn dither_strip(dither: Dither) -> DitherStripView {
+    DitherStripView {
+        value: dither.key(),
+        modes: dither_options(Dither::ALL.into_iter().filter(|d| d.is_binary())),
+    }
 }
 
 /// A material of the dropdown.
@@ -108,7 +129,7 @@ fn axis_view(recipe: &Recipe, side: Side) -> AxisFieldsView {
 
 impl Session {
     /// The bar's recipe: the selected grid's, else the tool's draft with a placeholder id.
-    fn bar_view_recipe(&self) -> Option<(Option<NodeId>, Recipe, bool)> {
+    pub(super) fn bar_view_recipe(&self) -> Option<(Option<NodeId>, Recipe, bool)> {
         if let Some(group) = self.whole_selected_grid() {
             let grid = self.grid_object(group)?;
             return Some((Some(group), grid.recipe, grid.lasered.is_some()));
@@ -163,6 +184,7 @@ impl Session {
                 .collect(),
             crosshatch: (kind == curvyo_laser_core::settings::SetKind::Engrave)
                 .then(|| recipe.test.crosshatch()),
+            dither: recipe.test.dither().map(dither_strip),
             cell_mm: recipe.test.cell().as_mm(),
             columns: axis_view(&recipe, Side::Columns),
             rows: axis_view(&recipe, Side::Rows),

@@ -28,7 +28,8 @@
         "missing": [
           "cut",
           "score",
-          "engrave"
+          "engrave",
+          "image"
         ],
         "open": true,
         "sets": [],

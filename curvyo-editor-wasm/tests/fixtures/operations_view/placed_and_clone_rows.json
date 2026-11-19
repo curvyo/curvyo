@@ -54,6 +54,7 @@
             "overscan_pct": 2,
             "scan_angle_deg": 0.0
           },
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -105,6 +106,7 @@
         "needs": "score",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -156,6 +158,7 @@
         "needs": "cut",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,

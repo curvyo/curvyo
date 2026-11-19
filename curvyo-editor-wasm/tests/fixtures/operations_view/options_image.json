@@ -1,0 +1,145 @@
+{
+  "cuts_last": true,
+  "entered_group": null,
+  "items": {
+    "not_assigned": [],
+    "output_off": [],
+    "running": [
+      {
+        "counter": 17,
+        "peer": "1"
+      }
+    ],
+    "runs_while_hidden": []
+  },
+  "operations_view": true,
+  "pick": [],
+  "rows": [
+    {
+      "accessible_name": "Image 1, run 1, 37 s",
+      "group_in_part": null,
+      "id": {
+        "counter": 22,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "image",
+      "margin_mm": 0.0,
+      "name": "Image 1",
+      "numbers": [
+        {
+          "text": "40 %, 3,000 mm/min, 1 ×, 0.1 mm · Grey 12.5–40 %",
+          "typed": []
+        }
+      ],
+      "output": true,
+      "run": {
+        "digit": 1,
+        "time": "37 s"
+      },
+      "section": "marking",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "interval_mm": 0.1,
+        "material": null,
+        "needs": "image",
+        "options": {
+          "hatch": {
+            "bidirectional": true,
+            "crosshatch": null,
+            "overscan_pct": 2,
+            "scan_angle_deg": 0.0
+          },
+          "image": {
+            "dither": "grey",
+            "fields": [
+              {
+                "field": "brightness",
+                "label": "Brightness",
+                "range": "Brightness is -100 to 100 %.",
+                "unit": "%",
+                "value": -10.0
+              },
+              {
+                "field": "contrast",
+                "label": "Contrast",
+                "range": "Contrast is -100 to 100 %.",
+                "unit": "%",
+                "value": 20.0
+              },
+              {
+                "field": "gamma",
+                "label": "Gamma",
+                "range": "Gamma is 0.10 to 4.00.",
+                "unit": "",
+                "value": 1.5
+              }
+            ],
+            "invert": true,
+            "mode_field": {
+              "field": "lowest_power",
+              "label": "Lowest power",
+              "range": "Lowest power is 0 to 100 %.",
+              "unit": "%",
+              "value": 12.5
+            },
+            "modes": [
+              {
+                "label": "Threshold",
+                "value": "threshold"
+              },
+              {
+                "label": "Ordered",
+                "value": "ordered"
+              },
+              {
+                "label": "Floyd-Steinberg",
+                "value": "floyd_steinberg"
+              },
+              {
+                "label": "Jarvis",
+                "value": "jarvis"
+              },
+              {
+                "label": "Atkinson",
+                "value": "atkinson"
+              },
+              {
+                "label": "Stucki",
+                "value": "stucki"
+              },
+              {
+                "label": "Grey",
+                "value": "grey"
+              }
+            ]
+          },
+          "z_offset_mm": 0.0
+        },
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [
+          {
+            "material": null,
+            "role": "main",
+            "run": {
+              "passes": 1,
+              "power_pct": 40.0,
+              "speed_mm_min": 3000
+            },
+            "typed": []
+          }
+        ],
+        "state": "own",
+        "z_offset_shown": false
+      },
+      "show": true,
+      "source": null,
+      "tick": "none",
+      "unfolded": true
+    }
+  ],
+  "select_bar_kinds": null
+}

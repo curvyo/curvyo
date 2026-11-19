@@ -439,7 +439,8 @@ fn s10_s12_accepted_send_is_one_step_lasered_stays_and_a_second_send_adds_no_ste
 
 #[test]
 fn s16_the_format_version_stays_49() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 49);
+    // No bump by `0125`; 50 is `specs/0123-raster-engraving` (ADR 0069 §10).
+    assert_eq!(CURRENT_FORMAT_VERSION, 50);
 }
 
 // ---- S6, S9, S11, S17, S19 against the fake connector --------------------------------------

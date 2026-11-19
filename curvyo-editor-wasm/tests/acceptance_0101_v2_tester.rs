@@ -369,6 +369,7 @@ fn c18_the_canvas_draws_at_most_500_symbol_chips_per_frame() {
                 ChipItem {
                     bounds: (Point::new(x, y), Point::new(x + 10.0, y + 10.0)),
                     glyphs: vec![Glyph::Cut],
+                    muted: Vec::new(),
                 }
             })
             .collect()

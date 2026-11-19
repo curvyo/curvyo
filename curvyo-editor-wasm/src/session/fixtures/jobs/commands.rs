@@ -12,9 +12,10 @@ impl Session {
     /// One of the five kind buttons (criterion 2): a job "`Kind` N" (the lowest N no job of
     /// that kind on this page uses) at the end of the one selected fixture's jobs, Show on,
     /// Output off, nothing ticked, selected, in one step "Add fixture job". `None` for an unknown
-    /// kind text or without exactly one selected fixture.
+    /// kind text, for `image` (a fixture job offers no Image kind, ADR 0069 §14) or without
+    /// exactly one selected fixture.
     pub fn add_fixture_job(&mut self, kind: &str) -> Option<NodeId> {
-        let kind = OperationKind::parse(kind)?;
+        let kind = OperationKind::parse(kind).filter(|k| *k != OperationKind::Image)?;
         let fixture = self.selected_fixture()?;
         let fixtures = self.active_fixtures()?;
         let names: Vec<&str> = fixtures

@@ -49,13 +49,22 @@ impl WasmSession {
     }
 
     /// Types `value` into the option field `option` of operation `id` (`interval`, `scan_angle`,
-    /// `overscan`, `z_offset`) or presses a toggle (`crosshatch`, `bidirectional`; non-zero is
-    /// on), `specs/0111` criteria 19 to 24. The chip, empty when taken or nothing changed.
+    /// `overscan`, `z_offset`; the Image settings `threshold`, `lowest_power`, `brightness`,
+    /// `contrast`, `gamma`) or presses a toggle (`crosshatch`, `bidirectional`, `invert`;
+    /// non-zero is on), `specs/0111` criteria 19 to 24, `specs/0123` criteria 11, 12. The chip,
+    /// empty when taken or nothing changed.
     pub fn edit_operation_option(&mut self, id: &str, option: &str, value: f64) -> String {
         node(id)
             .map(|id| self.session.edit_operation_option(id, option, value))
             .and_then(Result::err)
             .unwrap_or_default()
+    }
+
+    /// Picks the Dither mode `mode` of Engrave operation `id` (`threshold`, `ordered`,
+    /// `floyd_steinberg`, `jarvis`, `atkinson`, `stucki`, `grey`; `specs/0123` criteria 11, 12):
+    /// one step "Edit settings". Whether it was written.
+    pub fn set_operation_dither(&mut self, id: &str, mode: &str) -> bool {
+        node(id).is_some_and(|id| self.session.set_operation_dither(id, mode))
     }
 
     /// The Motorised Z axis switch of the active laser page's profile copy (`specs/0111`
@@ -128,6 +137,24 @@ impl WasmSession {
     /// selection and the summary; `null` on another page.
     pub fn operations_view_json(&self) -> String {
         self.session.operations_view_json()
+    }
+
+    /// Whether the Operations tab and the output group read a stale job (`specs/0123` criteria 12,
+    /// 37 d): the host then calls `advance_job` once per animation frame.
+    pub fn job_pending(&self) -> bool {
+        self.session.job_pending()
+    }
+
+    /// One animation frame's share of the pending job's raster dots; whether the job was built by
+    /// this call, so the host reads the views again.
+    pub fn advance_job(&self) -> bool {
+        self.session.advance_job()
+    }
+
+    /// The host's 300 ms mark of a pending job: the views now write its times as "…" (UX notes
+    /// P35).
+    pub fn show_stale_words(&self) {
+        self.session.show_stale_words();
     }
 
     /// The notice of the last operation command (criterion 10), `None` when there is none.

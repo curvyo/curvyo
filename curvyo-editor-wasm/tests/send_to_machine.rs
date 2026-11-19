@@ -377,7 +377,7 @@ fn s16_a_refused_send_leaves_the_project_bytes_unchanged() {
     assert_eq!(s.pack("test").unwrap(), before, "nothing was written");
     assert_eq!(
         curvyo_document_core::CURRENT_FORMAT_VERSION,
-        49,
+        50,
         "no format_version change"
     );
 }

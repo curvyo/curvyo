@@ -34,6 +34,7 @@ const fn look_of_set(kind: SetKind) -> OperationLook {
         SetKind::Cut => OperationLook::SolidLine,
         SetKind::Score => OperationLook::DashedLine,
         SetKind::Engrave => OperationLook::AreaFill,
+        SetKind::Image => OperationLook::Dots,
     }
 }
 
@@ -42,6 +43,7 @@ const fn glyph_of_set(kind: SetKind) -> Glyph {
         SetKind::Cut => Glyph::Cut,
         SetKind::Score => Glyph::Score,
         SetKind::Engrave => Glyph::Engrave,
+        SetKind::Image => Glyph::Image,
     }
 }
 
@@ -114,6 +116,7 @@ impl GridLooks {
                 Some(ChipItem {
                     bounds: union,
                     glyphs: grid.glyphs.clone(),
+                    muted: Vec::new(),
                 })
             })
             .collect()

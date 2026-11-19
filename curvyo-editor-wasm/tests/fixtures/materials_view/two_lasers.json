@@ -27,7 +27,8 @@
         },
         "missing": [
           "cut",
-          "engrave"
+          "engrave",
+          "image"
         ],
         "open": true,
         "sets": [
@@ -50,7 +51,8 @@
           "name": "Diode 20 W"
         },
         "missing": [
-          "score"
+          "score",
+          "image"
         ],
         "open": true,
         "sets": [

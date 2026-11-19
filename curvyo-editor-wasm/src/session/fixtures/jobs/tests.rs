@@ -42,6 +42,10 @@ fn criterion_2_a_kind_button_adds_a_job_to_the_one_selected_fixture() {
     let second = s.add_fixture_job("cut").unwrap();
     let engrave = s.add_fixture_job("engrave_outline").unwrap();
     assert!(s.add_fixture_job("laser_burn").is_none(), "no such kind");
+    assert!(
+        s.add_fixture_job("image").is_none(),
+        "a fixture job offers no Image kind (ADR 0069 §14)"
+    );
     let names: Vec<String> = [first, second, engrave]
         .iter()
         .map(|&id| stored(&s, id).name)

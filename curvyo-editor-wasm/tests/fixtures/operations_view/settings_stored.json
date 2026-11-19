@@ -12,7 +12,6 @@
   ],
   "rows": [
     {
-      "source": null,
       "kind": "score",
       "name": "score 5",
       "settings": {
@@ -31,6 +30,7 @@
         "needs": "score",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -54,10 +54,10 @@
         ],
         "state": "stored",
         "z_offset_shown": false
-      }
+      },
+      "source": null
     },
     {
-      "source": null,
       "kind": "cut",
       "name": "cut 1",
       "settings": {
@@ -71,6 +71,7 @@
         "needs": "cut",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -96,10 +97,10 @@
         ],
         "state": "stored",
         "z_offset_shown": false
-      }
+      },
+      "source": null
     },
     {
-      "source": null,
       "kind": "cut",
       "name": "cut 2",
       "settings": {
@@ -113,6 +114,7 @@
         "needs": "cut",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -136,10 +138,10 @@
         ],
         "state": "stored",
         "z_offset_shown": false
-      }
+      },
+      "source": null
     },
     {
-      "source": null,
       "kind": "cut",
       "name": "cut 3",
       "settings": {
@@ -153,6 +155,7 @@
         "needs": "cut",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -176,10 +179,10 @@
         ],
         "state": "stored",
         "z_offset_shown": false
-      }
+      },
+      "source": null
     },
     {
-      "source": null,
       "kind": "cut",
       "name": "cut 4",
       "settings": {
@@ -193,6 +196,7 @@
         "needs": "cut",
         "options": {
           "hatch": null,
+          "image": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -216,7 +220,8 @@
         ],
         "state": "stored",
         "z_offset_shown": false
-      }
+      },
+      "source": null
     }
   ]
 }

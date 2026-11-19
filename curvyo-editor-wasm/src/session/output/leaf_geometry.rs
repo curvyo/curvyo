@@ -1,17 +1,23 @@
 //! The geometry of one output leaf as it stands on its laser page (`specs/0029` criteria 13, 17;
-//! ADR 0064 §1): its outlines or image frame mapped into page mm, Y down from the page's corner.
+//! `specs/0123` criteria 3, 4, 23, 26; ADR 0064 §1, ADR 0068 §1): its outlines, image frame, or
+//! outlines with their placed gradient, mapped into page mm, Y down from the page's corner.
 
-use curvyo_document_core::{Affine, ObjectSnapshot, PathSnapshot, Point, Vec2};
+use curvyo_document_core::{
+    Affine, GradientBox, ObjectSnapshot, PathSnapshot, PlacedGradient, Point, Vec2,
+};
 use curvyo_geometry_core::OutlineTriple;
 use curvyo_laser_core::job::{LeafGeometry, LeafOutline};
 
-/// The geometry of `object` mapped by `map` (document space to page mm); `None` for an object
-/// with no outline (a dimension, a text not laid out yet, a clone of a picture).
+/// The geometry of `object` mapped by `map` (document space to page mm); an image's working
+/// image is left out (the job input adds it for an Engrave, `input.rs`). `None` for an object
+/// with no outline (a dimension, a text not laid out yet).
 pub(super) fn leaf_geometry(object: &ObjectSnapshot, map: Affine) -> Option<LeafGeometry> {
     let outlines = match object {
         ObjectSnapshot::Image(image) => {
             return Some(LeafGeometry::Image {
                 frame: image.corners().map(|p| map.apply_point(p)),
+                asset: image.asset.clone(),
+                pixels: None,
             });
         }
         ObjectSnapshot::Primitive(primitive) => {
@@ -31,7 +37,25 @@ pub(super) fn leaf_geometry(object: &ObjectSnapshot, map: Affine) -> Option<Leaf
         ObjectSnapshot::Dimension(_) => return None,
         _ => path_outlines(object.drawn_path()?, map),
     };
-    Some(LeafGeometry::Outlines(outlines))
+    Some(match placed_gradient(object, map) {
+        Some(gradient) => LeafGeometry::Gradient { outlines, gradient },
+        None => LeafGeometry::Outlines(outlines),
+    })
+}
+
+/// The gradient `object`'s fill paints, placed in its box mapped by `map` (`specs/0123`
+/// criterion 26: the gradient moves with the shape); `None` without a gradient fill.
+fn placed_gradient(object: &ObjectSnapshot, map: Affine) -> Option<PlacedGradient> {
+    let fill = object.style().fill.painted_gradient()?;
+    let frame = object.gradient_box()?;
+    Some(PlacedGradient::new(
+        fill,
+        &GradientBox {
+            min: frame.min,
+            max: frame.max,
+            to_document: map.compose(frame.to_document),
+        },
+    ))
 }
 
 /// The outlines of `path` mapped by `map`.

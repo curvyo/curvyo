@@ -12,7 +12,8 @@
     ],
     "param": "power"
   },
-  "crosshatch": true,
+  "crosshatch": false,
+  "dither": null,
   "fit": null,
   "group": {
     "counter": 0,

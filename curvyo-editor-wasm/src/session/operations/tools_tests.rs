@@ -223,8 +223,9 @@ fn criterion_1_and_2_the_bar_kinds_show_for_a_selection_with_what_a_press_does()
     assert_eq!(f.s.operations_view().unwrap().select_bar_kinds, None);
     f.s.selection.set(&[f.a]);
     let kinds = f.s.operations_view().unwrap().select_bar_kinds.unwrap();
-    assert_eq!(kinds.len(), 5);
+    assert_eq!(kinds.len(), 6, "`specs/0123` criterion 47: Image last");
     assert_eq!(kinds[0].description, "Creates Cut 1");
+    assert_eq!(kinds[5].description, "Creates Image 1");
     f.s.press_operation_kind("engrave", false).unwrap();
     let kinds = f.s.operations_view().unwrap().select_bar_kinds.unwrap();
     assert_eq!(kinds[2].description, "Assigns to Engrave 1");

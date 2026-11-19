@@ -244,7 +244,8 @@ impl Session {
         let op = &active.operations[at];
         let verb = if member { "Assign to" } else { "Remove from" };
         let id = op.id;
-        self.recording_named(format!("{verb} {}", op.name), |this| {
+        let summary = self.targets_summary(&selection.targets);
+        self.recording_named_counting(format!("{verb} {}", op.name), summary, |this| {
             let done = this
                 .document
                 .set_operation_members(id, &keys, member)
@@ -255,5 +256,45 @@ impl Session {
             }
             done
         })
+    }
+}
+
+impl Session {
+    /// "1 image", "2 rectangles", "3 objects": the objects summary of an assignment's `targets`
+    /// (`specs/0123` UX review U8). The step writes only its operation, whose node the History
+    /// would count as one path. `None` when a target is no object (a placed page): the touched
+    /// nodes are counted then.
+    pub(super) fn targets_summary(&self, targets: &[NodeId]) -> Option<String> {
+        use curvyo_document_core::{ObjectShape, ObjectSnapshot, Shape};
+        let shapes: Option<Vec<ObjectShape>> = targets
+            .iter()
+            .map(|&id| {
+                if self.document.is_group(id) {
+                    return Some(ObjectShape::Group);
+                }
+                Some(match self.document.object(id)? {
+                    ObjectSnapshot::Path(_) => ObjectShape::Path,
+                    ObjectSnapshot::Sketch(_) => ObjectShape::Sketch,
+                    ObjectSnapshot::Clone(_) => ObjectShape::Clone,
+                    ObjectSnapshot::Text(_) => ObjectShape::Text,
+                    ObjectSnapshot::Image(_) if self.is_placement(id) => return None,
+                    ObjectSnapshot::Image(_) => ObjectShape::Image,
+                    ObjectSnapshot::Dimension(_) => ObjectShape::Dimension,
+                    ObjectSnapshot::Primitive(primitive) => match primitive.shape {
+                        Shape::Rect { .. } => ObjectShape::Rectangle,
+                        Shape::Ellipse { .. } => ObjectShape::Ellipse,
+                        Shape::Polygon { .. } => ObjectShape::Polygon,
+                        Shape::Star { .. } => ObjectShape::Star,
+                    },
+                })
+            })
+            .collect();
+        curvyo_ui_core::objects_summary(&shapes?)
+    }
+
+    /// Whether `id` is a placed page's frame on the active laser page.
+    fn is_placement(&self, id: NodeId) -> bool {
+        self.active_manufacturing()
+            .is_some_and(|m| m.placements.iter().any(|p| p.id == id))
     }
 }

@@ -5,19 +5,10 @@ use curvyo_document_core::{
     Affine, CornerRadii, DrawingText, FontKind, FontRef, GridItems, Length, NewGridCell,
     NewGridLabel, Point, RectBounds, Shape, Style, TextChars, TextLayoutValues, Vec2,
 };
-use curvyo_laser_core::grids::{Recipe, TEXT_MM, TestLayout, layout};
-use curvyo_laser_core::settings::SetKind;
+use curvyo_laser_core::grids::{Recipe, TEXT_MM, TestLayout, cell_style, layout};
 
 use super::super::Session;
 use super::GridObject;
-
-/// The style of a cell: an outline for Cut and Score, a filled square for Engrave.
-fn cell_style(kind: SetKind) -> Style {
-    let mut style = Style::default();
-    style.fill.enabled = kind == SetKind::Engrave;
-    style.stroke.enabled = kind != SetKind::Engrave;
-    style
-}
 
 /// The style of a label: filled text, no stroke (it is engraved).
 fn label_style() -> Style {
@@ -105,7 +96,7 @@ pub(in crate::session) fn grid_items(
                     },
                     corner_radii: CornerRadii::uniform(Length::from_mm(0.0)),
                 },
-                style: cell_style(recipe.test.kind()),
+                style: cell_style(&recipe.test),
                 tag,
             }
         })

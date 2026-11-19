@@ -276,3 +276,48 @@ fn criterion_9_a_new_id_avoids_retired_and_project_ids() {
     assert_ne!(fresh, next);
     assert!(TestId::parse(fresh.as_str()).is_some());
 }
+
+#[test]
+fn raster_criterion_44_the_image_grids_dither_is_one_step_and_the_engrave_grid_has_none() {
+    use curvyo_laser_core::settings::Dither;
+    let mut s = laser_with_fonts();
+    let group = place_grid(&mut s);
+    s.set_test_grid_kind("engrave").unwrap();
+    let bar = |s: &Session| serde_json::to_value(s.test_grid_view().unwrap()).unwrap();
+    assert!(
+        bar(&s)["dither"].is_null(),
+        "the Engrave grid has no Dither"
+    );
+    assert!(bar(&s).get("fill").is_none(), "Fill is gone");
+    assert_eq!(s.set_test_grid_dither("ordered"), Ok(false));
+    s.set_test_grid_kind("image").unwrap();
+    let group = s.selected_test_grid().unwrap_or(group);
+    assert_eq!(bar(&s)["kind"], "image");
+    assert_eq!(bar(&s)["dither"]["value"], "floyd_steinberg");
+    assert_eq!(
+        bar(&s)["dither"]["modes"].as_array().unwrap().len(),
+        6,
+        "no Grey"
+    );
+    assert!(
+        bar(&s)["crosshatch"].is_null(),
+        "Crosshatch only on Engrave"
+    );
+    let steps = s.undo_len();
+    assert_eq!(s.set_test_grid_dither("grey"), Ok(false));
+    assert_eq!(s.set_test_grid_dither("ordered"), Ok(true));
+    assert_eq!(s.undo_len(), steps + 1);
+    assert_eq!(undo_label(&mut s), "Edit test grid");
+    let group = s.selected_test_grid().unwrap_or(group);
+    assert_eq!(recipe_of(&s, group).test.dither(), Some(Dither::Ordered));
+    let cell_ops: Vec<OperationSnapshot> = derived(&s)
+        .into_iter()
+        .filter(|op| op.kind.as_deref() == Some("image"))
+        .collect();
+    assert_eq!(cell_ops.len(), 25, "every cell is an Image operation");
+    assert!(cell_ops.iter().all(|op| {
+        op.options
+            .as_ref()
+            .is_some_and(|o| o.get("dither") == Some(&serde_json::json!("ordered")))
+    }));
+}

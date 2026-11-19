@@ -16,7 +16,8 @@ use super::view_types::{
     MaterialsView, PlaceView, SetKindView, SetView, TestDetailView, TestRowView,
 };
 
-const KINDS: [SetKind; 3] = [SetKind::Cut, SetKind::Score, SetKind::Engrave];
+/// The set rows of a laser in the tab's order, Image last (`specs/0123` Frage 270 B).
+const KINDS: [SetKind; 4] = SetKind::ALL;
 
 const MONTHS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
@@ -132,7 +133,8 @@ pub(in crate::session) const fn param_words(param: Param) -> (&'static str, &'st
     }
 }
 
-/// "Power 20–100 % × Speed 600–6000 mm/min · 1 × · cell 10 mm · 12 Nov 2026".
+/// "Power 20–100 % × Speed 600–6000 mm/min · 1 × · cell 10 mm · 12 Nov 2026", a Gradient test
+/// with "Gradient, Ordered" before the date.
 fn axes_line(test: &TestRecord) -> String {
     let side = |side| {
         let axis = test.recipe.axis(side);
@@ -148,6 +150,13 @@ fn axes_line(test: &TestRecord) -> String {
             .map(|value| format!("{value}{}", param_words(value.param).1)),
     );
     parts.push(format!("cell {} mm", test.recipe.cell().as_mm()));
+    // An Image test names its dither (`specs/0123` criterion 45, Frage 237 A).
+    if let Some(dither) = test.recipe.dither() {
+        parts.push(format!(
+            "Dither {}",
+            super::super::operations::image_view::dither_label(dither)
+        ));
+    }
     parts.push(long_date(test.created));
     parts.join(" · ")
 }
@@ -378,5 +387,43 @@ impl Session {
     #[must_use]
     pub fn materials_view_json(&self) -> String {
         serde_json::to_string(&self.materials_view()).unwrap_or_else(|_| "null".to_owned())
+    }
+}
+
+#[cfg(test)]
+mod raster_tests {
+    use curvyo_laser_core::grids::{RecipeDefaults, TestId, TestRecipe};
+    use curvyo_laser_core::library::TestRecord;
+    use curvyo_laser_core::settings::{Dither, MachineTie, SetKind};
+
+    use super::axes_line;
+
+    #[test]
+    fn an_image_test_names_its_dither_in_the_axes_line() {
+        let defaults = RecipeDefaults {
+            max_feed: curvyo_laser_core::FeedRate::default(),
+            set: None,
+        };
+        let engrave = TestRecipe::new(&defaults).with_kind(SetKind::Engrave, &defaults);
+        let record = |recipe: TestRecipe| TestRecord {
+            id: TestId::parse("K7Q2M").unwrap(),
+            created: 0,
+            machine: MachineTie {
+                id: "generic-laser".into(),
+                name: "Generic laser".into(),
+            },
+            recipe,
+            lasered: None,
+            best: None,
+            note: String::new(),
+            photo: None,
+        };
+        let solid = axes_line(&record(engrave.clone()));
+        assert!(!solid.contains("Dither"), "{solid}");
+        let image = engrave
+            .with_kind(SetKind::Image, &defaults)
+            .with_dither(Dither::Ordered);
+        let line = axes_line(&record(image));
+        assert!(line.contains(" · Dither Ordered · "), "{line}");
     }
 }

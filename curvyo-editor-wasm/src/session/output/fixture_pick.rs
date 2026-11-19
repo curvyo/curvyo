@@ -60,7 +60,7 @@ impl Session {
     /// The output part of the active laser page's Fixture jobs section; `None` while no fixture
     /// job runs (the pick hides, a stored pick stays).
     pub(in crate::session) fn fixture_output_view(&self) -> Option<FixtureOutputView> {
-        let job = self.laser_job()?;
+        let (job, _) = self.settled_job()?;
         let runs: Vec<&RunFacts> = job
             .gate
             .runs

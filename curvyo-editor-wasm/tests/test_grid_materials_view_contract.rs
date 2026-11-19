@@ -144,6 +144,10 @@ fn test_grid_view_fixtures() {
     s.set_test_grid_kind("engrave").unwrap();
     s.set_test_grid_crosshatch(true).unwrap();
     pin("test_grid_view", "engrave_crosshatch.json", &grid_view(&s));
+    s.set_test_grid_kind("image").unwrap();
+    s.set_test_grid_dither("ordered").unwrap();
+    pin("test_grid_view", "image_ordered.json", &grid_view(&s));
+    s.set_test_grid_kind("engrave").unwrap();
     assert!(s.set_test_grid_field("cell", "60").is_err());
     pin("test_grid_view", "invalid_value.json", &grid_view(&s));
 
@@ -190,6 +194,13 @@ fn materials_view_fixtures() {
     s.edit_material_set(&id, "generic-laser", "cut", "power", 70.0, &[6; 16])
         .unwrap();
     pin("materials_view", "typed_set.json", &materials_view(&s));
+    // The fourth set per laser, Image, with its Interval, last (`specs/0123` Frage 270 B).
+    s.add_material_set(&id, "generic-laser", "image", &[7; 16])
+        .unwrap();
+    s.edit_material_set(&id, "generic-laser", "image", "interval", 0.08, &[8; 16])
+        .unwrap();
+    s.unfold_material(Some(&id));
+    pin("materials_view", "image_set.json", &materials_view(&s));
 
     let (mut s, birch, test) = birch();
     s.unfold_material(Some(&birch));

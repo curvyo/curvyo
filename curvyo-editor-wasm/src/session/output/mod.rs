@@ -5,11 +5,16 @@
 mod commands;
 mod export;
 mod fixture_pick;
+mod gate_facts;
 mod input;
 mod job_cache;
 mod leaf_geometry;
+mod pixels;
 mod play;
+mod raster_picture;
+mod raster_view;
 mod send;
+mod tab_facts;
 #[cfg(test)]
 mod tests;
 mod toolpath;
@@ -23,7 +28,9 @@ pub use export::ExportedJob;
 pub use fixture_pick::FixtureOutputView;
 pub use play::PlayView;
 pub use send::{SendView, SentJobFile, send_notice};
-pub use view_json::{NumbersLineView, OutputGroupView, RowRunView};
+pub use tab_facts::RowRunView;
+pub(in crate::session) use view_json::STALE_TIME;
+pub use view_json::{NumbersLineView, OutputGroupView};
 
 /// What the session keeps for the output group and the Toolpath view: the job and geometry caches,
 /// the pressed Toolpath views, the play position and the exported jobs not yet saved.
@@ -33,6 +40,10 @@ pub(in crate::session) struct OutputState {
     job: job_cache::JobCache,
     /// The page-mm geometry of the output leaves (`input.rs`).
     geometry: input::GeometryCache,
+    /// The working images of the output's image leaves (`pixels.rs`).
+    pixels: pixels::PixelCache,
+    /// The dot pictures of the raster items (`raster_view.rs`).
+    raster: raster_view::RasterCache,
     /// The laser pages whose Toolpath view is pressed: session state, never saved.
     toolpath: HashSet<NodeId>,
     /// The toolpath's draw caches (`toolpath.rs`).

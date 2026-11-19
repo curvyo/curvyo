@@ -18,7 +18,8 @@ use serde::Serialize;
 use super::super::Session;
 use super::job_cache::PageJob;
 
-/// The toolpath look of the last job and the draw list of the last frame, with their keys.
+/// The toolpath look of the last job and the draw list of the last frame, with their keys; the
+/// raster items' dots are drawn as pictures beside it (`raster_view.rs`).
 #[derive(Debug, Default)]
 pub(super) struct DrawCache {
     look: RefCell<Option<HeldLook>>,
@@ -61,9 +62,8 @@ const fn burn_stroke(kind: OperationKind, role: Role) -> ToolpathStroke {
         (OperationKind::Score, _) | (OperationKind::EngraveOutline, Role::Outline) => {
             ToolpathStroke::Score
         }
-        (OperationKind::Engrave, _) | (OperationKind::EngraveOutline, Role::Main) => {
-            ToolpathStroke::Engrave
-        }
+        (OperationKind::Engrave | OperationKind::Image, _)
+        | (OperationKind::EngraveOutline, Role::Main) => ToolpathStroke::Engrave,
     }
 }
 
@@ -88,7 +88,7 @@ impl LookBuilder<'_> {
     /// The burn kind of move `index`, `None` when it is no burn.
     fn burn(&self, index: usize) -> Option<(ToolpathStroke, usize, curvyo_document_core::NodeId)> {
         let m = self.job.moves.get(index)?;
-        let MoveKind::Burn { role, node } = m.kind else {
+        let (MoveKind::Burn { role, node } | MoveKind::Sweep { role, node, .. }) = m.kind else {
             return None;
         };
         let block = self.job.blocks.get(m.block)?;
@@ -128,12 +128,18 @@ impl LookBuilder<'_> {
                 }
                 ToolpathStroke::Travel
             }
-            MoveKind::Burn { .. } => {
+            MoveKind::Burn { .. } | MoveKind::Sweep { .. } => {
                 // invariant: a burn move's block is in the job.
                 let Some((stroke, block, node)) = self.burn(index) else {
                     return;
                 };
                 self.burn_start(index, from, to, (stroke, block, node));
+                // A sweep is drawn as its dots (the item's dot picture, `raster_view.rs`), never
+                // as a line over its gaps (`specs/0123` criterion 20); its ring and its one
+                // arrowhead stay.
+                if matches!(m.kind, MoveKind::Sweep { .. }) {
+                    return;
+                }
                 stroke
             }
         };

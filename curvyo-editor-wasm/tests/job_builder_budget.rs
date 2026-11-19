@@ -154,6 +154,7 @@ fn engrave_page(crosshatch: bool) -> JobInput {
         scan_angle: ScanAngle::default(),
         overscan: Overscan::DEFAULT,
         z_offset: ZOffset::default(),
+        image: curvyo_laser_core::settings::ImageSettings::DEFAULT,
     };
     page(vec![block(
         ids[0],

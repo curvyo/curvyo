@@ -13,6 +13,7 @@ use curvyo_laser_core::operations::{
 use serde::Serialize;
 
 use super::super::Session;
+use super::super::output::STALE_TIME;
 use super::ActiveOperations;
 use super::assign::{Selection, target_tick};
 use super::index::IndexedLeaf;
@@ -105,6 +106,8 @@ pub enum KindView {
     EngraveOutline,
     /// Cut-out.
     CutOut,
+    /// Image (`specs/0123` criterion 47).
+    Image,
     /// A kind this build does not know, or an unreadable record.
     Unknown,
 }
@@ -189,6 +192,7 @@ pub(in crate::session) const fn kind_view_of(kind: Option<OperationKind>) -> Kin
         Some(OperationKind::Engrave) => KindView::Engrave,
         Some(OperationKind::EngraveOutline) => KindView::EngraveOutline,
         Some(OperationKind::CutOut) => KindView::CutOut,
+        Some(OperationKind::Image) => KindView::Image,
         None => KindView::Unknown,
     }
 }
@@ -231,7 +235,8 @@ impl Session {
         let list = OperationList::new(&active.operations, active.cuts_last);
         let leaves = self.output_leaves(&manufacturing);
         let job = self.job_with_facts(Some(&active));
-        let facts = job.as_ref().and_then(|job| job.tab.get());
+        let stale = job.as_ref().is_some_and(|(_, stale)| *stale);
+        let facts = job.as_ref().and_then(|(job, _)| job.tab.get());
         let selection = self.selection_targets();
         let pick = pick_views(self);
         let unfolded = self.operations.tools.unfolded();
@@ -244,7 +249,14 @@ impl Session {
                 let op = &active.operations[at];
                 let kind = KindRead::of(op.kind.as_deref());
                 let (tick, group_in_part) = row_tick(self, &selection, &list, at, &leaves);
-                let run = facts.and_then(|f| f.runs.get(&op.id).cloned());
+                let run = facts
+                    .and_then(|f| f.runs.get(&op.id).cloned())
+                    .map(|mut run| {
+                        if stale {
+                            STALE_TIME.clone_into(&mut run.time);
+                        }
+                        run
+                    });
                 let accessible_name = run.as_ref().map_or_else(
                     || op.name.clone(),
                     |run| format!("{}, run {}, {}", op.name, run.digit, run.time),
@@ -264,7 +276,7 @@ impl Session {
                     settings: settings_view(self, op, &pick, &page),
                     source: source_view(self, op, &mut sources),
                     run,
-                    numbers: facts.map_or_else(
+                    numbers: facts.filter(|_| !stale).map_or_else(
                         || self.row_numbers(op),
                         |f| f.numbers.get(&op.id).cloned().flatten(),
                     ),

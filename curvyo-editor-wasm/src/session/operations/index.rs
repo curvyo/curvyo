@@ -31,12 +31,24 @@ pub(in crate::session) struct IndexedLeaf {
 pub(in crate::session) enum LeafSource {
     /// An item of the output page, in document space.
     Own(usize),
-    /// The member `member` of the clone of a group at `clone`.
-    CloneMember { clone: usize, member: NodeId },
+    /// The leaf at `member` in the picture of the clone at `clone` (a clone of a group, text or
+    /// image, or of such a clone), by its place: the ids of a picture can repeat (a clone inside
+    /// a cloned group draws its original's ids).
+    CloneMember { clone: usize, member: usize },
+    /// A member of a cloned group that its clone does not draw (hidden inside the group): it
+    /// counts, but has no geometry.
+    NotDrawn,
     /// A placed page's frame, its placement node.
     PlacedFrame(NodeId),
     /// The member at `index` of the placed page `placement`.
     PlacedMember { index: usize, placement: NodeId },
+    /// The leaf at `member` in the picture of the clone at `clone`, a member of the placed page
+    /// `placement`.
+    PlacedCloneMember {
+        clone: usize,
+        member: usize,
+        placement: NodeId,
+    },
 }
 
 /// The index of one output page, for the drawing read it was built from.
@@ -111,7 +123,9 @@ fn build_leaves(
             continue;
         }
         // A clone of a group draws its members, which are the leaves (criteria 12, 17); a clone
-        // of one path draws that path, so the clone itself is the leaf.
+        // of one path draws that path, so the clone itself is the leaf. Any other picture clone
+        // (of a text, an image or another picture clone) draws its picture's leaves, each keyed
+        // by the clone (`specs/0123` criterion 46).
         if let Some((origin, _)) = links.get(&object.id())
             && session.document.is_group(*origin)
         {
@@ -129,6 +143,10 @@ fn build_leaves(
             ));
             continue;
         }
+        if object.picture().is_some() {
+            out.extend(own_picture_leaves(session, object, at, &visible));
+            continue;
+        }
         out.push(own_leaf(session, object, at, &visible));
     }
     out.extend(placed_leaves(
@@ -139,6 +157,27 @@ fn build_leaves(
         &visible,
     ));
     out
+}
+
+/// The leaves of the page's own picture clone `object` (of a text, an image or another picture
+/// clone), at `at` in the drawing read: its picture's leaves, each keyed by the clone.
+fn own_picture_leaves(
+    session: &Session,
+    object: &ObjectSnapshot,
+    at: usize,
+    visible: &HashSet<NodeId>,
+) -> Vec<IndexedLeaf> {
+    let chain = session.document.key_chain(&[object.id()]);
+    let hidden = if visible.contains(&object.id()) {
+        Hidden::No
+    } else {
+        Hidden::OnOutputPage
+    };
+    picture_leaves(
+        object,
+        |_| Some((chain.clone(), hidden)),
+        |member| LeafSource::CloneMember { clone: at, member },
+    )
 }
 
 /// The leaf of the page's own item `object`, at `at` in the drawing read.
@@ -188,13 +227,27 @@ fn placed_leaves(
             }
             let mut chain = session.document.key_chain(&[member.id()]);
             chain.push(vec![placement.id]);
+            let hidden = if visible.contains(&member.id()) {
+                Hidden::No
+            } else {
+                Hidden::InSource
+            };
+            // A picture clone on the source page draws its picture's leaves (criterion 46).
+            if member.picture().is_some() {
+                out.extend(picture_leaves(
+                    member,
+                    |_| Some((chain.clone(), hidden)),
+                    |at| LeafSource::PlacedCloneMember {
+                        clone: index,
+                        member: at,
+                        placement: placement.id,
+                    },
+                ));
+                continue;
+            }
             out.push(IndexedLeaf {
                 chain,
-                hidden: if visible.contains(&member.id()) {
-                    Hidden::No
-                } else {
-                    Hidden::InSource
-                },
+                hidden,
                 shape: shape_of(member),
                 source: LeafSource::PlacedMember {
                     index,
@@ -214,9 +267,10 @@ struct CloneOf {
     clone_visible: bool,
 }
 
-/// The leaves of a clone's members: each member of the origin group, keyed by its path through
-/// the clone (ADR 0046 §2, Frage 167 B), so a clone's own assignment reaches them through the
-/// nearest rule. A member is hidden when the clone or the member is not visible.
+/// The leaves of a clone's members: each leaf the clone draws, keyed by the path through the
+/// clone to the member of the origin group it comes from (ADR 0046 §2, Frage 167 B), so a
+/// clone's own assignment reaches them through the nearest rule; then each member it does not
+/// draw. A member is hidden when the clone or the member is not visible.
 fn clone_member_leaves(
     session: &Session,
     read: &DocumentRead,
@@ -224,28 +278,73 @@ fn clone_member_leaves(
     objects: &HashMap<NodeId, &ObjectSnapshot>,
     visible: &HashSet<NodeId>,
 ) -> Vec<IndexedLeaf> {
-    session
-        .document
-        .leaves_of(clone.origin)
-        .into_iter()
-        .filter_map(|member| {
-            let object = objects.get(&member)?;
-            if !output_capable(object, read) {
-                return None;
-            }
-            let path = session.document.clone_member_path(clone.clone, member)?;
+    let hidden = |member: NodeId| {
+        if clone.clone_visible && visible.contains(&member) {
+            Hidden::No
+        } else {
+            Hidden::OnOutputPage
+        }
+    };
+    let key = |member: NodeId| {
+        let object = objects.get(&member)?;
+        if !output_capable(object, read) {
+            return None;
+        }
+        let path = session.document.clone_member_path(clone.clone, member)?;
+        Some((session.document.key_chain(&path), hidden(member)))
+    };
+    let Some(object) = read.leaves.get(clone.at) else {
+        return Vec::new();
+    };
+    let mut out = picture_leaves(object, key, |member| LeafSource::CloneMember {
+        clone: clone.at,
+        member,
+    });
+    let drawn: HashSet<NodeId> = object
+        .picture_members()
+        .map(|members| members.iter().copied().collect())
+        .unwrap_or_default();
+    for member in session.document.leaves_of(clone.origin) {
+        if drawn.contains(&member) {
+            continue;
+        }
+        let Some((chain, hidden)) = key(member) else {
+            continue;
+        };
+        out.push(IndexedLeaf {
+            chain,
+            hidden,
+            shape: objects
+                .get(&member)
+                .map_or(LeafShape::Outlines { closed: 1, open: 0 }, |o| shape_of(o)),
+            source: LeafSource::NotDrawn,
+        });
+    }
+    out
+}
+
+/// The leaves of the picture of the clone `object`, one per picture leaf by its place, each with
+/// the chain and hidden state `key` gives for the member it comes from (`None` leaves it out)
+/// and the source `source` gives for its place (`specs/0123` criterion 46).
+fn picture_leaves(
+    object: &ObjectSnapshot,
+    mut key: impl FnMut(NodeId) -> Option<(Vec<Vec<NodeId>>, Hidden)>,
+    source: impl Fn(usize) -> LeafSource,
+) -> Vec<IndexedLeaf> {
+    let (Some(picture), Some(members)) = (object.picture(), object.picture_members()) else {
+        return Vec::new();
+    };
+    picture
+        .iter()
+        .zip(members)
+        .enumerate()
+        .filter_map(|(at, (leaf, &member))| {
+            let (chain, hidden) = key(member)?;
             Some(IndexedLeaf {
-                chain: session.document.key_chain(&path),
-                hidden: if clone.clone_visible && visible.contains(&member) {
-                    Hidden::No
-                } else {
-                    Hidden::OnOutputPage
-                },
-                shape: shape_of(object),
-                source: LeafSource::CloneMember {
-                    clone: clone.at,
-                    member,
-                },
+                chain,
+                hidden,
+                shape: shape_of(leaf),
+                source: source(at),
             })
         })
         .collect()
@@ -253,21 +352,26 @@ fn clone_member_leaves(
 
 /// The topology of a leaf for the run rules. Text and primitives count as one closed outline
 /// (Proposal: their outline count is not read here; the run rules differ only for open outlines).
+/// A leaf whose fill paints a gradient is a `Gradient` shape, the raster item of an Image
+/// operation (`specs/0123` criterion 3; ADR 0069 §13).
 fn shape_of(object: &ObjectSnapshot) -> LeafShape {
-    match object {
-        ObjectSnapshot::Path(path) => path_shape(path),
-        ObjectSnapshot::Image(_) => LeafShape::Image,
-        _ => LeafShape::Outlines { closed: 1, open: 0 },
+    let (closed, open) = match object {
+        ObjectSnapshot::Image(_) => return LeafShape::Image,
+        ObjectSnapshot::Path(path) => path_counts(path),
+        _ => (1, 0),
+    };
+    if object.style().fill.painted_gradient().is_some() {
+        LeafShape::Gradient { closed, open }
+    } else {
+        LeafShape::Outlines { closed, open }
     }
 }
 
-fn path_shape(path: &PathSnapshot) -> LeafShape {
-    let (closed, open) =
-        path.subpaths().fold(
-            (0, 0),
-            |(c, o), sub| {
-                if sub.closed { (c + 1, o) } else { (c, o + 1) }
-            },
-        );
-    LeafShape::Outlines { closed, open }
+fn path_counts(path: &PathSnapshot) -> (usize, usize) {
+    path.subpaths().fold(
+        (0, 0),
+        |(c, o), sub| {
+            if sub.closed { (c + 1, o) } else { (c, o + 1) }
+        },
+    )
 }

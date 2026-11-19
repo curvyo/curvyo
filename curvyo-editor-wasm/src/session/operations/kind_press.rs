@@ -1,4 +1,4 @@
-//! A press on one of the five kind buttons of the Select bar (`specs/0111-laser-operation-tools`
+//! A press on one of the six kind buttons of the Select bar (`specs/0111-laser-operation-tools`
 //! criteria 1 to 7 and 9; ADR 0056 §3): the selection goes into the last operation of that kind,
 //! or into a new "`<Kind> <N>`" when there is none or Shift is held, in one step.
 
@@ -14,14 +14,8 @@ use super::ActiveOperations;
 use super::assign::target_keys;
 use super::view_json::{KindView, kind_view};
 
-/// The five kinds in bar order (criterion 1).
-const BAR_ORDER: [OperationKind; 5] = [
-    OperationKind::Cut,
-    OperationKind::Score,
-    OperationKind::Engrave,
-    OperationKind::EngraveOutline,
-    OperationKind::CutOut,
-];
+/// The six kinds in bar order (criterion 1; `specs/0123` criterion 47: Image last).
+const BAR_ORDER: [OperationKind; 6] = OperationKind::ALL;
 
 /// One kind button of the Select bar (criterion 2; UX notes §3.2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -34,7 +28,7 @@ pub struct KindButtonView {
 
 impl Session {
     /// A press on the kind button `kind` (`cut`, `score`, `engrave`, `engrave_outline`,
-    /// `cut_out`), with `shift` held or not (criteria 3 to 5): the selection is assigned to the
+    /// `cut_out`, `image`), with `shift` held or not (criteria 3 to 5): the selection is assigned to the
     /// last operation of that kind, or to a new one at the end of its section (Show and Output
     /// on), in one step `Assign to <name>`; a group by the group rule (criterion 9). Guides, dimensions
     /// and test grid items are skipped with the notice of `0101` criterion 10. The operation
@@ -59,11 +53,13 @@ impl Session {
         let written = if let Some(at) = reuse {
             let keys = target_keys(&selection, &list, at, &leaves, true);
             let (id, name) = (active.operations[at].id, active.operations[at].name.clone());
-            let changed = self.recording_named(format!("Assign to {name}"), |this| {
-                this.document
-                    .set_operation_members(id, &keys, true)
-                    .unwrap_or(false)
-            });
+            let summary = self.targets_summary(&selection.targets);
+            let changed =
+                self.recording_named_counting(format!("Assign to {name}"), summary, |this| {
+                    this.document
+                        .set_operation_members(id, &keys, true)
+                        .unwrap_or(false)
+                });
             if !changed {
                 return None;
             }
@@ -79,11 +75,13 @@ impl Session {
                 kind: kind.as_str(),
                 name: &name,
             };
-            let added = self.recording_named(format!("Assign to {name}"), |this| {
-                this.document
-                    .add_operation(active.manufacturing, &new, index, &keys)
-                    .ok()
-            });
+            let summary = self.targets_summary(&selection.targets);
+            let added =
+                self.recording_named_counting(format!("Assign to {name}"), summary, |this| {
+                    this.document
+                        .add_operation(active.manufacturing, &new, index, &keys)
+                        .ok()
+                });
             let Some(id) = added else {
                 // Never silently nothing (`specs/0028` UX review).
                 self.operations.notice = Some(super::ADD_REFUSED_NOTICE.to_owned());
