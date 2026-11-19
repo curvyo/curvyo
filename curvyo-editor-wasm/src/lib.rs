@@ -55,8 +55,12 @@ mod gpu_pipeline;
 mod gpu_shader;
 #[cfg(target_arch = "wasm32")]
 mod gpu_stops;
+#[cfg(any(target_arch = "wasm32", test))]
+mod gpu_variant;
 #[cfg(target_arch = "wasm32")]
 mod gpu_vertex;
+#[cfg(target_arch = "wasm32")]
+mod gpu_vertex_upload;
 #[cfg(target_arch = "wasm32")]
 mod wasm_api;
 #[cfg(target_arch = "wasm32")]

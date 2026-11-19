@@ -87,6 +87,17 @@ impl ScreenTransform {
             checker_b: shader_colour(CHECKER_B),
         }
     }
+
+    /// The transform for vertices relative to an anchor `dx`, `dy` mm from the view's origin
+    /// (the perf build's `cache-vertices`, `gpu_vertex_upload.rs`); unchanged for `0, 0`.
+    pub(super) fn shifted(mut self, dx: f64, dy: f64) -> Self {
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            self.offset_x += (dx * f64::from(self.scale_x)) as f32;
+            self.offset_y += (dy * f64::from(self.scale_y)) as f32;
+        }
+        self
+    }
 }
 
 /// The buffer/bind-group pair that feeds [`ScreenTransform`] to the vertex

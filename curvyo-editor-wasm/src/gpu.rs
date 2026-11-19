@@ -21,7 +21,8 @@ use crate::gpu_pipeline::{
     create_msaa_view, create_pipeline, create_transform_resources,
 };
 use crate::gpu_stops::{StopTable, create_stop_table_layout};
-use crate::gpu_vertex::gpu_vertices;
+use crate::gpu_variant::{GpuVariant, current as current_variant};
+use crate::gpu_vertex_upload::VertexUpload;
 use crate::session::FrameImages;
 
 /// `--pasteboard-bg` (`docs/design-system.md`): cleared behind every frame's
@@ -87,13 +88,22 @@ const PREFERRED_SAMPLE_COUNTS: [u32; 2] = [8, 4];
 /// kept as a real fallback rather than an assumed-unreachable default,
 /// since a downlevel/software GL stack is exactly the kind of adapter
 /// this product's `WebKitGTK` target can hand back.
+///
+/// `asked` (the perf build's `samples-N` variant, `gpu_variant.rs`) replaces the preference list
+/// when the adapter supports it.
 fn choose_sample_count(
+    asked: Option<u32>,
     color: wgpu::TextureFormatFeatureFlags,
     depth: wgpu::TextureFormatFeatureFlags,
 ) -> u32 {
+    let supported =
+        |count: u32| color.sample_count_supported(count) && depth.sample_count_supported(count);
+    if let Some(count) = asked.filter(|&count| count == 1 || supported(count)) {
+        return count;
+    }
     PREFERRED_SAMPLE_COUNTS
         .into_iter()
-        .find(|&count| color.sample_count_supported(count) && depth.sample_count_supported(count))
+        .find(|&count| supported(count))
         .unwrap_or(1)
 }
 
@@ -146,6 +156,8 @@ pub struct Gpu {
     /// The adapter and surface configuration chosen at attach, as text for the
     /// performance probe ([`Gpu::info`]).
     info: String,
+    /// The draw-list vertex buffer of each frame ([`VertexUpload`]).
+    vertices: VertexUpload,
 }
 
 /// The surface, its backing adapter-derived device/queue, the
@@ -186,11 +198,16 @@ async fn create_surface_and_device(
     canvas: HtmlCanvasElement,
     width: u32,
     height: u32,
+    variant: GpuVariant,
 ) -> Result<SurfaceAndDevice, JsValue> {
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+    let mut descriptor = wgpu::InstanceDescriptor {
         backends: wgpu::Backends::GL,
         ..wgpu::InstanceDescriptor::new_without_display_handle()
-    });
+    };
+    if variant.no_fences {
+        descriptor.backend_options.gl.fence_behavior = wgpu::GlFenceBehavior::AutoFinish;
+    }
+    let instance = wgpu::Instance::new(descriptor);
     let surface = instance
         .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
         .map_err(|err| JsValue::from_str(&format!("creating the wgpu surface failed: {err}")))?;
@@ -232,10 +249,11 @@ async fn create_surface_and_device(
     // three engines ADR 0001 covers (`docs/technical-debt.md`'s canvas-
     // performance entry).
     let sample_count = choose_sample_count(
+        variant.samples,
         adapter.get_texture_format_features(config.format).flags,
         adapter.get_texture_format_features(DEPTH_FORMAT).flags,
     );
-    let info = describe(&adapter, &capabilities, &config, sample_count);
+    let info = describe(&adapter, &capabilities, &config, sample_count, variant);
 
     Ok(SurfaceAndDevice {
         surface,
@@ -276,7 +294,7 @@ impl Gpu {
             config,
             sample_count,
             info,
-        } = create_surface_and_device(canvas, width, height).await?;
+        } = create_surface_and_device(canvas, width, height, current_variant()).await?;
 
         let TransformResources {
             buffer: transform_buffer,
@@ -331,6 +349,7 @@ impl Gpu {
                 1.0
             },
             info,
+            vertices: VertexUpload::default(),
         })
     }
 
@@ -399,50 +418,47 @@ impl Gpu {
         view: ViewTransform,
         pictures: &FrameImages,
     ) -> PreparedFrame {
+        // Every vertex is shifted by the document point at screen pixel (0, 0), the view's
+        // origin, in `f64` before its own `f32` cast (`to_gpu_vertex`'s own doc comment); the
+        // perf build's `cache-vertices` keeps an older anchor, whose shift the transform adds.
+        // An empty document still needs its one clear pass in `draw`, or the canvas would show
+        // whatever the GPU left in this texture rather than `--canvas-bg`: the vertex buffer
+        // (and its draw call) exists only when there is anything to draw, the pass always runs.
+        let uploaded = self.vertices.prepare(
+            &self.device,
+            &self.queue,
+            draw_list,
+            view,
+            current_variant(),
+        );
+        let origin = view.screen_to_document(0.0, 0.0);
         let css_width = f64::from(self.config.width) / self.device_pixel_ratio;
         let css_height = f64::from(self.config.height) / self.device_pixel_ratio;
         let grid = checker_grid(view, self.device_pixel_ratio);
-        let transform = ScreenTransform::new(view, css_width, css_height, grid);
+        let transform = ScreenTransform::new(view, css_width, css_height, grid)
+            .shifted(uploaded.anchor.x - origin.x, uploaded.anchor.y - origin.y);
         self.queue
             .write_buffer(&self.transform_buffer, 0, bytemuck::bytes_of(&transform));
 
-        // The document point currently at screen pixel (0, 0) — every
-        // vertex below is shifted by this same point in `f64`, before
-        // its own `f32` cast (`to_gpu_vertex`'s own doc comment).
-        let origin = view.screen_to_document(0.0, 0.0);
-        let vertices = gpu_vertices(draw_list, origin);
         self.stops.sync(&self.device, &self.queue, draw_list);
         self.images.sync(&self.device, &self.queue, pictures);
-        let image_draws = self.images.prepare(&self.device, draw_list, view, origin);
+        let image_draws = self
+            .images
+            .prepare(&self.device, draw_list, view, uploaded.anchor);
 
-        // An empty document still needs its one clear pass in `draw`, or the
-        // canvas would show whatever the GPU happened to leave behind in
-        // this texture rather than `--canvas-bg` — so the vertex buffer
-        // (and the draw call using it) is only created/issued when there
-        // is anything to draw, but the render pass itself always runs.
-        let vertex_buffer = (!vertices.is_empty()).then(|| {
-            wgpu::util::DeviceExt::create_buffer_init(
-                &self.device,
-                &wgpu::util::BufferInitDescriptor {
-                    label: Some("curvyo vertex buffer"),
-                    contents: bytemuck::cast_slice(&vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                },
-            )
-        });
         // Vertex buffer 1 goes with the vertices it belongs to (ADR 0067 §2); zeros kept across
         // frames while nothing is shaded.
         let gradient_buffer =
             self.gradient_attributes
-                .prepare(&self.device, draw_list, vertices.len());
+                .prepare(&self.device, draw_list, uploaded.count);
         #[allow(clippy::cast_possible_truncation)]
         let ranges = (
             draw_list.checker_end() as u32,
             draw_list.overlay_start() as u32,
-            vertices.len() as u32,
+            uploaded.count as u32,
         );
         PreparedFrame {
-            vertex_buffer,
+            vertex_buffer: uploaded.buffer,
             gradient_buffer,
             image_draws,
             ranges,
