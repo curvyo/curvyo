@@ -1104,6 +1104,8 @@ dependencies = [
  "curvyo-document-core",
  "curvyo-extension-core",
  "curvyo-geometry-core",
+ "curvyo-image-core",
+ "libm",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

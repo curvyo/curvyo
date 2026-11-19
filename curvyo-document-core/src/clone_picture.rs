@@ -199,6 +199,10 @@ pub(crate) enum RootRef {
     Group(NodeId),
 }
 
+/// What a group draws: its leaves, and beside each the leaf of its subtree it comes from (itself,
+/// or the clone inside the group that draws it).
+type Drawn = (Arc<[ObjectSnapshot]>, Arc<[NodeId]>);
+
 /// A clone whose chain ends at a picture root, resolved once every other leaf is read.
 #[derive(Debug, Clone)]
 pub(crate) struct Pending {
@@ -236,7 +240,7 @@ pub(crate) fn resolve_pictures(
     }
     let graph = Graph::new(pending, structure, index);
     let ranges = structure.ranges();
-    let mut lists: HashMap<NodeId, Arc<[ObjectSnapshot]>> = HashMap::new();
+    let mut lists: HashMap<NodeId, Drawn> = HashMap::new();
     let mut orphaned: HashSet<usize> = HashSet::new();
     for component in graph.components() {
         let cyclic = component.len() > 1 || graph.loops(component[0]);
@@ -292,15 +296,19 @@ pub(crate) fn resolve_pictures(
 fn picture_clone(
     clone: &Pending,
     leaves: &[Option<ObjectSnapshot>],
-    lists: &HashMap<NodeId, Arc<[ObjectSnapshot]>>,
+    lists: &HashMap<NodeId, Drawn>,
 ) -> Option<crate::clone_model::CloneSnapshot> {
-    let (root_id, source): (NodeId, Vec<ObjectSnapshot>) = match clone.root {
-        RootRef::Group(group) => (group, lists.get(&group)?.to_vec()),
+    let (root_id, source, members): (NodeId, Vec<ObjectSnapshot>, Arc<[NodeId]>) = match clone.root
+    {
+        RootRef::Group(group) => {
+            let (list, members) = lists.get(&group)?;
+            (group, list.to_vec(), Arc::clone(members))
+        }
         RootRef::Leaf(at) => {
             let leaf = leaves.get(at)?.as_ref()?;
             match leaf {
                 ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
-                    (leaf.id(), vec![leaf.clone()])
+                    (leaf.id(), vec![leaf.clone()], Arc::from([leaf.id()]))
                 }
                 _ => return None,
             }
@@ -337,6 +345,7 @@ fn picture_clone(
             style_source: root_id,
             root_outline: Arc::new(empty),
             picture: Some(picture),
+            picture_members: Some(members),
         },
     ))
 }
@@ -368,11 +377,12 @@ fn group_list(
     leaves: &[Option<ObjectSnapshot>],
     structure: &Structure,
     index: &HashMap<NodeId, usize>,
-) -> Arc<[ObjectSnapshot]> {
+) -> Drawn {
     let Some(&(start, end)) = ranges.get(&group) else {
-        return Arc::from(Vec::new());
+        return (Arc::from(Vec::new()), Arc::from(Vec::new()));
     };
     let mut list = Vec::new();
+    let mut members = Vec::new();
     for at in start..end {
         let Some(object) = leaves.get(at).and_then(Option::as_ref) else {
             continue;
@@ -428,8 +438,9 @@ fn group_list(
                 list.push(faded(object.clone(), through * own));
             }
         }
+        members.resize(list.len(), object.id());
     }
-    list.into()
+    (list.into(), members.into())
 }
 
 /// A node of the dependency graph.
@@ -665,5 +676,38 @@ mod tests {
             panic!()
         };
         assert_eq!(c.chain.picture.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn each_leaf_of_a_picture_names_the_member_it_comes_from() {
+        // G1 (100) holds the square 1; G2 (200) holds C (2), a clone of G1, and the square 3;
+        // D (4) outside clones G2: its leaves are G1's square through C, then the square 3.
+        let leaves = vec![
+            (square(1), Some(100)),
+            (clone(2, 100, Affine::IDENTITY), Some(200)),
+            (square(3), Some(200)),
+            (clone(4, 200, Affine::IDENTITY), None),
+        ];
+        let read = read(leaves, &[(100, None), (200, None)], false);
+        let Some(ObjectSnapshot::Clone(d)) = read.get(id(4)) else {
+            panic!("D resolves")
+        };
+        let ids: Vec<NodeId> = d
+            .chain
+            .picture
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(ObjectSnapshot::id)
+            .collect();
+        assert_eq!(
+            ids,
+            vec![id(1), id(3)],
+            "the square through C keeps its own id"
+        );
+        assert_eq!(
+            d.chain.picture_members.as_deref(),
+            Some(&[id(2), id(3)][..])
+        );
     }
 }

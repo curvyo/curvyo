@@ -8,6 +8,7 @@ use curvyo_document_core::NodeId;
 use crate::GENERIC_LASER_ID;
 use crate::job_build::Built;
 use crate::job_gate_cause::{Cause, Severity};
+use crate::job_gate_raster::{bounding_points, raster_issues, raster_leaves};
 use crate::job_gate_rows::{RunFacts, run_facts};
 use crate::job_input::{BlockInput, BlockSource, JobInput, MachineInput, PointUm};
 use crate::job_moves::{Frame, MoveKind};
@@ -31,6 +32,9 @@ pub struct GateFacts {
     pub output_off: Vec<NodeId>,
     /// The items in those operations: what the check's button selects (`0101` criterion 17).
     pub output_off_items: Vec<NodeId>,
+    /// Per Image operation with Output on, the leaves assigned to it that are no picture and
+    /// burn nothing there (`specs/0123` criterion 48), in list order.
+    pub not_pictures: Vec<(NodeId, Vec<NodeId>)>,
 }
 
 /// What a check line's button does.
@@ -133,6 +137,8 @@ pub fn gate(input: &JobInput, built: &Built, timeline: &Timeline, facts: &GateFa
         );
     }
     page_issues(input, built, &mut issues);
+    raster_issues(input, built, &mut issues);
+    over_limit(input, &mut runs, &mut issues);
     fact_issues(facts, &mut issues);
     if damaged > 0 {
         issues.push(issue(Cause::DamagedSettings, damaged, Targets::None));
@@ -143,6 +149,32 @@ pub fn gate(input: &JobInput, built: &Built, timeline: &Timeline, facts: &GateFa
         machine: machine_facts(machine),
         runs,
         issues,
+    }
+}
+
+/// An item over the dot limit blocks with its own line: it stands in for "Nothing runs", and a
+/// row whose run burns nothing because of it reads no time ("–", `specs/0123` criterion 34).
+fn over_limit(input: &JobInput, runs: &mut [RunFacts], issues: &mut Vec<Issue>) {
+    let over: std::collections::HashSet<NodeId> = issues
+        .iter()
+        .filter_map(|issue| match issue.cause {
+            Cause::TooManyDots { item, .. } => Some(item),
+            _ => None,
+        })
+        .collect();
+    if over.is_empty() {
+        return;
+    }
+    issues.retain(|issue| issue.cause != Cause::NothingRuns);
+    for run in runs.iter_mut().filter(|run| run.time_s == Some(0.0)) {
+        let holds = input
+            .blocks
+            .iter()
+            .find(|block| block.id == run.block)
+            .is_some_and(|block| block.leaves.iter().any(|leaf| over.contains(&leaf.node)));
+        if holds {
+            run.time_s = None;
+        }
     }
 }
 
@@ -175,7 +207,7 @@ fn page_issues(input: &JobInput, built: &Built, issues: &mut Vec<Issue>) {
     if !built.job.burns() && !running_block {
         issues.push(issue(Cause::NothingRuns, 1, Targets::None));
     }
-    let outside = outside_bed(built);
+    let outside = outside_bed(input, built);
     if !outside.is_empty() {
         let cause = Cause::OutsideBed {
             width_um: built.job.frame.width,
@@ -211,6 +243,10 @@ fn fact_issues(facts: &GateFacts, issues: &mut Vec<Issue>) {
             ids.len(),
             Targets::Items(facts.output_off_items.clone()),
         ));
+    }
+    for (op, items) in &facts.not_pictures {
+        let cause = Cause::NotPictures { op: *op };
+        issues.push(issue(cause, items.len(), Targets::Items(items.clone())));
     }
 }
 
@@ -360,7 +396,7 @@ fn bed_offset(built: &Built) -> PointUm {
     let mut from = job.home;
     let mut corners: Option<(PointUm, PointUm)> = None;
     for m in &job.moves {
-        if matches!(m.kind, MoveKind::Burn { .. }) {
+        if matches!(m.kind, MoveKind::Burn { .. } | MoveKind::Sweep { .. }) {
             for p in [from, m.to] {
                 let (lo, hi) = corners.get_or_insert((p, p));
                 *lo = PointUm::new(lo.x.min(p.x), lo.y.min(p.y));
@@ -381,8 +417,10 @@ fn bed_offset(built: &Built) -> PointUm {
     PointUm::new(origin.x - corner.x, origin.y - corner.y)
 }
 
-/// The leaves with a burn point outside the bed, in move order, each once.
-fn outside_bed(built: &Built) -> Vec<NodeId> {
+/// The leaves with a burn point outside the bed, in move order, each once; then the raster
+/// items whose frame reaches outside (`specs/0123` criterion 31: the frame counts even where its
+/// edge is transparent).
+fn outside_bed(input: &JobInput, built: &Built) -> Vec<NodeId> {
     let frame: Frame = built.job.frame;
     let offset = bed_offset(built);
     let holds = |p: PointUm| {
@@ -395,13 +433,26 @@ fn outside_bed(built: &Built) -> Vec<NodeId> {
     let mut out = Vec::new();
     let mut from = built.job.home;
     for m in &built.job.moves {
-        if let MoveKind::Burn { node, .. } = m.kind
+        if let MoveKind::Burn { node, .. } | MoveKind::Sweep { node, .. } = m.kind
             && (!holds(m.to) || !holds(from))
             && seen.insert(node)
         {
             out.push(node);
         }
         from = m.to;
+    }
+    for (index, block) in input.blocks.iter().enumerate() {
+        if !built.runs[index] {
+            continue;
+        }
+        for leaf in raster_leaves(block, &built.numbers[index]) {
+            let outside = bounding_points(leaf)
+                .into_iter()
+                .any(|p| !holds(PointUm::of_mm(p)));
+            if outside && seen.insert(leaf.node) {
+                out.push(leaf.node);
+            }
+        }
     }
     out
 }

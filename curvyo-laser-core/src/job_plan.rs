@@ -1,25 +1,29 @@
-//! The ordered burn paths of one block, by kind (ADR 0064 §4, §5; criteria 13 to 18, 22): what
-//! each leaf runs, flattened at 0.0095 mm and rounded to µm, hatched and ordered.
+//! The ordered burn paths of one block, by kind (ADR 0064 §4, §5, ADR 0069 §2; criteria 13 to
+//! 18, 22): what each leaf runs, flattened at 0.0095 mm and rounded to µm, hatched, rastered and
+//! ordered.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use curvyo_document_core::{NodeId, Tolerance};
-use curvyo_geometry_core::{Outline, flatten_outline};
+use curvyo_document_core::{AssetHash, NodeId, Tolerance};
+use curvyo_geometry_core::Outline;
 
 use crate::job_fingerprint::plan_fingerprint;
+pub use crate::job_flatten::FLATTEN_MM;
+use crate::job_flatten::{dedupe, flat};
 use crate::job_hatch::hatch;
 use crate::job_input::{BlockInput, BlockSource, LeafGeometry, LeafOutline, PointUm};
 use crate::job_numbers::BlockNumbers;
 use crate::job_order::{Unit, UnitShape, order};
+use crate::job_raster_items::{
+    RasterCaches, RasterLeaf, frame_outline, prepare_raster, raster_leaf, raster_sweeps,
+};
+use crate::job_raster_rows::Sweep;
+use crate::job_raster_work::SweepCache;
 use crate::operation_cut_out::cut_out_contours;
 use crate::operation_kind::OperationKind;
 use crate::operation_kind_run::{LeafShape, Lines, kind_run};
 use crate::operation_settings::Role;
-
-/// The flattening tolerance: with the 0.0005 mm of µm rounding the written path stays within
-/// 0.01 mm of the curve (criterion 17).
-pub const FLATTEN_MM: f64 = 0.0095;
 
 /// One burn path of a plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +36,18 @@ pub struct PlannedPath {
     pub node: NodeId,
 }
 
+/// One sweep of a raster item in a plan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedSweep {
+    /// The image or gradient-filled leaf it belongs to.
+    pub node: NodeId,
+    /// That leaf's stacking place in the block ([`crate::job::LeafInput::stacking`]): leaves of
+    /// one clone share their node.
+    pub stacking: u32,
+    /// The sweep.
+    pub sweep: Arc<Sweep>,
+}
+
 /// The paths one set of a block runs, once per pass.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlannedRun {
@@ -39,6 +55,9 @@ pub struct PlannedRun {
     pub role: Role,
     /// The paths in run order.
     pub paths: Vec<PlannedPath>,
+    /// The raster items' sweeps, after the paths: items in stacking order, bottom first
+    /// (`specs/0123` criterion 14).
+    pub sweeps: Vec<PlannedSweep>,
 }
 
 /// The plan of one block.
@@ -55,37 +74,56 @@ pub struct Plan {
 /// The plan of `block` with `numbers`, entered from `entry`.
 #[must_use]
 pub fn plan_block(block: &BlockInput, numbers: &BlockNumbers, entry: PointUm) -> Plan {
+    plan_with(block, numbers, entry, &mut RasterCaches::default())
+}
+
+/// The plan of `block` with the grey pyramids and sweeps of `caches`.
+fn plan_with(
+    block: &BlockInput,
+    numbers: &BlockNumbers,
+    entry: PointUm,
+    caches: &mut RasterCaches,
+) -> Plan {
     let kind = numbers.kind;
     let mut main = Vec::new();
     let mut outline = Vec::new();
+    let mut raster = Vec::new();
     let mut no_contour = Vec::new();
     if kind == OperationKind::CutOut {
         cut_out_units(block, &mut main, &mut no_contour);
     } else {
         for leaf in &block.leaves {
-            leaf_units(leaf, numbers, &mut main, &mut outline);
+            leaf_units(leaf, numbers, &mut main, &mut outline, &mut raster);
         }
     }
     let bidirectional = numbers.options.bidirectional;
     let mut head = entry;
     let mut runs = Vec::new();
-    for (role, list) in [(Role::Main, main), (Role::Outline, outline)] {
-        if list.is_empty() {
-            continue;
-        }
-        let (nodes, units): (Vec<NodeId>, Vec<Unit>) = list.into_iter().unzip();
-        let (ordered, exit) = order(&units, head, bidirectional);
-        head = exit;
+    let paths = ordered(main, &mut head, bidirectional);
+    let sweeps: Vec<PlannedSweep> = raster_sweeps(&mut raster, numbers, caches)
+        .into_iter()
+        .map(|(node, stacking, sweep)| PlannedSweep {
+            node,
+            stacking,
+            sweep,
+        })
+        .collect();
+    if let Some(last) = sweeps.last() {
+        head = last.sweep.end;
+    }
+    if !paths.is_empty() || !sweeps.is_empty() {
         runs.push(PlannedRun {
-            role,
-            paths: ordered
-                .into_iter()
-                .map(|path| PlannedPath {
-                    points: path.points,
-                    hatch: path.hatch,
-                    node: nodes[path.unit],
-                })
-                .collect(),
+            role: Role::Main,
+            paths,
+            sweeps,
+        });
+    }
+    let paths = ordered(outline, &mut head, bidirectional);
+    if !paths.is_empty() {
+        runs.push(PlannedRun {
+            role: Role::Outline,
+            paths,
+            sweeps: Vec::new(),
         });
     }
     Plan {
@@ -95,50 +133,61 @@ pub fn plan_block(block: &BlockInput, numbers: &BlockNumbers, entry: PointUm) ->
     }
 }
 
+/// The units of `list` ordered from `head` (ADR 0064 §5), `head` moved to where they end.
+fn ordered(list: Units, head: &mut PointUm, bidirectional: bool) -> Vec<PlannedPath> {
+    if list.is_empty() {
+        return Vec::new();
+    }
+    let (nodes, units): (Vec<NodeId>, Vec<Unit>) = list.into_iter().unzip();
+    let (ordered, exit) = order(&units, *head, bidirectional);
+    *head = exit;
+    ordered
+        .into_iter()
+        .map(|path| PlannedPath {
+            points: path.points,
+            hatch: path.hatch,
+            node: nodes[path.unit],
+        })
+        .collect()
+}
+
 type Units = Vec<(NodeId, Unit)>;
 
-/// The units of one leaf: its lines into `main` (or `outline` for the outlines of Engrave +
-/// Outline) and its hatch into `main`. Engrave images run nothing (criterion 18).
-fn leaf_units(
-    leaf: &crate::job_input::LeafInput,
+/// The units of one leaf: in an Image block an image or a gradient-filled leaf into `raster`
+/// and nothing else (`specs/0123` criteria 1 to 3, 48); in every other block its lines into
+/// `main` (or `outline` for the outlines of Engrave + Outline) and its hatch into `main`, an
+/// image as its frame rectangle (Frage 271 A).
+fn leaf_units<'a>(
+    leaf: &'a crate::job_input::LeafInput,
     numbers: &BlockNumbers,
     main: &mut Units,
     outline: &mut Units,
+    raster: &mut Vec<RasterLeaf<'a>>,
 ) {
     let kind = numbers.kind;
-    let Some((shape, outlines)) = leaf_shape(&leaf.geometry, kind) else {
+    if kind == OperationKind::Image {
+        raster_leaf(leaf, raster);
         return;
-    };
+    }
+    let (shape, outlines) = leaf_shape(&leaf.geometry);
     let run = kind_run(kind, shape);
     let to_outline = kind == OperationKind::EngraveOutline && run.area;
     let stacking = leaf.stacking;
     for (index, item) in outlines.iter().enumerate() {
         let wanted = match run.lines {
             Lines::None => false,
-            Lines::All | Lines::Frame => true,
+            Lines::All => true,
             Lines::Closed => item.closed,
         };
         if !wanted {
             continue;
         }
-        if let Some(points) = flat(item) {
-            let into = if to_outline {
-                &mut *outline
-            } else {
-                &mut *main
-            };
-            into.push((
-                leaf.node,
-                Unit {
-                    shape: UnitShape::Path {
-                        closed: item.closed && points.len() >= 3,
-                        points,
-                    },
-                    stacking,
-                    outline: index_u32(index),
-                },
-            ));
-        }
+        let into = if to_outline {
+            &mut *outline
+        } else {
+            &mut *main
+        };
+        push_line(into, leaf, index, item);
     }
     if run.area
         && let Some(unit) = hatch_unit(&outlines, numbers, stacking)
@@ -147,43 +196,45 @@ fn leaf_units(
     }
 }
 
-/// The shape a leaf runs as and its outlines (an image's frame as one closed outline); `None`
-/// for an image in an Engrave kind, which writes nothing (criterion 18).
-fn leaf_shape(
-    geometry: &LeafGeometry,
-    kind: OperationKind,
-) -> Option<(LeafShape, Vec<LeafOutline>)> {
-    match geometry {
-        LeafGeometry::Image { .. }
-            if matches!(kind, OperationKind::Engrave | OperationKind::EngraveOutline) =>
-        {
-            None
-        }
-        LeafGeometry::Image { frame } => Some((
-            LeafShape::Image,
-            vec![LeafOutline {
-                anchors: frame
-                    .iter()
-                    .map(|&p| {
-                        (
-                            p,
-                            curvyo_document_core::Vec2::ZERO,
-                            curvyo_document_core::Vec2::ZERO,
-                        )
-                    })
-                    .collect(),
-                closed: true,
-            }],
-        )),
-        LeafGeometry::Outlines(outlines) => {
-            let closed = outlines.iter().filter(|o| o.closed).count();
-            Some((
-                LeafShape::Outlines {
-                    closed,
-                    open: outlines.len() - closed,
+/// Pushes outline `item` (number `index`) of `leaf` as a line unit.
+fn push_line(
+    into: &mut Units,
+    leaf: &crate::job_input::LeafInput,
+    index: usize,
+    item: &LeafOutline,
+) {
+    if let Some(points) = flat(item) {
+        into.push((
+            leaf.node,
+            Unit {
+                shape: UnitShape::Path {
+                    closed: item.closed && points.len() >= 3,
+                    points,
                 },
-                outlines.clone(),
-            ))
+                stacking: leaf.stacking,
+                outline: index_u32(index),
+            },
+        ));
+    }
+}
+
+/// The shape a leaf runs as outside the raster and its outlines (an image's frame as one closed
+/// outline, which every kind but Image runs as a rectangle; a gradient-filled leaf as its
+/// outlines, the paint never counts there, `0101` criterion 24).
+fn leaf_shape(geometry: &LeafGeometry) -> (LeafShape, Vec<LeafOutline>) {
+    let counts = |outlines: &[LeafOutline]| {
+        let closed = outlines.iter().filter(|o| o.closed).count();
+        (closed, outlines.len() - closed)
+    };
+    match geometry {
+        LeafGeometry::Image { frame, .. } => (LeafShape::Image, vec![frame_outline(frame)]),
+        LeafGeometry::Outlines(outlines) => {
+            let (closed, open) = counts(outlines);
+            (LeafShape::Outlines { closed, open }, outlines.clone())
+        }
+        LeafGeometry::Gradient { outlines, .. } => {
+            let (closed, open) = counts(outlines);
+            (LeafShape::Gradient { closed, open }, outlines.clone())
         }
     }
 }
@@ -250,31 +301,6 @@ fn cut_out_units(block: &BlockInput, main: &mut Units, no_contour: &mut Vec<Node
     }
 }
 
-/// The outline flattened and rounded to µm, `None` with fewer than two distinct points.
-fn flat(outline: &LeafOutline) -> Option<Vec<PointUm>> {
-    let points = flatten_outline(
-        &outline.anchors,
-        outline.closed,
-        Tolerance::from_mm(FLATTEN_MM),
-    );
-    let points = dedupe(points.into_iter().map(PointUm::of_mm), outline.closed);
-    (points.len() >= 2).then_some(points)
-}
-
-/// The points with consecutive repeats removed (and a closing repeat of the first when closed).
-fn dedupe(points: impl Iterator<Item = PointUm>, closed: bool) -> Vec<PointUm> {
-    let mut out: Vec<PointUm> = Vec::new();
-    for point in points {
-        if out.last() != Some(&point) {
-            out.push(point);
-        }
-    }
-    if closed && out.len() > 1 && out.first() == out.last() {
-        out.pop();
-    }
-    out
-}
-
 fn index_u32(index: usize) -> u32 {
     u32::try_from(index).unwrap_or(u32::MAX)
 }
@@ -284,6 +310,7 @@ fn index_u32(index: usize) -> u32 {
 #[derive(Debug, Default)]
 pub struct PlanCache {
     entries: HashMap<NodeId, (u64, PointUm, Arc<Plan>)>,
+    raster: RasterCaches,
 }
 
 impl PlanCache {
@@ -301,15 +328,53 @@ impl PlanCache {
         {
             return Arc::clone(plan);
         }
-        let plan = Arc::new(plan_block(block, numbers, entry));
+        let plan = Arc::new(plan_with(block, numbers, entry, &mut self.raster));
         self.entries
             .insert(block.id, (key, entry, Arc::clone(&plan)));
         plan
     }
 
-    /// Drops the plans of blocks not in `ids`.
-    pub fn retain(&mut self, ids: &[NodeId]) {
+    /// Advances the raster sweeps the plan of `block` with `numbers` needs by about `dots` dots,
+    /// `dots` lessened by the dots worked; whether its plan is cached or all of them are finished,
+    /// so [`PlanCache::plan`] builds no dot.
+    pub fn prepare(&mut self, block: &BlockInput, numbers: &BlockNumbers, dots: &mut u64) -> bool {
+        let key = plan_fingerprint(block, numbers);
+        if self
+            .entries
+            .get(&block.id)
+            .is_some_and(|(cached, _, _)| *cached == key)
+        {
+            return true;
+        }
+        prepare_raster(block, numbers, &mut self.raster, dots)
+    }
+
+    /// Drops the plans of blocks not in `ids`, the grey pyramids of assets not in `assets` and the
+    /// sweeps of raster items not in `items`.
+    pub fn retain(&mut self, ids: &[NodeId], assets: &[&AssetHash], items: &[NodeId]) {
+        let ids: HashSet<&NodeId> = ids.iter().collect();
         self.entries.retain(|id, _| ids.contains(id));
+        self.raster.pyramids.retain(assets);
+        self.raster.sweeps.retain(items);
+    }
+
+    /// An empty cache that shares the grey pyramids of this one (one pyramid per asset for the
+    /// job and the Operations view's preview, ADR 0069 §5).
+    #[must_use]
+    pub fn sharing_pyramids(&self) -> Self {
+        Self {
+            entries: HashMap::new(),
+            raster: RasterCaches {
+                pyramids: self.raster.pyramids.clone(),
+                sweeps: SweepCache::default(),
+            },
+        }
+    }
+
+    /// How many grey pyramids are kept.
+    #[must_use]
+    pub fn pyramids(&self) -> usize {
+        self.raster.pyramids.len()
     }
 
     /// How many plans are cached.

@@ -124,6 +124,38 @@ fn an_engrave_judge_takes_the_interval_from_the_shared_values() {
     assert_eq!(set.numbers, numbers(1000, 6000, Some(10)));
 }
 
+/// ADR 0069 §14: judging an Image test writes the laser's Image set and a `set` entry of kind
+/// `image`, never the Engrave set.
+#[test]
+fn an_image_judge_writes_the_image_set_and_never_the_engrave_set() {
+    let mut m = material();
+    m.type_set(
+        &diode(),
+        SetKind::Engrave,
+        numbers(300, 6000, Some(8)),
+        stamp(1),
+    )
+    .unwrap();
+    m.tests[0].recipe = recipe().with_kind(
+        SetKind::Image,
+        &RecipeDefaults {
+            max_feed: FeedRate::new(6000).unwrap(),
+            set: None,
+        },
+    );
+    m.judge(id("7K2QX"), CellIndex { column: 4, row: 4 }, stamp(2))
+        .unwrap();
+    let image = m.set_for(&diode().id, SetKind::Image).unwrap();
+    assert_eq!(image.numbers, numbers(1000, 6000, Some(10)));
+    assert_eq!(image.source, SetSource::Test(id("7K2QX")));
+    assert_eq!(
+        m.set_for(&diode().id, SetKind::Engrave).unwrap().numbers,
+        numbers(300, 6000, Some(8)),
+        "the Engrave set stays"
+    );
+    assert_eq!(m.history.last().unwrap().kind, SetKind::Image);
+}
+
 #[test]
 fn a_typed_set_adds_its_laser_and_a_hand_edit_of_a_tested_set_becomes_typed() {
     let mut m = material();

@@ -161,8 +161,15 @@ fn c20_score_runs_every_outline_closed_or_open_as_a_line() {
     );
     assert_eq!(run.lines, Lines::All);
     assert!(!run.area);
+    // Superseded by the Image kind rework (2026-11-19): Score scores an image's frame
+    // rectangle (`specs/0123` criterion 1, Frage 271 A); it ran nothing before.
     let image = kind_run(OperationKind::Score, LeafShape::Image);
-    assert!(image.is_empty(), "an image runs nothing under Score");
+    assert_eq!(
+        image.lines,
+        Lines::All,
+        "Score traces the frame as one closed line"
+    );
+    assert!(!image.raster && !image.area);
 }
 
 #[test]
@@ -185,10 +192,14 @@ fn c21_engrave_with_a_closed_outline_is_one_area_and_open_only_is_a_line() {
     assert_eq!(open_only.lines, Lines::All);
 }
 
+// Superseded by the Image kind rework (2026-11-19): Engrave hatches an image's frame rectangle
+// (`specs/0123` criterion 1, Frage 271 A); only the Image kind rasters it.
 #[test]
-fn c21_engrave_image_is_raster_and_counts() {
+fn c21_engrave_image_is_its_hatched_frame_and_counts() {
     let run = kind_run(OperationKind::Engrave, LeafShape::Image);
-    assert!(run.raster);
+    assert!(run.area, "the frame is hatched as one filled area");
+    assert!(!run.raster);
+    assert!(kind_run(OperationKind::Image, LeafShape::Image).raster);
 }
 
 #[test]
@@ -199,19 +210,23 @@ fn c22_engrave_outline_is_the_fill_plus_each_closed_outline_traced_once() {
     );
     assert!(run.area);
     assert_eq!(run.lines, Lines::Closed);
+    // Superseded by the Image kind rework (2026-11-19): Engrave + Outline hatches an image's
+    // frame and traces it (`specs/0123` criterion 1, Frage 271 A); it rastered the pixels before.
     let image = kind_run(OperationKind::EngraveOutline, LeafShape::Image);
-    assert!(image.raster);
+    assert!(image.area && !image.raster);
     assert_eq!(
         image.lines,
-        Lines::Frame,
-        "an image is raster engraved and its frame traced"
+        Lines::Closed,
+        "an image's frame is hatched and traced"
     );
 }
 
 #[test]
 fn c19_cut_of_an_image_runs_its_frame_only() {
+    // Superseded by the Image kind rework (2026-11-19): the frame is one closed outline, so
+    // `Lines::Frame` went (`specs/0123` criterion 1).
     let run = kind_run(OperationKind::Cut, LeafShape::Image);
-    assert_eq!(run.lines, Lines::Frame);
+    assert_eq!(run.lines, Lines::All);
     assert!(!run.raster, "the pixels never run under Cut");
     assert!(!run.area);
 }

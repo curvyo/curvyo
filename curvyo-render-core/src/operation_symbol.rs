@@ -6,7 +6,7 @@
 use curvyo_document_core::{Point, ViewTransform};
 
 use crate::glyphs::{DrawList, filled_rect, thick_line};
-use crate::theme::{OP_CHIP_GROUND, OP_CUT, OP_INK, OP_LANE_LINE};
+use crate::theme::{OP_CHIP_GROUND, OP_CUT, OP_INK, OP_LANE_LINE, OP_MUTED_INK};
 
 /// The chip's side, screen pixels.
 pub const CHIP_PX: f64 = 22.0;
@@ -32,7 +32,13 @@ pub enum Glyph {
     Engrave,
     /// The Engrave hatch with a 1.5 px square outline.
     EngraveOutline,
+    /// Image (`specs/0123` UX notes 2.1): a dot ramp of 2 x 2 squares on a 4 px pitch, four
+    /// columns of 4, 3, 2 and 1 dots.
+    Image,
 }
+
+/// The dots of the Image glyph by column: the rows (0 to 3) that hold a dot.
+const IMAGE_RAMP: [&[u8]; 4] = [&[0, 1, 2, 3], &[0, 1, 3], &[0, 2], &[1]];
 
 /// One object to mark: its box in document millimetres and the symbols of its kinds, in kind order.
 #[derive(Debug, Clone, PartialEq)]
@@ -41,6 +47,10 @@ pub struct ChipItem {
     pub bounds: (Point, Point),
     /// One symbol per kind the object is in; a repeated kind is given once.
     pub glyphs: Vec<Glyph>,
+    /// The symbols of `glyphs` drawn in `--panel-muted-fg`: kinds that hold the object but do
+    /// not run it (Output off, `0101` UX notes 13.2; a vector shape in Image, `specs/0123`
+    /// criterion 48).
+    pub muted: Vec<Glyph>,
 }
 
 /// The chips of `items`, in order, for a canvas of `canvas` screen pixels. Items that are off the
@@ -97,7 +107,7 @@ pub fn chips_list(items: &[ChipItem], canvas: (f64, f64), view: ViewTransform) -
             placed.push(rect);
             let a = to_doc(rect.0, rect.1);
             let b = to_doc(rect.2, rect.3);
-            list.extend(chip(a, b, *glyph, scale));
+            list.extend(chip(a, b, *glyph, item.muted.contains(glyph), scale));
         }
     }
     list
@@ -107,8 +117,8 @@ fn overlaps(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
     a.0 < b.2 && b.0 < a.2 && a.1 < b.3 && b.1 < a.3
 }
 
-/// One chip: ground, 1 px border, and the symbol at a 2 px inset.
-fn chip(a: Point, b: Point, glyph: Glyph, scale: f64) -> DrawList {
+/// One chip: ground, 1 px border, and the symbol at a 2 px inset, in muted ink when `muted`.
+fn chip(a: Point, b: Point, glyph: Glyph, muted: bool, scale: f64) -> DrawList {
     let mut list = filled_rect(a, b, OP_CHIP_GROUND);
     let edge = 1.0 / scale;
     list.extend(filled_rect(a, Point::new(b.x, a.y + edge), OP_LANE_LINE));
@@ -117,15 +127,17 @@ fn chip(a: Point, b: Point, glyph: Glyph, scale: f64) -> DrawList {
     list.extend(filled_rect(Point::new(b.x - edge, a.y), b, OP_LANE_LINE));
     let inset = 2.0;
     let at = |x: f64, y: f64| Point::new(a.x + (inset + x) / scale, a.y + (inset + y) / scale);
-    list.extend(symbol(glyph, &at, scale));
+    list.extend(symbol(glyph, &at, scale, muted));
     list
 }
 
-/// The symbol inside its 16 px box; `at` maps box pixels to document millimetres.
-fn symbol(glyph: Glyph, at: &dyn Fn(f64, f64) -> Point, scale: f64) -> DrawList {
+/// The symbol inside its 16 px box; `at` maps box pixels to document millimetres. A muted symbol
+/// is all `--panel-muted-fg`.
+fn symbol(glyph: Glyph, at: &dyn Fn(f64, f64) -> Point, scale: f64, muted: bool) -> DrawList {
     let mut list = DrawList::default();
     let red = matches!(glyph, Glyph::Cut | Glyph::CutOut);
-    let colour = if red { OP_CUT } else { OP_INK };
+    let ink = if muted { OP_MUTED_INK } else { OP_INK };
+    let colour = if red && !muted { OP_CUT } else { ink };
     let box_width = 1.5 / scale;
     match glyph {
         Glyph::Cut => list.extend(square_outline(at, 16.0, box_width, colour, None)),
@@ -145,10 +157,18 @@ fn symbol(glyph: Glyph, at: &dyn Fn(f64, f64) -> Point, scale: f64) -> DrawList 
                 x += 3.0;
             }
         }
-        Glyph::Engrave => list.extend(hatch_box(at, 1.0 / scale, OP_INK)),
+        Glyph::Engrave => list.extend(hatch_box(at, 1.0 / scale, ink)),
         Glyph::EngraveOutline => {
-            list.extend(hatch_box(at, 1.0 / scale, OP_INK));
-            list.extend(square_outline(at, 16.0, box_width, OP_INK, None));
+            list.extend(hatch_box(at, 1.0 / scale, ink));
+            list.extend(square_outline(at, 16.0, box_width, ink, None));
+        }
+        Glyph::Image => {
+            for (column, rows) in (0_u8..).zip(IMAGE_RAMP) {
+                for &row in rows {
+                    let (x, y) = (f64::from(column) * 4.0 + 1.0, f64::from(row) * 4.0 + 1.0);
+                    list.extend(filled_rect(at(x, y), at(x + 2.0, y + 2.0), ink));
+                }
+            }
         }
     }
     list
@@ -221,6 +241,7 @@ mod tests {
         ChipItem {
             bounds: (Point::new(x, 10.0), Point::new(x + 20.0, 30.0)),
             glyphs,
+            muted: Vec::new(),
         }
     }
 
@@ -259,10 +280,39 @@ mod tests {
                     Point::new(f64::from(i) * 40.0 + 20.0, 30.0),
                 ),
                 glyphs: vec![Glyph::Cut],
+                muted: Vec::new(),
             })
             .collect();
         let capped = chips_list(&items, (100_000.0, 100_000.0), view);
         let expected = chips_list(&items[..CHIP_CAP], (100_000.0, 100_000.0), view);
         assert_eq!(capped.triangle_count(), expected.triangle_count());
+    }
+
+    #[test]
+    fn the_image_glyph_is_ten_ink_dots() {
+        let at = |x: f64, y: f64| Point::new(x, y);
+        let list = symbol(Glyph::Image, &at, 1.0, false);
+        assert_eq!(list.triangle_count(), 10 * 2, "4 + 3 + 2 + 1 squares");
+    }
+
+    #[test]
+    fn a_muted_symbol_is_all_muted_ink_even_a_red_one() {
+        let at = |x: f64, y: f64| Point::new(x, y);
+        for glyph in [Glyph::Image, Glyph::Cut, Glyph::Engrave] {
+            let list = symbol(glyph, &at, 1.0, true);
+            assert!(
+                list.triangles.iter().all(|v| v.color == OP_MUTED_INK),
+                "{glyph:?}"
+            );
+        }
+        let mut muted = item(10.0, vec![Glyph::Cut, Glyph::Image]);
+        muted.muted = vec![Glyph::Image];
+        let view = ViewTransform::new(2.0, Point::new(0.0, 0.0));
+        let list = chips_list(&[muted], (800.0, 600.0), view);
+        assert!(list.triangles.iter().any(|v| v.color == OP_MUTED_INK));
+        assert!(
+            list.triangles.iter().any(|v| v.color == OP_CUT),
+            "the Cut chip stays red"
+        );
     }
 }

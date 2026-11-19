@@ -13,10 +13,8 @@ workspace = true
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 kurbo.workspace = true
 i_overlay.workspace = true
-# Bit-identical `sin`/`cos` for the pattern generators on every platform and in wasm (ADR 0029 §5;
-# `f64::sin` calls the platform's libm). MIT OR Apache-2.0, rust-lang, pure Rust; already in
-# `Cargo.lock` through the workspace's dependencies.
-libm = { version = "0.2.16", default-features = false }
+# Bit-identical `sin`/`cos` for the pattern generators (ADR 0029 §5).
+libm.workspace = true
 thiserror.workspace = true
 # Safe Rust port of Levien’s Spiro reference, Apache-2.0; see ADR 0053.
 spiro-inner = { version = "0.1.0", default-features = false }

@@ -1,4 +1,5 @@
-//! The five operation kinds of `specs/0101-laser-operations`, as stored (ADR 0046 §1).
+//! The six operation kinds of `specs/0101-laser-operations` and `specs/0123` (Image), as stored
+//! (ADR 0046 §1, ADR 0069 §13).
 
 /// What one operation does (criterion 2 and "Words").
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -13,18 +14,20 @@ pub enum OperationKind {
     EngraveOutline,
     /// The outer contour of each item.
     CutOut,
+    /// Images and gradient-filled shapes burned as rows of dots (`specs/0123` criterion 47).
+    Image,
 }
 
 /// The two sections of the list with Cuts last on (criterion 5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Section {
-    /// Engrave, Engrave + Outline, Score.
+    /// Engrave, Engrave + Outline, Score, Image.
     Marking,
     /// Cut, Cut-out.
     Cutting,
 }
 
-/// A stored kind as read: one of the five, or Unknown (criterion 26).
+/// A stored kind as read: one of the six, or Unknown (criterion 26).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KindRead {
     /// A kind this build knows.
@@ -35,12 +38,13 @@ pub enum KindRead {
 
 impl OperationKind {
     /// Every kind, in the order of the toolbar's kind buttons (criterion 1).
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Cut,
         Self::Score,
         Self::Engrave,
         Self::EngraveOutline,
         Self::CutOut,
+        Self::Image,
     ];
 
     /// The stored text (a published file key, ADR 0046 Consequences).
@@ -52,6 +56,7 @@ impl OperationKind {
             Self::Engrave => "engrave",
             Self::EngraveOutline => "engrave_outline",
             Self::CutOut => "cut_out",
+            Self::Image => "image",
         }
     }
 
@@ -70,7 +75,15 @@ impl OperationKind {
             Self::Engrave => "Engrave",
             Self::EngraveOutline => "Engrave + Outline",
             Self::CutOut => "Cut-out",
+            Self::Image => "Image",
         }
+    }
+
+    /// Whether operations of the kind keep an Interval (`main.interval_mm`, ADR 0056 §5): the
+    /// Engrave kinds and Image (ADR 0069 §13).
+    #[must_use]
+    pub const fn has_interval(self) -> bool {
+        matches!(self, Self::Engrave | Self::EngraveOutline | Self::Image)
     }
 
     /// The section the kind belongs to.
@@ -78,7 +91,7 @@ impl OperationKind {
     pub const fn section(self) -> Section {
         match self {
             Self::Cut | Self::CutOut => Section::Cutting,
-            Self::Score | Self::Engrave | Self::EngraveOutline => Section::Marking,
+            Self::Score | Self::Engrave | Self::EngraveOutline | Self::Image => Section::Marking,
         }
     }
 }
@@ -117,7 +130,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_five_texts_read_as_kinds_and_everything_else_as_unknown() {
+    fn the_six_texts_read_as_kinds_and_everything_else_as_unknown() {
         for kind in OperationKind::ALL {
             assert_eq!(KindRead::of(Some(kind.as_str())), KindRead::Known(kind));
         }
@@ -133,14 +146,16 @@ mod tests {
 
     #[test]
     fn cut_and_cut_out_are_cutting_and_the_rest_marking() {
-        use OperationKind::{Cut, CutOut, Engrave, EngraveOutline, Score};
+        use OperationKind::{Cut, CutOut, Engrave, EngraveOutline, Image, Score};
         assert_eq!(Cut.section(), Section::Cutting);
         assert_eq!(CutOut.section(), Section::Cutting);
-        for kind in [Score, Engrave, EngraveOutline] {
+        for kind in [Score, Engrave, EngraveOutline, Image] {
             assert_eq!(kind.section(), Section::Marking);
         }
         assert_eq!(KindRead::Unknown.section(), Section::Marking);
         assert_eq!(EngraveOutline.label(), "Engrave + Outline");
         assert_eq!(CutOut.label(), "Cut-out");
+        assert_eq!((Image.as_str(), Image.label()), ("image", "Image"));
+        assert_eq!(OperationKind::ALL.last(), Some(&Image), "the sixth button");
     }
 }

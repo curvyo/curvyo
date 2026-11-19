@@ -199,6 +199,10 @@ fn ac15_the_extension_crates_have_no_io_network_or_gcode() {
                     "curvyo-extension-core",
                     "curvyo-document-core",
                     "curvyo-geometry-core",
+                    // ADR 0068 §1 (`specs/0123`): the working image and the gamma table, both
+                    // pure and without I/O.
+                    "curvyo-image-core",
+                    "libm",
                     "serde",
                     "serde_json",
                     "thiserror"

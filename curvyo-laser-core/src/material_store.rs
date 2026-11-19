@@ -1,5 +1,5 @@
-//! The maker's format-2 material records as one list (ADR 0055 §3, §5; ADR 0058 §4, §6): loaded
-//! from the texts the host read, ordered, and changed one record at a time.
+//! The maker's material records of format 2 and 3 as one list (ADR 0055 §3, §5; ADR 0058 §4,
+//! §6): loaded from the texts the host read, ordered, and changed one record at a time.
 
 use std::cmp::Ordering;
 

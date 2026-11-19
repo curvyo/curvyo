@@ -3,6 +3,9 @@
 
 use serde_json::{Map, Value, json};
 
+use crate::operation_image_options::{
+    IMAGE_KEYS, ImageEdit, ImageSettings, read_image_key, write_image_keys,
+};
 use crate::operation_kind::OperationKind;
 use crate::steps::{exact_steps, rounded_steps, typed_steps};
 
@@ -179,16 +182,19 @@ impl ZOffset {
 /// The settings that belong to an operation and never to a material (`specs/0111` "Words").
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OperationOptions {
-    /// Hatch a second time at the scan angle plus 90 degrees (Engrave kinds only).
+    /// Hatch a second time at the scan angle plus 90 degrees (Engrave and Engrave + Outline
+    /// only).
     pub crosshatch: bool,
-    /// Alternate the hatch direction line by line (Engrave kinds only).
+    /// Alternate the hatch or row direction line by line (Engrave kinds and Image).
     pub bidirectional: bool,
-    /// The hatch direction (Engrave kinds only).
+    /// The hatch or row direction (Engrave kinds and Image).
     pub scan_angle: ScanAngle,
-    /// The run past the edge (Engrave kinds only).
+    /// The run past the edge (Engrave kinds and Image).
     pub overscan: Overscan,
     /// The focus height offset; runs only with a motorised Z axis.
     pub z_offset: ZOffset,
+    /// The Image settings of a raster item (Image only, `specs/0123`; ADR 0069 §13).
+    pub image: ImageSettings,
 }
 
 impl Default for OperationOptions {
@@ -199,6 +205,7 @@ impl Default for OperationOptions {
             scan_angle: ScanAngle::default(),
             overscan: Overscan::DEFAULT,
             z_offset: ZOffset::default(),
+            image: ImageSettings::DEFAULT,
         }
     }
 }
@@ -215,8 +222,9 @@ pub enum OptionsDamage {
     WrongType,
     /// A number out of range or with too many decimals.
     BadValue,
-    /// A hatch key on a kind other than Engrave or Engrave + Outline.
-    HatchOnKind,
+    /// A key on a kind that does not take it (ADR 0069 §13): Crosshatch off the Engrave kinds,
+    /// a scan key off the Engrave kinds and Image, an Image settings key off Image.
+    KeyOnKind,
 }
 
 /// One edit of the lower part of an unfolded row.
@@ -232,6 +240,8 @@ pub enum OptionEdit {
     Overscan(Overscan),
     /// A Z offset.
     ZOffset(ZOffset),
+    /// One of the Image settings (Image only, `specs/0123` criteria 11, 12).
+    Image(ImageEdit),
 }
 
 const KEY_CROSSHATCH: &str = "crosshatch";
@@ -239,17 +249,32 @@ const KEY_BIDIRECTIONAL: &str = "bidirectional";
 const KEY_SCAN_ANGLE: &str = "scan_angle_deg";
 const KEY_OVERSCAN: &str = "overscan_pct";
 const KEY_Z_OFFSET: &str = "z_offset_mm";
-const HATCH_KEYS: [&str; 4] = [
-    KEY_CROSSHATCH,
-    KEY_BIDIRECTIONAL,
-    KEY_SCAN_ANGLE,
-    KEY_OVERSCAN,
-];
+const SCAN_KEYS: [&str; 3] = [KEY_BIDIRECTIONAL, KEY_SCAN_ANGLE, KEY_OVERSCAN];
 
-/// Whether operations of `kind` hatch, so the four hatch options apply.
+/// Whether operations of `kind` hatch areas, so Crosshatch applies: the Engrave kinds.
 #[must_use]
 pub const fn hatches(kind: OperationKind) -> bool {
     matches!(kind, OperationKind::Engrave | OperationKind::EngraveOutline)
+}
+
+/// Whether operations of `kind` scan in rows, so Bidirectional fill, Scan angle and
+/// Overscanning apply: the Engrave kinds and Image (ADR 0069 §13).
+#[must_use]
+pub const fn scans(kind: OperationKind) -> bool {
+    hatches(kind) || matches!(kind, OperationKind::Image)
+}
+
+/// Whether `key` is valid on an operation of `kind`; `true` for a key no kind owns.
+fn key_on_kind(key: &str, kind: OperationKind) -> bool {
+    if key == KEY_CROSSHATCH {
+        hatches(kind)
+    } else if SCAN_KEYS.contains(&key) {
+        scans(kind)
+    } else if IMAGE_KEYS.contains(&key) {
+        kind == OperationKind::Image
+    } else {
+        true
+    }
 }
 
 fn flag(value: &Value) -> Result<bool, OptionsDamage> {
@@ -277,8 +302,11 @@ pub fn read_options(
     let map = value.as_object().ok_or(OptionsDamage::NotAMap)?;
     for (key, value) in map {
         let key = key.as_str();
-        if HATCH_KEYS.contains(&key) && !hatches(kind) {
-            return Err(OptionsDamage::HatchOnKind);
+        if !key_on_kind(key, kind) {
+            return Err(OptionsDamage::KeyOnKind);
+        }
+        if read_image_key(&mut options.image, key, value)? {
+            continue;
         }
         match key {
             KEY_CROSSHATCH => options.crosshatch = flag(value)?,
@@ -309,26 +337,34 @@ impl OperationOptions {
         let mut map = Map::new();
         if hatches(kind) {
             map.insert(KEY_CROSSHATCH.to_owned(), json!(self.crosshatch));
+        }
+        if scans(kind) {
             map.insert(KEY_BIDIRECTIONAL.to_owned(), json!(self.bidirectional));
             map.insert(KEY_SCAN_ANGLE.to_owned(), json!(self.scan_angle.degrees()));
             map.insert(KEY_OVERSCAN.to_owned(), json!(self.overscan.percent()));
+        }
+        if kind == OperationKind::Image {
+            write_image_keys(&self.image, &mut map);
         }
         map.insert(KEY_Z_OFFSET.to_owned(), json!(self.z_offset.mm()));
         Value::Object(map)
     }
 
     /// The options with `edit` applied, for an operation of kind `kind`: `None` when nothing
-    /// changes or for a hatch option on a kind that does not hatch.
+    /// changes or for an option the kind does not take (ADR 0069 §13).
     #[must_use]
     pub fn with(&self, kind: OperationKind, edit: OptionEdit) -> Option<Self> {
         let mut next = *self;
         match edit {
             OptionEdit::ZOffset(z) => next.z_offset = z,
-            _ if !hatches(kind) => return None,
-            OptionEdit::Crosshatch(on) => next.crosshatch = on,
-            OptionEdit::Bidirectional(on) => next.bidirectional = on,
-            OptionEdit::ScanAngle(angle) => next.scan_angle = angle,
-            OptionEdit::Overscan(overscan) => next.overscan = overscan,
+            OptionEdit::Crosshatch(on) if hatches(kind) => next.crosshatch = on,
+            OptionEdit::Bidirectional(on) if scans(kind) => next.bidirectional = on,
+            OptionEdit::ScanAngle(angle) if scans(kind) => next.scan_angle = angle,
+            OptionEdit::Overscan(overscan) if scans(kind) => next.overscan = overscan,
+            OptionEdit::Image(edit) if kind == OperationKind::Image => {
+                next.image = next.image.with(edit);
+            }
+            _ => return None,
         }
         (next != *self).then_some(next)
     }
@@ -346,148 +382,5 @@ impl OperationOptions {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn read(value: &Value, kind: OperationKind) -> Result<OperationOptions, OptionsDamage> {
-        read_options(Some(value), kind)
-    }
-
-    #[test]
-    fn absent_options_read_every_default() {
-        let options = read_options(None, OperationKind::Engrave).unwrap();
-        assert!(!options.crosshatch);
-        assert!(options.bidirectional);
-        assert_eq!(options.scan_angle.degrees(), 0.0);
-        assert_eq!(options.overscan.percent(), 2);
-        assert_eq!(options.z_offset.mm(), 0.0);
-        assert_eq!(read(&json!({}), OperationKind::Cut), Ok(options));
-    }
-
-    #[test]
-    fn a_full_engrave_map_reads_and_writes_back_the_same_plain_values() {
-        let value = json!({
-            "crosshatch": true, "bidirectional": false, "scan_angle_deg": 15.0,
-            "overscan_pct": 50, "z_offset_mm": -1.5,
-        });
-        let options = read(&value, OperationKind::EngraveOutline).unwrap();
-        assert!(options.crosshatch);
-        assert!(!options.bidirectional);
-        assert_eq!(options.scan_angle.tenths(), 150);
-        assert_eq!(options.overscan.percent(), 50);
-        assert_eq!(options.z_offset.tenths(), -15);
-        assert_eq!(options.to_value(OperationKind::EngraveOutline), value);
-    }
-
-    #[test]
-    fn a_cut_takes_the_z_offset_only() {
-        let value = json!({"z_offset_mm": 20.0});
-        let options = read(&value, OperationKind::Cut).unwrap();
-        assert_eq!(options.z_offset.tenths(), 200);
-        assert_eq!(options.to_value(OperationKind::Cut), value);
-        for hatch in HATCH_KEYS {
-            let mut map = Map::new();
-            map.insert(hatch.to_owned(), json!(false));
-            for kind in [
-                OperationKind::Cut,
-                OperationKind::Score,
-                OperationKind::CutOut,
-            ] {
-                assert_eq!(
-                    read(&Value::Object(map.clone()), kind),
-                    Err(OptionsDamage::HatchOnKind),
-                    "{hatch} on {kind:?}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn every_damage_reads_as_damage() {
-        let engrave = OperationKind::Engrave;
-        let cases = [
-            (json!([1]), OptionsDamage::NotAMap),
-            (json!(null), OptionsDamage::NotAMap),
-            (json!({"dither": true}), OptionsDamage::UnknownKey),
-            (json!({"crosshatch": 1}), OptionsDamage::WrongType),
-            (json!({"scan_angle_deg": "15"}), OptionsDamage::WrongType),
-            (json!({"overscan_pct": 2.5}), OptionsDamage::WrongType),
-            (json!({"overscan_pct": -1}), OptionsDamage::WrongType),
-            (json!({"scan_angle_deg": 90.1}), OptionsDamage::BadValue),
-            (json!({"scan_angle_deg": -90.1}), OptionsDamage::BadValue),
-            (json!({"scan_angle_deg": 12.25}), OptionsDamage::BadValue),
-            (json!({"overscan_pct": 51}), OptionsDamage::BadValue),
-            (json!({"z_offset_mm": 20.1}), OptionsDamage::BadValue),
-            (json!({"z_offset_mm": 0.05}), OptionsDamage::BadValue),
-        ];
-        for (value, damage) in cases {
-            assert_eq!(read(&value, engrave), Err(damage), "{value}");
-        }
-        assert_eq!(
-            read(
-                &json!({"scan_angle_deg": -90.0, "z_offset_mm": -20.0}),
-                engrave
-            )
-            .unwrap()
-            .scan_angle
-            .tenths(),
-            -900
-        );
-    }
-
-    #[test]
-    fn typed_values_round_to_their_decimals_and_name_their_range() {
-        assert_eq!(ScanAngle::typed(15.04).unwrap().tenths(), 150);
-        assert_eq!(ScanAngle::typed(90.1), Err("Scan angle is -90.0 to 90.0°."));
-        assert_eq!(ScanAngle::typed(f64::NAN), Err("Enter a number."));
-        assert_eq!(Overscan::typed(50.0).unwrap().percent(), 50);
-        assert_eq!(Overscan::typed(51.0), Err("Overscanning is 0 to 50 %."));
-        assert_eq!(Overscan::typed(-1.0), Err("Overscanning is 0 to 50 %."));
-        assert_eq!(Overscan::typed(2.5), Err("Enter a whole number."));
-        assert_eq!(ZOffset::typed(1.54).unwrap().tenths(), 15);
-        assert_eq!(ZOffset::typed(-20.5), Err("Z offset is -20.0 to 20.0 mm."));
-        // Out of range before rounding is refused, never rounded into the range (criterion 24).
-        assert_eq!(
-            ScanAngle::typed(90.04),
-            Err("Scan angle is -90.0 to 90.0°.")
-        );
-        assert_eq!(ScanAngle::typed(-90.0).unwrap().tenths(), -900);
-        assert_eq!(ZOffset::typed(-20.04), Err("Z offset is -20.0 to 20.0 mm."));
-        assert_eq!(ZOffset::typed(20.0).unwrap().tenths(), 200);
-        for text in [
-            ScanAngle::RANGE_TEXT,
-            Overscan::RANGE_TEXT,
-            ZOffset::RANGE_TEXT,
-        ] {
-            assert!(text.chars().count() <= 70);
-        }
-    }
-
-    #[test]
-    fn an_edit_changes_one_value_and_a_hatch_edit_on_a_cut_is_refused() {
-        let options = OperationOptions::default();
-        let on = options
-            .with(OperationKind::Engrave, OptionEdit::Crosshatch(true))
-            .unwrap();
-        assert!(on.crosshatch);
-        assert_eq!(
-            options.with(OperationKind::Engrave, OptionEdit::Bidirectional(true)),
-            None,
-            "unchanged"
-        );
-        assert_eq!(
-            options.with(OperationKind::Cut, OptionEdit::Crosshatch(true)),
-            None
-        );
-        let z = ZOffset::typed(1.5).unwrap();
-        let cut = options
-            .with(OperationKind::Cut, OptionEdit::ZOffset(z))
-            .unwrap();
-        assert_eq!(
-            cut.to_value(OperationKind::Cut),
-            json!({"z_offset_mm": 1.5})
-        );
-        assert_eq!(cut.running_z_offset(false), None, "kept, runs nothing");
-        assert_eq!(cut.running_z_offset(true), Some(z));
-    }
-}
+#[path = "operation_options_tests.rs"]
+mod tests;

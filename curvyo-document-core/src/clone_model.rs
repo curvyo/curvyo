@@ -70,6 +70,11 @@ pub struct CloneChain {
     /// whose drawing is [`CloneSnapshot::resolved`]; with it, `resolved` has no anchors.
     #[serde(skip)]
     pub picture: Option<std::sync::Arc<[crate::primitive_model::ObjectSnapshot]>>,
+    /// Beside each leaf of [`CloneChain::picture`], the leaf of the root's subtree it comes from:
+    /// the leaf itself, or the clone inside the root that draws it (whose leaves keep their own
+    /// originals' ids, so the ids of a picture can repeat). `None` with `picture`.
+    #[serde(skip)]
+    pub picture_members: Option<std::sync::Arc<[NodeId]>>,
 }
 
 impl CloneSnapshot {

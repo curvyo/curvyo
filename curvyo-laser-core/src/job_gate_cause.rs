@@ -47,6 +47,18 @@ pub enum Cause {
     StartDamaged,
     /// 4 d: nothing runs.
     NothingRuns,
+    /// `specs/0123` criterion 33: Grey needs laser mode M4.
+    GreyNeedsM4 {
+        /// The operation.
+        op: NodeId,
+    },
+    /// `specs/0123` criterion 34: a raster item has more dots than the limit.
+    TooManyDots {
+        /// The item.
+        item: NodeId,
+        /// Its estimated dot count.
+        count: u64,
+    },
     /// The machine is the built-in Generic laser.
     GenericLaser,
     /// A linked material is not found; the stored numbers run.
@@ -100,6 +112,24 @@ pub enum Cause {
         /// The operation.
         op: NodeId,
     },
+    /// `specs/0123` criterion 35: images coarser than twice their Interval.
+    CoarseImages,
+    /// `specs/0123` criterion 35: raster items of one operation overlap.
+    OverlappingRasterItems,
+    /// `specs/0123` criterion 36: images reduced by the working limit.
+    ReducedImages,
+    /// `specs/0123` criterion 36: images whose bytes cannot be read; skipped.
+    UnreadableImages,
+    /// `specs/0123` criterion 48: leaves of an Image operation that are not pictures.
+    NotPictures {
+        /// The operation.
+        op: NodeId,
+    },
+    /// `specs/0123` criterion 32 b: Grey with Lowest power above the set's Power.
+    LowestPowerAbovePower {
+        /// The operation.
+        op: NodeId,
+    },
     /// Operations of an Unknown kind or with damaged settings run nothing (criterion 33).
     DamagedSettings,
 }
@@ -116,24 +146,33 @@ impl Cause {
             Self::MachineDamaged => 4,
             Self::StartDamaged => 5,
             Self::NothingRuns => 6,
-            Self::GenericLaser => 7,
-            Self::MaterialNotFound { .. } => 8,
-            Self::NoSetForLaser { .. } => 9,
-            Self::TypedOverride { .. } => 10,
-            Self::OverFeed { .. } => 11,
-            Self::ZWithoutAxis { .. } => 12,
-            Self::NotAssigned => 13,
-            Self::HiddenRuns => 14,
-            Self::OutputOff { .. } => 15,
-            Self::CutOutNoContour { .. } => 16,
-            Self::DamagedSettings => 17,
+            Self::GreyNeedsM4 { .. } => 7,
+            Self::TooManyDots { .. } => 8,
+            Self::GenericLaser => 9,
+            Self::MaterialNotFound { .. } => 10,
+            Self::NoSetForLaser { .. } => 11,
+            Self::TypedOverride { .. } => 12,
+            Self::OverFeed { .. } => 13,
+            Self::ZWithoutAxis { .. } => 14,
+            Self::NotAssigned => 15,
+            Self::HiddenRuns => 16,
+            Self::OutputOff { .. } => 17,
+            Self::CutOutNoContour { .. } => 18,
+            Self::CoarseImages => 19,
+            Self::OverlappingRasterItems => 20,
+            Self::ReducedImages => 21,
+            Self::UnreadableImages => 22,
+            Self::NotPictures { .. } => 23,
+            Self::LowestPowerAbovePower { .. } => 24,
+            Self::DamagedSettings => 25,
         }
     }
 
     /// Block or warn.
     #[must_use]
     pub const fn severity(&self) -> Severity {
-        if self.rank() <= Self::NothingRuns.rank() {
+        // invariant: blocks are the variants up to `TooManyDots` (rank 8).
+        if self.rank() <= 8 {
             Severity::Block
         } else {
             Severity::Warn

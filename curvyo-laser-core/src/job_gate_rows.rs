@@ -6,6 +6,7 @@ use curvyo_document_core::NodeId;
 use crate::job_input::{BlockInput, Ring};
 use crate::job_numbers::{BlockNumbers, NumbersRead, NumbersSource, RunNumbers};
 use crate::material::Interval;
+use crate::operation_image_options::Dither;
 use crate::operation_kind::OperationKind;
 use crate::operation_settings::{Field, Role};
 
@@ -15,10 +16,13 @@ use crate::operation_settings::{Field, Role};
 pub struct NumbersLine {
     /// The numbers as set (the speed as typed, criterion 3).
     pub numbers: RunNumbers,
-    /// The interval of the Engrave kinds' main set.
+    /// The interval of the main set of a kind with an interval (Engrave kinds, Image).
     pub interval: Option<Interval>,
     /// The typed fields.
     pub typed: Vec<Field>,
+    /// An Image operation's dither mode and Lowest power in tenths of a percent, after the
+    /// numbers (`specs/0123` criterion 47 d).
+    pub dither: Option<(Dither, u16)>,
 }
 
 /// One run of the job: an operation that runs, or the fixture jobs of one kind.
@@ -54,10 +58,6 @@ pub fn numbers_lines(read: &NumbersRead) -> Vec<NumbersLine> {
 }
 
 fn lines_of(numbers: &BlockNumbers, typed: &[(Role, Field)]) -> Vec<NumbersLine> {
-    let engrave = matches!(
-        numbers.kind,
-        OperationKind::Engrave | OperationKind::EngraveOutline
-    );
     let line = |role: Role, set: RunNumbers, interval: Option<Interval>| NumbersLine {
         numbers: set,
         interval,
@@ -66,12 +66,18 @@ fn lines_of(numbers: &BlockNumbers, typed: &[(Role, Field)]) -> Vec<NumbersLine>
             .filter(|(r, _)| *r == role)
             .map(|(_, f)| *f)
             .collect(),
+        dither: None,
     };
-    let mut lines = vec![line(
+    let mut main = line(
         Role::Main,
         numbers.main,
-        engrave.then_some(numbers.interval),
-    )];
+        numbers.kind.has_interval().then_some(numbers.interval),
+    );
+    if numbers.kind == OperationKind::Image {
+        let image = &numbers.options.image;
+        main.dither = Some((image.dither, image.lowest_power_tenths));
+    }
+    let mut lines = vec![main];
     if let Some(outline) = numbers.outline {
         lines.push(line(Role::Outline, outline, None));
     }

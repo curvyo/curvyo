@@ -54,7 +54,7 @@ impl Param {
     /// Whether a grid of `kind` offers the parameter (interval only for Engrave, criterion 4).
     #[must_use]
     pub fn offered(self, kind: SetKind) -> bool {
-        self != Self::Interval || kind == SetKind::Engrave
+        self != Self::Interval || kind.has_interval()
     }
 
     /// The parameters a grid of `kind` offers, in bar order.
@@ -206,7 +206,7 @@ pub(crate) fn numbers_of(kind: SetKind, value: impl Fn(Param) -> u32) -> SetNumb
             speed: FeedRate::new(u64::from(value(Param::Speed))).expect("speed in range"),
             passes: Passes::new(u64::from(value(Param::Passes))).expect("passes in range"),
         },
-        interval: (kind == SetKind::Engrave).then(|| {
+        interval: kind.has_interval().then(|| {
             Interval::from_hundredths(i64::from(value(Param::Interval))).expect("interval in range")
         }),
     }

@@ -155,6 +155,8 @@ pub const fn main_set(kind: OperationKind) -> SetKind {
         OperationKind::Cut | OperationKind::CutOut => SetKind::Cut,
         OperationKind::Score => SetKind::Score,
         OperationKind::Engrave | OperationKind::EngraveOutline => SetKind::Engrave,
+        // No fallback to the Engrave set (ADR 0069 §14).
+        OperationKind::Image => SetKind::Image,
     }
 }
 
@@ -204,7 +206,7 @@ fn linked_interval(
     kind: OperationKind,
     kept: Option<Interval>,
 ) -> Option<Interval> {
-    if kept.is_some() || !crate::operation_options::hatches(kind) {
+    if kept.is_some() || !kind.has_interval() {
         return kept;
     }
     material

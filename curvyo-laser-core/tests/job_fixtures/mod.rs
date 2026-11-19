@@ -246,6 +246,7 @@ pub fn options(
         scan_angle: ScanAngle::from_degrees(angle).unwrap(),
         overscan: Overscan::new(overscan).unwrap(),
         z_offset: ZOffset::from_mm(z).unwrap(),
+        image: curvyo_laser_core::settings::ImageSettings::DEFAULT,
     }
 }
 
@@ -322,12 +323,57 @@ pub fn leaf(outlines: Vec<LeafOutline>) -> LeafGeometry {
 
 pub fn image(x: f64, y: f64, w: f64, h: f64) -> LeafGeometry {
     LeafGeometry::Image {
-        frame: [
-            Point::new(x, y),
-            Point::new(x + w, y),
-            Point::new(x + w, y + h),
-            Point::new(x, y + h),
-        ],
+        frame: frame(x, y, w, h),
+        asset: curvyo_document_core::AssetHash::of(b"unreadable"),
+        pixels: None,
+    }
+}
+
+/// The frame corners of an unrotated `w` x `h` box at `(x, y)`.
+pub fn frame(x: f64, y: f64, w: f64, h: f64) -> [Point; 4] {
+    [
+        Point::new(x, y),
+        Point::new(x + w, y),
+        Point::new(x + w, y + h),
+        Point::new(x, y + h),
+    ]
+}
+
+/// An image leaf of `pixels` at `(x, y)`, `w` x `h` mm (`specs/0123`).
+pub fn picture(
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    pixels: curvyo_image_core::WorkingImage,
+) -> LeafGeometry {
+    LeafGeometry::Image {
+        frame: frame(x, y, w, h),
+        asset: curvyo_document_core::AssetHash::of(&pixels.pixels),
+        pixels: Some(std::sync::Arc::new(pixels)),
+    }
+}
+
+/// A `width` x `height` opaque working image whose pixel `(x, y)` has the grey `grey(x, y)`.
+pub fn grey_image(
+    width: u32,
+    height: u32,
+    grey: impl Fn(u32, u32) -> u8,
+) -> curvyo_image_core::WorkingImage {
+    let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
+    for y in 0..height {
+        for x in 0..width {
+            let g = grey(x, y);
+            pixels.extend_from_slice(&[g, g, g, 255]);
+        }
+    }
+    curvyo_image_core::WorkingImage {
+        width,
+        height,
+        pixels,
+        original_size: (width, height),
+        truncated: false,
+        animated: false,
     }
 }
 

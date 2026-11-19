@@ -21,7 +21,7 @@ use curvyo_laser_core::library::MaterialRead;
 use curvyo_laser_core::operations::OperationKind::{Cut, CutOut, Engrave, EngraveOutline, Score};
 use curvyo_laser_core::settings::SetKind;
 use job_fixtures::{
-    BIRCH, Page, circle, image, leaf, line, material, options, own, own_engrave, plain, rect,
+    BIRCH, Page, circle, leaf, line, material, options, own, own_engrave, plain, rect,
     rect_reversed, settings,
 };
 use serde_json::json;
@@ -348,31 +348,6 @@ fn fixture_jobs_first() {
 }
 
 #[test]
-fn image_skipped() {
-    let mut page = Page::new();
-    page.operation(
-        Engrave,
-        "Engrave 1",
-        own_engrave(Engrave, 30.0, 6000, 1.0),
-        plain(),
-        vec![image(10.0, 10.0, 30.0, 20.0)],
-    );
-    page.operation(
-        Cut,
-        "Cut 1",
-        own(Cut, 90.0, 300, 1),
-        plain(),
-        vec![image(50.0, 10.0, 20.0, 10.0)],
-    );
-    let text = golden("image_skipped.gcode", &page.input, &[]);
-    assert!(
-        !text.contains("S300"),
-        "the Engrave image writes nothing (criterion 18)"
-    );
-    assert!(text.contains("S900"), "the Cut image writes its frame");
-}
-
-#[test]
 fn home_first() {
     // Superseded by 0029 rework (2026-11-17): the start is the one value Home, then machine
     // origin (was Head position with Home first on); the golden keeps its bytes.
@@ -437,7 +412,6 @@ fn every_golden_of_criterion_31_exists() {
         "origin_corners_tl",
         "origin_corners_tr",
         "fixture_jobs_first",
-        "image_skipped",
         "home_first",
         "start_head_position",
         "air_assist",

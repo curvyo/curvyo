@@ -106,6 +106,22 @@ mod tests {
     }
 
     #[test]
+    fn an_image_recipe_is_remembered_in_format_2() {
+        let defaults = RecipeDefaults {
+            max_feed: FeedRate::new(6000).unwrap(),
+            set: None,
+        };
+        let image = TestRecipe::new(&defaults)
+            .with_kind(SetKind::Image, &defaults)
+            .with_dither(crate::operation_image_options::Dither::Ordered);
+        let mut recipes = BTreeMap::new();
+        remember_test_grid(&mut recipes, "generic-laser", image);
+        let text = write_test_grid_choice(&recipes);
+        assert!(text.contains("\"format_version\": 2"), "{text}");
+        assert_eq!(read_test_grid_choice(&text), recipes);
+    }
+
+    #[test]
     fn the_hundred_and_first_machine_forgets_the_lowest_id() {
         let recipe = TestRecipe::new(&RecipeDefaults {
             max_feed: FeedRate::new(6000).unwrap(),

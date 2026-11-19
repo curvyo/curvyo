@@ -32,7 +32,7 @@ use curvyo_laser_core::job::{
 };
 use tester_grbl_0029::{Kind, Mode, Program, read};
 
-const GOLDENS: [&str; 20] = [
+const GOLDENS: [&str; 19] = [
     "cut_line",
     "score_and_cut_order",
     "engrave_bidirectional",
@@ -49,7 +49,6 @@ const GOLDENS: [&str; 20] = [
     "origin_corners_tl",
     "origin_corners_tr",
     "fixture_jobs_first",
-    "image_skipped",
     "home_first",
     "start_head_position",
     "air_assist",
@@ -77,7 +76,18 @@ fn c31_every_named_golden_exists_in_its_format_folder_and_reads() {
         let p = golden(g);
         assert!(!p.segs.is_empty(), "{g}: no move");
     }
-    let count = std::fs::read_dir(&dir).unwrap().count();
+    // `specs/0123` criterion 40 adds the `raster_*` goldens to this folder and replaces
+    // `image_skipped` (0029 criterion 18) by `raster_threshold`; they are checked there.
+    let count = std::fs::read_dir(&dir)
+        .unwrap()
+        .filter(|e| {
+            !e.as_ref()
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with("raster_")
+        })
+        .count();
     assert_eq!(
         count,
         GOLDENS.len(),
@@ -604,17 +614,6 @@ fn c16_cutout_margin_one_closed_outer_contour() {
     assert_eq!(runs[0].points.first(), runs[0].points.last());
 }
 
-#[test]
-fn c18_image_skipped_writes_only_the_cut() {
-    let p = golden("image_skipped");
-    let order = p.settings_order();
-    assert_eq!(
-        order,
-        [(900, 300)],
-        "only Cut 1 burns; the Engrave image writes nothing"
-    );
-}
-
 // ---- criterion 9 and 31 at file level: lengths are whole micrometres ------------------------------
 
 #[test]
@@ -758,7 +757,8 @@ fn c32_project_format_48_and_the_page_registers_read() {
     use curvyo_document_core::{CURRENT_FORMAT_VERSION, unpack};
     use curvyo_laser_core::job::read_output_settings;
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 49);
+    // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
+    assert_eq!(CURRENT_FORMAT_VERSION, 50);
     let dir =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../curvyo-document-core/tests/fixtures");
     let bytes = std::fs::read(dir.join("laser_output_v48.curvyo")).unwrap();

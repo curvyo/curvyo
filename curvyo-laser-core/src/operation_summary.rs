@@ -241,17 +241,23 @@ mod tests {
     }
 
     #[test]
-    fn an_image_in_score_only_runs_nothing() {
+    fn an_image_in_score_runs_its_frame_and_a_plain_shape_in_image_runs_nothing() {
         let x = id(1);
-        let ops = [op(0, Some("score"), true, &[x])];
         let chain = [vec![x]];
-        let image = Leaf {
+        let leaf = |shape| Leaf {
             chain: &chain,
             hidden: Hidden::No,
-            shape: LeafShape::Image,
+            shape,
         };
-        let summary = summarize(&list(&ops), [image]);
-        assert_eq!(summary.running, 0);
+        let ops = [op(0, Some("score"), true, &[x])];
+        let summary = summarize(&list(&ops), [leaf(LeafShape::Image)]);
+        assert_eq!(summary.running, 1, "Frage 271 A: the frame is scored");
+        let ops = [op(0, Some("image"), true, &[x])];
+        let shape = LeafShape::Outlines { closed: 1, open: 0 };
+        let summary = summarize(&list(&ops), [leaf(shape)]);
+        assert_eq!(summary.running, 0, "`specs/0123` criterion 48");
         assert_eq!(summary.operations, 0);
+        let summary = summarize(&list(&ops), [leaf(LeafShape::Image)]);
+        assert_eq!(summary.running, 1);
     }
 }

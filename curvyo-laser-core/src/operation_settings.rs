@@ -7,7 +7,6 @@ use serde_json::{Map, Value, json};
 use crate::machine_profile::FeedRate;
 use crate::material::{Interval, MAX_MATERIAL_NAME_CHARS, Passes, PowerPercent, SetKind, Settings};
 use crate::operation_kind::OperationKind;
-use crate::operation_options::hatches;
 
 /// A link of an operation to a material, with the name and `modified` it had when its numbers
 /// were last taken.
@@ -64,7 +63,7 @@ pub struct SetOverride {
     pub speed: Option<FeedRate>,
     /// Typed passes.
     pub passes: Option<Passes>,
-    /// A typed interval, read from a file (`overrides.main.interval_mm`, Engrave kinds only); no
+    /// A typed interval, read from a file (`overrides.main.interval_mm`, kinds with an interval only); no
     /// command of this slice writes one (`specs/0111` criterion 19).
     pub interval: Option<Interval>,
 }
@@ -141,7 +140,7 @@ impl Overrides {
 pub struct StoredSettings {
     /// The kind's set: own numbers, or the material's as last seen.
     pub main: Settings,
-    /// `main.interval_mm` of an Engrave kind; absent reads as [`Interval::DEFAULT`].
+    /// `main.interval_mm` of a kind with an interval; absent reads as [`Interval::DEFAULT`].
     pub interval: Option<Interval>,
     /// The outline of Engrave + Outline; absent, the outline runs with `main`.
     pub outline: Option<Settings>,
@@ -167,7 +166,7 @@ pub enum SettingsDamage {
     /// `overrides` without a link, empty, with an empty role map, an unknown key, a bad number,
     /// or an `outline` on a kind other than Engrave + Outline.
     BadOverride,
-    /// An `interval_mm` in an `outline` set or override, or on a kind that does not hatch, or one
+    /// An `interval_mm` in an `outline` set or override, or on a kind without an interval, or one
     /// out of range (ADR 0056 §5).
     BadInterval,
 }
@@ -188,7 +187,7 @@ const SET_KEYS: [&str; 3] = ["power_pct", "speed_mm_min", "passes"];
 const KEY_INTERVAL: &str = "interval_mm";
 
 /// The interval of a `main` set or override of an operation of kind `kind`, and the map without
-/// it: `Ok(None)` when absent; damage on a kind that does not hatch or for a bad value.
+/// it: `Ok(None)` when absent; damage on a kind without an interval or for a bad value.
 fn split_interval(
     value: &Value,
     kind: OperationKind,
@@ -199,7 +198,7 @@ fn split_interval(
     let Some(stored) = map.get(KEY_INTERVAL) else {
         return Ok((None, value.clone()));
     };
-    if !hatches(kind) {
+    if !kind.has_interval() {
         return Err(SettingsDamage::BadInterval);
     }
     let interval = stored
@@ -434,10 +433,11 @@ impl StoredSettings {
     }
 
     /// The stored interval of an operation of kind `kind`: the default when none is stored,
-    /// `None` for a kind that does not hatch.
+    /// `None` for a kind without an interval.
     #[must_use]
     pub fn stored_interval(&self, kind: OperationKind) -> Option<Interval> {
-        hatches(kind).then(|| self.interval.unwrap_or_default())
+        kind.has_interval()
+            .then(|| self.interval.unwrap_or_default())
     }
 
     /// The stored set of `role` for an operation of kind `kind`: the outline falls back to

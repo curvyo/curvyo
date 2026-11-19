@@ -114,10 +114,13 @@ fn every_damaged_option_and_interval_reads_as_damaged_settings() {
         options,
         [
             Some(OptionsDamage::NotAMap),
-            Some(OptionsDamage::UnknownKey),
+            // `{"dither": true}`: unknown at format 44, a known key of the wrong type since
+            // `specs/0123`; damaged either way. Superseded by the Image kind rework
+            // (2026-11-19): `dither` is an Image key, so on this kind it is a key on another kind.
+            Some(OptionsDamage::KeyOnKind),
             Some(OptionsDamage::BadValue),
             Some(OptionsDamage::BadValue),
-            Some(OptionsDamage::HatchOnKind),
+            Some(OptionsDamage::KeyOnKind),
             None,
             None,
         ]

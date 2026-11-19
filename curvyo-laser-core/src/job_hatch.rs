@@ -19,52 +19,114 @@ pub type HatchLines = Vec<Vec<Span>>;
 /// points and rounded to µm at once (ADR 0064 §2).
 #[must_use]
 pub fn hatch(rings: &[Vec<PointUm>], interval_um: i64, angle_deg: f64) -> HatchLines {
-    if interval_um <= 0 {
+    let Some(scan) = scan_lines(rings, interval_um, angle_deg) else {
         return Vec::new();
+    };
+    scan.lines
+        .iter()
+        .filter_map(|line| {
+            let spans = line
+                .spans
+                .iter()
+                .map(|&(t0, t1)| (scan.point(line.s, t0), scan.point(line.s, t1)))
+                .filter(|(a, b)| a != b)
+                .collect::<Vec<_>>();
+            (!spans.is_empty()).then_some(spans)
+        })
+        .collect()
+}
+
+/// The scan frame of an area: the lines' direction and normal on the page, and each line's
+/// inside spans along it. The one inside test of the hatch and the raster dot grid (ADR 0068 §2).
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ScanLines {
+    /// The unit direction along the lines, in page coordinates (Y down).
+    pub dir: (f64, f64),
+    /// The unit normal across the lines.
+    pub normal: (f64, f64),
+    /// The smallest and largest along-coordinate of the rings' points, in µm.
+    pub along: (f64, f64),
+    /// The lines with at least one crossing, in order across the area.
+    pub lines: Vec<ScanLine>,
+}
+
+/// One scan line of [`ScanLines`].
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ScanLine {
+    /// Its index from the first line, half an Interval inside the area's box.
+    pub k: i64,
+    /// Its across-coordinate in µm.
+    pub s: f64,
+    /// Its inside spans `(t0, t1)` along it, in increasing order, in µm.
+    pub spans: Vec<(f64, f64)>,
+}
+
+impl ScanLines {
+    /// The page point at across-coordinate `s` and along-coordinate `t`, rounded to µm.
+    pub fn point(&self, s: f64, t: f64) -> PointUm {
+        PointUm::new(
+            round_um(s * self.normal.0 + t * self.dir.0),
+            round_um(s * self.normal.1 + t * self.dir.1),
+        )
     }
+}
+
+/// The scan frame of `angle_deg` (the hatch's: positive turns counter-clockwise as seen).
+pub(crate) fn scan_frame(angle_deg: f64) -> ((f64, f64), (f64, f64)) {
     // The page's Y grows down, so a counter-clockwise turn as seen is a negative Y component.
     let turn = direction_of_degrees(angle_deg);
     let dir = (turn.x, -turn.y);
-    let normal = (-dir.1, dir.0);
+    (dir, (-dir.1, dir.0))
+}
+
+/// The scan lines of the area bounded by `rings` (see [`hatch`]), `None` when no line falls
+/// inside its box.
+pub(crate) fn scan_lines(
+    rings: &[Vec<PointUm>],
+    interval_um: i64,
+    angle_deg: f64,
+) -> Option<ScanLines> {
+    if interval_um <= 0 {
+        return None;
+    }
+    let (dir, normal) = scan_frame(angle_deg);
     let edges = scan_edges(rings, dir, normal);
-    let Some((low, high)) = edges.iter().fold(None, |range: Option<(f64, f64)>, edge| {
+    let (low, high) = edges.iter().fold(None, |range: Option<(f64, f64)>, edge| {
         let (a, b) = (edge.s0.min(edge.s1), edge.s0.max(edge.s1));
         Some(range.map_or((a, b), |(lo, hi)| (lo.min(a), hi.max(b))))
-    }) else {
-        return Vec::new();
-    };
+    })?;
+    let along = edges
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), edge| {
+            (lo.min(edge.t0).min(edge.t1), hi.max(edge.t0).max(edge.t1))
+        });
     let step = as_f64(interval_um);
     let first = low + step / 2.0;
     if first > high {
-        return Vec::new();
+        return None;
     }
     let count = line_count(first, high, step);
     let mut crossings: Vec<Vec<(f64, i32)>> = vec![Vec::new(); count];
     for edge in &edges {
         edge.cross(first, step, count, &mut crossings);
     }
-    let point = |s: f64, t: f64| {
-        PointUm::new(
-            round_um(s * normal.0 + t * dir.0),
-            round_um(s * normal.1 + t * dir.1),
-        )
-    };
-    crossings
-        .into_iter()
-        .enumerate()
+    let lines = (0_i64..)
+        .zip(crossings)
         .filter_map(|(k, mut list)| {
             #[allow(clippy::cast_precision_loss)]
             // exact: line counts are far below 2^53
             let s = first + k as f64 * step;
             list.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-            let spans = spans_of(&list)
-                .into_iter()
-                .map(|(t0, t1)| (point(s, t0), point(s, t1)))
-                .filter(|(a, b)| a != b)
-                .collect::<Vec<_>>();
-            (!spans.is_empty()).then_some(spans)
+            let spans = spans_of(&list);
+            (!spans.is_empty()).then_some(ScanLine { k, s, spans })
         })
-        .collect()
+        .collect();
+    Some(ScanLines {
+        dir,
+        normal,
+        along,
+        lines,
+    })
 }
 
 /// The edges of `rings` (each closed, at least three points) in the scan frame of `dir` and

@@ -23,6 +23,9 @@ struct Entry {
     label: String,
     /// What the maker reads for the step, when it is not the label's name ("Undo Resize").
     name: Option<String>,
+    /// The objects summary the maker reads for the step, when the touched nodes do not tell it
+    /// ("1 image" for an assignment, which writes only its operation).
+    summary: Option<String>,
     /// Shared with the neighbouring entries whenever the selection did not change: a long run of
     /// steps on one large selection holds the selection once.
     before: Arc<SelectionSnapshot>,
@@ -91,6 +94,19 @@ impl UndoStack {
         before: SelectionSnapshot,
         after: SelectionSnapshot,
     ) {
+        self.record_described(step, label, (name, None), before, after);
+    }
+
+    /// As [`UndoStack::record_named`], with the objects summary the maker reads for the step
+    /// (`words` is the name and the summary).
+    pub fn record_described(
+        &mut self,
+        step: StepRef,
+        label: &str,
+        (name, summary): (Option<String>, Option<String>),
+        before: SelectionSnapshot,
+        after: SelectionSnapshot,
+    ) {
         let before = self.shared(before);
         let after = if *before == after {
             Arc::clone(&before)
@@ -103,6 +119,7 @@ impl UndoStack {
             Entry {
                 label: label.to_owned(),
                 name,
+                summary,
                 before,
                 after,
             },
@@ -124,6 +141,13 @@ impl UndoStack {
     #[must_use]
     pub fn custom_name(&self, step: StepRef) -> Option<&str> {
         self.entries.get(&step)?.name.as_deref()
+    }
+
+    /// The objects summary the session gave `step` ("1 image"), `None` when the touched nodes
+    /// tell it or the step is not on the stacks.
+    #[must_use]
+    pub fn custom_summary(&self, step: StepRef) -> Option<&str> {
+        self.entries.get(&step)?.summary.as_deref()
     }
 
     /// The step an undo press acts on.

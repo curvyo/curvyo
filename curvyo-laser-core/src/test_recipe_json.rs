@@ -1,5 +1,5 @@
 //! The stored form of a test grid recipe, shared by the grid register and the test record
-//! (ADR 0057 §1, §6; ADR 0058 §2).
+//! (ADR 0057 §1, §6; ADR 0058 §2; ADR 0069 §8).
 
 use std::collections::BTreeMap;
 
@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 
 use crate::material::SetKind;
+use crate::operation_image_options::Dither;
 use crate::test_id::TestId;
 use crate::test_param::{Param, ParamValue};
 use crate::test_recipe::{
@@ -62,6 +63,8 @@ pub(crate) struct RecipeJson {
     fixed: FixedJson,
     cell_mm: f64,
     crosshatch: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    dither: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) material: Option<MaterialRefJson>,
 }
@@ -145,6 +148,8 @@ pub(crate) fn recipe_json(recipe: &TestRecipe) -> RecipeJson {
         fixed,
         cell_mm: recipe.cell.as_mm(),
         crosshatch: recipe.crosshatch,
+        // Only an Image grid writes its dither, so the other kinds keep the stored form of `0112`.
+        dither: recipe.dither().map(|d| d.key().to_owned()),
         material: None,
     }
 }
@@ -186,6 +191,7 @@ pub(crate) fn read_recipe(json: &RecipeJson) -> Option<TestRecipe> {
     if !(MIN_CELL..=MAX_CELL).contains(&cell) || (json.crosshatch && kind != SetKind::Engrave) {
         return None;
     }
+    let dither = read_dither(json, kind)?;
     Some(TestRecipe {
         kind,
         columns,
@@ -193,5 +199,16 @@ pub(crate) fn read_recipe(json: &RecipeJson) -> Option<TestRecipe> {
         fixed,
         cell: Length::from_mm(cell),
         crosshatch: json.crosshatch,
+        dither,
     })
+}
+
+/// The dither of `json` (ADR 0069 §13): on an Image grid a binary mode, absent reading
+/// Floyd-Steinberg; a dither on another kind, an unknown value or Grey is `None`.
+fn read_dither(json: &RecipeJson, kind: SetKind) -> Option<Dither> {
+    match (json.dither.as_deref(), kind) {
+        (None, _) => Some(Dither::FloydSteinberg),
+        (Some(key), SetKind::Image) => Dither::from_key(key).filter(|d| d.is_binary()),
+        (Some(_), _) => None,
+    }
 }

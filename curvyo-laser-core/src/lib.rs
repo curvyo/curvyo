@@ -22,8 +22,10 @@ mod grid_layout;
 mod job_build;
 mod job_effects;
 mod job_fingerprint;
+mod job_flatten;
 mod job_gate;
 mod job_gate_cause;
+mod job_gate_raster;
 mod job_gate_rows;
 mod job_gate_text;
 mod job_hatch;
@@ -32,6 +34,14 @@ mod job_moves;
 mod job_numbers;
 mod job_order;
 mod job_plan;
+mod job_raster_dither;
+mod job_raster_grid;
+mod job_raster_items;
+mod job_raster_plan;
+mod job_raster_rows;
+mod job_raster_sample;
+mod job_raster_tone;
+mod job_raster_work;
 mod job_timeline;
 mod job_write;
 mod job_write_grbl;
@@ -53,6 +63,7 @@ mod material_store;
 mod material_test_file;
 mod operation_cut_out;
 mod operation_group;
+mod operation_image_options;
 mod operation_kind;
 mod operation_kind_run;
 mod operation_naming;
@@ -67,6 +78,7 @@ mod output_settings;
 mod overhang;
 mod record_envelope;
 mod steps;
+mod test_cell_fill;
 mod test_grid_choice;
 mod test_grid_fit;
 mod test_grid_ops;
@@ -97,7 +109,7 @@ pub mod operations {
 /// move list one page runs, its order, time and gate, the output registers of ADR 0065 §1 and the
 /// one entry point to every output format.
 pub mod job {
-    pub use crate::job_build::{Built, build_job};
+    pub use crate::job_build::{Built, build_job, prepare_job};
     pub use crate::job_effects::{ExportEffects, export_effects};
     pub use crate::job_gate::{
         BED_TOLERANCE_UM, Gate, GateFacts, Issue, MachineFacts, Targets, gate,
@@ -112,11 +124,17 @@ pub mod job {
         BlockInput, BlockSource, CutOutItem, JobInput, LeafGeometry, LeafInput, LeafOutline,
         MachineInput, PointUm, Ring, mm_of_um, um_of_mm,
     };
-    pub use crate::job_moves::{Block, Frame, Job, Move, MoveKind, RUN_OUT_ACCELERATION};
+    pub use crate::job_moves::{
+        Block, BuiltMoves, Frame, Job, Move, MoveKind, RUN_OUT_ACCELERATION,
+    };
     pub use crate::job_numbers::{
         BlockNumbers, NumbersContext, NumbersRead, NumbersSource, RunNumbers, block_numbers,
     };
-    pub use crate::job_plan::{FLATTEN_MM, Plan, PlanCache, PlannedPath, PlannedRun, plan_block};
+    pub use crate::job_plan::{
+        FLATTEN_MM, Plan, PlanCache, PlannedPath, PlannedRun, PlannedSweep, plan_block,
+    };
+    pub use crate::job_raster_plan::{MAX_DOTS, raster_dot_map};
+    pub use crate::job_raster_rows::{GAP_UM, Levels, Run, Sweep, run_power};
     pub use crate::job_timeline::{
         Head, Timeline, duration_text, estimate_text, length_text, lengths_text, readout_text,
     };
@@ -136,9 +154,10 @@ pub mod settings {
         CellIndex, Interval, MAX_HISTORY_ENTRIES, MAX_MATERIAL_NAME_CHARS, MachineTie, Passes,
         PowerPercent, SetKind, SetNumbers, Settings, Thickness, next_modified,
     };
+    pub use crate::operation_image_options::{Dither, ImageEdit, ImageField, ImageSettings};
     pub use crate::operation_options::{
         ENTER_NUMBER, ENTER_WHOLE_NUMBER, OperationOptions, OptionEdit, OptionsDamage, Overscan,
-        ScanAngle, ZOffset, hatches, read_options,
+        ScanAngle, ZOffset, hatches, read_options, scans,
     };
     pub use crate::operation_settings::{
         Field, MaterialLink, Overrides, Role, SetOverride, SettingsDamage, SettingsRead,
@@ -154,6 +173,7 @@ pub mod settings {
 /// The test grid object of `specs/0112-test-grid-and-materials`: test ids, the recipe, its layout
 /// and the derived operations it resolves into (ADR 0057).
 pub mod grids {
+    pub use crate::test_cell_fill::{cell_gradient, cell_style};
     pub use crate::test_grid_choice::{
         GRID_CHOICE_FORMAT_VERSION, read_test_grid_choice, remember_test_grid,
         write_test_grid_choice,
@@ -173,7 +193,7 @@ pub mod grids {
     };
 }
 
-/// The maker's material library of `specs/0112-test-grid-and-materials`: record format 2 shared
+/// The maker's material library of `specs/0112-test-grid-and-materials`: record format 3 shared
 /// by all lasers, its tests, retired ids, photos and the list with its order (ADR 0055, ADR 0058).
 pub mod library {
     pub use crate::material_photo::{

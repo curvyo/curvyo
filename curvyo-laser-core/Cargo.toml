@@ -13,6 +13,10 @@ workspace = true
 curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 curvyo-geometry-core = { path = "../curvyo-geometry-core", version = "0.1.0" }
+# The decoded working image of a raster item (ADR 0068 §1); pure, builds for wasm32.
+curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
+# `pow` for the 256 entries of the gamma table (ADR 0068 §4): the same bits on every target.
+libm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

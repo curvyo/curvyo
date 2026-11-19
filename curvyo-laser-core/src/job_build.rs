@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use crate::job_input::{BlockInput, JobInput, PointUm, um_of_mm};
+use crate::job_input::{BlockInput, JobInput, LeafGeometry, PointUm, um_of_mm};
 use crate::job_moves::{Block, Frame, Job, build_moves, running_z_um};
 use crate::job_numbers::{BlockNumbers, NumbersContext, NumbersRead, block_numbers};
 use crate::job_plan::{Plan, PlanCache};
@@ -30,12 +30,7 @@ pub struct Built {
 pub fn build_job(input: &JobInput, materials: &[MaterialRead], cache: &mut PlanCache) -> Built {
     let values = &input.machine.values;
     let frame = frame_of(input);
-    let context = NumbersContext {
-        materials,
-        profile_id: &input.machine.profile_id,
-        fixture_material: input.fixture_material.as_deref(),
-        max_feed: values.max_feed,
-    };
+    let context = numbers_context(input, materials);
     let mut built = empty_built(input, frame);
     let mut entry: PointUm = frame.origin();
     for block in &input.blocks {
@@ -60,8 +55,56 @@ pub fn build_job(input: &JobInput, materials: &[MaterialRead], cache: &mut PlanC
     }
     add_moves(&mut built, frame, input.start);
     let ids: Vec<_> = input.blocks.iter().map(|b| b.id).collect();
-    cache.retain(&ids);
+    let assets: Vec<_> = input
+        .blocks
+        .iter()
+        .flat_map(|b| &b.leaves)
+        .filter_map(|leaf| match &leaf.geometry {
+            LeafGeometry::Image { asset, .. } => Some(asset),
+            LeafGeometry::Outlines(_) | LeafGeometry::Gradient { .. } => None,
+        })
+        .collect();
+    let items: Vec<_> = input
+        .blocks
+        .iter()
+        .flat_map(|b| &b.leaves)
+        .map(|leaf| leaf.node)
+        .collect();
+    cache.retain(&ids, &assets, &items);
     built
+}
+
+/// Works up to about `dots` dots of the raster sweeps the job of `input` needs that `cache` does
+/// not hold yet, in run order (ADR 0069 §12); whether all of them are held, so [`build_job`]
+/// builds no dot. Building in steps gives the same job as building at once.
+#[must_use]
+pub fn prepare_job(
+    input: &JobInput,
+    materials: &[MaterialRead],
+    cache: &mut PlanCache,
+    mut dots: u64,
+) -> bool {
+    let context = numbers_context(input, materials);
+    input.blocks.iter().all(|block| {
+        let read = block_numbers(block, context);
+        match read.numbers() {
+            Some(numbers) if block.has_items() && !matches!(read, NumbersRead::Damaged) => {
+                cache.prepare(block, numbers, &mut dots)
+            }
+            _ => true,
+        }
+    })
+}
+
+/// What the numbers of the blocks of `input` are read with.
+fn numbers_context<'a>(input: &'a JobInput, materials: &'a [MaterialRead]) -> NumbersContext<'a> {
+    let values = &input.machine.values;
+    NumbersContext {
+        materials,
+        profile_id: &input.machine.profile_id,
+        fixture_material: input.fixture_material.as_deref(),
+        max_feed: values.max_feed,
+    }
 }
 
 /// The bed of `input` in µm with its origin corner.
@@ -85,6 +128,7 @@ fn empty_built(input: &JobInput, frame: Frame) -> Built {
             home: frame.origin(),
             blocks: Vec::new(),
             moves: Vec::new(),
+            sweeps: Vec::new(),
         },
         numbers: Vec::with_capacity(capacity),
         runs: Vec::with_capacity(capacity),
@@ -114,7 +158,8 @@ fn add_moves(built: &mut Built, frame: Frame, start: Start) {
         .cloned()
         .zip(built.plans.iter().flatten().map(AsRef::as_ref))
         .collect();
-    let (moves, home) = build_moves(frame, start, &pairs);
-    built.job.moves = moves;
-    built.job.home = home;
+    let moves = build_moves(frame, start, &pairs);
+    built.job.moves = moves.moves;
+    built.job.home = moves.home;
+    built.job.sweeps = moves.sweeps;
 }

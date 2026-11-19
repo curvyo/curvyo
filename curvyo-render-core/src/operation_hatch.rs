@@ -86,6 +86,8 @@ pub fn object_polygons(object: &ObjectSnapshot) -> Option<Vec<Vec<Point>>> {
             Some(vec![flatten(&anchors, drawn.closed)])
         }
         ObjectSnapshot::Text(text) => text.outline.as_ref().map(|outline| paths(&outline.glyphs)),
+        // An image's frame rectangle (`specs/0123` criterion 1, Frage 271 A).
+        ObjectSnapshot::Image(image) => Some(vec![image.corners().to_vec()]),
         _ => None,
     }
 }

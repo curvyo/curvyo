@@ -258,6 +258,10 @@ pub const OP_CUT: RgbaColor = RgbaColor::opaque(0xC8, 0x10, 0x2E);
 /// 3.17:1 on `--canvas-bg` (criterion 18's 3:1 holds; the lighter orange does not).
 pub const OP_ENGRAVE_HATCH: RgbaColor = RgbaColor::opaque(0xC4, 0x6A, 0x1C);
 
+/// `--panel-muted-fg` (`specs/0101` ux-notes section 13.2): the symbol of a kind that holds an
+/// item but does not run it (Output off; a vector shape in Image, `specs/0123` criterion 48).
+pub const OP_MUTED_INK: RgbaColor = RgbaColor::opaque(0x5A, 0x5A, 0x5F);
+
 /// `--toolbar-icon` (ux-notes section 13.1): the Score line, the Engrave + Outline outline and every
 /// ink symbol.
 pub const OP_INK: RgbaColor = RgbaColor::opaque(0x3A, 0x3A, 0x3F);

@@ -122,9 +122,10 @@ fn c25_the_format_is_44() {
     // Superseded by `specs/0114-image-trace-mask` (format 45, ADR 0061) and
     // `specs/0112-test-grid-and-materials` (format 46, ADR 0057 §7).
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 49);
+    // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
+    assert_eq!(CURRENT_FORMAT_VERSION, 50);
     let (d, _, _) = laser();
-    assert_eq!(format_of(&pack(&d, "t").unwrap()), 49);
+    assert_eq!(format_of(&pack(&d, "t").unwrap()), 50);
 }
 
 #[test]

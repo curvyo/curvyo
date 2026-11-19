@@ -205,6 +205,7 @@ fn the_estimate_is_burn_over_feed_plus_travel_over_the_maximum_feed() {
             },
             burn(100_000),
         ],
+        sweeps: Vec::new(),
     };
     let timeline = Timeline::of(&job);
     assert!((timeline.total_s() - 21.0).abs() < 1e-9);
@@ -760,6 +761,7 @@ fn the_summary_count_lines_are_checks() {
         hidden_running: vec![ids[2]],
         output_off: vec![ids[3]],
         output_off_items: vec![ids[4], ids[5]],
+        not_pictures: Vec::new(),
     };
     let mut g = gate_of(&page, &[], &facts);
     let names = Names::of([(ids[3], "Score 2".to_owned())]);

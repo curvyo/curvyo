@@ -11,7 +11,8 @@ use crate::job_gate_rows::NumbersLine;
 use crate::job_input::mm_of_um;
 use crate::job_write;
 use crate::machine_profile::grouped;
-use crate::material::Interval;
+use crate::material::{Interval, PowerPercent};
+use crate::operation_image_options::Dither;
 use crate::operation_settings::Field;
 use crate::output_settings::Start;
 
@@ -29,6 +30,13 @@ impl Names {
     #[must_use]
     pub fn operation(&self, op: NodeId) -> &str {
         self.0.get(&op).map_or("An operation", String::as_str)
+    }
+
+    /// The name of item `item` (the session passes the names of the raster items it checks
+    /// beside the operations'), "An item" when it is not known here.
+    #[must_use]
+    pub fn item(&self, item: NodeId) -> &str {
+        self.0.get(&item).map_or("An item", String::as_str)
     }
 }
 
@@ -77,43 +85,82 @@ fn items(n: usize) -> String {
     }
 }
 
+/// "1 image", "3 images".
+fn images(n: usize) -> String {
+    if n == 1 {
+        "1 image".to_owned()
+    } else {
+        format!("{n} images")
+    }
+}
+
 /// The singular or plural verb of a count.
 const fn verb(count: usize, one: &'static str, many: &'static str) -> &'static str {
     if count == 1 { one } else { many }
 }
 
-/// The check text of `issue` with the operation names `names` (`ux-notes.md` section 10).
-#[must_use]
-pub fn check_text(issue: &Issue, names: &Names) -> CheckText {
-    let count = issue.count;
+/// The check text of a raster cause (`specs/0123` criteria 31 to 36, UX section 4).
+fn raster_text(cause: &Cause, count: usize, names: &Names) -> CheckText {
     let op = |id: &NodeId| names.operation(*id).to_owned();
-    let text = match &issue.cause {
-        Cause::NoSettings { op: id } => CheckText::led(op(id), " has no power and speed."),
-        Cause::FixtureNoMaterial => {
-            CheckText::led("Fixture jobs", " have no material. Pick one above.")
-        }
-        Cause::FixtureNoSet { material, kind } => CheckText::led(
-            "Fixture jobs",
-            format!(": {material} has no {} set.", kind.label()),
-        ),
-        Cause::OutsideBed {
-            width_um,
-            height_um,
-        } => CheckText::led(
-            items(count),
+    match cause {
+        Cause::GreyNeedsM4 { op: id } => CheckText::led(op(id), " needs laser mode M4 for Grey."),
+        Cause::TooManyDots { item, count: dots } => CheckText::led(
+            names.item(*item),
             format!(
-                " {} outside the {} × {} mm bed.",
-                verb(count, "lies", "lie"),
-                mm_text(mm_of_um(*width_um)),
-                mm_text(mm_of_um(*height_um))
+                " would need {} dots; the limit is {}.",
+                grouped(*dots),
+                grouped(crate::job_raster_plan::MAX_DOTS)
             ),
         ),
-        Cause::MachineDamaged => CheckText::plain("The machine profile of this page is damaged."),
-        Cause::StartDamaged => CheckText::led("Start", " is damaged. Pick one above."),
-        Cause::NothingRuns => CheckText::plain("Nothing runs. Assign items to an operation."),
-        Cause::GenericLaser => {
-            CheckText::plain("The machine is Generic laser; its limits may not match yours.")
+        Cause::CoarseImages => CheckText::led(
+            images(count),
+            verb(
+                count,
+                " is coarser than its Interval.",
+                " are coarser than their Interval.",
+            ),
+        ),
+        Cause::OverlappingRasterItems => CheckText::led(items(count), " overlap and burn twice."),
+        Cause::ReducedImages => CheckText::led(
+            images(count),
+            verb(
+                count,
+                " was reduced and loses detail.",
+                " were reduced and lose detail.",
+            ),
+        ),
+        Cause::UnreadableImages => CheckText::led(
+            images(count),
+            verb(
+                count,
+                " cannot be read and is skipped.",
+                " cannot be read and are skipped.",
+            ),
+        ),
+        Cause::NotPictures { op: id } => CheckText::led(
+            items(count),
+            format!(
+                " in {}{}",
+                op(id),
+                verb(
+                    count,
+                    " is not a picture and does not burn.",
+                    " are not pictures and do not burn.",
+                )
+            ),
+        ),
+        Cause::LowestPowerAbovePower { op: id } => {
+            CheckText::led(op(id), ": Lowest power is above Power.")
         }
+        _ => CheckText::plain(""),
+    }
+}
+
+/// The check text of an operation's numbers: material, set, typed values, feed, Z offset.
+fn operation_numbers_text(cause: &Cause, names: &Names) -> CheckText {
+    let op = |id: &NodeId| names.operation(*id).to_owned();
+    match cause {
+        Cause::NoSettings { op: id } => CheckText::led(op(id), " has no power and speed."),
         Cause::MaterialNotFound { op: id, material } => CheckText::led(
             op(id),
             format!(": {material} is not found, using stored numbers."),
@@ -148,6 +195,27 @@ pub fn check_text(issue: &Issue, names: &Names) -> CheckText {
             op(id),
             " has a Z offset; the machine has no motorised Z axis.",
         ),
+        _ => CheckText::plain(""),
+    }
+}
+
+/// The check text of a cause that counts items or operations: outside the bed, not assigned,
+/// hidden, Output off, no contour.
+fn count_text(cause: &Cause, count: usize, names: &Names) -> CheckText {
+    let op = |id: &NodeId| names.operation(*id).to_owned();
+    match cause {
+        Cause::OutsideBed {
+            width_um,
+            height_um,
+        } => CheckText::led(
+            items(count),
+            format!(
+                " {} outside the {} × {} mm bed.",
+                verb(count, "lies", "lie"),
+                mm_text(mm_of_um(*width_um)),
+                mm_text(mm_of_um(*height_um))
+            ),
+        ),
         Cause::NotAssigned => CheckText::led(
             items(count),
             format!(" {} not assigned.", verb(count, "is", "are")),
@@ -172,6 +240,49 @@ pub fn check_text(issue: &Issue, names: &Names) -> CheckText {
         } else {
             format!("{count} operations have damaged settings and do not run.")
         }),
+        _ => CheckText::plain(""),
+    }
+}
+
+/// The check text of `issue` with the operation names `names` (`ux-notes.md` section 10).
+#[must_use]
+pub fn check_text(issue: &Issue, names: &Names) -> CheckText {
+    let count = issue.count;
+    let cause = &issue.cause;
+    let text = match cause {
+        Cause::FixtureNoMaterial => {
+            CheckText::led("Fixture jobs", " have no material. Pick one above.")
+        }
+        Cause::FixtureNoSet { material, kind } => CheckText::led(
+            "Fixture jobs",
+            format!(": {material} has no {} set.", kind.label()),
+        ),
+        Cause::MachineDamaged => CheckText::plain("The machine profile of this page is damaged."),
+        Cause::StartDamaged => CheckText::led("Start", " is damaged. Pick one above."),
+        Cause::NothingRuns => CheckText::plain("Nothing runs. Assign items to an operation."),
+        Cause::GenericLaser => {
+            CheckText::plain("The machine is Generic laser; its limits may not match yours.")
+        }
+        Cause::NoSettings { .. }
+        | Cause::MaterialNotFound { .. }
+        | Cause::NoSetForLaser { .. }
+        | Cause::TypedOverride { .. }
+        | Cause::OverFeed { .. }
+        | Cause::ZWithoutAxis { .. } => operation_numbers_text(cause, names),
+        Cause::OutsideBed { .. }
+        | Cause::NotAssigned
+        | Cause::HiddenRuns
+        | Cause::OutputOff { .. }
+        | Cause::CutOutNoContour { .. }
+        | Cause::DamagedSettings => count_text(cause, count, names),
+        Cause::GreyNeedsM4 { .. }
+        | Cause::TooManyDots { .. }
+        | Cause::CoarseImages
+        | Cause::OverlappingRasterItems
+        | Cause::ReducedImages
+        | Cause::UnreadableImages
+        | Cause::NotPictures { .. }
+        | Cause::LowestPowerAbovePower { .. } => raster_text(cause, count, names),
     };
     if issue.targets == Targets::None {
         return CheckText::plain(&text.whole());
@@ -216,7 +327,33 @@ pub fn numbers_text(line: &NumbersLine) -> String {
         text.push_str(", ");
         text.push_str(&interval_text(interval));
     }
+    if let Some((dither, lowest)) = line.dither {
+        text.push_str(" · ");
+        text.push_str(&dither_text(dither, lowest, line.numbers.power));
+    }
     text
+}
+
+/// The dither of an Image row's numbers line (`specs/0123` criterion 47 d, UX notes 2.3): the
+/// strip's short name ("Floyd"), Grey with its range from Lowest power to Power.
+fn dither_text(dither: Dither, lowest_tenths: u16, power: PowerPercent) -> String {
+    match dither {
+        Dither::Threshold => "Threshold".to_owned(),
+        Dither::Ordered => "Ordered".to_owned(),
+        Dither::FloydSteinberg => "Floyd".to_owned(),
+        Dither::Jarvis => "Jarvis".to_owned(),
+        Dither::Atkinson => "Atkinson".to_owned(),
+        Dither::Stucki => "Stucki".to_owned(),
+        Dither::Grey => {
+            let (whole, tenth) = (lowest_tenths / 10, lowest_tenths % 10);
+            let lowest = if tenth == 0 {
+                whole.to_string()
+            } else {
+                format!("{whole}.{tenth}")
+            };
+            format!("Grey {lowest}–{power} %")
+        }
+    }
 }
 
 /// The Start pick's words of `start` (`ux-notes.md` section 10).

@@ -29,6 +29,12 @@ fn read(name: &str) -> Result<curvyo_laser_core::library::Material, RecordFileEr
     read_record(&file_name(), &fixture(name))
 }
 
+/// The text a format-2 record is written back as: the same, at format 3 (`specs/0123` Frage 237
+/// A; no migration, the version is the only change).
+fn as_format3(text: &str) -> String {
+    text.replacen("\"format_version\": 2,", "\"format_version\": 3,", 1)
+}
+
 fn test_id(text: &str) -> TestId {
     TestId::parse(text).unwrap()
 }
@@ -37,7 +43,7 @@ fn test_id(text: &str) -> TestId {
 fn the_full_record_reads_and_writes_back_byte_for_byte() {
     let text = fixture("format2_full.json");
     let material = read("format2_full.json").unwrap();
-    assert_eq!(write_record(&material), text);
+    assert_eq!(write_record(&material), as_format3(&text));
     assert_eq!(material.lasers.len(), 2);
     let cut = material.set_for(DIODE, SetKind::Cut).unwrap();
     assert_eq!(cut.source, SetSource::Test(test_id("7K2QX")));
@@ -62,7 +68,7 @@ fn the_one_laser_and_the_maximal_record_read_and_write_back() {
     for name in ["format2_one_laser.json", "format2_max.json"] {
         let text = fixture(name);
         let material = read(name).unwrap_or_else(|e| panic!("{name}: {e}"));
-        assert_eq!(write_record(&material), text, "{name}");
+        assert_eq!(write_record(&material), as_format3(&text), "{name}");
     }
     let max = fixture("format2_max.json");
     assert!(max.len() <= MAX_RECORD_TEXT, "{} bytes", max.len());

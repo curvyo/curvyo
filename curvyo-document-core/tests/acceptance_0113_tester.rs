@@ -84,13 +84,14 @@ fn with_format(bytes: &[u8], to: i64) -> Vec<u8> {
 #[test]
 fn format_is_47() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 49);
+    // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
+    assert_eq!(CURRENT_FORMAT_VERSION, 50);
 }
 
 #[test]
 fn a_format_48_file_is_refused() {
     let bytes = pack(&unpack(1, &golden("fixture_sets_v47.curvyo")).unwrap(), "t").unwrap();
-    assert!(unpack(2, &with_format(&bytes, 50)).is_err());
+    assert!(unpack(2, &with_format(&bytes, 51)).is_err());
 }
 
 #[test]
@@ -158,7 +159,7 @@ fn ac38_golden_v47_round_trips_every_value_and_saves_as_47() {
             f.read_to_string(&mut t).unwrap();
             if t.contains("\"format_version\"") {
                 assert!(
-                    t.contains("\"format_version\": 49") || t.contains("\"format_version\":49")
+                    t.contains("\"format_version\": 50") || t.contains("\"format_version\":50")
                 );
                 seen = true;
             }
