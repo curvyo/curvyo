@@ -111,7 +111,9 @@ mid-move, then one at rest); `empty-zoom` (5 s, Ctrl+wheel, each tick a burst of
 ticks in, 30 out); then a generated SVG of 5 000 stroked paths is imported and fitted
 (**the whale and dolphin fixtures are trace inputs, not loadable documents, so a generated page is
 used**); `idle-5000` 30 s; `wheel-zoom` (5 s, Ctrl+wheel, 30 notches in, 30 out); `pan-drag` (5 s,
-middle button, pointer on a 150 px circle). The `s` column is wall time: when frames are slow the timers
+middle button, pointer on a 150 px circle), both with the 5 000 imported paths selected; then
+Escape and a fit, and the same two with nothing selected (`wheel-zoom-none`, `pan-drag-none`). The
+line `selected objects` gives the count before and after the Escape. The `s` column is wall time: when frames are slow the timers
 fall behind, so a 5 s scenario can take longer.
 
 ## Ablation matrix (`--ablate`)

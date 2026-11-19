@@ -1,7 +1,7 @@
 //! The CPU cost of a drawn frame by phase on the performance page of `tools/perf/` (5 000
 //! stroked paths, imported and fitted, `specs/0126-performance-pass` phase 4): the draw list
-//! and the pictures (the wasm probe times the GPU vertices), at rest, zooming and panning. Thread CPU time
-//! (`CLAUDE.md` §5); the budgets are asserted in a release build only, a debug build prints.
+//! and the pictures (the wasm probe times the GPU vertices), at rest, zooming and panning, with
+//! all its paths selected and with none. Thread CPU time (`CLAUDE.md` §5); the budgets are asserted in a release build only, a debug build prints.
 //! An integration test: the library's own test build checks every cached document read
 //! against a fresh one, which would be most of the time measured.
 //!
@@ -41,7 +41,7 @@ fn generated_svg(nodes: usize) -> String {
 }
 
 /// The perf page as the probe leaves it: imported (its paths selected) and fitted into a
-/// canvas of 1 280 x 800 CSS pixels.
+/// canvas of 1 280 x 800 CSS pixels, the pointer over its centre.
 fn perf_session() -> Session {
     let mut session = Session::new(1);
     session.resize_viewport(1280.0, 800.0);
@@ -49,6 +49,10 @@ fn perf_session() -> Session {
         .import_svg(generated_svg(5000).as_bytes(), "perf-5000.svg")
         .unwrap();
     session.fit_document();
+    // The pointer rests over the canvas centre, as in the app while it zooms and pans: the
+    // hover reads (handle under the pointer) run every frame.
+    let centre = session.screen_to_document(640.0, 400.0);
+    session.pointer_hover(centre, false, false);
     session
 }
 
@@ -97,33 +101,70 @@ fn report(label: &str, cost: &PhaseCost, budget: Duration) {
     }
 }
 
-/// The draw-list budgets of a frame of the perf page on the host CPU (release build). Measured
-/// on 2026-11-18: 36 ms at rest (everything in view), 31 ms zooming and 28 ms panning, where only
-/// what the canvas shows is tessellated; zoom and pan are held to about 1.5 times that.
-const REST_BUDGET: Duration = Duration::from_millis(60);
-const ZOOM_BUDGET: Duration = Duration::from_millis(45);
-const PAN_BUDGET: Duration = Duration::from_millis(45);
+/// The draw-list budgets of a frame of the perf page on the host CPU (release build), the
+/// probe's import leaving all 5 000 paths selected and the pointer over the canvas. Measured on
+/// 2026-11-19: 42 ms at rest, 39 ms zooming and 36 ms panning before the selection pass (about
+/// 30 ms were lookups over the selection, `specs/0126-performance-pass` plan), 13, 9 and 5 ms
+/// after it; held to the budgets of the page with nothing selected.
+const REST_BUDGET: Duration = Duration::from_millis(20);
+const ZOOM_BUDGET: Duration = Duration::from_millis(15);
+const PAN_BUDGET: Duration = Duration::from_millis(10);
 
-#[test]
-fn frame_cost_of_the_perf_page_by_phase() {
-    let mut session = perf_session();
+/// The same page with nothing selected: only the artwork (measured 2026-11-19: 13 ms at rest,
+/// 9 ms zooming, 4 ms panning), held to about 1.5 times that.
+const NONE_REST_BUDGET: Duration = Duration::from_millis(20);
+const NONE_ZOOM_BUDGET: Duration = Duration::from_millis(15);
+const NONE_PAN_BUDGET: Duration = Duration::from_millis(10);
+
+/// Rest, ten Ctrl+wheel notches about the canvas centre (one per frame, as the probe's
+/// wheel-zoom, which ends about four times closer than the fit), then a middle-button drag on
+/// a circle of 150 px at that zoom (as the probe's pan-drag).
+fn rest_zoom_pan(session: &mut Session, label: &str, budgets: [Duration; 3]) {
     // A first frame warms the caches the document read fills.
     let _ = session.frame_draw_list();
-    let rest = measure(&mut session, 5, |_, _| {});
-    report("rest", &rest, REST_BUDGET);
-    // Ctrl+wheel about the canvas centre, ten notches in, one per frame, as the probe's
-    // wheel-zoom (which ends about four times closer than the fit).
-    let zoom = measure(&mut session, 10, |session, _| {
+    let rest = measure(session, 5, |_, _| {});
+    report(&format!("{label} rest"), &rest, budgets[0]);
+    let zoom = measure(session, 10, |session, _| {
         session.wheel(0.0, -100.0, 640.0, 400.0, false, true);
     });
-    report("zoom", &zoom, ZOOM_BUDGET);
+    report(&format!("{label} zoom"), &zoom, budgets[1]);
     println!("zoomed to scale {:.2}", session.view().scale());
-    // A middle-button drag on a circle of 150 px at that zoom, as the probe's pan-drag.
     session.begin_pan(790.0, 400.0);
-    let pan = measure(&mut session, 10, |session, frame| {
+    let pan = measure(session, 10, |session, frame| {
         let angle = f64::from(frame + 1) / 30.0;
         session.pan_to(640.0 + 150.0 * angle.cos(), 400.0 + 150.0 * angle.sin());
     });
     session.end_pan();
-    report("pan", &pan, PAN_BUDGET);
+    report(&format!("{label} pan"), &pan, budgets[2]);
+}
+
+#[test]
+fn frame_cost_of_the_perf_page_by_phase_all_selected() {
+    let mut session = perf_session();
+    assert_eq!(
+        session.selected_object_count(),
+        5000,
+        "the import selects its paths"
+    );
+    rest_zoom_pan(
+        &mut session,
+        "all selected",
+        [REST_BUDGET, ZOOM_BUDGET, PAN_BUDGET],
+    );
+}
+
+#[test]
+fn frame_cost_of_the_perf_page_by_phase_none_selected() {
+    let mut session = perf_session();
+    session.escape();
+    assert_eq!(
+        session.selected_object_count(),
+        0,
+        "Escape clears the selection"
+    );
+    rest_zoom_pan(
+        &mut session,
+        "none selected",
+        [NONE_REST_BUDGET, NONE_ZOOM_BUDGET, NONE_PAN_BUDGET],
+    );
 }

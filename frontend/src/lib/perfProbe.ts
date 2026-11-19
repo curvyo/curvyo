@@ -484,19 +484,29 @@ async function run(canvas: HTMLCanvasElement, getSession: () => WasmSession | nu
   const cy = rect.top + rect.height / 2;
   await mark("idle-5000", () => sleep(30_000));
   // Wheel zoom: 60 events per second, 30 notches in, 30 out, around the page centre.
-  await mark("wheel-zoom", () =>
+  const wheelZoom = () =>
     every(16, 5, (index) => {
       const sign = Math.floor(index / 30) % 2 === 0 ? -1 : 1;
       canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: sign * 100, clientX: cx, clientY: cy, ctrlKey: true, bubbles: true, cancelable: true }));
-    }),
-  );
+    });
   // Pan drag: middle button held, the pointer on a circle of 150 px, 60 moves per second.
-  await mark("pan-drag", async () => {
+  const panDrag = async () => {
     const at = (angle: number) => ({ clientX: cx + 150 * Math.cos(angle), clientY: cy + 150 * Math.sin(angle), pointerId: 1, pointerType: "mouse", isPrimary: true, bubbles: true, cancelable: true });
     canvas.dispatchEvent(new PointerEvent("pointerdown", { ...at(0), button: 1, buttons: 4 }));
     await every(16, 5, (index) => canvas.dispatchEvent(new PointerEvent("pointermove", { ...at(index / 30), button: -1, buttons: 4 })));
     canvas.dispatchEvent(new PointerEvent("pointerup", { ...at(0), button: 1, buttons: 0 }));
-  });
+  };
+  // The import leaves its 5 000 paths selected: zoom and pan with that selection, then the same
+  // with nothing selected (Escape), so the cost of the selection's decorations stands apart.
+  send({ event: "selection", selected: session.selection_count() });
+  await mark("wheel-zoom", wheelZoom);
+  await mark("pan-drag", panDrag);
+  const escaped = session.key_down("Escape", false, false, false, false, false, false, performance.now());
+  session.fit_document();
+  send({ event: "selection", selected: session.selection_count(), escape: escaped });
+  await sleep(1000);
+  await mark("wheel-zoom-none", wheelZoom);
+  await mark("pan-drag-none", panDrag);
   send({ event: "done" });
 }
 
