@@ -97,6 +97,8 @@ The job block's state line (`0064` section 8 frame, 12px, wraps, `role="status"`
 | The connector refuses Home (a job started meanwhile) | "Connector busy" (existing text) | failure | alert |
 | No answer to the press in 5 s | "Timed out" (existing text) | failure | alert |
 | The controller is lost while homing | "Lost the controller" (existing `0127` text) | failure | alert |
+| Amended by `0134`: a send and start from the page that did not start, while the job is still `Ready` | "Ready: <name>, <n> lines, <size>" and under it "Not started: <reason>" | the second line in the failure look (`CircleAlert`, `--destructive`) | alert, once, with the Ready line |
+| Amended by `0134`: a member's start (`0128`) | "Waiting for <owner> to confirm" | neutral | polite |
 
 - **The counts line names a job only while the connector holds it** (the status carries it), or next to the refusal of a chosen file (`0064` section 8). After an alarm dropped the job, and while homing without a job, it names none (UX review 2026-11-19, tester finding F2).
 - **Texts reused word for word** from the connector's GRBL table as built for `0129` (`texts.rs`, `grbl_home_first.rs`), so a failed homing reads the same whether it came from the Home button or from a job's own `$H` (criterion 4). The only difference: outside a job there is no line number, so `error:5` reads "Homing is not enabled (error 5)" instead of "Failed at line 4: Homing is not enabled (error 5)". The alarm's first text stands until the alarm clears (`0127` V11).

@@ -1,6 +1,6 @@
 # Fix: a Pause pressed while the machine homes is forgotten
 
-Status: Ready (the build waits for PR #399, Homing and Machine controls, to be merged)
+Status: Done (PR #420)
 Kind: Bug (branch `fix/pause-while-homing`)
 Priority: Must (safety: a Pause the maker pressed must never be lost)
 Origin: Customer, test of PR #399 on the real laser, 2026-11-19. Translated: "When you home and press pause, it forgets the pause. Expectation: it should go directly into pause."
