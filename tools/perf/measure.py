@@ -2,15 +2,41 @@
 """Measures the native Curvyo app (Tauri on WebKitGTK) under Xvfb: process CPU and RSS from /proc
 every second, joined with the frame counters of the page probe (`frontend/src/lib/perfProbe.ts`).
 Standard library only. See README.md. Usage: tools/perf/measure.py [--no-build] [--out DIR]
-[--desktop] [--ablate [VARIANT,...] | --gpu-variants [VARIANT,...] | --gl-bench]
+[--desktop] [--ablate [VARIANT,...] | --gpu-variants [VARIANT,...] | --gl-bench | --page-only]
+`--page-only` also runs on Windows (WebView2) and macOS (WKWebView); every other mode is Linux only.
 """
-import argparse, asyncio, base64, hashlib, json, os, re, signal, struct, subprocess, sys, time
+import argparse, asyncio, base64, csv, hashlib, io, json, os, platform, re, shutil, signal, struct, subprocess, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PORT = 47126
-TICKS = os.sysconf("SC_CLK_TCK")
-PAGE = os.sysconf("SC_PAGE_SIZE")
+LINUX = sys.platform.startswith("linux")
+WINDOWS = os.name == "nt"
+MAC = sys.platform == "darwin"
+TICKS = os.sysconf("SC_CLK_TCK") if LINUX else 100
+PAGE = os.sysconf("SC_PAGE_SIZE") if LINUX else 4096
+
+
+def run(command, cwd, env=None):
+    """Runs a build step; `shutil.which` finds `npm.cmd` and `npx.cmd` on Windows."""
+    command = [shutil.which(command[0]) or command[0], *command[1:]]
+    print("+", " ".join(command), file=sys.stderr, flush=True)
+    subprocess.run(command, cwd=cwd, env=env, check=True)
+
+
+def build_wasm(features="perf"):
+    """`frontend/scripts/build-wasm.sh` without bash (Windows has none): cargo build of the wasm
+    crate, then the `wasm-bindgen` CLI, which must match the Cargo.lock version exactly."""
+    wanted = lock_versions("wasm-bindgen").split()[-1]
+    try:
+        have = subprocess.run(["wasm-bindgen", "--version"], capture_output=True, text=True, check=True).stdout.split()[-1]
+    except (OSError, subprocess.CalledProcessError):
+        sys.exit(f"wasm-bindgen CLI not found: cargo install wasm-bindgen-cli --version {wanted}")
+    if have != wanted:
+        sys.exit(f"wasm-bindgen CLI {have} does not match Cargo.lock {wanted}: cargo install wasm-bindgen-cli --version {wanted} --force")
+    run(["cargo", "build", "--target", "wasm32-unknown-unknown", "--release", "-p", "curvyo-editor-wasm", *(["--features", features] if features else [])], ROOT)
+    wasm = ROOT / "target" / "wasm32-unknown-unknown" / "release" / "curvyo_editor_wasm.wasm"
+    run(["wasm-bindgen", str(wasm), "--target", "web", "--out-dir", str(ROOT / "frontend" / "src" / "wasm-bindings"), "--out-name", "curvyo_editor_wasm"], ROOT)
 
 
 def build():
@@ -18,11 +44,10 @@ def build():
     # than the page leave the render loop dead (zero counters in every scenario).
     # The `perf` feature compiles in the GPU-path switches of `--gpu-variants`
     # (`curvyo-editor-wasm/src/gpu_variant.rs`); without them every variant runs as baseline.
-    subprocess.run(["npm", "run", "build:wasm"], cwd=ROOT / "frontend", env=dict(os.environ, CURVYO_WASM_FEATURES="perf"), check=True)
-    env = dict(os.environ, VITE_CURVYO_PERF=f"ws://127.0.0.1:{PORT}")
-    subprocess.run(["npx", "vite", "build", "--outDir", "dist-perf", "--emptyOutDir"], cwd=ROOT / "frontend", env=env, check=True)
-    env = dict(os.environ, TAURI_CONFIG=json.dumps({"build": {"frontendDist": "../frontend/dist-perf"}}))
-    subprocess.run(["cargo", "build", "-p", "curvyo-app"], cwd=ROOT, env=env, check=True)
+    build_wasm()
+    frontend = ROOT / "frontend"
+    run(["npx", "vite", "build", "--outDir", "dist-perf", "--emptyOutDir"], frontend, dict(os.environ, VITE_CURVYO_PERF=f"ws://127.0.0.1:{PORT}"))
+    run(["cargo", "build", "-p", "curvyo-app"], ROOT, dict(os.environ, TAURI_CONFIG=json.dumps({"build": {"frontendDist": "../frontend/dist-perf"}})))
 
 
 def descendants(root_pid):
@@ -49,10 +74,77 @@ def cpu_of(stat):
     return stat[stat.index("(") + 1:stat.rindex(")")], (int(fields[11]) + int(fields[12])) / TICKS
 
 
+def parse_cputime(text):
+    """Seconds of a `ps` cputime, `[dd-][hh:]mm:ss.ss`."""
+    days, _, rest = text.rpartition("-")
+    seconds = 0.0
+    for part in rest.split(":"):
+        seconds = seconds * 60 + float(part)
+    return seconds + 86400 * int(days or 0)
+
+
+def process_table():
+    """{pid: (ppid, name, cpu seconds, rss MiB)} of every process, off Linux (macOS: `ps`; Windows:
+    PowerShell's CIM, whose times are 100 ns units); {} when the tool fails (the CPU columns then
+    read n/a, the run goes on)."""
+    table = {}
+    try:
+        if MAC:
+            out = subprocess.run(["ps", "-A", "-o", "pid=,ppid=,cputime=,rss=,comm="], capture_output=True, text=True, check=True, timeout=10).stdout
+            for line in out.splitlines():
+                pid, ppid, cpu, rss, comm = line.split(None, 4)
+                table[int(pid)] = (int(ppid), Path(comm).name, parse_cputime(cpu), int(rss) / 1024)
+        elif WINDOWS:
+            command = ("Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,KernelModeTime,UserModeTime,WorkingSetSize"
+                       " | ConvertTo-Csv -NoTypeInformation")
+            out = subprocess.run(["powershell", "-NoProfile", "-Command", command], capture_output=True, text=True, check=True, timeout=30).stdout
+            for row in csv.DictReader(io.StringIO(out)):
+                table[int(row["ProcessId"])] = (int(row["ParentProcessId"]), row["Name"], (int(row["KernelModeTime"] or 0) + int(row["UserModeTime"] or 0)) / 1e7,
+                                                int(row["WorkingSetSize"] or 0) / 2**20)
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError):
+        return {}
+    return table
+
+
+# macOS: WebKit's web, GPU and network processes are XPC services of launchd, not children of the
+# app. The ones that appeared after the app's launch are counted (`sample`), so a Safari that
+# was open before does not count; one opened during the run would.
+MAC_WEBKIT = "com.apple.WebKit."
+mac_known = set()
+
+
+def sample_portable(root_pid):
+    """The `sample` of macOS and Windows: (cpu seconds, rss MiB, {name: cpu seconds}, {}), None
+    when the process table is unavailable."""
+    table = process_table()
+    if not table:
+        return None
+    children = {}
+    for pid, (ppid, *_rest) in table.items():
+        children.setdefault(ppid, []).append(pid)
+    tree, todo = set(), [root_pid]
+    while todo:
+        pid = todo.pop()
+        if pid not in tree:
+            tree.add(pid)
+            todo += children.get(pid, [])
+    if MAC:
+        tree |= {pid for pid, (_, name, _c, _r) in table.items() if name.startswith(MAC_WEBKIT) and pid not in mac_known}
+    cpu, rss, by_name = 0.0, 0.0, {}
+    for pid in tree:
+        _, name, seconds, mib = table[pid] if pid in table else (0, "?", 0.0, 0.0)
+        cpu, rss = cpu + seconds, rss + mib
+        by_name[name] = by_name.get(name, 0.0) + seconds
+    return cpu, rss, by_name, {}
+
+
 def sample(root_pid, threads=False):
     """(cpu seconds, rss MiB, {process name: cpu seconds}, {thread name: cpu seconds}) summed over
     the app's process tree; the threads (of the WebKit web process only, named like
-    `WebProc/<thread>`, those of one name summed) only when `threads`."""
+    `WebProc/<thread>`, those of one name summed) only when `threads`. Off Linux see
+    `sample_portable`, which may give None."""
+    if not LINUX:
+        return sample_portable(root_pid)
     cpu, rss, by_name, by_thread = 0.0, 0.0, {}, {}
     for pid in descendants(root_pid):
         try:
@@ -136,29 +228,43 @@ async def launch(args, out, order, extra_env=None, interval=1.0, log_name="event
             pass
 
     server = await asyncio.start_server(on_client, "127.0.0.1", PORT)
-    app = ROOT / "target" / "debug" / "curvyo-app"
-    # xvfb-run keeps Xvfb alive for the app's lifetime; the app is its direct child.
-    command = [str(app)] if args.desktop else ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", str(app)]
-    env = dict(os.environ) if args.desktop else dict(os.environ, GDK_BACKEND="x11", WEBKIT_DISABLE_COMPOSITING_MODE=os.environ.get("WEBKIT_DISABLE_COMPOSITING_MODE", "0"))
+    app = ROOT / "target" / "debug" / ("curvyo-app.exe" if WINDOWS else "curvyo-app")
+    if not app.exists():
+        server.close()
+        sys.exit(f"{app} not found (build failed, or --no-build without an earlier build)")
+    # Linux: xvfb-run keeps Xvfb alive for the app's lifetime; the app is its direct child.
+    # Windows and macOS: the app itself, on the real display.
+    xvfb_wanted = LINUX and not args.desktop
+    command = ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", str(app)] if xvfb_wanted else [str(app)]
+    env = dict(os.environ, GDK_BACKEND="x11", WEBKIT_DISABLE_COMPOSITING_MODE=os.environ.get("WEBKIT_DISABLE_COMPOSITING_MODE", "0")) if xvfb_wanted else dict(os.environ)
     env.update(extra_env or {})
-    xvfb = subprocess.Popen(command, cwd=ROOT, start_new_session=True, env=env)
+    if MAC:
+        mac_known.clear()
+        mac_known.update(pid for pid, (_, name, _c, _r) in process_table().items() if name.startswith(MAC_WEBKIT))
+    xvfb = subprocess.Popen(command, cwd=ROOT, start_new_session=not WINDOWS, env=env)
     t0 = time.time()
     try:
         while not state["done"].is_set() and time.time() - t0 < args.timeout:
             if xvfb.poll() is not None:
                 print("app exited early", file=sys.stderr)
                 break
-            tree = next((p for p in descendants(xvfb.pid) if "curvyo-app" in Path(f"/proc/{p}/cmdline").read_text().replace("\0", " ").split(" ")[0]), None)
-            if tree and not state["env"] and not args.desktop:
+            if LINUX:
+                tree = next((p for p in descendants(xvfb.pid) if "curvyo-app" in Path(f"/proc/{p}/cmdline").read_text().replace("\0", " ").split(" ")[0]), None)
+            else:
+                tree = xvfb.pid
+            if tree and not state["env"] and xvfb_wanted:
                 state["env"] = display_env(tree)
             if tree:
-                cpu, rss, names, by_thread = sample(tree, threads)
-                procs.append({"wall": time.time(), "cpu": cpu, "rss": rss, "names": names, "threads": by_thread})
-                if facts is not None and "libs" not in facts and any(e["event"] == "platform" for e in events):
+                # Off Linux the process table is a subprocess: not in the event loop's thread.
+                got = sample(tree, threads) if LINUX else await asyncio.to_thread(sample, tree, threads)
+                if got:
+                    cpu, rss, names, by_thread = got
+                    procs.append({"wall": time.time(), "cpu": cpu, "rss": rss, "names": names, "threads": by_thread})
+                if LINUX and facts is not None and "libs" not in facts and any(e["event"] == "platform" for e in events):
                     facts.update(gl_facts(tree))
             await asyncio.sleep(interval)
     finally:
-        os.killpg(xvfb.pid, signal.SIGTERM)
+        terminate(xvfb)
         server.close()
         await server.wait_closed()
         log.close()
@@ -167,7 +273,21 @@ async def launch(args, out, order, extra_env=None, interval=1.0, log_name="event
         if xvfb.poll() is not None:
             break
         await asyncio.sleep(0.1)
+    else:
+        xvfb.kill()
     return events, procs, state["done"].is_set()
+
+
+def terminate(process):
+    """Ends the app and everything it started: Windows `taskkill /T /F` (WebView2's processes
+    are its children), elsewhere SIGTERM to the process group (`start_new_session`)."""
+    if WINDOWS:
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True)
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
 
 
 async def main():
@@ -185,11 +305,18 @@ async def main():
                         help="only the empty-page pan, once per variant of our wgpu path (default: all): " + ", ".join(GPU_ORDER))
     parser.add_argument("--gl-bench", action="store_true",
                         help="GL micro benchmarks in one launch: our wgpu canvas, raw WebGL2, 2D and CSS-transform canvases at 1, 1/2, 1/4 size")
+    parser.add_argument("--page-only", action="store_true",
+                        help="Windows, macOS and Linux: only idle-empty, empty-pan and empty-zoom (no 5 000-path import), one table with the platform strings")
     args = parser.parse_args()
+    if not LINUX and not args.page_only:
+        sys.exit("only --page-only runs off Linux")
     if not args.no_build:
         build()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    if args.page_only:
+        await page_only(args, out)
+        return
     if args.ablate:
         await ablate(args, out)
         return
@@ -208,6 +335,71 @@ async def main():
     report(events, procs, out)
     if args.desktop:
         print("lag: not measured in desktop mode (no screenshots)")
+
+
+PAGE_SCENARIOS = ["idle-empty", "empty-pan", "empty-zoom"]
+
+
+async def page_only(args, out):
+    """The empty page's three scenarios on any platform, one table (`--page-only`)."""
+    events, procs, done = await launch(args, out, {"mode": "page-only"}, interval=1.0 if LINUX else 2.0, log_name="page-only.ndjson")
+    json.dump(procs, open(out / "page-only-procs.json", "w"))
+    print_page_platform(events, args)
+    if not done:
+        print(f"timed out or the app exited before scenario {unfinished(events, PAGE_SCENARIOS)} ended (--timeout {args.timeout} s)")
+    print_page_table(events, procs)
+
+
+def print_page_platform(events, args):
+    """What ran: the OS, the web view's user agent, the WebGL renderer and wgpu's adapter."""
+    info = next((e for e in events if e["event"] == "platform"), None)
+    print(f"\nplatform: sys.platform {sys.platform}; {platform.platform()}; python {platform.python_version()}; {lock_versions('tauri', 'wry')}"
+          + ("; Xvfb (software GL)" if LINUX and not args.desktop else ""))
+    if not info:
+        print("  (the page sent no platform strings)")
+        return
+    print(f"  navigator.userAgent: {info['userAgent']}")
+    for label, strings in (("editor canvas", info.get("editor")), ("scratch canvas", info.get("scratch"))):
+        if strings:
+            print(f"  WebGL RENDERER ({label}): {strings['unmaskedRenderer']!r}, VENDOR {strings['unmaskedVendor']!r}, {strings['version']}")
+    print("  wgpu gpu_info: " + "; ".join(info.get("wgpu", "(none)").splitlines()))
+
+
+def print_page_table(events, procs):
+    """One row per scenario: frame pacing from the page, CPU and RSS of the app's process tree."""
+    marks = {}
+    for e in events:
+        if e["event"] == "scenario":
+            marks.setdefault(e["name"], {})[e["state"]] = e
+    print(f"\n{'scenario':<11} {'s':>4} {'rAF p50':>7} {'p95':>6} {'p99':>6} {'>33ms':>5} {'submit/s':>8} {'render ms':>9} {'backing':>10} {'dpr':>4} {'window':>9} {'cpu %core':>9} {'rss MiB':>7}")
+    for name in PAGE_SCENARIOS:
+        m = marks.get(name, {})
+        if "end" not in m:
+            print(f"{name:<11} (no data)")
+            continue
+        rows = [e for e in events if e["event"] == "second" and e["scenario"] == name]
+        n = max(len(rows), 1)
+        intervals = [i for r in rows for i in r.get("intervals", [])]
+        built = sum(r["built"] for r in rows)
+        window = [p for p in procs if m["start"]["wall"] <= p["wall"] <= m["end"]["wall"]]
+        cpu, rss = ("n/a", "n/a")
+        if len(window) >= 2 and window[-1]["wall"] > window[0]["wall"]:
+            cpu = f"{100 * (window[-1]['cpu'] - window[0]['cpu']) / (window[-1]['wall'] - window[0]['wall']):.1f}"
+            rss = f"{max(p['rss'] for p in window):.0f}"
+        end = m["end"]
+        backing = "x".join(str(v) for v in end.get("backing", ["?", "?"]))
+        win = "x".join(str(v) for v in end.get("window", ["?", "?"]))
+        print(f"{name:<11} {m['end']['wall'] - m['start']['wall']:4.0f} {quantile(intervals, 0.5):7.1f} {quantile(intervals, 0.95):6.1f} {quantile(intervals, 0.99):6.1f} "
+              f"{sum(1 for i in intervals if i > 33):5d} {sum(r['submitted'] for r in rows) / n:8.1f} {sum(r['renderMs'] for r in rows) / max(built, 1):9.2f} "
+              f"{backing:>10} {end.get('dpr', 0):4g} {win:>9} {cpu:>9} {rss:>7}")
+        if built == 0:
+            print(f"  WARNING: render loop not running ({name}: built/s = 0)")
+    for e in events:
+        if e["event"] == "error":
+            print(f"page error in {e['scenario']}: {e['message'][:300]}")
+    print("rAF = interval between animation frames in ms; >33ms = count of intervals above that; submit/s = frames the app handed to the GPU per s; "
+          "render ms = main-thread ms per render-loop tick; backing = canvas device px, window = CSS px; cpu = the app's process tree in % of one core "
+          "(n/a when the platform tool failed; macOS counts new com.apple.WebKit.* processes). Raw: page-only.ndjson, page-only-procs.json")
 
 
 # The ablation variants in run order: the page's own (`frontend/src/lib/perfAblate.ts`), then two
@@ -736,10 +928,10 @@ def lag(events, out):
               + ", ".join(f"{m:.1f}" for m in moves) + f" moves; median {quantile(moves, 0.5):.1f} (rest offset {base} px)")
 
 
-def unfinished(events):
+def unfinished(events, names=None):
     """The first scenario of the probe's list that sent no end event."""
     ended = {e["name"] for e in events if e["event"] == "scenario" and e["state"] == "end"}
-    return next((name for name in SCENARIOS if name not in ended), "(all ended)")
+    return next((name for name in names or SCENARIOS if name not in ended), "(all ended)")
 
 
 def report(events, procs, out):
