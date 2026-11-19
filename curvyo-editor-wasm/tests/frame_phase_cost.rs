@@ -146,17 +146,20 @@ const fn ms(n: u64) -> Duration {
 /// 5 000 paths, the probe's import leaving them all selected and the pointer over the canvas.
 /// Measured on 2026-11-19: 42 ms at rest, 39 ms zooming and 36 ms panning before the selection
 /// pass (about 30 ms were lookups over the selection, `specs/0126-performance-pass` plan), 13,
-/// 9 and 5 ms after it, 14 ms panning at the fit; held to the budgets of the page with nothing
-/// selected.
-const BUDGETS_5000: Budgets = Budgets([ms(20), ms(20), ms(15), ms(10)]);
+/// 9 and 5 ms after it, 14 ms panning at the fit; with the artwork kept while only the view
+/// moves and the cull boxes kept per read (`session/artwork_memo.rs`): 7 ms at rest, 5 ms
+/// panning at the fit, 8 ms zooming, 3 ms panning; held to about 1.5 to 2 times that.
+const BUDGETS_5000: Budgets = Budgets([ms(12), ms(9), ms(13), ms(6)]);
 
 /// 20 000 paths (the fit shows 8 201 of them: the page is four times as tall). Measured on
-/// 2026-11-19: 37 ms at rest and panning at the fit, 23 ms zooming, 18 ms panning (11 ms of
-/// it work over all objects whatever the view), held to about 1.5 times that.
-const BUDGETS_20000: Budgets = Budgets([ms(55), ms(55), ms(35), ms(27)]);
+/// 2026-11-19: 37 ms at rest and 34-37 ms panning at the fit, 23 ms zooming, 17-19 ms panning
+/// (11 ms of it work over all objects whatever the view); with the memo 18-21 ms at rest (a
+/// repeat of a view), 32-35 ms panning at the fit (objects enter and leave the view in every
+/// frame, so the kept list is never drawn), 17-19 ms zooming, 11-13 ms panning.
+const BUDGETS_20000: Budgets = Budgets([ms(32), ms(52), ms(28), ms(20)]);
 
 /// Rest; a middle-button drag on a circle of 150 px at the fit (the scale unchanged, the
-/// whole page width in view); ten Ctrl+wheel notches about the canvas centre (one per frame,
+/// whole page width in view) and a wheel pan there; ten Ctrl+wheel notches about the canvas centre (one per frame,
 /// as the probe's wheel-zoom, which ends about four times closer than the fit), then a
 /// middle-button drag on a circle of 150 px at that zoom (as the probe's pan-drag).
 fn rest_pan_zoom_pan(session: &mut Session, label: &str, budgets: &Budgets) {
@@ -177,6 +180,12 @@ fn rest_pan_zoom_pan(session: &mut Session, label: &str, budgets: &Budgets) {
         "a pan keeps the scale"
     );
     report(&format!("{label} fit pan"), &fit_pan, budgets.0[1]);
+    // A trackpad or wheel pan at the fit: 12 px a frame, the pointer still.
+    let wheel_pan = measure(session, 10, |session, frame| {
+        let dy = if frame < 5 { 12.0 } else { -12.0 };
+        session.wheel(0.0, dy, 640.0, 400.0, false, false);
+    });
+    report(&format!("{label} wheel pan"), &wheel_pan, budgets.0[1]);
     let zoom = measure(session, 10, |session, _| {
         session.wheel(0.0, -100.0, 640.0, 400.0, false, true);
     });

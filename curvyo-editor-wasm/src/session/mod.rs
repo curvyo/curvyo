@@ -29,6 +29,7 @@ mod align_tests;
 mod arc_tests;
 #[cfg(test)]
 mod arrange_grid_tests;
+mod artwork_memo;
 mod background;
 mod background_view;
 mod boolean;
@@ -566,6 +567,8 @@ pub struct Session {
     width_outlines: std::cell::RefCell<width_outlines::WidthOutlines>,
     /// The group box of the selection over the session's read of the objects (`group_view.rs`).
     group_memo: std::cell::RefCell<group_view::GroupMemo>,
+    /// The cull boxes and the artwork of the session's read between frames (`artwork_memo.rs`).
+    artwork_memo: std::cell::RefCell<artwork_memo::ArtworkMemo>,
     /// The open Find centre lines bar with its preview (`centre_lines.rs`).
     centre: Option<centre_lines_bar::CentreBar>,
     /// `window.devicePixelRatio` as of the last attach or resize, so the
@@ -768,6 +771,7 @@ impl Session {
             spiro_cache: std::cell::RefCell::default(),
             width_outlines: std::cell::RefCell::default(),
             group_memo: std::cell::RefCell::default(),
+            artwork_memo: std::cell::RefCell::default(),
             centre: None,
             device_pixel_ratio: 1.0,
             button_down: false,
@@ -885,6 +889,7 @@ impl Session {
             spiro_cache: std::cell::RefCell::default(),
             width_outlines: std::cell::RefCell::default(),
             group_memo: std::cell::RefCell::default(),
+            artwork_memo: std::cell::RefCell::default(),
             centre: None,
             device_pixel_ratio: 1.0,
             button_down: false,
