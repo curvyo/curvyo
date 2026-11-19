@@ -256,6 +256,10 @@ pub enum Message {
         /// "Lost the controller at line 120", "Stopping", "Controller state: Door").
         #[serde(default, skip_serializing_if = "Option::is_none")]
         detail: Option<String>,
+        /// A `Pause` was taken and waits for the controller's first moment to hold (a job's
+        /// `$H` runs, `specs/0133`); left out when false.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        pause_pending: bool,
     },
     /// A refusal that keeps the connection open, except where stated.
     Error {

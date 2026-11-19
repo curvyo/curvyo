@@ -104,6 +104,7 @@ fn all_messages() -> Vec<Message> {
             position: None,
             alarm: None,
             detail: None,
+            pause_pending: false,
         },
         Message::Error {
             code: ErrorCode::Malformed,
@@ -373,6 +374,7 @@ fn p3_status_nulls_are_present() {
         position: None,
         alarm: None,
         detail: None,
+        pause_pending: false,
     })
     .unwrap();
     let v: Value = serde_json::from_str(&text).unwrap();
@@ -396,6 +398,7 @@ fn p3_status_with_job_and_position_round_trips() {
         position: Some([Millimetres(1.5), Millimetres(-2.25), Millimetres(0.0)]),
         alarm: None,
         detail: None,
+        pause_pending: false,
     };
     let text = encode(&msg).unwrap();
     assert_eq!(decode(&text).unwrap(), msg);

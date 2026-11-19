@@ -89,6 +89,9 @@ pub enum Event {
         /// The sentence the app shows ("Homing is not enabled (error 5)").
         detail: String,
     },
+    /// The controller cannot hold now (a job's `$H` runs) and holds at its first safe moment;
+    /// `Running` keeps the pause pending until `Held` (`specs/0133` P3).
+    PauseDeferred,
 }
 
 /// What the transport has to tell the controller.
@@ -157,6 +160,8 @@ pub struct Machine {
     word: Option<String>,
     /// A stop was sent and waits for the controller.
     stop_pending: bool,
+    /// A pause was taken and waits for the controller's first moment to hold (`specs/0133`).
+    pause_pending: bool,
     /// The controller's laser mode is off: `SubmitJob` is refused.
     laser_off: bool,
     /// The controller's laser mode is unknown: `SubmitJob` is refused.
@@ -199,6 +204,7 @@ impl Machine {
             sticky: false,
             word: None,
             stop_pending: false,
+            pause_pending: false,
             laser_off: false,
             laser_unknown: false,
             waiting: Waiting::Start,
@@ -273,6 +279,7 @@ impl Machine {
             position: self.position,
             alarm: self.alarm.clone().filter(|_| self.state != State::Homing),
             detail: self.shown_detail(),
+            pause_pending: self.pause_pending,
         }
     }
 
@@ -314,6 +321,7 @@ impl Machine {
         if !matches!(state, State::Running | State::Paused | State::Homing) {
             self.stop_pending = false;
         }
+        self.pause_pending &= state == State::Running;
         self.state = state;
         out.messages.push(self.status());
     }

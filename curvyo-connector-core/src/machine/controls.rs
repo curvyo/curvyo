@@ -1,7 +1,7 @@
 //! How the job machine takes the job controls and the events of the controller side.
 
 use super::{ControllerCommand, Event, Machine, Output, Waiting, count};
-use crate::message::{JobResult, Message, State};
+use crate::message::{ErrorCode, JobResult, Message, State};
 
 impl Machine {
     /// Pause, Resume or Stop from the app. With `confirm`, the state changes only when the
@@ -9,7 +9,7 @@ impl Machine {
     pub(super) fn control(&mut self, message: &Message, out: &mut Output) {
         match (message, self.state) {
             (Message::Pause, State::Running) => {
-                if !self.stop_pending {
+                if !self.stop_pending && !self.pause_pending {
                     out.commands.push(ControllerCommand::Pause);
                     if !self.confirm {
                         self.set(State::Paused, out);
@@ -24,10 +24,17 @@ impl Machine {
                     }
                 }
             }
+            (Message::Resume, State::Running) if self.pause_pending && !self.stop_pending => {
+                // Only cancels the pending pause: the job never stood still (`specs/0133` P3).
+                self.pause_pending = false;
+                out.messages.push(self.status());
+                out.commands.push(ControllerCommand::Resume);
+            }
             (Message::Stop, State::Running | State::Paused) => {
                 if self.stop_pending {
                     return;
                 }
+                self.pause_pending = false;
                 out.commands.push(ControllerCommand::Stop);
                 if self.confirm {
                     self.stop_pending = true;
@@ -40,6 +47,9 @@ impl Machine {
                         out,
                     );
                 }
+            }
+            (Message::Pause, State::Homing) => {
+                Self::error(out, ErrorCode::WrongState, "No job to pause");
             }
             (Message::Stop, State::Homing) => self.stop_homing(out),
             (Message::Stop, State::AwaitingLocalStart) if self.waiting == Waiting::Home => {
@@ -187,6 +197,12 @@ impl Machine {
             }
             Event::Held if self.state == State::Running && !self.stop_pending => {
                 self.set(State::Paused, out);
+            }
+            Event::PauseDeferred
+                if self.state == State::Running && !self.stop_pending && !self.pause_pending =>
+            {
+                self.pause_pending = true;
+                out.messages.push(self.status());
             }
             Event::Resumed if self.state == State::Paused && !self.stop_pending => {
                 self.set(State::Running, out);

@@ -91,6 +91,7 @@ fn m1_home_and_homing_match_their_golden_files() {
                 position: None,
                 alarm: None,
                 detail: None,
+                pause_pending: false,
             },
         ),
         (
@@ -101,6 +102,7 @@ fn m1_home_and_homing_match_their_golden_files() {
                 position: None,
                 alarm: None,
                 detail: None,
+                pause_pending: false,
             },
         ),
     ];
