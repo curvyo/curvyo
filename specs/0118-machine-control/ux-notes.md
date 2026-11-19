@@ -42,12 +42,12 @@ Every button is the `0064` symbol button: `rounded-md`, 16px Lucide glyph at 1.5
 | Home | `House` | "Home"; disabled: line 2 the cause (section 4) | section 4 |
 | Send job... | `FileUp` (W5; was `Upload`) | "Send job..." | `0064` section 7 table, plus off while Homing |
 | Start / Resume | `Play` | "Start" / "Resume" | `0064` section 7 table, plus off while Homing |
-| Pause | `Pause` | "Pause" | `0064` section 7 table (off while Homing) |
+| Pause | `Pause` | "Pause" | `0064` section 7 table (off while Homing, except while a job runs its own `$H`; amended by 0133) |
 | Stop | `Square` | "Stop" | `0064` section 7 table, **plus on while Homing** (criterion 5, `0127` G9) |
 | Unlock | `LockOpen` | "Unlock" | `0127` section 6: only in Alarm, at the right of the alarm line in the job block, hidden otherwise |
 
 - **Not possible = greyed in place**, `aria-disabled`, 40% opacity, Tab stop (within the roving toolbar) and tooltip kept, a press does nothing and sends nothing: the recorded `0064` exception to "Hidden, not disabled", now for the Machine controls toolbar.
-- **Busy** as `0064` section 3: `aria-busy="true"`, `LoaderCircle` turning once a second (also under `prefers-reduced-motion`), from the press until the connector's answer or 5 s ("Timed out"); Pause, Resume, Stop and Unlock stay busy until the machine confirms (`0127` section 7). While one button waits, the others are greyed as built.
+- **Busy** as `0064` section 3: `aria-busy="true"`, `LoaderCircle` turning once a second (also under `prefers-reduced-motion`), from the press until the connector's answer or 5 s ("Timed out"); Pause, Resume, Stop and Unlock stay busy until the machine confirms (`0127` section 7). While one button waits, the others are greyed as built (not during a pending pause; amended by 0133).
 - **Stop never asks, is never armed, and is never disabled while anything can move**: Running, Paused, AwaitingLocalStart, Ready (discards the held job), Homing. Escape never sends Stop or Pause; no global chord for any machine command (`0064` section 3; a laser must not move from a stray key).
 - **Send job...** opens the OS file dialog as built (`0064` section 7): title "Send job", same filters, same refusals. Its press failures read in the group's state line.
 
@@ -172,7 +172,7 @@ The Connector group keeps, in this order: heading row "Connector" with Test conn
 - **W3** Toolbar order Home | Send job..., Start / Resume, Pause, Stop, with an 8px gap after Home for the later jog and frame buttons.
 - **W4** Toolbar tooltips open on top (the footer is at the panel's bottom).
 - **W5** Send job... takes `FileUp` instead of `Upload`: Send to machine (`Upload`, this page's job) and Send job... (a file) now sit in one tab and must not look alike.
-- **W6** Only Home has a cause line; the other toolbar buttons keep their name-only tooltips.
+- **W6** Only Home has a cause line; the other toolbar buttons keep their name-only tooltips (amended by 0133: Pause's pending line "Pause after homing").
 - **W7** After homing, the sr-only status says the next state word ("Idle", or the Ready line) once; no visible text.
 - **W8** Stop during homing stops the homing only. A held Ready job is kept on the fake controller only; on GRBL the reset raises alarm 6 and the alarm drops the job (architect addendum).
 - **W9** The Controller block's two settings warnings move to the footer, above the job block.

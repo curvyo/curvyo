@@ -557,7 +557,8 @@ bytes, and `prepare` refuses characters outside `0x20` to `0x7E` behind the job'
 "The controller was reset at line <n>", plus GRBL's alarm if it raises one. Completed (G8):
 the last `ok` and then a status report **received after it** that says `Idle`. Pause (G10): a
 `Pause` GRBL does not confirm within the hold limit (2 s; GRBL ignores `!` while homing) is
-dropped and the state stays `Running`. Resume (G11): confirmed by `Run`, or `Idle` when the
+dropped and the state stays `Running` (amended by `specs/0133` P4: no `!` while the job's `$H`
+runs, the pause is held after its `ok` and never dropped). Resume (G11): confirmed by `Run`, or `Idle` when the
 planner was empty. Status words (G4): `Door`, `Check`, `Home`, `Sleep`, `Jog` go into
 `Status.detail` ("Controller state: Door") and leave the state as the job machine has it.
 
