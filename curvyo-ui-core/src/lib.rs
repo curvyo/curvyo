@@ -149,7 +149,9 @@ pub use edit_context_text::{
     NO_DRAWING_PAGE_NOTICE, OutsideHomes, home_row_line, not_editable_notice, out_of_context_line,
     out_of_context_suffix,
 };
-pub use send_button::{SendButton, SendCause, SendLink, connector_speaks, send_button};
+pub use send_button::{
+    SendButton, SendCause, SendLink, SendMachine, connector_speaks, send_button, send_starts,
+};
 pub use step_scope::{EDIT_STEPS, FREE_STEPS, MOVE_STEPS, StepScope, step_scope};
 mod centre_lines_plan;
 mod controller_warnings;
