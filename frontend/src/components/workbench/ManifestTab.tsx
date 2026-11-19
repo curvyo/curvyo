@@ -16,8 +16,6 @@ interface ManifestTabProps {
   workbenches: WorkbenchesApi;
   /** The document's display unit (the Machine block's work area line). */
   unit: UnitSymbol;
-  /** The Fixtures block's API (`specs/0102-laser-fixtures`). */
-  fixtures: FixturesApi;
   /** The library sync's toggles (`specs/0116-library-sync`). */
   library?: LibrarySyncApi;
   onReturnFocus: () => void;
@@ -29,8 +27,7 @@ interface ManifestTabProps {
  * (`specs/0026-machine-profile`) in the manifest's order; a `FixtureList` block draws nothing here (the Fixtures tab, `specs/0113`). Nothing here names a
  * process.
  */
-export function ManifestTab({ contribution, pages, view, workbenches, unit, onReturnFocus }: ManifestTabProps) {
-export function ManifestTab({ contribution, pages, view, workbenches, unit, fixtures, library, onReturnFocus }: ManifestTabProps) {
+export function ManifestTab({ contribution, pages, view, workbenches, unit, library, onReturnFocus }: ManifestTabProps) {
   const blocks = contribution.tabs[0]?.blocks ?? [];
   return (
     <div className="flex flex-col gap-4">
@@ -43,7 +40,6 @@ export function ManifestTab({ contribution, pages, view, workbenches, unit, fixt
           view={view}
           workbenches={workbenches}
           unit={unit}
-          fixtures={fixtures}
           library={library}
           onReturnFocus={onReturnFocus}
         />
@@ -58,7 +54,6 @@ function Block({
   view,
   workbenches,
   unit,
-  fixtures,
   library,
   onReturnFocus,
 }: ManifestTabProps & { block: ManifestBlock }) {
