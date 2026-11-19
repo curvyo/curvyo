@@ -13,7 +13,7 @@ import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import { PanelSwitch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ConnectorGroup } from "@/components/workbench/ConnectorGroup";
-import { FIELD, ICON_BUTTON } from "@/components/workbench/machineStyles";
+import { ARMED_ACCENT_BUTTON, FIELD, ICON_BUTTON } from "@/components/workbench/machineStyles";
 import { MachineProfileList } from "@/components/workbench/MachineProfileList";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
@@ -157,27 +157,11 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", onRetur
           <span role="status" className="text-xs text-[var(--toolbar-icon)]">
             {machine.state === "differs" ? "Differs from profile" : "Not in your profiles"}
           </span>
+          {/* Reset from profile first with the save mark, Update profile last with the
+              counter-clockwise arrow (`specs/0130` criterion 2a, Frage 260 B); Update is hidden
+              for the built-in, so Reset then holds the rightmost slot. */}
           {machine.state === "differs" ? (
             <span className="flex gap-1">
-              {machine.can_update ? (
-                <Tooltip side="left" content={update.armed ? ARMED_UPDATE : "Update profile"}>
-                  <button
-                    type="button"
-                    aria-label={update.armed ? ARMED_UPDATE : "Update profile"}
-                    {...{ [ARM_TRASH]: "update" }}
-                    className={update.armed ? ICON_BUTTON.replace("hover:bg-[var(--editor-accent-hover)]", "bg-[var(--destructive)] text-white") : ICON_BUTTON}
-                    onClick={() =>
-                      update.press("update", ARMED_UPDATE, () => {
-                        show(api.update(), "save");
-                        profileButton.current?.focus();
-                        return "";
-                      })
-                    }
-                  >
-                    <BookmarkCheck size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-                  </button>
-                </Tooltip>
-              ) : null}
               <Tooltip side="left" content="Reset from profile">
                 <button
                   type="button"
@@ -188,9 +172,28 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", onRetur
                     profileButton.current?.focus();
                   }}
                 >
-                  <RotateCcw size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+                  <BookmarkCheck size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
                 </button>
               </Tooltip>
+              {machine.can_update ? (
+                <Tooltip side="left" content={update.armed ? ARMED_UPDATE : "Update profile"}>
+                  <button
+                    type="button"
+                    aria-label={update.armed ? ARMED_UPDATE : "Update profile"}
+                    {...{ [ARM_TRASH]: "update" }}
+                    className={update.armed ? ARMED_ACCENT_BUTTON : ICON_BUTTON}
+                    onClick={() =>
+                      update.press("update", ARMED_UPDATE, () => {
+                        show(api.update(), "save");
+                        profileButton.current?.focus();
+                        return "";
+                      })
+                    }
+                  >
+                    <RotateCcw size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+                  </button>
+                </Tooltip>
+              ) : null}
             </span>
           ) : null}
           <span role="status" className="sr-only">
