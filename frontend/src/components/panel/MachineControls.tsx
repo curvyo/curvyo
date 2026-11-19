@@ -5,7 +5,16 @@ import { GLYPH, SMALL } from "@/components/workbench/machineStyles";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
 import { type MachineControlsModel, useMachineControls } from "@/hooks/useMachineControls";
 import { formatCount, formatElapsed, jobButtons } from "@/lib/connectorText";
-import { type ControlsLine, afterHoming, controlsLine, countsName, footerNotice, homeButton } from "@/lib/machineControls";
+import {
+  type ControlsLine,
+  afterHoming,
+  controlsLine,
+  countsName,
+  footerNotice,
+  homeButton,
+  pauseButton,
+  pausePending,
+} from "@/lib/machineControls";
 import { isTauri } from "@/platform/host";
 import { controller_warnings } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
@@ -131,9 +140,10 @@ interface Item {
 
 function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRef: RefObject<HTMLDivElement | null> }) {
   const { entry } = model;
-  const buttons = jobButtons(entry.status?.state ?? null);
+  const buttons = jobButtons(entry.status?.state ?? null, pausePending(entry.status));
   const idle = entry.busy === null;
   const home = homeButton(entry);
+  const pause = pauseButton(entry);
   const resume = buttons.startName === "Resume";
   const items: Item[] = [
     { key: "home", name: "Home", enabled: home.enabled, busy: home.busy, cause: home.cause, icon: <House {...GLYPH} />, press: () => model.command("home") },
@@ -146,7 +156,7 @@ function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRe
       icon: <Play {...GLYPH} />,
       press: () => model.command(resume ? "resume" : "start"),
     },
-    { key: "pause", name: "Pause", enabled: buttons.pause && idle, busy: entry.busy === "pause", icon: <Pause {...GLYPH} />, press: () => model.command("pause") },
+    { key: "pause", name: "Pause", enabled: pause.enabled, busy: pause.busy, cause: pause.cause, icon: <Pause {...GLYPH} />, press: () => model.command("pause") },
     { key: "stop", name: "Stop", enabled: buttons.stop && idle, busy: entry.busy === "stop", icon: <Square {...GLYPH} />, press: () => model.command("stop") },
   ];
   const refs = useRef<(HTMLButtonElement | null)[]>([]);

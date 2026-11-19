@@ -12,13 +12,13 @@ import {
   type LinkError,
   type SendAnswer,
   type StatusMessage,
+  NO_JOB_TO_PAUSE_TEXT,
   UNKNOWN_JOB_TEXT,
   UNREADABLE_TEXT,
-  clearsRefusal,
   errorLine,
   refusalText,
 } from "@/lib/connectorText";
-import { type OwnPress, SETTLES } from "@/lib/machineControls";
+import { type OwnPress, SETTLES, refusalEnds } from "@/lib/machineControls";
 import { invoke } from "@/platform/host";
 
 /** A command of the toolbar or Unlock. */
@@ -63,17 +63,23 @@ export function useMachineControls(profileId: string, address: string, enabled: 
   const [failure, setFailure] = useState<Line | null>(null);
   const entry = useLinkEntry(profileId, address, enabled, true);
   const lastStatus = useRef<StatusMessage | null>(null);
+  // The state "No job to pause" was given in; it ends with any other (`specs/0133` H8).
+  const refusedAt = useRef<string | null>(null);
 
   // A refusal or failure ends when the job moves into another state that has a line count.
   useEffect(() => {
     const next = entry.status;
-    if (next !== null && clearsRefusal(lastStatus.current, next)) {
+    if (next !== null && refusalEnds(lastStatus.current, next, refusedAt.current)) {
       setFailure(null);
+      refusedAt.current = null;
     }
     lastStatus.current = next;
   }, [entry.status]);
 
-  const show = (line: Line | null) => setFailure(line);
+  const show = (line: Line | null) => {
+    refusedAt.current = null;
+    setFailure(line);
+  };
 
   const fail = (error: LinkError) => {
     // A key change or a lost pairing shows in the Machine block too.
@@ -86,9 +92,11 @@ export function useMachineControls(profileId: string, address: string, enabled: 
     void run().finally(() => linkStore.release(profileId));
   };
 
-  const refresh = async () => {
+  /** A fresh status; `false` when the connector could not be read. */
+  const refresh = async (): Promise<boolean> => {
     const answer = await linkStore.read(profileId, address);
     if (answer.kind === "failed") fail(answer.error);
+    return answer.kind === "connected";
   };
 
   const send = () =>
@@ -127,6 +135,10 @@ export function useMachineControls(profileId: string, address: string, enabled: 
         // A job started meanwhile (UX notes section 5); the fresh status shows the state.
         show({ text: BUSY_TEXT, failure: true });
         await refresh();
+      } else if (answer.kind === "wrongState" && kind === "pause") {
+        // The Home button's homing (or no job at all) has nothing to pause (`specs/0133` H8).
+        show({ text: NO_JOB_TO_PAUSE_TEXT, failure: true });
+        if (await refresh()) refusedAt.current = linkStore.get(profileId).status?.state.name ?? null;
       } else {
         // The connector's status says what changed; a fresh read also covers a lost connection.
         await refresh();

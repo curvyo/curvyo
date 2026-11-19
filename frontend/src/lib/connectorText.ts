@@ -19,7 +19,15 @@ export interface StatusMessage {
   alarm: string | null;
   /** The sentence that explains the state (`specs/0127`); absent when there is none. */
   detail?: string | null;
+  /** A Pause waits for the controller's first moment to hold (`specs/0133`); absent when false. */
+  pause_pending?: boolean;
 }
+
+/** The state line while a Pause waits for the job's homing to end (`specs/0133` UX notes H1). */
+export const PAUSE_PENDING_TEXT = "Pause after homing";
+
+/** The connector refused a Pause: no job runs (the Home button's homing, `specs/0133` H8). */
+export const NO_JOB_TO_PAUSE_TEXT = "No job to pause";
 
 /** What the controller reported (`ControllerInfo`, `specs/0127` G19). */
 export interface ControllerInfo {
@@ -201,7 +209,7 @@ export interface JobButtons {
   stop: boolean;
 }
 
-export function jobButtons(state: JobState | null): JobButtons {
+export function jobButtons(state: JobState | null, pausePending = false): JobButtons {
   const none: JobButtons = { send: false, start: false, startName: "Start", pause: false, stop: false };
   if (state === null) {
     return { ...none, send: true };
@@ -217,6 +225,8 @@ export function jobButtons(state: JobState | null): JobButtons {
       // Stop ends a homing too and never asks (`specs/0118` criterion 5).
       return { ...none, stop: true };
     case "Running":
+      // A pending pause is cancelled by Resume; Pause shows it as waiting (`specs/0133` H3, H6).
+      if (pausePending) return { ...none, start: true, startName: "Resume", stop: true };
       return { ...none, pause: true, stop: true };
     case "Paused":
       return { ...none, start: true, startName: "Resume", stop: true };
@@ -281,7 +291,7 @@ export function jobStateLine(status: StatusMessage, held: HeldJob | null): Line 
     case "Homing":
       return neutral("Homing");
     case "Running":
-      return neutral("Running");
+      return neutral(status.pause_pending === true ? PAUSE_PENDING_TEXT : "Running");
     case "Paused":
       return neutral("Paused");
     case "Done":
