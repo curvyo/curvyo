@@ -1785,6 +1785,7 @@ fn golden_the_three_new_messages_have_exactly_these_bytes() {
         position: None,
         alarm: None,
         detail: None,
+        pause_pending: false,
     };
     assert_eq!(
         read("status_homing.json").trim_end(),
