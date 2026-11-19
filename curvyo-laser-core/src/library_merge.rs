@@ -73,7 +73,9 @@ pub fn merge_machine_record(id: &str, incoming: &str, local: Option<&str>) -> Re
                 reason: MergeReason::Newer,
             };
         }
-        Err(RecordError::Damaged) => {
+        // A record of a format before 5 is never read into sets (ADR 0060 §3): it counts as
+        // unreadable here too.
+        Err(RecordError::Damaged | RecordError::Older) => {
             return RecordMerge::SkipIncoming {
                 reason: MergeReason::Damaged,
             };
@@ -90,7 +92,7 @@ pub fn merge_machine_record(id: &str, incoming: &str, local: Option<&str>) -> Re
         Err(RecordError::Newer) => RecordMerge::LocalNewer {
             conflict: incoming.to_owned(),
         },
-        Err(RecordError::Damaged) => RecordMerge::IncomingWins {
+        Err(RecordError::Damaged | RecordError::Older) => RecordMerge::IncomingWins {
             loser: Some(local.to_owned()),
         },
     }
