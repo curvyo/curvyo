@@ -2691,3 +2691,14 @@ for satin stitch (embroidery family) rather than here.
   `MaterialPick.tsx` (line 177) show grey, not the selection blue. Found in the `0124` UX
   review, where the Gradient block's active-stop bar had the same mistake (fixed there).
   **Resolution:** a separate fix PR switches the three to `--editor-accent`.
+
+## Image optimisation: known gaps (`0135`, 2026-11-19)
+
+- **The whole asset store sits in wasm memory, with up to about 1 GiB of assets.** Pictures and
+  fonts (512 MiB) plus derived AI results (512 MiB, ADR 0077 §6) are held in the editor's
+  memory in the browser build. **Resolution:** when an out-of-memory is measured, page assets
+  from IndexedDB or the container on demand instead of holding the store.
+- **Running the model host is an operating duty if Frage 280 is A.** A domain, a bucket and an
+  upload per model version (ADR 0076) must be kept alive for the AI tools to download; the app
+  does not work around a lost host except through stored results. **Resolution:** a documented
+  runbook with the model upload, or bundling the models (option C) if the duty is not wanted.
