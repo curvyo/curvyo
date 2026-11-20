@@ -64,6 +64,13 @@ impl Bench {
         Self::with(config, Options::default())
     }
 
+    /// A bench whose controller uses `timing` (a short homing cap, `specs/0142`).
+    pub fn with_timing(config: SimConfig, timing: Timing) -> Self {
+        let mut bench = Self::new(config);
+        bench.ctrl = GrblController::new(PORT, 115_200, timing, Duration::ZERO);
+        bench
+    }
+
     pub fn with(config: SimConfig, options: Options) -> Self {
         Self {
             sim: GrblSim::new(config),

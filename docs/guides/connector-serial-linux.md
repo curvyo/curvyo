@@ -50,6 +50,15 @@ or stop the service when the computer has no modem: `sudo systemctl disable --no
   SIGHUP and power loss cannot be handled; GRBL's own planner keeps moving for a moment after a
   pulled cable, which no software can undo.
 
+## Homing
+
+GRBL answers nothing while it homes (`$H`, from a job's first line or the Home button), so a
+pulled cable looks like a homing that takes long. The connector therefore caps the wait: when
+`$H` gets no answer for 120 s, it writes the reset, `M5` and `M9`, gives the controller up and
+tries the port again. The app reads "Lost the controller: homing took longer than 120 s"; a job
+ends failed and is not resumed. A large or slow machine whose homing takes longer needs a higher
+cap: `--homing-timeout <seconds>`, 10 to 3600 (with `--serial`).
+
 ## Without a laser
 
 `cargo run -p curvyo-connector-io --example grbl_pty` starts a GRBL 1.1 simulator on a

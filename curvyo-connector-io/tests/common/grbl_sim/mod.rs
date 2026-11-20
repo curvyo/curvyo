@@ -341,6 +341,19 @@ impl GrblSim {
         }
     }
 
+    /// A homing cycle in progress ends at the next step, with its `ok` (`specs/0142` HC5).
+    pub fn end_homing_next_step(&mut self) {
+        if self.homing.is_some() {
+            self.homing = Some(1);
+        }
+    }
+
+    /// Whether a homing cycle runs.
+    #[must_use]
+    pub fn homing(&self) -> bool {
+        self.homing.is_some()
+    }
+
     /// An `ok` nobody asked for (another program on the port).
     pub fn inject_ok(&mut self) {
         self.print("ok");

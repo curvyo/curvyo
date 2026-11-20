@@ -34,6 +34,8 @@ Nothing is known yet. The implementer finds it out, in this order, and records t
 
 None intended. If the cause is in `0029` criterion 38 (what the file writes after `$H`), the change is listed in the PR and the customer is asked.
 
+*(Amended by `0142`: the 3 s loss clock stays paused while `$H` is in flight (PR #392); the pause is bounded by the homing cap, 120 s by default, instead of running indefinitely.)*
+
 ## Out of scope
 
 - A live Home button (`0118`), changing GRBL settings (`0127` G5), other controllers.
