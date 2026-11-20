@@ -20,10 +20,11 @@ pub fn in_sync_line(others: usize) -> String {
 pub const SYNCING_LINE: &str = "Syncing...";
 /// The tooltip's second line while the group cannot be reached or was refused.
 pub const OFFLINE_LINE: &str = "Offline.";
-/// The first sync's confirm of criterion 3, the spec's sentence: the fonts arrive with slice 2,
-/// the machines and materials are the libraries of slice 1.
+/// The first sync's confirm of criterion 3: the spec's sentence for the libraries this build
+/// syncs, machines and materials (the fonts join with slice 2), with the closing period the
+/// other sentences carry.
 pub const FIRST_SYNC_CONFIRM: &str =
-    "Your fonts, machines and materials leave this computer encrypted, to your own computers only";
+    "Your machines and materials leave this computer encrypted, to your own computers only.";
 
 /// The arrival notice of a batch (criterion 5, P8): the kinds with none left out, at most 70
 /// characters; a batch of one item of one kind is named by `machine_arrived_notice` or
@@ -125,8 +126,7 @@ mod tests {
         assert_eq!(OFFLINE_LINE, "Offline.");
         assert_eq!(
             FIRST_SYNC_CONFIRM,
-            "Your fonts, machines and materials leave this computer encrypted, to your own \
-             computers only"
+            "Your machines and materials leave this computer encrypted, to your own computers only."
         );
     }
 
