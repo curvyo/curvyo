@@ -30,6 +30,16 @@ inputs nobody thought of.
   code. If a test needs a seam that does not exist, report it.
 - Never weaken an assertion to make a test pass.
 
+## Request economy
+Some models bill per request (every tool call re-sends the whole context), so
+few large steps beat many small ones.
+- Read whole files, not `head`/`tail` slices; read several files in one call.
+- Run a test or gate command once, write the full output to a file in the
+  scratchpad, then search that file; never re-run it with another `head`/`tail`.
+- Combine independent shell commands into one call (`ls a b c`, `cmd1 && cmd2`).
+- Write all tests for a crate in one edit, then run once; fix all failures
+  from that run before the next run.
+
 ## Reporting to the lead
 Verdict `PASS` or `FAIL`, then a table: criterion number, test name, result.
 Then findings with reproduction steps. At most 30 lines plus the table.
