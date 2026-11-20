@@ -58,6 +58,10 @@ pub enum ArrivalChange {
         sync: bool,
         /// The record text, absent in a marker.
         text: Option<String>,
+        /// The text the entry held before, `None` for a new entry or a marker: a local record
+        /// that still equals it was not edited here, so the arrival supersedes it without a
+        /// conflict.
+        previous: Option<String>,
     },
     /// A synced item was switched off elsewhere: every device keeps its local copy.
     SwitchedOff,

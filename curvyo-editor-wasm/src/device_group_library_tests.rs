@@ -755,3 +755,62 @@ fn a_local_delete_uploads_the_snapshot_after_its_ack() {
     );
     assert_eq!(glue.library().entries(LibraryKind::Machine), Vec::new());
 }
+
+/// UX review 2026-11-19: an edit of an item the device already holds is applied but is not an
+/// arrival: no notice (UX notes section 5, new items only), and its host write is still queued.
+#[test]
+fn an_edit_of_a_held_item_is_applied_without_an_arrival_notice() {
+    let mut net = Net::new();
+    let a = net.add(
+        DeviceGroupGlue::create(SERVER, ROOM, "Desktop", &seeds(1), 11, Millis(net.now)).unwrap(),
+        Session::new(11),
+    );
+    net.run(500);
+    net.devices[a].glue.add_device(identity(2), "Laptop");
+    net.run(200);
+    net.devices[a]
+        .session
+        .load_machine_profiles(&[(record_file_name(P1), machine_text(P1, "ZQX-MACH-7731", 5))]);
+    let device = &mut net.devices[a];
+    let _ = device.session.library_first_sync(&mut device.glue);
+    net.run(500);
+    let b = net.add(
+        DeviceGroupGlue::join(SERVER, ROOM, "Laptop", &seeds(2), 12, Millis(net.now)).unwrap(),
+        Session::new(12),
+    );
+    net.run(1_500);
+    assert_eq!(net.devices[b].notices.len(), 1, "the new item arrived");
+    let _ = net.devices[a]
+        .session
+        .rename_machine_profile(P1, "ZQX-MACH-7731 K40", 9);
+    net.run(1_000);
+    assert_eq!(
+        net.devices[b]
+            .session
+            .machine_profiles()
+            .find(P1)
+            .unwrap()
+            .values
+            .name,
+        "ZQX-MACH-7731 K40",
+        "the edit is applied"
+    );
+    assert_eq!(
+        net.devices[b].wrote(P1).len(),
+        2,
+        "its host write is queued"
+    );
+    assert_eq!(
+        net.devices[b].notices.len(),
+        1,
+        "an edit is no arrival: {:?}",
+        net.devices[b].notices
+    );
+    assert!(
+        net.devices[b]
+            .writes
+            .iter()
+            .all(|write| !write["id"].as_str().unwrap_or("").ends_with(".conflict")),
+        "a plain edit of the other device keeps no conflict copy"
+    );
+}
