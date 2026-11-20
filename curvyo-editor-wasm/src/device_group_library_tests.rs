@@ -17,6 +17,7 @@ const SERVER: &str = "ws://relay";
 const ROOM: [u8; 16] = [0x6e; 16];
 const P1: &str = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f";
 const M1: &str = "5d4e3f2a-1b0c-4a9d-8e7f-2c3b4a596875";
+const P2: &str = "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c";
 
 fn seeds(n: u8) -> SyncSeeds {
     SyncSeeds {
@@ -813,4 +814,96 @@ fn an_edit_of_a_held_item_is_applied_without_an_arrival_notice() {
             .all(|write| !write["id"].as_str().unwrap_or("").ends_with(".conflict")),
         "a plain edit of the other device keeps no conflict copy"
     );
+}
+
+/// A paired desktop with one local machine P1 that never synced, and a laptop joined.
+fn paired_with_local_item() -> (Net, usize, usize) {
+    let mut net = Net::new();
+    let a = net.add(
+        DeviceGroupGlue::create(SERVER, ROOM, "Desktop", &seeds(1), 11, Millis(net.now)).unwrap(),
+        Session::new(11),
+    );
+    net.run(500);
+    net.devices[a].glue.add_device(identity(2), "Laptop");
+    net.run(200);
+    net.devices[a]
+        .session
+        .load_machine_profiles(&[(record_file_name(P1), machine_text(P1, "ZQX-MACH-7731", 5))]);
+    let b = net.add(
+        DeviceGroupGlue::join(SERVER, ROOM, "Laptop", &seeds(2), 12, Millis(net.now)).unwrap(),
+        Session::new(12),
+    );
+    net.run(1_500);
+    (net, a, b)
+}
+
+/// Audit 2026-11-19 (architect and UX): an item that never synced stays local when the maker
+/// declined the first sync; a later edit of it publishes nothing, and the room's list stays
+/// empty of it.
+#[test]
+fn a_declined_first_sync_publishes_no_edit() {
+    let (mut net, a, b) = paired_with_local_item();
+    let _ = net.devices[a]
+        .session
+        .rename_machine_profile(P1, "ZQX-MACH-7731 edit", 9);
+    net.run(1_000);
+    assert!(
+        net.devices[a]
+            .glue
+            .library()
+            .entry(LibraryKind::Machine, P1)
+            .is_none()
+    );
+    assert!(
+        net.devices[b]
+            .glue
+            .library()
+            .entry(LibraryKind::Machine, P1)
+            .is_none()
+    );
+    assert!(net.devices[b].session.machine_profiles().find(P1).is_none());
+}
+
+/// The toggle of an item without an entry turns it on: the first sync of that one item.
+#[test]
+fn the_toggle_of_an_item_without_an_entry_publishes_it() {
+    let (mut net, a, b) = paired_with_local_item();
+    let device = &mut net.devices[a];
+    assert!(
+        device
+            .session
+            .library_switch(&mut device.glue, LibraryKind::Machine, P1, true)
+    );
+    net.run(1_000);
+    assert!(net.devices[b].session.machine_profiles().find(P1).is_some());
+}
+
+/// Once the first sync was confirmed, an item made afterwards has no entry yet and starts on
+/// (criterion 4).
+#[test]
+fn after_the_confirm_a_new_item_starts_on() {
+    let (mut net, a, b) = paired_with_local_item();
+    let device = &mut net.devices[a];
+    assert_eq!(device.session.library_first_sync(&mut device.glue), 1);
+    net.devices[a].session.load_machine_profiles(&[
+        (record_file_name(P1), machine_text(P1, "ZQX-MACH-7731", 5)),
+        (record_file_name(P2), machine_text(P2, "ZQX-MACH-NEW", 6)),
+    ]);
+    let _ = net.devices[a]
+        .session
+        .rename_machine_profile(P2, "ZQX-MACH-NEW edit", 9);
+    net.run(1_000);
+    assert!(net.devices[b].session.machine_profiles().find(P2).is_some());
+}
+
+/// A confirmed first sync of an earlier run restores the policy through the page.
+#[test]
+fn the_page_restores_the_confirmed_policy() {
+    let (mut net, a, b) = paired_with_local_item();
+    net.devices[a].glue.set_library_new_items(true);
+    let _ = net.devices[a]
+        .session
+        .rename_machine_profile(P1, "ZQX-MACH-7731 edit", 9);
+    net.run(1_000);
+    assert!(net.devices[b].session.machine_profiles().find(P1).is_some());
 }
