@@ -955,6 +955,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "curvyo-connector-ctl"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "curvyo-connector-core",
+ "curvyo-connector-io",
+ "curvyo-storage-io",
+ "dirs",
+ "rustix",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "time",
+ "toml 1.1.6+spec-1.1.0",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "curvyo-connector-io"
 version = "0.1.0"
 dependencies = [
@@ -972,6 +992,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "time",
+ "toml 1.1.6+spec-1.1.0",
  "tungstenite",
  "uuid",
  "zeroize",

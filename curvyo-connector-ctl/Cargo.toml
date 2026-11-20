@@ -1,0 +1,44 @@
+[package]
+name = "curvyo-connector-ctl"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "curvyoctl: sets up and manages Curvyo machine connectors over the network (ADR 0071 decision 10)."
+
+[lints]
+workspace = true
+
+[lib]
+name = "curvyo_connector_ctl"
+path = "src/lib.rs"
+
+[[bin]]
+name = "curvyoctl"
+path = "src/main.rs"
+
+[dependencies]
+curvyo-connector-core = { path = "../curvyo-connector-core", version = "0.1.0" }
+# The TLS client, the pin and SPAKE2 pairing (addendum D2); without `serial`: no port is opened.
+curvyo-connector-io = { path = "../curvyo-connector-io", version = "0.1.0", default-features = false }
+# The credential store of the token (ADR 0007, ADR 0071 decision 10).
+curvyo-storage-io = { path = "../curvyo-storage-io", version = "0.1.0" }
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+zeroize = "1"
+# Only in `main.rs` (CLAUDE.md §5).
+anyhow = "1"
+# The user's config directory. MIT OR Apache-2.0; already locked.
+dirs = "7"
+time = { version = "0.3.55", default-features = false, features = ["std"] }
+
+[target.'cfg(unix)'.dependencies]
+# The passphrase read with echo off (addendum D12): safe `termios`. Already locked; only the feature.
+rustix = { version = "1.1.6", default-features = false, features = ["std", "termios"] }
+
+[dev-dependencies]
+curvyo-connector-io = { path = "../curvyo-connector-io", version = "0.1.0" }
+tempfile = "3"
+uuid.workspace = true
