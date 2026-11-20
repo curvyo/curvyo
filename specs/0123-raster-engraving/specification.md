@@ -129,6 +129,7 @@ The gradient itself (paint switch, colours, handles, drawing, SVG) is `0124`; th
 ## Out of scope
 
 - Offset fill and the vector Fill hatch (already exist: `0029` criterion 14; not changed).
+- **Amended by `0135` (Frage 283 B, 2026-11-20):** the Dither of a PICTURE (mode and its fields, criterion 11) moves from the Image operation to the picture object; the operation's Dither strip stays only as the dither of non-picture leaves (Gradient-fill shapes, test-grid Ramp cells) and shows only while the operation holds one.
 - Image optimisation (automatic, AI-assisted, manual: a test photo is hard to recognise when engraved): the backlog story `0135` `image-optimisation`; this story gives the seven dither modes and the four adjustments only.
 - Raster of a filled vector shape (a Colour fill burning as a solid dot area) in an Image operation: Engrave does that; the Image kind ignores such leaves and warns (criterion 48).
 - **Future idea (customer, 2026-11-19, not now): Cut-out that follows the contour of an image with a transparent background** (today Cut-out cuts the frame rectangle, criterion 1); it belongs with image optimisation, backlog `0135`.

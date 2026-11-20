@@ -62,7 +62,28 @@ function presetStrip(on, { focus = null, hover = null, mark = false } = {}) {
     `${i === 3 ? '<span class="br"></span>' : ''}<span class="c${id === on ? ' on' : ''}${id === focus ? ' focus' : ''}${id === hover ? ' hov' : ''}" data-p="${id}" title="${full}">${short}</span>`).join('');
   return `<div class="strip${mark ? ' new' : ''}" role="radiogroup" aria-label="Preset">${cells}</div>`;
 }
-const presetTip = (id) => { const p = PRESETS.find((q) => q[0] === id); return p[3] ? `${p[2]} · Dither: ${p[3]}` : 'Expert · Dither as set in the operation'; };
+const presetTip = (id) => { const p = PRESETS.find((q) => q[0] === id); return p[3] ? `${p[2]} · Dither: ${p[3]}` : 'Expert · Dither unchanged'; };
+/** The dither each preset sets on the picture (criterion 27; Expert leaves it). */
+const PRESET_DITHER = { photo: 'jarvis', graphics: 'ordered', bw: 'threshold', lineart: 'threshold', dots: 'halftone', newspaper: 'lines' };
+
+/** The nine Dither modes: [id, visible word, full name]; a tooltip only where the word differs. */
+const MODES9 = [['threshold', 'Threshold', 'Threshold'], ['ordered', 'Ordered', 'Ordered'], ['floyd', 'Floyd', 'Floyd-Steinberg'],
+  ['jarvis', 'Jarvis', 'Jarvis'], ['atkinson', 'Atkinson', 'Atkinson'], ['stucki', 'Stucki', 'Stucki'], ['grey', 'Grey', 'Grey'],
+  ['halftone', 'Halftone', 'Halftone dots'], ['lines', 'Lines', 'Line screen']];
+/** The nine-mode Dither strip: three fixed rows, breaks after Floyd and Grey (ux-notes 3.10, 10). */
+function dither9(on, { focus = null, mark = false, label = null } = {}) {
+  const cells = MODES9.map(([id, w, full], i) => `${i === 3 || i === 7 ? '<span class="br"></span>' : ''}<span class="c${id === on ? ' on' : ''}${id === focus ? ' focus' : ''}"${w !== full ? ` title="${full}"` : ''}>${w}</span>`).join('');
+  return `<div class="strip${mark ? ' new' : ''}" role="radiogroup" aria-label="${label ?? 'Dither'}">${cells}</div>`;
+}
+/** The mode's own fields, one row, or nothing for the five error-diffusion and Ordered modes. */
+function modeFields(mode, { mark = false } = {}) {
+  const r = (inner) => `<div class="fr${mark ? ' new' : ''}">${inner}</div>`;
+  if (mode === 'threshold') return r(field('Threshold', '50', '%', 124));
+  if (mode === 'grey') return r(field('Lowest power', '10', '%', 132));
+  if (mode === 'halftone') return r(field('Cell size', '0.80', 'mm', 124) + field('Angle', '45', '°', 104));
+  if (mode === 'lines') return r(field('Line pitch', '1.20', 'mm', 124) + field('Angle', '45', '°', 104));
+  return '';
+}
 
 /** The Strength row: slider, then the percent field, the ends under the slider (ux-notes 3.3). */
 function strength(v, { focus = false, mark = false } = {}) {

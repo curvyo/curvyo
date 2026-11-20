@@ -12,7 +12,12 @@ tips", "No notice after a success", the new "Choice strip"). Drafts: `docs/desig
 applied: no invented colours (pale orange `--engrave-hatch`, red `--cut`, ink, the existing blue of a
 pressed control), symbol-only buttons with a tooltip, units inside the fields, plain fields and no
 sliders, compact, the operation's own row and no dialog, not LightBurn. **(Proposal)** items are
-vetoable at the demo; section 11 lists them. "Ink" is `--toolbar-icon`; "body column" is the unfolded
+vetoable at the demo; section 11 lists them. **Amended 2026-11-20 by `0135` (Frage 283 B: the Dither
+belongs to the picture):** a picture burns with its own Dither, set in its Style tab
+(`specs/0135-image-optimisation/ux-notes.md` 3.10); the Image operation's Dither strip, now nine modes,
+applies only to gradient fills and test-grid ramp cells and is shown only while the operation holds one,
+last in the Image settings under the label "Dither for gradient fills" (`0135` 10). Sections 2.3, 2.4,
+4, 5 and P37, P39, P41 read with that. "Ink" is `--toolbar-icon`; "body column" is the unfolded
 row's body, 232 px wide (panel 280 less 2 x 12 padding, the row's 2 x 4, the body's 12 indent and 4
 right: the column the built Brightness 120 + 4 + Contrast 108 fill).
 
@@ -72,7 +77,7 @@ As every run row (`OperationRow`, 56 px, 64 coarse):
 |---|---|
 | 1 | Image glyph, name "Image 1", Show, Output, trash, gap, Up, Down (as built) |
 | 2 | the ring with the digit, "Image · 2 items", the time at the right in ink ("7 min 12 s"); without a run the plain digit as built |
-| 3 | the set's numbers as every row, then " · " and the **dither short name** of the strip (2.5): "35 %, 6,000 mm/min, 1 ×, 0.10 mm · Floyd"; Grey adds its range: "· Grey 10–35 %" (Lowest power to Power) |
+| 3 | the set's numbers as every row, then " · " and the **dither short name** of the strip (2.5): "35 %, 6,000 mm/min, 1 ×, 0.10 mm · Floyd"; Grey adds its range: "· Grey 10–35 %" (Lowest power to Power). *Amended 2026-11-20 (`0135` P31): only when every item burns with the same dither, else no dither word* |
 
 - Scan angle and the adjustments are not on line 3 (the Engrave row does not show its Scan angle
   either; the row stays one line of numbers). Too long: ellipsis, the line's tooltip carries it (P41).
@@ -92,7 +97,7 @@ As every run row (`OperationRow`, 56 px, 64 coarse):
 
 | Row | Controls | Size |
 |---|---|---|
-| 1 and 2 | **Dither** choice strip (2.5) | 232 x 59 (two 28 px rows, 1 px between, 1 px border) |
+| 1 and 2 | **Dither** choice strip (2.5) | 232 x 59 (two 28 px rows, 1 px between, 1 px border). *Amended 2026-11-20 (`0135` 10, P30): nine modes in three rows, moved to the end of the group under the label "Dither for gradient fills" with its mode fields, shown only while the operation holds a gradient fill; a picture's dither is in its Style tab* |
 | 3 | **Brightness** "%", **Contrast** "%" | 120 and 108 (P34) |
 | 4 | **Gamma** (no unit), **Invert** toggle | 100 and 28 x 28 |
 | 5 | **Threshold** "%" (Threshold only) or **Lowest power** "%" (Grey only); absent for the other five | 124 and 132 |
@@ -219,13 +224,13 @@ selects and unfolds its row and focuses the field named (P28).
 | Kind | Symbol | Text (singular / plural) | Button does |
 |---|---|---|---|
 | block | `OctagonX` | "1 item lies outside the 400 x 300 mm bed." / "<n> items lie outside ..." (as built) | selects them |
-| block | `OctagonX` | "**Image 1** needs laser mode M4 for Grey." | unfolds, focus the Dither strip |
+| block | `OctagonX` | "**Image 1** needs laser mode M4 for Grey." | unfolds, focus the Dither strip. *Amended 2026-11-20 (`0135` P34): for a picture's own Grey "**1 picture in Image 1** needs laser mode M4 for Grey.", selects it, Style tab* |
 | block | `OctagonX` | "Photo 1 would need 120,000,000 dots; the limit is 50,000,000." | selects the item |
 | warn | `TriangleAlert` | "1 image is coarser than its Interval." / "<n> images are coarser than their Interval." | selects them |
 | warn | `TriangleAlert` | "2 items overlap and burn twice." | selects them |
 | warn | `TriangleAlert` | "1 image was reduced and loses detail." / "<n> images were reduced and lose detail." | selects them |
 | warn | `TriangleAlert` | "1 image cannot be read and is skipped." / "<n> images cannot be read and are skipped." | selects them |
-| warn | `TriangleAlert` | "**Image 1**: Lowest power is above Power." | unfolds, focus Lowest power |
+| warn | `TriangleAlert` | "**Image 1**: Lowest power is above Power." | unfolds, focus Lowest power. *Amended 2026-11-20 (`0135` P34): for a picture "**photo.jpg**: Lowest power is above the Power of Image 1.", selects it* |
 | warn | `TriangleAlert` | spec criterion 48: "1 item in Image 1 is not a picture and does not burn." / "<n> items in Image 1 are not pictures and do not burn." | selects them, unfolds the row |
 
 - One line per operation for the wrong-kind line of criterion 48; the name is the operation's. It
@@ -257,7 +262,9 @@ and word need more than the minimum), the group 284 px.
 - The bar's own segment look, not the panel strip's solid blue (P45): in the bar, Kind and the axis
   parameters already use `--value-fill`; a solid-blue Dither would shout louder than Kind.
 - Cells: drawn grey on the laser page and as dots in the Operations view; the derived rows are Image
-  operations with the chosen Dither.
+  operations with the chosen Dither. *Amended 2026-11-20 (`0135` P32): the Dither is the operations'
+  dither for gradient fills; with Picture "Selected picture" the Dither segments are absent and the
+  cells burn with the picture's own dither.*
 - The Kind switch between Engrave and Image keeps the shared values and axes (Interval exists in
   both); Dither stays stored on the grid while Engrave is shown (no sign).
 

@@ -8,10 +8,10 @@
 .mat .n{flex:1;overflow:hidden;text-overflow:ellipsis}.tid{font:600 13px ui-monospace,monospace;letter-spacing:.08em;width:64px}
 .segs span.newseg{outline:1.5px dashed var(--panel-muted-fg);outline-offset:-3px}</style></head>
 <body><div class="sheet">
-<h1>05 · A linked clone with its own adjustments, the nine Dither modes, the test grid's Strength axis, the checks</h1>
-<p class="lead">The clone uses the override row of 0057 (a third row, Adjustments: Original's | Own), not a new line and button. The Image operation row gains only the two new dither modes. The Image test grid can engrave the selected picture with a Strength axis. Notes: <code>ux-notes.md</code> sections 9 to 11.</p>
+<h1>05 · A linked clone with its own adjustments, the Image row after Frage 283 B, the test grid's Strength axis, the checks</h1>
+<p class="lead">The clone uses the override row of 0057 (a third row, Adjustments: Original's | Own), not a new line and button; the picture's Dither is part of its adjustments. Each picture burns with its own dither (Frage 283 B, 2026-11-20): the Image operation row keeps Interval, Scan angle, Bidirectional fill and Overscanning, and shows its own nine-mode Dither strip only while it holds a gradient fill (a gradient-filled shape or a test-grid cell). The Image test grid can engrave the selected picture with a Strength axis. Notes: <code>ux-notes.md</code> sections 9 to 11.</p>
 <div class="cols" id="cols"></div>
-<figure class="wide" style="margin-top:20px"><figcaption>E · Image test grid: Picture "Selected picture", Strength across, Power down<span>Picture is a two-segment pick in row 1 (Ramp, Selected picture). With Selected picture and a Preset on it, Strength joins the axis parameters (0 to 100 %, Count 5); with Ramp or Expert it is not there (hidden, no hint). Each cell engraves the picture with its Preset at the cell's Strength.</span></figcaption>
+<figure class="wide" style="margin-top:20px"><figcaption>F · Image test grid: Picture "Selected picture", Strength across, Power down<span>Picture is a two-segment pick in row 1 (Ramp, Selected picture). With Selected picture and a Preset on it, Strength joins the axis parameters (0 to 100 %, Count 5); with Ramp or Expert it is not there (hidden, no hint). Each cell engraves the picture with its Preset at the cell's Strength and with the picture's own Dither (Jarvis here), so the bar has no Dither segments with Selected picture; with Ramp they are there as in 0123.</span></figcaption>
   <div class="cv" id="cvE" style="width:1240px;height:500px"><div class="page" style="left:20px;top:100px;width:1200px;height:380px"></div></div></figure>
 </div>
 <script>
@@ -24,29 +24,34 @@ const derivedRows = (s) => `<div class="muted">From preset Photo, Strength ${s} 
   ${step({ kind: 'levels', ro: true, nums: `Black 1 %, White 99 %, Gamma ${(0.95 - s * 0.002).toFixed(2)}` })}
   ${step({ kind: 'local_contrast', ro: true, nums: `Radius 10.0 mm, Amount ${Math.round(10 + 0.8 * s)} %` })}
   ${step({ kind: 'sharpen', ro: true, nums: `Radius 0.10 mm, Amount ${Math.round(40 + 1.6 * s)} %, Threshold 0 %` })}</div><div class="btn full">Make editable</div>`;
-const MODES9 = [['threshold', 'Threshold'], ['ordered', 'Ordered'], ['floyd', 'Floyd'], ['jarvis', 'Jarvis'], ['atkinson', 'Atkinson'], ['stucki', 'Stucki'], ['grey', 'Grey'], ['halftone', 'Halftone'], ['lines', 'Lines']];
-const strip9 = (on) => `<div class="strip" role="radiogroup" aria-label="Dither">${MODES9.map(([id, w], i) => `${i === 3 || i === 7 ? '<span class="br"></span>' : ''}<span class="c${id === on ? ' on' : ''}${i >= 7 ? ' new' : ''}">${w}</span>`).join('')}</div>`;
-const imageRow = row({ kind: 'image', name: 'Image 1', digit: 2, count: '1 item', time: '9 min 40 s', line3: '35 %, 6,000 mm/min, 1 ×, 0.10 mm · Halftone 0.80 mm', sel: true, unf: true,
-  body: `<div class="body">${upper}<div class="hair"></div>${strip9('halftone')}<div class="fr">${field('Brightness', '0', '%', 120)}${field('Contrast', '0', '%', 108)}</div>
-    <div class="fr">${field('Gamma', '1.00', '', 100)}<span class="tg">${ic('contrast')}</span></div><div class="fr new">${field('Cell size', '0.80', 'mm', 124)}${field('Angle', '45', '°', 104)}</div>${lower('image')}</div>` });
+const tone = `<div class="fr">${field('Brightness', '0', '%', 120)}${field('Contrast', '0', '%', 108)}</div>
+    <div class="fr">${field('Gamma', '1.00', '', 100)}<span class="tg">${ic('contrast')}</span></div>`;
+const imageRow = row({ kind: 'image', name: 'Image 1', digit: 2, count: '2 items', time: '9 min 40 s', line3: '35 %, 6,000 mm/min, 1 ×, 0.10 mm · Jarvis', sel: true, unf: true,
+  body: `<div class="body">${upper}<div class="hair"></div>${tone}${lower('image')}</div>` });
+const fillLabel = 'Dither for gradient fills';
+const imageRowFill = row({ kind: 'image', name: 'Image 1', digit: 2, count: '3 items', time: '11 min 05 s', line3: '35 %, 6,000 mm/min, 1 ×, 0.10 mm', sel: true, unf: true,
+  body: `<div class="body">${upper}<div class="hair"></div>${tone}<div class="new" style="display:flex;flex-direction:column;gap:4px"><div class="lab12">${fillLabel}</div>${dither9('halftone', { label: fillLabel })}${modeFields('halftone')}</div>${lower('image')}</div>` });
 const checks = `<div class="hdr">Checks</div><div class="checks">
   <div>${ic('warn')}<span>1 step in the Adjustments of photo.jpg could not run. <u>Select</u></span></div>
   <div>${ic('warn')}<span>2 stored AI results of photo.jpg are out of date. <u>Select</u></span></div></div>
-  <div class="hair"></div><div class="muted">Notice after a Preset pick on a picture in two Image operations (canvas notice slot, status, 3 s):</div>
-  <div style="background:var(--toolbar-bg);box-shadow:var(--panel-elevation-shadow);border-radius:8px;padding:8px;font-size:12px;width:max-content">Dither set in 2 operations.</div>`;
+  <div class="hair"></div><div class="muted">The 0123 Grey lines when a picture's own Dither is Grey (amended):</div>
+  <div class="checks"><div>${ic('octx')}<span><u>1 picture in Image 1</u> needs laser mode M4 for Grey.</span></div>
+  <div>${ic('warn')}<span><u>photo.jpg</u>: Lowest power is above the Power of Image 1.</span></div></div>`;
 const screens = [
-  ['A · A clone that shows the original\'s adjustments', 'Image clone: no Style row (as built for image roots); the third override row Adjustments, Original\'s pressed. The group below shows the original\'s Preset and steps, live and editable.',
-    `<div class="hdr">Style</div><div class="col">${cloneBlock('orig')}<div class="hair"></div>${groupHeader()}${presetStrip('photo')}${strength(50)}<div class="hair"></div>${derivedRows(50)}</div>`,
+  ['A · A clone that shows the original\'s adjustments', 'Image clone: no Style row (as built for image roots); the third override row Adjustments, Original\'s pressed. The group below shows the original\'s Preset, Dither and steps, live and editable.',
+    `<div class="hdr">Style</div><div class="col">${cloneBlock('orig')}<div class="hair"></div>${groupHeader()}${presetStrip('photo')}${dither9('jarvis')}${strength(50)}<div class="hair"></div>${derivedRows(50)}</div>`,
     'Tooltips of the segments: "Shows the original\'s adjustments." / "Has its own adjustments; the original\'s stay as they are."'],
   ['B · First edit on the clone: Own', 'Strength dragged to 70 on the clone: in the same undo step the clone gets a full copy of the original\'s adjustments and the edit; the row turns to Own. The original is untouched. Pressing Original\'s again is "Follow original" (one step, no question).',
-    `<div class="hdr">Style</div><div class="col">${cloneBlock('own')}<div class="hair"></div>${groupHeader()}${presetStrip('photo')}${strength(70, { focus: true })}<div class="hair"></div>${derivedRows(70)}</div>`,
+    `<div class="hdr">Style</div><div class="col">${cloneBlock('own')}<div class="hair"></div>${groupHeader()}${presetStrip('photo')}${dither9('jarvis')}${strength(70, { focus: true })}<div class="hair"></div>${derivedRows(70)}</div>`,
     'Canvas tag "Clone, own adjustments"; Layers tooltip line "Own adjustments" (0057 criteria 28, 29).'],
-  ['C · The Image row with nine modes: Halftone', 'A third fixed row Halftone | Lines; the mode\'s fields are the last row (Cell size, Angle; Lines: Line pitch, Angle). Line 3 names the mode with its size. Nothing else in the row changes: no Preset, no stack.',
-    `<div class="hdr">Operations</div>${imageRow}`, 'Arrow order follows the reading order of the three rows.'],
-  ['D · Checks and the one notice', 'Two warn lines at most (criterion 23), each with Select. The only notice of the story: a preset pick that changed the dither of more than one operation.',
-    checks, 'No notice after a successful run, download or Make editable (customer rule).'],
+  ['C · The Image row holding two pictures', 'No Dither strip: each picture burns with its own (its Style tab). The row keeps the set, Brightness, Contrast, Gamma, Invert, Bidirectional fill, Scan angle, Overscanning. Both pictures use Jarvis, so line 3 names it.',
+    `<div class="hdr">Operations</div>${imageRow}`, 'Line 3 names a dither only when every item of the operation burns with the same one.'],
+  ['D · The same row with a gradient-filled shape added', 'Its own Dither strip appears, last in the Image settings, under the label "Dither for gradient fills" (a name, not a tip); it applies to gradient fills and test-grid cells, never to a picture. Nine modes, the mode\'s fields last. The pictures (Jarvis) and the fill (Halftone) differ: line 3 shows no dither.',
+    `<div class="hdr">Operations</div>${imageRowFill}`, 'Arrow order follows the reading order of the three rows; tooltips only on Floyd, Halftone and Lines.'],
+  ['E · Checks', 'Two warn lines at most (criterion 23), each with Select. The story has no notice: a preset pick presses the picture\'s own dither in the tab the maker is looking at.',
+    checks, 'No notice after a successful run, download, preset pick or Make editable (customer rule).'],
 ];
-screens.push(['F · Halftone and Lines at draft scale', 'A ramp and the photo (Photo preset steps at Strength 50 %) with Halftone dots (cell 8 dots, 45°) and Line screen (pitch 12 dots, 45°), one dot = 2 px. Pale orange dots as every dot in the app.',
+screens.push(['G · Halftone and Lines at draft scale', 'A ramp and the photo (Photo preset steps at Strength 50 %) with Halftone dots (cell 8 dots, 45°) and Line screen (pitch 12 dots, 45°), one dot = 2 px. Pale orange dots as every dot in the app.',
   '<div id="ht" style="position:relative;height:156px;width:256px"></div>', '']);
 figures('cols', screens);
 {
@@ -69,7 +74,6 @@ E.insertAdjacentHTML('beforeend', `<div class="bar" style="position:absolute;lef
   <div class="grp">${KIND}</div><div class="grp"><span class="tid">K7Q2M</span>${mat}</div>
   <div class="grp">${segs('Picture', ['Ramp', 'Selected picture'], 'Selected picture')}</div>
   <div class="grp">${field('Power', '50', '%', 104)}${field('Speed', '3000', 'mm/min', 160)}</div>
-  <div class="grp">${segs('Dither', ['Threshold', 'Ordered', 'Floyd', 'Jarvis', 'Atkinson', 'Stucki'], 'Jarvis')}</div>
   <div class="brk"></div>${unit('Columns', 'Strength', ['0', '%'], ['100', '%'], 5)}${unit('Rows', 'Power', ['20', '%'], ['60', '%'], 3)}</div>`);
 const cw = 120, ch = 80, x0 = 120, y0 = 180, gap = 24, P = 2;
 E.insertAdjacentHTML('beforeend', `<div class="lbl" style="left:${x0}px;top:${y0 - 18}px">K7Q2M</div>`);

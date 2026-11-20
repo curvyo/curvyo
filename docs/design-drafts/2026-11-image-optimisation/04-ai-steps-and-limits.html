@@ -17,7 +17,7 @@ const upFields = (on) => `<div class="strip" role="radiogroup" aria-label="Facto
 const dnFields = `<div class="fr">${field('Strength', '50', '%', 112)}</div>`;
 const prog = (p, text) => `<div class="prog"><b style="width:${p}%"></b></div><div class="fr"><span class="muted" style="flex:1">${text}</span><span class="btn">Cancel</span></div>`;
 const warn = (t) => `<div class="warnl"><span style="display:flex;margin-top:0">${ic('warn')}</span><span>${t}</span></div>`;
-const head = `<div class="hdr">Style</div><div class="col">${groupHeader()}${presetStrip('expert')}<div class="hair"></div>${addBar()}`;
+const head = `<div class="hdr">Style</div><div class="col">${groupHeader()}${presetStrip('expert')}${dither9('floyd')}<div class="hair"></div>${addBar()}`;
 const screens = [
   ['A · Remove background, model not on this device', 'Line under Run: the size it will fetch. Edge softness and Threshold refine the mask afterwards without the model.',
     `${head}<div class="steps">${step({ kind: 'remove_background', name: 'Remove background', body: rb(bgFields, '<div class="muted">Model not downloaded yet (38 MB).</div>'), up: false, down: false })}</div></div>`,
