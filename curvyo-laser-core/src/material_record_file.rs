@@ -1,4 +1,5 @@
-//! Reads and writes one material record file of format 3 (ADR 0058 §2, §6; ADR 0069 §8).
+//! Reads and writes one material record file of format 4 (ADR 0058 §2, §6; ADR 0069 §8; ADR 0072
+//! §6).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -23,7 +24,10 @@ use crate::test_id::TestId;
 /// A; ADR 0069 §13, §14) lets a test's recipe carry the kind `image` with `dither`, a laser's sets
 /// an `image` set and a history entry the kind `image`; a format-2 record reads as is and is
 /// written back as format 3 at its next save (no migration), one holding any of these is damaged.
-pub const RECORD_FORMAT_VERSION: u64 = 3;
+/// Format 4 (`specs/0135` criterion 51, ADR 0072 §6) lets an Image test's recipe carry `picture`
+/// `"selected"` and an axis on `strength`; a record of format 2 or 3 reads as is and is written
+/// back as format 4 at its next save, one holding either is damaged.
+pub const RECORD_FORMAT_VERSION: u64 = 4;
 /// The oldest record format this build reads; format 1 is skipped as older.
 const OLDEST_READ_FORMAT: u64 = 2;
 /// The largest record text that is read or written (ADR 0058 §6).
@@ -140,7 +144,7 @@ pub fn load_record(file_name: &str, text: &str) -> MaterialRead {
 /// The material the record file `file_name` holds.
 ///
 /// # Errors
-/// [`RecordFileError::Newer`] above format 3, [`RecordFileError::Older`] for format 1, and
+/// [`RecordFileError::Newer`] above format 4, [`RecordFileError::Older`] for format 1, and
 /// [`RecordFileError::Damaged`] with one reason for every damage of ADR 0055 §3 and ADR 0058 §6.
 /// Nothing is written on read.
 pub fn read_record(file_name: &str, text: &str) -> Result<Material, RecordFileError> {

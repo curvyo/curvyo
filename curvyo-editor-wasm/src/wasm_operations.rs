@@ -140,15 +140,17 @@ impl WasmSession {
     }
 
     /// Whether the Operations tab and the output group read a stale job (`specs/0123` criteria 12,
-    /// 37 d): the host then calls `advance_job` once per animation frame.
+    /// 37 d) or an adjusted picture's canvas look waits (`specs/0135` criterion 15): the host then
+    /// calls `advance_job` once per animation frame.
     pub fn job_pending(&self) -> bool {
-        self.session.job_pending()
+        self.session.ticks_pending()
     }
 
-    /// One animation frame's share of the pending job's raster dots; whether the job was built by
-    /// this call, so the host reads the views again.
+    /// One animation frame's share of the pending job's raster dots, else of a canvas look;
+    /// whether the job or a look was finished by this call, so the host reads the views and
+    /// draws again.
     pub fn advance_job(&self) -> bool {
-        self.session.advance_job()
+        self.session.advance_tick()
     }
 
     /// The host's 300 ms mark of a pending job: the views now write its times as "…" (UX notes

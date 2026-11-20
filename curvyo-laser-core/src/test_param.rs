@@ -17,10 +17,14 @@ pub enum Param {
     Passes,
     /// The hatch interval in mm, kept in hundredths; Engrave only.
     Interval,
+    /// The picture's Strength in whole percent: an axis of an Image grid of the selected
+    /// picture only, never shared (`specs/0135` criterion 51, ADR 0072 §6).
+    Strength,
 }
 
 impl Param {
-    /// Every parameter in the order of the bar (UX 4.1).
+    /// Every parameter that numbers a cell, in the order of the bar (UX 4.1); Strength is not
+    /// one of them (it adjusts the picture, the set never holds it, criterion 52).
     pub const ALL: [Self; 4] = [Self::Power, Self::Speed, Self::Passes, Self::Interval];
 
     /// The stored text of an axis `param`.
@@ -31,13 +35,17 @@ impl Param {
             Self::Speed => "speed",
             Self::Passes => "passes",
             Self::Interval => "interval",
+            Self::Strength => "strength",
         }
     }
 
     /// The parameter an axis text names.
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|p| p.as_str() == text)
+        Self::ALL
+            .into_iter()
+            .chain([Self::Strength])
+            .find(|p| p.as_str() == text)
     }
 
     /// The key of the parameter in `fixed`.
@@ -48,13 +56,19 @@ impl Param {
             Self::Speed => "speed_mm_min",
             Self::Passes => "passes",
             Self::Interval => "interval_mm",
+            Self::Strength => "strength_pct",
         }
     }
 
-    /// Whether a grid of `kind` offers the parameter (interval only for Engrave, criterion 4).
+    /// Whether a grid of `kind` offers the parameter (interval only for Engrave and Image,
+    /// criterion 4; Strength only for Image, and there only with the selected picture).
     #[must_use]
     pub fn offered(self, kind: SetKind) -> bool {
-        self != Self::Interval || kind.has_interval()
+        match self {
+            Self::Interval => kind.has_interval(),
+            Self::Strength => kind == SetKind::Image,
+            Self::Power | Self::Speed | Self::Passes => true,
+        }
     }
 
     /// The parameters a grid of `kind` offers, in bar order.
@@ -70,6 +84,7 @@ impl Param {
             Self::Speed => "mm/min",
             Self::Passes => "Passes",
             Self::Interval => "Interval mm",
+            Self::Strength => "Strength %",
         }
     }
 
@@ -77,14 +92,14 @@ impl Param {
     pub(crate) const fn per_unit(self) -> f64 {
         match self {
             Self::Power => 10.0,
-            Self::Speed | Self::Passes => 1.0,
+            Self::Speed | Self::Passes | Self::Strength => 1.0,
             Self::Interval => 100.0,
         }
     }
 
     /// Whether a typed value must be whole.
     pub(crate) const fn whole(self) -> bool {
-        matches!(self, Self::Speed | Self::Passes)
+        matches!(self, Self::Speed | Self::Passes | Self::Strength)
     }
 
     /// The steps a stored value may take; a speed is not checked against a machine.
@@ -105,6 +120,7 @@ impl Param {
                 u32::from(Interval::MIN_HUNDREDTHS),
                 u32::from(Interval::MAX_HUNDREDTHS),
             ),
+            Self::Strength => (0, 100),
         }
     }
 
@@ -116,13 +132,16 @@ impl Param {
             Self::Speed => format!("Speed is 1 to {} mm/min.", max_feed.get()),
             Self::Passes => "Passes are 1 to 20.".to_owned(),
             Self::Interval => Interval::RANGE_TEXT.to_owned(),
+            Self::Strength => "Strength is 0 to 100 %.".to_owned(),
         }
     }
 
     /// The default Min and Max of an axis (criterion 6): 20 to 100 %, 10 % to 100 % of the
-    /// maximum feed, 1 to 5 passes, 0.05 to 0.25 mm.
+    /// maximum feed, 1 to 5 passes, 0.05 to 0.25 mm, Strength 0 to 100 % (`specs/0135`
+    /// criterion 51).
     pub(crate) fn axis_default(self, max_feed: FeedRate) -> (u32, u32) {
         match self {
+            Self::Strength => (0, 100),
             Self::Power => (200, 1000),
             Self::Speed => (((max_feed.get() + 5) / 10).max(1), max_feed.get()),
             Self::Passes => (1, 5),
@@ -138,12 +157,14 @@ impl Param {
             Self::Speed => Some(set.settings.speed.get()),
             Self::Passes => Some(u32::from(set.settings.passes.get())),
             Self::Interval => set.interval.map(|i| u32::from(i.hundredths())),
+            Self::Strength => None,
         });
         from_set.unwrap_or(match self {
             Self::Power => 500,
             Self::Speed => max_feed.get().min(3000),
             Self::Passes => 1,
             Self::Interval => u32::from(Interval::DEFAULT.hundredths()),
+            Self::Strength => u32::from(crate::image_adjust_resolve::DEFAULT_STRENGTH),
         })
     }
 }
@@ -180,7 +201,7 @@ impl fmt::Display for ParamValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.param {
             Param::Power => write!(f, "{}", power(self.steps)),
-            Param::Speed | Param::Passes => write!(f, "{}", self.steps),
+            Param::Speed | Param::Passes | Param::Strength => write!(f, "{}", self.steps),
             Param::Interval => write!(f, "{}.{:02}", self.steps / 100, self.steps % 100),
         }
     }

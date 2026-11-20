@@ -277,7 +277,7 @@ pub(crate) fn json_of(value: &LoroValue) -> Option<serde_json::Value> {
 
 /// A JSON value as a plain Loro value; an integer is stored as `I64` (ADR 0039 §1), every other
 /// number as a double.
-fn loro_of(value: &serde_json::Value) -> LoroValue {
+pub(crate) fn loro_of(value: &serde_json::Value) -> LoroValue {
     match value {
         serde_json::Value::Null => LoroValue::Null,
         serde_json::Value::Bool(flag) => LoroValue::Bool(*flag),

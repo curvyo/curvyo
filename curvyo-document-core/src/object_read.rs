@@ -131,6 +131,9 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
                     own_style: overrides
                         .own_style
                         .then(|| crate::style_codec::read_style(meta)),
+                    own_adjustments: overrides
+                        .own_adjustments
+                        .then(|| crate::image_adjust_codec::read_adjustments(meta)),
                 },
             )
         });

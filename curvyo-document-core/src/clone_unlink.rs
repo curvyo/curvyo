@@ -96,12 +96,23 @@ impl Document {
         else {
             return Err(CloneError::NoSuchObject);
         };
+        // The copy shows what the clone showed: the effective adjustments (ADR 0072 §2).
+        let adjustments = (clone.chain.adjust_source != root)
+            .then(|| {
+                tree.get_meta(crate::paths::tree_id_of(clone.chain.adjust_source))
+                    .ok()
+            })
+            .flatten()
+            .map(|source| crate::image_adjust_codec::raw_registers(&source));
         for key in clone_meta.keys() {
             if !crate::objects::LINEAGE_KEYS.contains(&&*key) {
                 let _ = clone_meta.delete(&key);
             }
         }
         crate::objects::copy_map(&copy_meta, &clone_meta, crate::objects::LINEAGE_KEYS);
+        if let Some(raw) = &adjustments {
+            crate::image_adjust_codec::write_raw_registers(&clone_meta, raw);
+        }
         if !crate::node_registers::read_registers(&clone_meta).visible {
             // invariant: a plain value under a known key on a live map.
             #[allow(clippy::unwrap_used)]

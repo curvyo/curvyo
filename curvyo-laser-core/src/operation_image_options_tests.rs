@@ -121,6 +121,7 @@ fn an_image_edit_changes_one_setting_and_reads_back_from_the_stored_map() {
             gamma_hundredths: 180,
             invert: true,
             lowest_power_tenths: 125,
+            ..ImageSettings::DEFAULT
         }
     );
     // The same value writes nothing; a Cut takes no Image setting.
@@ -153,7 +154,11 @@ fn an_image_edit_changes_one_setting_and_reads_back_from_the_stored_map() {
 #[test]
 fn every_damage_reads_as_damage() {
     let cases = [
-        (json!({"dither": "halftone"}), OptionsDamage::BadValue),
+        (json!({"dither": "halftone_x"}), OptionsDamage::BadValue),
+        (json!({"screen_size_mm": 0.19}), OptionsDamage::BadValue),
+        (json!({"screen_size_mm": 0.805}), OptionsDamage::BadValue),
+        (json!({"screen_angle_deg": 90}), OptionsDamage::BadValue),
+        (json!({"screen_angle_deg": 4.5}), OptionsDamage::WrongType),
         (json!({"dither": 1}), OptionsDamage::WrongType),
         (json!({"threshold_pct": 101}), OptionsDamage::BadValue),
         (json!({"threshold_pct": 50.5}), OptionsDamage::WrongType),

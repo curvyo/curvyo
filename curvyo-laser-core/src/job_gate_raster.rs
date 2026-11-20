@@ -14,8 +14,8 @@ use crate::job_input::{BlockInput, JobInput, LeafGeometry, LeafInput, PointUm};
 use crate::job_numbers::NumbersRead;
 use crate::job_raster_grid::estimated_dots;
 use crate::job_raster_plan::MAX_DOTS;
+use crate::job_raster_plan::burns_grey;
 use crate::job_raster_sample::pixel_pitch_mm;
-use crate::operation_image_options::Dither;
 use crate::operation_kind::OperationKind;
 
 /// How far two frames must reach into each other to overlap, in mm (an edge shared within this
@@ -67,10 +67,13 @@ pub(crate) fn raster_issues(input: &JobInput, built: &Built, issues: &mut Vec<Is
         }
         let image = &numbers.options.image;
         let operation = || Targets::Operations(vec![block.id]);
-        if image.dither == Dither::Grey && !m4 {
+        // Any raster leaf burning Grey, a picture with its own dither included (ADR 0072
+        // amendment A4); the lines stay the operation's (Frage 284 B, Lowest power is its field).
+        let grey = burns_grey(image, leaves.iter().copied());
+        if grey && !m4 {
             issues.push(issue(Cause::GreyNeedsM4 { op: block.id }, 1, operation()));
         }
-        if image.dither == Dither::Grey && image.lowest_power_tenths > numbers.main.power.tenths() {
+        if grey && image.lowest_power_tenths > numbers.main.power.tenths() {
             let cause = Cause::LowestPowerAbovePower { op: block.id };
             issues.push(issue(cause, 1, operation()));
         }
@@ -118,13 +121,25 @@ struct Lists {
     overlapping: Once,
     reduced: Once,
     unreadable: Once,
+    /// Pictures with steps that cannot run, each once with its count (`specs/0135` criterion 23).
+    broken: Vec<(NodeId, usize)>,
 }
 
 impl Lists {
     fn image(&mut self, leaf: &LeafInput, interval_mm: f64) {
-        let LeafGeometry::Image { frame, pixels, .. } = &leaf.geometry else {
+        let LeafGeometry::Image {
+            frame,
+            pixels,
+            adjust,
+            ..
+        } = &leaf.geometry
+        else {
             return;
         };
+        let broken = adjust.broken_steps();
+        if broken > 0 && !self.broken.iter().any(|(node, _)| *node == leaf.node) {
+            self.broken.push((leaf.node, broken));
+        }
         let Some(pixels) = pixels else {
             self.unreadable.add(leaf.node);
             return;
@@ -177,6 +192,13 @@ impl Lists {
             if !items.is_empty() {
                 issues.push(issue(cause, items.len(), Targets::Items(items)));
             }
+        }
+        for (item, count) in self.broken {
+            issues.push(issue(
+                Cause::BrokenAdjustments { item },
+                count,
+                Targets::Items(vec![item]),
+            ));
         }
     }
 }

@@ -42,6 +42,8 @@ impl OptionField {
             "contrast" => Self::Image(ImageField::Contrast),
             "gamma" => Self::Image(ImageField::Gamma),
             "lowest_power" => Self::Image(ImageField::LowestPower),
+            "screen_size" => Self::Image(ImageField::ScreenSize),
+            "screen_angle" => Self::Image(ImageField::ScreenAngle),
             "invert" => Self::Invert,
             _ => return None,
         })

@@ -7,6 +7,7 @@ use curvyo_document_core::{AssetHash, DocumentSize, Length, NodeId, PlacedGradie
 use curvyo_geometry_core::OutlineTriple;
 use curvyo_image_core::WorkingImage;
 
+use crate::image_adjust_resolve::AdjustRegisters;
 use crate::machine_profile::ProfileValues;
 use crate::operation_kind::KindRead;
 use crate::operation_options::{OperationOptions, OptionsDamage};
@@ -99,6 +100,9 @@ pub enum LeafGeometry {
         asset: AssetHash,
         /// The decoded working image; `None` when its bytes cannot be read (skipped, a warn).
         pixels: Option<Arc<WorkingImage>>,
+        /// The adjustments the picture shows (`specs/0135` criteria 19, 61: a clone's effective
+        /// ones); the default is no adjustment.
+        adjust: AdjustRegisters,
     },
     /// A path, text or primitive whose fill paint is a gradient (`specs/0123` criterion 3): its
     /// outlines and the gradient placed on the page.

@@ -1,6 +1,9 @@
-//! The dither of one raster item (ADR 0068 §5, `specs/0123` criterion 10): each dot's adjusted
-//! grey becomes a level, 0 off and 1 to 255 burning, in integers only.
+//! The dither of one raster item (ADR 0068 §5, ADR 0074; `specs/0123` criterion 10, `specs/0135`
+//! criteria 42, 43): each dot's adjusted grey becomes a level, 0 off and 1 to 255 burning, in
+//! integers only.
 
+use crate::job_input::PointUm;
+use crate::job_raster_screen::{Screen, ScreenShape};
 use crate::operation_image_options::{Dither, ImageSettings};
 
 /// The 8 x 8 Bayer matrix, values 0 to 63.
@@ -82,6 +85,8 @@ pub struct Ditherer {
     errors: [Vec<i32>; 3],
     /// The row the first accumulator belongs to.
     row: Option<i64>,
+    /// The screen of Halftone and Line screen, `None` for the other modes.
+    screen: Option<Screen>,
 }
 
 impl Ditherer {
@@ -93,7 +98,11 @@ impl Ditherer {
             Dither::Jarvis => Some(JARVIS),
             Dither::Atkinson => Some(ATKINSON),
             Dither::Stucki => Some(STUCKI),
-            Dither::Threshold | Dither::Ordered | Dither::Grey => None,
+            Dither::Threshold
+            | Dither::Ordered
+            | Dither::Grey
+            | Dither::Halftone
+            | Dither::LineScreen => None,
         };
         let len = if diffusion.is_some() {
             width + 2 * usize::try_from(MARGIN).unwrap_or(2)
@@ -107,7 +116,27 @@ impl Ditherer {
             first_column,
             errors: [vec![0; len], vec![0; len], vec![0; len]],
             row: None,
+            screen: None,
         }
+    }
+
+    /// This dither with the screen of a screen mode for dots of `interval_um`, anchored at the
+    /// item's first frame corner `anchor` (ADR 0074 §2); the other modes are unchanged.
+    #[must_use]
+    pub fn screened(mut self, settings: &ImageSettings, interval_um: i64, anchor: PointUm) -> Self {
+        let shape = match settings.dither {
+            Dither::Halftone => ScreenShape::Dots,
+            Dither::LineScreen => ScreenShape::Lines,
+            _ => return self,
+        };
+        self.screen = Some(Screen::new(
+            shape,
+            i64::from(settings.screen_size_hundredths) * 10,
+            settings.screen_angle_deg,
+            interval_um,
+            anchor,
+        ));
+        self
     }
 
     /// Moves the error rows down to row `k` (rows only increase).
@@ -121,9 +150,23 @@ impl Ditherer {
     }
 
     /// The levels of the dots of row `k` from column `first` on, one per grey in `greys`,
-    /// appended to `out`.
-    pub fn stretch(&mut self, k: i64, first: i64, greys: &[u8], out: &mut Vec<u8>) {
+    /// appended to `out`; `centre(j)` is the page point of dot `j`'s centre (read by the screens
+    /// only).
+    pub fn stretch(
+        &mut self,
+        k: i64,
+        first: i64,
+        greys: &[u8],
+        centre: impl Fn(i64) -> PointUm,
+        out: &mut Vec<u8>,
+    ) {
         out.reserve(greys.len());
+        if let Some(screen) = &self.screen {
+            for (j, &g) in (first..).zip(greys) {
+                out.push(if screen.burns(centre(j), g) { 255 } else { 0 });
+            }
+            return;
+        }
         let Some((d, weights)) = self.diffusion else {
             for (j, &g) in (first..).zip(greys) {
                 out.push(self.level(k, j, g));
@@ -162,7 +205,12 @@ impl Ditherer {
                 128 * u32::from(g) < (2 * u32::from(m) + 1) * 255
             }
             Dither::Grey => return 255 - g,
-            Dither::FloydSteinberg | Dither::Jarvis | Dither::Atkinson | Dither::Stucki => false,
+            Dither::FloydSteinberg
+            | Dither::Jarvis
+            | Dither::Atkinson
+            | Dither::Stucki
+            | Dither::Halftone
+            | Dither::LineScreen => false,
         };
         if burn { 255 } else { 0 }
     }
@@ -186,11 +234,18 @@ mod tests {
 
     /// The levels of a `width` x `rows` area of one grey per column.
     fn area(dither: Dither, greys: &[u8], rows: i64) -> Vec<Vec<u8>> {
-        let mut d = Ditherer::new(&settings(dither), 0, greys.len());
+        let s = settings(dither);
+        let mut d = Ditherer::new(&s, 0, greys.len()).screened(&s, 100, PointUm::new(0, 0));
         (0..rows)
             .map(|k| {
                 let mut out = Vec::new();
-                d.stretch(k, 0, greys, &mut out);
+                d.stretch(
+                    k,
+                    0,
+                    greys,
+                    |j| PointUm::new(j * 100 + 50, k * 100 + 50),
+                    &mut out,
+                );
                 out
             })
             .collect()
@@ -200,13 +255,15 @@ mod tests {
         levels.iter().flatten().filter(|&&l| l > 0).count()
     }
 
-    const BINARY: [Dither; 6] = [
+    const BINARY: [Dither; 8] = [
         Dither::Threshold,
         Dither::Ordered,
         Dither::FloydSteinberg,
         Dither::Jarvis,
         Dither::Atkinson,
         Dither::Stucki,
+        Dither::Halftone,
+        Dither::LineScreen,
     ];
 
     #[test]
@@ -261,9 +318,9 @@ mod tests {
     fn skipped_rows_drop_their_error() {
         let mut d = Ditherer::new(&settings(Dither::FloydSteinberg), 0, 4);
         let mut out = Vec::new();
-        d.stretch(0, 0, &[200; 4], &mut out);
+        d.stretch(0, 0, &[200; 4], |_| PointUm::new(0, 0), &mut out);
         out.clear();
-        d.stretch(5, 0, &[255; 4], &mut out);
+        d.stretch(5, 0, &[255; 4], |_| PointUm::new(0, 0), &mut out);
         assert_eq!(out, vec![0; 4], "no error reaches row 5 from row 0");
     }
 }

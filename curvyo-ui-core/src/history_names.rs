@@ -333,6 +333,10 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("remove_gradient_stop", "Remove gradient stop"),
     ("reverse_gradient", "Reverse gradient"),
     // `specs/0025-raster-trace` criterion 13.
+    // `specs/0135-image-optimisation` criteria 2, 9, 24, 59 (ADR 0072 §7).
+    ("edit_adjustments", "Edit adjustments"),
+    ("restore_original", "Restore original"),
+    ("follow_original", "Follow original"),
     ("trace_image", "Trace image"),
     // `specs/0114-image-trace-mask` criterion 17, ADR 0061 §6.
     ("draw_trace_rectangle", "Draw rectangle"),

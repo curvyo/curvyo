@@ -59,6 +59,11 @@ pub struct CloneChain {
     /// The node its style and opacity register are read from (ADR 0016 §3): itself with own
     /// style, else the nearest clone on its chain with own style, else the root.
     pub style_source: NodeId,
+    /// Whether it owns its adjustments (ADR 0072 §2); only ever true for a clone of an image.
+    pub own_adjustments: bool,
+    /// The node its adjustment registers are read from (ADR 0072 §2): itself with own
+    /// adjustments, else the nearest clone on its chain with them, else the root.
+    pub adjust_source: NodeId,
     /// The root's own snapshot as read, unmapped, one allocation shared by every clone of that
     /// root, so the renderer can tessellate it once (`adrs.md` decision 3, criterion 44).
     /// Invariant: [`CloneSnapshot::resolved`]'s anchors are this outline's under `composed`.

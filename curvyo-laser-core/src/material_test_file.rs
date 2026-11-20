@@ -12,6 +12,7 @@ use crate::material_record_file::{
     MachineJson, RecordFileError, damaged, machine_json, read_machine,
 };
 use crate::test_id::TestId;
+use crate::test_recipe::PictureSource;
 use crate::test_recipe_json::{RecipeJson, read_recipe, recipe_json};
 
 #[derive(Serialize, Deserialize)]
@@ -36,7 +37,8 @@ struct CellJson {
     row: u64,
 }
 
-/// The tests of a record of format `version`; a format-2 record holds no Image test.
+/// The tests of a record of format `version`; a format-2 record holds no Image test, a format-3
+/// record no picture test (`specs/0135` criterion 51).
 pub(crate) fn read_tests(
     tests: Vec<TestJson>,
     version: u64,
@@ -58,6 +60,7 @@ pub(crate) fn read_tests(
         }
         let recipe = read_recipe(&test.recipe)
             .filter(|recipe| version > 2 || recipe.kind() != SetKind::Image)
+            .filter(|recipe| version > 3 || recipe.picture() == PictureSource::Ramp)
             .ok_or_else(|| damaged(format!("The recipe of test {id} is not valid.")))?;
         let best = match test.best {
             None => None,

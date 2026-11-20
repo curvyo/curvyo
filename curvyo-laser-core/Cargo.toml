@@ -9,6 +9,12 @@ description = "The laser workbench extension (ADR 0034): its manifest, fixture o
 [lints]
 workspace = true
 
+# The adjustment goldens are also compared in the wasm build, in Node, by
+# `wasm-bindgen-test-runner` (`tests/adjust_goldens.rs`, ADR 0073 §1). The version
+# `curvyo-geometry-core` already uses; MIT OR Apache-2.0.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
 [dependencies]
 curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }

@@ -19,6 +19,12 @@ mod fixture_slot;
 mod fixture_snap;
 mod fixture_stored;
 mod grid_layout;
+mod image_adjust_cache;
+mod image_adjust_fields;
+mod image_adjust_resolve;
+mod image_adjust_stored;
+mod image_dither;
+mod image_preset;
 mod job_build;
 mod job_effects;
 mod job_fingerprint;
@@ -40,6 +46,7 @@ mod job_raster_items;
 mod job_raster_plan;
 mod job_raster_rows;
 mod job_raster_sample;
+mod job_raster_screen;
 mod job_raster_tone;
 mod job_raster_work;
 mod job_timeline;
@@ -89,6 +96,22 @@ mod test_recipe;
 mod test_recipe_json;
 mod test_recipe_layout;
 
+/// The adjustments of a picture before its dots are made (`specs/0135-image-optimisation`, ADR
+/// 0073): the stored steps, the presets with their Strength, and the adjusted image at an
+/// Interval.
+pub mod adjust {
+    pub use crate::image_adjust_cache::{
+        ADJUST_WORK, ADJUSTED_BYTES, AdjustKey, AdjustedPicture, LOOK_BYTES, PyramidCache,
+        RUN_BYTES, Resolved, reduced_level,
+    };
+    pub use crate::image_adjust_fields::{FieldSpec, ManualStep, StepDamage, StepKind};
+    pub use crate::image_adjust_resolve::{
+        AdjustRegisters, DEFAULT_STRENGTH, StoredStep, adjust_picture, pixel_steps,
+    };
+    pub use crate::image_dither::DitherSettings;
+    pub use crate::image_preset::{Preset, stretch_points};
+}
+
 /// The laser operations of `specs/0101-laser-operations` as pure rules over stored records
 /// (ADR 0046 §5).
 pub mod operations {
@@ -134,7 +157,10 @@ pub mod job {
     pub use crate::job_plan::{
         FLATTEN_MM, Plan, PlanCache, PlannedPath, PlannedRun, PlannedSweep, plan_block,
     };
-    pub use crate::job_raster_plan::{MAX_DOTS, raster_dot_map};
+    pub use crate::job_raster_items::ADJUST_DOTS;
+    pub use crate::job_raster_plan::{
+        MAX_DOTS, burns_grey, leaf_image_settings, raster_dot_map, raster_dot_map_adjusted,
+    };
     pub use crate::job_raster_rows::{GAP_UM, Levels, Run, Sweep, run_power};
     pub use crate::job_timeline::{
         Head, Timeline, duration_text, estimate_text, length_text, lengths_text, readout_text,
@@ -186,8 +212,8 @@ pub mod grids {
     pub use crate::test_id::{TEST_ID_CHARS, TestId};
     pub use crate::test_param::{Param, ParamValue};
     pub use crate::test_recipe::{
-        Axis, MAX_CELL, MAX_COUNT, MIN_CELL, MIN_COUNT, MaterialRef, Recipe, RecipeDefaults,
-        RecipeField, Side, TestRecipe,
+        Axis, MAX_CELL, MAX_COUNT, MIN_CELL, MIN_COUNT, MaterialRef, PictureSource, Recipe,
+        RecipeDefaults, RecipeField, Side, TestRecipe,
     };
     pub use crate::test_recipe_layout::{
         GAP_MM, LabelPart, LaidCell, LaidLabel, TEXT_MM, TestLayout, layout,

@@ -132,6 +132,12 @@ pub enum Cause {
     },
     /// Operations of an Unknown kind or with damaged settings run nothing (criterion 33).
     DamagedSettings,
+    /// `specs/0135` criterion 23: steps in the Adjustments of a picture that cannot run (an
+    /// unknown kind, a damaged field or register); the count is the steps'.
+    BrokenAdjustments {
+        /// The picture.
+        item: NodeId,
+    },
 }
 
 impl Cause {
@@ -165,6 +171,7 @@ impl Cause {
             Self::NotPictures { .. } => 23,
             Self::LowestPowerAbovePower { .. } => 24,
             Self::DamagedSettings => 25,
+            Self::BrokenAdjustments { .. } => 26,
         }
     }
 

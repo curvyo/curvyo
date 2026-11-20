@@ -371,6 +371,12 @@ impl PlanCache {
         }
     }
 
+    /// The grey pyramids and adjusted pictures this cache shares (a clone shares its maps).
+    #[must_use]
+    pub fn pictures(&self) -> crate::image_adjust_cache::PyramidCache {
+        self.raster.pyramids.clone()
+    }
+
     /// How many grey pyramids are kept.
     #[must_use]
     pub fn pyramids(&self) -> usize {

@@ -37,13 +37,17 @@ pub(crate) enum RawLeaf {
     Unreadable(NodeId),
 }
 
-/// What a clone node stores besides its link (ADR 0016 §1).
+/// What a clone node stores besides its link (ADR 0016 §1). The fields are named after the
+/// stored markers `own_placement`, `own_style` and `own_adjustments`.
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct RawOverrides {
     /// The own-placement flag.
     pub(crate) own_placement: bool,
     /// Its own style when it has the `own_style` marker.
     pub(crate) own_style: Option<Style>,
+    /// Its own adjustments when it has the `own_adjustments` marker (ADR 0072 §2).
+    pub(crate) own_adjustments: Option<crate::image_adjust_model::ImageAdjustments>,
 }
 
 impl RawLeaf {
@@ -71,6 +75,16 @@ impl RawLeaf {
             RawOverrides {
                 own_placement: clone.chain.own_placement,
                 own_style: clone.chain.own_style.then(|| clone.resolved.style.clone()),
+                own_adjustments: clone.chain.own_adjustments.then(|| {
+                    clone
+                        .drawn_leaves()
+                        .iter()
+                        .find_map(|leaf| match leaf {
+                            ObjectSnapshot::Image(image) => Some(image.adjustments.clone()),
+                            _ => None,
+                        })
+                        .unwrap_or_default()
+                }),
             },
         )
     }
@@ -187,11 +201,21 @@ enum State {
     Pending,
     /// A clone on the stack of the walk in progress.
     OnStack,
-    /// A resolved clone: its root, its depth, its composed matrix and the index of its style
-    /// source (`None`: the root).
-    Resolved(RootRef, usize, Affine, Option<usize>),
+    /// A resolved clone: its root, its depth, its composed matrix and its sources.
+    Resolved(RootRef, usize, Affine, Sources),
     /// A clone that cannot be resolved.
     Orphan,
+}
+
+/// The clones a resolved clone reads its style and its adjustments from (ADR 0016 §3, ADR 0072
+/// §2): the index of the nearest clone on its chain, itself first, with own style and with own
+/// adjustments; `None`: the root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) struct Sources {
+    /// The style source S(c).
+    pub(crate) style: Option<usize>,
+    /// The adjustment source A(c).
+    pub(crate) adjust: Option<usize>,
 }
 
 /// Resolves every clone of `leaves` (stacking order) without the tree around them: a clone of a
@@ -253,12 +277,19 @@ fn walk(
         };
         let Some(&next) = index.get(&link.origin) else {
             if structure.is_group(link.origin) {
-                break Some((RootRef::Group(link.origin), 0, Affine::IDENTITY, None));
+                break Some((
+                    RootRef::Group(link.origin),
+                    0,
+                    Affine::IDENTITY,
+                    Sources::default(),
+                ));
             }
             break None;
         };
         match states[next] {
-            State::Root => break Some((RootRef::Leaf(next), 0, Affine::IDENTITY, None)),
+            State::Root => {
+                break Some((RootRef::Leaf(next), 0, Affine::IDENTITY, Sources::default()));
+            }
             State::Resolved(root, depth, composed, source) => {
                 break Some((root, depth, composed, source));
             }
@@ -276,10 +307,17 @@ fn walk(
                 return None;
             };
             let own = link.matrix.compose(composed);
-            let source = if overrides.own_style.is_some() {
-                Some(clone)
-            } else {
-                source
+            let source = Sources {
+                style: if overrides.own_style.is_some() {
+                    Some(clone)
+                } else {
+                    source.style
+                },
+                adjust: if overrides.own_adjustments.is_some() {
+                    Some(clone)
+                } else {
+                    source.adjust
+                },
             };
             own.is_finite().then_some((root, depth + 1, own, source))
         });
@@ -316,11 +354,20 @@ fn outline_clones(
         let root = match root {
             RootRef::Leaf(root) if root_path_of(&leaves[root], &mut shared, root).is_some() => root,
             RootRef::Leaf(_) | RootRef::Group(_) => {
+                let adjustments = source.adjust.and_then(|s| match &leaves[s] {
+                    RawLeaf::Clone(source_id, _, raw) => raw
+                        .own_adjustments
+                        .clone()
+                        .map(|own| (*source_id, std::sync::Arc::new(own))),
+                    _ => None,
+                });
                 pictures.push(Pending {
                     at: i,
                     id: *id,
                     link: *link,
                     own_placement: overrides.own_placement,
+                    own_adjustments: overrides.own_adjustments.is_some(),
+                    adjustments,
                     root,
                     depth,
                     composed,
@@ -332,7 +379,7 @@ fn outline_clones(
             && let Some(root_outline) = shared.get(&root).cloned()
         {
             let root_path = &*root_outline;
-            let (style_source, style) = match source.map(|s| &leaves[s]) {
+            let (style_source, style) = match source.style.map(|s| &leaves[s]) {
                 Some(RawLeaf::Clone(
                     source_id,
                     _,
@@ -354,6 +401,8 @@ fn outline_clones(
                     own_placement: overrides.own_placement,
                     own_style: overrides.own_style.is_some(),
                     style_source,
+                    own_adjustments: false,
+                    adjust_source: root_path.id,
                     root_outline,
                     picture: None,
                     picture_members: None,
@@ -542,6 +591,7 @@ pub(crate) mod tests_support {
             RawOverrides {
                 own_placement,
                 own_style: Some(style),
+                own_adjustments: None,
             },
         )
     }

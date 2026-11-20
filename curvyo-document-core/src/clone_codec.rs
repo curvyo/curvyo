@@ -11,6 +11,9 @@
 //!   own_placement : true        absent = false; held back when its original is transformed
 //!   own_style     : true        absent = false; then the ordinary style keys (`style_codec`,
 //!                               absent key = default) and `opacity` (absent = 1) are its own
+//!   own_adjustments : true      absent = false; on a clone of an image only: then the three
+//!                               adjustment registers (`image_adjust_codec`, absent = default)
+//!                               are its own (ADR 0072 §2); not a bool reads false, never refused
 //! ```
 //!
 //! A clone carries no anchors or `rotation`, and without `own_style` no style and no `opacity`;
@@ -34,6 +37,8 @@ pub(crate) const KEY_CLONE_LINK: &str = "clone_link";
 pub(crate) const KEY_OWN_PLACEMENT: &str = "own_placement";
 /// The meta key of the own-style marker (ADR 0016 §1).
 pub(crate) const KEY_OWN_STYLE: &str = "own_style";
+/// The meta key of the own-adjustments marker of a clone of an image (ADR 0072 §2).
+pub(crate) const KEY_OWN_ADJUSTMENTS: &str = "own_adjustments";
 const KEY_ORIGIN: &str = "origin";
 const KEY_MATRIX: &str = "matrix";
 
@@ -54,6 +59,9 @@ pub(crate) struct CloneOverrides {
     pub(crate) own_placement: bool,
     /// Its style keys and `opacity` are its own (`0057` criterion 11).
     pub(crate) own_style: bool,
+    /// Its adjustment registers are its own (ADR 0072 §2); a flag that is not a bool is damage
+    /// of the flag only and reads false (ADR 0072 §5).
+    pub(crate) own_adjustments: bool,
 }
 
 /// Reads the override flags of a clone node.
@@ -67,6 +75,7 @@ pub(crate) fn read_overrides(meta: &LoroMap) -> CloneOverrides {
     CloneOverrides {
         own_placement: flag(KEY_OWN_PLACEMENT),
         own_style: flag(KEY_OWN_STYLE),
+        own_adjustments: flag(KEY_OWN_ADJUSTMENTS),
     }
 }
 
@@ -335,7 +344,8 @@ mod tests {
             read_overrides(&meta),
             CloneOverrides {
                 own_placement: true,
-                own_style: true
+                own_style: true,
+                own_adjustments: false,
             }
         );
         assert!(validate_clone_node(&meta));
@@ -373,6 +383,21 @@ mod tests {
         assert!(!validate_clone_node(&meta), "a damaged own style");
         meta.insert(KEY_OWN_STYLE, false).unwrap();
         assert!(validate_clone_node(&meta), "a stored false is not damage");
+    }
+
+    #[test]
+    fn the_own_adjustments_marker_reads_true_only_as_a_bool_and_is_never_refused() {
+        let (_doc, meta) = meta();
+        write_flag(&meta, KEY_OWN_ADJUSTMENTS, true);
+        assert!(read_overrides(&meta).own_adjustments);
+        for value in [LoroValue::from("true"), LoroValue::I64(1)] {
+            meta.insert(KEY_OWN_ADJUSTMENTS, value).unwrap();
+            assert!(!read_overrides(&meta).own_adjustments);
+            assert!(
+                validate_clone_node(&meta),
+                "damage of the flag only (ADR 0072 §5)"
+            );
+        }
     }
 
     #[test]

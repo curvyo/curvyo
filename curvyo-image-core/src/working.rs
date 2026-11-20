@@ -83,6 +83,86 @@ impl WorkingImage {
         chain.push(level);
         chain
     }
+
+    /// The alpha of level `level` of the mip chain, one byte per pixel in the order and halving
+    /// of [`Self::reduced_over_white`] (the canvas look keeps a picture's transparency, ADR 0073
+    /// §8); `None` when the picture is opaque.
+    #[must_use]
+    pub fn reduced_alpha(&self, level: u32) -> Option<Vec<u8>> {
+        if self.pixels.as_chunks::<4>().0.iter().all(|p| p[3] == 255) {
+            return None;
+        }
+        let (mut w, mut h) = (self.width as usize, self.height as usize);
+        let mut alpha: Vec<u8> = self
+            .pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|p| p[3])
+            .collect();
+        for _ in 0..level {
+            if w == 1 && h == 1 {
+                break;
+            }
+            let (nw, nh) = ((w / 2).max(1), (h / 2).max(1));
+            let mut next = Vec::with_capacity(nw * nh);
+            for y in 0..nh {
+                let (y0, y1) = ((2 * y).min(h - 1), (2 * y + 1).min(h - 1));
+                for x in 0..nw {
+                    let (x0, x1) = ((2 * x).min(w - 1), (2 * x + 1).min(w - 1));
+                    let at = |xx: usize, yy: usize| u16::from(alpha[yy * w + xx]);
+                    let sum = at(x0, y0) + at(x1, y0) + at(x0, y1) + at(x1, y1);
+                    // invariant: a sum of four bytes plus 2, divided by 4, is a byte.
+                    #[allow(clippy::cast_possible_truncation)]
+                    next.push(((sum + 2) / 4) as u8);
+                }
+            }
+            (alpha, w, h) = (next, nw, nh);
+        }
+        Some(alpha)
+    }
+
+    /// Level `level` of the premultiplied mip chain composited over white, as an opaque picture
+    /// (a reduced input for the adjustments of a coarse preview, ADR 0073 §8); level 0 is this
+    /// picture over white.
+    #[must_use]
+    pub fn reduced_over_white(&self, level: u32) -> Self {
+        let mut mip = MipLevel {
+            width: self.width,
+            height: self.height,
+            pixels: self.pixels.clone(),
+        };
+        for pixel in mip.pixels.as_chunks_mut::<4>().0 {
+            let a = u16::from(pixel[3]);
+            for c in &mut pixel[..3] {
+                // invariant: (c * a + 127) / 255 <= 255.
+                #[allow(clippy::cast_possible_truncation)]
+                let value = ((u16::from(*c) * a + 127) / 255) as u8;
+                *c = value;
+            }
+        }
+        for _ in 0..level {
+            if mip.width == 1 && mip.height == 1 {
+                break;
+            }
+            mip = half(&mip);
+        }
+        for pixel in mip.pixels.as_chunks_mut::<4>().0 {
+            let white = 255 - pixel[3];
+            for c in &mut pixel[..3] {
+                *c = c.saturating_add(white);
+            }
+            pixel[3] = 255;
+        }
+        Self {
+            width: mip.width,
+            height: mip.height,
+            pixels: mip.pixels,
+            original_size: self.original_size,
+            truncated: self.truncated,
+            animated: self.animated,
+        }
+    }
 }
 
 fn half(level: &MipLevel) -> MipLevel {
@@ -131,5 +211,57 @@ mod tests {
         assert_eq!(sizes, [(5, 2), (2, 1), (1, 1)]);
         assert_eq!(&chain[0].pixels[..4], &[128, 128, 128, 128]);
         assert_eq!(&chain[2].pixels[..4], &[128, 128, 128, 128]);
+    }
+
+    #[test]
+    fn a_reduced_picture_is_opaque_over_white_and_halved() {
+        let image = WorkingImage {
+            width: 4,
+            height: 2,
+            pixels: [0, 0, 0, 128].repeat(8),
+            original_size: (4, 2),
+            truncated: false,
+            animated: false,
+        };
+        let full = image.reduced_over_white(0);
+        assert_eq!(&full.pixels[..4], &[127, 127, 127, 255]);
+        let half = image.reduced_over_white(1);
+        assert_eq!((half.width, half.height), (2, 1));
+        assert_eq!(&half.pixels[..4], &[127, 127, 127, 255]);
+        assert_eq!(image.reduced_over_white(9).width, 1);
+    }
+
+    /// Criterion 15 (ADR 0073 §8): the look's alpha is the alpha of the reduced level, the same
+    /// halving as the colour; an opaque picture has none.
+    #[test]
+    fn the_reduced_alpha_follows_the_halving() {
+        let mut pixels = Vec::new();
+        for a in [0_u8, 255, 255, 255, 0, 0, 255, 255] {
+            pixels.extend_from_slice(&[10, 20, 30, a]);
+        }
+        let image = WorkingImage {
+            width: 4,
+            height: 2,
+            pixels,
+            original_size: (4, 2),
+            truncated: false,
+            animated: false,
+        };
+        assert_eq!(
+            image.reduced_alpha(0).unwrap(),
+            [0, 255, 255, 255, 0, 0, 255, 255]
+        );
+        let half = image.reduced_alpha(1).unwrap();
+        assert_eq!(half, [64, 255]);
+        assert_eq!(
+            image.reduced_alpha(9).unwrap(),
+            [160],
+            "(64 + 255 + 64 + 255 + 2) / 4"
+        );
+        let opaque = WorkingImage {
+            pixels: [1, 2, 3, 255].repeat(8),
+            ..image
+        };
+        assert_eq!(opaque.reduced_alpha(1), None);
     }
 }

@@ -31,10 +31,12 @@ struct PreviewKey {
     library: u64,
     /// The view's scale, whose preview step each item's Interval sets.
     scale_bits: u64,
+    /// The Strength held on a picture while its slider is dragged (`specs/0135` criterion 26).
+    held: Option<(NodeId, u8)>,
 }
 
 /// A raster item: its leaf's node and stacking place (the leaves of one clone share the node).
-type Item = (NodeId, u32);
+pub(super) type Item = (NodeId, u32);
 
 /// The Toolpath view's pictures of one job generation, each with the job move its item starts on.
 type HeldToolpath = (u64, Arc<Vec<(RasterPicture, usize)>>);
@@ -46,6 +48,9 @@ pub(super) struct RasterCache {
     preview: RefCell<Option<(PreviewKey, Arc<Vec<RasterPicture>>)>>,
     /// The preview grid's plans, sharing the job's grey pyramids (made on first use).
     preview_plans: RefCell<Option<PlanCache>>,
+    /// The Before and after pane's After picture and its reduced plans (`pane_picture.rs`).
+    pub(super) pane: RefCell<Option<RasterPicture>>,
+    pub(super) pane_plans: RefCell<Option<PlanCache>>,
     /// The working images of the pictures both views hold, by name.
     names: RefCell<HashMap<AssetHash, Arc<curvyo_image_core::WorkingImage>>>,
     serial: Cell<u64>,
@@ -57,7 +62,7 @@ pub(super) struct RasterCache {
 impl RasterCache {
     /// The picture of `item` from `sweeps`: one of `old` drawn from the same sweeps, else a new
     /// one under a fresh name.
-    fn picture(
+    pub(super) fn picture(
         &self,
         item: Item,
         sweeps: Vec<Arc<Sweep>>,
@@ -96,7 +101,7 @@ impl RasterCache {
 }
 
 /// The pictures of `pictures` by item.
-fn by_item<'a>(
+pub(super) fn by_item<'a>(
     pictures: impl Iterator<Item = &'a RasterPicture>,
 ) -> HashMap<Item, &'a RasterPicture> {
     pictures.map(|p| ((p.node, p.stacking), p)).collect()
@@ -153,7 +158,7 @@ fn preview_step(interval: Interval, view: ViewTransform) -> i64 {
 const PREVIEW_DOTS: f64 = 300_000.0;
 
 /// The area in mm² of the box of each raster leaf of `block`, summed.
-fn raster_area_mm2(block: &BlockInput) -> f64 {
+pub(super) fn raster_area_mm2(block: &BlockInput) -> f64 {
     block
         .leaves
         .iter()
@@ -185,13 +190,13 @@ fn raster_area_mm2(block: &BlockInput) -> f64 {
 }
 
 /// The smallest power of two `k` from `k` up for which the raster items of `area_mm2` have at
-/// most [`PREVIEW_DOTS`] dots at `k` times `interval`.
-fn capped_step(mut k: i64, interval: Interval, area_mm2: f64) -> i64 {
+/// most `most` dots at `k` times `interval` ([`PREVIEW_DOTS`] for the Operations view).
+pub(super) fn capped_step(mut k: i64, interval: Interval, area_mm2: f64, most: f64) -> i64 {
     let dots = |k: i64| {
         let step = interval.mm() * f64::from(u32::try_from(k).unwrap_or(u32::MAX));
         area_mm2 / (step * step)
     };
-    while dots(k) > PREVIEW_DOTS && k < 1 << 16 {
+    while dots(k) > most && k < 1 << 16 {
         k *= 2;
     }
     k
@@ -278,6 +283,7 @@ impl Session {
             manufacturing: self.active_manufacturing().map(|m| m.id),
             library: self.materials.library_generation(),
             scale_bits: view.scale().to_bits(),
+            held: self.held_adjust_strength(),
         };
         if let Some((held, pictures)) = cache.preview.borrow().as_ref()
             && *held == key
@@ -332,6 +338,7 @@ impl Session {
                 preview_step(numbers.interval, view),
                 numbers.interval,
                 raster_area_mm2(&raster),
+                PREVIEW_DOTS,
             );
             let hundredths = i64::from(numbers.interval.hundredths()) * k;
             numbers.interval =
@@ -362,7 +369,7 @@ impl Session {
 }
 
 /// Keeps the preview plans of the Image blocks `ids` and the images and leaves `input` names.
-fn retain_preview_plans(
+pub(super) fn retain_preview_plans(
     plans: &mut PlanCache,
     input: &curvyo_laser_core::job::JobInput,
     ids: &[NodeId],
@@ -388,7 +395,7 @@ fn retain_preview_plans(
 /// The numbers the preview draws `block`'s dots with: the block's, or for an operation with no
 /// settings the default Interval with its own options, so its items show their dots before
 /// power and speed are set (UX notes 3.1). The power and speed are never drawn.
-fn preview_numbers(block: &BlockInput, read: &NumbersRead) -> Option<BlockNumbers> {
+pub(super) fn preview_numbers(block: &BlockInput, read: &NumbersRead) -> Option<BlockNumbers> {
     if let Some(numbers) = read.numbers() {
         return Some(*numbers);
     }
@@ -413,13 +420,14 @@ fn preview_numbers(block: &BlockInput, read: &NumbersRead) -> Option<BlockNumber
         main: run,
         outline: None,
         interval: Interval::DEFAULT,
+        picture_interval: Interval::DEFAULT,
         options: *options,
     })
 }
 
 /// `block` with only its raster leaves (images with pixels and gradient-filled leaves) and no
 /// outline work, `None` when it has none or is no operation.
-fn raster_block(block: &BlockInput) -> Option<BlockInput> {
+pub(super) fn raster_block(block: &BlockInput) -> Option<BlockInput> {
     if !matches!(block.source, BlockSource::Operation { .. }) {
         return None;
     }
@@ -462,17 +470,21 @@ mod tests {
     #[test]
     fn the_preview_step_is_capped_at_300_000_dots() {
         let interval = Interval::DEFAULT;
-        assert_eq!(capped_step(1, interval, 50.0 * 50.0), 1, "250,000 dots");
         assert_eq!(
-            capped_step(1, interval, 200.0 * 200.0),
+            capped_step(1, interval, 50.0 * 50.0, PREVIEW_DOTS),
+            1,
+            "250,000 dots"
+        );
+        assert_eq!(
+            capped_step(1, interval, 200.0 * 200.0, PREVIEW_DOTS),
             4,
             "4 million dots: 250,000 at 4"
         );
         assert_eq!(
-            capped_step(8, interval, 200.0 * 200.0),
+            capped_step(8, interval, 200.0 * 200.0, PREVIEW_DOTS),
             8,
             "never finer than the view's"
         );
-        assert_eq!(capped_step(1, interval, 0.0), 1);
+        assert_eq!(capped_step(1, interval, 0.0, PREVIEW_DOTS), 1);
     }
 }

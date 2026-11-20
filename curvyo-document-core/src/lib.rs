@@ -107,6 +107,9 @@ mod group_tree;
 mod groups;
 mod guides;
 mod history;
+mod image_adjust_codec;
+mod image_adjust_commands;
+mod image_adjust_model;
 mod image_codec;
 mod image_model;
 mod images;
@@ -349,6 +352,12 @@ pub use history::{
     ObjectRowClass, ObjectShape, ObjectStatus, ObjectTarget, ObjectTargets, OwnStep, RestoreReport,
     Role, RowRevert, RowVersion, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status,
     StepKind, StepRef, SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
+};
+pub use image_adjust_model::{
+    AdjustDamage, AdjustEntry, AdjustError, AdjustOwner, AdjustStep, AdjustmentsWrite,
+    DEFAULT_IMAGE_STRENGTH, EDIT_ADJUSTMENTS_COMMIT_LABEL, EXPERT_PRESET,
+    FOLLOW_ORIGINAL_COMMIT_LABEL, ImageAdjustments, MAX_IMAGE_STRENGTH,
+    RESTORE_ORIGINAL_COMMIT_LABEL, ShownAdjustments, StoredDither,
 };
 pub use image_model::{
     IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL, IMPORT_IMAGES_COMMIT_LABEL, ImageSnapshot,

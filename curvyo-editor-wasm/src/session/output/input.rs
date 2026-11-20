@@ -167,7 +167,10 @@ impl Session {
 
     /// The working image of `asset` for the job (`pixels.rs`): the canvas's when decoded, else
     /// decoded once; `None` when its bytes cannot be read.
-    fn job_pixels(&self, asset: &AssetHash) -> Option<Arc<curvyo_image_core::WorkingImage>> {
+    pub(in crate::session) fn job_pixels(
+        &self,
+        asset: &AssetHash,
+    ) -> Option<Arc<curvyo_image_core::WorkingImage>> {
         self.output
             .pixels
             .working(&self.document, asset, || self.decoded_working_image(asset))
@@ -297,11 +300,24 @@ impl Session {
             let stacking = u32::try_from(at).unwrap_or(u32::MAX);
             if !cut_out {
                 let geometry = match shape {
-                    LeafGeometry::Image { frame, asset, .. } if rasters => LeafGeometry::Image {
-                        pixels: self.job_pixels(&asset),
+                    LeafGeometry::Image {
                         frame,
                         asset,
-                    },
+                        mut adjust,
+                        ..
+                    } if rasters => {
+                        if let Some((held, strength)) = self.held_adjust_strength()
+                            && held == node
+                        {
+                            adjust.strength = strength;
+                        }
+                        LeafGeometry::Image {
+                            pixels: self.job_pixels(&asset),
+                            frame,
+                            asset,
+                            adjust,
+                        }
+                    }
                     other if rasters => other,
                     other => vector_geometry(other),
                 };

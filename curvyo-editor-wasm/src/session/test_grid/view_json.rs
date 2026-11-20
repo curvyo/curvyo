@@ -64,7 +64,7 @@ pub struct DitherStripView {
 fn dither_strip(dither: Dither) -> DitherStripView {
     DitherStripView {
         value: dither.key(),
-        modes: dither_options(Dither::ALL.into_iter().filter(|d| d.is_binary())),
+        modes: dither_options(Dither::ALL.into_iter().filter(|d| d.in_test_grid())),
     }
 }
 
