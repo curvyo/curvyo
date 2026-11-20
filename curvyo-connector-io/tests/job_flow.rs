@@ -56,9 +56,9 @@ fn q13_refusals_are_named_and_logged() {
         SendError::Rejected(RejectReason::Busy)
     );
     let log = rig.log();
-    assert!(log.contains("\tbinary.bin\tRejected: NotAscii\n"), "{log}");
-    assert!(log.contains("\thuge.gcode\tRejected: TooLarge\n"), "{log}");
-    assert!(log.contains("\ttwo.gcode\tRejected: Busy\n"), "{log}");
+    assert!(log.contains("\tbinary.bin\tRejected: NotAscii\t"), "{log}");
+    assert!(log.contains("\thuge.gcode\tRejected: TooLarge\t"), "{log}");
+    assert!(log.contains("\ttwo.gcode\tRejected: Busy\t"), "{log}");
     // The refused jobs held nothing: the first one is still ready.
     connection.send(&Message::GetStatus).unwrap();
     assert_eq!(state_of(&wait_for(&mut connection, |_| true)), State::Ready);
@@ -96,7 +96,7 @@ fn q14_q15_start_pause_resume_stop_and_the_log() {
             result: JobResult::Stopped,
         },
     );
-    assert!(rig.log().contains("\tlong.gcode\tStopped\n"));
+    assert!(rig.log().contains("\tlong.gcode\tStopped\t"));
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn q14_a_short_job_completes_and_the_row_can_read_the_end() {
         },
     );
     assert_eq!(line_of(&done), 6);
-    assert!(rig.log().contains("\tcoaster.gcode\tCompleted\n"));
+    assert!(rig.log().contains("\tcoaster.gcode\tCompleted\t"));
 }
 
 #[test]
@@ -279,7 +279,7 @@ fn q19_an_alarm_stops_the_stream_is_logged_and_keeps_the_machine_busy() {
     assert_eq!(text.as_deref(), Some("Fake alarm at line 3"));
     assert!(
         rig.log()
-            .contains("\tetch.gcode\tAlarm: Fake alarm at line 3\n")
+            .contains("\tetch.gcode\tAlarm: Fake alarm at line 3\t")
     );
     assert_eq!(
         connection

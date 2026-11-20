@@ -6,6 +6,7 @@
 pub mod grbl_bench;
 pub mod grbl_sim;
 pub mod pty_link;
+pub mod service;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;

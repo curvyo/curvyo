@@ -144,8 +144,9 @@ fn hc3_hc7_a_silent_homing_over_a_real_pty_ends_at_the_cap_and_reconnects() {
     }
     let log = std::fs::read_to_string(state.join("jobs.log")).unwrap();
     assert!(
-        log.lines().any(|l| l
-            .ends_with("\thome_first.gcode\tFailed: controller lost, homing took longer than 1 s")),
+        log.lines().any(|l| l.contains(
+            "\thome_first.gcode\tFailed: controller lost, homing took longer than 1 s\t"
+        )),
         "{log}"
     );
 

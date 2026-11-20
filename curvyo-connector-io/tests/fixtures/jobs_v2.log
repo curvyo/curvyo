@@ -1,0 +1,15 @@
+2023-11-14T22:13:20Z	coaster.gcode	Completed			
+2023-11-14T22:14:20Z	coaster.gcode	Stopped			
+2023-11-14T22:15:20Z	sign.nc	Failed			
+2023-11-14T22:16:20Z	sign.nc	Alarm: Fake alarm at line 3			
+2023-11-14T22:17:20Z	big.txt	Rejected: TooLarge			
+2023-11-14T22:18:20Z	odd name .gcode	Alarm: a b			
+2023-11-14T22:19:20Z	cut_line.gcode	Failed: line 12, No feed rate (error 22)			
+2023-11-14T22:20:20Z	cut_line.gcode	Failed: line 4, Contains !, ~ or ?			
+2023-11-14T22:21:20Z	cut_line.gcode	Failed: controller lost at line 120			
+2023-11-14T22:22:20Z	cut_line.gcode	Failed: could not confirm the machine stopped			
+2023-11-14T22:23:20Z	cut_line.gcode	Alarm: Hard limit hit, position may be lost (alarm 1)			
+2023-11-14T22:24:20Z		Unlock: Laptop			
+2023-11-14T22:25:20Z		Home: Laptop			
+2023-11-14T22:26:20Z	sign.gcode	Completed	Phone	Phone	Laptop
+2023-11-14T22:27:20Z	cut.gcode	Discarded	Phone		

@@ -8,6 +8,7 @@ mod common;
 use std::time::{Duration, Instant};
 
 use common::grbl_sim::{GrblSim, SimConfig};
+use curvyo_connector_core::Peer;
 use curvyo_connector_core::{JobKind, Message, State};
 use curvyo_connector_io::grbl::Timing;
 use curvyo_connector_io::hub::{ControllerChoice, Hub, HubSettings, SerialSettings};
@@ -73,6 +74,7 @@ fn g15_get_status_after_the_serial_thread_died_is_not_running() {
             bytes: text.len() as u64,
             sha256,
         },
+        &Peer::host(),
         now,
     );
     hub.handle_message(
@@ -81,15 +83,20 @@ fn g15_get_status_after_the_serial_thread_died_is_not_running() {
             index: 0,
             text: text.into(),
         },
+        &Peer::host(),
         now,
     );
-    hub.handle_message(Message::Start { job_id: id }, now);
+    hub.handle_message(Message::Start { job_id: id }, &Peer::host(), now);
     for _ in 0..20 {
         turn(&hub, &mut sim, &mut at);
     }
     assert_eq!(hub.state(), State::Running);
     // The serial thread stops turning; only `GetStatus` comes, 3 s later.
-    let answer = hub.handle_message(Message::GetStatus, started + at + Duration::from_secs(3));
+    let answer = hub.handle_message(
+        Message::GetStatus,
+        &Peer::host(),
+        started + at + Duration::from_secs(3),
+    );
     assert_eq!(answer.len(), 1);
     assert_eq!(state_of(&answer[0]), State::NoController, "{answer:?}");
 }

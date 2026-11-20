@@ -132,7 +132,8 @@ impl Link {
                     .then(|| port_group(&self.settings.port))
                     .flatten();
                 let problem = open_problem(&self.settings.port, &e, group);
-                self.hub.open_failed(problem.detail, now);
+                self.hub
+                    .open_failed(&self.settings.port, problem.detail, now);
                 if self.last_problem.as_ref() != Some(&problem.notice) {
                     self.hub.notice(problem.notice.clone());
                     self.last_problem = Some(problem.notice);
@@ -151,7 +152,11 @@ impl Link {
 
     /// The port failed: the hub loses the controller, the safety bytes are tried once.
     fn fail(&mut self, error: &std::io::Error, now: Instant) {
-        self.hub.lose(format!("Lost the controller: {error}"), now);
+        self.hub.lose(
+            &self.settings.port,
+            format!("Lost the controller: {error}"),
+            now,
+        );
         if let Some(mut port) = self.port.take() {
             let _ = port.write_all(SAFETY);
         }

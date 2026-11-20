@@ -728,6 +728,7 @@ impl Rig {
         self.welcome = Some(Message::Welcome {
             connector_name: g.name.clone(),
             controller: g.controller.clone(),
+            mode: None,
         });
         self.conn = Some(c);
     }
@@ -987,8 +988,10 @@ fn g1_usage_errors_and_help() {
 #[test]
 fn g1_no_serial_and_no_fake_is_no_controller() {
     let d = tempfile::tempdir().unwrap();
+    // `specs/0128` A1, A28: without a run flag the program is a service in maintenance mode;
+    // `--pair` alone is foreground mode without a controller.
     let mut child = Command::new(bin())
-        .args(["--listen", "127.0.0.1:0", "--state-dir"])
+        .args(["--pair", "--listen", "127.0.0.1:0", "--state-dir"])
         .arg(d.path())
         .stdout(Stdio::piped())
         .stdin(Stdio::piped())

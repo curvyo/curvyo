@@ -6,6 +6,7 @@
 
 mod common;
 
+use curvyo_connector_core::Peer;
 use std::time::Duration;
 
 use common::grbl_bench::{Bench, DT, PORT};
@@ -54,7 +55,9 @@ fn unlocked() -> Bench {
 
 /// Applies `Home` as the app's button sends it; no refusal.
 fn press_home(bench: &mut Bench) {
-    let out = bench.machine.handle(Event::Message(Message::Home));
+    let out = bench
+        .machine
+        .handle(Event::Message(Message::Home, Peer::host()));
     assert!(
         !out.messages
             .iter()
@@ -296,7 +299,7 @@ fn hc7_after_the_cap_a_reconnect_identifies_afresh_and_resumes_nothing() {
     assert!(!job_of(&bench), "the dropped job is not back");
     let out = bench
         .machine
-        .handle(Event::Message(Message::Start { job_id: job }));
+        .handle(Event::Message(Message::Start { job_id: job }, Peer::host()));
     assert!(
         out.messages.iter().any(|m| matches!(
             m,

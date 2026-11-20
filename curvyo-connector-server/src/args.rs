@@ -1,5 +1,5 @@
-//! The command line, parsed by hand (no `clap`, no environment variables, no config file in this
-//! slice).
+//! The command line, parsed by hand (no `clap`, no environment variables): the service flags,
+//! the run flags of foreground mode and the host-side commands (`specs/0128` A21, A28, A31).
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -27,6 +27,10 @@ pub enum Command {
     ListClients,
     /// Unpair the app of this name and exit.
     Revoke(String),
+    /// Empty the state directory unless a connector holds it, and exit (A21).
+    Reset,
+    /// Print the key's fingerprint and exit (A21).
+    Fingerprint,
     /// Print the help and exit.
     Help,
 }
@@ -56,7 +60,23 @@ pub struct Args {
     pub require_local_start: bool,
     /// Print a new pairing code at start.
     pub pair: bool,
+    /// The first run flag of foreground mode on the line, if any (A28).
+    pub foreground_flag: Option<String>,
+    /// The `--listen` value when one was given (A31: `connector.toml` wins over it).
+    pub listen_flag: Option<SocketAddr>,
 }
+
+/// The run flags that make foreground mode (A28).
+const FOREGROUND_FLAGS: [&str; 8] = [
+    "--fake-controller",
+    "--fake-lines-per-second",
+    "--fake-alarm-at-line",
+    "--serial",
+    "--baud",
+    "--homing-timeout",
+    "--require-local-start",
+    "--pair",
+];
 
 /// The help text: every flag.
 pub const HELP: &str = "\
@@ -64,10 +84,20 @@ curvyo-connector-server: the machine connector, run next to the machine.
 
 Usage: curvyo-connector-server [options]
 
+Without run flags it serves as configured by <state dir>/connector.toml, or in maintenance mode
+for 30 minutes after the start when there is none, set up with curvyoctl.
+
 Options:
-  --listen <addr:port>             where to listen (default 0.0.0.0:7447)
-  --state-dir <dir>                key, paired apps and job log
+  --listen <addr:port>             where to listen (default 0.0.0.0:7447; connector.toml wins)
+  --state-dir <dir>                configuration, key, paired apps and logs
                                    (default: the user's data directory, curvyo-connector)
+  --fingerprint                    print the key fingerprint and exit
+  --reset                          delete everything in the state directory and exit
+  --list-clients                   print the paired apps and their roles and exit
+  --revoke <name>                  unpair the app of this name and exit
+  --help                           print this text and exit
+
+Run flags (foreground mode, refused when connector.toml exists):
   --fake-controller                attach a fake controller: no machine, nothing moves
   --fake-lines-per-second <n>      its pace (default 20; needs --fake-controller)
   --fake-alarm-at-line <n>         raise an alarm at line n (needs --fake-controller)
@@ -77,11 +107,8 @@ Options:
                                    for this long; 10 to 3600 (default 120; needs --serial)
   --require-local-start            a job starts only after Enter on this terminal
   --pair                           print a new pairing code at start
-  --list-clients                   print the paired apps and exit
-  --revoke <name>                  unpair the app of this name and exit
-  --help                           print this text and exit
 
-While running: an empty line is the start press for a job that waits; the line `pair` prints a
+In foreground mode: an empty line is the start press for a job that waits; the line `pair` prints a
 new pairing code. A GRBL alarm lock is left with Unlock in the app.
 
 Serial ports on Linux: the user must be in the group that owns the port (dialout on Debian, Ubuntu
@@ -142,12 +169,17 @@ pub fn parse(
         homing_timeout: HOMING_CAP,
         require_local_start: false,
         pair: false,
+        foreground_flag: None,
+        listen_flag: None,
     };
     let mut state_dir = None;
     let mut fake_option = None;
     let mut baud_given = false;
     let mut homing_given = false;
     while let Some(flag) = args.next() {
+        if parsed.foreground_flag.is_none() && FOREGROUND_FLAGS.contains(&flag.as_str()) {
+            parsed.foreground_flag = Some(flag.clone());
+        }
         match flag.as_str() {
             "--help" | "-h" => parsed.command = Command::Help,
             "--listen" => {
@@ -155,6 +187,7 @@ pub fn parse(
                 parsed.listen = text
                     .parse()
                     .map_err(|_| UsageError(format!("--listen needs addr:port, not {text}")))?;
+                parsed.listen_flag = Some(parsed.listen);
             }
             "--state-dir" => state_dir = Some(PathBuf::from(value(&mut args, &flag)?)),
             "--fake-controller" => parsed.fake_controller = true,
@@ -183,6 +216,8 @@ pub fn parse(
             "--require-local-start" => parsed.require_local_start = true,
             "--pair" => parsed.pair = true,
             "--list-clients" => parsed.command = Command::ListClients,
+            "--reset" => parsed.command = Command::Reset,
+            "--fingerprint" => parsed.command = Command::Fingerprint,
             "--revoke" => parsed.command = Command::Revoke(value(&mut args, &flag)?),
             other => return Err(UsageError(format!("unknown option {other}"))),
         }
@@ -369,6 +404,35 @@ mod tests {
             "ModemManager",
         ] {
             assert!(HELP.contains(flag), "{flag}");
+        }
+    }
+
+    #[test]
+    fn a21_a28_host_commands_and_the_first_run_flag() {
+        assert_eq!(parse_args(&["--reset"]).unwrap().command, Command::Reset);
+        assert_eq!(
+            parse_args(&["--fingerprint"]).unwrap().command,
+            Command::Fingerprint
+        );
+        let args = parse_args(&["--listen", "127.0.0.1:0"]).unwrap();
+        assert_eq!(args.foreground_flag, None);
+        assert_eq!(args.listen_flag, Some(args.listen));
+        let args = parse_args(&["--require-local-start", "--fake-controller"]).unwrap();
+        assert_eq!(
+            args.foreground_flag.as_deref(),
+            Some("--require-local-start")
+        );
+        assert_eq!(args.listen_flag, None);
+        for flag in [
+            "--reset",
+            "--fingerprint",
+            "connector.toml",
+            "maintenance mode",
+        ] {
+            assert!(HELP.contains(flag), "{flag}");
+        }
+        for line in HELP.lines() {
+            assert!(line.chars().count() <= 100, "{line}");
         }
     }
 }

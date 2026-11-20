@@ -210,7 +210,7 @@ fn g16_sigterm_stops_a_running_job_and_logs_it_before_exiting() {
     running.until(|l| l == "Exiting");
     assert_eq!(running.exit_code(), 0);
     let log = std::fs::read_to_string(dir.path().join("jobs.log")).unwrap();
-    assert!(log.contains("\tlong.gcode\tStopped\n"), "{log}");
+    assert!(log.contains("\tlong.gcode\tStopped\t"), "{log}");
 }
 
 #[test]

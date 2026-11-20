@@ -296,7 +296,7 @@ fn g18_no_job_byte_before_the_local_start() {
     let mut bench = Bench::with(
         SimConfig::default(),
         Options {
-            require_local_start: true,
+            start_rule: curvyo_connector_core::StartRule::LocalPress,
         },
     );
     assert!(bench.run_until(|b| b.state() == State::Idle, 1_000));

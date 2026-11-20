@@ -1,0 +1,10 @@
+2026-11-18T14:06:11Z	configured	curvyoctl@marc-laptop		192.168.1.30
+2026-11-18T14:08:40Z	code-issued	curvyoctl@marc-laptop	Laptop	owner
+2026-11-18T14:09:02Z	paired	Laptop		owner
+2026-11-18T14:12:20Z	code-issued	curvyoctl@marc-laptop	Phone	member
+2026-11-18T14:13:05Z	paired	Phone		member
+2026-11-18T14:20:01Z	start-confirmed	Laptop	Phone	sign.gcode 67e55044-10b1-426f-9247-bb680e5fe0c8
+2026-11-18T14:31:04Z	revoked	curvyoctl@marc-laptop	Phone	member
+2026-11-18T14:35:00Z	unlocked	Laptop		
+2026-11-18T15:00:00Z	config-changed	curvyoctl@marc-laptop		controller, name
+2026-11-18T15:01:11Z	start-confirmed		odd name	cut.gcode 67e55044-10b1-426f-9247-bb680e5fe0c8 resume

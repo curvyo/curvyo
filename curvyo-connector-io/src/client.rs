@@ -5,7 +5,9 @@ use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use curvyo_connector_core::{ControllerInfo, ErrorCode, Message, PROTOCOL_VERSION};
+use curvyo_connector_core::{
+    ConnectorMode, ControllerInfo, ErrorCode, Message, PROTOCOL_VERSION, Role,
+};
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, StreamOwned};
 use tungstenite::client::IntoClientRequest as _;
@@ -49,6 +51,9 @@ pub enum ClientError {
     /// The connector does not know the token (revoked).
     #[error("no longer paired")]
     NoLongerPaired,
+    /// The connector is in maintenance mode and takes no login (`specs/0128` A3).
+    #[error("connector in maintenance mode")]
+    InMaintenance,
     /// The connector speaks another protocol version.
     #[error("protocol mismatch: app {PROTOCOL_VERSION}, connector {connector}")]
     ProtocolMismatch {
@@ -77,6 +82,8 @@ pub struct Greeting {
     pub name: String,
     /// Its controller.
     pub controller: Option<ControllerInfo>,
+    /// Its mode; `None` from a connector before `specs/0128`.
+    pub mode: Option<ConnectorMode>,
 }
 
 /// One open connection, after `Hello` and `Welcome`.
@@ -86,6 +93,8 @@ pub struct Connection {
     pub greeting: Greeting,
     /// Hash of the key it presented.
     pub spki: SpkiHash,
+    /// This client's name and role, from `Authenticated` after a login or pairing.
+    pub session: Option<(String, Role)>,
 }
 
 fn is_idle(error: &tungstenite::Error) -> bool {
@@ -227,10 +236,12 @@ pub fn connect_on(
             version: String::new(),
             name: String::new(),
             controller: None,
+            mode: None,
         },
         spki: verifier
             .seen()
             .ok_or_else(|| ClientError::Tls("no key was presented".to_owned()))?,
+        session: None,
     };
     connection.greet(deadline)?;
     Ok(connection)
@@ -348,12 +359,14 @@ impl Connection {
             Message::Welcome {
                 connector_name,
                 controller,
+                mode,
             } => {
                 self.greeting = Greeting {
                     protocol,
                     version,
                     name: connector_name,
                     controller,
+                    mode,
                 };
                 Ok(())
             }
@@ -367,21 +380,54 @@ impl Connection {
         }
     }
 
-    /// Authenticates with the token; the answer is the current `Status`.
+    /// Authenticates with the token; the answer is the current `Status`. The `Authenticated`
+    /// before it fills [`Connection::session`].
     ///
     /// # Errors
-    /// [`ClientError::NoLongerPaired`] when the connector does not know the token.
+    /// [`ClientError::NoLongerPaired`] when the connector does not know the token,
+    /// [`ClientError::InMaintenance`] when it is in maintenance mode.
     pub fn auth(&mut self, token: &Token, deadline: Instant) -> Result<Message, ClientError> {
         self.send(&Message::Auth {
             token: token.to_hex().to_string(),
         })?;
-        match self.recv_message(deadline)? {
-            status @ Message::Status { .. } => Ok(status),
-            Message::Error {
-                code: ErrorCode::PairingRequired,
-                ..
-            } => Err(ClientError::NoLongerPaired),
-            other => Err(ClientError::Protocol(format!("{other:?}"))),
+        loop {
+            match self.recv_message(deadline)? {
+                Message::Authenticated { client_name, role } => {
+                    self.session = Some((client_name, role));
+                }
+                status @ Message::Status { .. } => return Ok(status),
+                Message::Error {
+                    code: ErrorCode::PairingRequired,
+                    ..
+                } => return Err(ClientError::NoLongerPaired),
+                Message::Error {
+                    code: ErrorCode::Maintenance,
+                    ..
+                } => return Err(ClientError::InMaintenance),
+                other => return Err(ClientError::Protocol(format!("{other:?}"))),
+            }
+        }
+    }
+
+    /// Sends one request and returns its answer, an `Error` included; pushed `Status`, `Welcome`
+    /// and `Authenticated` frames on the way are skipped (addendum D14).
+    ///
+    /// # Errors
+    /// [`ClientError`] when the connection fails or nothing answers by `deadline`.
+    pub fn request(
+        &mut self,
+        message: &Message,
+        deadline: Instant,
+    ) -> Result<Message, ClientError> {
+        self.send(message)?;
+        loop {
+            match self.recv(deadline)? {
+                Frame::Core(Message::Authenticated { client_name, role }) => {
+                    self.session = Some((client_name, role));
+                }
+                Frame::Core(Message::Status { .. } | Message::Welcome { .. }) | Frame::Io(_) => {}
+                Frame::Core(answer) => return Ok(answer),
+            }
         }
     }
 }

@@ -3,6 +3,7 @@
 
 use std::time::{Duration, Instant};
 
+use curvyo_connector_core::Role;
 use ring::rand::{SecureRandom, SystemRandom};
 use zeroize::Zeroizing;
 
@@ -53,10 +54,20 @@ pub fn display(code: &Password) -> String {
     format!("{}-{}", &text[..4], &text[4..])
 }
 
+/// The name and role an owner issued a code for (`IssueCode`, addendum D7).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Grant {
+    /// The name the pairing is recorded under.
+    pub name: String,
+    /// The role it gets.
+    pub role: Role,
+}
+
 struct Active {
     code: Password,
     issued: Instant,
     attempts_left: u8,
+    grant: Option<Grant>,
 }
 
 /// The one code a connector holds, if any.
@@ -75,6 +86,21 @@ impl PairingCodes {
         Some(self.issue_from(bits, now))
     }
 
+    /// Issues a code bound to `grant`, replacing a valid one; `None` without random bytes.
+    pub fn issue_for(&mut self, grant: Grant, now: Instant) -> Option<String> {
+        let shown = self.issue(now)?;
+        if let Some(active) = self.active.as_mut() {
+            active.grant = Some(grant);
+        }
+        Some(shown)
+    }
+
+    /// The name and role the valid code was issued for; `None` for a terminal code.
+    #[must_use]
+    pub fn grant(&self) -> Option<Grant> {
+        self.active.as_ref().and_then(|a| a.grant.clone())
+    }
+
     /// Issues the code of these 40 bits.
     pub fn issue_from(&mut self, bits: [u8; 5], now: Instant) -> String {
         let value = bits.iter().fold(0u64, |acc, b| (acc << 8) | u64::from(*b));
@@ -88,6 +114,7 @@ impl PairingCodes {
             code,
             issued: now,
             attempts_left: ATTEMPTS,
+            grant: None,
         });
         shown
     }
@@ -231,5 +258,23 @@ mod tests {
         codes.failed();
         assert!(codes.begin(base).is_ok());
         assert_eq!(codes.current(base), Some(second));
+    }
+
+    #[test]
+    fn a_code_issued_for_a_name_carries_it_until_it_is_spent() {
+        let base = Instant::now();
+        let mut codes = PairingCodes::default();
+        let grant = Grant {
+            name: "Phone".into(),
+            role: Role::Member,
+        };
+        codes.issue_for(grant.clone(), base).unwrap();
+        assert_eq!(codes.grant(), Some(grant));
+        codes.begin(base).unwrap();
+        assert!(codes.grant().is_some());
+        codes.succeeded();
+        assert_eq!(codes.grant(), None);
+        codes.issue_from([1; 5], base);
+        assert_eq!(codes.grant(), None);
     }
 }
