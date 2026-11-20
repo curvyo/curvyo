@@ -453,14 +453,6 @@ impl WasmDeviceGroup {
     pub fn library_view_json(&self) -> String {
         self.glue.library_view_json()
     }
-
-    /// Deletes the library item `id` of `kind` (`machine` or `material`) from the stream
-    /// (criterion 11); an unknown kind changes nothing.
-    pub fn library_delete(&mut self, kind: &str, id: &str) {
-        if let Some(kind) = library_kind(kind) {
-            self.glue.library_delete(kind, id);
-        }
-    }
 }
 
 /// The library of a `kind` word, `None` for another.

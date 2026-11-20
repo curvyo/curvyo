@@ -172,6 +172,21 @@ impl LibraryList {
             .map_err(|_| LibraryListError::Encode)
     }
 
+    /// The current entries without their history, for the group room's snapshot: a state-only
+    /// export, so the text of an item switched off or deleted since is not in its bytes (ADR 0062
+    /// decision 4, criteria 23 and 27). A replica started from it cannot merge the updates of
+    /// a peer whose history ends before the snapshot (the trade-off is noted in the story's
+    /// `adrs.md`); `library.loro` keeps the full [`LibraryList::snapshot`].
+    ///
+    /// # Errors
+    /// [`LibraryListError::Encode`].
+    pub fn snapshot_state(&self) -> Result<Vec<u8>, LibraryListError> {
+        self.doc.commit();
+        self.doc
+            .export(ExportMode::state_only(None))
+            .map_err(|_| LibraryListError::Encode)
+    }
+
     /// Merges updates of another replica. Updates that write a newer `format_version` are
     /// refused and leave the list unchanged (ADR 0040 decision 11), also when the write would
     /// not win the register; so are bytes that do not import.
@@ -179,6 +194,28 @@ impl LibraryList {
     /// # Errors
     /// [`LibraryListError::Malformed`], [`LibraryListError::FormatTooNew`].
     pub fn import_updates(&self, bytes: &[u8]) -> Result<(), LibraryListError> {
+        self.merge(bytes).map(|_| ())
+    }
+
+    /// Takes a room snapshot, a full one as a merge, a state-only one ([`snapshot_state`]) as a
+    /// start from its state when this replica holds history it cannot be merged onto: the
+    /// replica then continues as `peer` from the snapshot and its changes not yet pushed are
+    /// lost (the trade-off of the state-only snapshot, the story's `adrs.md`).
+    ///
+    /// # Errors
+    /// [`LibraryListError::Malformed`], [`LibraryListError::FormatTooNew`].
+    ///
+    /// [`snapshot_state`]: LibraryList::snapshot_state
+    pub fn import_snapshot(&mut self, peer: u64, bytes: &[u8]) -> Result<(), LibraryListError> {
+        let theirs = Self::from_snapshot(peer, bytes)?;
+        if self.merge(bytes)? {
+            *self = theirs;
+        }
+        Ok(())
+    }
+
+    /// Merges `bytes`; whether some of their changes wait for history this replica lacks.
+    fn merge(&self, bytes: &[u8]) -> Result<bool, LibraryListError> {
         // The bytes on their own (changes whose history is not in them stay pending there), then
         // merged into a copy of this replica (changes it already holds are not new there).
         let alone = LoroDoc::new();
@@ -196,10 +233,12 @@ impl LibraryList {
             return Err(LibraryListError::FormatTooNew);
         }
         check_format(&trial)?;
-        self.doc
+        let status = self
+            .doc
             .import(bytes)
             .map_err(|_| LibraryListError::Malformed)?;
-        self.check_format()
+        self.check_format()?;
+        Ok(status.pending.is_some())
     }
 
     /// Records the item `id` of `kind` as switched on with `text`, the exact record text.

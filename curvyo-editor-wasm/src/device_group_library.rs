@@ -106,19 +106,6 @@ impl DeviceGroupGlue {
         self.pump();
     }
 
-    /// Deletes the item: the entry goes, and synced devices delete their local copy through
-    /// sync (criterion 11); an absent one does nothing.
-    pub fn library_delete(&mut self, kind: LibraryKind, id: &str) {
-        if self.library.entry(kind, id).is_some() {
-            let _ = self.library.remove(kind, id);
-            self.snapshot_after_ack = true;
-            self.files_changed = true;
-            self.bump();
-        }
-        self.export_library();
-        self.pump();
-    }
-
     /// The first sync (criterion 3): writes every local item on behind nothing; the confirm is
     /// the page's. How many entries were written.
     pub fn library_first_sync(&mut self, items: &[(LibraryKind, String, String)]) -> usize {
@@ -156,6 +143,7 @@ impl DeviceGroupGlue {
                         .is_some_and(|entry| entry.sync);
                     on && {
                         let _ = self.library.remove(kind, &id);
+                        self.snapshot_after_ack = true;
                         true
                     }
                 }
@@ -194,13 +182,36 @@ impl DeviceGroupGlue {
     /// One library update of the room: merged into the list, its changes queued for the page's
     /// session; a newer build's update refused once (ADR 0040 decision 11).
     pub(super) fn import_library(&mut self, payload: &[u8]) {
+        self.import_library_bytes(payload, false);
+    }
+
+    /// The library part of a framed room snapshot: state-only, so a list with history starts
+    /// over from it (`LibraryList::import_snapshot`).
+    fn import_library_snapshot(&mut self, payload: &[u8]) {
+        self.import_library_bytes(payload, true);
+    }
+
+    fn import_library_bytes(&mut self, payload: &[u8], snapshot: bool) {
+        // Own changes still waiting go out first: whatever the import adds is the room's, and
+        // is not pushed back (a pushed echo would carry the imported history to the others).
+        self.export_library();
+        let in_step = self.library.version() == self.library_exported;
         let before = state_of(&self.library);
-        match self.library.import_updates(payload) {
+        let result = if snapshot {
+            self.library.import_snapshot(self.peer, payload)
+        } else {
+            self.library.import_updates(payload)
+        };
+        match result {
             Ok(()) => {
                 self.files_changed = true;
                 self.queue_arrivals(&before);
                 self.bump();
-                self.export_library();
+                if in_step {
+                    self.library_exported = self.library.version();
+                } else {
+                    self.export_library();
+                }
             }
             Err(LibraryListError::FormatTooNew) => {
                 if !self.newer_library {
@@ -219,23 +230,30 @@ impl DeviceGroupGlue {
         if entry.stream == DEVICES_STREAM_ID {
             self.import_devices(&entry.bytes);
         } else if let Ok(GroupRecord::Library { payload, .. }) = route_group_record(&entry.bytes) {
-            self.import_library(payload);
+            self.import_library_snapshot(payload);
         }
     }
 
     /// Uploads the room's framed snapshot of both lists, in parts (ADR 0062 decision 1): a
     /// pre-0116 build in the group ignores it and keeps converging through update records.
     pub(super) fn upload_group_snapshot(&mut self, covers_seq: u64) {
-        let Ok(devices) = self.list.snapshot() else {
+        let Some(stream) = self.group_snapshot_stream() else {
             return;
         };
-        let Ok(library) = self.library.snapshot() else {
-            return;
-        };
-        let stream = encode_group_snapshot(&devices, &encode_library_record(self.peer, &library));
         let id = self.client.fresh_snapshot_id();
         let parts = split_snapshot(&stream, id);
         let _ = self.client.upload_snapshot_parts(&parts, covers_seq);
+    }
+
+    /// The room's snapshot stream: the devices list and the library's current state without its
+    /// history (a switched-off or deleted item's text is not in it, ADR 0062 decision 4).
+    pub(super) fn group_snapshot_stream(&self) -> Option<Vec<u8>> {
+        let devices = self.list.snapshot().ok()?;
+        let library = self.library.snapshot_state().ok()?;
+        Some(encode_group_snapshot(
+            &devices,
+            &encode_library_record(self.peer, &library),
+        ))
     }
 
     /// The entries that changed between `before` and now, queued for the page's session.

@@ -682,3 +682,76 @@ fn library_loro_round_trips_through_the_group_files() {
     .unwrap();
     assert_eq!(fresh.library().entries(LibraryKind::Machine).len(), 0);
 }
+
+/// Architect review 2026-11-19: what a device imports from the room is not pushed back, so a
+/// device sends its own changes only and no imported history.
+#[test]
+fn an_import_is_not_pushed_back() {
+    let mut net = Net::new();
+    let a = net.add(
+        DeviceGroupGlue::create(SERVER, ROOM, "Desktop", &seeds(1), 11, Millis(net.now)).unwrap(),
+        Session::new(11),
+    );
+    net.run(500);
+    net.devices[a].glue.add_device(identity(2), "Laptop");
+    net.run(200);
+    let b = net.add(
+        DeviceGroupGlue::join(SERVER, ROOM, "Laptop", &seeds(2), 12, Millis(net.now)).unwrap(),
+        Session::new(12),
+    );
+    net.run(1_500);
+    assert!(net.devices[b].glue.is_online());
+    let known = net.devices[a].glue.library().version();
+    net.devices[a]
+        .glue
+        .library()
+        .set(
+            curvyo_document_core::LibraryKind::Machine,
+            P1,
+            &machine_text(P1, "ZQX-MACH-7731", 5),
+        )
+        .unwrap();
+    let bytes = net.devices[a]
+        .glue
+        .library()
+        .export_updates(&known)
+        .unwrap();
+    let glue = &mut net.devices[b].glue;
+    let pushed = glue.library_pushed.len();
+    glue.import_library(&bytes);
+    assert_eq!(
+        glue.library_pushed.len(),
+        pushed,
+        "the import is not pushed"
+    );
+    assert!(glue.library_acked(), "and nothing waits for an ack");
+    assert_eq!(glue.library().entries(LibraryKind::Machine).len(), 1);
+}
+
+/// A delete tapped from the host write list uploads the room snapshot after its ack, as a
+/// switch-off does (criterion 27, commit 35e08c19 claimed it for deletes too).
+#[test]
+fn a_local_delete_uploads_the_snapshot_after_its_ack() {
+    let mut net = Net::new();
+    let a = net.add(
+        DeviceGroupGlue::create(SERVER, ROOM, "Desktop", &seeds(1), 11, Millis(net.now)).unwrap(),
+        Session::new(11),
+    );
+    net.run(500);
+    let glue = &mut net.devices[a].glue;
+    glue.library_set(
+        LibraryKind::Machine,
+        P1,
+        &machine_text(P1, "ZQX-MACH-7731", 5),
+    );
+    assert!(!glue.snapshot_after_ack);
+    glue.library_local_edits(vec![crate::session::LibraryEdit::Remove {
+        kind: LibraryKind::Machine,
+        id: P1.to_owned(),
+    }]);
+    assert!(
+        glue.snapshot_after_ack,
+        "the delete is followed by a snapshot"
+    );
+    assert_eq!(glue.library().entries(LibraryKind::Machine), Vec::new());
+}
