@@ -1,5 +1,6 @@
 //! Identifies GRBL after the port opens (`specs/0127` G2, G17; addendum C4): soft reset first,
-//! the banner within the limit, then `$I`, `$$` and one status report, one at a time.
+//! the banner within the limit, then `$I`, `$$` and one status report, one at a time; a stale
+//! banner or `ok` from before the reset is not taken as an answer.
 
 use std::time::Duration;
 
@@ -101,6 +102,9 @@ impl Identify {
                 out.extend_from_slice(b"$$\n");
                 self.step = Step::Settings;
             }
+            // An `ok` before any `$n=` line answers an earlier `$I` (two banners, two `$I`), not
+            // `$$`: `$32` is known only from a `$$` that was really read (`specs/0142` HC7).
+            Reply::Ok if self.step == Step::Settings && self.settings.is_empty() => {}
             Reply::Ok | Reply::Error(_) if self.step == Step::Settings => {
                 out.push(b'?');
                 self.step = Step::Report;
@@ -265,17 +269,102 @@ mod tests {
             &mut out,
         );
         out.clear();
+        // Both `$I` are answered: the second `ok` is not the answer to `$$`.
         feed(
             &mut id,
             &["[MSG:'$H'|'$X' to unlock]", "ok", "ok"],
             t,
             &mut out,
         );
+        assert_eq!(out, b"$$\n");
+        out.clear();
+        feed(&mut id, &["$32=1", "ok"], t, &mut out);
+        assert_eq!(out, b"?");
         let done = feed(&mut id, &["<Alarm|MPos:0.000,0.000,0.000>"], t, &mut out);
         let Outcome::Done(found) = done else {
             panic!("{done:?}")
         };
         assert!(found.locked);
         assert_eq!(found.alarm, Some(3));
+        assert_eq!(found.settings.laser_mode(), Some(true));
+    }
+
+    /// After a loss the banner of the reset the connector gave up with can still be in the port:
+    /// a stale banner, then the identify reset's banner, then both `$I` answers (`specs/0142`).
+    #[test]
+    fn a_stale_banner_before_the_reset_banner_still_reads_the_settings() {
+        let mut out = Vec::new();
+        let mut id = Identify::start(Duration::ZERO, LIMIT, &mut out);
+        let t = Duration::ZERO;
+        let info = ["[VER:1.1h.20190825:]", "[OPT:V,15,128]", "ok"];
+        feed(
+            &mut id,
+            &["Grbl 1.1h ['$' for help]", "ALARM:6"],
+            t,
+            &mut out,
+        );
+        feed(&mut id, &["Grbl 1.1h ['$' for help]"], t, &mut out);
+        feed(&mut id, &info, t, &mut out);
+        feed(&mut id, &info, t, &mut out);
+        feed(
+            &mut id,
+            &["$30=1000", "$32=1", "$130=400.000", "ok"],
+            t,
+            &mut out,
+        );
+        assert_eq!(out, [&[RESET][..], b"$I\n$I\n$$\n?"].concat());
+        let done = feed(&mut id, &["<Alarm|MPos:0.000,0.000,0.000>"], t, &mut out);
+        let Outcome::Done(found) = done else {
+            panic!("{done:?}")
+        };
+        assert_eq!(found.settings.laser_mode(), Some(true));
+        assert_eq!(found.settings.s_max(), Some(1000));
+    }
+
+    /// A banner while `$$` is read restarts; the `ok` of the old `$$` answers the new `$I`, the
+    /// `ok` of the new `$I` (no setting yet) answers nothing.
+    #[test]
+    fn a_banner_while_the_settings_are_read_reads_them_again() {
+        let mut out = Vec::new();
+        let mut id = Identify::start(Duration::ZERO, LIMIT, &mut out);
+        let t = Duration::ZERO;
+        feed(
+            &mut id,
+            &["Grbl 1.1h ['$' for help]", "ok", "$30=1000"],
+            t,
+            &mut out,
+        );
+        feed(&mut id, &["Grbl 1.1h ['$' for help]", "ok"], t, &mut out);
+        feed(&mut id, &["[VER:1.1h.20190825:]", "ok"], t, &mut out);
+        feed(&mut id, &["$30=1000", "$32=0", "ok"], t, &mut out);
+        let done = feed(&mut id, &["<Idle|MPos:0.000,0.000,0.000>"], t, &mut out);
+        let Outcome::Done(found) = done else {
+            panic!("{done:?}")
+        };
+        assert_eq!(found.settings.laser_mode(), Some(false));
+    }
+
+    /// An `ok` with no setting before it never ends the settings step: `$32` stays unknown only
+    /// when `$$` really answered without it.
+    #[test]
+    fn an_ok_without_settings_does_not_end_the_settings_step() {
+        let mut out = Vec::new();
+        let mut id = Identify::start(Duration::ZERO, LIMIT, &mut out);
+        let t = Duration::ZERO;
+        feed(&mut id, &["Grbl 1.1h ['$' for help]", "ok"], t, &mut out);
+        out.clear();
+        feed(&mut id, &["ok", "ok"], t, &mut out);
+        assert!(out.is_empty(), "{out:?}");
+        assert_eq!(
+            feed(&mut id, &["<Idle|MPos:0.000,0.000,0.000>"], t, &mut out),
+            Outcome::Waiting
+        );
+        assert!(matches!(id.on_time(LIMIT), Outcome::Failed(_)));
+        feed(&mut id, &["$30=1000", "ok"], t, &mut out);
+        let done = feed(&mut id, &["<Idle|MPos:0.000,0.000,0.000>"], t, &mut out);
+        let Outcome::Done(found) = done else {
+            panic!("{done:?}")
+        };
+        assert_eq!(found.settings.laser_mode(), None);
     }
 }

@@ -64,6 +64,8 @@ pub struct GrblController {
     pub(super) deferred_alarm: bool,
     /// A reset the connector sent after an alarm; its banner is expected.
     pub(super) expect_banner: bool,
+    /// When the unanswered `$H` went out; the homing cap counts from it (`specs/0142`).
+    pub(super) homing_since: Option<Duration>,
 }
 
 impl GrblController {
@@ -101,10 +103,11 @@ impl GrblController {
             stop: None,
             deferred_alarm: false,
             expect_banner: false,
+            homing_since: None,
         }
     }
 
-    fn give_up(&mut self, notice: String, safety: bool) {
+    pub(super) fn give_up(&mut self, notice: String, safety: bool) {
         // Nothing queued goes out ahead of the safety bytes, or at all.
         self.out.clear();
         if safety {
@@ -241,27 +244,6 @@ impl GrblController {
     /// the stop's wait for its banner included.
     fn stale(&self, at: Duration) -> bool {
         self.identify.is_none() && at.saturating_sub(self.last_report) >= self.timing.loss
-    }
-
-    /// While `$H` is in flight, a job's or the Home command's: GRBL 1.1's homing loop answers no
-    /// `?` until the cycle ends (`specs/0129`, `specs/0118` M4), so the silence is no loss and the
-    /// loss clock restarts when homing ends; a port error still is one, and the stop of G12 keeps
-    /// its own banner limit. In a job the state word reads `Home` meanwhile, as the reports of a
-    /// GRBL that does answer show it; the Home command has a state of its own.
-    fn during_homing(&mut self, at: Duration) {
-        let in_job = self.stream.as_ref().is_some_and(Stream::homing);
-        if !in_job && !self.home_in_flight() {
-            return;
-        }
-        self.last_report = at;
-        if !in_job {
-            return;
-        }
-        if self.word.as_deref() != Some("Home") {
-            self.word = Some("Home".to_owned());
-            self.notices.push("Controller state: Home".to_owned());
-            self.events.push(Event::ControllerWord(self.word.clone()));
-        }
     }
 
     fn take(&mut self) -> Advance {
@@ -456,6 +438,10 @@ impl Controller for GrblController {
             }
             self.on_line(line, at);
         }
+        if !self.closed && self.homing_capped(at) {
+            // Judged after the step's input is read: an `ok` in the same step wins (HC5).
+            return self.take();
+        }
         if !self.closed {
             self.on_time(at);
         }
@@ -473,6 +459,9 @@ impl Controller for GrblController {
             if stream.all_answered() && stream.finished_at_report.is_none() {
                 stream.finished_at_report = Some(self.reports);
             }
+        }
+        if !self.closed {
+            self.note_homing(at);
         }
         self.take()
     }
