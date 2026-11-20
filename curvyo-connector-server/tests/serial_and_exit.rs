@@ -104,6 +104,23 @@ fn g1_usage_errors_exit_with_2_and_name_the_flags() {
             &["--serial", "/dev/ttyUSB0", "--baud", "0"],
             "--baud must be 1 to 4000000",
         ),
+        // `specs/0142` HC2: refused before the port is opened (the port does not exist).
+        (
+            &["--serial", "/dev/ttyUSB0", "--homing-timeout", "0"],
+            "--homing-timeout must be 10 to 3600 seconds, got 0",
+        ),
+        (
+            &["--serial", "/dev/ttyUSB0", "--homing-timeout", "3601"],
+            "--homing-timeout must be 10 to 3600 seconds, got 3601",
+        ),
+        (
+            &["--serial", "/dev/ttyUSB0", "--homing-timeout", "abc"],
+            "--homing-timeout must be 10 to 3600 seconds, got abc",
+        ),
+        (
+            &["--homing-timeout", "60"],
+            "--homing-timeout needs --serial",
+        ),
     ] {
         let out = Command::new(BIN)
             .args(args)
