@@ -1,6 +1,6 @@
 # Performance pass: idle CPU, a draw only when something changed, and a view that stays glued to its frame
 
-Status: In progress (PRs #387, #393, #395, #419, #422; remaining: the per-frame path copies of the node decorations, per-object tessellation reuse on very large pages)
+Status: Done (PRs #387, #393, #395, #422, #427; harness #385, #388, #418, #421; the Linux driver switch is left to the shell, #430)
 Priority: Should
 Origin: Customer (2026-11-18): about 8.5 % of one core and 2 % of 64 GB while idle; scroll, zoom and pan feel laggy, the white of the page trails the frame.
 
