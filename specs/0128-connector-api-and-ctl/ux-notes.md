@@ -233,7 +233,7 @@ The other refusals of section 5 (nothing listens, no answer, too old) apply as w
 | Last owner (A11, Frage 248 A) | `Laptop is the last owner of workshop-laser` | 1 |
 | Unknown client on revoke | `workshop-laser has no client called Phon` | 1 |
 | Name taken on pair (open point A4) | `workshop-laser already has a client called Phone` | 1 |
-| Unknown command or option | `unknown command frob` / `unknown option --forse`, then the usage line | 2 |
+| Unknown command or option | `unknown command frob` (no usage line: there is no command to show it for) / `unknown option --forse`, then the usage line | 2 |
 | Missing value | `--name needs a value`, then the usage line of that command | 2 |
 
 Any other connector error code: `workshop-laser refused: <ErrorCode name>` (V12, the CLI may name the code; the app keeps "Connector error").
@@ -300,7 +300,7 @@ Kept from `0064` 11: the version line, "Listening on …", "Key fingerprint: …
 | Member start (A13) | `Start of sign.gcode requested by Phone` |
 | Confirmation (A14) | `Started sign.gcode, confirmed by Laptop for Phone` |
 | Reset (A19) | `Reset by curvyoctl@marc-laptop: state directory deleted` |
-| Host `--reset` done (A21) | `Deleted /var/lib/curvyo-connector` |
+| Host `--reset` done (A21) | `Deleted the contents of /var/lib/curvyo-connector` (the directory itself stays) |
 | Host `--reset` while running (A21) | stderr `curvyo-connector-server: a running connector holds /var/lib/curvyo-connector/lock`, exit 1 |
 | Foreground flag with `connector.toml` present (A28) | stderr `curvyo-connector-server: --serial cannot be used: /var/lib/curvyo-connector/connector.toml exists`, exit 2 |
 

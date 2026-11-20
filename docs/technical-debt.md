@@ -9,6 +9,39 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 (each names its slice). An entry is removed when its resolution lands, or stays with the note that
 it is accepted for good.
 
+## Foreground mode and `--require-local-start` stay as a legacy (`0128` A28, Frage 247 A, 2026-11-20)
+
+The run flags of slices 2 and 4 (`--fake-controller`, `--serial`, `--require-local-start`,
+`--pair`) still start the connector in foreground mode, with the terminal's Enter as the start
+press. Tests and demos use them; the service never does.
+
+**Resolution:** move the tests and demos to a configuration applied with `curvyoctl`, then remove
+foreground mode and the terminal press.
+
+## The open setup window and TCP relays (`0128` A4, addendum D6, 2026-11-20)
+
+For 30 minutes after each start of an unconfigured connector, the first host on the local network
+that applies a configuration becomes its owner. The local-address check sees the TCP peer, so a
+relay on the host or the LAN (nginx `stream`, `ssh -R`, Tailscale serve, Docker's userland proxy)
+makes every peer look local.
+
+**Resolution:** accepted (ADR 0071 decision 2); the guide says to set the connector up before it is
+exposed through a proxy or tunnel. Enrolment through the relay (slice 6) may replace the window.
+
+## `jobs.log` and `admin.log` are never rotated (`0128`, addendum D9, 2026-11-20)
+
+Both logs only grow. `GetLog` reads their ends backwards, so a long log costs disk, not time.
+
+**Resolution:** a size limit with one rotated file, when a workshop shows the need.
+
+## `curvyoctl` links all of `curvyo-storage-io` for the credential store (`0128`, addendum D2, 2026-11-20)
+
+The credential store lives in `curvyo-storage-io`, which also brings the font list, zip and the
+trash: 145 crates in `curvyoctl`'s tree instead of 82 with the keychain crate alone.
+
+**Resolution:** move the credential store into a crate of its own (needs an ADR) if build time or
+binary size bites.
+
 ## Test grid chips overlap the page label and the Operations toggle at the page top edge (older than `0123`, 2026-11-19)
 
 The chips of a test grid placed at the top edge of its page sit on the page label and the
