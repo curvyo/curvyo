@@ -13,6 +13,7 @@ use curvyo_connector_core::{
     MAX_CHUNK_BYTES, MAX_FRAME_BYTES, MAX_JOB_BYTES, Machine, Message, Millimetres, Options,
     Outcome, Output, PROTOCOL_VERSION, RejectReason, State, decode, encode,
 };
+use curvyo_connector_core::{Peer, StartRule};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -89,6 +90,7 @@ fn all_messages() -> Vec<Message> {
         Message::Welcome {
             connector_name: "shop".into(),
             controller: None,
+            mode: None,
         },
         Message::Paired {
             token: "tok".into(),
@@ -105,6 +107,9 @@ fn all_messages() -> Vec<Message> {
             alarm: None,
             detail: None,
             pause_pending: false,
+            requested_by: None,
+            job_name: None,
+            sent_by: None,
         },
         Message::Error {
             code: ErrorCode::Malformed,
@@ -142,7 +147,7 @@ impl FakeController {
     }
 
     fn send(&mut self, message: Message) -> Output {
-        self.event(Event::Message(message))
+        self.event(Event::Message(message, Peer::host()))
     }
 
     fn state(&self) -> State {
@@ -186,7 +191,7 @@ fn in_state(state: State, text: &str) -> FakeController {
         }
         State::AwaitingLocalStart => {
             let mut f = FakeController::connected(Options {
-                require_local_start: true,
+                start_rule: StartRule::LocalPress,
             });
             f.send(submit(j1(), JobKind::Job, text));
             f.send(chunk(j1(), 0, text));
@@ -375,6 +380,9 @@ fn p3_status_nulls_are_present() {
         alarm: None,
         detail: None,
         pause_pending: false,
+        requested_by: None,
+        job_name: None,
+        sent_by: None,
     })
     .unwrap();
     let v: Value = serde_json::from_str(&text).unwrap();
@@ -399,6 +407,9 @@ fn p3_status_with_job_and_position_round_trips() {
         alarm: None,
         detail: None,
         pause_pending: false,
+        requested_by: None,
+        job_name: None,
+        sent_by: None,
     };
     let text = encode(&msg).unwrap();
     assert_eq!(decode(&text).unwrap(), msg);
@@ -983,9 +994,11 @@ fn p16_unlisted_pairs_leave_state_unchanged() {
         State::Alarm,
     ];
     let events: [(&str, Make); 9] = [
-        ("Start", || Event::Message(Message::Start { job_id: j1() })),
-        ("Pause", || Event::Message(Message::Pause)),
-        ("Resume", || Event::Message(Message::Resume)),
+        ("Start", || {
+            Event::Message(Message::Start { job_id: j1() }, Peer::host())
+        }),
+        ("Pause", || Event::Message(Message::Pause, Peer::host())),
+        ("Resume", || Event::Message(Message::Resume, Peer::host())),
         ("JobFinished", || Event::JobFinished { elapsed_ms: 1 }),
         ("JobFailed", || Event::JobFailed { elapsed_ms: 1 }),
         ("LocalStartPressed", || Event::LocalStartPressed),
@@ -1114,7 +1127,7 @@ fn p17_second_stop_changes_nothing() {
 #[test]
 fn p18_local_start_required_when_option_on() {
     let mut f = FakeController::connected(Options {
-        require_local_start: true,
+        start_rule: StartRule::LocalPress,
     });
     f.send(submit(j1(), JobKind::Job, "G0\n"));
     f.send(chunk(j1(), 0, "G0\n"));
@@ -1135,7 +1148,7 @@ fn p18_stop_while_awaiting_local_start_returns_idle() {
 // P18: the option is off by default, and Start then goes straight to Running.
 #[test]
 fn p18_default_option_is_off_and_start_runs() {
-    assert!(!Options::default().require_local_start);
+    assert_eq!(Options::default().start_rule, StartRule::Immediate);
     let mut f = in_state(State::Ready, "G0\n");
     f.send(Message::Start { job_id: j1() });
     assert_eq!(f.state(), State::Running);

@@ -13,13 +13,14 @@ use curvyo_connector_core::{
     ControllerCommand, ErrorCode, Event, JobKind, JobResult, Machine, Message, Options, Output,
     Progress, RejectReason, State, decode, encode,
 };
+use curvyo_connector_core::{Peer, StartRule};
 
 const REQUIRE: Options = Options {
-    require_local_start: true,
+    start_rule: StartRule::LocalPress,
 };
 
 fn app(m: &mut Machine, message: Message) -> Output {
-    m.handle(Event::Message(message))
+    m.handle(Event::Message(message, Peer::host()))
 }
 
 fn idle(m: Machine) -> Machine {
@@ -92,6 +93,9 @@ fn m1_home_and_homing_match_their_golden_files() {
                 alarm: None,
                 detail: None,
                 pause_pending: false,
+                requested_by: None,
+                job_name: None,
+                sent_by: None,
             },
         ),
         (
@@ -103,6 +107,9 @@ fn m1_home_and_homing_match_their_golden_files() {
                 alarm: None,
                 detail: None,
                 pause_pending: false,
+                requested_by: None,
+                job_name: None,
+                sent_by: None,
             },
         ),
     ];

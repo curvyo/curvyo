@@ -15,9 +15,10 @@ use curvyo_connector_core::{
     ControllerCommand, ErrorCode, Event, JobKind, JobResult, Message, Millimetres, Options,
     RejectReason, State,
 };
+use curvyo_connector_core::{Peer, StartRule};
 
 const REQUIRE: Options = Options {
-    require_local_start: true,
+    start_rule: StartRule::LocalPress,
 };
 
 fn is_error(m: &Message) -> bool {
@@ -110,14 +111,14 @@ const EVENTS: [&str; 19] = [
 fn event(name: &str) -> Event {
     let other: uuid::Uuid = "00000000-0000-4000-8000-000000000001".parse().unwrap();
     match name {
-        "Submit" => Event::Message(submit(JOB_TEXT, JobKind::Job)),
-        "Chunk" => Event::Message(chunk(0, JOB_TEXT)),
-        "GetStatus" => Event::Message(Message::GetStatus),
-        "Start" => Event::Message(Message::Start { job_id: job_id() }),
-        "StartOtherJob" => Event::Message(Message::Start { job_id: other }),
-        "Pause" => Event::Message(Message::Pause),
-        "Resume" => Event::Message(Message::Resume),
-        "Stop" => Event::Message(Message::Stop),
+        "Submit" => Event::Message(submit(JOB_TEXT, JobKind::Job), Peer::host()),
+        "Chunk" => Event::Message(chunk(0, JOB_TEXT), Peer::host()),
+        "GetStatus" => Event::Message(Message::GetStatus, Peer::host()),
+        "Start" => Event::Message(Message::Start { job_id: job_id() }, Peer::host()),
+        "StartOtherJob" => Event::Message(Message::Start { job_id: other }, Peer::host()),
+        "Pause" => Event::Message(Message::Pause, Peer::host()),
+        "Resume" => Event::Message(Message::Resume, Peer::host()),
+        "Stop" => Event::Message(Message::Stop, Peer::host()),
         "Connected" => Event::ControllerConnected,
         "Lost" => Event::ControllerLost,
         "Progress" => Event::Progress {
@@ -133,11 +134,14 @@ fn event(name: &str) -> Event {
         "AlarmCleared" => Event::AlarmCleared,
         "LocalStart" => Event::LocalStartPressed,
         "ClientDisconnected" => Event::ClientDisconnected,
-        "Hello" => Event::Message(Message::Hello {
-            protocol: 0,
-            software: "x".into(),
-            version: "0".into(),
-        }),
+        "Hello" => Event::Message(
+            Message::Hello {
+                protocol: 0,
+                software: "x".into(),
+                version: "0".into(),
+            },
+            Peer::host(),
+        ),
         other => panic!("{other}"),
     }
 }

@@ -1,0 +1,20 @@
+{"format":2,"name":"a","controller":{"kind":"fake"}} -> format: 2 is not 1
+{"format":1,"name":"","controller":{"kind":"fake"}} -> name: is empty
+{"format":1,"name":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","controller":{"kind":"fake"}} -> name: has more than 64 characters
+{"format":1,"name":"a\u0007b","controller":{"kind":"fake"}} -> name: has a control character
+{"format":1,"name":"a","owner":"","controller":{"kind":"fake"}} -> owner: is empty
+{"format":1,"name":"a","owner":"Marc\nWorkshop","controller":{"kind":"fake"}} -> owner: has a control character
+{"format":1,"name":"a","listen":"0.0.0.0","controller":{"kind":"fake"}} -> listen: 0.0.0.0 is not an address and port
+{"format":1,"name":"a","controller":{"kind":"grbl-serial","port":""}} -> controller.port: is empty
+{"format":1,"name":"a","controller":{"kind":"grbl-serial","port":"/dev/tty\tUSB0"}} -> controller.port: has a control character
+{"format":1,"name":"a","controller":{"kind":"grbl-serial","port":"/dev/ttyUSB0","baud":0}} -> controller.baud: 0 is not from 1 to 4,000,000
+{"format":1,"name":"a","controller":{"kind":"grbl-serial","port":"/dev/ttyUSB0","baud":4000001}} -> controller.baud: 4,000,001 is not from 1 to 4,000,000
+{"format":1,"name":"a","controller":{"kind":"fake","lines_per_second":0}} -> controller.lines_per_second: 0 is not from 1 to 10,000
+{"format":1,"name":"a","controller":{"kind":"fake","lines_per_second":10001}} -> controller.lines_per_second: 10,001 is not from 1 to 10,000
+{"format":1,"name":"a","controller":{"kind":"fake","alarm_at_line":0}} -> controller.alarm_at_line: 0 is not at least 1
+{"format":1,"name":"a","controller":{"kind":"fake","pace":3}} -> refused
+{"format":1,"name":"a","colour":"red","controller":{"kind":"fake"}} -> refused
+{"format":1,"name":"a","controller":{"kind":"laser"}} -> refused
+{"format":1,"name":"a","controller":{"kind":"grbl-serial"}} -> refused
+{"format":1,"controller":{"kind":"fake"}} -> refused
+{"format":1,"name":"a","controller":{"kind":"grbl-serial","port":"/dev/ttyUSB0"}} -> valid

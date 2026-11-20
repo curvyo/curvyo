@@ -1,0 +1,1 @@
+{"type":"Error","code":"InvalidConfig","message":"controller.baud: 0 is not from 1 to 4,000,000"}

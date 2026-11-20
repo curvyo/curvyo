@@ -5,13 +5,14 @@
 mod common;
 
 use common::{JOB_TEXT, chunk, fixture, job_id, submit};
+use curvyo_connector_core::Peer;
 use curvyo_connector_core::{
     ControllerCommand, ErrorCode, Event, JobKind, JobResult, Machine, Message, Options, Output,
     Progress, State, decode, encode,
 };
 
 fn app(m: &mut Machine, message: Message) -> Output {
-    m.handle(Event::Message(message))
+    m.handle(Event::Message(message, Peer::host()))
 }
 
 fn ready(mut m: Machine) -> Machine {
@@ -71,6 +72,9 @@ fn p2_status_pause_pending_matches_its_golden_file_and_old_files_are_unchanged()
         alarm: None,
         detail: Some("Controller state: Home".into()),
         pause_pending: true,
+        requested_by: None,
+        job_name: None,
+        sent_by: None,
     };
     let golden = fixture("messages/status_pause_pending.json");
     assert_eq!(encode(&message).unwrap(), golden);

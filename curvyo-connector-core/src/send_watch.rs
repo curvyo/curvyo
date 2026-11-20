@@ -109,6 +109,9 @@ mod tests {
             alarm: None,
             detail: None,
             pause_pending: false,
+            requested_by: None,
+            job_name: None,
+            sent_by: None,
         }
     }
 

@@ -1,6 +1,6 @@
 //! How the job machine takes the job controls and the events of the controller side.
 
-use super::{ControllerCommand, Event, Machine, Output, Waiting, count};
+use super::{ControllerCommand, Event, Machine, Output, StartRule, Waiting, count};
 use crate::message::{ErrorCode, JobResult, Message, State};
 
 impl Machine {
@@ -110,6 +110,7 @@ impl Machine {
                     out.messages.push(self.status());
                 }
             }
+            Event::LocalStartPressed if self.options.start_rule != StartRule::LocalPress => {}
             Event::LocalStartPressed
                 if self.state == State::AwaitingLocalStart && self.waiting == Waiting::Home =>
             {
@@ -117,12 +118,7 @@ impl Machine {
                 self.set(State::Homing, out);
             }
             Event::LocalStartPressed if self.state == State::AwaitingLocalStart => {
-                if let Some(h) = &self.held {
-                    out.commands.push(ControllerCommand::Start {
-                        job_id: h.job.job_id,
-                    });
-                }
-                self.set(State::Running, out);
+                self.run_waiting(None, out);
             }
             event @ (Event::Homed | Event::HomingFailed { .. } | Event::Stopped)
                 if self.state == State::Homing =>
@@ -138,6 +134,9 @@ impl Machine {
     fn lose(&mut self, text: Option<&str>, out: &mut Output) {
         let line = self.held.as_ref().map_or(0, |h| h.line);
         let loss = match self.state {
+            _ if self.waits_for_resume() => {
+                Some(format!("Lost the controller at line {}", count(line)))
+            }
             State::Running | State::Paused => {
                 Some(format!("Lost the controller at line {}", count(line)))
             }
@@ -160,7 +159,8 @@ impl Machine {
     }
 
     fn on_job_event(&mut self, event: Event, out: &mut Output) {
-        let running = matches!(self.state, State::Running | State::Paused);
+        let running =
+            matches!(self.state, State::Running | State::Paused) || self.waits_for_resume();
         let Some(held) = self.held.as_mut().filter(|_| running) else {
             return;
         };
