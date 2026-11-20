@@ -73,6 +73,10 @@ docs, not the TypeScript.
 Agents in the same checkout build or test one at a time; only docs-only agents run in parallel.
 Only one agent drives a browser.
 
+**Request economy** (matters on per-request billed models, e.g. GLM via opencode, where `.claude/agents/`
+is not used and `AGENTS.md` is this file): few large steps, no `head`/`tail` slicing, run a gate command
+once into a file and search that; details in `docs/playbooks/tester.md`. Dispatch prompts name the playbook.
+
 **Model per task** (role default in `.claude/agents/`, the lead overrides per dispatch):
 Haiku for `tester`, `refactorer` and mechanical work (clean rebases, dependency/advisory
 bumps, status rows, lint fixes in tests, watching CI); Sonnet (medium) for lead, `implementer`,
