@@ -2735,3 +2735,32 @@ guards change.
 
 `frontend/tests` `centreLineJobs` "a drag sends one job" can fail on a loaded machine: it waits on
 wall time for the debounced job. **Resolution:** drive the debounce with a fake clock.
+
+## The group glue holds every synced font's bytes in memory (`0116` slice 2, 2026-11-20)
+
+The room's snapshot carries the blobs of switched-on fonts (the relay prunes the records a
+snapshot covers, ADR 0062 decision 3), so `DeviceGroupGlue` keeps the bytes of every synced font
+and licence file resident while the group is open: up to the 512 MiB library budget, held and
+arriving bytes together (a blob no entry names makes room first). Typical libraries are tens of
+MiB; a library near the budget costs about that much wasm heap, and at a snapshot upload about
+three times that at the peak (the held bytes, the encoded snapshot, its parts and their sealed
+copies: over 1.5 GiB of wasm memory), and every snapshot uploads all blobs again. The glue also
+asks the page for bytes it lacks (`library_font_wants`); a snapshot waits for blobs still
+arriving as parts (30 minutes at most per hash) and for the page's supply of bytes it holds (10
+minutes at most per hash), never longer.
+
+**A restart loses the transfer state.** What is still being sent or received (`assembling`,
+`to_push`, `pending_acks`) lives in memory only. After a restart a half-received blob is lost and
+a font switched on while offline never pushes its parts; the row then reads as transferred,
+because nothing is owed any more. Only the next snapshot of a device that holds the bytes
+repairs it (the page supplies them on the next start). Re-pushing the unacknowledged own blobs
+on Online needs a persisted outbox of hashes.
+
+**Resolution:** a streaming snapshot that reads each blob from the host while it is sealed, or a
+relay-side blob store beside the snapshot (a protocol change, so an ADR).
+
+## Fonts: a documented gap in the desktop's document bytes (`0116` slice 2, 2026-11-20)
+
+`read_font_document` returns text only (the first 1 MiB), so licence and readme files travel as
+UTF-8 text and a PDF document of a font folder does not travel. **Resolution:** a bytes command
+for font documents beside `read_font_document`.
