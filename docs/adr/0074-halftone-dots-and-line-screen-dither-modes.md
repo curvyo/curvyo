@@ -1,6 +1,6 @@
 # ADR 0074: Two screen dither modes, Halftone dots and Line screen: an integer threshold per dot from a rotated cell of the item
 
-**Status:** Proposed (architect, 2026-11-19), note 2026-11-20 (Frage 283 B: the screen fields come from the item's own dither). No customer decision needed beyond Frage 277 (open, default A: both modes in slice 1). Spec: [`0135`](../../specs/0135-image-optimisation/specification.md) criteria 36, 37, 42 to 44. Extends [ADR 0068](0068-raster-dot-values-and-dithering.md) §5 (modes) and §6 (determinism); the stored keys are [ADR 0072](0072-image-adjustments-on-the-image-object.md) §6.
+**Status:** Accepted (PR #435, 2026-11-20; architect, 2026-11-19), note 2026-11-20 (Frage 283 B: the screen fields come from the item's own dither). No customer decision needed beyond Frage 277 (open, default A: both modes in slice 1). Spec: [`0135`](../../specs/0135-image-optimisation/specification.md) criteria 36, 37, 42 to 44. Extends [ADR 0068](0068-raster-dot-values-and-dithering.md) §5 (modes) and §6 (determinism); the stored keys are [ADR 0072](0072-image-adjustments-on-the-image-object.md) §6.
 
 **In plain words (for the customer).** The picture is laid under a regular grid of cells, turned by the Angle. In each cell a round dot (or a band) burns, bigger where the picture is darker. Whole numbers only, so it is the same on every computer.
 

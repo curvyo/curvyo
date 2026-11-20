@@ -1,5 +1,7 @@
 # Plan for image optimisation, slice 1: Presets and Strength (0135)
 
+**Status:** Done (PR #435, 2026-11-20).
+
 Slice 1 = criteria 1, 2, 4, 5 (Denoise, Levels, Local contrast, Contours, Sharpen), 8, 9, 11 to 13,
 15 to 46, 51 to 62 (spec "Acceptance criteria" intro). Not in this build: slice 2 (Crop, Resize,
 Channel mix, Curves, reorder rules beyond the bands, Copy and Paste adjustments; criteria 3, 6, 7,
@@ -136,10 +138,10 @@ test grid) is in slice 1's list. No new crate. No new third-party dependency; on
 
 ### Part E: gate, docs, PR (lead)
 
-- [ ] E1. `docs/design-system.md` (Adjustments group, the Strength slider exception),
+- [x] E1. `docs/design-system.md` (Adjustments group, the Strength slider exception),
       `docs/requirements.md` (next R-MFG-LASER), `docs/technical-debt.md`, README format row 51,
-      spec `Status: Done (PR #n)` (AC 57, 58).
-- [ ] E2. Full gate (`CLAUDE.md` §7), PR with the review guide.
+      spec `Status: Done (PR #435)` (AC 57, 58).
+- [x] E2. Full gate (`CLAUDE.md` §7), PR with the review guide.
 
 ## Validation
 
