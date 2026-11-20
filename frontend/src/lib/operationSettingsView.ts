@@ -89,8 +89,19 @@ export interface OperationOptions {
   image: ImageSettings | null;
 }
 
-/** The Dither modes in the strip's order (`specs/0123` criterion 11). */
-export const DITHER_MODES = ["threshold", "ordered", "floyd_steinberg", "jarvis", "atkinson", "stucki", "grey"] as const;
+/** The Dither modes in the strip's order (`specs/0123` criterion 11; the two screens of `specs/0135`
+ * criteria 42 to 44 last). */
+export const DITHER_MODES = [
+  "threshold",
+  "ordered",
+  "floyd_steinberg",
+  "jarvis",
+  "atkinson",
+  "stucki",
+  "grey",
+  "halftone",
+  "line_screen",
+] as const;
 
 /** One Dither mode. */
 export type DitherMode = (typeof DITHER_MODES)[number];
@@ -101,8 +112,16 @@ export interface DitherOption {
   label: string;
 }
 
-/** The names `edit_operation_option` takes for the Image settings numbers. */
-export type ImageFieldName = "threshold" | "lowest_power" | "brightness" | "contrast" | "gamma";
+/** The names `edit_operation_option` takes for the Image settings numbers (`screen_size` is the
+ * Cell size of Halftone dots and the Line pitch of Line screen, `specs/0135` criteria 42, 43). */
+export type ImageFieldName =
+  | "threshold"
+  | "lowest_power"
+  | "brightness"
+  | "contrast"
+  | "gamma"
+  | "screen_size"
+  | "screen_angle";
 
 /** One number field of the Image settings group. */
 export interface ImageField {
@@ -115,15 +134,26 @@ export interface ImageField {
   range: string;
 }
 
-/** The Image settings group (UX notes 2.4): the Dither strip, Brightness, Contrast, Gamma, Invert,
- * and the mode's own field last (Threshold or Lowest power, `null` for the other modes). */
-export interface ImageSettings {
+/** A Dither strip with its mode's own fields: a picture's (`specs/0135` UX notes 3.10) or an
+ * Image operation's for its gradient fills (UX notes 10). */
+export interface DitherSettings {
   /** `null` for a damaged dither: no cell is pressed (UX P46). */
   dither: DitherMode | null;
   modes: DitherOption[];
+  /** Threshold's field with Threshold, `null` for the other modes. */
   modeField: ImageField | null;
+  /** Cell size or Line pitch, then Angle, for the two screens; empty for the other modes. */
+  screenFields: ImageField[];
+}
+
+/** The Image settings group of an Image row (`specs/0135` UX notes 10): Brightness, Contrast,
+ * Gamma, Invert, Lowest power while an item burns Grey, and the operation's own Dither only while
+ * it holds a gradient fill. */
+export interface ImageSettings {
   fields: ImageField[];
   invert: boolean;
+  lowestPower: ImageField | null;
+  dither: DitherSettings | null;
 }
 
 /** The four hatch options. */
@@ -260,7 +290,15 @@ export function decodeDitherOption(value: unknown): DitherOption | null {
   return mode === null ? null : { value: mode, label: value.label };
 }
 
-const IMAGE_FIELDS: readonly unknown[] = ["threshold", "lowest_power", "brightness", "contrast", "gamma"];
+const IMAGE_FIELDS: readonly unknown[] = [
+  "threshold",
+  "lowest_power",
+  "brightness",
+  "contrast",
+  "gamma",
+  "screen_size",
+  "screen_angle",
+];
 
 function asImageField(value: unknown): ImageField | null {
   if (
@@ -282,19 +320,20 @@ function asImageField(value: unknown): ImageField | null {
   };
 }
 
-function asImage(value: unknown): ImageSettings | null | undefined {
-  if (value === null) return null;
-  if (!isObject(value) || !Array.isArray(value.modes) || !Array.isArray(value.fields)) return undefined;
+/** A Dither strip and its fields; `undefined` when wrong. */
+export function decodeDitherSettings(value: unknown): DitherSettings | undefined {
+  if (!isObject(value) || !Array.isArray(value.modes) || !Array.isArray(value.screen_fields)) {
+    return undefined;
+  }
   const dither = value.dither === null ? null : asDither(value.dither);
   const modeField = value.mode_field === null ? null : asImageField(value.mode_field);
   const modes = value.modes.map(decodeDitherOption);
-  const fields = value.fields.map(asImageField);
+  const screenFields = value.screen_fields.map(asImageField);
   if (
     (value.dither !== null && dither === null) ||
     (value.mode_field !== null && modeField === null) ||
-    typeof value.invert !== "boolean" ||
     modes.some((m) => m === null) ||
-    fields.some((f) => f === null)
+    screenFields.some((f) => f === null)
   ) {
     return undefined;
   }
@@ -302,9 +341,25 @@ function asImage(value: unknown): ImageSettings | null | undefined {
     dither,
     modes: modes as DitherOption[],
     modeField,
-    fields: fields as ImageField[],
-    invert: value.invert,
+    screenFields: screenFields as ImageField[],
   };
+}
+
+function asImage(value: unknown): ImageSettings | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value) || !Array.isArray(value.fields)) return undefined;
+  const fields = value.fields.map(asImageField);
+  const lowestPower = value.lowest_power === null ? null : asImageField(value.lowest_power);
+  const dither = value.dither === null ? null : decodeDitherSettings(value.dither);
+  if (
+    typeof value.invert !== "boolean" ||
+    fields.some((f) => f === null) ||
+    (value.lowest_power !== null && lowestPower === null) ||
+    dither === undefined
+  ) {
+    return undefined;
+  }
+  return { fields: fields as ImageField[], invert: value.invert, lowestPower, dither };
 }
 
 function asOptions(value: unknown): OperationOptions | null | undefined {

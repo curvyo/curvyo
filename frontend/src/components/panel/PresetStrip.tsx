@@ -53,15 +53,31 @@ function rowsOf(cells: readonly StripCell[], breakAfter: readonly string[]): Str
   return rows.filter((row) => row.length > 0);
 }
 
-/** Home and End move and select too (Radix only moves the focus for them). Captured on a wrapper,
- * before the roving focus takes the key. */
-function homeEndPress(event: KeyboardEvent<HTMLElement>) {
-  if (event.key !== "Home" && event.key !== "End") return;
-  const items = event.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]');
-  const target = event.key === "Home" ? items[0] : items[items.length - 1];
-  if (!target) return;
+const BACK = ["ArrowLeft", "ArrowUp"];
+const ON = ["ArrowRight", "ArrowDown"];
+
+/** The arrows, Home and End move and select in a strip of fixed rows, without wrap. Captured on
+ * a wrapper before Radix's roving focus takes the key: Radix moves the focus a tick later and
+ * selects only when the arrow is still held then, so a short press would only move. */
+function fixedRowsKey(event: KeyboardEvent<HTMLElement>) {
+  const { key } = event;
+  if (key !== "Home" && key !== "End" && !BACK.includes(key) && !ON.includes(key)) return;
+  const items = Array.from(
+    event.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]:not([disabled])'),
+  );
+  const at = items.findIndex((item) => item === document.activeElement);
+  if (at < 0) return;
   event.preventDefault();
   event.stopPropagation();
+  const to =
+    key === "Home"
+      ? 0
+      : key === "End"
+        ? items.length - 1
+        : Math.min(items.length - 1, Math.max(0, at + (BACK.includes(key) ? -1 : 1)));
+  // Already there (an arrow at the end, Home on the first, End on the last): no second press.
+  if (to === at) return;
+  const target = items[to];
   target.focus();
   target.click();
 }
@@ -93,6 +109,8 @@ export function PresetStrip({
   fixedRows,
   tooltipSide = "left",
 }: PresetStripProps) {
+  // In fixed rows a cell shrinks with its row instead of wrapping to a row of its own.
+  const cellClass = fixedRows ? `${CELL} min-w-0 overflow-hidden whitespace-nowrap` : CELL;
   const cell = (one: StripCell) => (
     <Tooltip key={one.id} side={tooltipSide} content={one.tooltip}>
       <RadioGroup.Item
@@ -105,7 +123,7 @@ export function PresetStrip({
             onReturnFocus();
           }
         }}
-        className={CELL}
+        className={cellClass}
       >
         {one.content}
       </RadioGroup.Item>
@@ -133,7 +151,7 @@ export function PresetStrip({
     );
   }
   return (
-    <div className="contents" onKeyDownCapture={homeEndPress}>
+    <div className="contents" onKeyDownCapture={fixedRowsKey}>
       <RadioGroup.Root
         {...shared}
         // No orientation: Left and Up, Right and Down all move; no wrap.
@@ -141,7 +159,8 @@ export function PresetStrip({
         className={`flex ${width} flex-col gap-px overflow-hidden rounded-[5px] border`}
       >
         {rowsOf(cells, fixedRows.breakAfter).map((row) => (
-          <div key={row[0].id} className="flex flex-wrap gap-px">
+          // A fixed row never wraps (`0123` Dither in a narrow operation row: Grey stays in its row).
+          <div key={row[0].id} className="flex flex-wrap gap-px" style={{ flexWrap: "nowrap" }}>
             {row.map(cell)}
           </div>
         ))}

@@ -59,6 +59,11 @@ import { useOperations } from "@/hooks/useOperations";
 import { useOperationSettings } from "@/hooks/useOperationSettings";
 import { useGradient } from "@/hooks/useGradient";
 import { useOperationTools } from "@/hooks/useOperationTools";
+import { useAdjustments } from "@/hooks/useAdjustments";
+import { useBeforeAfter } from "@/hooks/useBeforeAfter";
+import { usePaneExclusion } from "@/hooks/usePaneExclusion";
+import { BeforeAfterPane } from "@/components/beforeAfter/BeforeAfterPane";
+import { SIZE_RANGE } from "@/lib/fontPreviewState";
 import { CollaborationPill } from "@/components/CollaborationPill";
 import { PresenceOverlay } from "@/components/PresenceOverlay";
 import { RULER_THICKNESS_PX } from "@/lib/rulerDraw";
@@ -117,6 +122,11 @@ function Editor() {
     },
   };
   const preview = useFontPreview({ node: editor.text.bar.sampleNode, sample: editor.text.bar.sample });
+  // The Adjustments group of a selected picture and its Before and after pane (`specs/0135`); the
+  // pane and the font preview share the canvas area's one side pane.
+  const adjust = useAdjustments(editor);
+  const beforeAfter = useBeforeAfter(editor);
+  usePaneExclusion(preview.store.open, beforeAfter.open, preview.close, beforeAfter.close);
   const { getSession } = editor;
   const placeOn = usePlaceOn(editor);
   const keepViewOrigin = useCallback(
@@ -427,13 +437,15 @@ function Editor() {
         <CanvasArea
           keepViewOrigin={keepViewOrigin}
           coverDrawing={editor.coverCanvasRight}
-          open={preview.store.open}
-          wantFull={preview.wantFull}
-          size={preview.size}
-          toggleFull={preview.toggleFull}
-          split={preview.split}
-          setSplit={preview.setSplit}
-          pane={(layout, switchView, resizing) => (
+          open={preview.store.open || beforeAfter.open}
+          wantFull={beforeAfter.open ? beforeAfter.full : preview.wantFull}
+          size={beforeAfter.open ? SIZE_RANGE.min : preview.size}
+          toggleFull={beforeAfter.open ? beforeAfter.toggleFull : preview.toggleFull}
+          split={beforeAfter.open ? beforeAfter.split : preview.split}
+          setSplit={beforeAfter.open ? beforeAfter.setSplit : preview.setSplit}
+          pane={(layout, switchView, resizing) => beforeAfter.open ? (
+            <BeforeAfterPane api={beforeAfter} layout={layout} onSwitchView={switchView} onReturnFocus={returnToText} />
+          ) : (
             <FontPreview
               preview={preview}
               layout={layout}
@@ -497,6 +509,8 @@ function Editor() {
           workbenches={workbenches}
           editor={editor}
           gradient={gradient}
+          adjust={adjust}
+          onToggleBeforeAfter={() => void beforeAfter.toggle()}
           document={documentPanel}
           panelOpen={panelOpen}
           project={project}
