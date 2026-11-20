@@ -119,23 +119,31 @@ fn started(status: &Message, job_id: Uuid) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curvyo_connector_core::{Event, Machine, Options};
+    use curvyo_connector_core::{Event, Machine, Options, Peer, StartRule};
     use curvyo_connector_core::{JobKind, JobResult};
 
     fn submit(job_id: Uuid) -> Event {
-        Event::Message(Message::SubmitJob {
-            job_id,
-            name: "page".to_owned(),
-            kind: JobKind::Job,
-            bytes: 3,
-            sha256: "3b7fe25639867d0e186bd77a042b8cfd7a1dc313b72ce8603a5681a9093ac19c".to_owned(),
-        })
+        Event::Message(
+            Message::SubmitJob {
+                job_id,
+                name: "page".to_owned(),
+                kind: JobKind::Job,
+                bytes: 3,
+                sha256: "3b7fe25639867d0e186bd77a042b8cfd7a1dc313b72ce8603a5681a9093ac19c"
+                    .to_owned(),
+            },
+            Peer::host(),
+        )
     }
 
     /// A machine driven into `state` by events only.
     fn machine_in(state: &str) -> Machine {
         let options = Options {
-            require_local_start: state == "AwaitingLocalStart",
+            start_rule: if state == "AwaitingLocalStart" {
+                StartRule::LocalPress
+            } else {
+                StartRule::Immediate
+            },
         };
         let mut m = Machine::new(options);
         if state == "NoController" {
@@ -151,23 +159,26 @@ mod tests {
                 });
             }
             "Homing" => {
-                m.handle(Event::Message(Message::Home));
+                m.handle(Event::Message(Message::Home, Peer::host()));
             }
             "Receiving" => {
                 m.handle(submit(id));
             }
             _ => {
                 m.handle(submit(id));
-                m.handle(Event::Message(Message::JobChunk {
-                    job_id: id,
-                    index: 0,
-                    text: "G0\n".to_owned(),
-                }));
+                m.handle(Event::Message(
+                    Message::JobChunk {
+                        job_id: id,
+                        index: 0,
+                        text: "G0\n".to_owned(),
+                    },
+                    Peer::host(),
+                ));
                 if state != "Ready" {
-                    m.handle(Event::Message(Message::Start { job_id: id }));
+                    m.handle(Event::Message(Message::Start { job_id: id }, Peer::host()));
                 }
                 if state == "Paused" {
-                    m.handle(Event::Message(Message::Pause));
+                    m.handle(Event::Message(Message::Pause, Peer::host()));
                 }
                 if state == "Done" {
                     m.handle(Event::JobFinished { elapsed_ms: 1 });
@@ -252,6 +263,9 @@ mod tests {
             alarm: None,
             detail: None,
             pause_pending: false,
+            requested_by: None,
+            job_name: None,
+            sent_by: None,
         };
         assert!(starts_after_send(true, Some(&done)));
     }

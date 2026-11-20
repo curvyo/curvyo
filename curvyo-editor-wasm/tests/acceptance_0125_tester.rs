@@ -714,6 +714,9 @@ fn s11_connection_dropped_and_a_fresh_read_fails_commits_nothing_and_keeps_the_w
         alarm: None,
         detail: None,
         pause_pending: false,
+        requested_by: None,
+        job_name: None,
+        sent_by: None,
     };
     let r = curvyo_connector_io::send_tracked::observe_shared(&watch, &ready);
     assert_eq!(r, Some(Resolution::Accepted));

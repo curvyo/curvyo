@@ -14,6 +14,7 @@ import {
   jobButtons,
   jobLineAlerts,
   jobStateLine,
+  waitingText,
 } from "./connectorText.ts";
 import { withName } from "./sendLine.ts";
 
@@ -39,7 +40,7 @@ export function homeButton(entry: LinkEntry): HomeButton {
     case "Paused":
       return off("A job is running");
     case "AwaitingLocalStart":
-      return off("Waiting for the start at the machine");
+      return off(waitingText(status, entry.session));
     case "Receiving":
       return off("Sending");
     case "NoController":
@@ -96,6 +97,8 @@ export interface ControlsLine {
   failure: boolean;
   /** `TriangleAlert` and Unlock at the right. */
   alarm: boolean;
+  /** The muted look of a line that answers no press ("Not started: <job>", `0128` UX notes 8.3). */
+  muted?: boolean;
   /** Read out as an alert: an alarm, a lost job, a failure of the maker's own press. */
   alerts: boolean;
   bar: Bar | null;
@@ -135,7 +138,10 @@ export function controlsLine(entry: LinkEntry, own: OwnPress = NO_PRESS): Contro
   // The name and size of this app's job only; a job of another app reads as plain "Ready".
   const id = status.job?.job_id ?? null;
   const held = entry.held !== null && (entry.held.jobId === null || entry.held.jobId === id) ? entry.held : null;
-  const line = jobStateLine(status, held);
+  if (entry.discarded && status.state.name === "Idle") {
+    return { ...pressed({ text: `Not started: ${entry.discarded}`, failure: false }), muted: true };
+  }
+  const line = jobStateLine(status, held, entry.session);
   if (line === null) return null;
   const bar = barOf(status, line);
   if (entry.lost) return { text: "Connection lost", failure: true, alarm: false, alerts: false, bar };

@@ -6,7 +6,15 @@ import { SymbolButton } from "@/components/workbench/SymbolButton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { type ConnectorLinkModel, useConnectorLink } from "@/hooks/useConnectorLink";
 import { useArm } from "@/hooks/useArm";
-import { type Line, codeComplete, controllerRows, fingerprintLines, pairRowShown, typedCode } from "@/lib/connectorText";
+import {
+  type Line,
+  codeComplete,
+  controllerRows,
+  fingerprintLines,
+  pairRowShown,
+  trustLabel,
+  typedCode,
+} from "@/lib/connectorText";
 import { isTauri } from "@/platform/host";
 
 interface Props {
@@ -76,7 +84,7 @@ function ConnectorBody({
   if (address === "") {
     return <p className="text-xs text-[var(--panel-muted-fg)]">No connector address</p>;
   }
-  const showPair = pairRowShown({ paired: model.paired !== null, noStore: model.noStore });
+  const showPair = pairRowShown({ paired: model.paired !== null, noStore: model.noStore, maintenance: model.maintenance });
   return (
     <>
       <LinkLine line={model.line} alert={model.alert} />
@@ -145,7 +153,7 @@ function TrustBlock({ model, onForget }: { model: ConnectorLinkModel; onForget: 
   const name = arm.armed ? "Forget pairing. A new code is needed." : "Forget pairing";
   return (
     <dl
-      aria-label={`Paired with ${paired.connectorName}, key ${paired.fingerprint}`}
+      aria-label={trustLabel(paired, model.session)}
       className="grid grid-cols-[80px_minmax(0,1fr)] gap-x-1 gap-y-1 text-xs"
       {...arm.zone}
     >
@@ -172,6 +180,20 @@ function TrustBlock({ model, onForget }: { model: ConnectorLinkModel; onForget: 
           </button>
         </Tooltip>
       </dd>
+      {model.session?.ownerLabel ? (
+        <>
+          <dt className="text-[var(--panel-muted-fg)]">Belongs to</dt>
+          <dd className="m-0 min-w-0 truncate text-[var(--toolbar-icon)]" title={model.session.ownerLabel}>
+            {model.session.ownerLabel}
+          </dd>
+        </>
+      ) : null}
+      {model.session ? (
+        <>
+          <dt className="text-[var(--panel-muted-fg)]">This app</dt>
+          <dd className="m-0 whitespace-nowrap text-[var(--toolbar-icon)]">{model.session.role}</dd>
+        </>
+      ) : null}
       <KeyRow label="Key" fingerprint={paired.fingerprint} />
     </dl>
   );

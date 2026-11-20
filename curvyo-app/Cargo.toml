@@ -53,7 +53,7 @@ curvyo-storage-io = { path = "../curvyo-storage-io", version = "0.1.0" }
 # The machine connector's app side (`specs/0064-machine-connector`, ADR 0035): the blocking client,
 # pairing and the status watcher run in this host; the webview never holds the token or the pin.
 curvyo-connector-core = { path = "../curvyo-connector-core", version = "0.1.0" }
-curvyo-connector-io = { path = "../curvyo-connector-io", version = "0.1.0" }
+curvyo-connector-io = { path = "../curvyo-connector-io", version = "0.1.0", default-features = false }
 
 # The import's file limit, checked before a pasted or dropped local file is read
 # (`specs/0087-image-clipboard-and-drop` criterion 6); on Linux the import dialog's preview also

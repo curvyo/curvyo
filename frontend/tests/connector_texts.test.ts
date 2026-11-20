@@ -48,7 +48,7 @@ test("a failed forget and an unmapped error have fixed short words; no store hid
   assert.equal(FORGET_FAILED_TEXT, "Could not forget the pairing");
   assert.equal(errorLine({ kind: "other", message: "Connector error" }).text, "Connector error");
   assert.equal(errorLine({ kind: "noCredentialStore" }).text, "No credential store on this computer");
-  assert.equal(pairRowShown({ paired: false, noStore: false }), true);
-  assert.equal(pairRowShown({ paired: true, noStore: false }), false);
-  assert.equal(pairRowShown({ paired: false, noStore: true }), false);
+  assert.equal(pairRowShown({ paired: false, noStore: false, maintenance: false }), true);
+  assert.equal(pairRowShown({ paired: true, noStore: false, maintenance: false }), false);
+  assert.equal(pairRowShown({ paired: false, noStore: true, maintenance: false }), false);
 });
