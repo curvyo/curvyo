@@ -11,6 +11,7 @@ import {
   type Line,
   type LinkError,
   type PairAnswer,
+  type Session,
   type StatusMessage,
   FORGET_FAILED_TEXT,
   errorLine,
@@ -30,6 +31,8 @@ export interface ConnectorLinkModel {
   paired: { connectorName: string; fingerprint: string } | null;
   /** This computer has no credential store: pairing cannot work, so the Pair row is not shown. */
   noStore: boolean;
+  /** The last test reached a connector in maintenance mode: no Pair row (`specs/0128` UX notes 8.4). */
+  maintenance: boolean;
   keyChanged: { stored: string; presented: string } | null;
   line: Line | null;
   /** The text of the hidden alert: a failure that answers the maker's own press, or a changed key. */
@@ -37,6 +40,8 @@ export interface ConnectorLinkModel {
   status: StatusMessage | null;
   /** What the controller reported at its last identify. */
   controller: ControllerInfo | null;
+  /** This app's role and the owner label, from the last login (`specs/0128` A26). */
+  session: Session | null;
   /** The press that waits for its answer, here or in the Machine controls footer. */
   busy: Busy | null;
   test: () => void;
@@ -84,6 +89,9 @@ export function useConnectorLink(profileId: string | null, address: string, enab
       const answer = await linkStore.read(profileId, address);
       if (mine !== generation.current) return;
       if (answer.kind === "connected") {
+        setLine(explain ? testLine(answer) : null);
+        setAlert("");
+      } else if (answer.kind === "maintenance") {
         setLine(explain ? testLine(answer) : null);
         setAlert("");
       } else {
@@ -196,11 +204,13 @@ export function useConnectorLink(profileId: string | null, address: string, enab
   return {
     paired: entry.paired,
     noStore: entry.noStore,
+    maintenance: entry.maintenance,
     keyChanged: entry.keyChanged,
     line: entry.lost ? LOST : line,
     alert,
     status: entry.status,
     controller: entry.controller,
+    session: entry.session,
     busy: entry.busy,
     test,
     pair,

@@ -1,7 +1,7 @@
 //! What the connector commands answer: plain data for the webview, and the mapping from the
 //! client's errors. No Tauri here, so the tables are tested without a window.
 
-use curvyo_connector_core::{ControllerInfo, Message, RejectReason};
+use curvyo_connector_core::{ConnectorMode, ControllerInfo, Message, RejectReason, Role};
 use curvyo_connector_io::client::ClientError;
 use curvyo_connector_io::frames::RefusalReason;
 use curvyo_connector_io::job_send::SendError;
@@ -32,6 +32,10 @@ pub(crate) enum LinkError {
     NoLongerPaired,
     /// Another protocol version.
     ProtocolMismatch { connector: u32 },
+    /// The connector is in maintenance mode and takes no login (`specs/0128` A26).
+    InMaintenance,
+    /// The connector refused a call only an owner may make: this app is a member (A26).
+    MemberOnly,
     /// Anything else, as the one fixed text [`OTHER_TEXT`]; the detail goes to the log only.
     Other { message: String },
 }
@@ -61,6 +65,7 @@ impl From<ClientError> for LinkError {
             },
             ClientError::NoLongerPaired => Self::NoLongerPaired,
             ClientError::ProtocolMismatch { connector } => Self::ProtocolMismatch { connector },
+            ClientError::InMaintenance => Self::InMaintenance,
             other => Self::other(&other),
         }
     }
@@ -82,10 +87,26 @@ pub(crate) enum TestAnswer {
         protocol: u32,
         version: String,
         connector_name: String,
-        status: Message,
+        status: Box<Message>,
+        /// This app's role, from `Authenticated` (`specs/0128` A26); absent from an older connector.
+        role: Option<Role>,
+        /// This app's name in the connector's client list.
+        client_name: Option<String>,
+        /// The connector's owner label ("Belongs to"), from `Welcome`.
+        owner_label: Option<String>,
     },
+    /// A connector in maintenance mode, reached without a pairing (`specs/0128` UX notes 8.4).
+    Maintenance { protocol: u32, version: String },
     /// Not connected.
     Failed { error: LinkError },
+}
+
+/// The owner label a `Welcome` mode carries.
+pub(crate) fn owner_label(mode: Option<&ConnectorMode>) -> Option<String> {
+    match mode {
+        Some(ConnectorMode::Configured { owner }) => owner.clone(),
+        _ => None,
+    }
 }
 
 impl TestAnswer {
@@ -226,6 +247,9 @@ impl CommandAnswer {
         match &error {
             ClientError::Protocol(text) if text == "WrongState" => Self::WrongState,
             ClientError::Protocol(text) if text == "UnknownJob" => Self::UnknownJob,
+            ClientError::Protocol(text) if text == "OwnerRequired" => Self::Failed {
+                error: LinkError::MemberOnly,
+            },
             _ => Self::Failed {
                 error: error.into(),
             },
@@ -310,6 +334,7 @@ mod tests {
                 "keyChanged",
             ),
             (ClientError::NoLongerPaired, "noLongerPaired"),
+            (ClientError::InMaintenance, "inMaintenance"),
             (
                 ClientError::ProtocolMismatch { connector: 3 },
                 "protocolMismatch",
@@ -355,6 +380,13 @@ mod tests {
         assert_eq!(
             CommandAnswer::from_error(ClientError::Protocol("UnknownJob".to_owned())),
             CommandAnswer::UnknownJob
+        );
+        // A member's Home under the owner rule (`specs/0128`): "This app is a member".
+        assert_eq!(
+            CommandAnswer::from_error(ClientError::Protocol("OwnerRequired".to_owned())),
+            CommandAnswer::Failed {
+                error: LinkError::MemberOnly
+            }
         );
         assert!(matches!(
             CommandAnswer::from_error(ClientError::TimedOut),

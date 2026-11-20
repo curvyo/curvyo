@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use curvyo_connector_core::{ControllerInfo, MAX_JOB_BYTES, Message, State as JobState};
 use curvyo_connector_io::Uuid;
 use curvyo_connector_io::client::{
-    CONNECT_TIMEOUT, ClientError, DEFAULT_PORT, connect, open_paired_on,
+    CONNECT_TIMEOUT, ClientError, DEFAULT_PORT, connect, connect_on, open_paired_on,
 };
 use curvyo_connector_io::job_send::SendError;
 use curvyo_connector_io::pin_verifier::PinMode;
@@ -24,7 +24,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::connector_link::{
     CommandAnswer, FileSendError, LinkError, OTHER_TEXT, PairAnswer, PairingView, SendAnswer,
-    TestAnswer,
+    TestAnswer, owner_label,
 };
 use crate::connector_send::{PendingSends, report_resolution, send_pending};
 use crate::device_keys::{OpenStore, StoreProblem};
@@ -91,12 +91,19 @@ fn job_state(status: &Message) -> JobState {
     }
 }
 
-/// The id of the job a `Ready` status carries: what `Start` needs, from any connection.
+/// The id of the job a `Ready` status carries, or of a start a member requested (an owner's
+/// Confirm start, `specs/0128` A26): what `Start` needs, from any connection.
 fn ready_job_id(status: &Message) -> Option<Uuid> {
     match status {
         Message::Status {
             state: JobState::Ready,
             job: Some(progress),
+            ..
+        }
+        | Message::Status {
+            state: JobState::AwaitingLocalStart,
+            job: Some(progress),
+            requested_by: Some(_),
             ..
         } => Some(progress.job_id),
         _ => None,
@@ -150,11 +157,30 @@ pub(crate) fn connector_test(
     profile_id: String,
     address: String,
 ) -> TestAnswer {
-    let record = match load_record(&app, &open, &profile_id) {
-        Ok(record) => record,
-        Err(error) => return TestAnswer::Failed { error },
+    match load_record(&app, &open, &profile_id) {
+        Ok(record) => run_test(&address, DEFAULT_PORT, &record),
+        Err(LinkError::NotPaired) => run_test_unpaired(&address, DEFAULT_PORT),
+        Err(error) => TestAnswer::Failed { error },
+    }
+}
+
+/// The test of a profile without a pairing: only a connector in maintenance mode is told apart
+/// (`specs/0128` UX notes 8.4); anything else is "Not paired".
+fn run_test_unpaired(address: &str, default_port: u16) -> TestAnswer {
+    let not_paired = TestAnswer::Failed {
+        error: LinkError::NotPaired,
     };
-    run_test(&address, DEFAULT_PORT, &record)
+    let Ok(connection) = connect_on(address, default_port, PinMode::Capture, CONNECT_TIMEOUT)
+    else {
+        return not_paired;
+    };
+    match connection.greeting.mode {
+        Some(curvyo_connector_core::ConnectorMode::Maintenance { .. }) => TestAnswer::Maintenance {
+            protocol: connection.greeting.protocol,
+            version: connection.greeting.version.clone(),
+        },
+        _ => not_paired,
+    }
 }
 
 /// The test itself; `default_port` is what an address without a port means.
@@ -172,7 +198,10 @@ fn run_test(address: &str, default_port: u16, record: &PairingRecord) -> TestAns
             protocol: connection.greeting.protocol,
             version: connection.greeting.version.clone(),
             connector_name: connection.greeting.name.clone(),
-            status,
+            status: Box::new(status),
+            role: connection.session.as_ref().map(|(_, role)| *role),
+            client_name: connection.session.as_ref().map(|(name, _)| name.clone()),
+            owner_label: owner_label(connection.greeting.mode.as_ref()),
         },
         Err(e) => TestAnswer::Failed { error: e.into() },
     }
@@ -205,6 +234,15 @@ pub(crate) fn connector_pair(
         Ok(connection) => connection,
         Err(e) => return PairAnswer::Failed { error: e.into() },
     };
+    // A connector in maintenance mode takes no pairing (`specs/0128` A3, A26).
+    if matches!(
+        connection.greeting.mode,
+        Some(curvyo_connector_core::ConnectorMode::Maintenance { .. })
+    ) {
+        return PairAnswer::Failed {
+            error: LinkError::InMaintenance,
+        };
+    }
     let record = match connection.pair(&code, &client_name(), deadline) {
         Ok(record) => record,
         Err(e) => return e.into(),
@@ -550,6 +588,35 @@ mod tests {
     }
 
     #[test]
+    fn test_connection_of_an_unpaired_profile_tells_maintenance_mode_from_not_paired() {
+        let (server, _dir, _record) = rig();
+        let answer = run_test_unpaired("127.0.0.1", server.addr().port());
+        assert!(
+            matches!(
+                answer,
+                TestAnswer::Failed {
+                    error: LinkError::NotPaired
+                }
+            ),
+            "{answer:?}"
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let service = RunningServer::start_service(&curvyo_connector_io::server::ServiceConfig {
+            listen: "127.0.0.1:0".parse().unwrap(),
+            state_dir: dir.path().to_owned(),
+            host_name: "workshop-pi".into(),
+            timing: curvyo_connector_io::server::ServerTiming::default(),
+        })
+        .unwrap();
+        let answer = run_test_unpaired("127.0.0.1", service.addr().port());
+        let TestAnswer::Maintenance { protocol, version } = answer else {
+            panic!("{answer:?}");
+        };
+        assert_eq!(protocol, 0);
+        assert_ne!(version, "");
+    }
+
+    #[test]
     fn test_connection_with_garbage_says_not_a_valid_address() {
         let (_server, _dir, record) = rig();
         let answer = run_test("not an address", DEFAULT_PORT, &record);
@@ -589,6 +656,9 @@ mod tests {
             alarm: None,
             detail: None,
             pause_pending: false,
+            requested_by: None,
+            job_name: None,
+            sent_by: None,
         }
     }
 
@@ -598,6 +668,14 @@ mod tests {
         assert_eq!(ready_job_id(&status(JobState::Ready, Some(id))), Some(id));
         assert_eq!(ready_job_id(&status(JobState::Idle, None)), None);
         assert_eq!(ready_job_id(&status(JobState::Running, Some(id))), None);
+        // `specs/0128` A26: an owner's Confirm start takes the id of the start a member requested;
+        // the foreground wait for Enter carries no requester and is not confirmed from the app.
+        let mut waiting = status(JobState::AwaitingLocalStart, Some(id));
+        assert_eq!(ready_job_id(&waiting), None);
+        if let Message::Status { requested_by, .. } = &mut waiting {
+            *requested_by = Some("Phone".into());
+        }
+        assert_eq!(ready_job_id(&waiting), Some(id));
     }
 
     #[test]

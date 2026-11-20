@@ -5,7 +5,7 @@ import { GLYPH, SMALL } from "@/components/workbench/machineStyles";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
 import { type MachineControlsModel, useMachineControls } from "@/hooks/useMachineControls";
 import { notStartedLine } from "@/lib/connectorLink";
-import { formatCount, formatElapsed, jobButtons } from "@/lib/connectorText";
+import { confirmKind, formatCount, formatElapsed, jobButtons } from "@/lib/connectorText";
 import {
   type ControlsLine,
   afterHoming,
@@ -153,13 +153,15 @@ interface Item {
   enabled: boolean;
   busy: boolean;
   cause?: string | null;
+  describedBy?: string;
   icon: ReactNode;
   press: () => void;
 }
 
 function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRef: RefObject<HTMLDivElement | null> }) {
   const { entry } = model;
-  const buttons = jobButtons(entry.status?.state ?? null, pausePending(entry.status));
+  const confirm = confirmKind(entry.status, entry.session);
+  const buttons = jobButtons(entry.status?.state ?? null, pausePending(entry.status), confirm);
   const idle = entry.busy === null;
   const home = homeButton(entry);
   const pause = pauseButton(entry);
@@ -173,6 +175,8 @@ function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRe
       // Greyed while the page's own Start is in flight (`0134` P6).
       enabled: buttons.start && idle && !entry.startStep,
       busy: entry.busy === (resume ? "resume" : "start"),
+      // The job block's state line names the requester and the job (`0128` UX notes 8.2).
+      describedBy: confirm !== null ? "machine-controls-state" : undefined,
       icon: <Play {...GLYPH} />,
       press: () => model.command(resume ? "resume" : "start"),
     },
@@ -202,6 +206,7 @@ function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRe
             enabled={item.enabled}
             busy={item.busy}
             cause={item.cause}
+            describedBy={item.describedBy}
             side="top"
             tabIndex={rover === at ? 0 : -1}
             buttonRef={(node) => {
@@ -241,7 +246,8 @@ function JobBlock({
     <div className="flex flex-col gap-1">
       <div className="flex items-start justify-between gap-1 text-xs">
         <p
-          className={`flex items-start gap-1 [overflow-wrap:anywhere] ${line.alarm ? "pt-1.5" : ""} ${line.failure ? "text-[var(--destructive)]" : "text-[var(--toolbar-icon)]"}`}
+          id="machine-controls-state"
+          className={`flex items-start gap-1 [overflow-wrap:anywhere] ${line.alarm ? "pt-1.5" : ""} ${line.failure ? "text-[var(--destructive)]" : line.muted ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}`}
         >
           {line.alarm ? <TriangleAlert {...SMALL} className="mt-0.5 shrink-0" /> : line.failure ? <CircleAlert {...SMALL} className="mt-0.5 shrink-0" /> : null}
           <span>{line.text}</span>

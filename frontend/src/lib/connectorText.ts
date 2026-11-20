@@ -21,6 +21,20 @@ export interface StatusMessage {
   detail?: string | null;
   /** A Pause waits for the controller's first moment to hold (`specs/0133`); absent when false. */
   pause_pending?: boolean;
+  /** The member whose start or resume waits for an owner (`specs/0128`); absent otherwise. */
+  requested_by?: string | null;
+  /** The held job's name, from a configured connector (`specs/0128`). */
+  job_name?: string | null;
+  /** The client that sent the held job, from a configured connector (`specs/0128`). */
+  sent_by?: string | null;
+}
+
+/** Who this app is on the connector (`specs/0128` A26): from the login answer, not stored. */
+export interface Session {
+  role: "Owner" | "Member";
+  clientName: string;
+  /** The connector's owner label ("Belongs to"); `null` without one. */
+  ownerLabel: string | null;
 }
 
 /** The state line while a Pause waits for the job's homing to end (`specs/0133` UX notes H1). */
@@ -48,6 +62,8 @@ export type LinkError =
   | { kind: "keyChanged"; stored: string; presented: string }
   | { kind: "noLongerPaired" }
   | { kind: "protocolMismatch"; connector: number }
+  | { kind: "inMaintenance" }
+  | { kind: "memberOnly" }
   | { kind: "other"; message: string };
 
 export type TestAnswer =
@@ -59,7 +75,13 @@ export type TestAnswer =
       version: string;
       connectorName: string;
       status: StatusMessage;
+      /** This app's role and name, and the owner label; absent from a connector before `0128`. */
+      role?: "Owner" | "Member" | null;
+      clientName?: string | null;
+      ownerLabel?: string | null;
     }
+  /** A connector in maintenance mode, reached without a pairing (`specs/0128` UX notes 8.4). */
+  | { kind: "maintenance"; protocol: number; version: string }
   | { kind: "failed"; error: LinkError };
 
 export type PairAnswer =
@@ -111,6 +133,10 @@ export function errorLine(error: LinkError): Line {
       return neutral("No longer paired");
     case "protocolMismatch":
       return failure(`Protocol mismatch: app 0, connector ${error.connector}`);
+    case "inMaintenance":
+      return failure("Connector in maintenance mode");
+    case "memberOnly":
+      return failure("This app is a member");
     case "other":
       return failure(error.message);
   }
@@ -120,6 +146,9 @@ export function errorLine(error: LinkError): Line {
 export function testLine(answer: TestAnswer): Line {
   if (answer.kind === "failed") {
     return errorLine(answer.error);
+  }
+  if (answer.kind === "maintenance") {
+    return neutral(`Connected, maintenance mode, protocol ${answer.protocol}, connector ${answer.version}`);
   }
   const controller = answer.controller ?? "none";
   return neutral(
@@ -155,8 +184,8 @@ export const FORGET_FAILED_TEXT = "Could not forget the pairing";
 
 /** Pairing needs a credential store to keep the key and the token in, so without one (or while a
  * pairing exists) the Pair row is not shown. */
-export function pairRowShown(state: { paired: boolean; noStore: boolean }): boolean {
-  return !state.paired && !state.noStore;
+export function pairRowShown(state: { paired: boolean; noStore: boolean; maintenance: boolean }): boolean {
+  return !state.paired && !state.noStore && !state.maintenance;
 }
 
 /** The connector holds another job than the one a command named. */
@@ -204,12 +233,23 @@ export function clearsRefusal(last: StatusMessage | null, next: StatusMessage): 
 export interface JobButtons {
   send: boolean;
   start: boolean;
-  startName: "Start" | "Resume";
+  startName: "Start" | "Resume" | "Confirm start" | "Confirm resume";
   pause: boolean;
   stop: boolean;
 }
 
-export function jobButtons(state: JobState | null, pausePending = false): JobButtons {
+/** What an owner app's Start slot confirms (`specs/0128` UX notes 8.2): a member's waiting start
+ * or resume; `null` for a member app, no request, or the foreground wait for Enter. */
+export function confirmKind(status: StatusMessage | null, session: Session | null): "Confirm start" | "Confirm resume" | null {
+  if (status?.state.name !== "AwaitingLocalStart" || !status.requested_by || session?.role !== "Owner") return null;
+  return (status.job?.line ?? 0) > 0 ? "Confirm resume" : "Confirm start";
+}
+
+export function jobButtons(
+  state: JobState | null,
+  pausePending = false,
+  confirm: "Confirm start" | "Confirm resume" | null = null,
+): JobButtons {
   const none: JobButtons = { send: false, start: false, startName: "Start", pause: false, stop: false };
   if (state === null) {
     return { ...none, send: true };
@@ -221,6 +261,9 @@ export function jobButtons(state: JobState | null, pausePending = false): JobBut
     case "Ready":
       return { ...none, start: true, stop: true };
     case "AwaitingLocalStart":
+      // An owner confirms a member's request in the Start slot, not armed (`0128` V14, V15).
+      if (confirm !== null) return { ...none, start: true, startName: confirm, stop: true };
+      return { ...none, stop: true };
     case "Homing":
       // Stop ends a homing too and never asks (`specs/0118` criterion 5).
       return { ...none, stop: true };
@@ -273,8 +316,38 @@ export interface HeldJob {
   bytes: number;
 }
 
+/** The longest waiting line before names are cut (`specs/0128` UX notes 8.3). */
+const WAITING_MAX = 70;
+
+/** `text` with `name` cut at its end ("…") so that the line stays within 70 characters. */
+function fitName(build: (name: string) => string, name: string): string {
+  let cut = name;
+  while (build(cut).length > WAITING_MAX && cut.length > 1) {
+    cut = cut.slice(0, -1);
+  }
+  return cut === name ? build(name) : build(`${cut.slice(0, -1)}…`);
+}
+
+/** The words of a start that waits (`specs/0128` UX notes 8.3): the owner app names the member,
+ * a member app the owner; the foreground wait for Enter as built. */
+export function waitingText(status: StatusMessage, session: Session | null): string {
+  const member = status.requested_by;
+  if (!member) return "Waiting for the start at the machine";
+  const line = status.job?.line ?? 0;
+  if (session?.role === "Owner") {
+    return line > 0
+      ? fitName((n) => `Resume requested by ${n} at line ${formatCount(line)}`, member)
+      : fitName((n) => `Start requested by ${n}`, member);
+  }
+  const owner = session?.ownerLabel ?? "an owner";
+  if (!session || member === session.clientName) {
+    return fitName((n) => `Waiting for ${n} to confirm`, owner);
+  }
+  return fitName((n) => `${n} waits for ${owner} to confirm`, member);
+}
+
 /** The state line of the job block (UX notes §8); `null` when there is no block. */
-export function jobStateLine(status: StatusMessage, held: HeldJob | null): Line | null {
+export function jobStateLine(status: StatusMessage, held: HeldJob | null, session: Session | null = null): Line | null {
   const lines = status.job?.lines ?? held?.lines ?? 0;
   const line = status.job?.line ?? 0;
   switch (status.state.name) {
@@ -287,7 +360,7 @@ export function jobStateLine(status: StatusMessage, held: HeldJob | null): Line 
         held ? `Ready: ${held.name}, ${formatCount(held.lines)} lines, ${formatSize(held.bytes)}` : "Ready",
       );
     case "AwaitingLocalStart":
-      return neutral("Waiting for the start at the machine");
+      return neutral(waitingText(status, session));
     case "Homing":
       return neutral("Homing");
     case "Running":
@@ -406,6 +479,16 @@ export function typedCode(text: string): string {
 /** Whether the field holds 8 characters of the code's alphabet (spaces and hyphens ignored). */
 export function codeComplete(text: string): boolean {
   return /^[0-9A-TV-Z]{8}$/.test(text.toUpperCase().replace(/[-\s]/g, ""));
+}
+
+/** The accessible text of the trust block (`specs/0128` UX notes 8.1): "Paired with workshop-laser,
+ * belongs to Marc, this app is a member, key 3F2A ...". */
+export function trustLabel(paired: { connectorName: string; fingerprint: string }, session: Session | null): string {
+  const parts = [`Paired with ${paired.connectorName}`];
+  if (session?.ownerLabel) parts.push(`belongs to ${session.ownerLabel}`);
+  if (session) parts.push(`this app is ${session.role === "Owner" ? "an owner" : "a member"}`);
+  parts.push(`key ${paired.fingerprint}`);
+  return parts.join(", ");
 }
 
 /** The fingerprint as two lines of 4 groups (UX notes §5). */

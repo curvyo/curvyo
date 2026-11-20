@@ -9,6 +9,7 @@ import {
   type ControllerInfo,
   type Line,
   type LinkError,
+  type Session,
   type StatusMessage,
   type TestAnswer,
   errorLine,
@@ -70,6 +71,8 @@ export interface LinkEntry {
   link: Link;
   paired: { connectorName: string; fingerprint: string } | null;
   noStore: boolean;
+  /** The last test reached a connector in maintenance mode, which takes no pairing. */
+  maintenance: boolean;
   keyChanged: { stored: string; presented: string } | null;
   status: StatusMessage | null;
   /** What the connector's controller reported at its last identify (`specs/0127` G19). */
@@ -99,6 +102,12 @@ export interface LinkEntry {
   reading: boolean;
   /** Why the last status read failed; `null` after a read that connected. */
   readError: LinkError | null;
+  /** This app's role and name and the owner label, from the last connection test or status read
+   * (`specs/0128` A26); not stored. */
+  session: Session | null;
+  /** A member's waiting request that someone else discarded: its job's name, until the next
+   * state change, send or test (`specs/0128` UX notes V16). */
+  discarded: string | null;
 }
 
 type Payload =
@@ -139,6 +148,7 @@ const EMPTY: LinkEntry = {
   link: "unknown",
   paired: null,
   noStore: false,
+  maintenance: false,
   keyChanged: null,
   status: null,
   controller: null,
@@ -154,7 +164,24 @@ const EMPTY: LinkEntry = {
   busy: null,
   reading: false,
   readError: null,
+  session: null,
+  discarded: null,
 };
+
+/** The job's name when `next` shows that a member's own waiting request was discarded by someone
+ * else (`specs/0128` UX notes V16): it waited, now nothing is held, and this app did not press
+ * Stop; `null` otherwise. */
+export function discardedName(
+  last: StatusMessage | null,
+  next: StatusMessage,
+  session: Session | null,
+  ownStop: boolean,
+): string | null {
+  const waited = last?.state.name === "AwaitingLocalStart" && Boolean(last.requested_by);
+  const mine = session?.role === "Member" && last?.requested_by === session.clientName;
+  if (!waited || !mine || ownStop || next.state.name !== "Idle") return null;
+  return last?.job_name ?? "the job";
+}
 
 /** The text of a send that ended without an accepted job (S7, S11). */
 export function resolutionText(resolution: Resolution, alarm: string | null): string | null {
@@ -203,6 +230,10 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
       patch(profileId, { link: "not_paired", paired: null, status: null });
     } else if (error.kind === "noCredentialStore") {
       patch(profileId, { noStore: true });
+    } else if (error.kind === "memberOnly") {
+      // The connector knows better than the login answer did (`specs/0128` UX notes 8.4).
+      const session = get(profileId).session;
+      if (session) patch(profileId, { session: { ...session, role: "Member" } });
     }
   };
 
@@ -216,7 +247,9 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
     const changed = now.status?.state.name !== status.state.name;
     const ours = status.state.name === "Ready" && jobId !== null && jobId === now.notStarted?.jobId;
     const started = status.state.name === "Ready" && jobId !== null && jobId === now.startedJob;
+    const discarded = discardedName(now.status, status, now.session, now.busy === "stop");
     patch(profileId, {
+      discarded: discarded ?? (changed ? null : now.discarded),
       notStarted: ours ? now.notStarted : null,
       startedJob: started ? now.startedJob : null,
       status,
@@ -263,7 +296,7 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
         patch(profileId, { controller: payload.controller });
         break;
       case "sending":
-        patch(profileId, { sendingName: payload.name });
+        patch(profileId, { sendingName: payload.name, discarded: null });
         break;
       case "lost":
         if (jobIsActive(get(profileId).status?.state ?? { name: "Idle" })) patch(profileId, { lost: true });
@@ -333,12 +366,20 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
     const answer = await host
       .invoke<TestAnswer>("connector_test", { profileId, address })
       .catch((): TestAnswer => ({ kind: "failed", error: { kind: "other", message: "Connector error" } }));
-    patch(profileId, { reading: false, readError: answer.kind === "connected" ? null : answer.error });
+    patch(profileId, {
+      reading: false,
+      readError: answer.kind === "connected" || answer.kind === "maintenance" ? null : answer.error,
+      maintenance: answer.kind === "maintenance",
+    });
     if (answer.kind === "connected") {
-      patch(profileId, { controller: answer.controllerInfo ?? null });
+      const session: Session | null =
+        answer.role && answer.clientName
+          ? { role: answer.role, clientName: answer.clientName, ownerLabel: answer.ownerLabel ?? null }
+          : get(profileId).session;
+      patch(profileId, { controller: answer.controllerInfo ?? null, session, discarded: null });
       setStatus(profileId, answer.status);
       void host.invoke("connector_watch", { profileId, address }).catch(() => undefined);
-    } else {
+    } else if (answer.kind === "failed") {
       linkFailure(profileId, answer.error);
     }
     return answer;
