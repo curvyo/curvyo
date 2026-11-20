@@ -292,7 +292,8 @@ Grown past the module limit of CLAUDE.md §5 by the membership lifecycle, each b
 leave, the `left` reconcile or the ended record of the group it already drives:
 `frontend/src/hooks/useDevices.ts` (930), `useSyncedWorkspaces.ts` (600),
 `frontend/src/lib/backgroundWorkspace.ts` (588), `PropertiesPanel.tsx` (621),
-`useWorkspaceSync.ts` (558) and `curvyo-editor-wasm/src/device_group_glue.rs` (566);
+`useWorkspaceSync.ts` (558) and `curvyo-editor-wasm/src/device_group_glue.rs` (686, library
+sync of `0116`);
 `useCollaboration.ts` shrank to 445 with `0105`. Splitting them is a refactoring outside the
 story.
 
@@ -2710,6 +2711,7 @@ for satin stitch (embroidery family) rather than here.
   must be kept alive for the AI tools to download on demand (models are never bundled); the app
   does not work around a lost host except through stored results. **Resolution:** a documented
   runbook with the model upload and CDN settings; bundling was rejected by the customer.
+
 ## `library_list` duplicates the format guards of `devices_list` (`0116`, 2026-11-15)
 
 `curvyo-document-core`'s `library_list` (ADR 0062 decision 2) repeats the private format-guard
