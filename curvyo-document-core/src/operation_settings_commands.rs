@@ -220,7 +220,8 @@ impl Document {
 
     /// The document part of a material edit made in this project (ADR 0054 §3, ADR 0055 §9): the
     /// root marker `x.curvyo.laser.material_edit` = `{ id, modified }` and the refreshed settings of
-    /// every operation that points to the material, in one history step `step`.
+    /// every operation that points to the material, in one history step `step`. The stored
+    /// `modified` is at least one more than the last marker's, so every edit is a step.
     ///
     /// # Errors
     /// As [`Document::write_operation_settings`]; nothing is written then.
@@ -233,6 +234,12 @@ impl Document {
     ) -> Result<(), OperationError> {
         let metas = self.settings_targets(refreshed)?;
         Self::write_settings(&metas, refreshed);
+        // The marker only makes the step exist: it moves on past the stored one, so an edit in
+        // the same whole second as the last one (a delete right after an edit) is a step too.
+        let last = self
+            .material_edit_marker()
+            .and_then(|m| m.get("modified").and_then(serde_json::Value::as_u64));
+        let modified = last.map_or(modified, |last| modified.max(last.saturating_add(1)));
         let mut marker = serde_json::Map::new();
         marker.insert("id".to_owned(), material_id.into());
         marker.insert("modified".to_owned(), modified.into());

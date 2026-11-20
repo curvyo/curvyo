@@ -265,6 +265,17 @@ fn criterion_17_deleting_a_material_retires_its_tests_and_removes_photos() {
 }
 
 #[test]
+fn deleting_a_material_in_the_same_second_as_its_last_edit_is_a_step() {
+    let mut s = laser_with_fonts();
+    s.set_clock(|| curvyo_document_core::Timestamp::from_secs(1_700_000_000));
+    let birch = s.add_material("Birch 3 mm", 3.0, &random(1)).unwrap();
+    let steps = s.undo_len();
+    assert_eq!(s.delete_material(&birch), Ok(()));
+    assert_eq!(s.undo_len(), steps + 1);
+    assert_eq!(undo_label(&mut s), "Delete material");
+}
+
+#[test]
 fn the_journal_counts_photo_bytes_and_drops_the_oldest_past_its_limit() {
     let (mut s, birch, group) = birch_grid();
     let id = recipe_of(&s, group).id.to_string();
