@@ -21,6 +21,12 @@ impl Settings {
         self.values.insert(number, value.to_owned());
     }
 
+    /// Whether no `$<n>=` line has been read.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
     fn number(&self, n: u16) -> Option<f64> {
         self.values.get(&n)?.trim().parse().ok()
     }

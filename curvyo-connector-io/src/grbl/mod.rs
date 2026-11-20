@@ -4,6 +4,7 @@
 pub mod controller;
 pub mod flow;
 pub mod home;
+mod homing;
 pub mod identify;
 pub mod prepare;
 mod replies;
@@ -16,6 +17,10 @@ pub mod texts;
 use std::time::Duration;
 
 pub use controller::GrblController;
+
+/// The longest a `$H` may go unanswered before the controller counts as lost, unless
+/// `--homing-timeout` sets another (`specs/0142` HC2).
+pub const HOMING_CAP: Duration = Duration::from_secs(120);
 
 /// The connector's GRBL limits; the tests shorten them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +39,8 @@ pub struct Timing {
     pub poll_fast: Duration,
     /// Between two `?` otherwise (G4).
     pub poll_slow: Duration,
+    /// No answer to `$H` for this long is a lost controller (`specs/0142`).
+    pub homing: Duration,
 }
 
 impl Default for Timing {
@@ -46,6 +53,7 @@ impl Default for Timing {
             banner: Duration::from_secs(3),
             poll_fast: Duration::from_millis(200),
             poll_slow: Duration::from_secs(1),
+            homing: HOMING_CAP,
         }
     }
 }

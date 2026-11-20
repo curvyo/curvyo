@@ -119,6 +119,15 @@ pub fn reset_at(line: u32) -> String {
     format!("The controller was reset at line {}", count(line))
 }
 
+/// `"Lost the controller: homing took longer than <cap> s"` (`specs/0142` HC3), whole seconds.
+#[must_use]
+pub fn homing_cap(cap: std::time::Duration) -> String {
+    format!(
+        "Lost the controller: homing took longer than {} s",
+        cap.as_secs()
+    )
+}
+
 /// `"No GRBL answer on <port>"`.
 #[must_use]
 pub fn no_answer(port: &str) -> String {

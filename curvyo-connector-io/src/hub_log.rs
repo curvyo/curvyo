@@ -33,11 +33,15 @@ fn alarm_of(status: &Message) -> Option<&str> {
 }
 
 /// The log's words for an app sentence: "Failed at line 12: X" is "line 12, X", "Lost the
-/// controller at line 120" is "controller lost at line 120", any other starts in lower case.
+/// controller at line 120" is "controller lost at line 120", "Lost the controller: X" is
+/// "controller lost, X" (`specs/0142` HC3), any other starts in lower case.
 #[must_use]
 pub fn log_text(detail: &str) -> String {
     if let Some(rest) = detail.strip_prefix("Failed at ") {
         return rest.replacen(": ", ", ", 1);
+    }
+    if let Some(rest) = detail.strip_prefix("Lost the controller: ") {
+        return format!("controller lost, {rest}");
     }
     if let Some(rest) = detail.strip_prefix("Lost the controller") {
         return format!("controller lost{rest}");
@@ -130,6 +134,10 @@ mod tests {
         assert_eq!(
             log_text("Lost the controller at line 120"),
             "controller lost at line 120"
+        );
+        assert_eq!(
+            log_text("Lost the controller: homing took longer than 3600 s"),
+            "controller lost, homing took longer than 3600 s"
         );
         assert_eq!(
             log_text("Could not confirm the machine stopped"),
