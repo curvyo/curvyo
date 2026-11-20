@@ -801,6 +801,11 @@ fn an_edit_of_a_held_item_is_applied_without_an_arrival_notice() {
         2,
         "its host write is queued"
     );
+    assert!(
+        net.devices[b].session.take_library_applied(),
+        "the page is told to flush and re-read, with no notice"
+    );
+    assert!(!net.devices[b].session.take_library_applied(), "once");
     assert_eq!(
         net.devices[b].notices.len(),
         1,
