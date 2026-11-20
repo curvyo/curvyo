@@ -2,23 +2,11 @@ import { Contrast } from "lucide-react";
 import { Toggle } from "radix-ui";
 import { useId } from "react";
 
-import { EntryField } from "@/components/panel/EntryField";
-import { PresetStrip } from "@/components/panel/PresetStrip";
+import { DitherFields, DitherModeStrip, ImageNumberField } from "@/components/panel/DitherStrip";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { OperationToolsApi } from "@/hooks/useOperationTools";
-import { IMAGE_FIELD_LOOK, imageFieldStep, imageFieldText } from "@/lib/imageSettingsRows";
 import type { ImageField, ImageSettings } from "@/lib/operationSettingsView";
 import type { OperationRow } from "@/lib/operationsView";
-import { CHIP_IS_MESSAGE, outcomeOf, typedNumber } from "@/lib/settingsFieldText";
-
-/** The strip's two fixed rows: a break after the third cell (`ux-notes.md` 2.5). */
-const STRIP_BREAK = ["floyd_steinberg"];
-
-/** Only Floyd-Steinberg is shortened; every cell's accessible name is the full name, and a cell
- * whose word is shortened has the full name as its tooltip (the others none, UX notes 2.5). */
-function cellWord(label: string): string {
-  return label === "Floyd-Steinberg" ? "Floyd" : label;
-}
 
 interface GroupProps {
   row: OperationRow;
@@ -27,42 +15,20 @@ interface GroupProps {
   onReturnFocus: () => void;
 }
 
-function ImageFieldView({ field, row, tools, onReturnFocus }: Omit<GroupProps, "image"> & { field: ImageField }) {
-  const look = IMAGE_FIELD_LOOK[field.field];
-  return (
-    <div data-image-field={field.field}>
-      <EntryField
-        label={look.name}
-        prefix={field.label}
-        shown={imageFieldText(field.value)}
-        mixed={false}
-        suffix={field.unit}
-        width={look.width}
-        gutter={field.unit === "" ? 8 : undefined}
-        commitOnBlur
-        inputMode="decimal"
-        onSubmit={(text) => outcomeOf(tools.edit(row.id, field.field, typedNumber(text)))}
-        messages={CHIP_IS_MESSAGE}
-        stepText={imageFieldStep(field.field)}
-        onReturnFocus={onReturnFocus}
-      />
-    </div>
-  );
-}
-
 /**
- * The Image settings group of an Image row (`specs/0123-raster-engraving` `ux-notes.md` 2.4, 2.5):
- * under a hairline, no heading, the Dither as an always-visible choice strip (arrows move and
- * select, each selection one step, the canvas redraw is the preview), Brightness and Contrast,
- * Gamma and the Invert toggle, then the mode's own field (Threshold or Lowest power) last, so a
- * change of mode never moves the strip. The session shows it on every Image row and holds every
- * range.
+ * The Image settings group of an Image row (`specs/0123-raster-engraving` `ux-notes.md` 2.4;
+ * `specs/0135` UX notes §10, P30): under a hairline, no heading, Brightness and Contrast, Gamma
+ * and the Invert toggle, Lowest power while an item burns Grey, then, only while the operation
+ * holds a gradient fill, its own Dither block labelled "Dither for gradient fills" (the strip and
+ * the mode's fields last). A picture burns its own dither (its Adjustments group); the session
+ * holds every range.
  */
 export function ImageSettingsGroup({ row, image, tools, onReturnFocus }: GroupProps) {
-  const damagedId = useId();
+  const labelId = useId();
   const [brightness, contrast, gamma] = image.fields;
-  const field = (one: ImageField | undefined) =>
-    one ? <ImageFieldView field={one} row={row} tools={tools} onReturnFocus={onReturnFocus} /> : null;
+  const onEdit = (name: string, value: number) => tools.edit(row.id, name, value);
+  const field = (one: ImageField | undefined | null) =>
+    one ? <ImageNumberField field={one} onEdit={onEdit} onReturnFocus={onReturnFocus} /> : null;
   return (
     <div role="group" aria-label={`Image settings of ${row.name}`} data-image-settings="" className="flex flex-col gap-1">
       <div
@@ -70,30 +36,6 @@ export function ImageSettingsGroup({ row, image, tools, onReturnFocus }: GroupPr
         className="my-1 h-px"
         style={{ background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
       />
-      <div data-image-dither={image.dither ?? "damaged"} className="flex flex-col gap-1">
-        <PresetStrip
-          label="Dither"
-          describedBy={image.dither === null ? damagedId : undefined}
-          width="w-full"
-          tooltipSide="top"
-          fixedRows={{ breakAfter: STRIP_BREAK }}
-          cells={image.modes.map((mode) => ({
-            id: mode.value,
-            content: cellWord(mode.label),
-            label: mode.label,
-            tooltip: cellWord(mode.label) === mode.label ? "" : mode.label,
-          }))}
-          value={image.dither}
-          onPress={(mode) => tools.setDither(row.id, mode)}
-          // The focus stays on the strip: the arrows keep working (UX 2.5).
-          onReturnFocus={() => undefined}
-        />
-        {image.dither === null ? (
-          <p id={damagedId} className="text-xs text-[var(--field-invalid)]">
-            Damaged
-          </p>
-        ) : null}
-      </div>
       <div className="flex flex-wrap gap-1">
         {field(brightness)}
         {field(contrast)}
@@ -111,7 +53,20 @@ export function ImageSettingsGroup({ row, image, tools, onReturnFocus }: GroupPr
           </Toggle.Root>
         </Tooltip>
       </div>
-      {image.modeField ? <div className="flex flex-wrap gap-1">{field(image.modeField)}</div> : null}
+      {image.lowestPower ? <div className="flex flex-wrap gap-1">{field(image.lowestPower)}</div> : null}
+      {image.dither ? (
+        <div data-gradient-dither="" className="flex flex-col gap-1">
+          <p id={labelId} className="h-4 text-xs leading-4 text-[var(--panel-muted-fg)]">
+            Dither for gradient fills
+          </p>
+          <DitherModeStrip
+            dither={image.dither}
+            labelledBy={labelId}
+            onPress={(mode) => tools.setDither(row.id, mode)}
+          />
+          <DitherFields dither={image.dither} onEdit={onEdit} onReturnFocus={onReturnFocus} />
+        </div>
+      ) : null}
     </div>
   );
 }

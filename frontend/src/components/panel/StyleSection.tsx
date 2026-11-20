@@ -1,12 +1,15 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { CloneBlock, GreyedStyleHeaders, OriginLine } from "@/components/panel/CloneBlock";
+import { AdjustmentsGroup } from "@/components/panel/AdjustmentsGroup";
+import { CloneBlock, GreyedStyleHeaders, OriginLine, OverrideRow } from "@/components/panel/CloneBlock";
 import { FillSection } from "@/components/panel/FillSection";
 import { collapseSpacer } from "@/lib/collapseSpacer";
 import { StrokeSection } from "@/components/panel/StrokeSection";
+import type { AdjustmentsApi } from "@/hooks/useAdjustments";
 import type { ClonesApi } from "@/hooks/useClones";
 import type { GradientApi } from "@/hooks/useGradient";
 import type { StylePanelApi } from "@/hooks/useStylePanel";
+import { ADJUSTMENTS_SEGMENTS } from "@/lib/cloneText";
 
 /** The element that scrolls the panel body, or null. */
 function scrollerOf(element: HTMLElement | null): HTMLElement | null {
@@ -44,6 +47,10 @@ interface StyleSectionProps {
   /** Linked clones: the clone block replaces the sections for a selection of clones only, and
    * the origin line sits above them (`specs/0049-linked-clone` criteria 22 and 23). */
   clones: ClonesApi;
+  /** The Adjustments group of a selected picture (`specs/0135-image-optimisation`). */
+  adjust: AdjustmentsApi;
+  /** The group's Before and after button. */
+  onToggleBeforeAfter: () => void;
   onReturnFocus: () => void;
 }
 
@@ -54,7 +61,10 @@ interface StyleSectionProps {
  * `0043`). Every value comes from the session; every
  * control sends one command back.
  */
-export function StyleSection({ panel, gradient, clones, onReturnFocus }: StyleSectionProps) {
+export function StyleSection({ panel, gradient, clones, adjust, onToggleBeforeAfter, onReturnFocus }: StyleSectionProps) {
+  const adjustments = adjust.view ? (
+    <AdjustmentsGroup adjust={adjust} view={adjust.view} onToggleBeforeAfter={onToggleBeforeAfter} onReturnFocus={onReturnFocus} />
+  ) : null;
   const body = useRef<HTMLDivElement>(null);
   const { focusRequest, panelNotice } = clones;
   // After a key press on a clone command the focus goes where the UX notes say ("Focus"): Stroke
@@ -194,10 +204,28 @@ export function StyleSection({ panel, gradient, clones, onReturnFocus }: StyleSe
     // mix) they open as for a path and write to the clones with own style (`0057` criterion 10).
     return (
       <div ref={body} className="relative flex flex-col gap-2" {...press}>
-        <CloneBlock clones={clones} onReturnFocus={onReturnFocus} onPressedAt={pressedAt} />
+        <CloneBlock
+          clones={clones}
+          onReturnFocus={onReturnFocus}
+          onPressedAt={pressedAt}
+          extraRow={
+            adjust.view?.cloneRow ? (
+              <OverrideRow
+                label="Adjustments"
+                segments={ADJUSTMENTS_SEGMENTS}
+                state={adjust.view.cloneRow}
+                // Original's is Follow original; Own copies the original's adjustments whole.
+                onSet={(own) => void (own ? adjust.ownAdjustments() : adjust.followOriginal())}
+                onReturnFocus={onReturnFocus}
+                onPressedAt={() => undefined}
+              />
+            ) : null
+          }
+        />
         {notice}
         <div className="mt-2 flex flex-col gap-2">
-          {own ? (
+          {adjustments}
+          {own && !adjustments ? (
             <>
               <StrokeSection panel={panel} onReturnFocus={onReturnFocus} />
               {fill}
@@ -214,8 +242,9 @@ export function StyleSection({ panel, gradient, clones, onReturnFocus }: StyleSe
     <div ref={body} className="relative flex flex-col gap-2" {...press}>
       {notice}
       <OriginLine clones={clones} onReturnFocus={onReturnFocus} onPressedAt={pressedAt} />
+      {adjustments}
       {/* A selection of dimensions only has nothing to edit here (`0070` UI review item 3). */}
-      {panel.view.sectionsShown ? (
+      {panel.view.sectionsShown && !adjustments ? (
         <>
           <StrokeSection panel={panel} onReturnFocus={onReturnFocus} />
           {fill}

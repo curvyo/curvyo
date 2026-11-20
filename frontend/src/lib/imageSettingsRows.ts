@@ -21,6 +21,10 @@ export const IMAGE_FIELD_LOOK: Record<ImageFieldName, ImageFieldLook> = {
   brightness: { width: 120, step: 1, shiftStep: 10, decimals: 0, name: "Brightness, percent" },
   contrast: { width: 108, step: 1, shiftStep: 10, decimals: 0, name: "Contrast, percent" },
   gamma: { width: 100, step: 0.01, shiftStep: 0.1, decimals: 2, name: "Gamma" },
+  // The screens' fields (`specs/0135` criteria 42, 43; UX notes §10): 136 px holds "Line pitch"
+  // with a two-decimal value and "mm"; with Angle 104 the row stays inside the 256 px column.
+  screen_size: { width: 136, step: 0.05, shiftStep: 0.5, decimals: 2, name: "Cell size or line pitch, millimetres" },
+  screen_angle: { width: 104, step: 1, shiftStep: 15, decimals: 0, name: "Screen angle, degrees" },
 };
 
 /** A number as an Image field shows it: at most two decimals, no trailing zeros. */

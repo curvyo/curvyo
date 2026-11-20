@@ -1,5 +1,5 @@
 import { Link2 } from "lucide-react";
-import { useEffect, useId, useRef } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import type { CloneCommand, ClonesApi } from "@/hooks/useClones";
@@ -25,6 +25,9 @@ interface CloneBlockProps {
   /** A move-only selection (`specs/0106` UX notes §3): the name row and the select buttons only;
    * Unlink, Placement, Style and Spread colours are hidden. */
   moveOnly?: boolean;
+  /** A further override row after Placement (an image clone's Adjustments, `specs/0135`
+   * criterion 9), so it stands with the other overrides and not above a heading of its name. */
+  extraRow?: ReactNode;
 }
 
 /** A button of the block: a mouse press returns the focus to the canvas, a key press keeps it
@@ -84,7 +87,7 @@ function BlockButton({
  * (roving tabindex), arrows move and set, Space and Enter set. Mixed: no segment pressed. A mouse
  * press returns the focus to the canvas; a key press keeps it in the group.
  */
-function OverrideRow({
+export function OverrideRow({
   label,
   segments,
   state,
@@ -185,7 +188,7 @@ function OverrideRow({
  * original (chains only) and Unlink clone, then the Placement and Style rows and Spread colours
  * (`specs/0057-clone-overrides`). Inline, no popup.
  */
-export function CloneBlock({ clones, onReturnFocus, onPressedAt, moveOnly = false }: CloneBlockProps) {
+export function CloneBlock({ clones, onReturnFocus, onPressedAt, moveOnly = false, extraRow = null }: CloneBlockProps) {
   const { panel } = clones;
   if (!panel.clonesOnly) {
     return null;
@@ -250,6 +253,7 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt, moveOnly = fals
             onPressedAt={onPressedAt}
           />
         )}
+        {extraRow}
         {panel.styleRow && (
           <>
         <OverrideRow

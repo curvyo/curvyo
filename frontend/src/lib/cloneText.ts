@@ -88,6 +88,13 @@ export const PLACEMENT_SEGMENTS: OverrideSegment[] = [
   { own: true, label: "Own", name: "Own placement", title: "Stays where it is when the original is moved." },
 ];
 
+/** The Adjustments row of an image clone (`specs/0135-image-optimisation` criterion 9, UX notes §9);
+ * pressing Original's is Follow original. */
+export const ADJUSTMENTS_SEGMENTS: OverrideSegment[] = [
+  { own: false, label: "Original's", name: "Original's", title: "Shows the original's adjustments." },
+  { own: true, label: "Own", name: "Own", title: "Has its own adjustments; the original's stay as they are." },
+];
+
 export const STYLE_SEGMENTS: OverrideSegment[] = [
   {
     own: false,
