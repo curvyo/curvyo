@@ -5,6 +5,7 @@
 import { ChevronDown, ChevronRight, FilePlus, Star, Trash2, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { LibrarySyncToggle } from "@/components/LibrarySyncToggle";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cssFamilyOf, type LinePreview, linePreviewOf } from "@/lib/fontFaceLoader";
 
@@ -35,6 +36,7 @@ export function LineName({ preview, em }: { preview: LinePreview; em: number }) 
 }
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import { tagsLine } from "@/lib/fontLibraryText";
+import type { LibrarySyncView } from "@/lib/librarySyncView";
 import { type FontFace as ListedFace, type FontFamily, familyName } from "@/lib/textText";
 
 interface FamilyRowProps {
@@ -52,6 +54,9 @@ interface FamilyRowProps {
   zone?: string;
   /** The Remove trash of a Curvyo family (`specs/0081-inline-delete-confirm` criterion 1). */
   trash?: TrashProps;
+  /** The sync toggle of a Curvyo family, before its trash (`specs/0116-library-sync` UX notes
+   * section 1); `view` is `null` while no device is paired (greyed). */
+  sync?: { on: boolean; view: LibrarySyncView | null; onToggle: () => void };
   /** The install icon of a Document Fonts family that is not installed; its star and tag line
    * are greyed (`specs/0107-document-fonts` criteria 11 to 14). */
   install?: { onPress: () => void; busy: boolean };
@@ -116,6 +121,7 @@ export function FamilyRow({
   tagLine,
   zone,
   trash,
+  sync,
   install,
   notice,
   style,
@@ -129,7 +135,8 @@ export function FamilyRow({
   const faces = family.faces.length;
   const greyed = install !== undefined;
   const tagsPart = tagNames.length > 0 ? `, tags ${tagNames.join(", ")}` : "";
-  const name = `${familyName(family)}${favourite ? ", favourite" : ""}${tagsPart}`;
+  const syncedPart = sync?.view != null && sync.on ? ", synced" : "";
+  const name = `${familyName(family)}${favourite ? ", favourite" : ""}${syncedPart}${tagsPart}`;
   const tip = [
     `${family.family}, ${faces === 1 ? "1 face" : `${faces} faces`}`,
     holdsCurrent && !open ? "Contains the current font" : null,
@@ -179,6 +186,16 @@ export function FamilyRow({
           </span>
         )}
         {holdsCurrent && !open ? <span aria-hidden className="size-1.5 rotate-45 bg-[var(--editor-accent)]" /> : null}
+        {sync ? (
+          <LibrarySyncToggle
+            name={family.family}
+            on={sync.on}
+            view={sync.view}
+            onToggle={sync.onToggle}
+            slot="flex h-7 w-6"
+            keyHint={false}
+          />
+        ) : null}
         {trash ? (
           <span className="relative flex shrink-0">
             <RowTrash {...trash} />

@@ -18,6 +18,7 @@ import {
   removeBrowserFontFiles,
 } from "@/lib/browserFonts";
 import { ARGS_HEADER, asciiJson } from "@/lib/binaryArgs";
+import { addBrowserSyncedFonts } from "@/lib/browserSyncedFonts";
 import { browserDeviceName } from "@/lib/browserDevice";
 import { browserKeyStore, readDeviceKeys, writeRoomKeys } from "@/lib/deviceKeyStore";
 import { recordTextRefusal } from "@/lib/materialHostWrites";
@@ -313,6 +314,10 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
     throw new Error("the browser adds dropped font files through browserFonts");
   },
   remove_font_files: (args) => removeBrowserFontFiles(args?.faces as { id: string; index: number }[]),
+  // Fonts that arrived from the maker's other devices (`specs/0116-library-sync`); the browser
+  // has no trash, so a font deleted elsewhere is removed as Remove removes it.
+  add_synced_fonts: (args) => addBrowserSyncedFonts(args?.fonts as Parameters<typeof addBrowserSyncedFonts>[0]),
+  trash_font_files: (args) => removeBrowserFontFiles(args?.faces as { id: string; index: number }[]),
   // A font folder's documents from IndexedDB (`specs/0083-font-info-and-zip` criterion 4): the
   // first 1 MiB of a text, a PDF in a new tab from the stored bytes (no network request).
   read_font_document: async (args) => {

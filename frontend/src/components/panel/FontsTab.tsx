@@ -33,6 +33,7 @@ import { useFontTreeScroll } from "@/hooks/useFontTreeScroll";
 import { useFontPreviewState } from "@/hooks/useFontPreviewState";
 import { type PreviewListing, previewState, publishListing, setPreviewOpen } from "@/lib/fontPreviewStore";
 import { subjectLine } from "@/lib/fontPreviewText";
+import type { LibrarySyncApi } from "@/lib/devicesApi";
 import { onFontTreeKey } from "@/lib/fontTreeKeys";
 import { TabNotice } from "@/components/panel/FontTabNotice";
 import { FontSearchRow } from "@/components/panel/FontSearchRow";
@@ -58,6 +59,9 @@ interface FontsTabProps {
   onShown: () => Promise<void>;
   /** The texts of the project using a Curvyo family (`0075` criterion 25). */
   textsUsingFamily: (family: string) => number;
+  /** The library sync of the maker's devices: the Curvyo family rows' toggle
+   * (`specs/0116-library-sync` slice 2); absent where there is no device group hook. */
+  sync?: LibrarySyncApi;
   /** The text layout block over the strip (`specs/0079-text-layout-controls` criterion 6). */
   layout: TextLayoutApi;
 }
@@ -74,6 +78,7 @@ export function FontsTab({
   onReturnFocus,
   onShown,
   textsUsingFamily,
+  sync,
   layout,
 }: FontsTabProps) {
   const [search, setSearch] = useState("");
@@ -247,6 +252,7 @@ export function FontsTab({
       const before = focusable.slice(0, at).reverse().find((r) => r.kind === "family");
       // By mouse the focus stays, unless it was inside the removed row (never to `body`).
       const inRow = document.activeElement?.closest(`[data-arm-zone="${CSS.escape(`font:${key}`)}"]`);
+      sync?.fonts.forget(family.faces.map((face) => face.id));
       void lib.removeFamily(family).then(() => {
         const target = after ?? before;
         if (target && (byKeyboard || inRow)) {
@@ -494,6 +500,15 @@ export function FontsTab({
                   }
                   zone={row.family.block === "curvyo" ? `font:${row.key}` : undefined}
                   trash={row.family.block === "curvyo" ? trashOf(row.family) : undefined}
+                  sync={
+                    sync && row.family.block === "curvyo"
+                      ? {
+                          on: sync.fonts.on(row.family),
+                          view: sync.view,
+                          onToggle: () => sync.fonts.toggle(row.family),
+                        }
+                      : undefined
+                  }
                   install={
                     greyed(row.family)
                       ? { onPress: () => void installFamily(row.family), busy: installing === row.key }
@@ -587,6 +602,11 @@ export function FontsTab({
             notice={lib.notice}
             onAdd={(byKeyboard) => void addFonts(undefined, byKeyboard)}
           />
+          {sync !== undefined && sync.view === null && data.faces.some((face) => face.block === "curvyo") ? (
+            <p role="status" className="mb-1 text-xs text-[var(--panel-muted-fg)]">
+              Pair a device to sync fonts.
+            </p>
+          ) : null}
           {list}
       </>
     </div>

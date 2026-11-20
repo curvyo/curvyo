@@ -60,6 +60,7 @@ mod flatten_command;
 mod flip;
 mod font_library;
 mod font_library_file;
+mod font_library_sync;
 mod font_match;
 mod format_form;
 mod format_list_view;
@@ -339,6 +340,7 @@ pub use font_library_file::{
     FONT_LIBRARY_FORMAT, FontLibraryFileError, MAX_FONT_LIBRARY_BYTES, read_font_library,
     write_font_library,
 };
+pub use font_library_sync::FontMeta;
 pub use font_match::{FaceMatch, FontBlock, ListedFace, match_face};
 pub use format_form::{
     FieldError, FormDraft, FormField, FormPrefill, add_prefill, check_format_form, edit_prefill,
