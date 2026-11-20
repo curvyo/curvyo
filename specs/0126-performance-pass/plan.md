@@ -278,3 +278,11 @@ Rewrites of the renderer, a different GPU API, multi-threaded rendering.
 
 ## Order and cost
 Phase 0 and 1 first (small, safe, largest win); phase 2 next (the visible lag); 3 and 4 by data.
+
+## Closed (2026-11-20)
+
+The customer closed the spec (Frage 232 A). Left out on purpose, each a future story if a page needs it:
+the two full path copies per frame for the node decorations (about 7 ms at 20 000 paths), per-object
+tessellation reuse on very large pages (the 20 000 path pan at the fit stays at 31 ms; needs a
+`render-core` API, architect first). The Linux driver switch (`WEBKIT_DISABLE_DMABUF_RENDERER=1`) is
+set by the user's shell, not by the app (#430).
