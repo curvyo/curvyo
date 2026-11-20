@@ -95,6 +95,10 @@ pub struct DeviceGroupGlue {
     library_exported: DocumentVersion,
     library_synced: DocumentVersion,
     library_pushed: BTreeMap<u64, DocumentVersion>,
+    /// The first sync was confirmed (here or in an earlier run, the page tells): an item
+    /// without an entry is a new one and starts on. Before it, an item that never synced stays
+    /// local until its toggle is pressed (audit 2026-11-19, criterion 4).
+    library_new_items: bool,
     /// A switch-off or delete was pushed: the room's snapshot follows its ack, so the server's
     /// record history no longer holds the item's text (criteria 23 and 27).
     snapshot_after_ack: bool,
@@ -248,6 +252,7 @@ impl DeviceGroupGlue {
             library_exported: DocumentVersion::never(),
             library_synced: DocumentVersion::never(),
             library_pushed: BTreeMap::new(),
+            library_new_items: false,
             snapshot_after_ack: false,
             library_arrivals: VecDeque::new(),
             assembling: None,

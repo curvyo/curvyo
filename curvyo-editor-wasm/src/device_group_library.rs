@@ -106,9 +106,16 @@ impl DeviceGroupGlue {
         self.pump();
     }
 
+    /// Tells whether the first sync was confirmed (the page keeps the answer): from then on an
+    /// item without an entry is a new one and starts on.
+    pub fn set_library_new_items(&mut self, confirmed: bool) {
+        self.library_new_items = confirmed;
+    }
+
     /// The first sync (criterion 3): writes every local item on behind nothing; the confirm is
     /// the page's. How many entries were written.
     pub fn library_first_sync(&mut self, items: &[(LibraryKind, String, String)]) -> usize {
+        self.library_new_items = true;
         let mut written = 0;
         for (kind, id, text) in items {
             if self.library.set(*kind, id, text).is_ok() {
@@ -125,7 +132,8 @@ impl DeviceGroupGlue {
     }
 
     /// The local library edits of this device's session (the write list taps): an on item's
-    /// entry takes the text, a new item starts on (criterion 4), an off item publishes
+    /// entry takes the text, a new item starts on once the first sync was confirmed
+    /// (criterion 4; before, an item without an entry stays local), an off item publishes
     /// nothing (criterion 10), a delete removes the entry of an on item (criterion 11).
     pub fn library_local_edits(&mut self, edits: Vec<LibraryEdit>) {
         let mut changed = false;
@@ -134,6 +142,7 @@ impl DeviceGroupGlue {
                 LibraryEdit::Write { kind, id, text } => match self.library.entry(kind, &id) {
                     Some(entry) if !entry.sync => false,
                     Some(entry) if entry.text.as_deref() == Some(text.as_str()) => false,
+                    None if !self.library_new_items => false,
                     _ => self.library.set(kind, &id, &text).is_ok(),
                 },
                 LibraryEdit::Remove { kind, id } => {

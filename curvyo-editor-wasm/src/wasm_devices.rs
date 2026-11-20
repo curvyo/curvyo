@@ -447,6 +447,12 @@ impl WasmDeviceGroup {
         self.glue.take_notice().unwrap_or_default()
     }
 
+    /// Tells the group whether the maker confirmed the first library sync (the page keeps the
+    /// answer): from then on an item made without an entry starts on.
+    pub fn set_library_new_items(&mut self, confirmed: bool) {
+        self.glue.set_library_new_items(confirmed);
+    }
+
     /// The per-item library toggles as `{"machines": [{"id", "sync"}], "materials": [...]}`
     /// (`specs/0116-library-sync` criterion 1; the rows of task 7 read this).
     #[must_use]
