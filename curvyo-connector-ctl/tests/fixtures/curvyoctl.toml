@@ -1,0 +1,11 @@
+format = 1
+
+[[connectors]]
+name = "garage-plotter"
+address = "192.168.1.21:7447"
+spki_sha256 = "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+
+[[connectors]]
+name = "workshop-laser"
+address = "192.168.1.20:7447"
+spki_sha256 = "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"

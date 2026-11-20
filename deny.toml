@@ -92,6 +92,11 @@ name = "curvyo-connector-io"
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-connector-server"
 
+# `curvyoctl` (ADR 0071 decision 10, `specs/0128`).
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-connector-ctl"
+
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-ui-core"
