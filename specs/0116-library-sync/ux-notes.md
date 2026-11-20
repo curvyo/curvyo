@@ -49,11 +49,18 @@ and the three placement notes in the Fonts/Machine/Materials rows.
   `--editor-accent` ring as the row controls. **On, in sync:** pressed look
   `--toolbar-icon-active-bg` ground with `--toolbar-icon-active-fg` glyph (the accent of
   every pressed toggle; on 4.7:1, off 8:1 — state by ground and glyph, never colour alone).
-  **On, syncing** (this item's upload or arrival is running): same ground, `RefreshCw`
-  glyph, `aria-busy`. **On, offline or refused:** same ground, `CloudOff` glyph — the row
-  says what is true of *this* item; the app-wide offline state stays where it is (Server
-  field line, collaboration pill). `aria-pressed` stays true through both; the accessible
-  name is constant.
+  **On, syncing** (the library stream's upload or arrival is running): same ground,
+  `RefreshCw` glyph, `aria-busy`. **On, offline:** same ground, `CloudOff` glyph; the app-wide
+  offline state stays where it is (Server field line, collaboration pill). `aria-pressed`
+  stays true through both; the accessible name is constant. **Amended 2026-11-19 (UX
+  review, Proposal F5, vetoable at the demo):** the glyph is the **group's** library-stream
+  state, not the single item's (the library is one Loro list; the view carries one `online`
+  and one `acked`, so every pressed toggle swaps together). A refused item (too large,
+  damaged) gets no `CloudOff` of its own: the view does not expose refusals per item, so the
+  canvas notice tells it (section 5) and the row is left as it is. **Never synced:** an item
+  without an entry in the group's list (the first sync declined, or made before the pairing)
+  reads as off with the plain cloud and no state line; pressing its toggle turns it on, the
+  first sync of that one item.
 - **Name and tooltip.** Accessible name "Sync `<name>` to my devices" (names the control
   and its subject, as "Favourite: `<family>`"). Tooltip (Radix, 400 ms, `side="left"`,
   as the row's other controls): line 1 "Sync to my devices (S)"; line 2, muted, by state:
@@ -127,13 +134,14 @@ and 400 ms guard are untouched.
   "Font Source Serif 4 arrived." / "Machine profile `<name>` arrived." /
   "Material Slate tile arrived."; a batch counts per kind, kinds with none left out:
   "3 fonts, 2 machine profiles and 1 material arrived." The rows appear in their lists
-  with the toggle already pressed. A family or profile whose name already exists on this
+  with the toggle already pressed. Only an item **new to the device** is an arrival: an edit
+  of an item the device already holds is applied without a notice (amended 2026-11-19). A family or profile whose name already exists on this
   device   follows the spec's merge rule; the notice names the final row. A device that
   still holds its old copy of a switched-off-then-on item merges its local
   edits as an offline edit would (the spec's criterion 10) — no decision row.
 - **On the row.** Syncing / in sync / offline are carried by the toggle's glyph swap
   (section 1): `RefreshCw` while this item transfers, plain pressed `CloudSync` when it is
-  done, `CloudOff` while the server cannot be reached or the item was refused. The
+  done, `CloudOff` while the server cannot be reached (the group's state, section 1). The
   tooltip's second line states the same in words.
 - **Failures.** No success notice (customer rule 2026-10-31) — the pressed look is the
   feedback. A toggle press flips the local switch at once and retries through the group;
@@ -172,3 +180,8 @@ and 400 ms guard are untouched.
 - F2: builtin machine profiles carry no toggle (section 1).
 - F3: new items default on (section 1).
 - F4: no Share-tab block (section 6; Frage 217).
+- F5: the toggle's glyph is the group's library-stream state, a refused item has no glyph of
+  its own, and a never-synced item reads as the plain cloud (section 1; 2026-11-19).
+- F6: the first-sync confirm shows once per group, only while the group's list holds no entry;
+  its decline is "Keep local" so the pick block has the one "Not now" of the workspaces (the
+  answer is kept per group room; 2026-11-19).

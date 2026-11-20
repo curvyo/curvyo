@@ -108,6 +108,27 @@ One PR per slice at the end. **(Proposal)** marks my own choices, vetoable at th
   swap carries the state and the canvas notices tell skips and refusals — so no anchored
   line exists and section 5 was amended to say so (built 2026-11-13, lead-approved).
 
+- **P17 (never-synced items, review finding 3).** An item without an entry in the group's list
+  (the first sync declined, or made before the pairing) reads as the plain cloud and its toggle
+  turns it on (the first sync of that item). A local edit publishes such an item only once the
+  first sync was confirmed (the glue's `library_new_items`, set by `library_first_sync` and
+  restored by the page from the answer it keeps per group room); a joiner's own earlier items
+  need their toggles pressed. The first-sync confirm shows only in a group without entries
+  until answered; its decline is "Keep local" (the pick block has the workspaces' one "Not now").
+- **P18 (arrivals, review finding 6).** Only an item new to the device is an arrival with a
+  notice. An edit of a held item is applied silently and, when the local record still equals the
+  entry's earlier text and the change saw everything this replica held, without a conflict copy
+  (before, every plain edit of another device left a "Both copies are kept" copy). The page
+  flushes the queued host writes and re-reads its rows on `take_library_applied`, never
+  depending on a notice.
+- **P19 (glyph, review finding 7).** The toggle's `RefreshCw`/`CloudOff` is the group's library
+  stream state; a refused item has no glyph of its own (the view is not per item). Noted in
+  `ux-notes.md` section 1 and the design-system row (F5).
+- **P20 (state-only room snapshot, review finding 1).** The library part of the room snapshot is
+  state-only, so a switched-off or deleted item's text leaves the server and a fresh member's
+  oplog; a member with history starts over from it. See `adrs.md` (feature-local decisions of
+  2026-11-19) for the trade-off.
+
 ## Tasks
 
 ### This dispatch (core, test-first)
@@ -162,6 +183,9 @@ One PR per slice at the end. **(Proposal)** marks my own choices, vetoable at th
 
 8. [~] Tester acceptance run from the spec (acceptance_0116_tester in three crates, green; a switch-off or delete now uploads the room snapshot after its ack, criteria 23 and 27); the three-device journey (A, B, browser R) with the
    relay data scan; UX and architect reviews; docs (design-system rows, technical debt).
+   Done: the reviews' findings of 2026-11-19 (P17 to P20, conflict copies on the desktop, Ctrl+S
+   in the materials list, the dead `library_delete` export, the confirm sentence, the duplicate
+   design-system row). Left: the three-device journey with the relay data scan, the demo.
 9. [ ] Slice-2 placeholders (fonts, criteria 16 to 20): `fonts.<sha-256> = {sync, file_name,
    tags, favourite, cuttable}` entries, blobs sealed as 4 MiB parts keyed by the face hash, the
    16 MiB per-file and 512 MiB total budgets, IndexedDB reception, licence files as blobs, the
