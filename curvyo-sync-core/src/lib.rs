@@ -16,6 +16,7 @@ mod devices;
 mod entropy;
 mod frame;
 mod invite_link;
+mod library_blob;
 mod library_stream;
 mod membership;
 mod pairing;
@@ -37,9 +38,14 @@ pub use frame::{
     PROTOCOL_VERSION, PairCloseReason, RecordKind, RefusalReason, RelayFrame, RoomId,
 };
 pub use invite_link::{InviteKind, InviteLink, InviteLinkError};
+pub use library_blob::{
+    BLOB_HASH_BYTES, BLOB_STREAM_ID, BlobAssembler, BlobPart, MAX_BLOB_BYTES, decode_blob_entry,
+    decode_blob_part, encode_blob_entry, encode_blob_parts,
+};
 pub use library_stream::{
     DEVICES_STREAM_ID, GroupRecord, LIBRARY_STREAM_ID, encode_group_snapshot,
-    encode_library_record, route_group_record,
+    encode_group_snapshot_with_blobs, encode_library_record, group_snapshot_assembler,
+    route_group_record,
 };
 pub use membership::{
     MembershipNotice, admin_remains, admin_set, left_by_own_hand, membership_notices,

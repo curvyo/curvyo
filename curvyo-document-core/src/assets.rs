@@ -50,6 +50,29 @@ impl AssetHash {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// The hash from its 32 raw bytes.
+    #[must_use]
+    pub fn from_bytes(bytes: &[u8; 32]) -> Self {
+        let mut hex = String::with_capacity(64);
+        for byte in bytes {
+            hex.push(char::from_digit(u32::from(byte >> 4), 16).unwrap_or('0'));
+            hex.push(char::from_digit(u32::from(byte & 0x0F), 16).unwrap_or('0'));
+        }
+        Self(hex)
+    }
+
+    /// The 32 raw bytes.
+    #[must_use]
+    pub fn to_bytes(&self) -> [u8; 32] {
+        let mut out = [0_u8; 32];
+        for (slot, pair) in out.iter_mut().zip(self.0.as_bytes().chunks(2)) {
+            let digit = |b: u8| char::from(b).to_digit(16).unwrap_or(0);
+            // invariant: a hash holds hex digits only, so a digit is below 16.
+            *slot = u8::try_from(digit(pair[0]) * 16 + digit(pair[1])).unwrap_or(0);
+        }
+        out
+    }
 }
 
 /// The container extension of an asset by its first bytes: `png`, `jpg`, `webp`, or `bin` for

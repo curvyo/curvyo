@@ -5,9 +5,15 @@
 //! update carries the ADR 0037 inner header with [`LIBRARY_STREAM_ID`], so a session routes a
 //! record by decoding its header. Everything here is sealed before it leaves a client.
 
+use crate::library_blob::{BLOB_HASH_BYTES, BLOB_STREAM_ID, MAX_BLOB_BYTES, encode_blob_entry};
 use crate::workspace_stream::{
-    StreamEntry, StreamError, decode_inner_record, encode_inner_record, encode_snapshot_stream,
+    SnapshotAssembler, StreamEntry, StreamError, decode_inner_record, encode_inner_record,
+    encode_snapshot_stream,
 };
+
+/// The most bytes the devices list's or the library's entry of a group snapshot may have: 32 MiB
+/// **(Proposal)**, far over any list the toggles' text limits allow.
+const MAX_LIST_ENTRY_BYTES: u64 = 32 * 1024 * 1024;
 
 /// The stream id of the devices list: the first entry of the group room's framed snapshot.
 pub const DEVICES_STREAM_ID: [u8; 16] = *b"curvyo.devices-1";
@@ -27,6 +33,19 @@ pub enum GroupRecord<'a> {
         /// The library list's update bytes.
         payload: &'a [u8],
     },
+}
+
+/// A reader of the group room's framed snapshot that drops an entry over its limit: a blob entry
+/// over [`MAX_BLOB_BYTES`] plus its hash, a list entry over 32 MiB.
+#[must_use]
+pub fn group_snapshot_assembler() -> SnapshotAssembler {
+    SnapshotAssembler::with_entry_limit(|stream| {
+        if *stream == BLOB_STREAM_ID {
+            MAX_BLOB_BYTES + BLOB_HASH_BYTES as u64
+        } else {
+            MAX_LIST_ENTRY_BYTES
+        }
+    })
 }
 
 /// Routes the plaintext of one group room record: an inner record of the library stream apart
@@ -61,7 +80,18 @@ pub fn encode_library_record(peer: u64, payload: &[u8]) -> Vec<u8> {
 /// decision 7 and cut by its `split_snapshot`.
 #[must_use]
 pub fn encode_group_snapshot(devices: &[u8], library: &[u8]) -> Vec<u8> {
-    encode_snapshot_stream(&[
+    encode_group_snapshot_with_blobs(devices, library, &[])
+}
+
+/// As [`encode_group_snapshot`], followed by one entry per blob of a switched-on font (ADR 0062
+/// decision 3: the relay prunes the records a snapshot covers, so the blobs live in it).
+#[must_use]
+pub fn encode_group_snapshot_with_blobs(
+    devices: &[u8],
+    library: &[u8],
+    blobs: &[([u8; BLOB_HASH_BYTES], &[u8])],
+) -> Vec<u8> {
+    let mut entries = vec![
         StreamEntry {
             stream: DEVICES_STREAM_ID,
             bytes: devices.to_vec(),
@@ -70,5 +100,11 @@ pub fn encode_group_snapshot(devices: &[u8], library: &[u8]) -> Vec<u8> {
             stream: LIBRARY_STREAM_ID,
             bytes: library.to_vec(),
         },
-    ])
+    ];
+    entries.extend(
+        blobs
+            .iter()
+            .map(|(hash, bytes)| encode_blob_entry(hash, bytes)),
+    );
+    encode_snapshot_stream(&entries)
 }
