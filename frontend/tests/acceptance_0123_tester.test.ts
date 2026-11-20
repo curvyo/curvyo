@@ -14,8 +14,10 @@ import { KIND_ORDER, KIND_WORD } from "../src/lib/materialRows.ts";
 import { decodeMaterialsText } from "../src/lib/materialsView.ts";
 import { decodeTestGridText } from "../src/lib/testGridView.ts";
 
+// Superseded by the Dither on the picture (2026-11-20): the operation's own Dither shows only with a gradient fill, so the
+// strip's cases read `options_image_gradient.json`.
 const fixture = readFileSync(
-  new URL("../../curvyo-editor-wasm/tests/fixtures/operations_view/options_image.json", import.meta.url),
+  new URL("../../curvyo-editor-wasm/tests/fixtures/operations_view/options_image_gradient.json", import.meta.url),
   "utf8",
 );
 
@@ -25,19 +27,23 @@ function withImage(edit: (image: Record<string, unknown> | null) => unknown): st
   return JSON.stringify(v);
 }
 
-test("criterion 11: the group decodes with the seven modes in order and Grey's Lowest power", () => {
+// Superseded by 0135 slice 1: criteria 42 to 44 add Halftone dots and Line screen after the seven
+// modes of 0123, so "halftone" is a mode now and no longer damage.
+test("criterion 11: the group decodes with the nine modes in order and Grey's Lowest power", () => {
   const view = decodeOperationsText(fixture);
   assert.ok(view, "the contract fixture decodes");
   const image = view.rows[0].settings?.options?.image;
   assert.ok(image, "the group is there for an Image row");
+  assert.ok(image.dither, "Superseded by the Dither on the picture (2026-11-20): the gradient fill's Dither");
   assert.deepEqual(
-    image.modes.map((m) => m.value),
-    ["threshold", "ordered", "floyd_steinberg", "jarvis", "atkinson", "stucki", "grey"],
+    image.dither.modes.map((m) => m.value),
+    ["threshold", "ordered", "floyd_steinberg", "jarvis", "atkinson", "stucki", "grey", "halftone", "line_screen"],
   );
-  assert.deepEqual([...DITHER_MODES], image.modes.map((m) => m.value));
-  assert.equal(image.dither, "grey");
-  assert.equal(image.modeField?.field, "lowest_power");
-  assert.equal(image.modeField?.unit, "%");
+  assert.deepEqual([...DITHER_MODES], image.dither.modes.map((m) => m.value));
+  assert.equal(image.dither.dither, "grey");
+  // Frage 284 B: Lowest power is the operation's own field, shown while an item burns Grey.
+  assert.equal(image.lowestPower?.field, "lowest_power");
+  assert.equal(image.lowestPower?.unit, "%");
   assert.deepEqual(
     image.fields.map((f) => f.field),
     ["brightness", "contrast", "gamma"],
@@ -54,7 +60,9 @@ test("criterion 11: a row without a raster item has no group", () => {
 
 test("an unknown dither mode or a broken field is refused, never drawn half", () => {
   assert.equal(
-    decodeOperationsText(withImage((i) => ({ ...i, dither: "halftone" }))),
+    decodeOperationsText(
+      withImage((i) => ({ ...i, dither: { ...(i?.dither as Record<string, unknown>), dither: "stochastic" } })),
+    ),
     null,
   );
   assert.equal(
@@ -92,12 +100,14 @@ test("criterion 47: the Image row decodes with kind image in the Marking section
 });
 
 test("criterion 11: a damaged dither decodes as no pressed segment, the rest of the group kept", () => {
-  const v = decodeOperationsText(withImage((i) => ({ ...i, dither: null })));
+  const v = decodeOperationsText(
+    withImage((i) => ({ ...i, dither: { ...(i?.dither as Record<string, unknown>), dither: null } })),
+  );
   assert.ok(v, "a damaged dither is shown, not refused");
   const image = v.rows[0].settings?.options?.image;
-  assert.ok(image);
-  assert.equal(image.dither, null);
-  assert.equal(image.modes.length, 7, "the strip keeps its seven segments");
+  assert.ok(image?.dither);
+  assert.equal(image.dither.dither, null);
+  assert.equal(image.dither.modes.length, 9, "the strip keeps its nine segments (0135 criterion 42)");
   assert.equal(image.fields.length, 3);
 });
 

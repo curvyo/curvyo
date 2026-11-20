@@ -30,9 +30,9 @@ fn read(name: &str) -> Result<curvyo_laser_core::library::Material, RecordFileEr
 }
 
 /// The text a format-2 record is written back as: the same, at format 3 (`specs/0123` Frage 237
-/// A; no migration, the version is the only change).
+/// A; no migration, the version is the only change). Superseded by 0135 slice 1 (2026-11-19): at format 4 (ADR 0072 §6).
 fn as_format3(text: &str) -> String {
-    text.replacen("\"format_version\": 2,", "\"format_version\": 3,", 1)
+    text.replacen("\"format_version\": 2,", "\"format_version\": 4,", 1)
 }
 
 fn test_id(text: &str) -> TestId {

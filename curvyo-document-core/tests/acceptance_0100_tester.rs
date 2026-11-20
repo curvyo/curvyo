@@ -1358,17 +1358,18 @@ fn ac21_the_format_is_38_and_a_newer_file_is_refused() {
     // Format 48 since `specs/0029-laser-job-preview-and-output` (ADR 0065 §4).
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
-    assert_eq!(CURRENT_FORMAT_VERSION, 50);
+    // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
+    assert_eq!(CURRENT_FORMAT_VERSION, 51);
     let f = fx();
     f.d.place_linked_clones(&[f.g], to_laser(&f)).unwrap();
     let bytes = pack(&f.d, "t").unwrap();
-    assert_eq!(manifest_version(&bytes), 50);
-    let newer = with_manifest_version(&bytes, 51);
+    assert_eq!(manifest_version(&bytes), 51);
+    let newer = with_manifest_version(&bytes, 52);
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew {
-            found: 51,
-            supported: 50
+            found: 52,
+            supported: 51
         })
     ));
 }

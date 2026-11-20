@@ -149,6 +149,27 @@ fn state_raster_checks() -> (Document, String) {
         panic!("an object")
     };
     d.write_operation_options(raster, &options).unwrap();
+    // Superseded by the Dither on the picture (2026-11-20): the picture burns Grey with its own
+    // dither, the operation's Lowest power stays (ADR 0072 amendment A4, Frage 284 B).
+    let grey = curvyo_document_core::StoredDither {
+        mode: "grey".to_owned(),
+        fields: [
+            ("threshold_pct", 50),
+            ("screen_size_um", 800),
+            ("screen_angle_deg", 45),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v))
+        .collect(),
+    };
+    d.edit_image_adjustments(
+        coarse,
+        &curvyo_document_core::AdjustmentsWrite {
+            dither: Some(grey),
+            ..curvyo_document_core::AdjustmentsWrite::default()
+        },
+    )
+    .unwrap();
     (d, laser)
 }
 

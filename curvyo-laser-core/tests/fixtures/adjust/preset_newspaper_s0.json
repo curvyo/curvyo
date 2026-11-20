@@ -1,0 +1,19 @@
+[
+  {
+    "enabled": true,
+    "fields": {
+      "detail_pct": 50,
+      "strength_pct": 30
+    },
+    "kind": "denoise"
+  },
+  {
+    "enabled": true,
+    "fields": {
+      "black_pct": 25,
+      "gamma_centi": 83,
+      "white_pct": 71
+    },
+    "kind": "levels"
+  }
+]

@@ -1,0 +1,182 @@
+{
+  "add_geometry": [],
+  "add_tone": [
+    {
+      "kind": "denoise",
+      "name": "Add Denoise"
+    },
+    {
+      "kind": "levels",
+      "name": "Add Levels"
+    },
+    {
+      "kind": "local_contrast",
+      "name": "Add Local contrast"
+    },
+    {
+      "kind": "contours",
+      "name": "Add Contours"
+    },
+    {
+      "kind": "sharpen",
+      "name": "Add Sharpen"
+    }
+  ],
+  "before_after_open": false,
+  "clone_row": null,
+  "derived": null,
+  "dither": {
+    "dither": "floyd_steinberg",
+    "mode_field": null,
+    "modes": [
+      {
+        "label": "Threshold",
+        "value": "threshold"
+      },
+      {
+        "label": "Ordered",
+        "value": "ordered"
+      },
+      {
+        "label": "Floyd-Steinberg",
+        "value": "floyd_steinberg"
+      },
+      {
+        "label": "Jarvis",
+        "value": "jarvis"
+      },
+      {
+        "label": "Atkinson",
+        "value": "atkinson"
+      },
+      {
+        "label": "Stucki",
+        "value": "stucki"
+      },
+      {
+        "label": "Grey",
+        "value": "grey"
+      },
+      {
+        "label": "Halftone dots",
+        "value": "halftone"
+      },
+      {
+        "label": "Line screen",
+        "value": "line_screen"
+      }
+    ],
+    "screen_fields": []
+  },
+  "memory_line": null,
+  "notice": null,
+  "presets": [
+    {
+      "cell": "Photo",
+      "key": "photo",
+      "name": "Photo (detailed)",
+      "pressed": false,
+      "tooltip": "Photo (detailed) · Dither: Jarvis"
+    },
+    {
+      "cell": "Graphics",
+      "key": "graphics",
+      "name": "Graphics (flat areas)",
+      "pressed": false,
+      "tooltip": "Graphics (flat areas) · Dither: Ordered"
+    },
+    {
+      "cell": "Black and white",
+      "key": "black_white",
+      "name": "Black and white (hard edges)",
+      "pressed": false,
+      "tooltip": "Black and white (hard edges) · Dither: Threshold 50 %"
+    },
+    {
+      "cell": "Line art",
+      "key": "line_art",
+      "name": "Line art (outlines and handwriting)",
+      "pressed": false,
+      "tooltip": "Line art (outlines and handwriting) · Dither: Threshold 50 %"
+    },
+    {
+      "cell": "Dots",
+      "key": "dot_raster",
+      "name": "Dot raster (round dots)",
+      "pressed": false,
+      "tooltip": "Dot raster (round dots) · Dither: Halftone"
+    },
+    {
+      "cell": "Newspaper",
+      "key": "newspaper",
+      "name": "Newspaper (retro screen)",
+      "pressed": false,
+      "tooltip": "Newspaper (retro screen) · Dither: Lines"
+    },
+    {
+      "cell": "Expert",
+      "key": "expert",
+      "name": "Expert",
+      "pressed": true,
+      "tooltip": "Expert · Dither unchanged"
+    }
+  ],
+  "restore_enabled": true,
+  "state_line": null,
+  "steps": [
+    {
+      "accessible_name": "Unknown step, not run",
+      "down": false,
+      "enabled": false,
+      "fields": [],
+      "histogram": null,
+      "index": 0,
+      "kind": "unknown",
+      "line": "Not run · from a newer Curvyo",
+      "name": "Unknown step",
+      "preset_in_use": false,
+      "unknown": true,
+      "up": false
+    },
+    {
+      "accessible_name": "Sharpen, Radius 0.10 mm, Amount 100 %, Threshold 0 %",
+      "down": false,
+      "enabled": true,
+      "fields": [
+        {
+          "decimals": 2,
+          "key": "radius_um",
+          "label": "Radius",
+          "range": "Radius is 0.05 to 5.00 mm.",
+          "unit": "mm",
+          "value": 0.1
+        },
+        {
+          "decimals": 0,
+          "key": "amount_pct",
+          "label": "Amount",
+          "range": "Amount is 0 to 500 %.",
+          "unit": "%",
+          "value": 100.0
+        },
+        {
+          "decimals": 0,
+          "key": "threshold_pct",
+          "label": "Threshold",
+          "range": "Threshold is 0 to 50 %.",
+          "unit": "%",
+          "value": 0.0
+        }
+      ],
+      "histogram": null,
+      "index": 1,
+      "kind": "sharpen",
+      "line": "Radius 0.10 mm, Amount 100 %, Threshold 0 %",
+      "name": "Sharpen",
+      "preset_in_use": false,
+      "unknown": false,
+      "up": true
+    }
+  ],
+  "strength": null
+}

@@ -67,13 +67,15 @@ test("A3: only the Dither strips use the fixed rows (every arrow, no wrap, Home 
   assert.doesNotMatch(html, /aria-orientation/);
   assert.match(html, /aria-describedby="dmg"/);
   assert.equal(html.match(/class="flex flex-wrap gap-px"/g)?.length, 2, "two fixed rows");
-  assert.match(source("components/panel/ImageSettingsGroup.tsx"), /fixedRows=\{\{ breakAfter: STRIP_BREAK \}\}/);
+  // Superseded by the Dither on the picture (2026-11-20): the strip is one component for the picture and the operation.
+  assert.match(source("components/panel/DitherStrip.tsx"), /fixedRows=\{\{ breakAfter: STRIP_BREAK \}\}/);
 });
 
 test("U3, U5: a Dither cell has a tooltip only when its word is shortened; Damaged describes the strip", () => {
-  const group = source("components/panel/ImageSettingsGroup.tsx");
+  // Superseded by the Dither on the picture (2026-11-20): one strip component for the picture and the operation.
+  const group = source("components/panel/DitherStrip.tsx");
   assert.match(group, /tooltip: cellWord\(mode\.label\) === mode\.label \? "" : mode\.label/);
-  assert.match(group, /describedBy=\{image\.dither === null \? damagedId : undefined\}/);
+  assert.match(group, /describedBy=\{dither\.dither === null \? damagedId : undefined\}/);
   assert.match(group, /<p id=\{damagedId\}/);
 });
 

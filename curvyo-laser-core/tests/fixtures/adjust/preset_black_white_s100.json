@@ -1,0 +1,28 @@
+[
+  {
+    "enabled": true,
+    "fields": {
+      "detail_pct": 60,
+      "strength_pct": 30
+    },
+    "kind": "denoise"
+  },
+  {
+    "enabled": true,
+    "fields": {
+      "black_pct": 8,
+      "gamma_centi": 119,
+      "white_pct": 91
+    },
+    "kind": "levels"
+  },
+  {
+    "enabled": true,
+    "fields": {
+      "amount_pct": 200,
+      "radius_um": 100,
+      "threshold_pct": 0
+    },
+    "kind": "sharpen"
+  }
+]

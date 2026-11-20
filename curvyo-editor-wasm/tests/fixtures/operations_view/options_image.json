@@ -19,7 +19,7 @@
       "accessible_name": "Image 1, run 1, 37 s",
       "group_in_part": null,
       "id": {
-        "counter": 22,
+        "counter": 23,
         "peer": "1"
       },
       "items": 1,
@@ -52,7 +52,7 @@
             "scan_angle_deg": 0.0
           },
           "image": {
-            "dither": "grey",
+            "dither": null,
             "fields": [
               {
                 "field": "brightness",
@@ -77,43 +77,13 @@
               }
             ],
             "invert": true,
-            "mode_field": {
+            "lowest_power": {
               "field": "lowest_power",
               "label": "Lowest power",
               "range": "Lowest power is 0 to 100 %.",
               "unit": "%",
               "value": 12.5
-            },
-            "modes": [
-              {
-                "label": "Threshold",
-                "value": "threshold"
-              },
-              {
-                "label": "Ordered",
-                "value": "ordered"
-              },
-              {
-                "label": "Floyd-Steinberg",
-                "value": "floyd_steinberg"
-              },
-              {
-                "label": "Jarvis",
-                "value": "jarvis"
-              },
-              {
-                "label": "Atkinson",
-                "value": "atkinson"
-              },
-              {
-                "label": "Stucki",
-                "value": "stucki"
-              },
-              {
-                "label": "Grey",
-                "value": "grey"
-              }
-            ]
+            }
           },
           "z_offset_mm": 0.0
         },

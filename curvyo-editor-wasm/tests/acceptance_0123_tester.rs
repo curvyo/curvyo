@@ -291,8 +291,33 @@ fn passes(s: &mut Session, id: NodeId, n: f64) {
     assert_eq!(s.edit_operation_setting(id, "main", "passes", n), Ok(true));
 }
 
+/// The operation's Dither `mode`. Superseded by the Dither on the picture (2026-11-20): the same
+/// mode on each picture of the operation too (a picture burns its own dither, ADR 0072 amendment
+/// A4), so the dots of these criteria stay; the selection is left empty.
 fn dither(s: &mut Session, id: NodeId, mode: &str) {
     let _ = s.set_operation_dither(id, mode);
+    let d = unpack(99, &s.pack("0.1.0").unwrap()).unwrap();
+    let Some(mfg) = d.pages().into_iter().find_map(|p| p.kind.manufacturing()) else {
+        return;
+    };
+    let pictures: Vec<NodeId> = d
+        .operations(mfg)
+        .unwrap()
+        .into_iter()
+        .filter(|op| op.id == id)
+        .flat_map(|op| op.members.into_iter().flatten())
+        .filter(|m| {
+            matches!(
+                d.object(*m),
+                Some(curvyo_document_core::ObjectSnapshot::Image(_))
+            )
+        })
+        .collect();
+    for picture in pictures {
+        s.select_output_items(&[picture]);
+        let _ = s.set_picture_dither(mode);
+    }
+    s.select_output_items(&[]);
 }
 
 /// One Image operation of `image` (or any leaf) at 60 %, 3,000 mm/min, Interval 0.5, Threshold.
@@ -925,12 +950,21 @@ fn c11_the_group_shows_only_with_a_raster_item_in_the_documented_order() {
         image_group(&mut fx.s, shapes_only).is_null(),
         "an Engrave row shows what 0111 built"
     );
+    // Superseded by the Dither on the picture (2026-11-20): the Dither strip and its Threshold
+    // are the picture's (its Adjustments group); the Image row of a picture-only operation shows
+    // no Dither, and Lowest power while an item burns Grey (ADR 0072 amendment A4, Frage 284 B).
     let g = image_group(&mut fx.s, with_image);
+    assert!(g["dither"].is_null(), "no gradient fill, no Dither: {g}");
+    assert!(g["lowest_power"].is_null(), "nothing burns Grey");
+    let picture = ids[1];
+    fx.s.select_output_items(&[picture]);
+    let strip: Value = serde_json::from_str(&fx.s.adjustments_view_json()).unwrap();
+    let strip = strip["dither"].clone();
     assert_eq!(
-        g["dither"], "floyd_steinberg",
-        "default for a new operation"
+        strip["dither"], "floyd_steinberg",
+        "default for a new picture"
     );
-    let modes: Vec<&str> = g["modes"]
+    let modes: Vec<&str> = strip["modes"]
         .as_array()
         .unwrap()
         .iter()
@@ -945,10 +979,12 @@ fn c11_the_group_shows_only_with_a_raster_item_in_the_documented_order() {
             "jarvis",
             "atkinson",
             "stucki",
-            "grey"
+            "grey",
+            "halftone",
+            "line_screen",
         ]
     );
-    let labels: Vec<&str> = g["modes"]
+    let labels: Vec<&str> = strip["modes"]
         .as_array()
         .unwrap()
         .iter()
@@ -963,13 +999,17 @@ fn c11_the_group_shows_only_with_a_raster_item_in_the_documented_order() {
             "Jarvis",
             "Atkinson",
             "Stucki",
-            "Grey"
+            "Grey",
+            "Halftone dots",
+            "Line screen",
         ]
     );
     assert!(
-        g["mode_field"].is_null(),
-        "no Threshold or Lowest power with Floyd-Steinberg"
+        strip["mode_field"].is_null(),
+        "no Threshold with Floyd-Steinberg"
     );
+    fx.s.select_output_items(&[]);
+    let g = image_group(&mut fx.s, with_image);
     let fields: Vec<&str> = g["fields"]
         .as_array()
         .unwrap()
@@ -994,14 +1034,17 @@ fn c11_the_group_shows_only_with_a_raster_item_in_the_documented_order() {
     assert_eq!(vals, [0.0, 0.0, 1.0]);
 
     dither(&mut fx.s, with_image, "threshold");
-    let g = image_group(&mut fx.s, with_image);
-    assert_eq!(g["mode_field"]["label"], "Threshold");
-    assert_eq!(g["mode_field"]["value"], 50.0);
-    assert_eq!(g["mode_field"]["unit"], "%");
+    fx.s.select_output_items(&[picture]);
+    let strip: Value = serde_json::from_str(&fx.s.adjustments_view_json()).unwrap();
+    let field = &strip["dither"]["mode_field"];
+    assert_eq!(field["label"], "Threshold");
+    assert_eq!(field["value"], 50.0);
+    assert_eq!(field["unit"], "%");
+    fx.s.select_output_items(&[]);
     dither(&mut fx.s, with_image, "grey");
     let g = image_group(&mut fx.s, with_image);
-    assert_eq!(g["mode_field"]["label"], "Lowest power");
-    assert_eq!(g["mode_field"]["value"], 0.0);
+    assert_eq!(g["lowest_power"]["label"], "Lowest power");
+    assert_eq!(g["lowest_power"]["value"], 0.0);
     // The hatch options keep their place.
     let opts = row_of(&fx.s, with_image)["settings"]["options"].clone();
     for k in ["bidirectional", "scan_angle_deg", "overscan_pct"] {
@@ -1143,7 +1186,7 @@ fn c12_every_image_edit_is_one_undo_step_edit_settings_and_undo_restores() {
     }
     // The same value writes nothing.
     assert!(!fx.s.set_operation_dither(e, "threshold"));
-    assert!(!fx.s.set_operation_dither(e, "halftone"));
+    assert!(!fx.s.set_operation_dither(e, "halftone_x"));
 }
 
 #[test]
@@ -1252,7 +1295,11 @@ fn damaged(engrave: Value, cut: Value) -> Fx {
 #[test]
 fn c13_c41_each_damage_reason_stops_the_operation_with_one_warn_line() {
     for (what, e, c) in [
-        ("unknown dither", json!({"dither": "halftone"}), Value::Null),
+        (
+            "unknown dither",
+            json!({"dither": "halftone_x"}),
+            Value::Null,
+        ),
         ("gamma 4.01", json!({"gamma": 4.01}), Value::Null),
         ("gamma three decimals", json!({"gamma": 1.234}), Value::Null),
         ("threshold 101", json!({"threshold_pct": 101}), Value::Null),
@@ -2213,7 +2260,8 @@ fn open_golden(name: &str) -> Session {
 fn c41_the_format_50_golden_opens_engraves_and_round_trips() {
     let bytes = golden_project("raster_engraving_v50.curvyo");
     let d = unpack(9, &bytes).unwrap();
-    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 50);
+    // Superseded by 0135 slice 1 (2026-11-19): format 51 (ADR 0072 §8).
+    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 51);
     let page = d
         .pages()
         .into_iter()
@@ -2501,7 +2549,8 @@ fn c45_an_engrave_grid_is_unchanged_and_the_record_keeps_the_image_grids_dither(
         .and_then(|w| w["text"].as_str().map(str::to_owned))
         .unwrap_or_else(|| panic!("{writes}"));
     let rec: Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(rec["format_version"], 3);
+    // Superseded by 0135 slice 1 (2026-11-19): material record format 4 (ADR 0072 §6).
+    assert_eq!(rec["format_version"], 4);
     let t = rec["tests"]
         .as_array()
         .unwrap()

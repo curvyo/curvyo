@@ -517,7 +517,8 @@ fn a_linked_clone_shows_its_originals_gradient_and_own_style_carries_its_own() {
 
 #[test]
 fn the_format_is_49() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 50);
+    // Superseded by 0135 slice 1 (2026-11-19): format 51.
+    assert_eq!(CURRENT_FORMAT_VERSION, 51);
 }
 
 fn font() -> FontRef {
@@ -664,11 +665,11 @@ fn the_golden_reads_back_every_gradient() {
     assert_eq!(gradient_of(&opened, g.clone).stops.len(), 3);
     assert_ne!(gradient_of(&opened, g.own), gradient_of(&opened, g.clone));
     let saved = pack(&opened, "0.1.0").unwrap();
-    // Saved by a build of format 50 (`0123`): the same content under its own version.
+    // Saved by a build of format 51 (`0135`; Superseded by 0135 slice 1 (2026-11-19)): the same content under its own version.
     let json = |bytes: &[u8]| {
         String::from_utf8(members(bytes)["document.json"].clone())
             .unwrap()
-            .replacen("\"format_version\": 50,", "\"format_version\": 49,", 1)
+            .replacen("\"format_version\": 51,", "\"format_version\": 49,", 1)
     };
     assert_eq!(
         json(&saved),
@@ -759,7 +760,7 @@ fn a_newer_file_is_refused_by_version() {
     let bytes = read_or_write(GOLDEN, golden_bytes);
     let mut files = members(&bytes);
     let mut manifest: serde_json::Value = serde_json::from_slice(&files["manifest.json"]).unwrap();
-    manifest["format_version"] = serde_json::json!(51);
+    manifest["format_version"] = serde_json::json!(52);
     files.insert(
         "manifest.json".to_owned(),
         serde_json::to_vec(&manifest).unwrap(),
@@ -767,8 +768,8 @@ fn a_newer_file_is_refused_by_version() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 51,
-            supported: 50
+            found: 52,
+            supported: 51
         })
     ));
 }

@@ -135,11 +135,13 @@ fn ring_of(corners: [Point; 4]) -> LeafGeometry {
 #[test]
 fn c1_an_image_in_a_vector_kind_runs_as_the_rectangle_of_its_frame() {
     let image = LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: slanted(),
         asset: curvyo_document_core::AssetHash::of(b"slanted"),
         pixels: Some(Arc::new(black(8, 8))),
     };
     let unreadable = LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: slanted(),
         asset: curvyo_document_core::AssetHash::of(b"gone"),
         pixels: None,
@@ -574,6 +576,7 @@ fn c39_two_exports_are_byte_identical_and_the_cache_reuses_the_pyramid() {
         u8::try_from((x * 3 + y * 2) % 256).unwrap()
     }));
     let leaf = LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: job_fixtures::frame(5.0, 5.0, 20.0, 20.0),
         asset: curvyo_document_core::AssetHash::of(b"ramp"),
         pixels: Some(img),
@@ -652,6 +655,7 @@ fn c37_two_caches_sharing_pyramids_hold_one_pyramid_per_asset() {
         u8::try_from((x * 3 + y * 2) % 256).unwrap()
     }));
     let leaf = LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: job_fixtures::frame(5.0, 5.0, 20.0, 20.0),
         asset: curvyo_document_core::AssetHash::of(b"ramp"),
         pixels: Some(img),

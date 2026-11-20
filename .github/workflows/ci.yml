@@ -50,7 +50,8 @@
 #                        trace mask of 8 parts of 20 regions (0114, criterion 24), the job
 #                        preview and output (0029, criterion 36), raster engraving (0123,
 #                        criterion 37).
-#   boolean-wasm-golden — the kernel's golden results and the tiling layout goldens (0069) in the
+#   boolean-wasm-golden — the kernel's golden results, the tiling layout goldens (0069) and the
+#                        image adjustment goldens (0135, ADR 0073 §1) in the
 #                        wasm build, run in Node, ubuntu only.
 #   deny              — `cargo deny check`, once, over the whole workspace
 #                        (ADR 0011 §7: not matrixed — it inspects the
@@ -564,6 +565,9 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --lib frame_start_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test gradient_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test acceptance_0124_tester_budget -- --nocapture --test-threads=1
+          cargo test --release -p curvyo-image-core --test adjust_budgets -- --ignored --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --lib image_adjust::budget_tests -- --ignored --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --test acceptance_0135_tester_budget -- --nocapture --test-threads=1
 
   # Criterion 43 of specs/0016-boolean-operations: the golden results of the boolean kernel are
   # compared in the build that ships to the browser, run in Node by wasm-bindgen-test-runner
@@ -598,6 +602,8 @@ jobs:
           cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test boolean_golden_wasm --test offset_golden --test weld_golden --test stroke_to_path_golden --test pattern_golden --test centre_lines_golden
           cargo test --release --target wasm32-unknown-unknown -p curvyo-geometry-core --test centre_lines_wasm_cpu -- --nocapture
           cargo test --target wasm32-unknown-unknown -p curvyo-ui-core --test tiling_golden
+          cargo test --target wasm32-unknown-unknown -p curvyo-image-core --test adjust_goldens
+          cargo test --target wasm32-unknown-unknown -p curvyo-laser-core --test adjust_goldens
 
   # Dependency-graph/license check, not compiled code — one run sees every
   # target deny.toml's [graph] lists (including wasm32-unknown-unknown),

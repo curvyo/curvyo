@@ -270,10 +270,9 @@ fn f_the_checks_after_an_edit_that_keeps_the_dots_and_opening_the_tab_take_16_ms
         assert!(s.unfold_operation_row(engrave));
         s.operations_view_json()
     });
-    assert!(
-        json.contains("\"dither\":\"floyd_steinberg\""),
-        "the group is open"
-    );
+    // Superseded by the Dither on the picture (2026-11-20): a picture-only Image row shows its
+    // tone fields and no Dither of its own.
+    assert!(json.contains("\"invert\":false"), "the group is open");
     check("37 f tab open", took, 16);
 }
 

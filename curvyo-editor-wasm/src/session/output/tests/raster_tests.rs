@@ -171,17 +171,16 @@ pub(super) fn image_group(s: &Session, op: NodeId) -> serde_json::Value {
     row["settings"]["options"]["image"].clone()
 }
 
+/// Superseded by the Dither on the picture (2026-11-20): the group shows its tone fields on every
+/// Image row; its own Dither only with a gradient fill, Lowest power only while an item burns
+/// Grey (ADR 0072 amendment A4, Frage 284 B).
 #[test]
 fn criterion_11_the_image_settings_show_on_every_image_row_and_never_on_engrave() {
     let (mut s, square) = laser_with_square();
     let op = image_op(&mut s, &[square]);
     let group = image_group(&s, op);
-    assert_eq!(
-        group["dither"], "floyd_steinberg",
-        "shown with no raster item"
-    );
-    assert!(group["mode_field"].is_null());
-    assert_eq!(group["modes"].as_array().unwrap().len(), 7);
+    assert!(group["dither"].is_null(), "no gradient fill, no Dither");
+    assert!(group["lowest_power"].is_null(), "nothing burns Grey");
     assert_eq!(group["fields"][2]["range"], "Gamma is 0.10 to 4.00.");
     let image = place_image(&s, &half_black_png(8, 8), "Photo 1", (50.0, 50.0, 8.0, 8.0));
     s.selection.set(&[image]);
@@ -206,7 +205,7 @@ fn criterion_11_the_image_settings_show_on_every_image_row_and_never_on_engrave(
 
 #[test]
 fn criterion_12_a_value_out_of_range_is_refused_and_a_valid_one_is_one_step() {
-    let (mut s, _, op) = engraved_image();
+    let (mut s, image, op) = engraved_image();
     let steps = s.undo_len();
     assert_eq!(
         s.edit_operation_option(op, "gamma", 4.01),
@@ -221,16 +220,25 @@ fn criterion_12_a_value_out_of_range_is_refused_and_a_valid_one_is_one_step() {
     );
     assert_eq!(undo_label(&mut s), "Edit settings");
     assert!(s.set_operation_dither(op, "grey"));
-    let group = image_group(&s, op);
+    assert!(
+        image_group(&s, op)["lowest_power"].is_null(),
+        "superseded by the Dither on the picture (2026-11-20): the operation's Grey does not reach \
+         its picture"
+    );
+    s.selection.set(&[image]);
+    assert!(s.set_picture_dither("grey"));
     assert_eq!(
-        group["mode_field"]["field"], "lowest_power",
-        "Lowest power in Threshold's row"
+        image_group(&s, op)["lowest_power"]["field"],
+        "lowest_power",
+        "the picture burns Grey: the operation's Lowest power"
     );
     assert!(
         !s.set_operation_dither(op, "grey"),
         "the same mode writes nothing"
     );
-    assert!(!s.set_operation_dither(op, "halftone"));
+    assert!(!s.set_operation_dither(op, "halftone_x"));
+    assert_eq!(undo_label(&mut s), "Edit adjustments");
+    s.undo();
     assert_eq!(s.edit_operation_option(op, "invert", 1.0), Ok(true));
     assert_eq!(image_group(&s, op)["invert"], true);
     s.undo();
@@ -269,10 +277,13 @@ fn criterion_34_the_dot_limit_line_names_the_item_and_selects_it() {
     let _ = image;
 }
 
+/// Superseded by the Dither on the picture (2026-11-20): the picture burns Grey with its own
+/// dither; the line stays the operation's and focuses its Lowest power (Frage 284 B).
 #[test]
 fn criterion_32_lowest_power_above_power_warns_and_focuses_lowest_power() {
-    let (mut s, _, op) = engraved_image();
-    assert!(s.set_operation_dither(op, "grey"));
+    let (mut s, image, op) = engraved_image();
+    s.selection.set(&[image]);
+    assert!(s.set_picture_dither("grey"));
     s.edit_operation_option(op, "lowest_power", 60.0).unwrap();
     let line = checks(&s)
         .into_iter()

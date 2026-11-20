@@ -47,6 +47,7 @@ fn the_golden_reads_every_image_setting() {
             gamma_hundredths: 180,
             invert: true,
             lowest_power_tenths: 55,
+            ..ImageSettings::DEFAULT
         }
     );
     assert_eq!(
