@@ -4,10 +4,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use curvyo_document_core::{LibraryKind, LibraryList, LibraryListError};
+use curvyo_document_core::{LibraryKind, LibraryList, LibraryListError, SnapshotImport};
 use curvyo_sync_core::{
-    DEVICES_STREAM_ID, GroupRecord, RecordKind, StreamEntry, encode_group_snapshot,
-    encode_library_record, route_group_record, split_snapshot,
+    BLOB_STREAM_ID, DEVICES_STREAM_ID, GroupRecord, RecordKind, StreamEntry,
+    encode_group_snapshot_with_blobs, encode_library_record, route_group_record, split_snapshot,
 };
 use curvyo_ui_core::library_text as texts;
 
@@ -59,7 +59,14 @@ impl DeviceGroupGlue {
         } else {
             texts::in_sync_line(others)
         };
+        let fonts: Vec<_> = self
+            .library
+            .font_entries()
+            .into_iter()
+            .map(|entry| serde_json::json!({"id": entry.hash.as_str(), "sync": entry.sync}))
+            .collect();
         serde_json::json!({
+            "fonts": fonts,
             "machines": rows(LibraryKind::Machine).collect::<Vec<_>>(),
             "materials": rows(LibraryKind::Material).collect::<Vec<_>>(),
             "online": self.online,
@@ -73,7 +80,9 @@ impl DeviceGroupGlue {
     /// "this item transfers" state of the toggle (UX notes section 1).
     #[must_use]
     pub fn library_acked(&self) -> bool {
-        self.library_pushed.is_empty() && self.library_exported == self.library.version()
+        self.library_pushed.is_empty()
+            && self.library_exported == self.library.version()
+            && self.fonts.idle()
     }
 
     /// Switches the item `id` of `kind` on with `text`, the exact record text (criterion 3);
@@ -206,15 +215,22 @@ impl DeviceGroupGlue {
         self.export_library();
         let in_step = self.library.version() == self.library_exported;
         let before = state_of(&self.library);
+        let before_fonts = self.font_state();
         let result = if snapshot {
             self.library.import_snapshot(self.peer, payload)
         } else {
-            self.library.import_updates_seen(payload)
+            self.library
+                .import_updates_seen(payload)
+                .map(|seen| SnapshotImport {
+                    seen,
+                    replaced: false,
+                })
         };
         match result {
-            Ok(seen) => {
+            Ok(SnapshotImport { seen, replaced }) => {
                 self.files_changed = true;
                 self.queue_arrivals(&before, seen);
+                self.queue_font_changes(&before_fonts, seen, replaced);
                 self.bump();
                 if in_step {
                     self.library_exported = self.library.version();
@@ -238,6 +254,8 @@ impl DeviceGroupGlue {
     pub(super) fn snapshot_stream(&mut self, entry: &StreamEntry) {
         if entry.stream == DEVICES_STREAM_ID {
             self.import_devices(&entry.bytes);
+        } else if entry.stream == BLOB_STREAM_ID {
+            self.receive_font_entry(entry);
         } else if let Ok(GroupRecord::Library { payload, .. }) = route_group_record(&entry.bytes) {
             self.import_library_snapshot(payload);
         }
@@ -246,6 +264,10 @@ impl DeviceGroupGlue {
     /// Uploads the room's framed snapshot of both lists, in parts (ADR 0062 decision 1): a
     /// pre-0116 build in the group ignores it and keeps converging through update records.
     pub(super) fn upload_group_snapshot(&mut self, covers_seq: u64) {
+        // The relay prunes the records the snapshot covers: never without the font bytes.
+        if !self.fonts_complete() {
+            return;
+        }
         let Some(stream) = self.group_snapshot_stream() else {
             return;
         };
@@ -259,9 +281,11 @@ impl DeviceGroupGlue {
     pub(super) fn group_snapshot_stream(&self) -> Option<Vec<u8>> {
         let devices = self.list.snapshot().ok()?;
         let library = self.library.snapshot_state().ok()?;
-        Some(encode_group_snapshot(
+        let blobs = self.font_snapshot_blobs();
+        Some(encode_group_snapshot_with_blobs(
             &devices,
             &encode_library_record(self.peer, &library),
+            &blobs,
         ))
     }
 

@@ -81,6 +81,17 @@ impl WasmFontLibrary {
         self.glue.delete_tag(id)
     }
 
+    /// What of a family's tags, star and Cuttable travels to the maker's other devices (JSON).
+    #[must_use]
+    pub fn sync_meta(&self, name: &str) -> String {
+        self.glue.sync_meta(name)
+    }
+
+    /// Makes a family carry what arrived from another device; whether anything changed.
+    pub fn apply_sync_meta(&mut self, name: &str, json: &str) -> bool {
+        self.glue.apply_sync_meta(name, json)
+    }
+
     /// Chooses a strip cell.
     pub fn choose(&mut self, id: &str) -> bool {
         self.glue.choose(id)
@@ -208,6 +219,14 @@ impl WasmPreviewFaces {
 #[must_use]
 pub fn font_file_faces(bytes: &[u8]) -> String {
     crate::font_file_faces(bytes)
+}
+
+/// Whether a name that arrived with a synced font is safe to write as it is; `document` for a
+/// licence or readme file (the browser's reception, as the desktop's).
+#[wasm_bindgen]
+#[must_use]
+pub fn synced_name_ok(name: &str, document: bool) -> bool {
+    crate::synced_name_ok(name, document)
 }
 
 /// A single-line face's name drawn in its own centre lines, for its Fonts-tab row, as JSON

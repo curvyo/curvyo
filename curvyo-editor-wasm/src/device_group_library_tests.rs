@@ -13,13 +13,13 @@ use curvyo_sync_core::{
 use super::DeviceGroupGlue;
 use crate::session::{Session, SyncSeeds, TransportAction};
 
-const SERVER: &str = "ws://relay";
-const ROOM: [u8; 16] = [0x6e; 16];
+pub(super) const SERVER: &str = "ws://relay";
+pub(super) const ROOM: [u8; 16] = [0x6e; 16];
 const P1: &str = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f";
 const M1: &str = "5d4e3f2a-1b0c-4a9d-8e7f-2c3b4a596875";
 const P2: &str = "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c";
 
-fn seeds(n: u8) -> SyncSeeds {
+pub(super) fn seeds(n: u8) -> SyncSeeds {
     SyncSeeds {
         identity: [n; 64],
         nonce: [n.wrapping_add(100); 32],
@@ -27,7 +27,7 @@ fn seeds(n: u8) -> SyncSeeds {
     }
 }
 
-fn identity(n: u8) -> curvyo_crypto_core::Identity {
+pub(super) fn identity(n: u8) -> curvyo_crypto_core::Identity {
     curvyo_crypto_core::IdentityKeys::from_entropy(&[n; 64]).identity()
 }
 
@@ -52,24 +52,34 @@ fn material_text(id: &str, name: &str, modified: u64) -> String {
 }
 
 /// One device: its group glue, its session, and what the page collected of it.
-struct Device {
-    glue: DeviceGroupGlue,
-    session: Session,
+pub(super) struct Device {
+    pub(super) glue: DeviceGroupGlue,
+    pub(super) session: Session,
     connection: Option<ConnectionId>,
     writes: Vec<serde_json::Value>,
-    notices: Vec<String>,
+    pub(super) notices: Vec<String>,
+    /// The font changes the page was handed, and the font files this host holds.
+    pub(super) font_arrivals: Vec<crate::FontArrival>,
+    pub(super) host: std::collections::BTreeSet<curvyo_document_core::AssetHash>,
 }
 
 impl Device {
     /// The page's slow poll: the host write lists (which tap the local edits), then the library
     /// pump (which feeds the edits to the group's list and applies the arrivals).
-    fn page(&mut self) {
+    pub(super) fn page(&mut self) {
         for list in [
             self.session.take_machine_writes_json(),
             self.session.take_material_writes_json(),
         ] {
             let taken: Vec<serde_json::Value> = serde_json::from_str(&list).unwrap_or_default();
             self.writes.extend(taken);
+        }
+        self.glue.font_host_hashes(self.host.clone());
+        for arrival in self.glue.take_font_arrivals() {
+            if let crate::FontChange::Add(_) = &arrival.change {
+                self.host.insert(arrival.hash.clone());
+            }
+            self.font_arrivals.push(arrival);
         }
         let notice = self.session.library_sync_pump(&mut self.glue);
         if !notice.is_empty() {
@@ -86,14 +96,14 @@ impl Device {
 }
 
 /// The devices in one in-memory relay, each with at most one connection.
-struct Net {
+pub(super) struct Net {
     relay: Relay,
-    devices: Vec<Device>,
-    now: u64,
+    pub(super) devices: Vec<Device>,
+    pub(super) now: u64,
 }
 
 impl Net {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             relay: Relay::new(),
             devices: Vec::new(),
@@ -101,13 +111,15 @@ impl Net {
         }
     }
 
-    fn add(&mut self, glue: DeviceGroupGlue, session: Session) -> usize {
+    pub(super) fn add(&mut self, glue: DeviceGroupGlue, session: Session) -> usize {
         self.devices.push(Device {
             glue,
             session,
             connection: None,
             writes: Vec::new(),
             notices: Vec::new(),
+            font_arrivals: Vec::new(),
+            host: std::collections::BTreeSet::new(),
         });
         self.devices.len() - 1
     }
@@ -171,7 +183,7 @@ impl Net {
         }
     }
 
-    fn run(&mut self, ms: u64) {
+    pub(super) fn run(&mut self, ms: u64) {
         let end = self.now + ms;
         while self.now < end {
             self.now += 50;

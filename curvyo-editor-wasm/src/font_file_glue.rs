@@ -1,8 +1,18 @@
 //! The faces of a font file Add font accepts in the browser, with their names and class bytes
 //! (`specs/0075-font-library` criteria 28 and 32, `adrs.md` decisions 3 and 7).
 
-use curvyo_text_core::{FaceStore, listable_faces, os2_class_bytes, preview_path};
+use curvyo_text_core::{
+    FaceStore, is_document_name, listable_faces, os2_class_bytes, preview_path, sanitised_name,
+};
 use serde_json::{Value, json};
+
+/// Whether `name` is a name a synced font may arrive under on a host that writes it as it is:
+/// one every system takes unchanged (no reserved Windows name, `:`, control character or
+/// trailing dot, as `sanitised_name` leaves it); with `document`, also a licence or readme name.
+#[must_use]
+pub fn synced_name_ok(name: &str, document: bool) -> bool {
+    name == sanitised_name(name) && (!document || is_document_name(name))
+}
 
 /// The faces Add font accepts in the browser (criteria 28 and 32), as JSON
 /// `[{"index", "family", "style", "os2": hex|null, "kind"?}]` (`kind` is `"single_line"` for an
@@ -46,4 +56,21 @@ pub fn face_preview_path(bytes: &[u8], index: u32, text: &str) -> String {
     preview_path(&face, text).map_or_else(String::new, |(d, area)| {
         json!({ "d": d, "box": [area.x0, area.y0, area.width(), area.height()] }).to_string()
     })
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::synced_name_ok;
+
+    /// The reception rule of the browser and the desktop (architect finding 8).
+    #[test]
+    fn synced_names_are_plain_and_documents_are_licence_names() {
+        assert!(synced_name_ok("Serif-Bold.ttf", false));
+        assert!(synced_name_ok("OFL.txt", true));
+        assert!(!synced_name_ok("notes.exe", true));
+        assert!(!synced_name_ok("CON.ttf", false));
+        assert!(!synced_name_ok("a:b.ttf", false));
+        assert!(!synced_name_ok("x.ttf.", false));
+        assert!(!synced_name_ok("", false));
+    }
 }

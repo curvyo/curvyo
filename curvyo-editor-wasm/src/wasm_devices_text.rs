@@ -20,6 +20,7 @@ pub fn library_word(key: &str) -> String {
     use curvyo_ui_core::library_text as library;
     match key {
         "first-sync-confirm" => library::FIRST_SYNC_CONFIRM,
+        "font-skipped" => library::FONT_SKIPPED_NOTICE,
         _ => "",
     }
     .to_owned()

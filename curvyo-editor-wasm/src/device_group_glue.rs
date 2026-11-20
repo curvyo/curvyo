@@ -17,6 +17,9 @@ use curvyo_sync_core::{
 
 use crate::session::{SyncSeeds, TransportAction};
 
+use self::fonts::FontSync;
+pub use self::fonts::{FontArrival, FontChange, FontInput};
+
 /// How often a freshly paired device retries its first connection when the relay has not yet
 /// stored the opener's `AddMember` (the welcome travels on another socket).
 const JOIN_RETRIES: u8 = 5;
@@ -104,8 +107,13 @@ pub struct DeviceGroupGlue {
     snapshot_after_ack: bool,
     /// Library entries that changed and wait for the page's session to apply them.
     library_arrivals: VecDeque<LibraryArrival>,
+    /// The font entries' blobs and arrivals (`specs/0116-library-sync` slice 2).
+    fonts: FontSync,
     /// The framed room snapshot being assembled, with the sequence of its first part.
     assembling: Option<(u64, SnapshotAssembler)>,
+    /// The snapshot given up half way (an entry over its limit or the budget): its other parts
+    /// are ignored.
+    skipped_snapshot: Option<u64>,
     actions: VecDeque<TransportAction>,
     online: bool,
     removed: bool,
@@ -255,7 +263,9 @@ impl DeviceGroupGlue {
             library_new_items: false,
             snapshot_after_ack: false,
             library_arrivals: VecDeque::new(),
+            fonts: FontSync::default(),
             assembling: None,
+            skipped_snapshot: None,
             pushed: BTreeMap::new(),
             actions: VecDeque::new(),
             online: false,
@@ -366,6 +376,7 @@ impl DeviceGroupGlue {
         self.client.tick(now);
         self.export_list();
         self.export_library();
+        self.font_tick();
         self.reconcile_group();
         self.pump();
     }
@@ -672,6 +683,12 @@ fn new_client(
 
 #[path = "device_group_events.rs"]
 mod events;
+#[path = "device_group_font_changes.rs"]
+mod font_changes;
+#[path = "device_group_font_receive.rs"]
+mod font_receive;
+#[path = "device_group_fonts.rs"]
+mod fonts;
 #[path = "device_group_library.rs"]
 mod library;
 #[path = "device_group_view.rs"]
@@ -684,3 +701,23 @@ mod tests;
 #[cfg(test)]
 #[path = "device_group_library_tests.rs"]
 mod library_tests;
+
+#[cfg(test)]
+#[path = "device_group_fonts_tests.rs"]
+mod font_tests;
+
+#[cfg(test)]
+#[path = "device_group_font_review_tests.rs"]
+mod font_review_tests;
+
+#[cfg(test)]
+#[path = "device_group_font_rereview_tests.rs"]
+mod font_rereview_tests;
+
+#[cfg(test)]
+#[path = "device_group_font_snapshot_tests.rs"]
+mod font_snapshot_tests;
+
+#[cfg(test)]
+#[path = "device_group_font_wait_tests.rs"]
+mod font_wait_tests;

@@ -202,7 +202,7 @@ impl Session {
                 LibraryKind::Material => texts::material_arrived_notice(&name),
             }
         } else if machines + materials > 0 {
-            texts::arrived_notice(machines, materials)
+            texts::arrived_notice(0, machines, materials)
         } else {
             return;
         };
