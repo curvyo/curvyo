@@ -52,6 +52,7 @@ mod state;
 mod svg_export;
 #[cfg(target_os = "linux")]
 mod svg_preview;
+mod synced_fonts;
 mod workspace;
 mod workspace_around;
 mod workspace_share;
@@ -116,6 +117,8 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         dropped_fonts::add_dropped_fonts,
         local_files::read_local_files,
         fonts::remove_font_files,
+        synced_fonts::add_synced_fonts,
+        synced_fonts::trash_font_files,
         font_documents::read_font_document,
         font_documents::open_font_document,
         font_library::read_font_library,

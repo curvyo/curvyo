@@ -21,6 +21,17 @@ const FONTS_FOLDER: &str = "fonts";
 #[derive(Default)]
 pub(crate) struct FontFiles(Mutex<HashMap<String, PathBuf>>);
 
+impl FontFiles {
+    /// The path of the listed face `id`, host side only.
+    pub(crate) fn path_of(&self, id: &str) -> Option<PathBuf> {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(id)
+            .cloned()
+    }
+}
+
 /// One face as the page lists it.
 #[derive(Clone, serde::Serialize)]
 pub(crate) struct ListedFace {
@@ -326,8 +337,8 @@ pub(crate) fn add_paths(dir: &Path, chosen: Vec<PathBuf>) -> AddedFonts {
 /// One face of the family to remove.
 #[derive(serde::Deserialize)]
 pub(crate) struct FaceToRemove {
-    id: String,
-    index: u32,
+    pub(crate) id: String,
+    pub(crate) index: u32,
 }
 
 /// What Remove did, by file name (`0075` criterion 25).
@@ -337,6 +348,17 @@ pub(crate) struct RemovedFonts {
     kept: Vec<String>,
     /// Documents deleted with an emptied font folder (`0083` criterion 14).
     documents: usize,
+}
+
+impl RemovedFonts {
+    /// What storage reported, as the page reads it.
+    pub(crate) fn from_report(report: curvyo_storage_io::RemovedFonts) -> Self {
+        Self {
+            removed: report.removed,
+            kept: report.kept,
+            documents: report.documents,
+        }
+    }
 }
 
 /// Remove from Curvyo fonts (`0075` criterion 25): deletes the files of these faces that lie
