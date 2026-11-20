@@ -3,7 +3,7 @@
 //! They parse nothing; `curvyo-laser-core` does, inside the frontend's `WasmSession`. An id that
 //! is not a profile id is refused, so no command can reach outside the folder.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -28,10 +28,19 @@ fn machines_dir(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn record_path(app: &AppHandle, id: &str) -> Result<PathBuf, String> {
-    if !curvyo_laser_core::is_profile_id(id) {
+    record_path_in(&machines_dir(app)?, id)
+}
+
+/// The path of the record `id` in the folder `dir`: a profile id, or one with the conflict
+/// copy's suffix (`specs/0116-library-sync`, ADR 0062 decision 5); any other id is refused.
+fn record_path_in(dir: &Path, id: &str) -> Result<PathBuf, String> {
+    let profile = id
+        .strip_suffix(curvyo_laser_core::CONFLICT_SUFFIX)
+        .unwrap_or(id);
+    if !curvyo_laser_core::is_profile_id(profile) {
         return Err("not a machine profile id".to_owned());
     }
-    Ok(machines_dir(app)?.join(curvyo_laser_core::record_file_name(id)))
+    Ok(dir.join(curvyo_laser_core::record_file_name(id)))
 }
 
 fn choice_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -106,6 +115,32 @@ pub(crate) fn remove_machine_profile(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const ID: &str = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f";
+
+    #[test]
+    fn a_conflict_copy_has_a_record_path_and_other_ids_are_refused() {
+        let dir = Path::new("machines");
+        assert_eq!(
+            record_path_in(dir, ID).unwrap(),
+            dir.join(curvyo_laser_core::record_file_name(ID))
+        );
+        let copy = curvyo_laser_core::conflict_id(ID);
+        assert_eq!(
+            record_path_in(dir, &copy).unwrap(),
+            dir.join(curvyo_laser_core::record_file_name(&copy))
+        );
+        for bad in [
+            "",
+            ".conflict",
+            "../x.conflict",
+            "6f1c2a4e.conflict",
+            &format!("{ID}.conflict.conflict"),
+            &format!("{ID}/../x"),
+        ] {
+            assert!(record_path_in(dir, bad).is_err(), "{bad}");
+        }
+    }
 
     #[test]
     fn deleting_a_profile_removes_its_pairing_too() {
