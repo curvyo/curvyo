@@ -122,6 +122,25 @@ cd ../curvyo-app && cargo tauri dev           # start the desktop app
 Checks: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets
 -- -D warnings`, `cargo nextest run --workspace` (full gate: `CLAUDE.md` §7).
 
+### Linux: WebKitGTK and graphics drivers
+
+On some drivers the canvas stays blank (measured on the NVIDIA proprietary driver 580 with
+WebKitGTK 2.54: blank canvas, "Failed to create GBM buffer"). Set
+`WEBKIT_DISABLE_DMABUF_RENDERER=1` in your shell before starting the app.
+`WEBKIT_DISABLE_COMPOSITING_MODE=1` and `LIBGL_ALWAYS_SOFTWARE=1` are further switches. The app
+sets none of them and does not relaunch itself; it starts with the environment it is given.
+
+```sh
+WEBKIT_DISABLE_DMABUF_RENDERER=1 cargo tauri dev
+```
+
+For the packaged app, export the variable in your shell profile or put it in the desktop
+launcher (`Exec=env WEBKIT_DISABLE_DMABUF_RENDERER=1 curvyo`).
+
+Cost: with it set, CPU compositing pans a 4 Mpx canvas at ~16 fps (measured).
+`WEBKIT_DMABUF_RENDERER_FORCE_SHM=1` reached 60 fps but ran out of file descriptors ("Too many
+open files") in a longer session and is not recommended.
+
 Not run for this README: `cargo tauri dev` and `cargo tauri build`. The npm
 and check commands come from `frontend/package.json` and the CI workflow.
 

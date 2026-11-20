@@ -633,24 +633,21 @@ discharged [ADR 0001](adr/0001-ui-framework-and-canvas-rendering.md) §4's owed
 measurement (`specs/0002-path-node-editing/adrs.md`). Performance itself passed:
 50 000 nodes at a vsync-locked ~60 fps. These are the two things that did not.
 
-1. **WebGL2 renders nothing unless WebKitGTK's DMA-BUF renderer is disabled.**
-   At its default the context is created and reports `WebGL 2.0`, and then no
-   frame ever appears — for `wgpu` and for hand-written WebGL2 alike. The Linux
-   build works around it with `WEBKIT_DISABLE_DMABUF_RENDERER=1` set before the
-   webview starts. The cost is that we opt out of WebKitGTK's zero-copy
-   compositing path on *all* Linux systems to satisfy one driver family, and
-   the failure mode if the variable is ever lost is a silent blank canvas.
+1. **WebGL2 renders nothing on some drivers unless WebKitGTK's DMA-BUF renderer is
+   disabled.** The app sets no WebKit environment variable and does not relaunch itself
+   (customer decision 2026-11-20); whoever has driver problems sets the variable in the shell
+   (README, "Linux: WebKitGTK and graphics drivers"). Spike finding: on NVIDIA proprietary
+   580.178.04 with WebKitGTK 2.5x, without `WEBKIT_DISABLE_DMABUF_RENDERER=1` the WebGL2
+   context reports `WebGL 2.0` and no frame ever appears (grey/blank canvas, "Failed to create
+   GBM buffer ... Invalid argument"), for `wgpu` and hand-written WebGL2 alike.
 
-   **Update (2026-11):** on the NVIDIA proprietary driver the app now sets
-   `WEBKIT_DISABLE_DMABUF_RENDERER=0 WEBKIT_DMABUF_RENDERER_FORCE_SHM=1`
-   instead (renderer on, shared-memory buffers; the GBM buffers fail with
-   "Failed to create GBM buffer ... Invalid argument"). Measured on Arch/X11,
-   driver 580.178.04, WebKitGTK 2.54.2, wry 0.57, empty-page pan/zoom: rAF p50
-   17 ms and 55 frames/s, against ~16 fps (p50 36-63 ms) with
-   `WEBKIT_DISABLE_DMABUF_RENDERER=1`. **Open:** every other Linux machine
-   (AMD, Intel, nouveau) still gets `=1`; nothing is measured there. Run
-   `tools/perf` `--page-only` with `WEBKIT_DMABUF_RENDERER_FORCE_SHM=1` on such a
-   machine and, if it is smooth, drop the NVIDIA condition.
+   Measured on Arch/X11, WebKitGTK 2.54.2, wry 0.57, empty-page pan/zoom: with
+   `WEBKIT_DISABLE_DMABUF_RENDERER=1` CPU compositing gives ~16 fps (rAF p50 36-63 ms) on a
+   4 Mpx canvas; `WEBKIT_DMABUF_RENDERER_FORCE_SHM=1` gave 55-60 fps but leaks file descriptors
+   ("Failed to create shared memory: Too many open files", "Failed to allocate shared memory
+   buffer of size 1991x1221") in a longer session, so it is not recommended (PR #419 had set it
+   on NVIDIA; removed again). **Upstream:** the shared-memory fd leak is a WebKit issue to
+   watch; not filed yet. **Resolution:** revisit with a newer WebKitGTK/driver or Tauri 3.
 
 2. **The web process segfaults in `libnvidia-eglcore` on webview teardown**
    whenever that webview held a WebGL2 context. Rendering completes normally

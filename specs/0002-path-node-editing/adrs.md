@@ -135,14 +135,14 @@ spelled out under ADR 0002 and ADR 0009 rather than assumed.
   implementation requirements fall out of it, neither of them an architecture
   decision:
 
-  1. **The Linux build must disable WebKitGTK's DMA-BUF renderer before the
+  1. **On this driver WebKitGTK's DMA-BUF renderer has to be disabled before the
      webview starts** (`WEBKIT_DISABLE_DMABUF_RENDERER=1`). Measured on this
      machine: with it at its default, a WebGL2 context is acquired and
      reported as `WebGL 2.0` but **zero frames ever render** — for `wgpu` and
      for hand-written WebGL2 alike. This is the known WebKitGTK/NVIDIA
-     DMA-BUF problem, not ours. The Tauri host sets it; it must be a startup
-     requirement with a test, because the failure mode is a silent blank
-     canvas, not an error.
+     DMA-BUF problem, not ours. The Tauri host does **not** set it (superseded 2026-11-20): the user
+     sets it in the shell where the driver needs it (README, "Linux: WebKitGTK
+     and graphics drivers"; `docs/technical-debt.md`).
   2. **The canvas layer reconfigures the `wgpu` surface on every resize** —
      set `canvas.width`/`canvas.height`, call `surface.configure()` with the
      new size, then render, all in one frame. Standard `wgpu` usage, verified
