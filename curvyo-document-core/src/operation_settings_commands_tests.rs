@@ -192,6 +192,32 @@ fn a_material_edit_writes_the_marker_and_the_refresh_in_its_own_step() {
 }
 
 #[test]
+fn a_material_edit_with_the_marker_of_the_last_one_is_still_its_own_step() {
+    let d = Document::new(1);
+    let _ = laser(&d);
+    d.commit_material_edit(MaterialStep::EditMaterial, "m1", 42_000, &[])
+        .unwrap();
+    let steps = d.own_step_count();
+    // A delete in the same second as the last edit: the same id, the same whole-second time.
+    d.commit_material_edit(MaterialStep::DeleteMaterial, "m1", 42_000, &[])
+        .unwrap();
+    assert_eq!(d.own_step_count(), steps + 1, "a step of its own");
+    assert_eq!(
+        d.material_edit_marker(),
+        Some(json!({"id": "m1", "modified": 42_001})),
+        "the marker moves on"
+    );
+    d.commit_material_edit(MaterialStep::EditMaterial, "m2", 41_000, &[])
+        .unwrap();
+    assert_eq!(d.own_step_count(), steps + 2);
+    assert_eq!(
+        d.material_edit_marker(),
+        Some(json!({"id": "m2", "modified": 42_002})),
+        "never back"
+    );
+}
+
+#[test]
 fn the_save_refresh_is_a_reserved_commit_without_a_step_and_only_when_something_differs() {
     let d = Document::new(1);
     let m = laser(&d);
