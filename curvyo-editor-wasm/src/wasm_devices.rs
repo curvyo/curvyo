@@ -555,4 +555,11 @@ impl WasmSession {
     pub fn library_sync_pump(&mut self, group: &mut WasmDeviceGroup) -> String {
         self.session.library_sync_pump(&mut group.glue)
     }
+
+    /// Whether library arrivals changed local records or queued host writes since the last
+    /// call: the page flushes the writes and re-reads its rows then, whether a notice came or
+    /// not.
+    pub fn take_library_applied(&mut self) -> bool {
+        self.session.take_library_applied()
+    }
 }

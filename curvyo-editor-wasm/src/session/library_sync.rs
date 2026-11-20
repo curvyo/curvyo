@@ -47,6 +47,8 @@ pub enum LibraryEdit {
 pub(in crate::session) struct LibrarySyncState {
     pub(in crate::session) edits: Vec<LibraryEdit>,
     notices: std::collections::VecDeque<String>,
+    /// An arrival changed a local record or queued a host write since the page last asked.
+    applied: bool,
 }
 
 impl LibrarySyncState {
@@ -207,6 +209,13 @@ impl Session {
         self.library.notices.push_back(notice);
     }
 
+    /// Whether arrivals changed local records or queued host writes since the last call: the
+    /// page then flushes the writes and re-reads its rows, notice or none (an edit of an item
+    /// the device holds is applied without a notice).
+    pub fn take_library_applied(&mut self) -> bool {
+        std::mem::take(&mut self.library.applied)
+    }
+
     /// The next notice of a library arrival, once.
     pub fn take_library_notice(&mut self) -> Option<String> {
         self.library.notices.pop_front()
@@ -296,6 +305,7 @@ impl Session {
     /// The winner becomes the local record, written through the existing host write paths with
     /// the exact text that travelled (criterion 7).
     fn library_write_local(&mut self, kind: LibraryKind, id: &str, text: &str) {
+        self.library.applied = true;
         match kind {
             LibraryKind::Machine => {
                 if let Ok(profile) = read_machine(&record_file_name(id), text) {
@@ -320,6 +330,7 @@ impl Session {
     /// a host write beside the record, renamed "<name> (from your devices)" (criterion 9) when
     /// its text parses; the notice names the copy.
     fn library_conflict(&mut self, kind: LibraryKind, id: &str, loser: &str) {
+        self.library.applied = true;
         let copy = conflict_id(id);
         let (text, name) = Self::conflict_copy(kind, id, loser);
         match kind {
@@ -393,6 +404,7 @@ impl Session {
             }
         };
         if gone {
+            self.library.applied = true;
             self.library.notices.push_back(match name {
                 Some(name) => texts::deleted_notice(&name),
                 None => texts::DELETED_UNNAMED_NOTICE.to_owned(),
