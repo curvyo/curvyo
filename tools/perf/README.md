@@ -26,6 +26,9 @@ python3 -I tools/perf/measure.py --gpu-variants            # our wgpu path's var
 python3 -I tools/perf/measure.py --desktop --gpu-variants  # the same on the real display and GPU
 ```
 
+The app sets no WebKit environment variable itself: on drivers that need one, put it in the
+harness's own environment, e.g. `WEBKIT_DISABLE_DMABUF_RENDERER=1 python3 -I tools/perf/measure.py --desktop`.
+
 `--desktop` starts the app on the current `DISPLAY` (no `xvfb-run`, no forced `GDK_BACKEND`): the
 numbers of a real GPU and the desktop compositor's pacing. It takes no screenshots (the window is
 wherever the window manager puts it), so the `lag` line is not measured there.
