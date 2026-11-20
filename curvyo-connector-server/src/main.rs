@@ -51,7 +51,10 @@ fn controller(args: &Args) -> ControllerChoice {
         ControllerChoice::Serial(SerialSettings {
             port: port.clone(),
             baud: args.baud,
-            timing: Timing::default(),
+            timing: Timing {
+                homing: args.homing_timeout,
+                ..Timing::default()
+            },
         })
     } else if args.fake_controller {
         ControllerChoice::Fake(FakeSettings {
