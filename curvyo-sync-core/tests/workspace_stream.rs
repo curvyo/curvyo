@@ -167,3 +167,24 @@ fn a_snapshot_is_due_by_the_size_ratio() {
     assert!(!snapshot_due(0, 2559, 20 * MIB));
     assert!(snapshot_due(0, 2560, 20 * MIB));
 }
+
+#[test]
+fn an_entry_over_its_limit_is_refused_as_soon_as_its_header_is_read() {
+    let stream = encode_snapshot_stream(&[StreamEntry {
+        stream: LIST,
+        bytes: vec![9; 1000],
+    }]);
+    let parts = split_snapshot(&stream, [5; 16]);
+    let mut roomy = SnapshotAssembler::with_entry_limit(|_| 1000);
+    assert_eq!(roomy.push_part(&parts[0]).unwrap().len(), 1);
+    let mut tight = SnapshotAssembler::with_entry_limit(|_| 999);
+    assert_eq!(tight.push_part(&parts[0]), Err(StreamError::TooLarge));
+    // An endless claim is refused from its header, before its bytes arrive.
+    let mut endless = vec![1u8];
+    endless.extend_from_slice(&1u32.to_le_bytes());
+    endless.extend_from_slice(&LIST);
+    endless.extend_from_slice(&u64::MAX.to_le_bytes());
+    let part = &split_snapshot(&endless, [6; 16])[0];
+    let mut limited = SnapshotAssembler::with_entry_limit(|_| 1 << 20);
+    assert_eq!(limited.push_part(part), Err(StreamError::TooLarge));
+}

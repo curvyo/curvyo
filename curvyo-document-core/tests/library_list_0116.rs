@@ -94,8 +94,8 @@ fn entries_of_both_kinds_reach_every_replica() {
     );
     assert_eq!(on_a.entry(LibraryKind::Machine, OTHER_MACHINE), None);
     assert_eq!(
-        LIBRARY_LIST_FORMAT_VERSION, 1,
-        "a change takes a new version and a refusal of the old"
+        LIBRARY_LIST_FORMAT_VERSION, 2,
+        "a change takes a new version and a refusal of the old (2 since the first font entry, plan P22)"
     );
 }
 
@@ -237,13 +237,13 @@ fn golden_library_list_v1() {
 /// with a bad key or value shape are skipped, the good ones read.
 #[test]
 fn golden_damaged_library_lists() {
-    let newer = fixture("library_list_v2.loro");
+    let newer = fixture("library_list_v3.loro");
     let truncated = fixture("library_list_truncated.loro");
     let odd = fixture("library_list_odd_entries.loro");
     if std::env::var_os("UPDATE_0116_FIXTURES").is_some() {
         let doc = loro::LoroDoc::new();
         doc.set_peer_id(1).unwrap();
-        doc.get_map("library").insert("format_version", 2).unwrap();
+        doc.get_map("library").insert("format_version", 3).unwrap();
         doc.commit();
         std::fs::write(&newer, doc.export(loro::ExportMode::Snapshot).unwrap()).unwrap();
 
@@ -303,7 +303,7 @@ fn an_update_of_a_newer_format_is_refused_and_merges_nothing() {
     let known = newer.oplog_vv();
     newer
         .get_map("library")
-        .insert("format_version", 2)
+        .insert("format_version", 3)
         .unwrap();
     newer
         .get_map("machines")

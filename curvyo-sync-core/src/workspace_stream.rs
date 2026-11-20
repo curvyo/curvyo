@@ -31,6 +31,9 @@ pub enum StreamError {
     /// A part of another snapshot, out of order, or after the last.
     #[error("the snapshot part is out of order")]
     OutOfOrder,
+    /// A stream entry longer than the limit its reader set.
+    #[error("a snapshot entry is over the limit")]
+    TooLarge,
     /// A stream of a newer version.
     #[error("the workspace stream is of a newer version")]
     FormatTooNew,
@@ -157,13 +160,32 @@ pub struct SnapshotAssembler {
     pending: Vec<u8>,
     /// Entries still to read, once the stream header was read.
     remaining: Option<u32>,
+    /// The most bytes an entry of a stream may have, when the reader sets one.
+    entry_limit: Option<fn(&[u8; 16]) -> u64>,
 }
 
 impl SnapshotAssembler {
+    /// An assembler that refuses an entry longer than `entry_limit` says for its stream, as soon
+    /// as the entry's header is read: a sender cannot make it keep bytes without end.
+    #[must_use]
+    pub fn with_entry_limit(entry_limit: fn(&[u8; 16]) -> u64) -> Self {
+        Self {
+            entry_limit: Some(entry_limit),
+            ..Self::default()
+        }
+    }
+
+    /// The stream bytes held that no entry has consumed yet.
+    #[must_use]
+    pub const fn pending_len(&self) -> usize {
+        self.pending.len()
+    }
+
     /// Feeds the plaintext of the next part; returns the entries it completed.
     ///
     /// # Errors
-    /// [`StreamError::OutOfOrder`], [`StreamError::Malformed`], [`StreamError::FormatTooNew`].
+    /// [`StreamError::OutOfOrder`], [`StreamError::Malformed`], [`StreamError::FormatTooNew`],
+    /// [`StreamError::TooLarge`].
     pub fn push_part(&mut self, part: &[u8]) -> Result<Vec<StreamEntry>, StreamError> {
         let (id, rest) = part
             .split_first_chunk::<16>()
@@ -221,13 +243,20 @@ impl SnapshotAssembler {
             };
             let (stream, length) = header.split_at(16);
             let length = u64::from_le_bytes(length.try_into().map_err(|_| StreamError::Malformed)?);
+            let stream: [u8; 16] = stream.try_into().map_err(|_| StreamError::Malformed)?;
+            if self
+                .entry_limit
+                .is_some_and(|limit| length > limit(&stream))
+            {
+                return Err(StreamError::TooLarge);
+            }
             let length = usize::try_from(length).map_err(|_| StreamError::Malformed)?;
             let start = at + ENTRY_HEADER;
             let Some(bytes) = self.pending.get(start..start.saturating_add(length)) else {
                 break;
             };
             entries.push(StreamEntry {
-                stream: stream.try_into().map_err(|_| StreamError::Malformed)?,
+                stream,
                 bytes: bytes.to_vec(),
             });
             at = start + length;

@@ -19,8 +19,12 @@ use loro::{
 
 use crate::document::DocumentVersion;
 
-/// The library list format this build writes and the newest it reads.
-pub const LIBRARY_LIST_FORMAT_VERSION: i64 = 1;
+/// The newest library list format this build reads. A list is written as version 1 and becomes
+/// version 2 when its first font entry is set (ADR 0040 decision 11: a build that reads only
+/// version 1 refuses the whole list, so a library without fonts stays readable by it).
+pub const LIBRARY_LIST_FORMAT_VERSION: i64 = 2;
+/// The format a library list without font entries is written as.
+pub(crate) const LIBRARY_LIST_BASE_VERSION: i64 = 1;
 /// The largest machine record text an entry holds: the machine record reader's limit
 /// (`curvyo-laser-core`'s `MAX_RECORD_BYTES`, plan P2).
 pub const MAX_MACHINE_TEXT_BYTES: usize = 128 * 1024;
@@ -28,10 +32,10 @@ pub const MAX_MACHINE_TEXT_BYTES: usize = 128 * 1024;
 /// (`curvyo-laser-core`'s `MAX_RECORD_TEXT`, plan P2).
 pub const MAX_MATERIAL_TEXT_BYTES: usize = 512 * 1024;
 
-const ROOT: &str = "library";
+pub(crate) const ROOT: &str = "library";
 const MACHINES: &str = "machines";
 const MATERIALS: &str = "materials";
-const KEY_FORMAT_VERSION: &str = "format_version";
+pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
 const KEY_SYNC: &str = "sync";
 const KEY_TEXT: &str = "text";
 
@@ -97,7 +101,7 @@ pub struct LibraryEntry {
 
 /// One replica of the library list.
 pub struct LibraryList {
-    doc: LoroDoc,
+    pub(crate) doc: LoroDoc,
 }
 
 impl LibraryList {
@@ -112,7 +116,7 @@ impl LibraryList {
         #[allow(clippy::unwrap_used)]
         list.doc
             .get_map(ROOT)
-            .insert(KEY_FORMAT_VERSION, LIBRARY_LIST_FORMAT_VERSION)
+            .insert(KEY_FORMAT_VERSION, LIBRARY_LIST_BASE_VERSION)
             .unwrap();
         list.doc.commit();
         list
@@ -210,21 +214,32 @@ impl LibraryList {
     /// Takes a room snapshot, a full one as a merge, a state-only one ([`snapshot_state`]) as a
     /// start from its state when this replica holds history it cannot be merged onto: the
     /// replica then continues as `peer` from the snapshot and its changes not yet pushed are
-    /// lost (the trade-off of the state-only snapshot, the story's `adrs.md`). Whether the
-    /// snapshot supersedes what this replica held, as [`LibraryList::import_updates_seen`].
+    /// lost (the trade-off of the state-only snapshot, the story's `adrs.md`). The result says
+    /// whether the snapshot supersedes what this replica held, as
+    /// [`LibraryList::import_updates_seen`], and whether it replaced the list.
     ///
     /// # Errors
     /// [`LibraryListError::Malformed`], [`LibraryListError::FormatTooNew`].
     ///
     /// [`snapshot_state`]: LibraryList::snapshot_state
-    pub fn import_snapshot(&mut self, peer: u64, bytes: &[u8]) -> Result<bool, LibraryListError> {
+    pub fn import_snapshot(
+        &mut self,
+        peer: u64,
+        bytes: &[u8],
+    ) -> Result<SnapshotImport, LibraryListError> {
         let theirs = Self::from_snapshot(peer, bytes)?;
         let merged = self.merge(bytes)?;
         if merged.pending {
             *self = theirs;
-            return Ok(false);
+            return Ok(SnapshotImport {
+                seen: false,
+                replaced: true,
+            });
         }
-        Ok(merged.seen)
+        Ok(SnapshotImport {
+            seen: merged.seen,
+            replaced: false,
+        })
     }
 
     /// Merges `bytes`.
@@ -361,6 +376,16 @@ impl LibraryList {
         self.doc.commit();
         Ok(())
     }
+}
+
+/// What taking a room snapshot did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnapshotImport {
+    /// Every change was made knowing everything this replica held before.
+    pub seen: bool,
+    /// The list started over from the snapshot (`*self` was replaced), so an entry missing from
+    /// it may be one this replica wrote and the room never saw.
+    pub replaced: bool,
 }
 
 /// What a merge found out.
