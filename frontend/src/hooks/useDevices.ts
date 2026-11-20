@@ -12,7 +12,12 @@ import type { WorkspaceApi } from "@/hooks/useWorkspace";
 import { type OfferedWorkspace, useSyncedWorkspaces } from "@/hooks/useSyncedWorkspaces";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import type { DevicesApi, DevicesView, LibrarySyncApi, PairingView, SyncedFolder } from "@/lib/devicesApi";
-import { decodeLibrarySync, type LibrarySyncView } from "@/lib/librarySyncView";
+import {
+  decodeLibrarySync,
+  firstSyncAsked,
+  type FirstSyncAnswer,
+  type LibrarySyncView,
+} from "@/lib/librarySyncView";
 import { openRoomNow, setGroupWorkspaces } from "@/lib/backgroundWorkspace";
 import { flushMaterialWrites } from "@/lib/materialsFile";
 import { flushMachineWrites } from "@/lib/machineProfilesFile";
@@ -37,6 +42,8 @@ const TICK_MS = 50;
 /** How often the files, keys, reconciliation and arrivals are looked at (ms). */
 const SLOW_MS = 1000;
 const DEVICE_NAME_KEY = "curvyo.device-name";
+/** The answer of the libraries' first-sync confirm, per group room (`specs/0116-library-sync`). */
+const FIRST_SYNC_KEY = "curvyo.library-first-sync.";
 /** How long the switch says "Leaving..." at most before it is usable again (ux-notes 5.4). */
 const LEAVING_MS = 30_000;
 
@@ -133,6 +140,8 @@ export function useDevices(
   /** The per-user libraries' view (`specs/0116-library-sync`): the rows' toggles and the
    * stream's state, `null` while this device is in no group (the rows grey). */
   const [libraryView, setLibraryView] = useState<LibrarySyncView | null>(null);
+  /** The maker's answer to the first-sync confirm, kept per group room. */
+  const [libraryAnswer, setLibraryAnswer] = useState<FirstSyncAnswer>("");
   useEffect(() => {
     viewRef.current = view;
     // A workspace the maker left ends as a leave with its record, not as a switch-off.
@@ -218,9 +227,17 @@ export function useDevices(
       // The other devices show this one as a browser (ADR 0040 decision 1).
       group.set_browser();
     }
+    if (group) {
+      // The confirmed first sync of an earlier run: a new item starts on (criterion 4).
+      const answer = stored(FIRST_SYNC_KEY + group.room());
+      const known: FirstSyncAnswer = answer === "yes" || answer === "no" ? answer : "";
+      setLibraryAnswer(known);
+      group.set_library_new_items(known === "yes");
+    }
     if (!group) {
       setView(null);
       setLibraryView(null);
+      setLibraryAnswer("");
     }
   }, []);
 
@@ -544,12 +561,15 @@ export function useDevices(
           const notice = session.library_sync_pump(group);
           if (notice !== "") {
             showNotice(notice, 5000, "canvas", "status");
-            // An arrival changed the session's libraries: the rows re-read, and the host
-            // writes the arrival queued (their flush also taps them for the group's list).
-            syncRef.current();
-            void flushMachineWrites(session, syncRef.current);
-            void flushMaterialWrites(session, syncRef.current);
           }
+          // An arrival changed the session's libraries, a notice or none (an edit of a held item
+          // has none): the rows re-read, and the host writes it queued are flushed (their flush
+          // also taps them for the group's list). The writes never wait for a notice.
+          if (session.take_library_applied()) {
+            syncRef.current();
+          }
+          void flushMachineWrites(session, syncRef.current);
+          void flushMaterialWrites(session, syncRef.current);
         }
         void persist(group);
         reconcileOpen();
@@ -866,7 +886,7 @@ export function useDevices(
   );
 
   /** The first sync (criterion 3): every local machine and material on, behind the confirm the
-   * pairing block shows (`specs/0116-library-sync`). */
+   * pairing block shows (`specs/0116-library-sync`). The answer is kept for this group. */
   const libraryFirstSync = useCallback(() => {
     const group = groupRef.current;
     const session = getSession();
@@ -874,13 +894,32 @@ export function useDevices(
       return;
     }
     session.library_first_sync(group);
+    store(FIRST_SYNC_KEY + group.room(), "yes");
+    setLibraryAnswer("yes");
     groupTransport.current?.drain();
     readLibrary();
     void persist(group);
   }, [getSession, persist, readLibrary]);
 
+  /** Declines the first sync: nothing leaves, the items stay local until their toggles are
+   * pressed; the confirm does not come back for this group. */
+  const libraryDeclineFirstSync = useCallback(() => {
+    const group = groupRef.current;
+    if (!group) {
+      return;
+    }
+    store(FIRST_SYNC_KEY + group.room(), "no");
+    setLibraryAnswer("no");
+  }, []);
+
   /** The per-user libraries' rows and actions (`specs/0116-library-sync`). */
-  const library: LibrarySyncApi = { view: libraryView, switch: librarySwitch, firstSync: libraryFirstSync };
+  const library: LibrarySyncApi = {
+    view: libraryView,
+    switch: librarySwitch,
+    firstSync: libraryFirstSync,
+    declineFirstSync: libraryDeclineFirstSync,
+    askFirstSync: firstSyncAsked(libraryView, libraryAnswer),
+  };
 
   const switchOn = useCallback(() => {
     pendingSwitchRef.current = "on";

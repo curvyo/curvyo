@@ -10,6 +10,7 @@ import { after, before, test } from "node:test";
 import {
   decodeLibrarySync,
   firstSyncAnswer,
+  firstSyncAsked,
   librarySyncGlyph,
   librarySyncOn,
 } from "../src/lib/librarySyncView.ts";
@@ -62,11 +63,11 @@ test("the view decodes with every field checked, a wrong shape to null", () => {
   assert.equal(decodeLibrarySync(view({ machines: [{ id: "u1" }] })), null);
 });
 
-test("an item without an entry defaults on, an off entry stays off (Frage 214 A)", () => {
+test("an item without an entry has its own plain state, an off entry stays off", () => {
   const decoded = decodeLibrarySync(view())!;
   assert.equal(librarySyncOn(decoded, "machines", "u1"), true);
   assert.equal(librarySyncOn(decoded, "materials", "m1"), false);
-  assert.equal(librarySyncOn(decoded, "machines", "never-seen"), true);
+  assert.equal(librarySyncOn(decoded, "machines", "never-seen"), false, "never synced: the plain cloud, a press turns it on");
   assert.equal(librarySyncOn(null, "machines", "u1"), true, "no group: the stored state shows, on by default");
 });
 
@@ -81,14 +82,27 @@ test("the glyph follows the view: cloud, RefreshCw while transferring, CloudOff 
 
 test("the first-sync confirm runs the first sync only when confirmed (criterion 3)", () => {
   let calls = 0;
-  firstSyncAnswer(true, () => {
+  let declined = 0;
+  const sync = () => {
     calls += 1;
-  });
-  assert.equal(calls, 1);
-  firstSyncAnswer(false, () => {
-    calls += 1;
-  });
-  assert.equal(calls, 1, "declining syncs nothing");
+  };
+  const decline = () => {
+    declined += 1;
+  };
+  firstSyncAnswer(true, sync, decline);
+  assert.deepEqual([calls, declined], [1, 0]);
+  firstSyncAnswer(false, sync, decline);
+  assert.deepEqual([calls, declined], [1, 1], "declining syncs nothing and is told");
+});
+
+test("the first-sync confirm shows only in a group without entries until it is answered", () => {
+  const empty = decodeLibrarySync(view({ machines: [], materials: [] }))!;
+  const full = decodeLibrarySync(view())!;
+  assert.equal(firstSyncAsked(empty, ""), true);
+  assert.equal(firstSyncAsked(empty, "yes"), false, "confirming ends it");
+  assert.equal(firstSyncAsked(empty, "no"), false, "declining ends it");
+  assert.equal(firstSyncAsked(full, ""), false, "another device's first sync ends it");
+  assert.equal(firstSyncAsked(null, ""), false, "no group: nothing to ask");
 });
 
 // ---- the rows, rendered --------------------------------------------------------------------------
@@ -272,15 +286,14 @@ test("a material toggle with the group on shows the stored state and is not grey
 
 test("the first-sync confirm sits in the pairing block: the sentence, confirm and decline", async () => {
   const html = await render("/src/components/panel/DeviceChoices.tsx", "LibrarySyncConfirm", {
-    sentence: "Your fonts, machines and materials leave this computer encrypted, to your own computers only",
+    sentence: "Your machines and materials leave this computer encrypted, to your own computers only.",
     onSync: noop,
+    onDecline: noop,
   });
   const groups = [...html.matchAll(/<div[^>]*role="group"[^>]*>/g)].map((m) => m[0]);
   assert.ok(groups.some((g) => /aria-label="Sync to my devices"/.test(g)));
-  assert.match(
-    html,
-    /Your fonts, machines and materials leave this computer encrypted, to your own computers only/,
-  );
+  assert.match(html, /Your machines and materials leave this computer encrypted, to your own computers only\./);
   assert.match(html, />Sync libraries<\/button>/);
-  assert.match(html, />Not now<\/button>/);
+  assert.match(html, />Keep local<\/button>/);
+  assert.doesNotMatch(html, /Not now/, "the workspace pick keeps the one Not now");
 });

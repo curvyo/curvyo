@@ -145,8 +145,10 @@ export function moveTarget(count: number, index: number, key: string): number | 
 }
 
 /** The key action on a row's name button: Alt+arrows move, F2 renames, Delete arms (and removes when armed), Enter or Space open, S
- * switches the row's library sync (`specs/0116` UX notes §2, a readable row only). */
-export function materialKeyAction(key: string, alt: boolean, armed: boolean): MaterialKeyAction {
+ * switches the row's library sync (`specs/0116` UX notes §2, a readable row only). A key with Ctrl or
+ * Cmd is the app's (Ctrl+S saves) and never a row action, as in the machine list. */
+export function materialKeyAction(key: string, alt: boolean, armed: boolean, ctrl = false): MaterialKeyAction {
+  if (ctrl) return "none";
   if (alt && (key === "ArrowUp" || key === "ArrowDown" || key === "Home" || key === "End")) return "move";
   if (key === "F2") return "rename";
   if (key === "Delete") return armed ? "remove" : "arm";

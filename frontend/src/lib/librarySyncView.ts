@@ -67,9 +67,15 @@ export function decodeLibrarySync(text: string): LibrarySyncView | null {
   return { machines, materials, online: parsed.online, acked: parsed.acked, state: parsed.state };
 }
 
-/** Whether the item `id` of `kind` syncs: an item without an entry starts on (Frage 214 A). */
+/** Whether the item `id` of `kind` syncs. An item without an entry in the group's list never
+ * synced (declined first sync, made before pairing): it has its own state, the plain cloud, and
+ * pressing its toggle turns it on, the first sync of that one item. Without a group (`null`)
+ * the toggles are greyed and show the stored state, on by default (Frage 214 A). */
 export function librarySyncOn(view: LibrarySyncView | null, kind: "machines" | "materials", id: string): boolean {
-  return view?.[kind].find((row) => row.id === id)?.sync ?? true;
+  if (view === null) {
+    return true;
+  }
+  return view[kind].find((row) => row.id === id)?.sync ?? false;
 }
 
 /** The glyph the toggle shows (UX notes §1): `RefreshCw` while this item transfers, `CloudOff`
@@ -84,9 +90,20 @@ export function librarySyncGlyph(on: boolean, greyed: boolean, online: boolean, 
 }
 
 /** The first-sync confirm's answer (criterion 3): confirming runs the first sync (every item
- * on), declining syncs nothing and can be done later. */
-export function firstSyncAnswer(confirm: boolean, firstSync: () => void): void {
+ * on), declining syncs nothing and keeps the items local; each item can be switched on later. */
+export function firstSyncAnswer(confirm: boolean, firstSync: () => void, decline: () => void = () => undefined): void {
   if (confirm) {
     firstSync();
+  } else {
+    decline();
   }
+}
+
+/** The stored answer of the first-sync confirm: `""` while unanswered. */
+export type FirstSyncAnswer = "" | "yes" | "no";
+
+/** Whether the first-sync confirm shows: in a group whose library list holds no entry yet and
+ * while the maker has not answered. Either answer, or another device's first sync, ends it. */
+export function firstSyncAsked(view: LibrarySyncView | null, answer: FirstSyncAnswer): boolean {
+  return view !== null && answer === "" && view.machines.length === 0 && view.materials.length === 0;
 }
