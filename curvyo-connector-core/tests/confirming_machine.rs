@@ -283,6 +283,36 @@ fn g15_a_loss_names_the_line_and_stays_through_the_reconnect_until_the_next_send
 }
 
 #[test]
+fn hc3_a_loss_with_its_own_sentence_drops_the_job_and_stays_through_the_reconnect() {
+    let text = "Lost the controller: homing took longer than 120 s";
+    for mut m in [running(), ready()] {
+        m.handle(Event::PauseDeferred);
+        m.handle(Event::ControllerLostWith {
+            detail: text.into(),
+        });
+        assert_eq!(m.state(), State::NoController);
+        assert_eq!(detail(&m).as_deref(), Some(text));
+        assert!(m.held_job().is_none(), "dropped");
+        assert!(!matches!(
+            m.status(),
+            Message::Status {
+                pause_pending: true,
+                ..
+            }
+        ));
+        m.handle(Event::NoControllerDetail {
+            detail: "Port /dev/ttyUSB0 not found".into(),
+        });
+        m.handle(Event::ControllerLostWith {
+            detail: "other".into(),
+        });
+        m.handle(Event::ControllerConnected);
+        assert_eq!(m.state(), State::Idle);
+        assert_eq!(detail(&m).as_deref(), Some(text));
+    }
+}
+
+#[test]
 fn g15_a_job_not_yet_started_reads_lost_the_controller() {
     let mut m = ready();
     m.handle(Event::ControllerLost);

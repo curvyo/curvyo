@@ -25,6 +25,12 @@ pub enum Event {
     ControllerConnected,
     /// The controller was lost; a job in flight is dropped and named in the detail.
     ControllerLost,
+    /// The controller was lost for the reason in `detail`, which the app shows in place of the
+    /// line count; a job in flight is dropped (`specs/0142`, the homing cap).
+    ControllerLostWith {
+        /// The sentence ("Lost the controller: homing took longer than 120 s").
+        detail: String,
+    },
     /// The controller got through `line` lines; `elapsed_ms` is counted by the caller.
     Progress {
         /// Lines done.
