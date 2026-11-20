@@ -84,6 +84,7 @@ impl Machine {
         }
         match event {
             Event::ControllerLost => self.lose(None, out),
+            Event::ControllerLostWith { detail } => self.lose(Some(&detail), out),
             Event::StopUnconfirmed => self.lose(Some("Could not confirm the machine stopped"), out),
             Event::Alarm { text } => {
                 self.discard();
