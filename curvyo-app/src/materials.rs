@@ -45,7 +45,11 @@ fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
 
 /// The path of the record `id` under the data directory `data`; refused for any other name.
 fn record_path(data: &Path, id: &str) -> Result<PathBuf, String> {
-    if !curvyo_laser_core::is_record_id(id) {
+    // A conflict copy (`specs/0116-library-sync`, ADR 0062 decision 5) is `<uuid>.conflict`.
+    let record = id
+        .strip_suffix(curvyo_laser_core::CONFLICT_SUFFIX)
+        .unwrap_or(id);
+    if !curvyo_laser_core::is_record_id(record) {
         return Err("not a material id".to_owned());
     }
     Ok(data
@@ -239,6 +243,22 @@ mod tests {
             Path::new("/data/materials").join(format!("{ID}.json"))
         );
         for bad in ["../machines/x", "generic-laser", "", &ID.to_uppercase()] {
+            assert!(record_path(data, bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_conflict_copy_reaches_the_materials_folder_too() {
+        let data = Path::new("/data");
+        assert_eq!(
+            record_path(data, &format!("{ID}.conflict")).unwrap(),
+            Path::new("/data/materials").join(format!("{ID}.conflict.json"))
+        );
+        for bad in [
+            ".conflict",
+            &format!("{ID}.conflict.conflict"),
+            &format!("x{ID}.conflict"),
+        ] {
             assert!(record_path(data, bad).is_err(), "{bad}");
         }
     }
