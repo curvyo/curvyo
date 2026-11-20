@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CollaborationApi } from "@/hooks/useCollaboration";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import type { WorkspaceApi } from "@/hooks/useWorkspace";
+import { useFontSync } from "@/hooks/useFontSync";
 import { type OfferedWorkspace, useSyncedWorkspaces } from "@/hooks/useSyncedWorkspaces";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import type { DevicesApi, DevicesView, LibrarySyncApi, PairingView, SyncedFolder } from "@/lib/devicesApi";
@@ -246,6 +247,14 @@ export function useDevices(
     const group = groupRef.current;
     setLibraryView(group ? decodeLibrarySync(group.library_view_json()) : null);
   }, []);
+
+  /** The font rows' sync (`specs/0116-library-sync` slice 2). */
+  const libraryAnswerRef = useRef<FirstSyncAnswer>("");
+  useEffect(() => {
+    libraryAnswerRef.current = libraryAnswer;
+  });
+  const fontSync = useFontSync(editor, libraryView, groupRef, showNotice, readLibrary);
+  const pumpFonts = fontSync.pump;
 
   /** Writes the group's files and keys when they changed. */
   const persist = useCallback(async (group: WasmDeviceGroup) => {
@@ -571,6 +580,7 @@ export function useDevices(
           void flushMachineWrites(session, syncRef.current);
           void flushMaterialWrites(session, syncRef.current);
         }
+        pumpFonts(group, libraryAnswerRef.current === "yes");
         void persist(group);
         reconcileOpen();
         syncedRef.current.slow();
@@ -587,7 +597,7 @@ export function useDevices(
       window.clearInterval(timer);
       window.removeEventListener("online", onOnline);
     };
-  }, [attachGroup, getSession, persist, readLibrary, reconcileOpen, retryNow, showNotice]);
+  }, [attachGroup, pumpFonts, getSession, persist, readLibrary, reconcileOpen, retryNow, showNotice]);
 
   const setDeviceName = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -915,6 +925,7 @@ export function useDevices(
   /** The per-user libraries' rows and actions (`specs/0116-library-sync`). */
   const library: LibrarySyncApi = {
     view: libraryView,
+    fonts: fontSync.api,
     switch: librarySwitch,
     firstSync: libraryFirstSync,
     declineFirstSync: libraryDeclineFirstSync,

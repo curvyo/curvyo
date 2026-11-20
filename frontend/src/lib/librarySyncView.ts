@@ -14,6 +14,8 @@ export interface LibraryToggleRow {
 
 /** The group's library view as the rows read it. */
 export interface LibrarySyncView {
+  /** The font entries, by the SHA-256 of the file (`0116` slice 2). */
+  fonts: LibraryToggleRow[];
   machines: LibraryToggleRow[];
   materials: LibraryToggleRow[];
   /** Whether the group session is connected. */
@@ -53,9 +55,11 @@ export function decodeLibrarySync(text: string): LibrarySyncView | null {
   if (!isObject(parsed)) {
     return null;
   }
+  const fonts = parsed.fonts === undefined ? [] : rows(parsed.fonts);
   const machines = rows(parsed.machines);
   const materials = rows(parsed.materials);
   if (
+    fonts === null ||
     machines === null ||
     materials === null ||
     typeof parsed.online !== "boolean" ||
@@ -64,7 +68,7 @@ export function decodeLibrarySync(text: string): LibrarySyncView | null {
   ) {
     return null;
   }
-  return { machines, materials, online: parsed.online, acked: parsed.acked, state: parsed.state };
+  return { fonts, machines, materials, online: parsed.online, acked: parsed.acked, state: parsed.state };
 }
 
 /** Whether the item `id` of `kind` syncs. An item without an entry in the group's list never
@@ -102,8 +106,8 @@ export function firstSyncAnswer(confirm: boolean, firstSync: () => void, decline
 /** The stored answer of the first-sync confirm: `""` while unanswered. */
 export type FirstSyncAnswer = "" | "yes" | "no";
 
-/** Whether the first-sync confirm shows: in a group whose library list holds no entry yet and
+/** Whether the first-sync confirm shows: in a group whose library list holds no entry yet (no font, machine or material) and
  * while the maker has not answered. Either answer, or another device's first sync, ends it. */
 export function firstSyncAsked(view: LibrarySyncView | null, answer: FirstSyncAnswer): boolean {
-  return view !== null && answer === "" && view.machines.length === 0 && view.materials.length === 0;
+  return view !== null && answer === "" && view.fonts.length === 0 && view.machines.length === 0 && view.materials.length === 0;
 }

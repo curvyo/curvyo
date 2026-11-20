@@ -15,6 +15,9 @@ interface LibrarySyncToggleProps {
   onToggle: () => void;
   /** The row's control slot: `h-7 w-6` in the machine row, `h-6 w-6` in the material row. */
   slot: string;
+  /** Whether the tooltip names the row key `S` (the fonts tree has no such key: type-to-search
+   * keeps every letter). */
+  keyHint?: boolean;
 }
 
 /**
@@ -25,7 +28,7 @@ interface LibrarySyncToggleProps {
  * switches, no armed second press (UX notes §4). Greyed without a paired device, its reason as
  * tooltip and `aria-description`.
  */
-export function LibrarySyncToggle({ name, on, view, onToggle, slot }: LibrarySyncToggleProps) {
+export function LibrarySyncToggle({ name, on, view, onToggle, slot, keyHint = true }: LibrarySyncToggleProps) {
   const greyed = view === null;
   const reason = "Pair a device to sync.";
   const glyph = librarySyncGlyph(on, greyed, view?.online ?? false, view?.acked ?? true);
@@ -33,7 +36,7 @@ export function LibrarySyncToggle({ name, on, view, onToggle, slot }: LibrarySyn
   const second = greyed || !on ? "" : (view?.state ?? "");
   const tooltip = (
     <>
-      <div>{greyed ? reason : "Sync to my devices (S)"}</div>
+      <div>{greyed ? reason : keyHint ? "Sync to my devices (S)" : "Sync to my devices"}</div>
       {second ? <div className="text-muted-foreground">{second}</div> : null}
     </>
   );

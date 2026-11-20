@@ -3,6 +3,7 @@
 
 import type { CopyDecision, OfferedWorkspace } from "@/hooks/useSyncedWorkspaces";
 import type { LibrarySyncView } from "@/lib/librarySyncView";
+import type { FontFamily } from "@/lib/textText";
 import { devices_synced_header } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** One synced workspace's line under a row (ux-notes 2.1, criterion 22). */
@@ -34,11 +35,22 @@ export interface GroupWorkspace {
   left: boolean;
 }
 
+/** What a Curvyo family row reads and does for the font sync: whether its toggle reads on and a
+ * press (the toggle; the fonts tree has no key for it). */
+export interface FontSyncApi {
+  on: (family: FontFamily) => boolean;
+  toggle: (family: FontFamily) => void;
+  /** The maker deleted these Curvyo font files (host ids): their entries leave the stream. */
+  forget: (ids: string[]) => void;
+}
+
 /** The library sync of the per-user libraries (`specs/0116-library-sync`): the rows' stored
  * on/off state and the stream's state from `library_view_json` (`null` while this device is in
  * no group: the toggles grey), and the two actions of the rows and the first-sync confirm. */
 export interface LibrarySyncApi {
   view: LibrarySyncView | null;
+  /** The Curvyo font rows' toggle (`specs/0116-library-sync` slice 2). */
+  fonts: FontSyncApi;
   /** Switches one item on or off (criterion 4). */
   switch: (kind: "machine" | "material", id: string, on: boolean) => void;
   /** The first sync: every item on behind the one confirm (criterion 3). */

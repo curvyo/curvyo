@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addBrowserFontFiles, type BrowserAddResult, pickBrowserFontFiles } from "@/lib/browserFonts";
 import { addBrowserFontArchives, isArchiveFile } from "@/lib/browserFontArchives";
 import { addNoticeWithArchives } from "@/lib/fontArchiveText";
+import { FONT_LIBRARY_CHANGED } from "@/lib/fontSyncModel";
 import {
   type AddResult,
   LIBRARY_NEWER,
@@ -101,6 +102,12 @@ export function useFontLibrary(
     },
     [show],
   );
+
+  // A synced font changed the library file (`specs/0116-library-sync`): read the view again.
+  useEffect(() => {
+    window.addEventListener(FONT_LIBRARY_CHANGED, bump);
+    return () => window.removeEventListener(FONT_LIBRARY_CHANGED, bump);
+  }, [bump]);
 
   useEffect(() => {
     let live = true;

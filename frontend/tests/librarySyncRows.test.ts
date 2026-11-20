@@ -51,6 +51,7 @@ function view(over: Record<string, unknown> = {}) {
 test("the view decodes with every field checked, a wrong shape to null", () => {
   const decoded = decodeLibrarySync(view());
   assert.deepEqual(decoded, {
+    fonts: [],
     machines: [{ id: "u1", sync: true }],
     materials: [{ id: "m1", sync: false }],
     online: true,
@@ -103,6 +104,8 @@ test("the first-sync confirm shows only in a group without entries until it is a
   assert.equal(firstSyncAsked(empty, "no"), false, "declining ends it");
   assert.equal(firstSyncAsked(full, ""), false, "another device's first sync ends it");
   assert.equal(firstSyncAsked(null, ""), false, "no group: nothing to ask");
+  const fonts = decodeLibrarySync(view({ machines: [], materials: [], fonts: [{ id: "h1", sync: true }] }))!;
+  assert.equal(firstSyncAsked(fonts, ""), false, "a group with only font entries has synced already");
 });
 
 // ---- the rows, rendered --------------------------------------------------------------------------
