@@ -1,5 +1,5 @@
 import { Tooltip as TooltipPrimitive } from "radix-ui";
-import { type ReactElement, type ReactNode, useRef, useState } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 /** One provider for a group of tooltips (`docs/design-system.md`, "Frontend
  * components to add"). */
@@ -22,36 +22,23 @@ interface TooltipProps {
  * it may cover the canvas but never the panel row it belongs to.
  */
 export function Tooltip({ content, side, offset = 8, children }: TooltipProps) {
-  const [open, setOpen] = useState(false);
-  // A focus that is not from the keyboard (a script moving it after a click) opens no tooltip.
-  const quietFocus = useRef(false);
   // No content, no tooltip: the trigger alone (a row that needs none).
   if (content === undefined || content === null || content === "") {
     return children;
   }
+  // Uncontrolled on purpose: every close goes through Radix, so the provider restarts its
+  // 300 ms skip window and the next tooltip waits its 400 ms again. Not hoverable: it closes
+  // when the pointer leaves the trigger, on a press and on blur (Radix's own handlers).
   return (
-    <TooltipPrimitive.Root
-      delayDuration={400}
-      open={open}
-      onOpenChange={(next) => {
-        if (next && quietFocus.current) {
-          quietFocus.current = false;
-          return;
-        }
-        setOpen(next);
-      }}
-    >
+    <TooltipPrimitive.Root delayDuration={400} disableHoverableContent>
       <TooltipPrimitive.Trigger
         asChild
-        // A tooltip, never a popup: it goes with the pointer, with a press and with the focus.
-        onPointerLeave={() => setOpen(false)}
-        onPointerUp={() => setOpen(false)}
-        onBlur={() => setOpen(false)}
         onFocus={(event) => {
-          quietFocus.current = !event.currentTarget.matches(":focus-visible");
-          queueMicrotask(() => {
-            quietFocus.current = false;
-          });
+          // A focus that is not from the keyboard (a script moving it after a click) opens no
+          // tooltip: a prevented event skips Radix's own open handler.
+          if (!event.currentTarget.matches(":focus-visible")) {
+            event.preventDefault();
+          }
         }}
       >
         {children}
