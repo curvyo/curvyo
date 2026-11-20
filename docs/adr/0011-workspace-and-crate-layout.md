@@ -202,6 +202,8 @@ for the cost of one `lib.rs`: doing it now is a speculative crate
    > `→ connector-core`), `curvyo-connector-server` (`→ connector-io`); `curvyo-app →
    > connector-io`. The first slot of §8 (machine/toolpath core and device `-io` crate) is filled
    > for the laser family by `curvyo-laser-core` and `curvyo-connector-io`.
+   > `curvyo-connector-ctl` (binary `curvyoctl`, ADR 0071 decision 10, `specs/0128`): `→
+   > connector-core, connector-io` (without its `serial` feature), `storage-io`.
 
    > **Note 2026-11-19 ([ADR 0068](0068-raster-dot-values-and-dithering.md) §1, [ADR 0069](0069-raster-rows-output-and-settings.md), the `0123` story):**
    > raster engraving adds modules to `curvyo-laser-core`, no crate; it now also depends on

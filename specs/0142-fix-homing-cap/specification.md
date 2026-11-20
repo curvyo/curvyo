@@ -1,6 +1,6 @@
 # Fix: a homing that never answers ends after a cap (120 s by default)
 
-Status: Ready (no UX notes and no architect work needed: one footer text, one flag, one constant; the build waits for PR #399 and for `0133`, which touch the same `$H` code)
+Status: Done (PR #429)
 Kind: Bug (branch `fix/homing-cap`)
 Priority: Must (safety: a pulled cable must never leave the app reading "Running")
 Origin: Customer. Test on the real laser, 2026-11-20: pulling the USB cable while the connector waits for the silent `$H` `ok` is never noticed (the status stays Running for 90 s); in a normal job the same unplug gives "Lost the controller" after about 3 s. **Frage 265 (HOMING-CAP), B decided by the customer 2026-11-20:** the connector gives up after a cap when `$H` returns no `ok`, 120 s by default, adjustable with `--homing-timeout <seconds>`.

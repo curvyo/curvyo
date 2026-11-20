@@ -1,6 +1,6 @@
 # Connector API, `curvyoctl` and maintenance mode: set up the machine without a shell
 
-Status: Ready (UX notes and architect addendum D1 to D17 done 2026-11-18; Fragen 247 to 249 are applied by default and vetoable at the demo; Fragen 250 to 252 are decided by the customer, 2026-11-18)
+Status: Done (PR #440)
 Priority: Should
 Origin: Customer (Frage 242 CONN-LOCALSTART-SERVICE, answered 2026-11-18, translated: "We build the connector from the API side, like e.g. talosctl. So it can only be set up via an insecure mode, and nothing can be armed in it. I don't like ssh for this kind of thing. Then we have one more small CLI tool, but we can couple the laser cutter, responsibility-wise, to a Curvyo instance. If you lose access because you deleted the secrets, the connector has to be set up again."). Decided by the customer 2026-11-18 as Fragen 243 to 246, all A (ADR 0071, Accepted). This is slice 5 of `0064` (order in `specs/0064-machine-connector/adrs.md` and "Slice order" of ADR 0071). Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
