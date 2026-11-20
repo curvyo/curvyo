@@ -77,3 +77,55 @@ material row. Constants marked Proposal are vetoable at the demo.
   version), is superseded without a conflict copy or a notice; an edit of an item the device
   holds is no arrival. An item that never synced (no entry) is published only by its toggle
   or, once the first sync was confirmed, as a new item (criterion 4).
+
+### Slice 2 (fonts), amendments of 2026-11-20
+
+Notes from the architect review of `story/library-fonts`; the numbers are the plan's.
+
+- 2026-11-20 (P21): an entry is a flat root map of registers `<sha-256>.<field>` with `sync`,
+  `file_name`, `folder`, `size`, `tags`, `favourite`, `cuttable`, `documents`. `folder`, `size`
+  and `documents` are additive to decision 2's list (the `.zip` subfolder of `0083`, the budgets,
+  criterion 18). A family's metadata travels on each of its file entries (decision 2), read from
+  the file's first family. Entries whose registers have a bad shape, a font over 16 MiB or a
+  licence file over 1 MiB are not read (decision 6, receiving side).
+- 2026-11-20 (P22): the first font entry writes `library.loro` as **format 2** (decision 1 says
+  `format_version = 1`). ADR 0040 decision 11 makes a build that reads only format 1 refuse the
+  update and upload no snapshot, so it cannot let the relay prune blob records it never held.
+  The price: a build without slice 2 in the group stops syncing machines and materials too once
+  a font is on; the release notes say so (as for P3). A list without fonts stays format 1.
+- 2026-11-20 (P23): blobs travel as parts (`hash | index | count | total | bytes`, the last part
+  padded to 64 KiB so the relay cannot recognise a known font by its size) in ordinary sealed
+  `Asset` records **and** live in the room's snapshot as entries of their own stream, because the
+  relay prunes the records a snapshot covers. A switched-off, deleted or unreferenced blob is gone
+  from the next snapshot (criteria 4 and 27).
+- 2026-11-20 (P24): the glue keeps the bytes of switched-on fonts in memory for the snapshot.
+  Peak is about three times the library (held bytes, the encoded snapshot, parts, sealed copies):
+  recorded in `docs/technical-debt.md`. On the receiving side, held plus arriving bytes are
+  counted against the 512 MiB budget, a blob that would pass it or is not the size its entry says
+  is refused with a notice, and blobs no entry names make room first. A blob still arriving as
+  parts holds the next snapshot back; one quiet for 10 minutes is given up (Proposal), and the
+  wait for one hash is capped at 30 minutes from its first part (10 minutes for the page's
+  supply, counted from the first ask), however often a sender starts over. A font whose bytes
+  nobody sends does not hold it back, so a stuck font cannot stop the relay's pruning. The
+  snapshot path has the same budget: a snapshot entry over 16 MiB plus its hash (blob stream) or
+  32 MiB (a list) or a blob that cannot fit the budget drops the assembly with a notice, so an
+  endless snapshot never grows in memory. Trade-off: a snapshot uploaded without a blob's bytes
+  lets the relay prune its parts; the next snapshot of a device that holds them restores it.
+  The transfer state (`assembling`, `to_push`, pending acks) is in memory only: after a restart a
+  half-received blob is lost and a font switched on offline never pushes its parts, yet its row
+  reads as transferred. Only the next snapshot of a device that holds the bytes repairs it
+  (recorded in `docs/technical-debt.md`).
+- 2026-11-20 (P28): deleting a synced font removes its entry. Another device moves its copy to
+  the trash (desktop) or deletes it (browser) **only if the copy was written there through
+  sync** (a set of the host ids of the files written through sync, dropped when the file goes),
+  never a font the maker installed there himself or a copy of the same bytes in another folder.
+  A deletion whose local copy stays is remembered (a persisted set of hashes), so the font is not
+  switched on and published again. A room snapshot can replace a whole list (a state-only
+  snapshot onto a replica with history); only then is an entry missing after it not read as a
+  deletion and nothing is trashed. A snapshot that merges reports a deletion like an update. A
+  replace also reverts a font switched on while offline (its entry is gone, the file stays and
+  its toggle reads off until it is pressed again).
+- 2026-11-20 (correction of decision 3): "a device that already holds a hash never receives it
+  again" holds for what the page writes (a hash the host has is not written again), not for the
+  wire: the relay still sends every part record to every device, and every snapshot uploads all
+  blobs of the on entries again.
