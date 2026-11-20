@@ -3,8 +3,8 @@
 <link rel="stylesheet" href="../2026-11-raster/kit.css"><link rel="stylesheet" href="adjust.css">
 <script src="../2026-11-raster/kit.js"></script><script src="adjust.js"></script></head>
 <body><div class="sheet">
-<h1>01 · The picture's own Adjustments: Preset, Strength, Make editable</h1>
-<p class="lead">A selected image shows its Adjustments in its own <b>Style tab</b> (the object's settings, like stroke and fill for a shape); the Image operation row is unchanged. Column 256 px. Preset is a fixed two-row choice strip (no list that opens); every cell's tooltip names the dither it sets. Strength is the one slider in the app's panels, with its percent field. A dashed outline marks a new control. Notes: <code>specs/0135-image-optimisation/ux-notes.md</code> sections 3 and 4.</p>
+<h1>01 · The picture's own Adjustments: Preset, Dither, Strength, Make editable</h1>
+<p class="lead">A selected image shows its Adjustments in its own <b>Style tab</b> (the object's settings, like stroke and fill for a shape); the picture also carries its own <b>Dither</b> (Frage 283 B, 2026-11-20): the nine-mode strip sits right under the Preset strip, so a preset pick visibly presses its dither and nothing above Strength moves; the mode's fields (Threshold, Lowest power, Cell size or Line pitch and Angle) come after Strength. Column 256 px. Preset is a fixed two-row choice strip (no list that opens); every cell's tooltip names the dither it sets. Strength is the one slider in the app's panels, with its percent field. A dashed outline marks a new control. Notes: <code>specs/0135-image-optimisation/ux-notes.md</code> sections 3, 3.10 and 4.</p>
 <div class="cols" id="cols"></div>
 </div>
 <script>
@@ -27,24 +27,24 @@ const levelsBody = () => {
     <div class="fr">${field('Gamma', '0.88', '', 112)}<span class="ib" title="Stretch to the picture's range">${ic('stretch')}</span></div>`;
 };
 const screens = [
-  ['A · A new picture: Expert, nothing changed', 'Preset Expert (no Strength: hidden, its value kept), no steps, the add toolbar. Restore original is greyed: nothing to restore. Not in an Image operation yet: the state line says so.',
-    hdr + `<div class="col">${groupHeader({ restoreOff: true })}<div class="muted">Not engraved yet</div>${presetStrip('expert', { mark: true })}<div class="hair"></div>${addBar()}</div>`,
+  ['A · A new picture: Expert, Floyd, nothing changed', 'Preset Expert (no Strength: hidden, its value kept), the picture\'s own Dither at its default Floyd-Steinberg (no field row), no steps, the add toolbar. Restore original is greyed: nothing to restore. Not in an Image operation yet: the state line says so.',
+    hdr + `<div class="col">${groupHeader({ restoreOff: true })}<div class="muted">Not engraved yet</div>${presetStrip('expert', { mark: true })}${dither9('floyd', { mark: true })}<div class="hair"></div>${addBar()}</div>`,
     'The dots equal those of 0123 byte for byte (criterion 1). Copy and Paste adjustments come with slice 2; AI buttons with slice 3.'],
-  ['B · Photo picked (tooltip on hover)', 'One press, one step "Edit adjustments"; it also sets Jarvis in the picture\'s Image operation. Strength appears at 50 %. The derived steps are read-only rows with their resolved numbers; Make editable turns them into ordinary steps.',
-    hdr + `<div class="col">${groupHeader()}${presetStrip('photo', { hover: 'photo' })}${strength(50, { mark: true })}<div class="hair"></div>${derived(50)}<div class="hair"></div>${addBar({ preset: true })}</div>`,
+  ['B · Photo picked (tooltip on hover)', 'One press, one step "Edit adjustments"; it also presses Jarvis in the picture\'s own Dither strip right below (nothing above it moves, no notice). Strength appears at 50 %. The derived steps are read-only rows with their resolved numbers; Make editable turns them into ordinary steps.',
+    hdr + `<div class="col">${groupHeader()}${presetStrip('photo', { hover: 'photo' })}${dither9('jarvis')}${strength(50, { mark: true })}<div class="hair"></div>${derived(50)}<div class="hair"></div>${addBar({ preset: true })}</div>`,
     'With a preset the tone and detail buttons are hidden (P8): those steps would not run. Crop, Resize and the AI steps always run, so they stay.'],
   ['C · Strength dragged to 80 %', 'Keyboard: arrows 1, Page Up and Down 10, Home 0, End 100. The field and the slider show the same value; the numbers of the derived rows follow live; press to release is one undo step.',
-    hdr + `<div class="col">${groupHeader()}${presetStrip('photo')}${strength(80, { focus: true })}<div class="hair"></div>${derived(80)}<div class="hair"></div>${addBar({ preset: true })}</div>`,
+    hdr + `<div class="col">${groupHeader()}${presetStrip('photo')}${dither9('jarvis')}${strength(80, { focus: true })}<div class="hair"></div>${derived(80)}<div class="hair"></div>${addBar({ preset: true })}</div>`,
     'Gentle and Strong are the slider\'s end labels (names, not tips). The field refuses 120 with "Between 0 and 100 %".'],
-  ['D · After Make editable: ordinary steps', 'Preset is Expert again, the four steps are the manual stack with the numbers they had (dots identical). Levels unfolded: the histogram of the picture before Levels, the three handles, the fields; Stretch is a symbol button.',
-    hdr + `<div class="col">${groupHeader()}${presetStrip('expert')}<div class="hair"></div>${addBar()}<div class="steps">
+  ['D · After Make editable: ordinary steps', 'Preset is Expert again, the Dither stays Jarvis, the four steps are the manual stack with the numbers they had (dots identical). Levels unfolded: the histogram of the picture before Levels, the three handles, the fields; Stretch is a symbol button.',
+    hdr + `<div class="col">${groupHeader()}${presetStrip('expert')}${dither9('jarvis')}<div class="hair"></div>${addBar()}<div class="steps">
       ${step({ kind: 'denoise', nums: 'Strength 25 %, Detail kept 60 %', up: false })}
       ${step({ kind: 'levels', body: levelsBody(), cls: 'new' })}
       ${step({ kind: 'local_contrast', nums: 'Radius 10.0 mm, Amount 50 %' })}
       ${step({ kind: 'sharpen', nums: 'Radius 0.10 mm, Amount 120 %, Threshold 0 %', down: false })}</div></div>`,
     'A press on a name folds or unfolds its row (several may be open). Fields: plain fields with units inside; the graph is a readout with handles.'],
   ['E · Graphics preset over a manual stack', 'A Crop (always runs) and a manual Levels the maker had before: with a preset it is kept but does not run, line 2 says "Preset in use". Remove background (slice 3) always runs, last. The bands are split by hairlines; arrows stop at a band\'s edge.',
-    hdr + `<div class="col">${groupHeader()}${presetStrip('graphics')}${strength(50)}<div class="hair"></div>
+    hdr + `<div class="col">${groupHeader()}${presetStrip('graphics')}${dither9('ordered')}${strength(50)}<div class="hair"></div>
       <div class="muted">From preset Graphics, Strength 50 %</div><div class="steps">
       ${step({ kind: 'denoise', ro: true, nums: 'Strength 40 %, Detail kept 80 %' })}
       ${step({ kind: 'levels', ro: true, nums: 'Black 1 %, White 99 %, Gamma 1.00' })}
@@ -55,13 +55,20 @@ const screens = [
       ${step({ kind: 'remove_background', nums: 'Edge softness 5 %, Threshold 50 %', up: false, down: false })}</div></div>`,
     'Make editable here would replace the manual Levels by the derived steps (criterion 29); the notes say how (5.4).'],
   ['F · Reorder by drag and by arrows; armed trash', 'Levels is dragged below Local contrast: ghost at the pointer, 2 px accent insertion line, landing only inside the tone band. Sharpen\'s trash is armed (first press): the row turns pale red, the trash a filled red square; the second press removes it.',
-    hdr + `<div class="col">${groupHeader()}${presetStrip('expert')}<div class="hair"></div>${addBar()}<div class="steps">
+    hdr + `<div class="col">${groupHeader()}${presetStrip('expert')}${dither9('jarvis')}<div class="hair"></div>${addBar()}<div class="steps">
       ${step({ kind: 'resize', nums: 'Width 1,200 px', up: false, down: false })}<div class="band"></div>
       ${step({ kind: 'denoise', nums: 'Strength 25 %, Detail kept 60 %', up: false })}
       ${step({ kind: 'levels', nums: 'Black 37 %, White 72 %, Gamma 0.88', cls: 'hold' })}
       ${step({ kind: 'local_contrast', nums: 'Radius 10.0 mm, Amount 50 %' })}<div class="ins"></div>
       ${step({ kind: 'sharpen', nums: 'Radius 0.10 mm, Amount 120 %, Threshold 0 %', down: false, armed: true })}</div></div>`,
     'Alt+Up and Alt+Down move the focused row; Delete arms, Delete or Enter removes. Each move or removal is one "Edit adjustments" step.'],
+  ['G · Black and white picked: the mode\'s field after Strength', 'Threshold is pressed in the Dither strip, Threshold 50 % appears after Strength, the last row of the dither (0123 rule: switching modes never moves the strip). Preset strip, Dither strip and Strength stay where they were for every preset; only what follows Strength changes, as the derived rows do anyway.',
+    hdr + `<div class="col">${groupHeader()}${presetStrip('bw')}${dither9('threshold', { focus: 'threshold' })}${strength(50)}${modeFields('threshold', { mark: true })}<div class="hair"></div>
+      <div class="muted">From preset Black and white, Strength 50 %</div><div class="steps">
+      ${step({ kind: 'denoise', ro: true, nums: 'Strength 30 %, Detail kept 70 %' })}
+      ${step({ kind: 'levels', ro: true, nums: 'Black 2 %, White 98 %, Gamma 1.00' })}</div>
+      <div class="btn full">Make editable</div><div class="hair"></div>${addBar({ preset: true })}</div>`,
+    'Dots and Newspaper show Cell size or Line pitch and Angle in that row; Photo, Graphics and Expert with Floyd show none. A press in the Dither strip keeps Preset and Strength (criterion 27).'],
 ];
 figures('cols', screens);
 const figs = document.querySelectorAll('figure');

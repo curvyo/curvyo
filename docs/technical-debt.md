@@ -2708,6 +2708,17 @@ for satin stitch (embroidery family) rather than here.
   must be kept alive for the AI tools to download on demand (models are never bundled); the app
   does not work around a lost host except through stored results. **Resolution:** a documented
   runbook with the model upload and CDN settings; bundling was rejected by the customer.
+- **The step drag's ghost is the row's name, not the row (2026-11-20).** The `0101` reorder drag
+  shows a picture of the dragged row; the Adjustments list shows its name in a 70 % chip.
+  **Resolution:** draw the row itself as the ghost when the list gets a second drag polish pass.
+- **The Levels histogram reads the rows above at most 256 Kpx and per channel only after grey
+  (2026-11-20, Proposal).** It is a readout: Denoise above it runs on the grey of a reduced mip,
+  not per channel at the pane's level (criterion 16). **Resolution:** read the Before and after
+  pane's reduced picture of the rows above once the pane keeps per-step results.
+- **Only the memory budget, not a failed allocation, skips a step (criterion 56, 2026-11-20).** A
+  run checks its bytes against `RUN_BYTES` (160 MiB) before each step; a real allocation failure
+  in wasm still aborts. **Resolution:** fallible allocation of the step buffers if a measured
+  out-of-memory appears below the budget.
 
 ## `library_list` duplicates the format guards of `devices_list` (`0116`, 2026-11-15)
 
@@ -2719,3 +2730,8 @@ guards change.
 
 **Resolution:** the refactorer unifies the guards behind one private helper module of
 `curvyo-document-core`, with the goldens of both lists as the behaviour proof.
+
+## A frontend test that a centre-line drag sends one job is timing-dependent (older than `0135`, 2026-11-20)
+
+`frontend/tests` `centreLineJobs` "a drag sends one job" can fail on a loaded machine: it waits on
+wall time for the debounced job. **Resolution:** drive the debounce with a fake clock.

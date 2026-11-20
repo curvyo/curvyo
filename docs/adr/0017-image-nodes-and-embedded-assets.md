@@ -10,6 +10,8 @@ the build".
 
 Note 2026-11-09: "Clones" amended by [ADR 0045](0045-clones-of-groups-texts-images-and-movable-placed-pages.md) (proposed, `needs-customer`, spec `0100`): an image may be a linked clone's original; the clone draws its pixels under the composed matrix.
 
+Note 2026-11-20: §1 and §4 amended by [ADR 0072](0072-image-adjustments-on-the-image-object.md) §1, §3 and [ADR 0073](0073-image-adjustment-pipeline-and-presets.md) (spec `0135`): an image node carries `image_preset`, `image_strength` and `image_adjustments`; the asset is never rewritten; from slice 2 the drawn frame is the placement restricted to the crop's visible part; the dots read the adjusted picture, derived from the working image and never stored.
+
 ## Context
 
 The customer wants a PNG, JPEG or WebP in the drawing, first as the input of the Trace tool

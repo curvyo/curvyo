@@ -63,3 +63,5 @@
 .handle{position:absolute;width:9px;height:9px;background:#fff;border:1.5px solid var(--accent);margin:-5px 0 0 -5px}
 .echip{position:absolute;background:var(--toolbar-bg);border-radius:6px;box-shadow:var(--panel-elevation-shadow);padding:4px;display:flex;gap:4px}
 canvas{image-rendering:pixelated;display:block}
+/* Frage 283 B: 8 px between the Preset strip and the picture's Dither strip (ux-notes 3.10). */
+.col > .strip + .strip{margin-top:4px}

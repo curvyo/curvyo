@@ -1,6 +1,8 @@
 # 0135 Image optimisation: UX notes
 
-ux-engineer, 2026-11-19. Written from `specification.md` (criteria 1 to 66; Fragen 272 A, 273 C, 274 B,
+ux-engineer, 2026-11-19; **amended 2026-11-20 after Frage 283 B: the Dither belongs to the picture**, each
+picture burns with its own dither (sections 1, 2, 3.1, 3.10, 4, 5, 9, 10, 11, 13 to 18; P12 withdrawn, P28 to
+P35 and E15 to E18 added; Frage 284 B and 300 A, 2026-11-20: Lowest power and the tone fields stay in the Image row, sections 3.10 and 10, P34). Written from `specification.md` (criteria 1 to 66; Fragen 272 A, 273 C, 274 B,
 275 A, 276 B answered; 277 to 279 at their default A), `specs/0123-raster-engraving/ux-notes.md` (Image
 row, Dither strip, test grid), the clone rules of `0049` and `0057` (override rows, tags), the font
 preview pane of `0077`, the Trace bar of `0025` (a bar that replaces the Select bar) and
@@ -13,7 +15,7 @@ the clone violet), symbol-only buttons with tooltip and accessible name, no tips
 units inside the fields, plain fields and no sliders **except the one Strength slider**, the
 tool-specific bar for tool settings (Crop), armed trash, arrows plus drag for order, compact (256 px
 column), not LightBurn (no image window). **(Proposal)** items are vetoable at the demo; section 17
-lists them as P1 to P27, section 18 the spec deltas E1 to E14 for the product owner. "Ink" is
+lists them as P1 to P35, section 18 the spec deltas E1 to E18 for the product owner. "Ink" is
 `--toolbar-icon`; "muted" is `--panel-muted-fg`; "column" is the Style tab's 256 px content column;
 "body column" is an unfolded step's 228 px (the column less the row's 2 x 4 padding and a 20 px
 indent under the glyph).
@@ -24,7 +26,7 @@ indent under the glyph).
 |---|---|---|
 | Place of the group | the Style tab (the object's own settings; stroke and fill for a shape) | an image gets the Adjustments group there |
 | Preset pick | `PresetStrip` (the Dither strip of `0123`) | seven cells in two fixed rows |
-| Strength slider | the Ratio slider look and `useSliderPointer` | 144 px wide in the panel, with a field |
+| Strength slider | the Ratio slider look and `useSliderPointer` | 136 px wide in the panel, with a field |
 | Step rows | `OperationRow` anatomy (glyph, name, power, armed trash, arrows), the reorder drag of `0101` 4.6 | no eye, no rename, line 2 holds the numbers |
 | Add toolbar | the Operations tab's add group (`0101` 1) | step glyphs, two rows |
 | Fields | the bar number field (label inside left, unit inside right) | none |
@@ -32,7 +34,8 @@ indent under the glyph).
 | Before and after | the canvas side pane of the font preview (`CanvasArea`, `SplitDivider`, Full view, Close) | new pane |
 | Consent | the Inline confirm block (sentence, two buttons, 400 ms guard) | the Apply look in place of the destructive one |
 | Clone override | the `0057` override row (two-segment pill) | a third row, Adjustments |
-| Dither strip, Image row, test grid bar | `0123` sections 2 and 5 | two modes, the Picture pick and the Strength axis |
+| Dither strip | `0123` 2.5 (`PresetStrip`, fixed rows) | nine modes; moves into the picture's Adjustments group (3.10) |
+| Image row, test grid bar | `0123` sections 2 and 5 | the Dither strip only for gradient fills (10), the Picture pick and the Strength axis |
 | Checks | `OutputChecks` warn lines | two lines |
 
 ## 1. Principle
@@ -42,7 +45,10 @@ shows what is done to it. The one main path is two presses: pick what kind of pi
 hard to work. Fine-tuning is one more press (Make editable) and then ordinary steps that look and move
 like operation rows. What will burn is shown at the real dot size beside the original, in the canvas
 area, never in a window. Nothing about the picture leaves the machine; the one download asks first, in
-place. The Image operation row is untouched apart from two dither modes.
+place. The picture also carries **how it is dithered** (Frage 283 B): the Dither strip sits under the
+Preset strip, so a preset pick visibly presses its dither. The Image operation keeps how the machine
+moves (the set, Interval, Scan angle, Bidirectional fill, Overscanning) and a Dither of its own only for
+the gradient fills it holds.
 
 ## 2. Where the adjustments live
 
@@ -53,8 +59,9 @@ place. The Image operation row is untouched apart from two dither modes.
   other) (P2). An image inside a selection with paths: the group is absent, the paths' Style shows.
 - **Selecting an image does not switch tabs** (P3). On a laser page the Operations tab stays when it is
   active; the Style tab is one press on the strip (`Shift+Ctrl+F`), as for any object's style.
-- **Operations tab**: the Image row of `0123` as built, plus Halftone and Lines (section 10). No Preset,
-  no Strength, no stack there (criterion 22).
+- **Operations tab**: the Image row of `0123` as built, without its Dither strip for pictures: the strip
+  is there only while the operation holds a gradient fill (section 10). No Preset, no Strength, no stack,
+  no picture's dither there (criterion 22).
 - **Select bar**: nothing new. While Crop is edited on the canvas the **Crop bar** replaces it in place
   (section 3.9), as the Trace bar does.
 - **Canvas**: Select view and Operations view as built; they show the adjusted picture (section 12).
@@ -69,7 +76,9 @@ place. The Image operation row is untouched apart from two dither modes.
 | 1 | Header: "Adjustments" 14 px semibold; then Before and after, Copy adjustments, Paste adjustments, Restore original, 28 x 28 symbol buttons 4 px apart | 28 | always |
 | 2 | State line, 12 px muted: "Not engraved yet" (no Image operation, criterion 60) or "Numbers for Image 1, 0.10 mm" (two or more Image operations) | 16 | only then |
 | 3 | Preset strip | 58 | always |
+| 3a | Dither strip (3.10), 8 px above it instead of 4 | 88 | always |
 | 4 | Strength: slider and field, then the end labels | 44 | Preset not Expert |
+| 4a | The dither mode's fields (3.10) | 28 | Threshold, Halftone, Lines |
 | 5 | Hairline | 9 | |
 | 6 | Derived block: "From preset Photo, Strength 50 %" (12 px muted), read-only step rows, **Make editable** (256 x 28 outline text button) | 16 + 42 n + 28 | Preset not Expert |
 | 7 | Hairline | 9 | Preset not Expert |
@@ -79,7 +88,12 @@ place. The Image operation row is untouched apart from two dither modes.
 
 Copy and Paste adjustments are slice 2: before it the header holds two buttons. Restore original is
 greyed (`aria-disabled`, still focusable, tooltip "Restore original") while there is nothing to restore
-(Preset Expert, no step, no stored result): the header never changes its length (P4).
+(Preset Expert, Dither Floyd-Steinberg with its default fields, no step, no stored result): the header
+never changes its length (P4).
+
+Nothing above row 4a moves on a preset pick: the Preset strip, the Dither strip and Strength keep their
+place for every non-Expert preset; the mode's fields (4a) and the derived rows below change with the
+preset (the derived rows did already). Expert hides Strength in the same frame, as before (P28).
 
 ### 3.2 Preset strip (criterion 25)
 
@@ -96,7 +110,7 @@ restless", and the panel has no popups).
 | Line art | Line art (outlines and handwriting) | Line art (outlines and handwriting) · Dither: Threshold 50 % |
 | Dots | Dot raster (round dots) | Dot raster (round dots) · Dither: Halftone |
 | Newspaper | Newspaper (retro screen) | Newspaper (retro screen) · Dither: Lines |
-| Expert | Expert | Expert · Dither as set in the operation |
+| Expert | Expert | Expert · Dither unchanged (P33) |
 
 Every cell has a tooltip here (the strip rule gives one only to shortened cells; the customer asked
 for the dither in it). The one-line meanings of the spec are not shown (no tips, E2). Measured at
@@ -104,9 +118,9 @@ for the dither in it). The one-line meanings of the spec are not shown (no tips,
 
 ### 3.3 Strength (criterion 26), the one slider
 
-- Row 1 (28 px): the slider, 144 x 24 px target (4 px track at ink 25 %, the filled part `--accent`,
+- Row 1 (28 px): the slider, 136 x 24 px target (4 px track at ink 25 %, the filled part `--accent`,
   14 px white thumb with a 1.5 px `--accent` ring; the Ratio slider look), 8 px, the field "Strength
-  50 %" 104 px. Row 2 (16 px): "Gentle" under the slider's left end, "Strong" under its right end,
+  50 %" 112 px (R6; the slider 136 so the row fills the 256 px column, UI review 2026-11-20). Row 2 (16 px): "Gentle" under the slider's left end, "Strong" under its right end,
   12 px muted. The ends are labels, not buttons.
 - `role="slider"`, name "Strength", `aria-valuetext` "50 %"; the field is a spinbutton with the same
   value. Keys of criterion 26; pointer: press sets the value at the pointer, drag changes it (the
@@ -201,26 +215,49 @@ and 94 %" (the range as it stands, here White minus 2).
 - Leaves on Done, Enter on the canvas, Escape (a cascade step: first a chip, then the bar), a change of
   selection or tool. While it is open the object's own handles are hidden and it cannot be moved.
 
+### 3.10 The picture's Dither strip (Frage 283 B, 2026-11-20; drafts 01, 05)
+
+- The nine-mode Dither strip of section 10, `PresetStrip` in **three fixed rows** (Threshold, Ordered,
+  Floyd / Jarvis, Atkinson, Stucki, Grey / Halftone, Lines), always visible, nothing opens, cells grow to
+  fill the 256 px column. `radiogroup` "Dither", one Tab stop, arrows move and select without wrap, Home
+  and End; each selection one step "Edit adjustments". Accessible names the full names; **a tooltip only
+  where the word differs**: Floyd "Floyd-Steinberg", Halftone "Halftone dots", Lines "Line screen".
+- Place: row 3a, right under the Preset strip with 8 px between the two strips (the column's 4 plus 4,
+  so they read as two choices), above Strength. **No label** (P28): the cells name themselves, and the
+  Preset strip has none either; "Dither" is the accessible name.
+- The mode's own fields are row 4a, after Strength (with Expert directly under the strip): Threshold
+  124 (%), Cell size 136 (mm) and Angle 104 (°), Line pitch 136 (mm) and Angle 104;
+  none for Ordered, Floyd, Jarvis, Atkinson, Stucki, Grey (no Lowest power here: it stays in the Image
+  row, section 10, Frage 284 B). Ranges, refusals, Damaged line as `0123` 2.4 and
+  2.5.
+- A press in the strip or a field edit keeps Preset and Strength (criterion 27: the derived steps do not
+  read the dither).
+- A new or imported picture starts with Floyd-Steinberg and the default fields (the `0123` default of a
+  new Image) (P29).
+- The strip is shown whatever the picture's operation (none, Image, a vector kind): the dither belongs to
+  the picture and burns once it is in an Image operation; the state line "Not engraved yet" says when it
+  is not.
+
 ## 4. A preset pick (criterion 27)
 
-One press writes the Preset and, in every Image operation of the picture, the Dither mode and its
-fields; one step "Edit adjustments". When more than one operation changed: the notice "Dither set in 2
-operations." (canvas notice slot, status, 3 s; the one notice of the story: a consequence the maker
-cannot see in the tab he is on, kept like "2 guides were not cloned", P12). Expert writes the Preset
-only; manual tone steps run again (their "Preset in use" lines go). The Strength row appears or
-disappears in the same frame, without animation.
+One press writes the Preset and the picture's own Dither mode and its fields (Threshold, Cell size,
+Angle) as the preset tables say; one step "Edit adjustments". The pressed cell moves in the Dither strip
+right below, in the same frame; nothing in any operation changes, so there is **no notice** (P12
+withdrawn). The same holds for a picture in no Image operation. Expert writes the Preset only and leaves
+the dither as it is; manual tone steps run again (their "Preset in use" lines go). The Strength row
+appears or disappears in the same frame, without animation.
 
 ## 5. Restore original, Make editable, Copy and Paste
 
 - **Restore original** (criterion 59): header symbol button `RotateCcw` (the reset glyph of the value
   field), tooltip and name "Restore original"; one press, one step "Restore original", no question,
-  focus stays (P13; the spec's text button and its tooltip sentence, E5). On a clone: own adjustments
-  emptied (section 9).
+  focus stays (P13; the spec's text button and its tooltip sentence, E5). It also sets the Dither back to
+  Floyd-Steinberg with its default fields (P29). On a clone: own adjustments emptied (section 9).
 - **Make editable** with manual tone steps present ("Preset in use"): the derived steps replace them;
   Crop, Resize and AI steps stay (the dots stay identical, criterion 29) (P14, E6). With the picture in
   two operations the notice "Numbers fixed for Image 1, 0.10 mm." (status, 3 s) (P15).
 - **Copy adjustments / Paste adjustments** (slice 2, criterion 10): header symbol buttons `Copy` and
-  `ClipboardPaste`. Copy holds Preset, Strength and stack in the app (not the system clipboard; kept for
+  `ClipboardPaste`. Copy holds Preset, Strength, Dither with its fields, and stack in the app (not the system clipboard; kept for
   the session, P16); Paste is greyed until something was copied; one step "Paste adjustments". No
   notice after either.
 
@@ -233,7 +270,7 @@ disappears in the same frame, without animation.
 | Field out of range | `--field-invalid` border, alert line with the range, value not written |
 | Unknown step, damaged fields | row of 3.6; check line (section 10) |
 | Image bytes missing | the group as it stands, steps kept; the `0123` check |
-| Not in an Image operation | state line "Not engraved yet"; presets still pickable (they store Preset only) |
+| Not in an Image operation | state line "Not engraved yet"; presets and the Dither strip still pickable (they write the picture's Preset and Dither) |
 | Stack too large for memory (criterion 56) | an alert line under the group header: "The adjustments of this picture need more memory than is free. The steps after Levels were not run." (P17) |
 
 ## 7. Before and after (criteria 11 to 13; draft 03 B, C)
@@ -284,23 +321,42 @@ No notice after a download or a run (the state line changes). A run is one step 
   "Adjustments"; tooltips "Shows the original's adjustments." / "Has its own adjustments; the
   original's stay as they are."). It replaces the spec's line "Own adjustments" and the text button
   Follow original (P22, E7): one pattern for every override.
+- The Adjustments row covers the picture's Dither and its fields (they are part of the adjustments): with
+  Original's the clone burns with the original's dither, with Own with its own.
 - With Original's the group below shows the original's adjustments, **live and editable**: the first
-  edit makes them Own in the same step (the copy and the edit together, one undo). Pressing Original's
+  edit (a Dither press included) makes them Own in the same step (the copy and the edit together, one undo). Pressing Original's
   is **Follow original**: one step "Follow original", no question. Restore original on a clone sets Own
-  with nothing in it. Several clones with different states: no segment pressed, hidden "Mixed" (0057).
+  with nothing in it (Expert, Floyd-Steinberg, no steps). Several clones with different states: no segment pressed, hidden "Mixed" (0057).
 - Canvas tag "Clone, own adjustments" (and the combinations "Clone, own placement and adjustments");
   Layers tooltip line "Own adjustments" (`0057` criteria 28 and 29).
 
-## 10. Image row, checks (draft 05 C, D)
+## 10. Image row, checks (draft 05 C, D, E)
 
-- Dither strip of the Image row: a third fixed row **Halftone | Lines** (break after Grey); tooltips
-  "Halftone dots" and "Line screen", accessible names the same; arrow order the reading order. The
-  mode's fields stay the last row: Halftone: Cell size 124 (mm, two decimals) and Angle 104 (°); Lines:
-  Line pitch 124 and Angle 104. Line 3: "Halftone 0.80 mm", "Lines 1.20 mm".
+- **Dither modes**: nine, in both strips (the picture's, 3.10, and the operation's): a third fixed row
+  **Halftone | Lines** (break after Grey); tooltips "Halftone dots" and "Line screen" (accessible names
+  the same); arrow order the reading order. Fields: Halftone: Cell size 136 (mm, two decimals) and Angle
+  104 (°); Lines: Line pitch 136 and Angle 104 (UI review 2026-11-20: at 124 "Line pitch" ran into
+  its value).
+- **Image settings of the operation** (amends `0123` 2.4): Brightness and Contrast, Gamma and Invert as
+  built (Frage 300 A: they stay, for every item). **Lowest power** 132 (%) as `0123` 2.4, after Invert,
+  shown while any item of the operation burns Grey (a picture with Grey or the gradient fills' Grey;
+  Frage 284 B; the Dither block's Grey shows no field of its own, Proposal). Then, **only while the operation holds a
+  gradient fill** (a gradient-filled shape, open path or text, or a test-grid ramp cell), the
+  operation's own Dither block, last in the group: the label **"Dither for gradient fills"** (12 px
+  muted, 16 px, a name, not a tip; the strip's `aria-labelledby`), the nine-mode strip, the mode's fields
+  last (P30). It never applies to a picture. Assigning the first gradient fill or removing the last one
+  shows or hides the block in the same frame; only the lower part under it moves (the `0123` rule).
+  An operation with pictures only, or empty, shows no Dither.
+- **Row line 3** (amends `0123` P41): " · <dither short name>" ("Jarvis", "Halftone 0.80 mm", "Grey
+  10–35 %") only when every item of the operation burns with the same dither (each picture its own, the
+  gradient fills the operation's); otherwise, or empty, no dither word (P31). The Before and after
+  subject line names the shown picture's dither, as before.
 - The test grid bar's Dither segments keep their six modes (no Grey, no Halftone, no Lines: a grid cell
-  is too small for a screen, P23).
+  is too small for a screen, P23); they set the dither of the Ramp cells (gradient fills).
 - Checks: the two warn lines of criterion 23 with a **Select** link (selects the image, shows its Style
-  tab).
+  tab). The `0123` Grey lines stay the operation's (P34, Frage 284 B): one line per
+  Image operation, as `0123`, shown when any of its items burns Grey, a picture included; the text
+  button selects the operation (Lowest power is its field).
 
 ## 11. Test grid (criterion 51; draft 05 E)
 
@@ -310,6 +366,8 @@ No notice after a download or a run (the state line changes). A run is one step 
 - With Selected picture and a Preset on it, the axis parameters of Columns and Rows gain **Strength**;
   Min 0 %, Max 100 %, Count 5 by default, editable as the other axes (P25, E8). With Ramp or Expert the
   segment is absent (hidden, not the spec's hint "Pick a Preset on the picture first", E9).
+- With Selected picture the bar's **Dither segments are absent** (P32): every cell burns with the
+  picture's own dither (its copy carries the adjustments). With Ramp they stand as in `0123` 5.
 
 ## 12. Canvas looks
 
@@ -321,8 +379,8 @@ Crop bar is open: section 3.9. Nothing is drawn while an AI step runs.
 
 | Do | Keys |
 |---|---|
-| Reach the group | `Shift+Ctrl+F` (Style tab), then Tab: header buttons, Preset strip (one stop), Strength slider, Strength field, Make editable, add toolbar (one stop), step list (one stop), each open body's fields |
-| Pick a preset | arrows in the strip, each a commit; Home, End |
+| Reach the group | `Shift+Ctrl+F` (Style tab), then Tab: header buttons, Preset strip (one stop), Dither strip (one stop), Strength slider, Strength field, the dither mode's fields, Make editable, add toolbar (one stop), step list (one stop), each open body's fields |
+| Pick a preset or a dither | arrows in the strip, each a commit; Home, End |
 | Strength | Left/Down -1, Right/Up +1, Page Up/Down ±10, Home 0, End 100; or type in the field |
 | Add a step | arrows in the add toolbar, Enter or Space |
 | Steps | Up, Down, Home, End between rows; Enter or Space folds; Tab into the open body; Alt+Up and Alt+Down move inside the band; Delete arms, Delete or Enter removes; Space on the power toggle |
@@ -333,7 +391,7 @@ No new letter or chord (P27).
 
 ## 14. Undo steps
 
-"Edit adjustments" (preset pick, Strength drag or key run, Make editable, add, remove, move, power, a
+"Edit adjustments" (preset pick, dither pick or dither field edit, Strength drag or key run, Make editable, add, remove, move, power, a
 field or graph edit, a crop edit, the first edit on a clone), "Restore original", "Follow original",
 "Paste adjustments", "Run Remove background" / "Run Upscale" / "Run AI denoise". No step for folding,
 the Before and after pane, the Crop bar opening, a download or Cancel.
@@ -341,7 +399,8 @@ the Before and after pane, the Crop bar opening, a download or Cancel.
 ## 15. Accessible names
 
 Group `role="group"` "Adjustments"; buttons "Before and after", "Copy adjustments", "Paste
-adjustments", "Restore original"; strip "Preset" with the full preset names; slider "Strength"; list
+adjustments", "Restore original"; strip "Preset" with the full preset names; strip "Dither" with the full
+mode names (the operation's: "Dither for gradient fills"); slider "Strength"; list
 `role="list"` "Adjustment steps", rows named "Levels, Black 37 %, White 72 %, Gamma 0.88" (with "off" or
 "preset in use"); toolbar "Add adjustment"; pane "Before and after"; bar "Crop". A polite status region
 says an armed trash's text and "Running Remove background, 62 %" at 25 % steps.
@@ -365,7 +424,7 @@ no success notices; no symbol on the canvas object; no automatic preset guess.
 - **P9** Bands split by hairlines; arrows and drag stay inside a band.
 - **P10** The Crop bar starts with the glyph and the word "Crop".
 - **P11** Crop edits are live steps; Done only leaves (no Apply, no Cancel).
-- **P12** The notice "Dither set in 2 operations." (the story's only notice).
+- **P12** *(withdrawn 2026-11-20, Frage 283 B: a preset pick changes no operation; no notice.)*
 - **P13** Restore original as a header symbol button, no question.
 - **P14** Make editable replaces manual tone steps that were "Preset in use".
 - **P15** Notice "Numbers fixed for Image 1, 0.10 mm." when the picture is in two operations.
@@ -381,6 +440,17 @@ no success notices; no symbol on the canvas object; no automatic preset guess.
 - **P25** The Strength axis has Min, Max, Count like the others (default 0, 100, 5).
 - **P26** No canvas symbol for steps that are off.
 - **P27** No new keyboard shortcut.
+- **P28** The picture's Dither strip right under the Preset strip (8 px apart), no label; the mode's
+  fields after Strength, so a preset pick moves nothing above them.
+- **P29** A new picture's dither is Floyd-Steinberg; Restore original returns to it with the default
+  fields.
+- **P30** The Image operation's own Dither block only while it holds a gradient fill, last in the Image
+  settings, labelled "Dither for gradient fills".
+- **P31** Row line 3 names the dither only when every item of the operation burns with the same one.
+- **P32** Test grid with Selected picture: no Dither segments; the cells burn with the picture's dither.
+- **P33** Expert's tooltip "Expert · Dither unchanged".
+- **P34** The Grey check lines stay the operation's and select it (Frage 284 B).
+- **P35** Copy and Paste adjustments carry the Dither and its fields.
 
 ## 18. Spec deltas for the product owner
 
@@ -406,6 +476,14 @@ no success notices; no symbol on the canvas object; no automatic preset guess.
   a second step of a kind is allowed.
 - **E14** Criterion 47: Remove stored result is offered whenever a stored result exists (criterion 66
   names it only after a refusal).
+- **E15** Criterion 27 (Frage 283 B): a preset pick writes the Preset and the picture's own Dither and
+  its fields, also for a picture in no Image operation; no operation changes; no notice line.
+- **E16** Criteria 9, 10, 59: the clone's Adjustments override, Copy and Paste adjustments and Restore
+  original cover the Dither and its fields (Restore: Floyd-Steinberg, default fields).
+- **E17** Criterion 22 and `0123` criterion 11: the Image operation's Dither applies to gradient fills
+  (and test-grid ramp cells) only and is shown only while it holds one; row line 3 names a dither only
+  when all items share it.
+- **E18** Criterion 51: with Selected picture the grid bar has no Dither; the cells use the picture's.
 
 ## Links
 

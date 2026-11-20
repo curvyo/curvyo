@@ -133,6 +133,7 @@ to it instead of restating it.
 | R-MFG-LASER-005 | Cut path options: start point, end point, lead-in, lead-out and overcut per operation or item (Z offset is `0111`); set on the operation, overridable per item; end point is the other end of an open path or where the overcut ends (Fragen 280 A, 281 A, revisitable). Output in the G-code slice `0029`. Draft. `specs/0139-laser-cut-path-options/` | Should | Customer (2026-11-19) |
 | R-MFG-LASER-006 | Frame loop: the frame repeats until stopped, toggled by a button, and re-plans while the maker nudges the part finely (Alt+Arrow 1 mm, Ctrl+Alt+Arrow 0.1 mm, only while the preview framing runs; Frage 284 A). Needs the connector `0064`. Extends R-MFG-LASER-003. Draft. `specs/0140-laser-positioning/` | Should | Customer (2026-11-19) |
 | R-MFG-LASER-007 | Stored zero and reference points per machine, used as the job's start origin (Absolute, a stored point, or the current head position); points live in the machine profile and per page (Frage 282 C). Draft. `specs/0140-laser-positioning/` | Should | Customer (2026-11-19) |
+| R-MFG-LASER-008 | Image preparation before engraving: manual steps on the picture (Levels with its histogram and Stretch, Local contrast, Sharpen, Denoise, Contours), automatic presets with one Strength slider, and, where decided, local AI tools (slice 3); kept on the image object, never changing the imported bytes, with Restore original at any time. `specs/0135-image-optimisation/` | Should | Customer (2026-11-19) |
 
 ## 6. Manufacturing — cutting plotter
 
