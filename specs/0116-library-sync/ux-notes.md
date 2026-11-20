@@ -23,7 +23,7 @@ governs workspaces only. Nothing of `0096` moves.
 |---|---|---|
 | Symbol toggle in a dense row | Star of the font family row, Show/Output of an operation row (`aria-pressed` button, not a Tab stop) | New glyph, new meaning; no new pattern |
 | Pressed look | Icon toggles app-wide (`aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)]`) | none |
-| Row keys | Machine list (`Ctrl+D`, F2, Delete on the focused row), materials list (F2, Delete, arrows) | One more key, `S` (section 2) |
+| Row keys | Machine list (`Ctrl+D`, F2, Delete on the focused row), materials list (F2, Delete, arrows) | One more key, `S`, on the machine and material rows; none in the fonts tree (section 2) |
 | Greyed with a reason | Share tab (`aria-disabled`, 40 %, reason as tooltip and `aria-description`) plus one visible state line | Applied to a row control |
 | State glyphs | Collaboration pill (`Radio` / `CloudOff` / `RefreshCw` by connection state) | Same swap inside the toggle |
 | Arrival notice | `0096` canvas notice ("Workspace Box job arrived.", status, 5 s, at most 70 characters, name cut to 24) | Same slot, item names |
@@ -94,16 +94,19 @@ and the three placement notes in the Fonts/Machine/Materials rows.
 - The toggle is **not a Tab stop**: each list keeps its one roving stop (the tree, the
   listbox, the list), and row actions are the row's own keys — the machine list already
   works this way for Duplicate (`Ctrl+D`), Rename (F2) and Delete.
-- **`S` on the focused row toggles that row's sync** in all three lists (Proposal: one key,
-  the same in each; `S` is free — tool letters are canvas-gated, and each list already
-  swallows its keys, F2/Delete/arrows/Enter; during an in-place rename `S` types). The
-  tooltip names it (section 1). The fonts tree has no row-action key yet; `S` is its
-  first, and the star stays as built.
+- **`S` on the focused row toggles that row's sync** in the machine list and the materials
+  list (Proposal: one key, the same in each; tool letters are canvas-gated, and each list
+  already swallows its keys, F2/Delete/arrows/Enter; during an in-place rename `S` types).
+  The tooltip names it (section 1). **The fonts tree has no sync key** (customer decision
+  FONT-SKEY C, 2026-11-20): it already has row keys (Ctrl+D, F2, Delete, Insert) and
+  type-to-search, which takes every letter, so a stray first `s` would otherwise upload a
+  font; the toggle works by click only, its tooltip reads "Sync to my devices" without
+  "(S)", and the row's accessible name carries ", synced" while it is on.
 - A mouse press keeps the focus on the row (`onMouseDown` preventDefault, as the trash and
   star); a key press stays on the row. DOM order = visual order, so the toggle between
   name and trash reads in place.
 - Space and Enter on the *row* keep their meanings (pick, open, select); the switch is
-  reached by `S`, never by overloading them.
+  reached by `S` (machine and material rows) or by the click, never by overloading them.
 
 ## 3. No paired device yet
 
@@ -113,7 +116,8 @@ and the three placement notes in the Fonts/Machine/Materials rows.
   `aria-description`: "Pair a device to sync." (the Share tab's disabled pattern).
 - Not tooltip-only: each of the three lists shows **one visible state line** while this
   device is in no device group — 12 px `--panel-muted-fg`, `role="status"`: "Pair a device
-  to sync fonts." under the Curvyo block header; "Pair a device to sync machine profiles."
+  to sync fonts." above the Fonts tab's tree (its rows are virtualised, so the line cannot sit
+  under the block header; 4 px below it, as the machine line); "Pair a device to sync machine profiles."
   above the profile list inside the Machine block; "Pair a device to sync materials."
   under the Materials section header. It is a state line (shown exactly while it applies),
   not a tip: it leaves in the frame the first device joins (the `0096` pairing), as the
@@ -133,7 +137,10 @@ and 400 ms guard are untouched.
   (`role="status"`, 5 s, at most 70 characters, names cut to 24): one item
   "Font Source Serif 4 arrived." / "Machine profile `<name>` arrived." /
   "Material Slate tile arrived."; a batch counts per kind, kinds with none left out:
-  "3 fonts, 2 machine profiles and 1 material arrived." The rows appear in their lists
+  "3 fonts, 2 machine profiles and 1 material arrived." (Built 2026-11-20: the font notice is
+  its own, apart from the machine and material one, and a font is named by its file
+  ("Font SourceSerif4-Regular arrived") and counted by files, not families; amended from the
+  family name because the receiving glue knows files only.) The rows appear in their lists
   with the toggle already pressed. Only an item **new to the device** is an arrival: an edit
   of an item the device already holds is applied without a notice (amended 2026-11-19). A family or profile whose name already exists on this
   device   follows the spec's merge rule; the notice names the final row. A device that
@@ -176,7 +183,8 @@ and 400 ms guard are untouched.
 
 ## 8. Proposals (F1 to F4, vetoable at the demo)
 
-- F1: `S` as the row key of the sync toggle in all three lists (section 2).
+- F1: `S` as the row key of the sync toggle in the machine and material lists (section 2); the
+  fonts tree has none (FONT-SKEY C, customer 2026-11-20).
 - F2: builtin machine profiles carry no toggle (section 1).
 - F3: new items default on (section 1).
 - F4: no Share-tab block (section 6; Frage 217).

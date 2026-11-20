@@ -1,6 +1,6 @@
 # Fonts, machines and materials across my devices
 
-Status: Ready (2026-11-13; ADR 0062 accepted 2026-11-13; Fragen 214 to 217 answered A)
+Status: Done (PR #369 machines and materials, PR #434 fonts; ADR 0062 accepted 2026-11-13; Fragen 214 to 217 answered A; FONT-SKEY C, Frage 286)
 Priority: Must
 Origin: Customer (request of 2026-11-13, translated): "in curvyo installierte fonts und machines sollen über das sync feature übertragen werden können. dazu brauchen wir einen symbol toggle schalter an den fonts zum sync einschalten, ebenso an den machines." and "materials sollen natürlich auch gesynced werden ;)". Everything marked Proposal is the product owner's and vetoable at the demo.
 
