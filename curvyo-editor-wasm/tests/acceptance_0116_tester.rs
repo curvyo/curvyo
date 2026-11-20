@@ -45,6 +45,10 @@ const B_NOW_MS: i64 = 1_762_949_000_000;
 /// The devices' identity entropy: a high-entropy pattern per device, so the server-data scan
 /// of criteria 24 and 25 can look for chunks of it without matching ordinary protocol bytes
 /// (runs of small integers occur in the sealed streams' framed headers).
+/// High-entropy names for the history scans: LZ4 would hide a repeated name in a snapshot.
+const OLD_MARK: &str = "Qk7vX9mZpL2wR8sT4nB6yH1";
+const OFF_MARK: &str = "Wz3Nq8Rt5Yh2Lp9Xc4Vb7Mk";
+
 fn identity_entropy(n: u8) -> [u8; 64] {
     let mut entropy = [0_u8; 64];
     for (i, slot) in entropy.iter_mut().enumerate() {
@@ -1144,9 +1148,22 @@ fn c23_a_third_device_pairs_through_b_and_gets_the_current_state_only() {
         .unwrap();
     net.page(a);
     assert!(net.within(30_000, |net| net.machine(b, &p2).is_some()));
+    // Two names that cannot hide in the snapshot's compression: P1's older one and the off
+    // item's.
+    for (step, (id, name)) in [(P1, OLD_MARK), (p2.as_str(), OFF_MARK)]
+        .into_iter()
+        .enumerate()
+    {
+        let now = A_NOW_MS + i64::try_from(step).unwrap() + 1;
+        let _ = net.session(a).rename_machine_profile(id, name, now);
+        net.page(a);
+        assert!(net.within(2_000, |net| {
+            net.machine(b, id).is_some_and(|m| m.values.name == name)
+        }));
+    }
     let _ = net
         .session(a)
-        .rename_machine_profile(P1, "ZQX-MACH-7731 new", A_NOW_MS);
+        .rename_machine_profile(P1, "ZQX-MACH-7731 new", A_NOW_MS + 3);
     net.page(a);
     assert!(net.within(2_000, |net| {
         net.machine(b, P1)
@@ -1184,6 +1201,17 @@ fn c23_a_third_device_pairs_through_b_and_gets_the_current_state_only() {
         None,
         "no text of the off item reaches C"
     );
+    // The oplog of C holds no old text either: not the off item's, not P1's name before the
+    // rename (architect review 2026-11-19: the room snapshot is state-only).
+    let held = net.glue(c).library().snapshot().unwrap();
+    assert!(
+        !contains(&held, OFF_MARK.as_bytes()),
+        "C's library oplog holds the off item's text"
+    );
+    assert!(
+        !contains(&held, OLD_MARK.as_bytes()),
+        "C's library oplog holds P1's older name"
+    );
     let users = net.user_machines(c);
     assert_eq!(users.len(), 1, "no history beyond the current state");
     assert!(
@@ -1203,6 +1231,14 @@ fn c27_after_a_switch_off_the_server_store_holds_no_text_of_the_item() {
         .unwrap();
     net.page(a);
     assert!(net.within(30_000, |net| net.machine(b, &p2).is_some()));
+    let _ = net
+        .session(a)
+        .rename_machine_profile(&p2, OFF_MARK, A_NOW_MS + 1);
+    net.page(a);
+    assert!(net.within(2_000, |net| {
+        net.machine(b, &p2)
+            .is_some_and(|m| m.values.name == OFF_MARK)
+    }));
     let device = &mut net.devices[a];
     let _ = device
         .session
@@ -1238,6 +1274,11 @@ fn c27_after_a_switch_off_the_server_store_holds_no_text_of_the_item() {
     assert!(
         net.machine(d, &p2).is_none(),
         "D receives no record of the off item"
+    );
+    let held = net.glue(d).library().snapshot().unwrap();
+    assert!(
+        !contains(&held, OFF_MARK.as_bytes()),
+        "the room snapshot D started from carries no history of the off item"
     );
     assert!(
         net.machine(b, &p2).is_some(),

@@ -322,3 +322,97 @@ fn an_update_of_a_newer_format_is_refused_and_merges_nothing() {
         vec![entry(MACHINE, true, Some(MACHINE_TEXT))]
     );
 }
+
+fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack
+        .windows(needle.len())
+        .any(|window| window == needle)
+}
+
+/// ADR 0062 decisions 1 and 4 (architect review 2026-11-19): the state-only snapshot of the
+/// group room carries the current entries and none of the history, so the text of an item
+/// switched off or deleted since is not in its bytes, while a full snapshot still holds it.
+#[test]
+fn the_state_snapshot_holds_no_text_of_a_switched_off_or_deleted_item() {
+    let list = LibraryList::new(1);
+    let off = MACHINE_TEXT.replace("ZQX-MACH-7731", "ZQX-OFF-4417");
+    let gone = MATERIAL_TEXT.replace("ZQX-MAT-7731", "ZQX-GONE-9902");
+    list.set(LibraryKind::Machine, MACHINE, &off).unwrap();
+    list.set(LibraryKind::Machine, OTHER_MACHINE, MACHINE_TEXT)
+        .unwrap();
+    list.set(LibraryKind::Material, MATERIAL, &gone).unwrap();
+    list.switch_off(LibraryKind::Machine, MACHINE).unwrap();
+    list.remove(LibraryKind::Material, MATERIAL).unwrap();
+    assert!(contains(&list.snapshot().unwrap(), b"ZQX-OFF-4417"));
+    let state = list.snapshot_state().unwrap();
+    assert!(!contains(&state, b"ZQX-OFF-4417"));
+    assert!(!contains(&state, b"ZQX-GONE-9902"));
+    assert!(contains(&state, b"ZQX-MACH-7731"), "the on item stays");
+    let fresh = LibraryList::from_snapshot(2, &state).unwrap();
+    assert_eq!(
+        fresh.entries(LibraryKind::Machine),
+        list.entries(LibraryKind::Machine)
+    );
+    assert_eq!(fresh.entries(LibraryKind::Material), Vec::new());
+}
+
+/// A member that started from the state snapshot still merges the updates that follow it, in
+/// both directions, and its own oplog holds no old text.
+#[test]
+fn a_state_snapshot_member_keeps_merging_later_updates() {
+    let a = LibraryList::new(1);
+    a.set(
+        LibraryKind::Machine,
+        MACHINE,
+        &MACHINE_TEXT.replace("ZQX-MACH-7731", "ZQX-OLD-1"),
+    )
+    .unwrap();
+    a.set(LibraryKind::Machine, MACHINE, MACHINE_TEXT).unwrap();
+    let b = LibraryList::from_snapshot(2, &a.snapshot_state().unwrap()).unwrap();
+    a.set(LibraryKind::Machine, OTHER_MACHINE, MACHINE_TEXT)
+        .unwrap();
+    b.set(LibraryKind::Material, MATERIAL, MATERIAL_TEXT)
+        .unwrap();
+    let to_b = a.export_updates(&b.version()).unwrap();
+    b.import_updates(&to_b).unwrap();
+    assert_eq!(b.entries(LibraryKind::Machine).len(), 2);
+    let all = b.snapshot().unwrap();
+    assert!(
+        !contains(&all, b"ZQX-OLD-1"),
+        "the member's oplog holds no old text"
+    );
+}
+
+/// A state snapshot only seeds a list that holds no history of its own; a list with history
+/// takes it by `import_snapshot`, which starts over from the snapshot (the trade-off of the
+/// state-only room snapshot, `adrs.md`), and the updates that follow it merge again.
+#[test]
+fn a_list_with_history_starts_over_from_a_state_snapshot() {
+    let a = LibraryList::new(1);
+    a.set(LibraryKind::Machine, MACHINE, MACHINE_TEXT).unwrap();
+    let mut b = LibraryList::from_snapshot(2, &a.snapshot().unwrap()).unwrap();
+    a.set(LibraryKind::Machine, OTHER_MACHINE, MACHINE_TEXT)
+        .unwrap();
+    a.switch_off(LibraryKind::Machine, MACHINE).unwrap();
+    let state = a.snapshot_state().unwrap();
+    b.import_snapshot(2, &state).unwrap();
+    assert_eq!(
+        b.entries(LibraryKind::Machine),
+        a.entries(LibraryKind::Machine)
+    );
+    a.set(LibraryKind::Material, MATERIAL, MATERIAL_TEXT)
+        .unwrap();
+    b.import_updates(&a.export_updates(&b.version()).unwrap())
+        .unwrap();
+    assert_eq!(b.entries(LibraryKind::Material).len(), 1);
+    // A list that is already current takes a full snapshot as a merge, nothing starts over.
+    let mut c = LibraryList::new(3);
+    c.set(LibraryKind::Material, MATERIAL, MATERIAL_TEXT)
+        .unwrap();
+    c.import_snapshot(3, &a.snapshot().unwrap()).unwrap();
+    assert_eq!(
+        c.entries(LibraryKind::Machine),
+        a.entries(LibraryKind::Machine)
+    );
+    assert_eq!(c.entries(LibraryKind::Material).len(), 1);
+}
