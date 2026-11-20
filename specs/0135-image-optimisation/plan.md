@@ -127,12 +127,12 @@ test grid) is in slice 1's list. No new crate. No new third-party dependency; on
 
 ### Part D: frontend (Sonnet)
 
-- [ ] D1. Style tab Adjustments group: Preset two-row strip, Strength slider (the one slider) and
+- [x] D1. Style tab Adjustments group: Preset two-row strip, Strength slider (the one slider) and
       percent field, Make editable, Restore original, step list with the slice-1 bodies, add
       toolbar (AC 1, 2, 5, 25, 26, 28, 29, 57, 59).
-- [ ] D2. Before and after side pane (Split default, Side by side, operation pick, locked zoom and
+- [x] D2. Before and after side pane (Split default, Side by side, operation pick, locked zoom and
       pan) (AC 11 to 13).
-- [ ] D3. Clone override row "Adjustments: Original's | Own"; canvas tag and Layers tooltip (AC 9).
+- [x] D3. Clone override row "Adjustments: Original's | Own"; canvas tag and Layers tooltip (AC 9).
 - [~] D4. Nine-mode Dither strip (third row Halftone | Lines) with Cell size / Line pitch and Angle
       (AC 42 to 44); test grid Picture pick and Strength axis (AC 51).
 
