@@ -228,6 +228,22 @@ fn clear_emptied_folder(subfolder: &Path) -> usize {
 /// left with no font loses its documents and, when then empty, itself (`0083` criterion 14).
 #[must_use]
 pub fn remove_font_files(dir: &Path, faces: &[(PathBuf, u32)]) -> RemovedFonts {
+    remove_font_files_with(dir, faces, |file| std::fs::remove_file(file).is_ok())
+}
+
+/// As [`remove_font_files`], but each file goes to the operating system's trash, never erased
+/// (`specs/0116-library-sync` criterion 11: a font deleted on another device).
+#[must_use]
+pub fn trash_font_files(dir: &Path, faces: &[(PathBuf, u32)]) -> RemovedFonts {
+    remove_font_files_with(dir, faces, |file| trash::delete(file).is_ok())
+}
+
+/// The shared rule of removal: `remove` takes one file away and says whether it did.
+fn remove_font_files_with(
+    dir: &Path,
+    faces: &[(PathBuf, u32)],
+    remove: impl Fn(&Path) -> bool,
+) -> RemovedFonts {
     let mut report = RemovedFonts::default();
     let Ok(folder) = dir.canonicalize() else {
         return report;
@@ -247,7 +263,7 @@ pub fn remove_font_files(dir: &Path, faces: &[(PathBuf, u32)]) -> RemovedFonts {
             && indices
                 .iter()
                 .all(|index| faces.iter().any(|(p, i)| p == file && i == index));
-        if all_faces && std::fs::remove_file(file).is_ok() {
+        if all_faces && remove(file) {
             report.removed.push(name_of(file));
             if let Some(Place::Subfolder(subfolder)) = place
                 && !touched.contains(&subfolder)

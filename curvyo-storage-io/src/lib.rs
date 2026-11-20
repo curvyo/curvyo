@@ -17,6 +17,7 @@ mod font_archives;
 mod font_documents;
 mod font_files;
 mod font_subfolders;
+mod font_sync_files;
 mod fonts;
 mod recent_workspaces;
 mod room_keys;
@@ -42,8 +43,11 @@ pub use filesystem::{
 pub use folder_texts::{read_dir_texts, remove_file};
 pub use font_archives::{AddedArchive, ArchiveRefusal, add_font_archive, is_archive};
 pub use font_documents::{MAX_SHOWN_DOCUMENT_BYTES, font_document_pdf, read_font_document};
-pub use font_files::{AddedFonts, RemovedFonts, add_font_files, remove_font_files};
+pub use font_files::{
+    AddedFonts, RemovedFonts, add_font_files, remove_font_files, trash_font_files,
+};
 pub use font_subfolders::{FolderDocument, FontFolder, remove_add_leftovers};
+pub use font_sync_files::{SyncedFont, SyncedWrite, write_synced_font};
 pub use fonts::{
     FolderFonts, FontFace, FontSource, MAX_FONT_FILE_BYTES, list_font_folder, list_system_fonts,
 };
