@@ -31,6 +31,7 @@ fn timing() -> Timing {
         banner: Duration::from_secs(1),
         poll_fast: Duration::from_millis(50),
         poll_slow: Duration::from_millis(200),
+        ..Timing::default()
     }
 }
 
