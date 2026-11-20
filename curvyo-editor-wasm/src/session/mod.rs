@@ -80,6 +80,7 @@ mod history_list;
 mod history_preview;
 mod history_rows;
 mod history_version;
+mod image_adjust;
 mod image_cache;
 mod image_clipboard;
 #[cfg(test)]
@@ -698,6 +699,9 @@ pub struct Session {
     fixtures: fixtures::FixtureState,
     /// The output group, the Toolpath view and the job export (`output/`, `specs/0029`).
     output: output::OutputState,
+    /// The Adjustments group's session state (`specs/0135`): the held Strength, the Before and
+    /// after pane.
+    image_adjust: image_adjust::AdjustState,
     /// The maker's materials, the journal of this session's material steps and the Materials
     /// tab's view state (`materials/`, `specs/0112-test-grid-and-materials`).
     materials: materials::MaterialsState,
@@ -827,6 +831,7 @@ impl Session {
             manufacturing: manufacturing::ManufacturingState::default(),
             operations: operations::OperationsState::default(),
             output: output::OutputState::default(),
+            image_adjust: image_adjust::AdjustState::default(),
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
             library_journal: library_journal::Journal::default(),
@@ -946,6 +951,7 @@ impl Session {
             manufacturing: manufacturing::ManufacturingState::default(),
             operations: operations::OperationsState::default(),
             output: output::OutputState::default(),
+            image_adjust: image_adjust::AdjustState::default(),
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
             library_journal: library_journal::Journal::default(),

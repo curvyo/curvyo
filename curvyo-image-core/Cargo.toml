@@ -11,8 +11,17 @@ workspace = true
 
 [dependencies]
 image.workspace = true
+# `pow` and `exp` for the 256-entry Levels and range tables (ADR 0073 §1, §4): the same bits on
+# every target.
+libm.workspace = true
 thiserror.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 # Mutation smoke over the fixtures (`specs/0058-bitmap-import` "Fixtures", the fuzz plan item).
 proptest.workspace = true
+
+# The adjustment goldens are also compared in the wasm build, in Node, by
+# `wasm-bindgen-test-runner` (`tests/adjust_goldens.rs`, ADR 0073 §1). The version
+# `curvyo-geometry-core` already uses; MIT OR Apache-2.0.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"

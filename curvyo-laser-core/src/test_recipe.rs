@@ -120,6 +120,16 @@ pub enum RecipeField {
     Cell,
 }
 
+/// What the cells of an Image grid engrave (`specs/0135` criterion 51, ADR 0072 §6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum PictureSource {
+    /// The built-in Ramp: no stack, no Strength axis.
+    #[default]
+    Ramp,
+    /// The selected picture, with its Preset at each cell's Strength.
+    Selected,
+}
+
 /// The recipe of a test as its record keeps it: everything but the id and the material.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TestRecipe {
@@ -131,6 +141,8 @@ pub struct TestRecipe {
     pub(crate) crosshatch: bool,
     /// The dither of an Image grid's cells (a binary mode); kept but unused on another kind.
     pub(crate) dither: Dither,
+    /// What an Image grid's cells engrave; the Ramp on every other kind.
+    pub(crate) picture: PictureSource,
 }
 
 impl TestRecipe {
@@ -146,6 +158,7 @@ impl TestRecipe {
             cell: Length::from_mm(DEFAULT_CELL),
             crosshatch: false,
             dither: Dither::FloydSteinberg,
+            picture: PictureSource::Ramp,
         };
         recipe.fill_fixed(defaults);
         recipe
@@ -198,6 +211,22 @@ impl TestRecipe {
     #[must_use]
     pub fn dither(&self) -> Option<Dither> {
         (self.kind == SetKind::Image).then_some(self.dither)
+    }
+
+    /// What the cells engrave (`specs/0135` criterion 51).
+    #[must_use]
+    pub const fn picture(&self) -> PictureSource {
+        self.picture
+    }
+
+    /// The Strength the cell at `column`, `row` engraves the picture with: the axis value when
+    /// Strength is on an axis, `None` (the picture's own) otherwise.
+    #[must_use]
+    pub fn cell_strength(&self, column: u8, row: u8) -> Option<u8> {
+        [self.columns.value(column), self.rows.value(row)]
+            .into_iter()
+            .find(|v| v.param == Param::Strength)
+            .and_then(|v| u8::try_from(v.steps()).ok())
     }
 
     /// The numbers of the cell at `column`, `row`: its two axis values over the shared values
@@ -281,7 +310,8 @@ impl TestRecipe {
     #[must_use]
     pub fn with_axis_param(&self, side: Side, param: Param, defaults: &RecipeDefaults) -> Self {
         let mut next = self.clone();
-        if !param.offered(self.kind) || self.axis(side).param == param {
+        let strength_free = param != Param::Strength || self.picture == PictureSource::Selected;
+        if !param.offered(self.kind) || !strength_free || self.axis(side).param == param {
             return next;
         }
         let other = match side {
@@ -316,7 +346,34 @@ impl TestRecipe {
             }
         }
         next.crosshatch &= kind == SetKind::Engrave;
+        if kind != SetKind::Image {
+            next.picture = PictureSource::Ramp;
+        }
         next.fill_fixed(defaults);
+        next
+    }
+
+    /// The recipe with the picture `picture` (criterion 51); only an Image grid takes the
+    /// selected picture. Back to the Ramp, an axis on Strength takes the first shared parameter.
+    #[must_use]
+    pub fn with_picture(&self, picture: PictureSource, defaults: &RecipeDefaults) -> Self {
+        let mut next = self.clone();
+        if picture == PictureSource::Selected && self.kind != SetKind::Image {
+            return next;
+        }
+        next.picture = picture;
+        if picture == PictureSource::Ramp {
+            for side in [Side::Columns, Side::Rows] {
+                if next.axis(side).param == Param::Strength {
+                    let taken = [next.columns.param, next.rows.param];
+                    if let Some(free) = Param::of_kind(next.kind).find(|p| !taken.contains(p)) {
+                        let count = next.axis(side).count;
+                        *next.axis_mut(side) = Axis::defaulted(free, count, defaults.max_feed);
+                    }
+                }
+            }
+            next.fill_fixed(defaults);
+        }
         next
     }
 
@@ -333,7 +390,7 @@ impl TestRecipe {
     #[must_use]
     pub fn with_dither(&self, dither: Dither) -> Self {
         let mut next = self.clone();
-        if self.kind == SetKind::Image && dither.is_binary() {
+        if self.kind == SetKind::Image && dither.in_test_grid() {
             next.dither = dither;
         }
         next

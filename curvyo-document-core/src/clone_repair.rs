@@ -106,6 +106,11 @@ impl Document {
                 crate::clone_overrides::write_own_style(&meta, &style, opacity);
             }
         }
+        for (clone, source) in self.adjustment_copies(&gone, &fixes) {
+            if let (Some(meta), Some(source)) = (meta_of(tree, clone), meta_of(tree, source)) {
+                crate::image_adjust_commands::own_copy(&meta, &source);
+            }
+        }
         for fix in fixes {
             match fix {
                 Fix::Repoint(clone, link) => {
@@ -164,6 +169,36 @@ impl Document {
                 {
                     let opacity = crate::clone_write::source_opacity(&tree, clone);
                     Some((clone.id(), clone.resolved.style.clone(), opacity))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The clones of an image that stay clones, follow their original's adjustments and lose
+    /// their adjustment source to the removal, each with that source: they get a copy of what
+    /// they showed as their own (ADR 0072 §2, as ADR 0016 §4 for the style).
+    fn adjustment_copies(&self, gone: &HashSet<NodeId>, fixes: &[Fix]) -> Vec<(NodeId, NodeId)> {
+        let unlinked: HashSet<NodeId> = fixes
+            .iter()
+            .filter_map(|fix| match fix {
+                Fix::Unlink(id, ..) => Some(*id),
+                Fix::Copy(read) => Some(read.id()),
+                Fix::Repoint(..) => None,
+            })
+            .collect();
+        self.read_objects()
+            .objects
+            .iter()
+            .filter_map(|object| match object {
+                crate::primitive_model::ObjectSnapshot::Clone(clone)
+                    if !clone.chain.own_adjustments
+                        && clone.chain.adjust_source != clone.chain.root
+                        && gone.contains(&clone.chain.adjust_source)
+                        && !gone.contains(&clone.id())
+                        && !unlinked.contains(&clone.id()) =>
+                {
+                    Some((clone.id(), clone.chain.adjust_source))
                 }
                 _ => None,
             })

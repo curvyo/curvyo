@@ -9,7 +9,7 @@ use curvyo_document_core::{NodeId, PlacedGradient, Point};
 use crate::job_input::PointUm;
 use crate::job_raster_dither::Ditherer;
 use crate::job_raster_grid::{DotGrid, estimated_dots};
-use crate::job_raster_plan::{MAX_DOTS, RasterSettings, RasterSource, row_levels};
+use crate::job_raster_plan::{MAX_DOTS, RasterSettings, RasterSource, row_levels, screen_anchor};
 use crate::job_raster_rows::{Sweep, row_sweeps};
 use crate::job_raster_sample::{GreyPyramid, ImageSampler};
 use crate::job_raster_tone::ToneTable;
@@ -47,18 +47,23 @@ pub(crate) struct ItemWork {
 impl ItemWork {
     /// The work of the item bounded by `rings`, `None` over [`MAX_DOTS`] (it blocks) or with no
     /// dot inside: such an item has no sweep.
-    pub(crate) fn new(rings: &[Vec<PointUm>], settings: RasterSettings<'_>) -> Option<Self> {
+    pub(crate) fn new(rings: &[Vec<PointUm>], settings: RasterSettings) -> Option<Self> {
         let RasterSettings {
             image,
             interval_um,
             angle_deg,
             bidirectional,
         } = settings;
+        let image = &image;
         if estimated_dots(rings, interval_um, angle_deg) > MAX_DOTS {
             return None;
         }
         let grid = DotGrid::new(rings, interval_um, angle_deg)?;
-        let ditherer = Ditherer::new(image, 0, grid.columns);
+        let ditherer = Ditherer::new(image, 0, grid.columns).screened(
+            image,
+            interval_um,
+            screen_anchor(rings),
+        );
         Some(Self {
             grid,
             tone: ToneTable::new(image),
@@ -148,7 +153,7 @@ impl SweepCache {
         &mut self,
         (node, key): (NodeId, u64),
         rings: &[Vec<PointUm>],
-        settings: RasterSettings<'_>,
+        settings: RasterSettings,
         source: impl FnOnce() -> HeldSource,
         dots: &mut u64,
     ) -> bool {

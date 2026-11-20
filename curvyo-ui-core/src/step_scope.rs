@@ -332,6 +332,10 @@ pub const EDIT_STEPS: &[&str] = &[
     "add_gradient_stop",
     "remove_gradient_stop",
     "reverse_gradient",
+    // `specs/0135-image-optimisation`: the adjustments are what the picture is.
+    "edit_adjustments",
+    "restore_original",
+    "follow_original",
     "trace_image",
     // `specs/0114-image-trace-mask`: the Trace tool's mask commands, as Create paths.
     "draw_trace_rectangle",

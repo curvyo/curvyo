@@ -43,6 +43,8 @@ struct JobKey {
     manufacturing: Option<NodeId>,
     library: u64,
     extensions: curvyo_ui_core::ExtensionSettings,
+    /// The Strength held on a picture while its slider is dragged (`specs/0135` criterion 26).
+    held: Option<(NodeId, u8)>,
 }
 
 /// The job held with its key and the drawing read it was built from (held, so its address is
@@ -83,6 +85,12 @@ pub(in crate::session) struct JobCache {
 }
 
 impl JobCache {
+    /// The job's grey pyramids and adjusted pictures (shared), for the Adjustments group's
+    /// resolved steps.
+    pub(in crate::session) fn pictures(&self) -> curvyo_laser_core::adjust::PyramidCache {
+        self.plans.borrow().pictures()
+    }
+
     /// An empty plan cache sharing the job's grey pyramids, for the Operations view's preview.
     pub(super) fn sharing_pyramids(&self) -> PlanCache {
         self.plans.borrow().sharing_pyramids()
@@ -90,6 +98,45 @@ impl JobCache {
 }
 
 impl Session {
+    /// The job's grey pyramids and adjusted pictures, shared (`specs/0135` criterion 18).
+    pub(in crate::session) fn adjust_pictures(&self) -> curvyo_laser_core::adjust::PyramidCache {
+        self.output.job.pictures()
+    }
+
+    /// `f` on the active laser page's job input now (`specs/0135`: the picture's operations and
+    /// the Before and after pane): the held or the pending job's input while it is current, so a
+    /// steady frame reads no page again; else a fresh read. `None` on another page or with its
+    /// extension off.
+    pub(in crate::session) fn with_page_job_input<R>(
+        &self,
+        f: impl FnOnce(&JobInput) -> R,
+    ) -> Option<R> {
+        self.with_page_job_input_in(&self.document_read(), f)
+    }
+
+    /// [`Session::with_page_job_input`] with the drawing read of now, `read`.
+    pub(in crate::session) fn with_page_job_input_in<R>(
+        &self,
+        read: &Arc<DocumentRead>,
+        f: impl FnOnce(&JobInput) -> R,
+    ) -> Option<R> {
+        let key = self.job_key();
+        let cache = &self.output.job;
+        if let Some((held, held_read, Some(job))) = cache.held.borrow().as_ref()
+            && *held == key
+            && Arc::ptr_eq(held_read, read)
+        {
+            return Some(f(&job.input));
+        }
+        if let Some((held, held_read, page)) = cache.pending.borrow().as_ref()
+            && *held == key
+            && Arc::ptr_eq(held_read, read)
+        {
+            return Some(f(&page.input));
+        }
+        self.page_input().map(|page| f(&page.input))
+    }
+
     /// The key of the active laser page's job now.
     fn job_key(&self) -> JobKey {
         JobKey {
@@ -97,14 +144,18 @@ impl Session {
             manufacturing: self.active_manufacturing().map(|m| m.id),
             library: self.materials.library_generation(),
             extensions: self.manufacturing.extensions.clone(),
+            held: self.held_adjust_strength(),
         }
     }
 
     /// The active laser page's job, built on a miss; `None` on another page or with its
     /// extension off.
     pub(in crate::session) fn laser_job(&self) -> Option<Arc<PageJob>> {
-        let read = self.document_read();
-        let key = self.job_key();
+        self.laser_job_of(self.job_key(), self.document_read())
+    }
+
+    /// [`Session::laser_job`] for the job key and the drawing read of now.
+    fn laser_job_of(&self, key: JobKey, read: Arc<DocumentRead>) -> Option<Arc<PageJob>> {
         let cache = &self.output.job;
         if let Some((held, held_read, job)) = cache.held.borrow().as_ref()
             && *held == key
@@ -130,15 +181,23 @@ impl Session {
     /// last job of the same page with `true` (stale) while [`Session::advance_job`] works the rest.
     /// With the Toolpath view pressed the canvas draws the full job, so the views read it too.
     pub(in crate::session) fn settled_job(&self) -> Option<(Arc<PageJob>, bool)> {
+        self.settled_job_in(self.document_read())
+    }
+
+    /// [`Session::settled_job`] with the drawing read of now, `read` (`specs/0135` criterion 55:
+    /// one read and one key for the whole lookup).
+    pub(in crate::session) fn settled_job_in(
+        &self,
+        read: Arc<DocumentRead>,
+    ) -> Option<(Arc<PageJob>, bool)> {
         self.active_manufacturing()?;
-        if self.toolpath_view_on() {
-            return self.laser_job().map(|job| (job, false));
-        }
-        let Some(stale) = self.stale_job() else {
-            return self.laser_job().map(|job| (job, false));
-        };
         let key = self.job_key();
-        let read = self.document_read();
+        if self.toolpath_view_on() {
+            return self.laser_job_of(key, read).map(|job| (job, false));
+        }
+        let Some(stale) = self.stale_job(&key, &read) else {
+            return self.laser_job_of(key, read).map(|job| (job, false));
+        };
         let cache = &self.output.job;
         let tried = cache
             .pending
@@ -149,7 +208,7 @@ impl Session {
             return Some((stale, true));
         }
         let Some(page) = self.page_input() else {
-            return self.laser_job().map(|job| (job, false));
+            return self.laser_job_of(key, read).map(|job| (job, false));
         };
         let ready = prepare_job(
             &page.input,
@@ -157,24 +216,22 @@ impl Session {
             &mut cache.plans.borrow_mut(),
             FIRST_READ_DOTS,
         );
-        *cache.pending.borrow_mut() = Some((key, read, page));
+        *cache.pending.borrow_mut() = Some((key.clone(), Arc::clone(&read), page));
         cache.prepared.set(false);
         cache.pendings.set(cache.pendings.get().wrapping_add(1));
         if ready {
-            return self.laser_job().map(|job| (job, false));
+            return self.laser_job_of(key, read).map(|job| (job, false));
         }
         Some((stale, true))
     }
 
     /// The last job of the active laser page while it is not the current one; `None` when the
     /// current job is built or there is no last job of the same page to show meanwhile.
-    fn stale_job(&self) -> Option<Arc<PageJob>> {
-        let key = self.job_key();
-        let read = self.document_read();
+    fn stale_job(&self, key: &JobKey, read: &Arc<DocumentRead>) -> Option<Arc<PageJob>> {
         let held = self.output.job.held.borrow();
         match held.as_ref() {
             Some((held_key, held_read, job))
-                if !(*held_key == key && Arc::ptr_eq(held_read, &read))
+                if !(held_key == key && Arc::ptr_eq(held_read, read))
                     && held_key.manufacturing == key.manufacturing
                     && held_key.extensions == key.extensions =>
             {

@@ -283,6 +283,14 @@ pub fn check_text(issue: &Issue, names: &Names) -> CheckText {
         | Cause::UnreadableImages
         | Cause::NotPictures { .. }
         | Cause::LowestPowerAbovePower { .. } => raster_text(cause, count, names),
+        Cause::BrokenAdjustments { item } => CheckText {
+            before: format!(
+                "{count} {} in the Adjustments of ",
+                verb(count, "step", "steps")
+            ),
+            button: names.item(*item).to_owned(),
+            after: " could not run.".to_owned(),
+        },
     };
     if issue.targets == Targets::None {
         return CheckText::plain(&text.whole());
@@ -344,6 +352,8 @@ fn dither_text(dither: Dither, lowest_tenths: u16, power: PowerPercent) -> Strin
         Dither::Jarvis => "Jarvis".to_owned(),
         Dither::Atkinson => "Atkinson".to_owned(),
         Dither::Stucki => "Stucki".to_owned(),
+        Dither::Halftone => "Halftone".to_owned(),
+        Dither::LineScreen => "Lines".to_owned(),
         Dither::Grey => {
             let (whole, tenth) = (lowest_tenths / 10, lowest_tenths % 10);
             let lowest = if tenth == 0 {

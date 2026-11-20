@@ -130,7 +130,7 @@ pub struct SettingsWrite {
 }
 
 /// The register `key` as plain values, `None` when absent or not a plain map.
-fn stored_at(meta: &LoroMap, key: &str) -> Option<serde_json::Value> {
+pub(crate) fn stored_at(meta: &LoroMap, key: &str) -> Option<serde_json::Value> {
     match meta.get(key)? {
         ValueOrContainer::Value(value) => json_of(&value),
         ValueOrContainer::Container(_) => None,

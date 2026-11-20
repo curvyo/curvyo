@@ -64,6 +64,8 @@ impl Session {
         !self.style_scope().ids.is_empty()
             || self.clone_subject().is_some()
             || self.selected_placement().is_some()
+            // A selected picture has its Adjustments group there (`specs/0135` UX notes E1).
+            || self.adjust_target().is_some()
     }
 
     /// Runs `change` on the tab state. The state is a `Cell` because a read of

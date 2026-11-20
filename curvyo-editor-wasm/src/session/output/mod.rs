@@ -9,6 +9,7 @@ mod gate_facts;
 mod input;
 mod job_cache;
 mod leaf_geometry;
+mod pane_picture;
 mod pixels;
 mod play;
 mod raster_picture;

@@ -32,6 +32,7 @@ pub fn plan_fingerprint(block: &BlockInput, numbers: &BlockNumbers) -> u64 {
     let mut fnv = Fnv(0xcbf2_9ce4_8422_2325);
     numbers.kind.hash(&mut fnv);
     numbers.interval.hash(&mut fnv);
+    numbers.picture_interval.hash(&mut fnv);
     numbers.options.crosshatch.hash(&mut fnv);
     numbers.options.bidirectional.hash(&mut fnv);
     numbers.options.scan_angle.hash(&mut fnv);
@@ -57,14 +58,16 @@ pub fn plan_fingerprint(block: &BlockInput, numbers: &BlockNumbers) -> u64 {
     fnv.finish()
 }
 
-/// The key of the sweeps of one raster item: its rings, its geometry (frame, asset or gradient)
-/// and the dot settings.
+/// The key of the sweeps of one raster item: its rings, its geometry (frame, asset and
+/// adjustments, or gradient), the dot settings and the Interval its preset is derived at.
 pub(crate) fn raster_fingerprint(
     rings: &[Vec<PointUm>],
     geometry: &LeafGeometry,
-    settings: RasterSettings<'_>,
+    settings: RasterSettings,
+    picture_interval: crate::material::Interval,
 ) -> u64 {
     let mut fnv = Fnv(0xcbf2_9ce4_8422_2325);
+    picture_interval.hash(&mut fnv);
     rings.hash(&mut fnv);
     geometry_hash(geometry, &mut fnv);
     settings.image.hash(&mut fnv);
@@ -84,6 +87,7 @@ fn geometry_hash(geometry: &LeafGeometry, fnv: &mut Fnv) {
             frame,
             asset,
             pixels,
+            adjust,
         } => {
             1_u8.hash(fnv);
             for corner in frame {
@@ -92,6 +96,7 @@ fn geometry_hash(geometry: &LeafGeometry, fnv: &mut Fnv) {
             }
             asset.hash(fnv);
             pixels.as_ref().map(|p| (p.width, p.height)).hash(fnv);
+            adjust.hash(fnv);
         }
         LeafGeometry::Gradient { outlines, gradient } => {
             2_u8.hash(fnv);

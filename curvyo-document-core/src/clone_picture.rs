@@ -214,6 +214,10 @@ pub(crate) struct Pending {
     pub(crate) link: crate::clone_codec::CloneLink,
     /// Its own-placement flag.
     pub(crate) own_placement: bool,
+    /// Its own-adjustments marker.
+    pub(crate) own_adjustments: bool,
+    /// Its adjustment source A(c) and that clone's own registers; `None`: the root (ADR 0072 §2).
+    pub(crate) adjustments: Option<(NodeId, Arc<crate::image_adjust_model::ImageAdjustments>)>,
     /// Where its chain ends.
     pub(crate) root: RootRef,
     /// Its depth.
@@ -307,13 +311,24 @@ fn picture_clone(
         RootRef::Leaf(at) => {
             let leaf = leaves.get(at)?.as_ref()?;
             match leaf {
-                ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
-                    (leaf.id(), vec![leaf.clone()], Arc::from([leaf.id()]))
+                ObjectSnapshot::Text(_) => (leaf.id(), vec![leaf.clone()], Arc::from([leaf.id()])),
+                ObjectSnapshot::Image(image) => {
+                    let mut image = image.clone();
+                    if let Some((_, own)) = &clone.adjustments {
+                        image.adjustments = (**own).clone();
+                    }
+                    (
+                        leaf.id(),
+                        vec![ObjectSnapshot::Image(image)],
+                        Arc::from([leaf.id()]),
+                    )
                 }
                 _ => return None,
             }
         }
     };
+    let image_root = matches!(clone.root, RootRef::Leaf(_))
+        && matches!(source.as_slice(), [ObjectSnapshot::Image(_)]);
     let picture: Arc<[ObjectSnapshot]> = source
         .iter()
         .map(|leaf| map_leaf(leaf, clone.composed))
@@ -343,6 +358,12 @@ fn picture_clone(
             own_placement: clone.own_placement,
             own_style: false,
             style_source: root_id,
+            own_adjustments: clone.own_adjustments && image_root,
+            adjust_source: clone
+                .adjustments
+                .as_ref()
+                .filter(|_| image_root)
+                .map_or(root_id, |(source, _)| *source),
             root_outline: Arc::new(empty),
             picture: Some(picture),
             picture_members: Some(members),

@@ -600,7 +600,30 @@ impl DocumentVersion {
 /// opens); a `dither` on a grid of another kind, Grey, or a `fill` key is a damaged recipe (ADR
 /// 0057 §6). The laser extension reads every value. Goldens: `raster_engraving_v50.curvyo` and
 /// `raster_engraving_damaged_v50.curvyo`; the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 50;
+///
+/// Bumped to 51 in `image-optimisation` slice 1 (ADR 0072 §1, §2, §5, §6, §8, `specs/0135`
+/// criteria 8, 9, 42, 43, 51): an image may hold the registers `image_preset` (text, absent =
+/// `"expert"`), `image_strength` (an integer 0 to 100, absent = 50) and `image_adjustments` (one
+/// plain list of `{kind, enabled, fields}` with integer fields, the unit in the key; the slice-1
+/// kinds `denoise`, `levels`, `local_contrast`, `contours`, `sharpen`); a linked clone of an image
+/// may hold the `own_adjustments` marker and then the same registers (ADR 0016 pattern, the
+/// nearest own on the chain is the source); changed in place (ADR 0072 amendment A1, A8): an image
+/// and an own set may hold `image_dither` (one plain map `{mode, threshold_pct, screen_size_um,
+/// screen_angle_deg}`, absent = Floyd-Steinberg; Lowest power stays the operation's, Frage 284 B), the dither
+/// the picture burns with, and a format-50 file's pictures open at Floyd-Steinberg; an Image
+/// operation's `dither` may be `"halftone"` or `"line_screen"` with `screen_size_mm` and
+/// `screen_angle_deg`, read for its gradient-filled leaves only; an Image test grid recipe may
+/// hold `picture` and a `strength` axis. Labels `edit_adjustments` ("Edit adjustments"),
+/// `restore_original` ("Restore original") and `follow_original` ("Follow original"); no label
+/// is reserved. A build that stops at 50 ignores the registers and would burn other dots, and
+/// reads the new dither values as damage, so this build's files are refused by version (ADR 0033
+/// §7). No migration: a file of 50 or lower has no adjustments and opens unchanged. The document
+/// stores no adjusted pixel (criterion 18). Damage (ADR 0072 §5) never refuses the file: a
+/// register that does not read reads as its default, an entry not of the step shape is kept and
+/// not run, a non-bool marker reads false; the laser extension counts them for the check line.
+/// Goldens: `image_adjust_v51.curvyo` and `image_adjust_damaged_v51.curvyo`; the older goldens
+/// stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 51;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -965,6 +988,7 @@ impl Document {
                         matrix: link.matrix,
                         own_placement: overrides.own_placement,
                         own_style: overrides.own_style,
+                        own_adjustments: overrides.own_adjustments,
                         style,
                     }
                 } else {
@@ -985,10 +1009,12 @@ impl Document {
                     .then(|| self.trace_mask(id))
                     .flatten()
                     .filter(|mask| !mask.is_empty());
+                let adjustments = self.stored_adjustments(id);
                 Some(NodeJson {
                     object,
                     registers,
                     trace_mask,
+                    adjustments,
                 })
             })
             .collect()
@@ -1027,6 +1053,10 @@ struct NodeJson {
     /// An image's stored trace mask (ADR 0061 §11), left out when nothing is stored.
     #[serde(skip_serializing_if = "Option::is_none")]
     trace_mask: Option<crate::trace_mask_model::TraceMask>,
+    /// An image's, or an own-adjustments clone's, adjustment registers as read (ADR 0072 §1),
+    /// left out when none is stored.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    adjustments: Option<crate::image_adjust_model::ImageAdjustments>,
 }
 
 /// The registers of one node in `document.json`; each is left out at its default.
@@ -1103,6 +1133,8 @@ enum ObjectJson {
         own_placement: bool,
         #[serde(skip_serializing_if = "std::ops::Not::not")]
         own_style: bool,
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        own_adjustments: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<crate::style_model::Style>,
     },
@@ -1245,6 +1277,7 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 matrix: clone.chain.matrix,
                 own_placement: clone.chain.own_placement,
                 own_style: clone.chain.own_style,
+                own_adjustments: clone.chain.own_adjustments,
                 style: clone.chain.own_style.then_some(clone.resolved.style),
             },
             ObjectSnapshot::Primitive(primitive) => {

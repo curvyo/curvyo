@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use crate::affine::Affine;
 use crate::assets::AssetHash;
+use crate::image_adjust_model::ImageAdjustments;
 use crate::path_model::NodeId;
 use crate::style_model::{Opacity, Stroke, Style};
 use crate::units::Point;
@@ -41,6 +42,9 @@ pub struct ImageSnapshot {
     /// (`specs/0050-layers-and-objects-panel` criterion 27), opaque as read.
     #[serde(skip)]
     pub shown_opacity: Opacity,
+    /// The adjustments it shows (ADR 0072 §1, §2): its own registers, or for a clone's leaf those
+    /// of the clone's adjustment source.
+    pub adjustments: ImageAdjustments,
 }
 
 impl ImageSnapshot {
@@ -53,6 +57,7 @@ impl ImageSnapshot {
             placement,
             style: no_paint(),
             shown_opacity: Opacity::OPAQUE,
+            adjustments: ImageAdjustments::default(),
         }
     }
 

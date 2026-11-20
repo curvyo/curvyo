@@ -82,30 +82,50 @@ impl OverrideState {
     }
 }
 
-/// The words a selected clone's tag adds for its overrides (`0057` criterion 29): "own
-/// placement", "own style" or "own placement and style"; `None` without any.
-#[must_use]
-pub fn overrides_words(clone: &CloneSnapshot) -> Option<&'static str> {
-    match (clone.chain.own_placement, clone.chain.own_style) {
-        (true, true) => Some("own placement and style"),
-        (true, false) => Some("own placement"),
-        (false, true) => Some("own style"),
-        (false, false) => None,
-    }
-}
-
-/// The second muted line of a clone's Layers tooltip (`0057` criterion 28): "Own placement, own
-/// style", only the parts that apply; empty without overrides.
-#[must_use]
-pub fn overrides_line(clone: &CloneSnapshot) -> String {
-    let parts: Vec<&str> = [
-        clone.chain.own_placement.then_some("Own placement"),
-        clone.chain.own_style.then_some("own style"),
+/// The overrides a clone has, in the tag's order (`0057` criterion 29, `0135` criterion 9).
+fn own_parts(clone: &CloneSnapshot) -> Vec<&'static str> {
+    [
+        clone.chain.own_placement.then_some("placement"),
+        clone.chain.own_style.then_some("style"),
+        clone.chain.own_adjustments.then_some("adjustments"),
     ]
     .into_iter()
     .flatten()
-    .collect();
-    let line = parts.join(", ");
+    .collect()
+}
+
+/// "own a", "own a and b", "own a, b and c"; `None` for no part.
+fn own_words(parts: &[&str]) -> Option<String> {
+    let (last, rest) = parts.split_last()?;
+    Some(if rest.is_empty() {
+        format!("own {last}")
+    } else {
+        format!("own {} and {last}", rest.join(", "))
+    })
+}
+
+/// The words a selected clone's tag adds for its overrides (`0057` criterion 29, `0135`
+/// criterion 9): "own placement", "own style and adjustments", "own placement, style and
+/// adjustments"; `None` without any.
+#[must_use]
+pub fn overrides_words(clone: &CloneSnapshot) -> Option<String> {
+    own_words(&own_parts(clone))
+}
+
+/// The second muted line of a clone's Layers tooltip (`0057` criterion 28, `0135` criterion 9):
+/// "Own placement, own style, own adjustments", only the parts that apply; empty without
+/// overrides.
+#[must_use]
+pub fn overrides_line(clone: &CloneSnapshot) -> String {
+    own_line(&own_parts(clone))
+}
+
+fn own_line(parts: &[&str]) -> String {
+    let line = parts
+        .iter()
+        .map(|part| format!("own {part}"))
+        .collect::<Vec<_>>()
+        .join(", ");
     let mut chars = line.chars();
     chars.next().map_or_else(String::new, |first| {
         first.to_uppercase().chain(chars).collect()
@@ -359,11 +379,36 @@ mod tests {
         let ObjectSnapshot::Clone(clone_a) = objects.get(a).unwrap() else {
             panic!("a clone")
         };
-        assert_eq!(overrides_words(clone_a), Some("own placement and style"));
+        assert_eq!(
+            overrides_words(clone_a).as_deref(),
+            Some("own placement and style")
+        );
         assert_eq!(overrides_line(clone_a), "Own placement, own style");
         let ObjectSnapshot::Clone(clone_b) = objects.get(b).unwrap() else {
             panic!("a clone")
         };
         assert_eq!(overrides_line(clone_b), "Own style");
+    }
+
+    /// `0135` criterion 9 (plan D3): the tag and the Layers line name own adjustments.
+    #[test]
+    fn own_adjustments_are_named_in_the_tag_and_the_line() {
+        assert_eq!(
+            own_words(&["adjustments"]).as_deref(),
+            Some("own adjustments")
+        );
+        assert_eq!(
+            own_words(&["placement", "adjustments"]).as_deref(),
+            Some("own placement and adjustments")
+        );
+        assert_eq!(
+            own_words(&["placement", "style", "adjustments"]).as_deref(),
+            Some("own placement, style and adjustments")
+        );
+        assert_eq!(own_words(&[]), None);
+        assert_eq!(
+            own_line(&["style", "adjustments"]),
+            "Own style, own adjustments"
+        );
     }
 }

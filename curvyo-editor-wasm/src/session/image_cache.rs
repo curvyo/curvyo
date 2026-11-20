@@ -108,6 +108,11 @@ impl Session {
                 ready.push((quad.asset.clone(), dots));
                 continue;
             }
+            // An adjusted picture's look is the session's own too (`specs/0135` criterion 15).
+            if let Some(look) = self.look_picture(&quad.asset) {
+                ready.push((quad.asset.clone(), look));
+                continue;
+            }
             if self.images.ready(&quad.asset).is_none()
                 && let Some(held) = self.job_decoded_image(&quad.asset)
             {

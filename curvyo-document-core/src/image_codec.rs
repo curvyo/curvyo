@@ -8,6 +8,8 @@
 //!                                            ±1e7; a singular map is allowed and draws nothing
 //!   + `name`, `visible`, `locked`, `opacity`; no style keys, no outline
 //!   + the trace mask `trace_*` (`trace_mask_codec.rs`, ADR 0061)
+//!   + the adjustments `image_preset`, `image_strength`, `image_adjustments`
+//!     (`image_adjust_codec.rs`, ADR 0072)
 //! ```
 
 use loro::{LoroMap, LoroValue, ValueOrContainer};
@@ -78,11 +80,9 @@ pub(crate) fn read_placement(meta: &LoroMap) -> Option<Affine> {
 
 /// The image `id` as stored, or `None` when a register cannot be read.
 pub(crate) fn read_image_snapshot(id: NodeId, meta: &LoroMap) -> Option<ImageSnapshot> {
-    Some(ImageSnapshot::new(
-        id,
-        read_asset(meta)?,
-        read_placement(meta)?,
-    ))
+    let mut image = ImageSnapshot::new(id, read_asset(meta)?, read_placement(meta)?);
+    image.adjustments = crate::image_adjust_codec::read_adjustments(meta);
+    Some(image)
 }
 
 /// Whether an image node's registers can be read (open-file validation).

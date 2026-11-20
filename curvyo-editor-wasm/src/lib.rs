@@ -257,6 +257,8 @@ mod wasm_fixture_sets;
 #[cfg(target_arch = "wasm32")]
 mod wasm_fixtures;
 #[cfg(target_arch = "wasm32")]
+mod wasm_image_adjust;
+#[cfg(target_arch = "wasm32")]
 mod wasm_machine_profiles;
 #[cfg(target_arch = "wasm32")]
 mod wasm_manufacturing;

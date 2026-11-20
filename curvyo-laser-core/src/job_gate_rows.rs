@@ -3,8 +3,9 @@
 
 use curvyo_document_core::NodeId;
 
-use crate::job_input::{BlockInput, Ring};
+use crate::job_input::{BlockInput, LeafInput, Ring};
 use crate::job_numbers::{BlockNumbers, NumbersRead, NumbersSource, RunNumbers};
+use crate::job_raster_plan::{burns_dots, leaf_image_settings};
 use crate::material::Interval;
 use crate::operation_image_options::Dither;
 use crate::operation_kind::OperationKind;
@@ -21,7 +22,7 @@ pub struct NumbersLine {
     /// The typed fields.
     pub typed: Vec<Field>,
     /// An Image operation's dither mode and Lowest power in tenths of a percent, after the
-    /// numbers (`specs/0123` criterion 47 d).
+    /// numbers (`specs/0123` criterion 47 d); `None` when its items burn with different dithers.
     pub dither: Option<(Dither, u16)>,
 }
 
@@ -44,9 +45,12 @@ pub struct RunFacts {
 
 /// The numbers lines of a block's read numbers: the main set (with the interval for Engrave
 /// kinds), then the outline set, the typed fields of each; empty when it has no numbers. The
-/// operations view calls this for every row, running or not (criterion 3).
+/// operations view calls this for every row, running or not (criterion 3). An Image row names
+/// the one dither its raster `leaves` burn with (each picture its own, a gradient leaf the
+/// operation's), none when they differ (ADR 0069 note of 2026-11-20, UX P31); with no raster
+/// leaf it names the operation's (Proposal).
 #[must_use]
-pub fn numbers_lines(read: &NumbersRead) -> Vec<NumbersLine> {
+pub fn numbers_lines(read: &NumbersRead, leaves: &[LeafInput]) -> Vec<NumbersLine> {
     let NumbersRead::Runs { numbers, source } = read else {
         return Vec::new();
     };
@@ -54,10 +58,28 @@ pub fn numbers_lines(read: &NumbersRead) -> Vec<NumbersLine> {
         NumbersSource::Live { typed, .. } | NumbersSource::Stored { typed, .. } => typed,
         NumbersSource::Own | NumbersSource::Fixture { .. } => &[],
     };
-    lines_of(numbers, typed)
+    lines_of(numbers, typed, leaves)
 }
 
-fn lines_of(numbers: &BlockNumbers, typed: &[(Role, Field)]) -> Vec<NumbersLine> {
+/// The one dither the raster leaves of an Image block burn with (a picture that cannot be read
+/// burns nothing), `None` when they differ.
+fn shared_dither(numbers: &BlockNumbers, leaves: &[LeafInput]) -> Option<Dither> {
+    let image = &numbers.options.image;
+    let mut modes = leaves
+        .iter()
+        .filter(|leaf| burns_dots(&leaf.geometry))
+        .map(|leaf| leaf_image_settings(image, &leaf.geometry).dither);
+    let Some(first) = modes.next() else {
+        return Some(image.dither);
+    };
+    modes.all(|mode| mode == first).then_some(first)
+}
+
+fn lines_of(
+    numbers: &BlockNumbers,
+    typed: &[(Role, Field)],
+    leaves: &[LeafInput],
+) -> Vec<NumbersLine> {
     let line = |role: Role, set: RunNumbers, interval: Option<Interval>| NumbersLine {
         numbers: set,
         interval,
@@ -74,8 +96,8 @@ fn lines_of(numbers: &BlockNumbers, typed: &[(Role, Field)]) -> Vec<NumbersLine>
         numbers.kind.has_interval().then_some(numbers.interval),
     );
     if numbers.kind == OperationKind::Image {
-        let image = &numbers.options.image;
-        main.dither = Some((image.dither, image.lowest_power_tenths));
+        let lowest = numbers.options.image.lowest_power_tenths;
+        main.dither = shared_dither(numbers, leaves).map(|dither| (dither, lowest));
     }
     let mut lines = vec![main];
     if let Some(outline) = numbers.outline {
@@ -86,7 +108,7 @@ fn lines_of(numbers: &BlockNumbers, typed: &[(Role, Field)]) -> Vec<NumbersLine>
 
 /// The facts of the running `block` with its read numbers and time.
 pub(crate) fn run_facts(block: &BlockInput, read: &NumbersRead, time_s: Option<f64>) -> RunFacts {
-    let numbers = numbers_lines(read);
+    let numbers = numbers_lines(read, &block.leaves);
     RunFacts {
         block: block.id,
         ring: block.ring,

@@ -55,6 +55,9 @@ pub struct BlockNumbers {
     pub outline: Option<RunNumbers>,
     /// The hatch interval of the Engrave kinds.
     pub interval: Interval,
+    /// The Interval a picture's preset is derived at (`specs/0135` criterion 60): the
+    /// operation's own, also while a coarse preview reads the dots at a larger `interval`.
+    pub picture_interval: Interval,
     /// The operation-only settings (defaults for fixture blocks).
     pub options: OperationOptions,
 }
@@ -213,6 +216,7 @@ fn operation_numbers(
             outline: (kind == OperationKind::EngraveOutline)
                 .then(|| RunNumbers::of(run.outline.unwrap_or(run.main), max_feed)),
             interval: run.interval.unwrap_or_default(),
+            picture_interval: run.interval.unwrap_or_default(),
             options,
         },
         source,
@@ -243,6 +247,7 @@ fn fixture_numbers(kind: OperationKind, context: NumbersContext<'_>) -> NumbersR
             main,
             outline: (kind == OperationKind::EngraveOutline).then_some(main),
             interval: set.numbers.interval.unwrap_or_default(),
+            picture_interval: set.numbers.interval.unwrap_or_default(),
             options: fixture_options(),
         },
         source: NumbersSource::Fixture {

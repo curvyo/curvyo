@@ -6,6 +6,7 @@ use curvyo_document_core::{
     Affine, GradientBox, ObjectSnapshot, PathSnapshot, PlacedGradient, Point, Vec2,
 };
 use curvyo_geometry_core::OutlineTriple;
+use curvyo_laser_core::adjust::AdjustRegisters;
 use curvyo_laser_core::job::{LeafGeometry, LeafOutline};
 
 /// The geometry of `object` mapped by `map` (document space to page mm); an image's working
@@ -18,6 +19,7 @@ pub(super) fn leaf_geometry(object: &ObjectSnapshot, map: Affine) -> Option<Leaf
                 frame: image.corners().map(|p| map.apply_point(p)),
                 asset: image.asset.clone(),
                 pixels: None,
+                adjust: AdjustRegisters::read(&image.adjustments),
             });
         }
         ObjectSnapshot::Primitive(primitive) => {

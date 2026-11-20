@@ -1,14 +1,11 @@
 //! The sweeps of one raster item from its leaf (ADR 0068, ADR 0069 §1, §2; `specs/0123`
 //! criteria 1 to 10): grid, sample, tone and dither in one pass over the rows.
 
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-
-use curvyo_document_core::{AssetHash, PlacedGradient, Point};
-use curvyo_image_core::WorkingImage;
+use curvyo_document_core::{PlacedGradient, Point};
+use curvyo_image_core::Adjusted;
 
 use crate::job_flatten::flat;
-use crate::job_input::{LeafGeometry, PointUm};
+use crate::job_input::{LeafGeometry, LeafInput, PointUm};
 use crate::job_raster_dither::Ditherer;
 use crate::job_raster_grid::{DotGrid, GridRow, estimated_dots};
 #[cfg(test)]
@@ -42,11 +39,11 @@ impl RasterSource<'_> {
     }
 }
 
-/// The dot settings of one operation's raster items.
+/// The dot settings of one raster item (ADR 0073 note of 2026-11-20: per leaf).
 #[derive(Debug, Clone, Copy)]
-pub struct RasterSettings<'a> {
-    /// The Image settings.
-    pub image: &'a ImageSettings,
+pub struct RasterSettings {
+    /// The Image settings the item burns with: the operation's, with a picture's own dither.
+    pub image: ImageSettings,
     /// The Interval in µm.
     pub interval_um: i64,
     /// The Scan angle in degrees.
@@ -62,13 +59,23 @@ pub struct RasterSettings<'a> {
 pub fn item_sweeps(
     rings: &[Vec<PointUm>],
     source: &RasterSource<'_>,
-    settings: RasterSettings<'_>,
+    settings: RasterSettings,
 ) -> Vec<Sweep> {
     ItemWork::new(rings, settings).map_or_else(Vec::new, |mut work| {
         let mut all = u64::MAX;
         work.advance(source, &mut all);
         work.into_sweeps()
     })
+}
+
+/// The anchor of an item's screen (ADR 0074 §2): the first corner of its first ring, the visible
+/// frame's first corner for an image.
+pub(crate) fn screen_anchor(rings: &[Vec<PointUm>]) -> PointUm {
+    rings
+        .first()
+        .and_then(|ring| ring.first())
+        .copied()
+        .unwrap_or(PointUm::new(0, 0))
 }
 
 /// Appends the levels of `row` (one per inside dot, stretches in order) to `out`, its greys
@@ -86,7 +93,13 @@ pub(crate) fn row_levels(
     for &(j0, j1) in &row.stretches {
         greys.clear();
         greys.extend((j0..j1).map(|j| tone.apply(source.grey_at(grid.centre_mm(row.s, j)))));
-        ditherer.stretch(row.k, j0, greys, out);
+        ditherer.stretch(
+            row.k,
+            j0,
+            greys,
+            |j| grid.point(row.s, grid.centre_t(j)),
+            out,
+        );
         dots += u64::try_from(j1 - j0).unwrap_or(0);
     }
     dots
@@ -97,7 +110,7 @@ pub(crate) fn row_levels(
 fn item_levels(
     rings: &[Vec<PointUm>],
     source: &RasterSource<'_>,
-    settings: RasterSettings<'_>,
+    settings: RasterSettings,
 ) -> Option<(DotGrid, Vec<Vec<u8>>)> {
     let RasterSettings {
         image,
@@ -105,12 +118,14 @@ fn item_levels(
         angle_deg,
         ..
     } = settings;
+    let image = &image;
     if estimated_dots(rings, interval_um, angle_deg) > MAX_DOTS {
         return None;
     }
     let grid = DotGrid::new(rings, interval_um, angle_deg)?;
     let tone = ToneTable::new(image);
-    let mut ditherer = Ditherer::new(image, 0, grid.columns);
+    let mut ditherer =
+        Ditherer::new(image, 0, grid.columns).screened(image, interval_um, screen_anchor(rings));
     let mut greys = Vec::new();
     let levels = grid
         .rows
@@ -139,7 +154,7 @@ fn item_levels(
 pub fn dot_map_text(
     rings: &[Vec<PointUm>],
     source: &RasterSource<'_>,
-    settings: RasterSettings<'_>,
+    settings: RasterSettings,
 ) -> String {
     let Some((grid, levels)) = item_levels(rings, source, settings) else {
         return String::new();
@@ -173,6 +188,41 @@ pub fn dot_map_text(
     text
 }
 
+/// The Image settings a raster leaf of an operation with `operation` burns with (ADR 0072
+/// amendment A4): a picture its own dither with the operation's tone fields and Lowest power, a
+/// gradient-filled leaf the operation's settings.
+#[must_use]
+pub fn leaf_image_settings(operation: &ImageSettings, geometry: &LeafGeometry) -> ImageSettings {
+    match geometry {
+        LeafGeometry::Image { adjust, .. } => operation.with_dither(adjust.dither),
+        LeafGeometry::Gradient { .. } | LeafGeometry::Outlines(_) => *operation,
+    }
+}
+
+/// Whether `geometry` burns raster dots: a gradient leaf or a picture whose pixels can be read.
+/// An outline burns none, a picture that cannot be read burns nothing.
+#[must_use]
+pub(crate) fn burns_dots(geometry: &LeafGeometry) -> bool {
+    !matches!(
+        geometry,
+        LeafGeometry::Outlines(_) | LeafGeometry::Image { pixels: None, .. }
+    )
+}
+
+/// Whether any of `leaves` burns Grey with the operation's Image settings `image` (a picture with
+/// its own dither included, ADR 0072 amendment A4). The one rule of the Grey check, the Settings
+/// view and the numbers line; a picture that cannot be read does not count.
+#[must_use]
+pub fn burns_grey<'a>(
+    image: &ImageSettings,
+    leaves: impl IntoIterator<Item = &'a LeafInput>,
+) -> bool {
+    leaves.into_iter().any(|leaf| {
+        burns_dots(&leaf.geometry)
+            && leaf_image_settings(image, &leaf.geometry).dither == Dither::Grey
+    })
+}
+
 /// The dot map text of a raster leaf (the golden format of `specs/0123` criterion 40) with an operation's Image settings,
 /// Interval and Scan angle; empty for a leaf that is no raster item or whose pixels cannot be
 /// read.
@@ -182,8 +232,22 @@ pub fn raster_dot_map(
     options: &OperationOptions,
     interval: Interval,
 ) -> String {
+    raster_dot_map_adjusted(geometry, options, interval, &Adjusted::Unchanged)
+}
+
+/// [`raster_dot_map`] of an image leaf whose picture is `adjusted` (ADR 0073 §7; `specs/0135`
+/// criteria 19, 54); [`Adjusted::Unchanged`] is the leaf's own pixels. A test hook for the
+/// goldens.
+#[doc(hidden)]
+#[must_use]
+pub fn raster_dot_map_adjusted(
+    geometry: &LeafGeometry,
+    options: &OperationOptions,
+    interval: Interval,
+    adjusted: &Adjusted,
+) -> String {
     let settings = RasterSettings {
-        image: &options.image,
+        image: leaf_image_settings(&options.image, geometry),
         interval_um: i64::from(interval.hundredths()) * 10,
         angle_deg: options.scan_angle.degrees(),
         bidirectional: options.bidirectional,
@@ -195,7 +259,7 @@ pub fn raster_dot_map(
             pixels: Some(pixels),
             ..
         } => {
-            let pyramid = GreyPyramid::of(pixels);
+            let pyramid = GreyPyramid::of_adjusted(pixels, adjusted);
             let ring = vec![frame.map(PointUm::of_mm).to_vec()];
             ImageSampler::new(&pyramid, frame, interval_mm).map_or_else(String::new, |sampler| {
                 dot_map_text(&ring, &RasterSource::Image(sampler), settings)
@@ -206,44 +270,6 @@ pub fn raster_dot_map(
             dot_map_text(&rings, &RasterSource::Gradient(gradient), settings)
         }
         LeafGeometry::Image { pixels: None, .. } | LeafGeometry::Outlines(_) => String::new(),
-    }
-}
-
-/// The grey pyramids of the images in use, one per asset (ADR 0068 §3), kept between builds;
-/// a clone shares them, so the job and the Operations view's preview hold one pyramid per asset.
-/// Lookups only: nothing iterates the map into output.
-#[derive(Debug, Default, Clone)]
-pub struct PyramidCache {
-    entries: Arc<Mutex<Pyramids>>,
-}
-
-type Pyramids = HashMap<AssetHash, Arc<GreyPyramid>>;
-
-impl PyramidCache {
-    /// The shared map; a panic while it was held leaves whole entries only, so it is read on.
-    fn entries(&self) -> MutexGuard<'_, Pyramids> {
-        self.entries.lock().unwrap_or_else(PoisonError::into_inner)
-    }
-
-    /// The pyramid of `asset` with the working image `image`, built on first use.
-    pub fn pyramid(&mut self, asset: &AssetHash, image: &WorkingImage) -> Arc<GreyPyramid> {
-        Arc::clone(
-            self.entries()
-                .entry(asset.clone())
-                .or_insert_with(|| Arc::new(GreyPyramid::of(image))),
-        )
-    }
-
-    /// Drops the pyramids of assets not in `assets`.
-    pub fn retain(&mut self, assets: &[&AssetHash]) {
-        let assets: HashSet<&AssetHash> = assets.iter().copied().collect();
-        self.entries().retain(|asset, _| assets.contains(asset));
-    }
-
-    /// How many pyramids are kept.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.entries().len()
     }
 }
 
@@ -261,9 +287,9 @@ mod tests {
         ]
     }
 
-    fn settings(image: &ImageSettings, bidirectional: bool) -> RasterSettings<'_> {
+    fn settings(image: &ImageSettings, bidirectional: bool) -> RasterSettings {
         RasterSettings {
-            image,
+            image: *image,
             interval_um: 100,
             angle_deg: 0.0,
             bidirectional,
@@ -322,7 +348,7 @@ mod tests {
         let image = ImageSettings::DEFAULT;
         let gradient = ramp();
         let raster = RasterSettings {
-            image: &image,
+            image,
             interval_um: 10,
             angle_deg: 0.0,
             bidirectional: true,

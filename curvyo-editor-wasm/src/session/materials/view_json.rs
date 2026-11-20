@@ -130,6 +130,7 @@ pub(in crate::session) const fn param_words(param: Param) -> (&'static str, &'st
         Param::Speed => ("Speed", " mm/min"),
         Param::Passes => ("Passes", " ×"),
         Param::Interval => ("Interval", " mm"),
+        Param::Strength => ("Strength", " %"),
     }
 }
 

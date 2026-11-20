@@ -17,7 +17,8 @@ use serde::Serialize;
 
 use super::super::Session;
 use super::super::materials::{NumbersView, SetKindView};
-use super::image_view::{ImageSettingsView, image_settings_view};
+use super::image_view::{ImageSettingsView, RasterFacts, image_settings_view};
+use curvyo_laser_core::job::{LeafGeometry, burns_grey};
 
 /// The state of an operation's settings (criterion 26), shown by symbol and text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -178,9 +179,9 @@ pub struct HatchOptionsView {
     pub overscan_pct: u8,
 }
 
-fn options_view(options: OperationOptions, kind: OperationKind) -> OptionsView {
+fn options_view(options: OperationOptions, kind: OperationKind, facts: RasterFacts) -> OptionsView {
     OptionsView {
-        image: (kind == OperationKind::Image).then(|| image_settings_view(&options.image)),
+        image: (kind == OperationKind::Image).then(|| image_settings_view(&options.image, facts)),
         hatch: scans(kind).then(|| HatchOptionsView {
             crosshatch: hatches(kind).then_some(options.crosshatch),
             bidirectional: options.bidirectional,
@@ -351,6 +352,8 @@ pub(super) struct PageFacts {
     pub(super) max_feed: FeedRate,
     /// Whether the machine has a motorised Z axis.
     pub(super) motorised_z: bool,
+    /// What each Image operation's items need of its group, by operation.
+    pub(super) raster: HashMap<NodeId, RasterFacts>,
 }
 
 impl PageFacts {
@@ -360,7 +363,39 @@ impl PageFacts {
             profile: session.active_profile_id().unwrap_or_default(),
             max_feed: session.active_max_feed(),
             motorised_z: session.active_motorised_z(),
+            raster: session.raster_facts(),
         }
+    }
+}
+
+impl Session {
+    /// What each Image operation of the active laser page needs of its group: whether it holds a
+    /// gradient-filled leaf, whether one of its items burns Grey (a picture with its own dither,
+    /// ADR 0072 amendment A4).
+    fn raster_facts(&self) -> HashMap<NodeId, RasterFacts> {
+        self.with_page_job_input(|page| {
+            page.blocks
+                .iter()
+                .filter_map(|block| {
+                    let curvyo_laser_core::job::BlockSource::Operation {
+                        options: Ok(options),
+                        ..
+                    } = &block.source
+                    else {
+                        return None;
+                    };
+                    let facts = RasterFacts {
+                        gradient: block
+                            .leaves
+                            .iter()
+                            .any(|l| matches!(l.geometry, LeafGeometry::Gradient { .. })),
+                        grey: burns_grey(&options.image, &block.leaves),
+                    };
+                    Some((block.id, facts))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
     }
 }
 
@@ -418,7 +453,10 @@ pub(super) fn settings_view(
         needs: needs_view,
         disabled,
         interval_mm: interval_view(session, op.id, &state, kind),
-        options: options.map(|options| options_view(options, kind)),
+        options: options.map(|options| {
+            let facts = page.raster.get(&op.id).copied().unwrap_or_default();
+            options_view(options, kind, facts)
+        }),
         z_offset_shown: page.motorised_z,
     })
 }

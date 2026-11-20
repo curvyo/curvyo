@@ -7,7 +7,8 @@ use std::sync::Arc;
 
 use curvyo_document_core::{NodeId, OperationSnapshot};
 use curvyo_laser_core::job::{
-    LeafGeometry, Names, NumbersContext, Ring, block_numbers, numbers_lines, read_output_settings,
+    LeafGeometry, LeafInput, Names, NumbersContext, Ring, block_numbers, numbers_lines,
+    read_output_settings,
 };
 use curvyo_laser_core::operations::{KindRead, Summary};
 use serde::Serialize;
@@ -107,13 +108,13 @@ impl Session {
         job: &PageJob,
         operations: &[OperationSnapshot],
     ) -> HashMap<NodeId, Option<Vec<NumbersLineView>>> {
-        let built: HashMap<NodeId, &curvyo_laser_core::job::NumbersRead> = job
+        let built: HashMap<NodeId, (&curvyo_laser_core::job::NumbersRead, &[LeafInput])> = job
             .input
             .blocks
             .iter()
             .zip(&job.built.numbers)
             .filter(|(block, _)| matches!(block.ring, Ring::Operation(_)))
-            .map(|(block, read)| (block.id, read))
+            .map(|(block, read)| (block.id, (read, block.leaves.as_slice())))
             .collect();
         let context = NumbersContext {
             materials: self.materials().reads(),
@@ -125,14 +126,14 @@ impl Session {
             .iter()
             .map(|op| {
                 let numbers = KindRead::of(op.kind.as_deref()).known().and_then(|_| {
-                    let read = built.get(&op.id).map_or_else(
+                    let (read, leaves) = built.get(&op.id).map_or_else(
                         || {
                             let block = self.operation_block(op, std::iter::empty(), &[], &[], &[]);
-                            block_numbers(&block, context)
+                            (block_numbers(&block, context), Vec::new())
                         },
-                        |read| (*read).clone(),
+                        |(read, leaves)| ((*read).clone(), leaves.to_vec()),
                     );
-                    row_numbers_view(&read)
+                    row_numbers_view(&read, &leaves)
                 });
                 (op.id, numbers)
             })
@@ -165,7 +166,7 @@ impl Session {
                 max_feed: profile.values.max_feed,
             },
         );
-        row_numbers_view(&read)
+        row_numbers_view(&read, &block.leaves)
     }
 }
 
@@ -188,9 +189,12 @@ fn row_runs(job: &PageJob) -> HashMap<NodeId, RowRunView> {
 }
 
 /// Line 3 of a row from its numbers, `None` for damaged settings.
-fn row_numbers_view(read: &curvyo_laser_core::job::NumbersRead) -> Option<Vec<NumbersLineView>> {
+fn row_numbers_view(
+    read: &curvyo_laser_core::job::NumbersRead,
+    leaves: &[LeafInput],
+) -> Option<Vec<NumbersLineView>> {
     if matches!(read, curvyo_laser_core::job::NumbersRead::Damaged) {
         return None;
     }
-    Some(numbers_view(&numbers_lines(read)))
+    Some(numbers_view(&numbers_lines(read, leaves)))
 }

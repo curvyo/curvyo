@@ -1,50 +1,8 @@
 //! The grey value at a dot (ADR 0068 §3, `specs/0123` criteria 6, 7, 24): a box pyramid of an
 //! image's grey read bilinearly, or a gradient's colour over white.
 
-use curvyo_document_core::{PlacedGradient, Point, PremultipliedRgba8, over_white_grey};
-use curvyo_image_core::WorkingImage;
-
-/// One level of a grey pyramid: row-major grey, 0 black to 255 white.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GreyPlane {
-    /// Width in pixels.
-    pub width: u32,
-    /// Height in pixels.
-    pub height: u32,
-    /// The greys, top row first.
-    pub grey: Vec<u8>,
-}
-
-impl GreyPlane {
-    /// The grey at `(x, y)`, clamped to the plane's edge.
-    fn at(&self, x: i64, y: i64) -> u32 {
-        let x = clamp_index(x, self.width);
-        let y = clamp_index(y, self.height);
-        u32::from(self.grey[y * self.width as usize + x])
-    }
-
-    /// The next level: each side halved (rounding down, at least 1) by a 2 x 2 integer box mean
-    /// rounded half up, the last column or row repeated where a side is odd.
-    fn halved(&self) -> Self {
-        let (width, height) = ((self.width / 2).max(1), (self.height / 2).max(1));
-        let mut grey = Vec::with_capacity(width as usize * height as usize);
-        for y in 0..i64::from(height) {
-            for x in 0..i64::from(width) {
-                let (x0, y0) = (2 * x, 2 * y);
-                let sum = self.at(x0, y0)
-                    + self.at(x0 + 1, y0)
-                    + self.at(x0, y0 + 1)
-                    + self.at(x0 + 1, y0 + 1);
-                grey.push(byte((sum + 2) / 4));
-            }
-        }
-        Self {
-            width,
-            height,
-            grey,
-        }
-    }
-}
+use curvyo_document_core::{PlacedGradient, Point, over_white_grey};
+use curvyo_image_core::{Adjusted, GreyPlane, WorkingImage};
 
 /// The grey pyramid of one working image, level 0 at full size down to 1 x 1; built once per
 /// asset on first raster use (ADR 0068 §3, criterion 37 g).
@@ -58,34 +16,23 @@ impl GreyPyramid {
     /// by the luminance weights of `over_white_grey`.
     #[must_use]
     pub fn of(image: &WorkingImage) -> Self {
-        let grey = image
-            .pixels
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .map(|p| {
-                let a = u32::from(p[3]);
-                let premultiply = |c: u8| byte((u32::from(c) * a + 127) / 255);
-                over_white_grey(PremultipliedRgba8 {
-                    r: premultiply(p[0]),
-                    g: premultiply(p[1]),
-                    b: premultiply(p[2]),
-                    a: p[3],
-                })
-            })
-            .collect();
-        let mut levels = vec![GreyPlane {
-            width: image.width.max(1),
-            height: image.height.max(1),
-            grey,
-        }];
-        if levels[0].grey.len() != levels[0].width as usize * levels[0].height as usize {
-            levels[0] = GreyPlane {
-                width: 1,
-                height: 1,
-                grey: vec![255],
-            };
+        Self::of_plane(GreyPlane::of_rgba(image))
+    }
+
+    /// The pyramid of an adjusted image (ADR 0073 §7): `image` itself when nothing changed it.
+    #[must_use]
+    pub fn of_adjusted(image: &WorkingImage, adjusted: &Adjusted) -> Self {
+        match adjusted {
+            Adjusted::Unchanged => Self::of(image),
+            Adjusted::Rgba(rgba) => Self::of(rgba),
+            Adjusted::Grey(plane) => Self::of_plane(plane.clone()),
         }
+    }
+
+    /// The pyramid with `plane` as its full-size level.
+    #[must_use]
+    pub fn of_plane(plane: GreyPlane) -> Self {
+        let mut levels = vec![plane];
         while let Some(last) = levels.last()
             && (last.width > 1 || last.height > 1)
         {
@@ -150,8 +97,9 @@ impl<'a> ImageSampler<'a> {
         let qy = quantised(v * f64::from(self.plane.height) - 0.5);
         let (ix, fx) = (qx >> 8, u32::try_from(qx & 255).unwrap_or(0));
         let (iy, fy) = (qy >> 8, u32::try_from(qy & 255).unwrap_or(0));
-        let top = self.plane.at(ix, iy) * (256 - fx) + self.plane.at(ix + 1, iy) * fx;
-        let bottom = self.plane.at(ix, iy + 1) * (256 - fx) + self.plane.at(ix + 1, iy + 1) * fx;
+        let at = |x: i64, y: i64| u32::from(self.plane.at(x, y));
+        let top = at(ix, iy) * (256 - fx) + at(ix + 1, iy) * fx;
+        let bottom = at(ix, iy + 1) * (256 - fx) + at(ix + 1, iy + 1) * fx;
         byte((top * (256 - fy) + bottom * fy + 32_768) >> 16)
     }
 }
@@ -178,10 +126,6 @@ fn quantised(value: f64) -> i64 {
     // invariant: `as` saturates; the clamp at the edge handles any far value
     let q = (value * 256.0).round() as i64;
     q
-}
-
-fn clamp_index(i: i64, size: u32) -> usize {
-    usize::try_from(i.clamp(0, i64::from(size.max(1)) - 1)).unwrap_or(0)
 }
 
 fn byte(value: u32) -> u8 {
@@ -224,6 +168,29 @@ mod tests {
             if x == 0 { [0, 0, 0, 0] } else { [0, 0, 0, 128] }
         }));
         assert_eq!(p.base().grey, vec![255, 127]);
+    }
+
+    #[test]
+    fn the_image_grey_is_over_white_grey_for_every_alpha() {
+        use curvyo_document_core::PremultipliedRgba8;
+        let colours: Vec<[u8; 4]> = (0..=255_u8)
+            .step_by(5)
+            .flat_map(|a| [[a, 255 - a, a / 3, a], [200, 13, 77, 255 - a], [9, 9, 9, a]])
+            .collect();
+        let p = GreyPyramid::of(&image(u32::try_from(colours.len()).unwrap(), 1, |x, _| {
+            colours[x as usize]
+        }));
+        for (c, &g) in colours.iter().zip(&p.base().grey) {
+            let a = u32::from(c[3]);
+            let pre = |v: u8| u8::try_from((u32::from(v) * a + 127) / 255).unwrap();
+            let expected = over_white_grey(PremultipliedRgba8 {
+                r: pre(c[0]),
+                g: pre(c[1]),
+                b: pre(c[2]),
+                a: c[3],
+            });
+            assert_eq!(g, expected, "{c:?}");
+        }
     }
 
     #[test]

@@ -12,7 +12,7 @@ use crate::operation_image_options::Dither;
 use crate::test_id::TestId;
 use crate::test_param::{Param, ParamValue};
 use crate::test_recipe::{
-    Axis, MAX_CELL, MAX_COUNT, MIN_CELL, MIN_COUNT, MaterialRef, Recipe, TestRecipe,
+    Axis, MAX_CELL, MAX_COUNT, MIN_CELL, MIN_COUNT, MaterialRef, PictureSource, Recipe, TestRecipe,
 };
 
 impl Recipe {
@@ -65,6 +65,10 @@ pub(crate) struct RecipeJson {
     crosshatch: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     dither: Option<String>,
+    /// The picture an Image grid engraves (`specs/0135` criterion 51): absent the Ramp,
+    /// `"selected"` the selected picture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    picture: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) material: Option<MaterialRefJson>,
 }
@@ -99,12 +103,14 @@ struct FixedJson {
 }
 
 impl FixedJson {
-    fn slot(&mut self, param: Param) -> &mut Option<Number> {
+    /// The slot of a shared `param`; Strength is never shared.
+    fn slot(&mut self, param: Param) -> Option<&mut Option<Number>> {
         match param {
-            Param::Power => &mut self.power_pct,
-            Param::Speed => &mut self.speed_mm_min,
-            Param::Passes => &mut self.passes,
-            Param::Interval => &mut self.interval_mm,
+            Param::Power => Some(&mut self.power_pct),
+            Param::Speed => Some(&mut self.speed_mm_min),
+            Param::Passes => Some(&mut self.passes),
+            Param::Interval => Some(&mut self.interval_mm),
+            Param::Strength => None,
         }
     }
 }
@@ -138,7 +144,9 @@ pub(crate) fn recipe_json(recipe: &TestRecipe) -> RecipeJson {
     };
     let mut fixed = FixedJson::default();
     for value in recipe.fixed_values() {
-        *fixed.slot(value.param) = Some(number_json(value));
+        if let Some(slot) = fixed.slot(value.param) {
+            *slot = Some(number_json(value));
+        }
     }
     RecipeJson {
         id: None,
@@ -150,6 +158,8 @@ pub(crate) fn recipe_json(recipe: &TestRecipe) -> RecipeJson {
         crosshatch: recipe.crosshatch,
         // Only an Image grid writes its dither, so the other kinds keep the stored form of `0112`.
         dither: recipe.dither().map(|d| d.key().to_owned()),
+        // The Ramp is the absent key, so a Ramp grid keeps the stored form of `0123`.
+        picture: (recipe.picture == PictureSource::Selected).then(|| PICTURE_SELECTED.to_owned()),
         material: None,
     }
 }
@@ -174,10 +184,14 @@ pub(crate) fn read_recipe(json: &RecipeJson) -> Option<TestRecipe> {
     if columns.param == rows.param {
         return None;
     }
+    let picture = read_picture(json, kind)?;
+    if picture == PictureSource::Ramp && [columns.param, rows.param].contains(&Param::Strength) {
+        return None;
+    }
     let mut stored = json.fixed.clone();
     let mut fixed = BTreeMap::new();
     for param in Param::ALL {
-        let slot = stored.slot(param).take();
+        let slot = stored.slot(param).and_then(Option::take);
         let shared = param.offered(kind) && param != columns.param && param != rows.param;
         match (shared, slot) {
             (true, Some(number)) => {
@@ -200,7 +214,23 @@ pub(crate) fn read_recipe(json: &RecipeJson) -> Option<TestRecipe> {
         cell: Length::from_mm(cell),
         crosshatch: json.crosshatch,
         dither,
+        picture,
     })
+}
+
+/// The stored text of the selected picture.
+const PICTURE_SELECTED: &str = "selected";
+/// The stored text of the Ramp, read as the absent key (a Ramp grid never writes it).
+const PICTURE_RAMP: &str = "ramp";
+
+/// The picture of `json` (ADR 0072 §6): absent or `"ramp"` the Ramp, `"selected"` on an Image
+/// grid the selected picture; any other value, or `"selected"` on another kind, is `None`.
+fn read_picture(json: &RecipeJson, kind: SetKind) -> Option<PictureSource> {
+    match json.picture.as_deref() {
+        None | Some(PICTURE_RAMP) => Some(PictureSource::Ramp),
+        Some(PICTURE_SELECTED) if kind == SetKind::Image => Some(PictureSource::Selected),
+        Some(_) => None,
+    }
 }
 
 /// The dither of `json` (ADR 0069 §13): on an Image grid a binary mode, absent reading
@@ -208,7 +238,7 @@ pub(crate) fn read_recipe(json: &RecipeJson) -> Option<TestRecipe> {
 fn read_dither(json: &RecipeJson, kind: SetKind) -> Option<Dither> {
     match (json.dither.as_deref(), kind) {
         (None, _) => Some(Dither::FloydSteinberg),
-        (Some(key), SetKind::Image) => Dither::from_key(key).filter(|d| d.is_binary()),
+        (Some(key), SetKind::Image) => Dither::from_key(key).filter(|d| d.in_test_grid()),
         (Some(_), _) => None,
     }
 }

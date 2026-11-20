@@ -255,6 +255,10 @@ impl Session {
         } else if !unsupported_width {
             self.unsupported_width_shown.set(false);
         }
+        // An adjusted picture draws its look (`specs/0135` criterion 15).
+        if let Some(looked) = self.adjusted_artwork(&artwork_objects) {
+            artwork_objects = Cow::Owned(looked);
+        }
         // The Trace tool washes the images it traces (`specs/0025-raster-trace` criteria 2, 68).
         if self.tool == Tool::Trace {
             self.trace_artwork(artwork_objects.to_mut());
