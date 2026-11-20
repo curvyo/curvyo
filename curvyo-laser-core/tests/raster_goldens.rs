@@ -17,8 +17,7 @@ use curvyo_document_core::{
 };
 use curvyo_image_core::{WorkingImage, decode_working, encode_png};
 use curvyo_laser_core::job::{
-    JobInput, LeafGeometry, LeafOutline, MoveKind, PlanCache, Timeline, build_job, raster_dot_map,
-    write,
+    JobInput, LeafGeometry, LeafOutline, MoveKind, PlanCache, Timeline, build_job, write,
 };
 use curvyo_laser_core::operations::OperationKind::{self, Cut, Engrave, EngraveOutline, Image};
 use curvyo_laser_core::settings::{
@@ -27,6 +26,16 @@ use curvyo_laser_core::settings::{
 use curvyo_laser_core::{FeedRate, OriginCorner};
 use job_fixtures::{Page, circle, frame, grey_image, line, own, plain, settings};
 use serde_json::json;
+
+/// Superseded by the Dither on the picture (2026-11-20): the picture leaf holds the dither the
+/// operation's `options` name (ADR 0072 amendment A4), so the dot maps keep their bytes.
+fn raster_dot_map(leaf: &LeafGeometry, options: &OperationOptions, interval: Interval) -> String {
+    curvyo_laser_core::job::raster_dot_map(
+        &job_fixtures::with_dither(leaf.clone(), job_fixtures::dither_of(&options.image)),
+        options,
+        interval,
+    )
+}
 
 fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
@@ -93,6 +102,7 @@ fn alpha_edge() -> WorkingImage {
 
 fn picture(x: f64, y: f64, w: f64, h: f64, pixels: WorkingImage) -> LeafGeometry {
     LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: frame(x, y, w, h),
         asset: AssetHash::of(&pixels.pixels),
         pixels: Some(Arc::new(pixels)),

@@ -48,7 +48,9 @@ fn criterion_47_the_image_button_makes_image_1_and_engrave_hatches_the_frame() {
         (Some("Image 1"), Some("image"))
     );
     assert_eq!(r["section"], "marking");
-    assert_eq!(image_group(&s, raster)["dither"], "floyd_steinberg");
+    // Superseded by the Dither on the picture (2026-11-20): a picture-only row shows no Dither.
+    assert!(image_group(&s, raster)["dither"].is_null());
+    assert_eq!(image_group(&s, raster)["invert"], false);
     let engrave = s.press_operation_kind("engrave", false).unwrap();
     assert_eq!(row(&rows(&s), engrave)["name"], "Engrave 1");
     numbers(&mut s, raster);

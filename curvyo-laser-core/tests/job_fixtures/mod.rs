@@ -11,6 +11,7 @@
 use std::collections::BTreeMap;
 
 use curvyo_document_core::{Document, DocumentSize, Length, NodeId, Point, RectBounds, Vec2};
+use curvyo_laser_core::adjust::DitherSettings;
 use curvyo_laser_core::job::{
     BlockInput, BlockSource, CutOutItem, JobInput, LeafGeometry, LeafInput, LeafOutline,
     MachineInput, Ring, Start,
@@ -18,8 +19,9 @@ use curvyo_laser_core::job::{
 use curvyo_laser_core::library::{LaserSets, Material, MaterialRead, Set, SetSource};
 use curvyo_laser_core::operations::{KindRead, OperationKind};
 use curvyo_laser_core::settings::{
-    Interval, MachineTie, OperationOptions, Overscan, Passes, PowerPercent, ScanAngle, SetKind,
-    SetNumbers, Settings, SettingsRead, StoredSettings, Thickness, ZOffset, read_settings,
+    ImageSettings, Interval, MachineTie, OperationOptions, Overscan, Passes, PowerPercent,
+    ScanAngle, SetKind, SetNumbers, Settings, SettingsRead, StoredSettings, Thickness, ZOffset,
+    read_settings,
 };
 use curvyo_laser_core::{FeedRate, OriginCorner, ProfileValues};
 use serde_json::{Value, json};
@@ -30,6 +32,26 @@ pub const PROFILE: &str = "6f1c2b0a-5d4e-4f3a-9b2c-1d0e8f7a6b5c";
 pub const BIRCH: &str = "0b3c7f1e-8f0e-4c4a-9a51-2f6c1c1e9d10";
 
 /// `n` distinct node ids.
+/// The dither fields of an operation's Image settings.
+pub fn dither_of(image: &ImageSettings) -> DitherSettings {
+    DitherSettings {
+        mode: image.dither,
+        threshold_pct: image.threshold_pct,
+        screen_size_um: image.screen_size_hundredths * 10,
+        screen_angle_deg: image.screen_angle_deg,
+    }
+}
+
+/// `leaf` with the picture's dither set to `dither`, any other leaf unchanged: the goldens that
+/// set a picture's dither on its operation before the Dither moved to the picture (ADR 0072
+/// amendment A4) keep their dots.
+pub fn with_dither(mut leaf: LeafGeometry, dither: DitherSettings) -> LeafGeometry {
+    if let LeafGeometry::Image { adjust, .. } = &mut leaf {
+        adjust.dither = dither;
+    }
+    leaf
+}
+
 pub fn ids(n: usize) -> Vec<NodeId> {
     let d = Document::new(1);
     (0..n)
@@ -105,8 +127,25 @@ impl Page {
         Ring::Operation(u32::try_from(operations).unwrap() + 1)
     }
 
-    /// Adds an operation block of `kind` with own numbers and the leaves `leaves`.
+    /// Adds an operation block of `kind` with own numbers and the leaves `leaves`. Superseded by
+    /// the Dither on the picture (2026-11-20): each picture leaf holds the dither of `options`
+    /// (the mode moved from the operation onto the picture, ADR 0072 amendment A4), so the fixtures
+    /// burn the dots they burned; [`Page::operation_as_is`] keeps the leaves' own dither.
     pub fn operation(
+        &mut self,
+        kind: OperationKind,
+        name: &str,
+        settings: SettingsRead,
+        options: OperationOptions,
+        leaves: Vec<LeafGeometry>,
+    ) -> NodeId {
+        let dither = dither_of(&options.image);
+        let leaves = leaves.into_iter().map(|l| with_dither(l, dither)).collect();
+        self.operation_as_is(kind, name, settings, options, leaves)
+    }
+
+    /// Adds an operation block of `kind` with own numbers and the leaves `leaves` as they are.
+    pub fn operation_as_is(
         &mut self,
         kind: OperationKind,
         name: &str,
@@ -323,6 +362,7 @@ pub fn leaf(outlines: Vec<LeafOutline>) -> LeafGeometry {
 
 pub fn image(x: f64, y: f64, w: f64, h: f64) -> LeafGeometry {
     LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: frame(x, y, w, h),
         asset: curvyo_document_core::AssetHash::of(b"unreadable"),
         pixels: None,
@@ -348,6 +388,7 @@ pub fn picture(
     pixels: curvyo_image_core::WorkingImage,
 ) -> LeafGeometry {
     LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: frame(x, y, w, h),
         asset: curvyo_document_core::AssetHash::of(&pixels.pixels),
         pixels: Some(std::sync::Arc::new(pixels)),

@@ -29,6 +29,7 @@ test("the five Rust states decode, and nothing else is in the folder", () => {
     "options_damaged",
     "options_engrave",
     "options_image",
+    "options_image_gradient",
     "placed_and_clone_rows",
     "select_bar_kinds",
     "unknown_and_clone_members",
@@ -316,10 +317,17 @@ test("an Image row shows the Image settings group in its options (specs/0123 AC 
   assert.ok(view);
   const image = view.rows[0]?.settings?.options?.image;
   assert.ok(image);
-  assert.equal(image.dither, "grey");
-  assert.equal(image.modes.length, 7);
-  assert.equal(image.modeField?.field, "lowest_power", "Lowest power in Threshold's row");
-  assert.equal(image.modeField?.value, 12.5);
+  // Superseded by the Dither on the picture (2026-11-20): a picture-only row has no Dither of its own; Lowest power shows while
+  // its picture burns Grey (Frage 284 B); "Dither for gradient fills" only with a gradient fill.
+  assert.equal(image.dither, null);
+  assert.equal(image.lowestPower?.field, "lowest_power");
+  assert.equal(image.lowestPower?.value, 12.5);
+  const gradient = decodeOperationsView(fixture("options_image_gradient"))?.rows[0]?.settings?.options?.image;
+  assert.ok(gradient?.dither);
+  assert.equal(gradient.dither.dither, "grey");
+  assert.equal(gradient.dither.modes.length, 9, "the two screens of specs/0135 last");
+  assert.deepEqual(gradient.dither.screenFields, [], "no screen fields for Grey");
+  assert.equal(gradient.dither.modeField, null, "no Lowest power in the Dither block");
   assert.deepEqual(
     image.fields.map((f) => [f.field, f.value, f.unit]),
     [
@@ -343,8 +351,35 @@ test("an Image row has no Crosshatch toggle, and a damaged dither decodes to no 
     lowerPart(row.kind, row.settings)?.toggles.map((toggle) => toggle.option),
     ["bidirectional"],
   );
-  const damaged = structuredClone(raw) as Raw;
-  const settings = damaged.rows[0].settings as { options: { image: Record<string, unknown> } };
-  settings.options.image.dither = null;
-  assert.equal(decodeOperationsView(damaged)?.rows[0].settings?.options?.image?.dither, null);
+  const damaged = structuredClone(fixture("options_image_gradient")) as Raw;
+  const settings = damaged.rows[0].settings as { options: { image: { dither: Record<string, unknown> } } };
+  settings.options.image.dither.dither = null;
+  assert.equal(decodeOperationsView(damaged)?.rows[0].settings?.options?.image?.dither?.dither, null);
+});
+
+test("specs/0135 criteria 42, 43: the screen modes decode with Cell size or Line pitch and Angle", () => {
+  const raw = fixture("options_image_gradient") as {
+    rows: Array<{ settings: { options: { image: { dither: Record<string, unknown> } } } }>;
+  };
+  const image = raw.rows[0].settings.options.image.dither;
+  image.dither = "line_screen";
+  image.mode_field = null;
+  image.screen_fields = [
+    { field: "screen_size", label: "Line pitch", value: 0.8, unit: "mm", range: "Line pitch is 0.20 to 5.00 mm." },
+    { field: "screen_angle", label: "Angle", value: 45, unit: "°", range: "Angle is 0 to 179°." },
+  ];
+  const decoded = decodeOperationsView(raw)?.rows[0]?.settings?.options?.image?.dither;
+  assert.ok(decoded);
+  assert.equal(decoded.dither, "line_screen");
+  assert.deepEqual(
+    decoded.screenFields.map((f) => [f.field, f.label, f.value, f.unit]),
+    [
+      ["screen_size", "Line pitch", 0.8, "mm"],
+      ["screen_angle", "Angle", 45, "°"],
+    ],
+  );
+  image.screen_fields = [{ field: "screen_pitch", label: "x", value: 1, unit: "", range: "x" }];
+  assert.equal(decodeOperationsView(raw), null, "an unknown screen field is refused");
+  delete image.screen_fields;
+  assert.equal(decodeOperationsView(raw), null, "the list is required");
 });

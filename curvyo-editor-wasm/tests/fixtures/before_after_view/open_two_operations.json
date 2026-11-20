@@ -1,0 +1,52 @@
+{
+  "after": {
+    "image": {
+      "height": 40,
+      "placement": [
+        8.0,
+        -0.0,
+        0.0,
+        4.0,
+        10.0,
+        10.0
+      ],
+      "width": 80
+    },
+    "reduced": false
+  },
+  "before": {
+    "height": 20,
+    "placement": [
+      8.0,
+      0.0,
+      0.0,
+      4.0,
+      10.0,
+      10.0
+    ],
+    "width": 40
+  },
+  "empty": null,
+  "interval_mm": 0.1,
+  "open": true,
+  "operations": [
+    {
+      "id": {
+        "counter": 23,
+        "peer": "290137"
+      },
+      "name": "Image 1",
+      "pressed": true
+    },
+    {
+      "id": {
+        "counter": 30,
+        "peer": "290137"
+      },
+      "name": "Image 2",
+      "pressed": false
+    }
+  ],
+  "subject": "Photo 1 · Image 1 · Jarvis · 0.10 mm",
+  "view": "split"
+}

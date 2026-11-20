@@ -27,6 +27,7 @@ test("the widths are those of the notes", () => {
   assert.equal(IMAGE_FIELD_LOOK.lowest_power.width, 132);
   assert.equal(IMAGE_FIELD_LOOK.brightness.width, 120);
   assert.equal(IMAGE_FIELD_LOOK.contrast.width, 108);
+  assert.equal(IMAGE_FIELD_LOOK.screen_size.width, 136);
   assert.equal(
     IMAGE_FIELD_LOOK.brightness.width + 4 + IMAGE_FIELD_LOOK.contrast.width,
     232,

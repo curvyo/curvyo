@@ -111,7 +111,7 @@ async function waitFor(url) {
     // The Dither strip: always visible, two fixed rows, short name Floyd with the full name as label.
     const strip = p.getByRole('radiogroup', { name: 'Dither' });
     const cells = strip.getByRole('radio');
-    assert.deepEqual(await cells.evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.textContent.trim()])), [['Threshold', 'Threshold'], ['Ordered', 'Ordered'], ['Floyd-Steinberg', 'Floyd'], ['Jarvis', 'Jarvis'], ['Atkinson', 'Atkinson'], ['Stucki', 'Stucki'], ['Grey', 'Grey']]);
+    assert.deepEqual(await cells.evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.textContent.trim()])), [['Threshold', 'Threshold'], ['Ordered', 'Ordered'], ['Floyd-Steinberg', 'Floyd'], ['Jarvis', 'Jarvis'], ['Atkinson', 'Atkinson'], ['Stucki', 'Stucki'], ['Grey', 'Grey'], ['Halftone dots', 'Halftone'], ['Line screen', 'Lines']]);
     const rowsOf = async () => cells.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
     const tops0 = await rowsOf();
     assert.ok(tops0[0] === tops0[1] && tops0[1] === tops0[2] && tops0[3] === tops0[6] && tops0[2] < tops0[3], `rows 3 + 4: ${tops0}`);

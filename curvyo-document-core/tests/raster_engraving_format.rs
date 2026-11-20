@@ -2,7 +2,7 @@
 //! §8, §10, §13, §14): the goldens `raster_engraving_v50.curvyo` (an Image operation linked to a
 //! material, with an image, a linked clone of it, a gradient-filled ellipse and every Image
 //! setting; an Engrave holding the image and the ellipse; an Image test grid with Dither Ordered)
-//! and `raster_engraving_damaged_v50.curvyo` (a `dither` of `"halftone"`, `gamma` 4.01, `dither`
+//! and `raster_engraving_damaged_v50.curvyo` (a `dither` of `"halftone_x"`, `gamma` 4.01, `dither`
 //! on a Cut and on an Engrave, `crosshatch` on an Image) read back as plain values and save back
 //! unchanged; an Image settings edit is one step
 //! "Edit settings"; two saves are byte-identical; a file of the next format is refused. The laser
@@ -344,7 +344,7 @@ fn damaged_bytes() -> Vec<u8> {
     let d = Document::new(1);
     let mfg = laser(&d);
     for (kind, name, value) in [
-        ("image", "Image 1", json!({"dither": "halftone"})),
+        ("image", "Image 1", json!({"dither": "halftone_x"})),
         ("image", "Image 2", json!({"gamma": 4.01})),
         ("cut", "Cut 1", json!({"dither": "ordered"})),
         ("engrave", "Engrave 1", json!({"dither": "ordered"})),
@@ -356,13 +356,23 @@ fn damaged_bytes() -> Vec<u8> {
     pack(&d, "0.1.0").unwrap()
 }
 
+/// `document.json` with the format number of a newer build put back to 50.
+fn as_format_50(json: &[u8]) -> String {
+    String::from_utf8(json.to_vec()).unwrap().replacen(
+        "\"format_version\": 51,",
+        "\"format_version\": 50,",
+        1,
+    )
+}
+
 fn row(d: &Document, at: usize) -> curvyo_document_core::OperationSnapshot {
     d.operations(d.manufacturings()[0].id).unwrap()[at].clone()
 }
 
 #[test]
 fn the_format_is_50() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 50);
+    // Superseded by 0135 slice 1 (2026-11-19): format 51.
+    assert_eq!(CURRENT_FORMAT_VERSION, 51);
 }
 
 #[test]
@@ -427,9 +437,10 @@ fn saving_twice_gives_the_same_bytes_and_the_golden_saves_back_unchanged() {
         first, second,
         "no pixel, dot or row is stored (criterion 38)"
     );
+    // Superseded by 0135 slice 1 (2026-11-19): saved by a build of format 51, the same content under its own version.
     assert_eq!(
-        members(&first)["document.json"],
-        members(&bytes)["document.json"]
+        as_format_50(&members(&first)["document.json"]),
+        as_format_50(&members(&bytes)["document.json"])
     );
     assert_eq!(
         members(&first).keys().collect::<Vec<_>>(),
@@ -448,7 +459,7 @@ fn the_damaged_golden_opens_and_keeps_every_damaged_map() {
     assert_eq!(
         stored,
         [
-            json!({"dither": "halftone"}),
+            json!({"dither": "halftone_x"}),
             json!({"gamma": 4.01}),
             json!({"dither": "ordered"}),
             json!({"dither": "ordered"}),
@@ -456,9 +467,10 @@ fn the_damaged_golden_opens_and_keeps_every_damaged_map() {
         ]
     );
     let saved = pack(&d, "0.1.0").unwrap();
+    // Superseded by 0135 slice 1 (2026-11-19): saved by a build of format 51.
     assert_eq!(
-        members(&saved)["document.json"],
-        members(&bytes)["document.json"],
+        as_format_50(&members(&saved)["document.json"]),
+        as_format_50(&members(&bytes)["document.json"]),
         "never repaired on read"
     );
 }
@@ -491,8 +503,8 @@ fn a_file_of_the_next_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 51,
-            supported: 50
+            found: 52,
+            supported: 51
         })
     ));
 }

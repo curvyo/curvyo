@@ -111,6 +111,7 @@ fn page(pixels: &Arc<WorkingImage>, dither: Dither) -> JobInput {
                 node: ids[1],
                 stacking: 0,
                 geometry: LeafGeometry::Image {
+                    adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
                     frame,
                     asset: AssetHash::of(b"budget"),
                     pixels: Some(Arc::clone(pixels)),
@@ -142,6 +143,9 @@ fn a_four_million_dot_image_builds_within_its_budget_in_every_mode() {
         (Dither::Jarvis, 350),
         (Dither::Atkinson, 350),
         (Dither::Stucki, 350),
+        // ADR 0074 §6: the two screens within the Threshold and Ordered budget.
+        (Dither::Halftone, 200),
+        (Dither::LineScreen, 200),
     ] {
         let (built, took) = build(&page(&pixels, dither));
         assert!(

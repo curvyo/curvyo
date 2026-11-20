@@ -174,8 +174,20 @@ fn state_options_engrave() -> Document {
 
 /// An Image operation holding a 20 x 10 mm image in Grey with every Image setting set
 /// (`specs/0123` criteria 11 to 13, 47): the unfolded row shows the Image settings group, Lowest
-/// power last, and no Crosshatch.
+/// power last, and no Crosshatch. Superseded by the Dither on the picture (2026-11-20): the
+/// picture burns Grey with its own dither, so the group shows Lowest power and no Dither of its
+/// own (ADR 0072 amendment A4, Frage 284 B).
 fn state_options_image() -> Document {
+    state_options_image_with(false)
+}
+
+/// [`state_options_image`] with a gradient-filled rectangle in the operation too: the group shows
+/// "Dither for gradient fills" (`specs/0135` UX notes 10, P30).
+fn state_options_image_gradient() -> Document {
+    state_options_image_with(true)
+}
+
+fn state_options_image_with(gradient: bool) -> Document {
     let (d, laser, o) = document();
     let m = manufacturing(&d, &laser);
     let image = d
@@ -185,7 +197,36 @@ fn state_options_image() -> Document {
             name: "Photo 1".to_owned(),
         }])
         .unwrap()[0];
-    let raster = add(&d, m, "image", "Image 1", &[vec![image]]);
+    let mut members = vec![vec![image]];
+    if gradient {
+        let rect = square(&d, o, 40.0, 10.0);
+        d.edit_style(
+            &[rect],
+            &curvyo_document_core::StyleEdit::FillPaint(curvyo_document_core::FillPaint::Gradient),
+        )
+        .unwrap();
+        members.push(vec![rect]);
+    }
+    let picture_dither = curvyo_document_core::StoredDither {
+        mode: "grey".to_owned(),
+        fields: [
+            ("threshold_pct", 40),
+            ("screen_size_um", 800),
+            ("screen_angle_deg", 45),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v))
+        .collect(),
+    };
+    d.edit_image_adjustments(
+        image,
+        &curvyo_document_core::AdjustmentsWrite {
+            dither: Some(picture_dither),
+            ..curvyo_document_core::AdjustmentsWrite::default()
+        },
+    )
+    .unwrap();
+    let raster = add(&d, m, "image", "Image 1", &members);
     settings(
         &d,
         raster,
@@ -339,6 +380,11 @@ fn states() -> Vec<(&'static str, Document, Setup)> {
             motorised_and_unfolded,
         ),
         ("options_image", state_options_image(), unfold_first),
+        (
+            "options_image_gradient",
+            state_options_image_gradient(),
+            unfold_first,
+        ),
         (
             "options_cut_z_hidden",
             state_options_cut_z_hidden(),

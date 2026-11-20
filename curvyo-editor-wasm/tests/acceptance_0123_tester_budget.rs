@@ -162,13 +162,15 @@ fn c12_c37d_one_image_setting_edit_in_the_app_frame_takes_50_ms() {
 
 #[test]
 fn c12_c37d_a_dither_pick_and_its_undo_in_the_app_frame_take_50_ms() {
-    let (mut s, e) = session();
+    // Superseded by the Dither on the picture (2026-11-20): the pick is the picture's Dither strip.
+    let (mut s, _) = session();
+    assert!(s.select_operation_items("running"));
     let modes = ["ordered", "jarvis", "atkinson", "stucki", "threshold"];
     let mut picks = Vec::new();
     let mut undos = Vec::new();
     for mode in modes {
         let ((), took) = cpu_time::cpu_time_of(|| {
-            assert!(s.set_operation_dither(e, mode));
+            assert!(s.set_picture_dither(mode));
             frame(&s);
         });
         picks.push(took);
@@ -177,7 +179,7 @@ fn c12_c37d_a_dither_pick_and_its_undo_in_the_app_frame_take_50_ms() {
             frame(&s);
         });
         undos.push(took);
-        assert!(s.set_operation_dither(e, mode));
+        assert!(s.set_picture_dither(mode));
         frame(&s);
     }
     check("12/37 d dither pick + app frame", &picks, 50);
@@ -186,8 +188,10 @@ fn c12_c37d_a_dither_pick_and_its_undo_in_the_app_frame_take_50_ms() {
 
 #[test]
 fn c37b_the_writer_of_a_worst_case_dither_takes_250_ms() {
-    let (mut s, e) = session();
-    assert!(s.set_operation_dither(e, "ordered"));
+    // Superseded by the Dither on the picture (2026-11-20): the picture burns Ordered.
+    let (mut s, _) = session();
+    assert!(s.select_operation_items("running"));
+    assert!(s.set_picture_dither("ordered"));
     let mut times = Vec::new();
     for _ in 0..REPEATS {
         let _ = s.output_group_json();

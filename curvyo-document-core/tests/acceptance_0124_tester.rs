@@ -588,7 +588,11 @@ fn fixture(name: &str) -> Vec<u8> {
 
 #[test]
 fn c22_format_bump_and_the_good_golden_opens_with_every_kind() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 50, "format 49, then 50 by `0123`");
+    // Superseded by 0135 slice 1 (2026-11-19).
+    assert_eq!(
+        CURRENT_FORMAT_VERSION, 51,
+        "format 49, then 50 by `0123`, 51 by `0135`"
+    );
     let name = "gradient_fill_v49.curvyo".to_owned();
     let d = unpack(3, &fixture(&name)).expect("the golden opens");
     let read = d.read_objects();

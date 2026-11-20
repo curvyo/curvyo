@@ -1,0 +1,156 @@
+{
+  "add_geometry": [],
+  "add_tone": [],
+  "before_after_open": false,
+  "clone_row": "original",
+  "derived": {
+    "line": "From preset Graphics, Strength 50 %",
+    "rows": [
+      {
+        "accessible_name": "Denoise, Strength 40 %, Detail kept 80 %",
+        "down": false,
+        "enabled": true,
+        "fields": [],
+        "histogram": null,
+        "index": null,
+        "kind": "denoise",
+        "line": "Strength 40 %, Detail kept 80 %",
+        "name": "Denoise",
+        "preset_in_use": false,
+        "unknown": false,
+        "up": false
+      },
+      {
+        "accessible_name": "Levels, Black 8 %, White 97 %, Gamma 1.00",
+        "down": false,
+        "enabled": true,
+        "fields": [],
+        "histogram": null,
+        "index": null,
+        "kind": "levels",
+        "line": "Black 8 %, White 97 %, Gamma 1.00",
+        "name": "Levels",
+        "preset_in_use": false,
+        "unknown": false,
+        "up": false
+      },
+      {
+        "accessible_name": "Sharpen, Radius 0.10 mm, Amount 50 %, Threshold 8 %",
+        "down": false,
+        "enabled": true,
+        "fields": [],
+        "histogram": null,
+        "index": null,
+        "kind": "sharpen",
+        "line": "Radius 0.10 mm, Amount 50 %, Threshold 8 %",
+        "name": "Sharpen",
+        "preset_in_use": false,
+        "unknown": false,
+        "up": false
+      }
+    ]
+  },
+  "dither": {
+    "dither": "ordered",
+    "mode_field": null,
+    "modes": [
+      {
+        "label": "Threshold",
+        "value": "threshold"
+      },
+      {
+        "label": "Ordered",
+        "value": "ordered"
+      },
+      {
+        "label": "Floyd-Steinberg",
+        "value": "floyd_steinberg"
+      },
+      {
+        "label": "Jarvis",
+        "value": "jarvis"
+      },
+      {
+        "label": "Atkinson",
+        "value": "atkinson"
+      },
+      {
+        "label": "Stucki",
+        "value": "stucki"
+      },
+      {
+        "label": "Grey",
+        "value": "grey"
+      },
+      {
+        "label": "Halftone dots",
+        "value": "halftone"
+      },
+      {
+        "label": "Line screen",
+        "value": "line_screen"
+      }
+    ],
+    "screen_fields": []
+  },
+  "memory_line": null,
+  "notice": null,
+  "presets": [
+    {
+      "cell": "Photo",
+      "key": "photo",
+      "name": "Photo (detailed)",
+      "pressed": false,
+      "tooltip": "Photo (detailed) · Dither: Jarvis"
+    },
+    {
+      "cell": "Graphics",
+      "key": "graphics",
+      "name": "Graphics (flat areas)",
+      "pressed": true,
+      "tooltip": "Graphics (flat areas) · Dither: Ordered"
+    },
+    {
+      "cell": "Black and white",
+      "key": "black_white",
+      "name": "Black and white (hard edges)",
+      "pressed": false,
+      "tooltip": "Black and white (hard edges) · Dither: Threshold 50 %"
+    },
+    {
+      "cell": "Line art",
+      "key": "line_art",
+      "name": "Line art (outlines and handwriting)",
+      "pressed": false,
+      "tooltip": "Line art (outlines and handwriting) · Dither: Threshold 50 %"
+    },
+    {
+      "cell": "Dots",
+      "key": "dot_raster",
+      "name": "Dot raster (round dots)",
+      "pressed": false,
+      "tooltip": "Dot raster (round dots) · Dither: Halftone"
+    },
+    {
+      "cell": "Newspaper",
+      "key": "newspaper",
+      "name": "Newspaper (retro screen)",
+      "pressed": false,
+      "tooltip": "Newspaper (retro screen) · Dither: Lines"
+    },
+    {
+      "cell": "Expert",
+      "key": "expert",
+      "name": "Expert",
+      "pressed": false,
+      "tooltip": "Expert · Dither unchanged"
+    }
+  ],
+  "restore_enabled": true,
+  "state_line": "Not engraved yet",
+  "steps": [],
+  "strength": {
+    "range": "Strength is 0 to 100 %.",
+    "value": 50
+  }
+}

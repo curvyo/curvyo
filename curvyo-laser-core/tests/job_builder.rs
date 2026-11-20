@@ -192,6 +192,7 @@ fn the_estimate_is_burn_over_feed_plus_travel_over_the_maximum_feed() {
                 main: numbers,
                 outline: None,
                 interval: curvyo_laser_core::settings::Interval::default(),
+                picture_interval: curvyo_laser_core::settings::Interval::default(),
                 options: plain(),
             },
             z: None,

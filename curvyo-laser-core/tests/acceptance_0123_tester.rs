@@ -29,11 +29,21 @@ use std::sync::Arc;
 
 use curvyo_document_core::{AssetHash, Color, GradientBox, GradientFill, PlacedGradient, Point};
 use curvyo_image_core::WorkingImage;
-use curvyo_laser_core::job::{LeafGeometry, raster_dot_map};
+use curvyo_laser_core::job::LeafGeometry;
 use curvyo_laser_core::library::read_record;
 use curvyo_laser_core::settings::{Dither, ImageSettings, Interval, OperationOptions, ScanAngle};
 use job_fixtures::{circle, frame, plain};
 use tester_raster_0123::{Mode, burned, dither, map_text, parse_map, read};
+
+/// Superseded by the Dither on the picture (2026-11-20): the picture leaf holds the dither the
+/// operation's `options` name (ADR 0072 amendment A4), so the dot maps keep their bytes.
+fn raster_dot_map(leaf: &LeafGeometry, options: &OperationOptions, interval: Interval) -> String {
+    curvyo_laser_core::job::raster_dot_map(
+        &job_fixtures::with_dither(leaf.clone(), job_fixtures::dither_of(&options.image)),
+        options,
+        interval,
+    )
+}
 
 fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
@@ -67,6 +77,7 @@ fn grey_img(w: u32, h: u32, mut g: impl FnMut(u32, u32) -> u8) -> WorkingImage {
 fn leaf(img: WorkingImage, i: f64) -> LeafGeometry {
     let (w, h) = (f64::from(img.width) * i, f64::from(img.height) * i);
     LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: frame(10.0, 10.0, w, h),
         asset: AssetHash::of(&img.pixels),
         pixels: Some(Arc::new(img)),
@@ -452,6 +463,7 @@ fn c6_a_finer_source_is_averaged_and_a_coarser_one_is_smooth() {
         [v, v, v, 255]
     });
     let l = LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: frame(0.0, 0.0, 1.6, 1.6),
         asset: AssetHash::of(&fine.pixels),
         pixels: Some(Arc::new(fine)),
@@ -466,6 +478,7 @@ fn c6_a_finer_source_is_averaged_and_a_coarser_one_is_smooth() {
     // A 2 x 1 picture (black, white) over 40 dots: a smooth ramp, many levels, not 2 blocks.
     let coarse = image(2, 1, |x, _| if x == 0 { [0, 0, 0, 255] } else { [255; 4] });
     let l = LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: frame(0.0, 0.0, 4.0, 0.1),
         asset: AssetHash::of(&coarse.pixels),
         pixels: Some(Arc::new(coarse)),
@@ -480,6 +493,7 @@ fn c6_a_finer_source_is_averaged_and_a_coarser_one_is_smooth() {
 fn c5_a_1x1_image_is_one_value_over_its_whole_frame() {
     let one = image(1, 1, |_, _| [0, 0, 0, 255]);
     let l = LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: frame(0.0, 0.0, 2.0, 1.0),
         asset: AssetHash::of(&one.pixels),
         pixels: Some(Arc::new(one)),
@@ -497,6 +511,7 @@ fn c5_a_1x1_image_is_one_value_over_its_whole_frame() {
 fn c5_scan_angle_dots_stay_in_the_frame_and_count_matches_the_area() {
     let black = grey_img(16, 16, |_, _| 0);
     let l = LeafGeometry::Image {
+        adjust: curvyo_laser_core::adjust::AdjustRegisters::default(),
         frame: frame(0.0, 0.0, 1.6, 1.6),
         asset: AssetHash::of(&black.pixels),
         pixels: Some(Arc::new(black)),

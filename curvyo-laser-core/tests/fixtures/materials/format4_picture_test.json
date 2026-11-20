@@ -1,0 +1,155 @@
+{
+  "format_version": 4,
+  "id": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c",
+  "kind": "laser",
+  "modified": 1762948805000,
+  "name": "Slate tile",
+  "thickness_mm": 5.0,
+  "lasers": [
+    {
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "sets": {
+        "engrave": {
+          "power_pct": 60.0,
+          "speed_mm_min": 3000,
+          "passes": 1,
+          "interval_mm": 0.15,
+          "source": "typed"
+        },
+        "image": {
+          "power_pct": 80.0,
+          "speed_mm_min": 3000,
+          "passes": 1,
+          "interval_mm": 0.1,
+          "source": {
+            "test": "9GR4D"
+          }
+        }
+      }
+    }
+  ],
+  "tests": [
+    {
+      "id": "9GR4D",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "image",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "interval",
+          "min": 0.05,
+          "max": 0.25,
+          "count": 5
+        },
+        "fixed": {
+          "speed_mm_min": 3000,
+          "passes": 1
+        },
+        "cell_mm": 8.0,
+        "crosshatch": false,
+        "dither": "ordered"
+      },
+      "lasered": 1762948801000,
+      "best": {
+        "column": 3,
+        "row": 1
+      },
+      "note": "Ordered ramp, even at 0.10 mm."
+    },
+    {
+      "id": "5SL1D",
+      "created": 1762948802000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "engrave",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "interval",
+          "min": 0.05,
+          "max": 0.25,
+          "count": 5
+        },
+        "fixed": {
+          "speed_mm_min": 3000,
+          "passes": 1
+        },
+        "cell_mm": 8.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "7ST4R",
+      "created": 1762948806000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "image",
+        "columns": {
+          "param": "strength",
+          "min": 0,
+          "max": 100,
+          "count": 5
+        },
+        "rows": {
+          "param": "power",
+          "min": 40.0,
+          "max": 80.0,
+          "count": 3
+        },
+        "fixed": {
+          "speed_mm_min": 3000,
+          "passes": 1,
+          "interval_mm": 0.1
+        },
+        "cell_mm": 12.0,
+        "crosshatch": false,
+        "dither": "jarvis",
+        "picture": "selected"
+      },
+      "lasered": null,
+      "note": "Photo preset, Strength 0 to 100."
+    }
+  ],
+  "history": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "date": 1762948803000,
+      "event": "set",
+      "machine": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+      "kind": "image",
+      "set": {
+        "power_pct": 80.0,
+        "speed_mm_min": 3000,
+        "passes": 1,
+        "interval_mm": 0.1
+      },
+      "source": {
+        "test": "9GR4D"
+      }
+    }
+  ]
+}
