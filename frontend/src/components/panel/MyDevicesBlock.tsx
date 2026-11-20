@@ -352,8 +352,9 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
           frozenWarning={frozenWarning}
           offered={devices.offered}
           synced={view ? view.workspaces.filter((w) => w.on).map((w) => w.id) : []}
-          libraryConfirm={library_word("first-sync-confirm")}
+          libraryConfirm={devices.library.askFirstSync ? library_word("first-sync-confirm") : ""}
           onLibrarySync={devices.library.firstSync}
+          onLibraryDecline={devices.library.declineFirstSync}
           onDone={(chosen) => {
             devices.clearJustPaired();
             if (chosen.length > 0) {

@@ -215,9 +215,12 @@ test("c2: without a paired device the toggles grey with their reason and the sta
 
 // ---- criterion 4: a new item starts on (Frage 214 A) ---------------------------------------------------
 
-test("c4: an item without an entry starts with its toggle on, an off entry stays off", () => {
+test("c4: an item without an entry is plain until it is published, an off entry stays off", () => {
+  // Corrected 2026-11-19 (audit): an item that never synced used to read as on, so a declined
+  // first sync looked synced; a new item gets its entry on its first publish (the confirmed
+  // first sync, or its toggle) and reads on from then.
   const paired = view();
-  assert.equal(librarySyncOn(paired, "machines", "made-afterwards"), true, "a new item starts on");
+  assert.equal(librarySyncOn(paired, "machines", "made-afterwards"), false, "no entry: plain, a press turns it on");
   assert.equal(librarySyncOn(paired, "machines", "u2"), false);
   assert.equal(librarySyncOn(paired, "materials", "m1"), true);
   assert.equal(librarySyncOn(null, "machines", "u1"), true, "no group: on by default");
@@ -246,19 +249,21 @@ test("c3: the confirm sits in the pairing block with the spec's sentence, Sync l
     offered: [{ id: "w1", name: "Box job", documents: 2, memberOnly: false }],
     synced: [],
     libraryConfirm:
-      "Your fonts, machines and materials leave this computer encrypted, to your own computers only",
+      "Your machines and materials leave this computer encrypted, to your own computers only.",
     onLibrarySync: noop,
+    onLibraryDecline: noop,
     onDone: noop,
   });
   const groups = [...html.matchAll(/<div[^>]*role="group"[^>]*>/g)].map((m) => m[0]);
   assert.ok(groups.some((g) => /aria-label="Sync to my devices"/.test(g)), "the confirm's own group");
   assert.match(
     html,
-    /Your fonts, machines and materials leave this computer encrypted, to your own computers only/,
+    /Your machines and materials leave this computer encrypted, to your own computers only./,
     "the spec's sentence",
   );
   assert.match(html, />Sync libraries<\/button>/);
-  assert.match(html, />Not now<\/button>/);
+  assert.match(html, />Keep local<\/button>/);
+  assert.equal(html.match(/>Not now<\/button>/g)?.length, 1, "the workspaces' own Not now is the only one");
 });
 
 test("c3: only confirming runs the first sync, declining writes nothing", () => {

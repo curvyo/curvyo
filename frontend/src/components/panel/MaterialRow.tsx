@@ -223,7 +223,7 @@ function RenameField({ row, actions }: { row: Row; actions: MaterialRowActions }
 }
 
 function onNameKey(event: ReactKeyboardEvent, row: Row, armed: boolean, actions: MaterialRowActions) {
-  const action = materialKeyAction(event.key, event.altKey, armed);
+  const action = materialKeyAction(event.key, event.altKey, armed, event.ctrlKey || event.metaKey);
   if (action === "none") return;
   if (action === "open") {
     event.preventDefault();

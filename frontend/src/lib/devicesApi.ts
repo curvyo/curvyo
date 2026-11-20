@@ -43,6 +43,10 @@ export interface LibrarySyncApi {
   switch: (kind: "machine" | "material", id: string, on: boolean) => void;
   /** The first sync: every item on behind the one confirm (criterion 3). */
   firstSync: () => void;
+  /** Declines the first sync: the items stay local until their toggles are pressed. */
+  declineFirstSync: () => void;
+  /** Whether the first-sync confirm shows now (no entry in the group, not answered yet). */
+  askFirstSync: boolean;
 }
 
 /** The My devices block as the group session describes it. */

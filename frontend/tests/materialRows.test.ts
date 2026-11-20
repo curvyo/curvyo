@@ -172,6 +172,9 @@ test("keys: S switches the focused row's library sync (`0116` UX notes §2)", ()
   assert.equal(materialKeyAction("s", false, false), "sync");
   assert.equal(materialKeyAction("S", true, false), "sync");
   assert.equal(materialKeyAction("S", false, true), "sync");
+  assert.equal(materialKeyAction("s", false, false, true), "none", "Ctrl+S and Cmd+S are the app's save");
+  assert.equal(materialKeyAction("S", false, false, true), "none");
+  assert.equal(materialKeyAction("Delete", false, false, true), "none", "no Ctrl chord is a row action");
 });
 
 test("the window gives the unfolded row its body and every other row 40 px", () => {

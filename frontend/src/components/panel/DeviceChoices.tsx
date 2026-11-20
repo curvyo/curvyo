@@ -32,18 +32,35 @@ export function DecisionRow({ devices, id, name, text }: { devices: DevicesApi; 
 }
 
 /** The libraries' first-sync confirm (`specs/0116-library-sync` criterion 3): the spec's
- * sentence with the choice to confirm (every item on) or decline (nothing, can be done later
- * from the rows). */
-export function LibrarySyncConfirm({ sentence, onSync }: { sentence: string; onSync: () => void }) {
+ * sentence with the choice to confirm (every item on) or decline (nothing leaves; each item can
+ * be switched on from its row). Its decline is "Keep local", so the pick block has one "Not now"
+ * (its own, for the workspaces) and the two groups cannot be mistaken for each other. */
+export function LibrarySyncConfirm({
+  sentence,
+  onSync,
+  onDecline,
+}: {
+  sentence: string;
+  onSync: () => void;
+  onDecline: () => void;
+}) {
   return (
     <div role="group" aria-label="Sync to my devices" className="flex flex-col gap-2">
       <p className="text-xs text-[var(--toolbar-icon)]">{sentence}</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={`${BUTTON} ${APPLY} px-3`} onClick={() => firstSyncAnswer(true, onSync)}>
+        <button
+          type="button"
+          className={`${BUTTON} ${APPLY} px-3`}
+          onClick={() => firstSyncAnswer(true, onSync, onDecline)}
+        >
           Sync libraries
         </button>
-        <button type="button" className={`${BUTTON} ${OUTLINE} px-3`} onClick={() => firstSyncAnswer(false, onSync)}>
-          Not now
+        <button
+          type="button"
+          className={`${BUTTON} ${OUTLINE} px-3`}
+          onClick={() => firstSyncAnswer(false, onSync, onDecline)}
+        >
+          Keep local
         </button>
       </div>
     </div>
@@ -61,6 +78,7 @@ export function PickWorkspaces({
   synced,
   libraryConfirm,
   onLibrarySync,
+  onLibraryDecline,
   onDone,
 }: {
   label: string;
@@ -73,6 +91,8 @@ export function PickWorkspaces({
   libraryConfirm: string;
   /** Confirms the libraries' first sync. */
   onLibrarySync: () => void;
+  /** Declines it: the libraries' items stay local. */
+  onLibraryDecline: () => void;
   onDone: (chosen: OfferedWorkspace[]) => void;
 }) {
   const rows = offered.filter((o) => !synced.includes(o.id));
@@ -130,7 +150,7 @@ export function PickWorkspaces({
           ))}
         </ul>
       ) : null}
-      {libraryConfirm ? <LibrarySyncConfirm sentence={libraryConfirm} onSync={onLibrarySync} /> : null}
+      {libraryConfirm ? <LibrarySyncConfirm sentence={libraryConfirm} onSync={onLibrarySync} onDecline={onLibraryDecline} /> : null}
       {frozenWarning ? <p className="text-xs text-[var(--toolbar-icon)]">{frozenWarning}</p> : null}
       <div className="flex flex-wrap gap-2">
         <button ref={notNow} type="button" className={`${BUTTON} ${OUTLINE} w-[90px]`} onClick={() => onDone([])}>
