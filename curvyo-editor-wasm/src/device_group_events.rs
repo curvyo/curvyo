@@ -5,8 +5,8 @@
 use curvyo_crypto_core::MemberId;
 use curvyo_document_core::DevicesListError;
 use curvyo_sync_core::{
-    ClientOutput, GroupRecord, RecordKind, RefusalReason, SessionEvent, SnapshotAssembler,
-    route_group_record,
+    ClientOutput, GroupRecord, RecordKind, RefusalReason, SessionEvent, StreamError,
+    group_snapshot_assembler, route_group_record,
 };
 use curvyo_ui_core::devices_text as texts;
 
@@ -45,6 +45,7 @@ impl DeviceGroupGlue {
                 self.write_pending();
                 self.write_own_label();
                 self.export_library();
+                self.flush_font_blobs();
             }
             SessionEvent::Offline => {
                 self.online = false;
@@ -54,6 +55,7 @@ impl DeviceGroupGlue {
                 seq, kind, bytes, ..
             } => {
                 if kind == RecordKind::Asset {
+                    self.receive_font_part(&bytes);
                     return;
                 }
                 if kind == RecordKind::Snapshot {
@@ -63,9 +65,11 @@ impl DeviceGroupGlue {
                 }
             }
             SessionEvent::Acked { client_id, .. } => {
+                self.fonts.ack(client_id);
                 if let Some(version) = self.library_pushed.remove(&client_id) {
                     self.library_synced = version;
                     self.files_changed = true;
+
                     if self.snapshot_after_ack && self.library_pushed.is_empty() {
                         self.snapshot_after_ack = false;
                         if !self.newer_list && !self.newer_library {
@@ -124,27 +128,55 @@ impl DeviceGroupGlue {
     /// One snapshot record of the room: a part of the framed snapshot of both streams (ADR
     /// 0062 decision 1), or a pre-0116 build's plain snapshot of the devices list.
     fn snapshot_part(&mut self, seq: u64, bytes: &[u8]) {
+        if self.skipped_snapshot == Some(seq) {
+            return;
+        }
         let starts_new = self.assembling.as_ref().is_none_or(|(at, _)| *at != seq);
         if starts_new {
-            self.assembling = Some((seq, SnapshotAssembler::default()));
+            self.assembling = Some((seq, group_snapshot_assembler()));
         }
         let outcome = match self.assembling.as_mut() {
             Some((_, assembler)) => assembler
                 .push_part(bytes)
-                .map(|entries| (entries, assembler.is_complete())),
+                .map(|entries| (entries, assembler.is_complete(), assembler.pending_len())),
             None => return,
         };
-        if let Ok((entries, complete)) = outcome {
-            for entry in &entries {
-                self.snapshot_stream(entry);
+        match outcome {
+            Ok((entries, complete, pending)) => {
+                for entry in &entries {
+                    self.snapshot_stream(entry);
+                }
+                if complete {
+                    self.assembling = None;
+                } else if !self.make_room(pending as u64) {
+                    // What is still arriving cannot fit the library budget: give it up.
+                    self.skip_snapshot(seq);
+                }
             }
-            if complete {
+            Err(StreamError::TooLarge) => self.skip_snapshot(seq),
+            Err(_) => {
                 self.assembling = None;
+                self.import_devices(bytes);
             }
-        } else {
-            self.assembling = None;
-            self.import_devices(bytes);
         }
+    }
+
+    /// Gives up the snapshot `seq` (an entry over its limit or the budget): the rest of its parts
+    /// is ignored, with a notice.
+    fn skip_snapshot(&mut self, seq: u64) {
+        self.assembling = None;
+        self.skipped_snapshot = Some(seq);
+        self.notices
+            .push_back(curvyo_ui_core::library_text::FONT_SKIPPED_NOTICE.to_owned());
+        self.bump();
+    }
+
+    /// The bytes of the room snapshot being assembled that no entry consumed yet.
+    #[cfg(test)]
+    pub(super) fn snapshot_assembly_bytes(&self) -> usize {
+        self.assembling
+            .as_ref()
+            .map_or(0, |(_, assembler)| assembler.pending_len())
     }
 
     /// A bare update or plain snapshot of the devices list, as every pre-0116 build writes it.

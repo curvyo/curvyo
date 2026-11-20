@@ -6,8 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use curvyo_text_core::{DeclaredClass, declared_class};
 use curvyo_ui_core::{
-    BuiltInTag, CheckResult, FamilyFacts, FontLibrary, FontLibraryFileError, MemberSource,
-    TagEntry, TagNameError, family_key, read_font_library, write_font_library,
+    BuiltInTag, CheckResult, FamilyFacts, FontLibrary, FontLibraryFileError, FontMeta,
+    MemberSource, TagEntry, TagNameError, family_key, read_font_library, write_font_library,
 };
 use serde_json::{Value, json};
 
@@ -219,6 +219,51 @@ impl FontLibraryGlue {
     /// Delete in the Tags list.
     pub fn delete_tag(&mut self, id: &str) -> bool {
         self.library.delete_tag(id)
+    }
+
+    /// What of the family `name` travels to the maker's other devices, as JSON
+    /// `{"tags": [..], "favourite": bool, "cuttable": "auto"|"yes"|"no"}`
+    /// (`specs/0116-library-sync` criteria 16 and 17).
+    #[must_use]
+    pub fn sync_meta(&self, name: &str) -> String {
+        let meta = self.library.font_meta(&family_key(name));
+        json!({
+            "tags": meta.tags,
+            "favourite": meta.favourite,
+            "cuttable": match meta.cuttable {
+                None => "auto",
+                Some(true) => "yes",
+                Some(false) => "no",
+            },
+        })
+        .to_string()
+    }
+
+    /// Makes the family `name` carry what arrived (the JSON of [`sync_meta`]); whether anything
+    /// changed.
+    ///
+    /// [`sync_meta`]: FontLibraryGlue::sync_meta
+    pub fn apply_sync_meta(&mut self, name: &str, json: &str) -> bool {
+        let Ok(value) = serde_json::from_str::<Value>(json) else {
+            return false;
+        };
+        let meta = FontMeta {
+            tags: value["tags"]
+                .as_array()
+                .map(|tags| {
+                    tags.iter()
+                        .filter_map(|tag| tag.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            favourite: value["favourite"].as_bool().unwrap_or(false),
+            cuttable: match value["cuttable"].as_str() {
+                Some("yes") => Some(true),
+                Some("no") => Some(false),
+                _ => None,
+            },
+        };
+        self.library.apply_font_meta(&family_key(name), &meta)
     }
 
     /// A strip press.

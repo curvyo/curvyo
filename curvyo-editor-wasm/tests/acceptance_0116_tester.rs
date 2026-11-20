@@ -511,7 +511,7 @@ fn paired() -> (Net, usize, usize) {
 fn c3_c5_c15_first_sync_arrives_without_input_with_the_same_values() {
     assert_eq!(
         texts::FIRST_SYNC_CONFIRM,
-        "Your machines and materials leave this computer encrypted, to your own computers only.",
+        "Your fonts, machines and materials leave this computer encrypted, to your own computers only.",
         "criterion 3's confirm sentence"
     );
     let (mut net, a, b) = paired();

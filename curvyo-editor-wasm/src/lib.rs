@@ -110,6 +110,8 @@ mod wasm_keys;
 #[cfg(target_arch = "wasm32")]
 mod wasm_layers;
 #[cfg(target_arch = "wasm32")]
+mod wasm_library_fonts;
+#[cfg(target_arch = "wasm32")]
 mod wasm_membership;
 #[cfg(target_arch = "wasm32")]
 mod wasm_membership_text;
@@ -189,10 +191,10 @@ mod wasm_workspace_tree;
 
 pub use background_writer::{BackgroundWriter, WRITE_INTERVAL_MS, Waiting, WriteError, Written};
 pub use clipboard_glue::{clipboard_notice, encode_rgba_png, paste_rank_code};
-pub use device_group_glue::{DeviceGroupGlue, GroupFiles};
+pub use device_group_glue::{DeviceGroupGlue, FontArrival, FontChange, FontInput, GroupFiles};
 pub use font_archive_glue::FontArchiveGlue;
 pub use font_checks_glue::FontChecksGlue;
-pub use font_file_glue::{face_preview_path, font_file_faces};
+pub use font_file_glue::{face_preview_path, font_file_faces, synced_name_ok};
 pub use font_library_glue::FontLibraryGlue;
 pub use font_preview_glue::PreviewFacesGlue;
 pub use ocr_pool_glue::{crops_wire, read_crops, read_crops_wire};
