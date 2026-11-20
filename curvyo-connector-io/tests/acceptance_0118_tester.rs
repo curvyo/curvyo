@@ -764,6 +764,7 @@ impl Rig {
         self.welcome = Some(Message::Welcome {
             connector_name: g.name.clone(),
             controller: g.controller.clone(),
+            mode: None,
         });
         self.conn = Some(c);
     }
@@ -1786,6 +1787,9 @@ fn golden_the_three_new_messages_have_exactly_these_bytes() {
         alarm: None,
         detail: None,
         pause_pending: false,
+        requested_by: None,
+        job_name: None,
+        sent_by: None,
     };
     assert_eq!(
         read("status_homing.json").trim_end(),

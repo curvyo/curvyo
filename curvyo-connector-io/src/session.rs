@@ -1,25 +1,30 @@
-//! One connection of the connector: TLS, the WebSocket, the hello, the auth gate, pairing and the
-//! relay of messages to the hub.
+//! One connection of the connector: the peer check, TLS, the WebSocket, the hello, the access
+//! gate, login and pairing, and the relay of messages to the hub.
 
-use std::net::TcpStream;
+#[cfg(test)]
+mod gate_tests;
+mod owner;
+mod pairing;
+
+use std::net::{IpAddr, TcpStream};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
-use curvyo_connector_core::{ErrorCode, Handshake, Message, Outcome, PROTOCOL_VERSION};
+use curvyo_connector_core::{
+    ErrorCode, Handshake, Message, Mode, Outcome, PROTOCOL_VERSION, Peer, Role, admit, refusal,
+};
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tungstenite::protocol::WebSocketConfig;
 use tungstenite::{HandshakeError, WebSocket};
 
 use crate::frames::{self, Frame, IoFrame, PATH, RefusalReason, SOCKET_LIMIT};
-use crate::hex;
 use crate::hub::Hub;
-use crate::pairing_code::Refusal;
-use crate::spake::{self, SessionKey};
+use crate::maintenance::is_local;
+use crate::spake::SessionKey;
 use crate::status_limit::StatusLimiter;
-use crate::token::Token;
 
 /// How long the TLS and WebSocket handshakes and the first frame may take.
 const FIRST_FRAME: Duration = Duration::from_secs(10);
@@ -51,8 +56,14 @@ struct Session {
     submitted: bool,
     /// When the last frame came in.
     last_frame: Instant,
-    /// The paired app's name, for the log of `Unlock` and `Home`.
-    client_name: String,
+    /// The logged-in client: its name and role.
+    peer: Option<Peer>,
+    /// The address the connection came from.
+    peer_ip: IpAddr,
+    /// Set by a revoke of this client: the connection closes at its next turn (A11).
+    close: Option<Arc<AtomicBool>>,
+    /// The hub's maintenance epoch this connection was greeted in; it closes when it moves (A6).
+    maintenance_epoch: Option<u64>,
 }
 
 #[allow(clippy::result_large_err)] // the signature tungstenite's callback asks for
@@ -72,8 +83,19 @@ fn accept_path(request: &Request, response: Response) -> Result<Response, ErrorR
     }
 }
 
-/// Serves one accepted connection until it ends or `shutdown` is set.
-pub fn serve(stream: TcpStream, tls: &Arc<ServerConfig>, hub: Arc<Hub>, shutdown: &AtomicBool) {
+/// Serves one accepted connection from `peer_ip` until it ends or `shutdown` is set. In
+/// maintenance mode a peer that is not local is closed before TLS (A4).
+pub fn serve(
+    stream: TcpStream,
+    peer_ip: IpAddr,
+    tls: &Arc<ServerConfig>,
+    hub: Arc<Hub>,
+    shutdown: &AtomicBool,
+) {
+    let maintenance = matches!(hub.access_mode(Instant::now()), Mode::Maintenance { .. });
+    if maintenance && !is_local(peer_ip) {
+        return;
+    }
     if stream.set_read_timeout(Some(POLL)).is_err() || stream.set_nodelay(true).is_err() {
         return;
     }
@@ -110,7 +132,10 @@ pub fn serve(stream: TcpStream, tls: &Arc<ServerConfig>, hub: Arc<Hub>, shutdown
         pairing: None,
         submitted: false,
         last_frame: Instant::now(),
-        client_name: String::new(),
+        peer: None,
+        peer_ip,
+        close: None,
+        maintenance_epoch: None,
     };
     session.run(&mut socket, deadline, shutdown);
     if session.submitted {
@@ -167,6 +192,8 @@ impl Session {
         }
         while !shutdown.load(Ordering::Relaxed) {
             let keep = match socket.read() {
+                // A revoked client or a maintenance connection after the setup takes nothing more.
+                Ok(tungstenite::Message::Text(_)) if self.must_close() => false,
                 Ok(tungstenite::Message::Text(text)) => {
                     self.last_frame = Instant::now();
                     self.on_text(socket, text.as_str())
@@ -199,6 +226,9 @@ impl Session {
         if !self.greeted && now >= first_frame {
             return true;
         }
+        if self.must_close() {
+            return true;
+        }
         let has_session = self.updates.is_some() || self.pairing.is_some();
         if silent_too_long(has_session, self.last_frame, now, UNAUTHENTICATED_IDLE) {
             return true;
@@ -209,6 +239,16 @@ impl Session {
             return !Self::refuse(socket, RefusalReason::WrongCode, left);
         }
         false
+    }
+
+    /// Whether a revoke of this client or the end of maintenance mode closes the connection.
+    fn must_close(&self) -> bool {
+        self.close
+            .as_ref()
+            .is_some_and(|c| c.load(Ordering::Relaxed))
+            || self
+                .maintenance_epoch
+                .is_some_and(|epoch| epoch != self.hub.epoch())
     }
 
     fn flush_statuses(&mut self, socket: &mut Socket, now: Instant) -> bool {
@@ -261,6 +301,12 @@ impl Session {
         match self.handshake.on_message(&message) {
             Outcome::Hello => {
                 self.greeted = true;
+                if matches!(
+                    self.hub.access_mode(Instant::now()),
+                    Mode::Maintenance { .. }
+                ) {
+                    self.maintenance_epoch = Some(self.hub.epoch());
+                }
                 return send(socket, self.hub.welcome());
             }
             Outcome::Close(reply) => {
@@ -270,8 +316,28 @@ impl Session {
             Outcome::Closed => return false,
             Outcome::Pass => {}
         }
+        let role = self.peer.as_ref().map(|p| p.role);
+        if let Err(code) = admit(self.hub.access_mode(Instant::now()), role, &message) {
+            if role.is_none()
+                && code == ErrorCode::OwnerRequired
+                && matches!(message, Message::ApplyConfig { .. })
+            {
+                self.hub.setup_refused(self.peer_ip);
+            }
+            return send(socket, refusal(code));
+        }
         match message {
             Message::Auth { token } => self.on_auth(socket, &token),
+            Message::ApplyConfig {
+                config,
+                client_name,
+            } => self.on_apply(socket, config, &client_name),
+            Message::ListPorts => send(
+                socket,
+                Message::Ports {
+                    paths: crate::ports::list_ports(std::path::Path::new("/dev")),
+                },
+            ),
             Message::Hello { .. } | Message::Pair { .. } => send(
                 socket,
                 error(
@@ -279,29 +345,35 @@ impl Session {
                     "The connector does not accept this message.",
                 ),
             ),
-            other if self.updates.is_none() => {
-                let _ = other;
-                send(
-                    socket,
-                    error(ErrorCode::PairingRequired, "Pair or authenticate first."),
-                )
-            }
+            other => match self.peer.clone() {
+                None => send(socket, refusal(ErrorCode::PairingRequired)),
+                Some(peer) => self.on_logged_in(socket, other, &peer),
+            },
+        }
+    }
+
+    fn on_logged_in(&mut self, socket: &mut Socket, message: Message, peer: &Peer) -> bool {
+        let now = Instant::now();
+        match message {
             Message::Home => {
-                let now = Instant::now();
-                let answers = self.hub.home(&self.client_name, now);
+                let answers = self.hub.home(peer, now);
                 self.limiter.answered(now);
                 answers.into_iter().all(|m| send(socket, m))
             }
             Message::Unlock => {
-                let now = Instant::now();
-                let status = self.hub.unlock(&self.client_name, now);
+                let status = self.hub.unlock(peer, now);
                 self.limiter.answered(now);
                 send(socket, status)
             }
+            owner_call @ (Message::GetConfig
+            | Message::IssueCode { .. }
+            | Message::ListClients
+            | Message::RevokeClient { .. }
+            | Message::GetLog { .. }
+            | Message::Reset { .. }) => self.on_owner_call(socket, owner_call, peer),
             other => {
-                let now = Instant::now();
                 self.submitted |= matches!(other, Message::SubmitJob { .. });
-                let answers = self.hub.handle_message(other, now);
+                let answers = self.hub.handle_message(other, peer, now);
                 if answers.iter().any(|m| matches!(m, Message::Status { .. })) {
                     self.limiter.answered(now);
                 }
@@ -311,26 +383,49 @@ impl Session {
     }
 
     fn on_auth(&mut self, socket: &mut Socket, token: &str) -> bool {
-        if !self.hub.accepts(token) {
+        let Some((name, role)) = self.hub.login(token) else {
             return send(
                 socket,
                 error(ErrorCode::PairingRequired, "This token is not paired."),
             );
-        }
-        self.client_name = self.hub.client_name(token).unwrap_or_default();
-        self.become_authenticated();
+        };
         self.limiter.answered(Instant::now());
-        send(socket, self.hub.status())
+        self.become_authenticated(socket, name, role) && send(socket, self.hub.status())
     }
 
-    fn become_authenticated(&mut self) {
+    /// The connection is now `name` with `role`: it gets the statuses and is told who it is.
+    fn become_authenticated(&mut self, socket: &mut Socket, name: String, role: Role) -> bool {
         if self.updates.is_none() {
             self.updates = Some(self.hub.subscribe());
         }
+        self.close = Some(self.hub.register_session(&name));
+        self.maintenance_epoch = None;
+        self.peer = Some(Peer::new(name.clone(), role));
+        send(
+            socket,
+            Message::Authenticated {
+                client_name: name,
+                role,
+            },
+        )
     }
 
     fn on_io(&mut self, socket: &mut Socket, frame: IoFrame) -> bool {
         match frame {
+            IoFrame::PairSpake { .. }
+                if admit(
+                    self.hub.access_mode(Instant::now()),
+                    self.peer.as_ref().map(|p| p.role),
+                    &Message::Pair {
+                        code: String::new(),
+                        client_name: String::new(),
+                    },
+                )
+                .is_err() =>
+            {
+                // A pairing frame is judged as `Pair` (addendum D4).
+                send(socket, refusal(ErrorCode::Maintenance))
+            }
             IoFrame::PairSpake {
                 round: 1,
                 client_name: Some(name),
@@ -351,79 +446,6 @@ impl Session {
                 ),
             ),
         }
-    }
-
-    fn pair_round_one(&mut self, socket: &mut Socket, name: &str, message: &str) -> bool {
-        if name.is_empty() || name.chars().count() > MAX_NAME || name.chars().any(char::is_control)
-        {
-            return send(
-                socket,
-                error(ErrorCode::Malformed, "The client name is not valid."),
-            );
-        }
-        let now = Instant::now();
-        let password = match self.hub.begin_pair(now) {
-            Ok(password) => password,
-            Err(Refusal::Expired) => return Self::refuse(socket, RefusalReason::CodeExpired, 0),
-            Err(Refusal::NoCode) => return Self::refuse(socket, RefusalReason::NoCode, 0),
-        };
-        let (exchange, reply) = spake::start_connector(&password, &self.hub.spki());
-        let key = hex::decode(message).and_then(|m| exchange.finish(&m).ok());
-        let Some(key) = key else {
-            let left = self.hub.pair_failed();
-            return Self::refuse(socket, RefusalReason::WrongCode, left);
-        };
-        self.pairing = Some(Pairing {
-            key,
-            client_name: name.to_owned(),
-            deadline: now + PAIRING_IDLE,
-        });
-        send_frame(
-            socket,
-            &Frame::Io(IoFrame::PairSpake {
-                round: 1,
-                client_name: None,
-                message: hex::encode(&reply),
-            }),
-        )
-    }
-
-    fn pair_round_two(&mut self, socket: &mut Socket, message: &str) -> bool {
-        let Some(pairing) = self.pairing.take() else {
-            return Self::refuse(socket, RefusalReason::NoCode, 0);
-        };
-        let verified = hex::decode(message).is_some_and(|tag| pairing.key.verify_app_tag(&tag));
-        if !verified {
-            let left = self.hub.pair_failed();
-            return Self::refuse(socket, RefusalReason::WrongCode, left);
-        }
-        let Some(token) = Token::generate() else {
-            self.hub.pair_failed();
-            return Self::refuse(socket, RefusalReason::NoCode, 0);
-        };
-        if self
-            .hub
-            .pair_succeeded(&pairing.client_name, &token.sha256_hex())
-            .is_err()
-        {
-            return Self::refuse(socket, RefusalReason::NoCode, 0);
-        }
-        self.client_name.clone_from(&pairing.client_name);
-        let confirmation = Frame::Io(IoFrame::PairSpake {
-            round: 2,
-            client_name: None,
-            message: hex::encode(&pairing.key.connector_tag()),
-        });
-        self.become_authenticated();
-        self.limiter.answered(Instant::now());
-        send_frame(socket, &confirmation)
-            && send(
-                socket,
-                Message::Paired {
-                    token: token.to_hex().to_string(),
-                },
-            )
-            && send(socket, self.hub.status())
     }
 }
 

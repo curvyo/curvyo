@@ -141,5 +141,5 @@ fn the_demo_path_from_pairing_to_revoke() {
     drop(server);
 
     let log = std::fs::read_to_string(dir.path().join("jobs.log")).unwrap();
-    assert!(log.contains("\tdemo.gcode\tStopped\n"), "{log}");
+    assert!(log.contains("\tdemo.gcode\tStopped\t"), "{log}");
 }

@@ -89,6 +89,7 @@ fn q7_a_man_in_the_middle_is_one_wrong_attempt_and_nothing_is_stored() {
             &Message::Welcome {
                 connector_name: up.greeting.name.clone(),
                 controller: None,
+                mode: None,
             },
         );
         loop {

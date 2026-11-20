@@ -32,7 +32,15 @@ time = { version = "0.3.55", default-features = false, features = ["std", "forma
 zeroize = "1"
 # The serial port of the GRBL controller (`specs/0064-machine-connector/adrs.md` C1): exclusive
 # open, arbitrary baud rates, and a pty pair for the tests. MPL-2.0; no libudev (no enumeration).
-serialport = { version = "4.10.1", default-features = false }
+# Behind the `serial` feature (architect addendum D2): `curvyoctl` and the app never open a port.
+serialport = { version = "4.10.1", default-features = false, optional = true }
+# `connector.toml` (`specs/0128`, addendum D8); already in the workspace.
+toml.workspace = true
+
+[features]
+default = ["serial"]
+# The serial port thread of the GRBL controller and the `serialport` dependency.
+serial = ["dep:serialport"]
 
 [dev-dependencies]
 # A fixed random source for the SPAKE2 known-answer test; already in the tree through `spake2`.

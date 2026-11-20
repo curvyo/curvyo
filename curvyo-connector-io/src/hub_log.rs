@@ -122,6 +122,9 @@ mod tests {
             alarm: alarm.map(str::to_owned),
             detail: detail.map(str::to_owned),
             pause_pending: false,
+            requested_by: None,
+            job_name: None,
+            sent_by: None,
         }
     }
 

@@ -6,6 +6,7 @@
 
 mod common;
 
+use curvyo_connector_core::Peer;
 use std::time::Duration;
 
 use common::grbl_bench::Bench;
@@ -47,7 +48,9 @@ fn homes(bench: &Bench) -> usize {
 
 /// Applies `Home` and returns the error message the machine answered with, if any.
 fn press_home(bench: &mut Bench) -> Option<String> {
-    let out = bench.machine.handle(Event::Message(Message::Home));
+    let out = bench
+        .machine
+        .handle(Event::Message(Message::Home, Peer::host()));
     let refusal = out.messages.iter().find_map(|m| match m {
         Message::Error {
             code: ErrorCode::WrongState,

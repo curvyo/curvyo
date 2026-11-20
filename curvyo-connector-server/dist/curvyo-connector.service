@@ -1,0 +1,28 @@
+# The Curvyo machine connector as a systemd service (specs/0128 A30, architect addendum D11).
+# Install: the binary at /usr/bin/curvyo-connector-server, this file at
+# /etc/systemd/system/curvyo-connector.service. See docs/guides/connector-service-linux.md.
+[Unit]
+Description=Curvyo machine connector
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/curvyo-connector-server --state-dir %S/curvyo-connector
+DynamicUser=yes
+StateDirectory=curvyo-connector
+StateDirectoryMode=0700
+UMask=0077
+SupplementaryGroups=dialout
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+DevicePolicy=closed
+DeviceAllow=char-ttyUSB rw
+DeviceAllow=char-ttyACM rw
+
+[Install]
+WantedBy=multi-user.target

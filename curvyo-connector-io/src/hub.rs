@@ -1,28 +1,34 @@
-//! The state shared by all connections of one connector: the job machine, its controller, the
-//! pairing code, the paired apps and the fan-out of status messages, under one lock.
+//! The state shared by all connections of one connector, under one lock: the job machine, its
+//! controller, the mode, the pairing code, the paired clients and the fan-out of status messages.
 
+mod journal;
+mod link;
+mod owner;
 mod pairing;
+mod setup;
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Mutex, MutexGuard, PoisonError, Weak};
 use std::time::{Duration, Instant};
 
 use curvyo_connector_core::{
-    ControllerCommand, ControllerInfo, Event, Machine, Message, Options, State,
+    ControllerCommand, ControllerInfo, Event, Machine, Message, Options, Peer, StartRule, State,
 };
-use time::OffsetDateTime;
 use uuid::Uuid;
 
+use crate::admin_log::{AdminEvent, AdminLog};
 use crate::clients::Clients;
 use crate::controller::Controller;
 use crate::fake_controller::FakeController;
-use crate::grbl::{GrblController, Timing};
-use crate::hub_log::{logged_outcome, rejection_line, terminal_alarm};
-use crate::job_log::{JobLog, LogResult};
+use crate::grbl::Timing;
+use crate::job_log::{JobLog, LogPeople, LogResult};
 use crate::pairing_code::PairingCodes;
 use crate::spki::SpkiHash;
+
+pub use setup::{ExitReason, HubMode};
 
 /// Settings of the fake controller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,12 +68,18 @@ pub struct HubSettings {
     pub state_dir: PathBuf,
     /// The controller.
     pub controller: ControllerChoice,
-    /// `Start` waits for the connector's own terminal.
+    /// `Start` waits for the connector's own terminal (foreground mode).
     pub require_local_start: bool,
-    /// The name `Welcome` carries.
+    /// The name `Welcome` carries without a configuration (the host name).
     pub connector_name: String,
     /// Hash of the connector's own key.
     pub spki: SpkiHash,
+}
+
+/// One authenticated connection as the hub knows it: its client's name and its close flag.
+struct SessionEntry {
+    name: String,
+    close: Weak<AtomicBool>,
 }
 
 pub(crate) struct Inner {
@@ -81,6 +93,19 @@ pub(crate) struct Inner {
     pub(crate) notices: Sender<String>,
     /// Bytes the controller produced outside the serial thread's turn.
     pending_write: Vec<u8>,
+    mode: HubMode,
+    /// Counts the switches out of maintenance mode; a maintenance session closes when it moves.
+    epoch: u64,
+    sessions: Vec<SessionEntry>,
+    /// Where a controller change goes: the supervisor of the controller thread.
+    supervisor: Option<Sender<curvyo_connector_core::ControllerConfig>>,
+    /// Who configured the connector, from which address (A7).
+    configured_by: Option<(String, std::net::IpAddr)>,
+    /// The terminal was told that the setup window closed.
+    window_told: bool,
+    /// The serial port the current controller choice names; a serial thread of another port
+    /// (one a new configuration replaced) attaches and loses nothing.
+    serial_port: Option<String>,
 }
 
 /// One turn of the serial thread: the bytes to write and whether to close the port.
@@ -98,27 +123,85 @@ pub struct Hub {
     started: Instant,
     clients: Clients,
     job_log: JobLog,
+    admin_log: AdminLog,
     settings: HubSettings,
+    exit: Mutex<Option<Sender<ExitReason>>>,
+}
+
+/// A refused owner or setup call: the code and the sentence of its `Error`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Refused {
+    /// The code.
+    pub code: curvyo_connector_core::ErrorCode,
+    /// The sentence.
+    pub text: String,
+}
+
+impl Refused {
+    /// The refusal in the access table's fixed words.
+    #[must_use]
+    pub fn fixed(code: curvyo_connector_core::ErrorCode) -> Self {
+        match curvyo_connector_core::refusal(code) {
+            Message::Error { code, message } => Self {
+                code,
+                text: message,
+            },
+            _ => Self {
+                code,
+                text: String::new(),
+            },
+        }
+    }
+
+    /// The `Error` message.
+    #[must_use]
+    pub fn message(self) -> Message {
+        Message::Error {
+            code: self.code,
+            message: self.text,
+        }
+    }
+}
+
+/// The machine for a controller choice: a serial controller confirms Pause, Resume and Stop.
+fn machine_for(choice: &ControllerChoice, start_rule: StartRule) -> Machine {
+    let options = Options { start_rule };
+    match choice {
+        ControllerChoice::Serial(_) => Machine::confirming(options),
+        _ => Machine::new(options),
+    }
+}
+
+fn serial_port_of(choice: &ControllerChoice) -> Option<String> {
+    match choice {
+        ControllerChoice::Serial(serial) => Some(serial.port.clone()),
+        _ => None,
+    }
+}
+
+fn fake_of(choice: &ControllerChoice) -> Option<Box<dyn Controller>> {
+    match choice {
+        ControllerChoice::Fake(f) => Some(Box::new(FakeController::new(
+            f.lines_per_second,
+            f.alarm_at_line,
+        ))),
+        _ => None,
+    }
 }
 
 impl Hub {
-    /// A hub, and the receiver of its terminal notices (one line each).
+    /// A hub in foreground mode, and the receiver of its terminal notices (one line each).
     #[must_use]
     pub fn new(settings: HubSettings, started: Instant) -> (Self, Receiver<String>) {
         let (notices, receiver) = channel();
-        let options = Options {
-            require_local_start: settings.require_local_start,
+        let rule = if settings.require_local_start {
+            StartRule::LocalPress
+        } else {
+            StartRule::Immediate
         };
-        let mut machine = match settings.controller {
-            ControllerChoice::Serial(_) => Machine::confirming(options),
-            _ => Machine::new(options),
-        };
-        let mut controller: Option<Box<dyn Controller>> = None;
-        if let ControllerChoice::Fake(f) = settings.controller {
-            controller = Some(Box::new(FakeController::new(
-                f.lines_per_second,
-                f.alarm_at_line,
-            )));
+        let mut machine = machine_for(&settings.controller, rule);
+        let controller = fake_of(&settings.controller);
+        if controller.is_some() {
             machine.handle(Event::ControllerConnected);
         }
         let info = controller.as_ref().and_then(|c| c.info());
@@ -133,11 +216,20 @@ impl Hub {
                 submitted: None,
                 notices,
                 pending_write: Vec::new(),
+                mode: HubMode::Foreground,
+                epoch: 0,
+                sessions: Vec::new(),
+                supervisor: None,
+                configured_by: None,
+                window_told: false,
+                serial_port: serial_port_of(&settings.controller),
             }),
             started,
             clients: Clients::new(&settings.state_dir),
             job_log: JobLog::new(&settings.state_dir),
+            admin_log: AdminLog::new(&settings.state_dir),
             settings,
+            exit: Mutex::new(None),
         };
         (hub, receiver)
     }
@@ -154,20 +246,6 @@ impl Hub {
     #[must_use]
     pub fn spki(&self) -> SpkiHash {
         self.settings.spki
-    }
-
-    fn welcome_of(&self, info: Option<ControllerInfo>) -> Message {
-        Message::Welcome {
-            connector_name: self.settings.connector_name.clone(),
-            controller: info,
-        }
-    }
-
-    /// The `Welcome` for a greeted client.
-    #[must_use]
-    pub fn welcome(&self) -> Message {
-        let info = self.lock().info.clone();
-        self.welcome_of(info)
     }
 
     /// The current `Status`.
@@ -190,54 +268,9 @@ impl Hub {
         receiver
     }
 
-    /// `Unlock` from the app `client` (G33): `$X` goes to the controller only in `Alarm`; the
-    /// answer is the status.
-    pub fn unlock(&self, client: &str, now: Instant) -> Message {
-        let mut inner = self.lock();
-        self.turn(&mut inner, &[], now);
-        if inner.machine.state() == State::Alarm {
-            let _ = inner.notices.send(format!("Unlock sent by {client}"));
-            let at = OffsetDateTime::now_utc();
-            let result = LogResult::Unlock(client.to_owned());
-            if let Err(e) = self.job_log.append(at, "", &result) {
-                let _ = inner.notices.send(format!("Cannot write the job log: {e}"));
-            }
-        }
-        self.apply(
-            &mut inner,
-            Event::Message(Message::Unlock),
-            now,
-            &mut Vec::new(),
-        );
-        inner.machine.status()
-    }
-
-    /// `Home` from the app `client` (`specs/0118` M8): one `jobs.log` line and one terminal line
-    /// when the connector takes it; the answers for that app alone, the status when there is no
-    /// other answer (in `Homing` a second Home changes nothing).
-    pub fn home(&self, client: &str, now: Instant) -> Vec<Message> {
-        let mut inner = self.lock();
-        self.turn(&mut inner, &[], now);
-        let before = inner.machine.state();
-        let mut direct = Vec::new();
-        self.apply(&mut inner, Event::Message(Message::Home), now, &mut direct);
-        let after = inner.machine.state();
-        if after != before && matches!(after, State::Homing | State::AwaitingLocalStart) {
-            let _ = inner.notices.send(format!("Home sent by {client}"));
-            let result = LogResult::Home(client.to_owned());
-            if let Err(e) = self.job_log.append(OffsetDateTime::now_utc(), "", &result) {
-                let _ = inner.notices.send(format!("Cannot write the job log: {e}"));
-            }
-        }
-        if direct.is_empty() {
-            direct.push(inner.machine.status());
-        }
-        direct
-    }
-
-    /// A message of a paired app; the answers for that app alone (statuses go to everyone
-    /// subscribed, `GetStatus` is answered directly).
-    pub fn handle_message(&self, message: Message, now: Instant) -> Vec<Message> {
+    /// A message of a paired client `peer`; the answers for that client alone (statuses go to
+    /// everyone subscribed, `GetStatus` is answered directly).
+    pub fn handle_message(&self, message: Message, peer: &Peer, now: Instant) -> Vec<Message> {
         let mut inner = self.lock();
         // A stale controller is judged before the command, so no command acts on a lost link
         // and no answer shows a dead link as `Running` (G15).
@@ -246,7 +279,56 @@ impl Hub {
             return vec![inner.machine.status()];
         }
         let mut direct = Vec::new();
-        self.apply(&mut inner, Event::Message(message), now, &mut direct);
+        self.apply(
+            &mut inner,
+            Event::Message(message, peer.clone()),
+            now,
+            &mut direct,
+        );
+        direct
+    }
+
+    /// `Unlock` from the client `peer` (G33): `$X` goes to the controller only in `Alarm`; the
+    /// answer is the status. Logged in `jobs.log` (G33) and `admin.log` (A18).
+    pub fn unlock(&self, peer: &Peer, now: Instant) -> Message {
+        let mut inner = self.lock();
+        self.turn(&mut inner, &[], now);
+        if inner.machine.state() == State::Alarm {
+            let client = peer.name.as_str();
+            let _ = inner.notices.send(format!("Unlock sent by {client}"));
+            let result = LogResult::Unlock(client.to_owned());
+            self.append_job_line(&inner, "", &result, &LogPeople::default());
+            self.append_admin(&inner, client, &AdminEvent::Unlocked);
+        }
+        self.apply(
+            &mut inner,
+            Event::Message(Message::Unlock, peer.clone()),
+            now,
+            &mut Vec::new(),
+        );
+        inner.machine.status()
+    }
+
+    /// `Home` from the client `peer` (`specs/0118` M8): one `jobs.log` line and one terminal
+    /// line when the connector takes it; the answers for that client alone, the status when there
+    /// is no other answer (in `Homing` a second Home changes nothing).
+    pub fn home(&self, peer: &Peer, now: Instant) -> Vec<Message> {
+        let mut inner = self.lock();
+        self.turn(&mut inner, &[], now);
+        let before = inner.machine.state();
+        let mut direct = Vec::new();
+        let event = Event::Message(Message::Home, peer.clone());
+        self.apply(&mut inner, event, now, &mut direct);
+        let after = inner.machine.state();
+        if after != before && matches!(after, State::Homing | State::AwaitingLocalStart) {
+            let client = peer.name.as_str();
+            let _ = inner.notices.send(format!("Home sent by {client}"));
+            let result = LogResult::Home(client.to_owned());
+            self.append_job_line(&inner, "", &result, &LogPeople::default());
+        }
+        if direct.is_empty() {
+            direct.push(inner.machine.status());
+        }
         direct
     }
 
@@ -254,91 +336,6 @@ impl Hub {
     pub fn client_disconnected(&self, now: Instant) {
         let mut inner = self.lock();
         self.apply(&mut inner, Event::ClientDisconnected, now, &mut Vec::new());
-    }
-
-    /// Lets the controller run up to `now` with nothing read (the fake controller's pace).
-    pub fn tick(&self, now: Instant) {
-        let mut inner = self.lock();
-        self.turn(&mut inner, &[], now);
-    }
-
-    /// One turn of the serial thread: `read` from the port; what to write and whether to close.
-    pub fn exchange(&self, read: &[u8], now: Instant) -> Exchange {
-        let mut inner = self.lock();
-        let close = self.turn(&mut inner, read, now);
-        Exchange {
-            write: std::mem::take(&mut inner.pending_write),
-            close,
-        }
-    }
-
-    /// Runs the controller once; true when it gave the link up.
-    fn turn(&self, inner: &mut Inner, read: &[u8], now: Instant) -> bool {
-        let at = self.at(now);
-        let Some(controller) = inner.controller.as_mut() else {
-            return false;
-        };
-        let advance = controller.advance(read, at);
-        inner.pending_write.extend_from_slice(&advance.write);
-        for notice in advance.notices {
-            let _ = inner.notices.send(notice);
-        }
-        self.publish_info(inner);
-        for event in advance.events {
-            self.apply(inner, event, now, &mut Vec::new());
-        }
-        let Some(notice) = advance.close else {
-            return false;
-        };
-        let _ = inner.notices.send(notice);
-        self.drop_controller(inner, now);
-        true
-    }
-
-    fn drop_controller(&self, inner: &mut Inner, now: Instant) {
-        inner.controller = None;
-        self.publish_info(inner);
-        self.apply(inner, Event::ControllerLost, now, &mut Vec::new());
-    }
-
-    /// Sends a `Welcome` to every subscriber when the controller's info changed (addendum C6).
-    fn publish_info(&self, inner: &mut Inner) {
-        let info = inner.controller.as_ref().and_then(|c| c.info());
-        if info != inner.info {
-            inner.info.clone_from(&info);
-            let welcome = self.welcome_of(info);
-            inner
-                .subscribers
-                .retain(|s| s.send(welcome.clone()).is_ok());
-        }
-    }
-
-    /// The serial thread opened the port at `now`: a fresh GRBL controller identifies (G3).
-    pub fn attach_serial(&self, serial: &SerialSettings, now: Instant) {
-        let controller =
-            GrblController::new(&serial.port, serial.baud, serial.timing, self.at(now));
-        self.lock().controller = Some(Box::new(controller));
-    }
-
-    /// The port failed (read or write error): the controller is lost (G15).
-    pub fn lose(&self, notice: String, now: Instant) {
-        let mut inner = self.lock();
-        if inner.controller.is_some() {
-            let _ = inner.notices.send(notice);
-            inner.pending_write.clear();
-            self.drop_controller(&mut inner, now);
-        }
-    }
-
-    /// The port could not be opened: why, for the app (G2, G3).
-    pub fn open_failed(&self, detail: String, now: Instant) {
-        let mut inner = self.lock();
-        self.apply(
-            &mut inner,
-            Event::NoControllerDetail { detail },
-            now,
-            &mut Vec::new(),
-        );
     }
 
     /// A line for the connector's terminal.
@@ -351,16 +348,18 @@ impl Hub {
         self.lock().notices = channel().0;
     }
 
-    /// Stops a running or paused job as a client's Stop would (G16); the job's name if one ran.
+    /// Stops a running or paused job as a client's Stop would (G16, A19); the job's name if one
+    /// ran. A paused job whose resume waits for an owner counts as paused.
     pub fn stop_for_exit(&self, now: Instant) -> Option<String> {
         let mut inner = self.lock();
-        if !matches!(inner.machine.state(), State::Running | State::Paused) {
+        let paused = inner.machine.waits_for_resume();
+        if !paused && !matches!(inner.machine.state(), State::Running | State::Paused) {
             return None;
         }
         let name = inner.job_name.clone();
         self.apply(
             &mut inner,
-            Event::Message(Message::Stop),
+            Event::Message(Message::Stop, Peer::host()),
             now,
             &mut Vec::new(),
         );
@@ -380,6 +379,9 @@ impl Hub {
             inner.job_name.clone()
         };
         self.apply(&mut inner, Event::LocalStartPressed, now, &mut Vec::new());
+        if inner.machine.state() == State::AwaitingLocalStart {
+            return None;
+        }
         let _ = inner.notices.send(format!("Started {name}"));
         Some(name)
     }
@@ -389,10 +391,11 @@ impl Hub {
         let at = self.at(now);
         let mut queue = VecDeque::from([event]);
         while let Some(event) = queue.pop_front() {
-            if let Event::Message(Message::SubmitJob { job_id, name, .. }) = &event {
+            if let Event::Message(Message::SubmitJob { job_id, name, .. }, _) = &event {
                 inner.submitted = Some((*job_id, name.clone()));
             }
             let before = inner.machine.state();
+            let people = inner.machine.people().cloned();
             let output = inner.machine.handle(event);
             for command in &output.commands {
                 if matches!(command, ControllerCommand::Start { .. }) {
@@ -408,10 +411,13 @@ impl Hub {
                     queue.extend(controller.command(command, job, at));
                 }
             }
+            if let Some(confirmation) = &output.confirmed {
+                self.log_confirmation(inner, confirmation);
+            }
             for message in output.messages {
                 self.route(inner, message, direct);
             }
-            self.log_outcome(inner, before);
+            self.log_outcome(inner, before, people);
         }
     }
 
@@ -429,58 +435,11 @@ impl Hub {
                 direct.push(message);
             }
             Message::JobRejected { job_id, reason } => {
-                let name = inner
-                    .submitted
-                    .as_ref()
-                    .filter(|(id, _)| *id == job_id)
-                    .map(|(_, name)| name.clone())
-                    .unwrap_or_default();
-                let result = LogResult::Rejected(format!("{reason:?}"));
-                match rejection_line(reason) {
-                    // The settings refusal is its own terminal line (UX notes section 10).
-                    Some(line) => self.log_with_line(inner, &name, &result, line),
-                    None => self.log(inner, &name, &result, None),
-                }
+                self.log_rejection(inner, job_id, reason);
                 direct.push(Message::JobRejected { job_id, reason });
             }
             other => direct.push(other),
         }
-    }
-
-    fn log_outcome(&self, inner: &mut Inner, before: State) {
-        let after = inner.machine.state();
-        if after == before {
-            return;
-        }
-        let status = inner.machine.status();
-        if let Some((result, shown)) = logged_outcome(before, after, &status) {
-            let name = inner.job_name.clone();
-            self.log(inner, &name, &result, shown);
-        } else if let Some(line) = terminal_alarm(before, after, &status) {
-            let _ = inner.notices.send(line);
-        }
-        if after == State::AwaitingLocalStart {
-            // A waiting Home carries no job (`specs/0118` M5).
-            let name = match status {
-                Message::Status { job: None, .. } => "Home",
-                _ => inner.job_name.as_str(),
-            };
-            let _ = inner.notices.send(format!("Press Enter to start {name}"));
-        }
-    }
-
-    fn log(&self, inner: &Inner, name: &str, result: &LogResult, shown: Option<String>) {
-        let text = shown.unwrap_or_else(|| result.text());
-        self.log_with_line(inner, name, result, format!("Job {name}: {text}"));
-    }
-
-    /// Appends `result` to `jobs.log` and prints `line` on the terminal.
-    fn log_with_line(&self, inner: &Inner, name: &str, result: &LogResult, line: String) {
-        let at = OffsetDateTime::now_utc();
-        if let Err(e) = self.job_log.append(at, name, result) {
-            let _ = inner.notices.send(format!("Cannot write the job log: {e}"));
-        }
-        let _ = inner.notices.send(line);
     }
 }
 

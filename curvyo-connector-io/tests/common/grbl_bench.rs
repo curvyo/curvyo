@@ -8,6 +8,7 @@
     clippy::format_collect
 )]
 
+use curvyo_connector_core::Peer;
 use std::time::Duration;
 
 use curvyo_connector_core::{Event, JobKind, Machine, Message, Options, State};
@@ -151,7 +152,7 @@ impl Bench {
     }
 
     pub fn app(&mut self, message: Message) {
-        self.apply(Event::Message(message));
+        self.apply(Event::Message(message, Peer::host()));
     }
 
     /// Sends `text` as a job and waits for `Ready`.

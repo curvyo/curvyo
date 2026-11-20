@@ -1,4 +1,4 @@
-//! Golden files for the frames of this crate: the four `PairSpake` shapes and the three reasons of
+//! Golden files for the frames of this crate: the four `PairSpake` shapes and the four reasons of
 //! `PairRefused` (addendum A6).
 #![allow(clippy::unwrap_used)]
 

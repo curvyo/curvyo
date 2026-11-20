@@ -860,20 +860,37 @@ fn q18_every_outcome_appends_one_time_name_result_line() {
     start_slow_stop(&server, &mut c);
     let rows = log_lines(dir.path());
     assert!(rows.len() >= 2, "{rows:?}");
+    // `specs/0128` A15 (addendum D9): time, name, result, then sent by, started by, confirmed by.
     for row in &rows {
-        assert_eq!(row.len(), 3, "{row:?}");
+        assert_eq!(row.len(), 6, "{row:?}");
         assert!(is_rfc3339_utc(&row[0]), "{}", row[0]);
     }
-    assert_eq!(rows[0][1..], ["done.gcode", "Completed"]);
-    assert_eq!(rows[1][1..], ["stopme.gcode", "Stopped"]);
+    assert_eq!(
+        rows[0][1..],
+        ["done.gcode", "Completed", "laptop", "laptop", ""]
+    );
+    assert_eq!(
+        rows[1][1..],
+        ["stopme.gcode", "Stopped", "laptop", "laptop", ""]
+    );
     // nothing else is a file of this program but the key, the clients and the log
     let mut names: Vec<_> = std::fs::read_dir(dir.path())
         .unwrap()
         .map(|e| e.unwrap().file_name().into_string().unwrap())
         .collect();
     names.sort();
-    assert!(names.contains(&"jobs.log".to_owned()), "{names:?}");
-    assert_eq!(names.len(), 3, "unexpected extra files: {names:?}");
+    // `specs/0128` adds `admin.log` (A18) and `lock` (A21).
+    assert_eq!(
+        names,
+        [
+            "admin.log",
+            "clients.json",
+            "identity.pem",
+            "jobs.log",
+            "lock"
+        ],
+        "unexpected extra files: {names:?}"
+    );
 }
 
 /// Submits a job, stops it right after the start. Returns nothing the caller needs.

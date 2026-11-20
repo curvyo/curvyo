@@ -38,7 +38,7 @@ fn m8_home_reaches_every_app_at_once_and_a_second_app_may_stop_it() {
     wait_state(&mut second, State::Idle);
     wait_state(&mut first, State::Idle);
     let log = rig.log();
-    assert!(log.contains("\t\tHome: Laptop\n"), "{log}");
+    assert!(log.contains("\t\tHome: Laptop\t"), "{log}");
     assert!(
         !log.contains("Stopped"),
         "a stopped homing is no job result: {log}"

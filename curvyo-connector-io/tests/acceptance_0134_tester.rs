@@ -7,6 +7,7 @@
 
 mod common;
 
+use curvyo_connector_core::Peer;
 use std::time::{Duration, Instant};
 
 use common::grbl_bench::{Bench, job_id};
@@ -191,13 +192,16 @@ fn ss6_a_start_after_a_stop_in_between_is_refused_and_the_job_does_not_run() {
 fn submit(bench: &mut Bench, n: u128, text: &str) -> Vec<Message> {
     bench
         .machine
-        .handle(Event::Message(Message::SubmitJob {
-            job_id: job_id(n),
-            name: "t.gcode".into(),
-            kind: JobKind::Job,
-            bytes: text.len() as u64,
-            sha256: "0".repeat(64),
-        }))
+        .handle(Event::Message(
+            Message::SubmitJob {
+                job_id: job_id(n),
+                name: "t.gcode".into(),
+                kind: JobKind::Job,
+                bytes: text.len() as u64,
+                sha256: "0".repeat(64),
+            },
+            Peer::host(),
+        ))
         .messages
 }
 

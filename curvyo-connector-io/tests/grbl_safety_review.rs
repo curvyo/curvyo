@@ -12,6 +12,7 @@
 
 mod common;
 
+use curvyo_connector_core::Peer;
 use std::time::Duration;
 
 use common::grbl_bench::{Bench, DT, job_id};
@@ -95,13 +96,16 @@ fn g34_laser_mode_unknown_refuses_every_job_and_the_controller_refuses_start_too
     );
     let lines = bench.sim.lines.len();
     let job = "G21\nM4 S0\nG1 X10 F600 S500\n";
-    let out = bench.machine.handle(Event::Message(Message::SubmitJob {
-        job_id: job_id(9),
-        name: "unknown.gcode".into(),
-        kind: JobKind::Job,
-        bytes: job.len() as u64,
-        sha256: "0".repeat(64),
-    }));
+    let out = bench.machine.handle(Event::Message(
+        Message::SubmitJob {
+            job_id: job_id(9),
+            name: "unknown.gcode".into(),
+            kind: JobKind::Job,
+            bytes: job.len() as u64,
+            sha256: "0".repeat(64),
+        },
+        Peer::host(),
+    ));
     assert_eq!(
         out.messages,
         [Message::JobRejected {
@@ -320,13 +324,16 @@ fn a_controller_in_the_door_state_takes_no_job() {
     bench.run_for(Duration::from_secs(1));
     assert_eq!(bench.sim.lines.len(), lines, "no byte of the job");
     let text = "G0 X2\n";
-    let out = bench.machine.handle(Event::Message(Message::SubmitJob {
-        job_id: job_id(5),
-        name: "door.gcode".into(),
-        kind: JobKind::Job,
-        bytes: text.len() as u64,
-        sha256: "0".repeat(64),
-    }));
+    let out = bench.machine.handle(Event::Message(
+        Message::SubmitJob {
+            job_id: job_id(5),
+            name: "door.gcode".into(),
+            kind: JobKind::Job,
+            bytes: text.len() as u64,
+            sha256: "0".repeat(64),
+        },
+        Peer::host(),
+    ));
     assert_eq!(
         out.messages,
         [Message::JobRejected {

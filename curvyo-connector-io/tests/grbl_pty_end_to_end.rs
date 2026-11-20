@@ -204,15 +204,15 @@ fn g23_the_whole_demo_over_a_real_pty() {
     assert!(job.is_none(), "the job is gone");
     let log = std::fs::read_to_string(dir.path().join("state/jobs.log")).unwrap();
     assert!(
-        log.contains("\tStopped\n") && log.contains("\tCompleted\n"),
+        log.contains("\tStopped\t") && log.contains("\tCompleted\t"),
         "{log}"
     );
     assert!(
-        log.contains("\tAlarm: Hard limit hit, position may be lost (alarm 1)\n"),
+        log.contains("\tAlarm: Hard limit hit, position may be lost (alarm 1)\t"),
         "{log}"
     );
     assert!(log.contains("\tFailed: controller lost at line "), "{log}");
-    assert!(log.contains("\t\tUnlock: Laptop\n"), "{log}");
+    assert!(log.contains("\t\tUnlock: Laptop\t"), "{log}");
     let sim = pty.sim.lock().unwrap();
     assert_eq!(sim.lines.iter().filter(|l| *l == "$X").count(), 1, "one $X");
     assert!(sim.lines.len() > writes);

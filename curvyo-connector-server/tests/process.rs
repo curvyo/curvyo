@@ -217,8 +217,11 @@ fn q17_q18_the_enter_key_starts_a_waiting_job_and_the_log_gets_a_line() {
         }
     }
     let log = std::fs::read_to_string(dir.path().join("jobs.log")).unwrap();
-    let fields: Vec<&str> = log.trim_end().split('\t').collect();
-    assert_eq!(&fields[1..], ["sign.gcode", "Completed"]);
+    let fields: Vec<&str> = log.trim_end_matches('\n').split('\t').collect();
+    assert_eq!(
+        &fields[1..],
+        ["sign.gcode", "Completed", "Laptop", "Laptop", ""]
+    );
     assert!(
         fields[0].ends_with('Z') && fields[0].len() == 20,
         "{}",
@@ -270,7 +273,9 @@ fn q19_the_alarm_flag_raises_an_alarm_at_the_line() {
     }
     let log = std::fs::read_to_string(dir.path().join("jobs.log")).unwrap();
     assert!(
-        log.ends_with("\tetch.gcode\tAlarm: Fake alarm at line 2\n"),
+        log.lines()
+            .last()
+            .is_some_and(|l| l.contains("\tetch.gcode\tAlarm: Fake alarm at line 2\t")),
         "{log}"
     );
 }

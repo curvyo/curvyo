@@ -93,6 +93,17 @@ impl Connection {
                 }
             }
         };
+        // The connector says who it recorded this client as before the status (`specs/0128` A8);
+        // an older connector sends the status at once.
+        loop {
+            match self.recv_message(deadline)? {
+                Message::Authenticated { client_name, role } => {
+                    self.session = Some((client_name, role));
+                }
+                Message::Status { .. } => break,
+                _ => {}
+            }
+        }
         Ok(PairingRecord {
             spki: self.spki,
             token: Token::from_hex(&token)

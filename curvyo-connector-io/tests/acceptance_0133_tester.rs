@@ -768,6 +768,7 @@ impl Rig {
         self.welcome = Some(Message::Welcome {
             connector_name: g.name.clone(),
             controller: g.controller.clone(),
+            mode: None,
         });
         self.conn = Some(c);
     }
