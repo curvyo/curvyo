@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::admin::{ClientEntry, ConnectorMode, LogName, Role, Secret};
+use crate::config::ConnectorConfig;
 use crate::millimetres::Millimetres;
 
 /// What a job is: the work itself or its outline at low power.
@@ -136,11 +138,21 @@ pub enum ErrorCode {
     WrongState,
     /// A message only the connector sends, or one the job machine does not take.
     UnexpectedMessage,
+    /// The connector is in maintenance mode and does not take this message (A3).
+    Maintenance,
+    /// The setup window of maintenance mode is closed (A5).
+    MaintenanceClosed,
+    /// `ApplyConfig` carried a configuration that breaks a rule; the message names the field.
+    InvalidConfig,
+    /// Only an owner may send this, or the connector is configured already (A7, A9).
+    OwnerRequired,
+    /// No client or connector is called that (A11, A19).
+    UnknownName,
 }
 
 impl ErrorCode {
     /// Every code, in the order of the golden file `errors/codes.json`.
-    pub const ALL: [ErrorCode; 9] = [
+    pub const ALL: [ErrorCode; 14] = [
         ErrorCode::UnsupportedProtocol,
         ErrorCode::Malformed,
         ErrorCode::UnknownType,
@@ -150,6 +162,11 @@ impl ErrorCode {
         ErrorCode::UnknownJob,
         ErrorCode::WrongState,
         ErrorCode::UnexpectedMessage,
+        ErrorCode::Maintenance,
+        ErrorCode::MaintenanceClosed,
+        ErrorCode::InvalidConfig,
+        ErrorCode::OwnerRequired,
+        ErrorCode::UnknownName,
     ];
 }
 
@@ -218,13 +235,101 @@ pub enum Message {
     /// Runs the controller's homing cycle (GRBL `$H`), from `Idle`, `Ready`, `Done` or `Alarm`
     /// (`specs/0118`); never sent on its own by the app or the connector.
     Home,
+    /// Asks for the serial ports of the connector's host (maintenance or owner).
+    ListPorts,
+    /// Configures the connector: in maintenance mode the sender becomes its owner; in configured
+    /// mode an owner replaces the configuration.
+    ApplyConfig {
+        /// The configuration.
+        config: ConnectorConfig,
+        /// The sender's name, recorded as the owner in maintenance mode.
+        client_name: String,
+    },
+    /// Asks for the configuration (owner).
+    GetConfig,
+    /// Issues a pairing code for a client of this name and role (owner).
+    IssueCode {
+        /// The name the pairing is recorded under.
+        client_name: String,
+        /// The role it gets.
+        role: Role,
+    },
+    /// Asks for the paired clients (owner).
+    ListClients,
+    /// Unpairs a client and closes its connections (owner).
+    RevokeClient {
+        /// Its name.
+        name: String,
+    },
+    /// Asks for the last lines of a log (owner).
+    GetLog {
+        /// Which log.
+        log: LogName,
+        /// How many lines, clamped to 1 to 1,000.
+        last: u32,
+    },
+    /// Stops a running job, deletes the connector's state and ends it (owner).
+    Reset {
+        /// The connector's name, typed by the owner as the confirmation.
+        connector_name: String,
+    },
     /// Answer to `Hello` once accepted.
     Welcome {
         /// The connector's name.
         connector_name: String,
         /// The controller, if one is attached.
         controller: Option<ControllerInfo>,
+        /// Maintenance, configured or foreground; absent from a connector before slice 5.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mode: Option<ConnectorMode>,
     },
+    /// After `Paired` and after a valid `Auth`, before the `Status`: who this client is.
+    Authenticated {
+        /// The client's name in `clients.json`.
+        client_name: String,
+        /// Its role.
+        role: Role,
+    },
+    /// Answer to `ListPorts`: device paths only.
+    Ports {
+        /// The paths, `/dev/serial/by-id/` names first.
+        paths: Vec<String>,
+    },
+    /// Answer to `ApplyConfig`: in maintenance mode with the new owner's token.
+    ConfigApplied {
+        /// The owner's token, for a first configuration only.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        token: Option<Secret>,
+    },
+    /// Answer to `GetConfig`.
+    Config {
+        /// The configuration.
+        config: ConnectorConfig,
+    },
+    /// Answer to `IssueCode`.
+    CodeIssued {
+        /// The code as printed (`XXXX-XXXX`).
+        code: Secret,
+        /// Seconds it stays valid.
+        expires_in_s: u64,
+    },
+    /// Answer to `ListClients`.
+    Clients {
+        /// Every paired client, oldest first.
+        clients: Vec<ClientEntry>,
+    },
+    /// Answer to `RevokeClient`.
+    ClientRevoked {
+        /// The removed client.
+        name: String,
+    },
+    /// Answer to `GetLog`: raw lines, oldest first.
+    LogLines {
+        /// The lines without their line ends.
+        lines: Vec<String>,
+    },
+    /// Answer to `Reset`, sent before the connector deletes its state and ends.
+    ResetDone,
     /// Answer to `Pair`.
     Paired {
         /// The token for later `Auth`.
@@ -260,6 +365,15 @@ pub enum Message {
         /// `$H` runs, `specs/0133`); left out when false.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         pause_pending: bool,
+        /// In `AwaitingLocalStart` under the owner rule: the member whose start or resume waits.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        requested_by: Option<String>,
+        /// Under the owner rule (configured mode): the held job's name.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        job_name: Option<String>,
+        /// Under the owner rule: the client that sent the held job.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sent_by: Option<String>,
     },
     /// A refusal that keeps the connection open, except where stated.
     Error {

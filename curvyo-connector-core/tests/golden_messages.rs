@@ -34,6 +34,9 @@ fn status(
         alarm: alarm.map(str::to_owned),
         detail: None,
         pause_pending: false,
+        requested_by: None,
+        job_name: None,
+        sent_by: None,
     }
 }
 
@@ -103,6 +106,7 @@ fn all() -> Vec<(&'static str, Message)> {
             Message::Welcome {
                 connector_name: "Workshop Pi".into(),
                 controller: Some(controller()),
+                mode: None,
             },
         ),
         (
@@ -110,6 +114,7 @@ fn all() -> Vec<(&'static str, Message)> {
             Message::Welcome {
                 connector_name: "Workshop Pi".into(),
                 controller: None,
+                mode: None,
             },
         ),
         (
@@ -199,9 +204,16 @@ fn status_shows_empty_fields_as_null_not_omitted() {
 
 #[test]
 fn every_error_code_is_fixed_by_the_golden_file() {
+    // `codes.json` holds the codes up to slice 4, `codes_0128.json` the ones `specs/0128` added;
+    // together, in order, they are every code.
+    let (old, added) = ErrorCode::ALL.split_at(9);
     assert_eq!(
-        serde_json::to_string(&ErrorCode::ALL).unwrap(),
+        serde_json::to_string(old).unwrap(),
         fixture("errors/codes.json")
+    );
+    assert_eq!(
+        serde_json::to_string(added).unwrap(),
+        fixture("errors/codes_0128.json")
     );
 }
 

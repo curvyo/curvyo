@@ -9,6 +9,7 @@
 mod common;
 
 use common::{JOB_TEXT, chunk, fixture, job_id, submit};
+use curvyo_connector_core::Peer;
 use curvyo_connector_core::{
     ControllerCommand, ControllerInfo, ControllerSettings, Event, JobKind, JobResult, Machine,
     Message, Millimetres, Options, Output, Progress, RejectReason, State, decode, encode,
@@ -48,6 +49,9 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                 alarm: None,
                 detail: Some("Failed at line 12: No feed rate (error 22)".into()),
                 pause_pending: false,
+                requested_by: None,
+                job_name: None,
+                sent_by: None,
             },
         ),
         (
@@ -59,6 +63,9 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                 alarm: None,
                 detail: Some("Lost the controller at line 120".into()),
                 pause_pending: false,
+                requested_by: None,
+                job_name: None,
+                sent_by: None,
             },
         ),
         (
@@ -70,6 +77,9 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                 alarm: None,
                 detail: Some("Controller state: Door".into()),
                 pause_pending: false,
+                requested_by: None,
+                job_name: None,
+                sent_by: None,
             },
         ),
         (
@@ -87,6 +97,7 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                         travel: Some([Millimetres(400.0), Millimetres(300.0)]),
                     }),
                 }),
+                mode: None,
             },
         ),
     ];
@@ -126,15 +137,18 @@ fn g19_settings_write_null_for_a_value_the_controller_did_not_report() {
 fn ready() -> Machine {
     let mut m = Machine::confirming(Options::default());
     m.handle(Event::ControllerConnected);
-    m.handle(Event::Message(submit(JOB_TEXT, JobKind::Job)));
-    m.handle(Event::Message(chunk(0, JOB_TEXT)));
+    m.handle(Event::Message(submit(JOB_TEXT, JobKind::Job), Peer::host()));
+    m.handle(Event::Message(chunk(0, JOB_TEXT), Peer::host()));
     assert_eq!(m.state(), State::Ready);
     m
 }
 
 fn running() -> Machine {
     let mut m = ready();
-    let out = m.handle(Event::Message(Message::Start { job_id: job_id() }));
+    let out = m.handle(Event::Message(
+        Message::Start { job_id: job_id() },
+        Peer::host(),
+    ));
     assert_eq!(
         out.commands,
         [ControllerCommand::Start { job_id: job_id() }]
@@ -144,7 +158,7 @@ fn running() -> Machine {
 }
 
 fn app(m: &mut Machine, message: Message) -> Output {
-    m.handle(Event::Message(message))
+    m.handle(Event::Message(message, Peer::host()))
 }
 
 #[test]

@@ -1,26 +1,30 @@
 //! The job state machine of one connector: events in, new state and messages out, no clock.
 
+mod confirm;
 mod controls;
 mod home;
+
+pub use confirm::{Confirmation, Peer, People, StartRule};
 
 use uuid::Uuid;
 
 use crate::assembly::{Assembly, ChunkError, Job};
+pub(crate) use crate::count::count;
 use crate::message::{ErrorCode, JobKind, Message, Progress, RejectReason, State};
 use crate::millimetres::Millimetres;
 
 /// Settings of the machine.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Options {
-    /// `Start` waits for the button on the connector's host (CONN-SAFETY, off by default).
-    pub require_local_start: bool,
+    /// Who has to agree before a `Start` runs (architect addendum D5).
+    pub start_rule: StartRule,
 }
 
 /// Something that happened: a message from the app or an event from the controller side.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    /// A message from a paired, greeted client.
-    Message(Message),
+    /// A message from a paired, greeted client, or from the host itself.
+    Message(Message, Peer),
     /// A controller was attached.
     ControllerConnected,
     /// The controller was lost; a job in flight is dropped and named in the detail.
@@ -127,6 +131,8 @@ pub struct Output {
     pub messages: Vec<Message>,
     /// Commands for the controller, in order.
     pub commands: Vec<ControllerCommand>,
+    /// A start or resume that waited ran: who asked and who agreed, for `admin.log`.
+    pub confirmed: Option<Confirmation>,
 }
 
 /// What `AwaitingLocalStart` waits to start.
@@ -134,6 +140,8 @@ pub struct Output {
 enum Waiting {
     /// The held job.
     Start,
+    /// The paused job's resume (owner rule only).
+    Resume,
     /// A homing cycle (`specs/0118` M5).
     Home,
 }
@@ -144,6 +152,7 @@ struct Held {
     lines: u32,
     line: u32,
     elapsed_ms: u64,
+    people: People,
 }
 
 /// The state of one connector and the one job it holds.
@@ -176,23 +185,14 @@ pub struct Machine {
     waiting: Waiting,
     /// The state a homing started from (`Idle`, `Ready` or `Alarm`), and returns to.
     homed_from: State,
+    /// Who pressed the start or resume that waits in `AwaitingLocalStart`.
+    requester: Option<String>,
+    /// Who sent the job being received.
+    sender: String,
 }
 
 /// Controller states in which no job may start (`specs/0127` G4): the door, check mode, sleep.
 const BUSY_WORDS: [&str; 3] = ["Door", "Check", "Sleep"];
-
-/// A count with a thousands comma: "12,345".
-pub(crate) fn count(n: u32) -> String {
-    let digits = n.to_string();
-    let mut out = String::new();
-    for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c);
-    }
-    out
-}
 
 impl Machine {
     /// A connector without a controller whose Pause, Resume and Stop take effect at once.
@@ -215,6 +215,8 @@ impl Machine {
             laser_unknown: false,
             waiting: Waiting::Start,
             homed_from: State::Idle,
+            requester: None,
+            sender: String::new(),
         }
     }
 
@@ -286,6 +288,9 @@ impl Machine {
             alarm: self.alarm.clone().filter(|_| self.state != State::Homing),
             detail: self.shown_detail(),
             pause_pending: self.pause_pending,
+            requested_by: self.shown_requester(),
+            job_name: self.shown_job().map(|h| h.job.name.clone()),
+            sent_by: self.shown_job().map(|h| h.people.sent_by.clone()),
         }
     }
 
@@ -293,7 +298,7 @@ impl Machine {
     pub fn handle(&mut self, event: Event) -> Output {
         let mut out = Output::default();
         match event {
-            Event::Message(message) => self.on_message(message, &mut out),
+            Event::Message(message, peer) => self.on_message(message, &peer, &mut out),
             Event::ClientDisconnected => {
                 if self.state == State::Receiving {
                     self.discard();
@@ -350,13 +355,17 @@ impl Machine {
     fn discard(&mut self) {
         self.assembly = None;
         self.held = None;
+        self.requester = None;
     }
 
     fn reject(out: &mut Output, job_id: Uuid, reason: RejectReason) {
         out.messages.push(Message::JobRejected { job_id, reason });
     }
 
-    fn on_message(&mut self, message: Message, out: &mut Output) {
+    fn on_message(&mut self, message: Message, peer: &Peer, out: &mut Output) {
+        if self.takes_as_request(&message, peer, out) {
+            return;
+        }
         match message {
             Message::GetStatus => out.messages.push(self.status()),
             Message::SubmitJob {
@@ -365,13 +374,16 @@ impl Machine {
                 kind,
                 bytes,
                 sha256,
-            } => self.submit(job_id, name, kind, bytes, sha256, out),
+            } => {
+                self.sender.clone_from(&peer.name);
+                self.submit(job_id, name, kind, bytes, sha256, out);
+            }
             Message::JobChunk {
                 job_id,
                 index,
                 text,
             } => self.chunk(job_id, index, &text, out),
-            Message::Start { job_id } => self.start(job_id, out),
+            Message::Start { job_id } => self.start(job_id, peer, out),
             Message::Pause | Message::Resume | Message::Stop => self.control(&message, out),
             // Outside `Alarm` nothing is written; the caller answers with the status (G33).
             Message::Unlock if self.state == State::Alarm => {
@@ -464,6 +476,11 @@ impl Machine {
                     lines,
                     line: 0,
                     elapsed_ms: 0,
+                    people: People {
+                        sent_by: std::mem::take(&mut self.sender),
+                        started_by: None,
+                        confirmed_by: None,
+                    },
                 });
                 out.messages.push(Message::JobAccepted { job_id });
                 self.set(State::Ready, out);
@@ -473,34 +490,5 @@ impl Machine {
                 self.set(State::Idle, out);
             }
         }
-    }
-
-    fn start(&mut self, job_id: Uuid, out: &mut Output) {
-        let held_id = self.held.as_ref().map(|h| h.job.job_id);
-        if self.state != State::Ready {
-            Self::wrong_state(out);
-        } else if held_id != Some(job_id) {
-            Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
-        } else if self.options.require_local_start {
-            self.waiting = Waiting::Start;
-            self.set(State::AwaitingLocalStart, out);
-        } else {
-            out.commands.push(ControllerCommand::Start { job_id });
-            self.set(State::Running, out);
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::count;
-
-    #[test]
-    fn counts_have_a_thousands_comma() {
-        assert_eq!(count(0), "0");
-        assert_eq!(count(999), "999");
-        assert_eq!(count(1000), "1,000");
-        assert_eq!(count(12_345), "12,345");
-        assert_eq!(count(1_234_567), "1,234,567");
     }
 }

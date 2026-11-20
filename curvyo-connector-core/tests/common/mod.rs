@@ -1,6 +1,7 @@
 //! Helpers shared by the tests: fixtures, a hand-written job and the fake controller.
 #![allow(dead_code, clippy::unwrap_used)]
 
+use curvyo_connector_core::Peer;
 use curvyo_connector_core::{
     ControllerCommand, Event, JobKind, Machine, Message, Options, Output, State,
 };
@@ -132,7 +133,7 @@ impl Rig {
     }
 
     pub fn app(&mut self, message: Message) -> Output {
-        self.send(Event::Message(message))
+        self.send(Event::Message(message, Peer::host()))
     }
 
     pub fn plugged() -> Self {

@@ -1,11 +1,11 @@
 //! How the job machine takes `Home` and the controller's homing events (`specs/0118` M3, M5).
 
-use super::{BUSY_WORDS, ControllerCommand, Event, Machine, Output, Waiting};
+use super::{BUSY_WORDS, ControllerCommand, Event, Machine, Output, StartRule, Waiting};
 use crate::message::{ErrorCode, State};
 
 impl Machine {
     /// `Home` from the app: homes from `Idle`, `Ready`, `Done` or `Alarm` (a `Ready` job is kept),
-    /// waits for the local press with `require_local_start`, and is refused with its cause in
+    /// waits for the local press under `StartRule::LocalPress`, and is refused with its cause in
     /// every other state; in `Homing` it changes nothing.
     pub(super) fn home(&mut self, out: &mut Output) {
         let busy_word = self
@@ -37,7 +37,7 @@ impl Machine {
             // A done job's result is over: homing from `Done` returns to `Idle`.
             self.discard();
         }
-        if self.options.require_local_start {
+        if self.options.start_rule == StartRule::LocalPress {
             self.waiting = Waiting::Home;
             self.set(State::AwaitingLocalStart, out);
         } else {
