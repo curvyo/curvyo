@@ -889,13 +889,21 @@ fn c10_switching_off_keeps_the_copy_and_resumes_as_an_offline_edit() {
             "ZQX-MACH-7731 laptop edit",
             "B's local edit reached every device"
         );
-        assert!(
-            net.conflict_texts(index, LibraryKind::Machine)
-                .iter()
-                .any(|text| text.contains("ZQX-MACH-7731 (from your devices)")),
-            "the older version is kept as the conflict copy, no edit lost"
-        );
     }
+    // B edited its copy while the item was off: A's older text, which B never saw changed, is
+    // kept there as the conflict copy, no edit lost. A made no edit since its text went out;
+    // B's newer record supersedes it there, so A keeps no copy (UX review 2026-11-19: a plain
+    // edit of another device is not a conflict).
+    assert!(
+        net.conflict_texts(b, LibraryKind::Machine)
+            .iter()
+            .any(|text| text.contains("ZQX-MACH-7731 (from your devices)")),
+        "the older version is kept as the conflict copy, no edit lost"
+    );
+    assert!(
+        net.conflict_texts(a, LibraryKind::Machine).is_empty(),
+        "A edited nothing: no copy"
+    );
 }
 
 /// Criterion 11: deleting a synced item on A deletes it on B with a notice; an off item's

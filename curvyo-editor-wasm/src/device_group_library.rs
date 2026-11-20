@@ -200,12 +200,12 @@ impl DeviceGroupGlue {
         let result = if snapshot {
             self.library.import_snapshot(self.peer, payload)
         } else {
-            self.library.import_updates(payload)
+            self.library.import_updates_seen(payload)
         };
         match result {
-            Ok(()) => {
+            Ok(seen) => {
                 self.files_changed = true;
-                self.queue_arrivals(&before);
+                self.queue_arrivals(&before, seen);
                 self.bump();
                 if in_step {
                     self.library_exported = self.library.version();
@@ -257,7 +257,9 @@ impl DeviceGroupGlue {
     }
 
     /// The entries that changed between `before` and now, queued for the page's session.
-    fn queue_arrivals(&mut self, before: &LibraryState) {
+    /// `seen`: the change was made knowing this device's earlier entries, so it supersedes the
+    /// entry text they held; otherwise a local record may be a concurrent edit.
+    fn queue_arrivals(&mut self, before: &LibraryState, seen: bool) {
         let after = state_of(&self.library);
         let keys: BTreeSet<_> = before.keys().chain(after.keys()).collect();
         for key in keys {
@@ -265,6 +267,7 @@ impl DeviceGroupGlue {
                 (None, Some(entry)) => Some(ArrivalChange::Arrived {
                     sync: entry.0,
                     text: entry.1.clone(),
+                    previous: None,
                 }),
                 (Some(_), None) => Some(ArrivalChange::Removed),
                 (Some(before_entry), Some(after_entry)) if before_entry != after_entry => {
@@ -274,6 +277,7 @@ impl DeviceGroupGlue {
                         Some(ArrivalChange::Arrived {
                             sync: after_entry.0,
                             text: after_entry.1.clone(),
+                            previous: before_entry.1.clone().filter(|_| seen),
                         })
                     }
                 }

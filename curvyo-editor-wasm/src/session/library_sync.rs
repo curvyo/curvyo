@@ -159,8 +159,15 @@ impl Session {
                 ArrivalChange::Arrived {
                     sync: true,
                     text: Some(text),
+                    previous,
                 } => {
-                    if self.library_arrived(group, arrival.kind, &arrival.id, &text) {
+                    if self.library_arrived(
+                        group,
+                        arrival.kind,
+                        &arrival.id,
+                        &text,
+                        previous.as_deref(),
+                    ) {
                         only = Some((arrival.kind, arrival.id.clone()));
                         match arrival.kind {
                             LibraryKind::Machine => machines += 1,
@@ -180,6 +187,7 @@ impl Session {
                 | ArrivalChange::Arrived {
                     sync: true,
                     text: None,
+                    ..
                 } => {}
             }
         }
@@ -227,13 +235,17 @@ impl Session {
 
     /// One arrived record text against the local record of the same id: the merge decides
     /// (ADR 0062 decision 5); the loser becomes the conflict copy, a local winner is written
-    /// back to the stream. Whether the local library took the text.
+    /// back to the stream. A local record that still equals the entry's `previous` text was not
+    /// edited here: the arrival is an edit of the other device, not a conflict, and keeps no
+    /// copy. Whether the item is new to this device: only a new item is an arrival of the
+    /// notice (UX notes section 5), an edit of an item the device holds is applied silently.
     fn library_arrived(
         &mut self,
         group: &mut DeviceGroupGlue,
         kind: LibraryKind,
         id: &str,
         text: &str,
+        previous: Option<&str>,
     ) -> bool {
         let local = match kind {
             LibraryKind::Machine => self.machine_record_text(id),
@@ -247,13 +259,16 @@ impl Session {
             RecordMerge::Same => false,
             RecordMerge::IncomingWins { loser } => {
                 self.library_write_local(kind, id, text);
-                if let Some(loser) = loser {
+                let arrived = local.is_none();
+                if let Some(loser) = loser.filter(|loser| Some(loser.as_str()) != previous) {
                     self.library_conflict(kind, id, &loser);
                 }
-                true
+                arrived
             }
             RecordMerge::LocalWins { conflict } => {
-                self.library_conflict(kind, id, &conflict);
+                if local.as_deref() != previous {
+                    self.library_conflict(kind, id, &conflict);
+                }
                 if let Some(winner) = local {
                     group.library_set(kind, id, &winner);
                 }

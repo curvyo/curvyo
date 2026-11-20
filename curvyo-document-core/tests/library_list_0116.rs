@@ -416,3 +416,52 @@ fn a_list_with_history_starts_over_from_a_state_snapshot() {
     );
     assert_eq!(c.entries(LibraryKind::Material).len(), 1);
 }
+
+/// An update made after seeing everything this replica holds supersedes its entries; one made
+/// beside an unseen change of this replica is concurrent (a local record may be an edit).
+#[test]
+fn updates_say_whether_they_saw_what_the_replica_held() {
+    let a = LibraryList::new(1);
+    let b = LibraryList::new(2);
+    sync(&a, &b);
+    a.set(LibraryKind::Machine, MACHINE, MACHINE_TEXT).unwrap();
+    let known = b.version();
+    assert!(
+        b.import_updates_seen(&a.export_updates(&known).unwrap())
+            .unwrap()
+    );
+    // B writes; A, having seen it, edits after: B sees it supersede.
+    b.set(
+        LibraryKind::Machine,
+        MACHINE,
+        &MACHINE_TEXT.replace("ZQX-MACH-7731", "B"),
+    )
+    .unwrap();
+    let known = a.version();
+    a.import_updates(&b.export_updates(&known).unwrap())
+        .unwrap();
+    let known = b.version();
+    a.set(LibraryKind::Machine, MACHINE, MACHINE_TEXT).unwrap();
+    assert!(
+        b.import_updates_seen(&a.export_updates(&known).unwrap())
+            .unwrap()
+    );
+    // Both write without seeing the other: concurrent.
+    b.set(
+        LibraryKind::Machine,
+        MACHINE,
+        &MACHINE_TEXT.replace("ZQX-MACH-7731", "B2"),
+    )
+    .unwrap();
+    let known = b.version();
+    a.set(
+        LibraryKind::Machine,
+        MACHINE,
+        &MACHINE_TEXT.replace("ZQX-MACH-7731", "A2"),
+    )
+    .unwrap();
+    assert!(
+        !b.import_updates_seen(&a.export_updates(&known).unwrap())
+            .unwrap()
+    );
+}

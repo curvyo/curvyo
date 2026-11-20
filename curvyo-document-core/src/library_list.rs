@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 
 use loro::{
-    ContainerID, ContainerType, ExportMode, JsonMapOp, JsonOpContent, LoroDoc, LoroMap,
+    ContainerID, ContainerType, ExportMode, Frontiers, JsonMapOp, JsonOpContent, LoroDoc, LoroMap,
     LoroMapValue, LoroValue, ValueOrContainer, VersionVector,
 };
 
@@ -197,25 +197,38 @@ impl LibraryList {
         self.merge(bytes).map(|_| ())
     }
 
+    /// As [`LibraryList::import_updates`]; whether every change the bytes brought was made
+    /// knowing everything this replica held before (it supersedes the entries it overwrote
+    /// instead of competing with a concurrent edit of this device).
+    ///
+    /// # Errors
+    /// [`LibraryListError::Malformed`], [`LibraryListError::FormatTooNew`].
+    pub fn import_updates_seen(&self, bytes: &[u8]) -> Result<bool, LibraryListError> {
+        self.merge(bytes).map(|merged| merged.seen)
+    }
+
     /// Takes a room snapshot, a full one as a merge, a state-only one ([`snapshot_state`]) as a
     /// start from its state when this replica holds history it cannot be merged onto: the
     /// replica then continues as `peer` from the snapshot and its changes not yet pushed are
-    /// lost (the trade-off of the state-only snapshot, the story's `adrs.md`).
+    /// lost (the trade-off of the state-only snapshot, the story's `adrs.md`). Whether the
+    /// snapshot supersedes what this replica held, as [`LibraryList::import_updates_seen`].
     ///
     /// # Errors
     /// [`LibraryListError::Malformed`], [`LibraryListError::FormatTooNew`].
     ///
     /// [`snapshot_state`]: LibraryList::snapshot_state
-    pub fn import_snapshot(&mut self, peer: u64, bytes: &[u8]) -> Result<(), LibraryListError> {
+    pub fn import_snapshot(&mut self, peer: u64, bytes: &[u8]) -> Result<bool, LibraryListError> {
         let theirs = Self::from_snapshot(peer, bytes)?;
-        if self.merge(bytes)? {
+        let merged = self.merge(bytes)?;
+        if merged.pending {
             *self = theirs;
+            return Ok(false);
         }
-        Ok(())
+        Ok(merged.seen)
     }
 
-    /// Merges `bytes`; whether some of their changes wait for history this replica lacks.
-    fn merge(&self, bytes: &[u8]) -> Result<bool, LibraryListError> {
+    /// Merges `bytes`.
+    fn merge(&self, bytes: &[u8]) -> Result<Merged, LibraryListError> {
         // The bytes on their own (changes whose history is not in them stay pending there), then
         // merged into a copy of this replica (changes it already holds are not new there).
         let alone = LoroDoc::new();
@@ -233,12 +246,16 @@ impl LibraryList {
             return Err(LibraryListError::FormatTooNew);
         }
         check_format(&trial)?;
+        let seen = brought_changes_saw(&trial, &before);
         let status = self
             .doc
             .import(bytes)
             .map_err(|_| LibraryListError::Malformed)?;
         self.check_format()?;
-        Ok(status.pending.is_some())
+        Ok(Merged {
+            pending: status.pending.is_some(),
+            seen,
+        })
     }
 
     /// Records the item `id` of `kind` as switched on with `text`, the exact record text.
@@ -344,6 +361,26 @@ impl LibraryList {
         self.doc.commit();
         Ok(())
     }
+}
+
+/// What a merge found out.
+struct Merged {
+    /// Some of the changes wait for history this replica lacks.
+    pending: bool,
+    /// Every change was made knowing everything the replica held before.
+    seen: bool,
+}
+
+/// Whether every change `doc` holds beyond `before` was made knowing all of `before`.
+fn brought_changes_saw(doc: &LoroDoc, before: &VersionVector) -> bool {
+    // Without peer compression, so the deps name real peers.
+    doc.export_json_updates_without_peer_compression(before, &doc.oplog_vv())
+        .changes
+        .iter()
+        .all(|change| {
+            doc.frontiers_to_vv(&Frontiers::from(change.deps.as_slice()))
+                .is_some_and(|known| known.includes_vv(before))
+        })
 }
 
 /// The map's entries whose value is a plain map.
