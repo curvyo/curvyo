@@ -11,6 +11,7 @@ export const PARAM_WORD: Record<Param, string> = {
   speed: "Speed",
   passes: "Passes",
   interval: "Interval",
+  strength: "Strength",
 };
 
 /** The unit inside a parameter's field. */
@@ -19,13 +20,14 @@ export const PARAM_UNIT: Record<Param, string> = {
   speed: "mm/min",
   passes: "×",
   interval: "mm",
+  strength: "%",
 };
 
 /** The width of a shared field in px (4.1). */
-export const SHARED_WIDTH: Record<Param, number> = { power: 104, speed: 160, passes: 88, interval: 120 };
+export const SHARED_WIDTH: Record<Param, number> = { power: 104, speed: 160, passes: 88, interval: 120, strength: 112 };
 
 /** The Up and Down step of a parameter (4.3); Shift takes ten times. */
-export const PARAM_STEP: Record<Param, number> = { power: 1, speed: 100, passes: 1, interval: 0.01 };
+export const PARAM_STEP: Record<Param, number> = { power: 1, speed: 100, passes: 1, interval: 0.01, strength: 1 };
 
 /** The step of the Cell size field. */
 export const CELL_STEP = 1;

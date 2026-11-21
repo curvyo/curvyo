@@ -8,8 +8,9 @@
 import { asId, type OperationId } from "./operationsView.ts";
 import { asSetKind, decodeDitherOption, type DitherMode, type DitherOption, isObject, type SetKind } from "./operationSettingsView.ts";
 
-/** The four parameters a grid varies or shares. */
-export const PARAMS = ["power", "speed", "passes", "interval"] as const;
+/** The parameters a grid varies or shares; Strength only on an axis of a picture grid
+ * (`specs/0135` criterion 51). */
+export const PARAMS = ["power", "speed", "passes", "interval", "strength"] as const;
 
 /** One parameter. */
 export type Param = (typeof PARAMS)[number];
@@ -58,6 +59,28 @@ function barDither(value: unknown): BarDither | null | undefined {
   return { value: mode.value, modes: modes as DitherOption[] };
 }
 
+/** The Picture segments of an Image grid (`specs/0135` criterion 51, `ux-notes.md` §11). */
+export interface BarPicture {
+  value: "ramp" | "selected";
+  /** The Selected picture segment shows (a picture is selected or the grid holds one). */
+  selectedOffered: boolean;
+  /** Strength is on the axis switches. */
+  strengthOffered: boolean;
+}
+
+function barPicture(value: unknown): BarPicture | null | undefined {
+  if (value === null) return null;
+  if (
+    !isObject(value) ||
+    (value.value !== "ramp" && value.value !== "selected") ||
+    typeof value.selected_offered !== "boolean" ||
+    typeof value.strength_offered !== "boolean"
+  ) {
+    return undefined;
+  }
+  return { value: value.value, selectedOffered: value.selected_offered, strengthOffered: value.strength_offered };
+}
+
 /** The bar of the selected grid, or of the tool's draft (`group` and `id` are `null`). */
 export interface TestGridBarView {
   group: OperationId | null;
@@ -69,8 +92,11 @@ export interface TestGridBarView {
   shared: SharedValue[];
   /** `null` unless the kind is Engrave. */
   crosshatch: boolean | null;
-  /** The Dither strip, `null` unless the kind is Image (`specs/0123` criterion 44). */
+  /** The Dither strip, `null` unless the kind is Image with the Ramp (`specs/0123` criterion 44,
+   * `specs/0135` P32). */
   dither: BarDither | null;
+  /** The Picture segments, `null` unless the kind is Image. */
+  picture: BarPicture | null;
   cellMm: number;
   columns: AxisFields;
   rows: AxisFields;
@@ -161,8 +187,10 @@ export function decodeTestGridView(value: unknown): TestGridBarView | null {
   const rows = axis(value.rows);
   const bad = invalid(value.invalid);
   const dither = barDither(value.dither);
+  const picture = barPicture(value.picture);
   if (
     dither === undefined ||
+    picture === undefined ||
     (value.group !== null && group === null) ||
     (value.id !== null && typeof value.id !== "string") ||
     typeof value.lasered !== "boolean" ||
@@ -192,6 +220,7 @@ export function decodeTestGridView(value: unknown): TestGridBarView | null {
     shared: values,
     crosshatch: value.crosshatch as boolean | null,
     dither,
+    picture,
     cellMm: value.cell_mm,
     columns,
     rows,

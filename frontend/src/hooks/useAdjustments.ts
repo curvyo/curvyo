@@ -40,6 +40,22 @@ export interface AdjustmentsApi {
   /** A drag of row `from` landing at index `to`: one step. */
   moveTo: (from: number, to: number) => boolean;
   remove: (index: number) => boolean;
+  /** A click on Curves row `index`'s curve at Input and Output %: a point there, one step. */
+  addCurvePoint: (index: number, input: number, output: number) => boolean;
+  /** A drag or arrow key of a Curves point to Input and Output %: one step. */
+  moveCurvePoint: (index: number, point: number, input: number, output: number) => boolean;
+  /** Delete on a Curves point (not an end point). */
+  removeCurvePoint: (index: number, point: number) => boolean;
+  /** The Straight curve button. */
+  straightenCurve: (index: number) => boolean;
+  /** Channel preset cell `preset` (0 Luminance to 3 Blue) of Channel mix row `index`. */
+  setChannelPreset: (index: number, preset: number) => boolean;
+  /** Crop on the canvas of Crop row `index`: the Crop bar opens. */
+  openCrop: (index: number) => boolean;
+  /** Copy adjustments: held for the session, no step. */
+  copyAdjustments: () => boolean;
+  /** Paste adjustments: one step "Paste adjustments". */
+  pasteAdjustments: () => boolean;
   makeEditable: () => boolean;
   restoreOriginal: () => boolean;
   /** Own on a clone's override row: a full copy of the original's adjustments, one step. */
@@ -89,6 +105,15 @@ export function useAdjustments(editor: EditorHandle): AdjustmentsApi {
       moveTo: (from, to) => act(false, (s) => s.move_adjust_step_to(from, to)),
       stretch: (index) => act(false, (s) => s.stretch_adjust_levels(index)),
       remove: (index) => act(false, (s) => s.remove_adjust_step(index)),
+      addCurvePoint: (index, input, output) => act(false, (s) => s.add_adjust_curve_point(index, input, output)),
+      moveCurvePoint: (index, point, input, output) =>
+        act(false, (s) => s.move_adjust_curve_point(index, point, input, output)),
+      removeCurvePoint: (index, point) => act(false, (s) => s.remove_adjust_curve_point(index, point)),
+      straightenCurve: (index) => act(false, (s) => s.straighten_adjust_curve(index)),
+      setChannelPreset: (index, preset) => act(false, (s) => s.set_adjust_channel_preset(index, preset)),
+      openCrop: (index) => act(false, (s) => s.open_crop_bar(index)),
+      copyAdjustments: () => act(false, (s) => s.copy_adjustments()),
+      pasteAdjustments: () => act(false, (s) => s.paste_adjustments()),
       makeEditable: () => act(false, (s) => s.make_adjust_editable()),
       restoreOriginal: () => act(false, (s) => s.restore_original_adjustments()),
       ownAdjustments: () => act(false, (s) => s.own_adjustments()),

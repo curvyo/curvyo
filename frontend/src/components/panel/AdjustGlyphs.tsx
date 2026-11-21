@@ -43,6 +43,26 @@ export function AdjustGlyph({ kind }: { kind: StepKindKey | "unknown" }) {
           <path d="M8 3v10" />
         </>
       ) : null}
+      {kind === "crop" ? <path d="M4.5 1.5v10h10M1.5 4.5h10v10" /> : null}
+      {kind === "resize" ? (
+        <>
+          <rect x={2.5} y={6.5} width={7} height={7} />
+          <path d="M9 2h5v5M14 2l-5 5" />
+        </>
+      ) : null}
+      {kind === "channel_mix" ? (
+        <>
+          <circle cx={6} cy={6} r={3.5} />
+          <circle cx={10} cy={6} r={3.5} />
+          <circle cx={8} cy={10} r={3.5} />
+        </>
+      ) : null}
+      {kind === "curves" ? (
+        <>
+          <path d="M2.5 13.5c3 0 4-11 11-11" />
+          <path d="M2.5 2.5v11h11" strokeWidth={1} />
+        </>
+      ) : null}
       {kind === "unknown" ? (
         <>
           <rect x={2.5} y={2.5} width={11} height={11} strokeDasharray="2 2" />

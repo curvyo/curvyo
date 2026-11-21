@@ -1,9 +1,12 @@
-import { ChevronDown, ChevronUp, MoveHorizontal, Power, PowerOff, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Crop, MoveHorizontal, Power, PowerOff, Trash2 } from "lucide-react";
+import { useState } from "react";
 import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 
 import { AdjustGlyph } from "@/components/panel/AdjustGlyphs";
+import { type CurveActions, CurvesGraph } from "@/components/panel/CurvesGraph";
 import { EntryField } from "@/components/panel/EntryField";
 import { LevelsGraph } from "@/components/panel/LevelsGraph";
+import { PresetStrip } from "@/components/panel/PresetStrip";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import { fieldStep, fieldText, typedField } from "@/lib/adjustText";
@@ -24,6 +27,16 @@ export interface StepActions {
   stretch: (index: number) => void;
   /** A pointer press on the glyph or name starts a reorder drag. */
   dragStart: (index: number, event: PointerEvent<HTMLElement>) => void;
+  /** The Curves graph's point edits of row `index`. */
+  curve: (index: number) => CurveActions;
+  /** The Straight curve button of row `index`. */
+  straighten: (index: number) => void;
+  /** Channel preset cell `preset` of Channel mix row `index`. */
+  channelPreset: (index: number, preset: number) => void;
+  /** Crop on the canvas of Crop row `index`. */
+  openCrop: (index: number) => void;
+  /** The Crop row the Crop bar edits, or `null`. */
+  cropBarRow: number | null;
 }
 
 interface RowProps {
@@ -40,7 +53,17 @@ interface RowProps {
   actions: StepActions;
 }
 
-function FieldView({ row, field, actions }: { row: StepRow; field: StepField; actions: StepActions }) {
+function FieldView({
+  row,
+  field,
+  actions,
+  width = 112,
+}: {
+  row: StepRow;
+  field: StepField;
+  actions: StepActions;
+  width?: number;
+}) {
   const index = row.index as number;
   return (
     <div data-adjust-field={field.key}>
@@ -50,7 +73,7 @@ function FieldView({ row, field, actions }: { row: StepRow; field: StepField; ac
         shown={fieldText(field.value, field.decimals)}
         mixed={false}
         suffix={field.unit === "" ? undefined : field.unit}
-        width={112}
+        width={width}
         gutter={field.unit === "" ? 8 : undefined}
         commitOnBlur
         inputMode="decimal"
@@ -210,9 +233,59 @@ export function AdjustStepRow(props: RowProps) {
               }}
             />
           ) : null}
-          {row.fields.map((field) => (
-            <FieldView key={field.key} row={row} field={field} actions={actions} />
-          ))}
+          {row.body?.kind === "curve" ? (
+            <CurvesBody row={row} points={row.body.points} actions={actions} />
+          ) : (
+            <>
+              {row.body?.kind === "channel_mix" ? (
+                <PresetStrip
+                  label="Channel preset"
+                  width="w-full"
+                  tooltipSide="top"
+                  cells={row.body.presets.map((preset, i) => ({
+                    id: String(i),
+                    content: preset.cell,
+                    label: preset.name,
+                    tooltip: preset.cell === preset.name ? "" : preset.name,
+                  }))}
+                  value={(() => {
+                    const at = row.body.presets.findIndex((preset) => preset.pressed);
+                    return at < 0 ? null : String(at);
+                  })()}
+                  onPress={(id) => actions.channelPreset(index, Number(id))}
+                  onReturnFocus={() => undefined}
+                />
+              ) : null}
+              {row.fields.map((field) => (
+                <FieldView key={field.key} row={row} field={field} actions={actions} />
+              ))}
+              {row.kind === "crop" ? (
+                <Tooltip side="top" content="Crop on the canvas">
+                  <button
+                    type="button"
+                    aria-label="Crop on the canvas"
+                    aria-pressed={actions.cropBarRow === index}
+                    onClick={() => actions.openCrop(index)}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)]"
+                  >
+                    <Crop aria-hidden size={16} strokeWidth={1.5} />
+                  </button>
+                </Tooltip>
+              ) : null}
+              {row.body?.kind === "resize" ? (
+                <>
+                  <div
+                    data-adjust-derived="height_px"
+                    className="flex h-7 w-[112px] items-center justify-between rounded-md border border-[var(--field-border)] px-2 text-[13px] tabular-nums text-[var(--field-derived-fg)]"
+                  >
+                    <span>Height</span>
+                    <span>{row.body.heightPx} px</span>
+                  </div>
+                  <p className="h-4 w-full text-xs text-[var(--panel-muted-fg)]">{row.body.line}</p>
+                </>
+              ) : null}
+            </>
+          )}
           {row.kind === "levels" ? (
             <Tooltip side="top" content="Stretch to the picture's range">
               <button
@@ -229,6 +302,49 @@ export function AdjustStepRow(props: RowProps) {
       ) : null}
     </li>
   );
+}
+
+/** The body of a Curves row (`ux-notes.md` §3.8): the graph, beside it In and Out of the picked
+ * point, "Point 2 of 4" and the Straight curve button. */
+function CurvesBody({ row, points, actions }: { row: StepRow; points: [number, number][]; actions: StepActions }) {
+  const index = row.index as number;
+  const [picked, setPicked] = useState(0);
+  const point = Math.min(picked, points.length - 1);
+  const fields = row.fields.filter((f) => f.key === `in_${point}` || f.key === `out_${point}`);
+  return (
+    <div className="flex w-full gap-1">
+      <CurvesGraph name={row.name} points={points} picked={point} onPick={setPicked} actions={actions.curve(index)} />
+      <div className="flex w-[104px] flex-col gap-1">
+        {fields.map((field) => (
+          <FieldViewNarrow key={field.key} row={row} field={field} actions={actions} />
+        ))}
+        <div className="flex h-7 items-center justify-between">
+          <p className="text-xs text-[var(--panel-muted-fg)]">
+            Point {point + 1} of {points.length}
+          </p>
+          <Tooltip side="top" content="Straight curve">
+            <button
+              type="button"
+              aria-label="Straight curve"
+              onClick={() => actions.straighten(index)}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+            >
+              {/* Draft 02's glyph: a square with its diagonal, unlike the Curves step glyph. */}
+              <svg aria-hidden width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                <rect width={18} height={18} x={3} y={3} rx={2} />
+                <path d="M7 17 17 7" />
+              </svg>
+            </button>
+          </Tooltip>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** [`FieldView`] at the 104 px of the Curves body. */
+function FieldViewNarrow({ row, field, actions }: { row: StepRow; field: StepField; actions: StepActions }) {
+  return <FieldView row={row} field={field} actions={actions} width={104} />;
 }
 
 /** One read-only row of the derived block (`ux-notes.md` §3.4): glyph, name, the resolved numbers. */
