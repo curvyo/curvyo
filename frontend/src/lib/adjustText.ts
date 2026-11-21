@@ -61,12 +61,13 @@ export function parseStrength(text: string): number | null {
 }
 
 /** A step list band (`ux-notes.md` §3.7): A Crop, Resize, Upscale, AI denoise; B the tone and
- * detail steps; C Remove background. Slice 1 has band B only; an unknown row has none. */
-export type Band = "B" | "unknown";
+ * detail steps; C Remove background. Slices 1 and 2 have bands A and B; an unknown row has none. */
+export type Band = "A" | "B" | "unknown";
 
 /** The band of a row. */
 export function bandOf(row: Pick<StepRow, "kind">): Band {
-  return row.kind === "unknown" ? "unknown" : "B";
+  if (row.kind === "unknown") return "unknown";
+  return row.kind === "crop" || row.kind === "resize" ? "A" : "B";
 }
 
 /** Whether a hairline separates row `index` from the one before it: the bands differ. */
@@ -74,15 +75,21 @@ export function bandBreak(rows: readonly StepRow[], index: number): boolean {
   return index > 0 && bandOf(rows[index - 1]) !== bandOf(rows[index]);
 }
 
+/** What a dragged row may pass: the tone rows of band B among themselves; band A runs in its fixed
+ * order, so a geometry row passes only rows of its own kind (the session's `same_band`). */
+function passGroup(row: Pick<StepRow, "kind">): string {
+  return bandOf(row) === "A" ? row.kind : bandOf(row);
+}
+
 /** The rows a drag from `from` may land between: the insertion slots (0 to n) inside the
  * source row's band, as an inclusive range of slots; an unknown row does not drag. */
 export function dropSlots(rows: readonly StepRow[], from: number): { first: number; last: number } | null {
-  const band = bandOf(rows[from]);
-  if (band === "unknown") return null;
+  if (bandOf(rows[from]) === "unknown") return null;
+  const group = passGroup(rows[from]);
   let first = from;
-  while (first > 0 && bandOf(rows[first - 1]) === band) first -= 1;
+  while (first > 0 && passGroup(rows[first - 1]) === group) first -= 1;
   let last = from;
-  while (last < rows.length - 1 && bandOf(rows[last + 1]) === band) last += 1;
+  while (last < rows.length - 1 && passGroup(rows[last + 1]) === group) last += 1;
   return { first, last: last + 1 };
 }
 

@@ -14,8 +14,18 @@ export const PRESET_KEYS = ["photo", "graphics", "black_white", "line_art", "dot
 /** One preset key, as `pick_adjust_preset` takes it. */
 export type PresetKey = (typeof PRESET_KEYS)[number];
 
-/** The slice-1 step kinds, as `add_adjust_step` takes them. */
-export const STEP_KINDS = ["denoise", "levels", "local_contrast", "contours", "sharpen"] as const;
+/** The step kinds in pipeline order, as `add_adjust_step` takes them. */
+export const STEP_KINDS = [
+  "crop",
+  "resize",
+  "channel_mix",
+  "denoise",
+  "levels",
+  "curves",
+  "local_contrast",
+  "contours",
+  "sharpen",
+] as const;
 
 /** One step kind, also its glyph's name. */
 export type StepKindKey = (typeof STEP_KINDS)[number];
@@ -51,6 +61,21 @@ export interface StepField {
   range: string;
 }
 
+/** One cell of a Channel mix row's Channel preset strip. */
+export interface ChannelPreset {
+  /** The visible cell text ("Red"). */
+  cell: string;
+  /** The accessible name ("Red filter"). */
+  name: string;
+  pressed: boolean;
+}
+
+/** The body of a Curves, Channel mix or Resize row beyond its plain fields. */
+export type StepBody =
+  | { kind: "curve"; points: [number, number][] }
+  | { kind: "channel_mix"; presets: ChannelPreset[] }
+  | { kind: "resize"; heightPx: number; line: string };
+
 /** One step row, manual or derived. */
 export interface StepRow {
   /** The row's index in the stored stack; `null` for a derived row. */
@@ -73,6 +98,8 @@ export interface StepRow {
   /** A Levels row's histogram of its input (criterion 16): 256 bars, black to white, each 0 to
    * 255 of the tallest; `null` for other rows and an unreadable picture. */
   histogram: number[] | null;
+  /** The graph or strip of a Curves, Channel mix or Resize row; `null` for the others. */
+  body: StepBody | null;
 }
 
 /** The derived block of a preset (criterion 28). */
@@ -93,6 +120,10 @@ export interface AddButton {
 export interface AdjustmentsView {
   /** Restore original is greyed, never hidden (criterion 59). */
   restoreEnabled: boolean;
+  /** Paste adjustments is greyed until a Copy (criterion 10). */
+  pasteEnabled: boolean;
+  /** The Crop row the Crop bar edits ("Crop on the canvas" pressed), or `null`. */
+  cropBarRow: number | null;
   beforeAfterOpen: boolean;
   /** "Not engraved yet", "Numbers for Image 1, 0.10 mm" or `null`. */
   stateLine: string | null;
@@ -107,7 +138,7 @@ export interface AdjustmentsView {
   derived: Derived | null;
   /** Row 1 of the add toolbar; empty while a preset is active. */
   addTone: AddButton[];
-  /** Row 2: none in slice 1. */
+  /** Row 2: Crop and Resize, shown with any preset. */
   addGeometry: AddButton[];
   steps: StepRow[];
   /** The clone's Adjustments override row; `null` for an image. */
@@ -185,9 +216,52 @@ function asStepField(value: unknown): StepField | null {
   };
 }
 
+/** The number fields of a step row (also the Crop bar's); `null` when one is of the wrong shape. */
+export function decodeStepFields(value: unknown): StepField[] | null {
+  return list(value, asStepField);
+}
+
+function asChannelPreset(value: unknown): ChannelPreset | null {
+  if (
+    !isObject(value) ||
+    typeof value.cell !== "string" ||
+    typeof value.name !== "string" ||
+    typeof value.pressed !== "boolean"
+  ) {
+    return null;
+  }
+  return { cell: value.cell, name: value.name, pressed: value.pressed };
+}
+
+function asPoint(value: unknown): [number, number] | null {
+  if (!Array.isArray(value) || value.length !== 2) return null;
+  const [input, output] = value as unknown[];
+  if (!whole(input) || !whole(output) || input > 100 || output > 100) return null;
+  return [input, output];
+}
+
+/** A row body; `undefined` when it is of the wrong shape. */
+function asStepBody(value: unknown): StepBody | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value)) return undefined;
+  if (value.kind === "curve") {
+    const points = list(value.points, asPoint);
+    return points === null || points.length < 2 ? undefined : { kind: "curve", points };
+  }
+  if (value.kind === "channel_mix") {
+    const presets = list(value.presets, asChannelPreset);
+    return presets === null ? undefined : { kind: "channel_mix", presets };
+  }
+  if (value.kind === "resize" && whole(value.height_px) && typeof value.line === "string") {
+    return { kind: "resize", heightPx: value.height_px, line: value.line };
+  }
+  return undefined;
+}
+
 function asStepRow(value: unknown): StepRow | null {
   if (!isObject(value)) return null;
   const fields = list(value.fields, asStepField);
+  const body = asStepBody(value.body);
   const kind = value.kind;
   if (
     !(value.index === null || whole(value.index)) ||
@@ -201,7 +275,8 @@ function asStepRow(value: unknown): StepRow | null {
     typeof value.up !== "boolean" ||
     typeof value.down !== "boolean" ||
     typeof value.accessible_name !== "string" ||
-    !(value.histogram === null || isHistogram(value.histogram))
+    !(value.histogram === null || isHistogram(value.histogram)) ||
+    body === undefined
   ) {
     return null;
   }
@@ -218,6 +293,7 @@ function asStepRow(value: unknown): StepRow | null {
     down: value.down,
     accessibleName: value.accessible_name,
     histogram: value.histogram,
+    body,
   };
 }
 
@@ -254,6 +330,8 @@ export function decodeAdjustmentsView(value: unknown): AdjustmentsView | null {
   const cloneRow = value.clone_row;
   if (
     typeof value.restore_enabled !== "boolean" ||
+    typeof value.paste_enabled !== "boolean" ||
+    !(value.crop_bar_row === null || whole(value.crop_bar_row)) ||
     typeof value.before_after_open !== "boolean" ||
     !textOrNull(value.state_line) ||
     !textOrNull(value.memory_line) ||
@@ -271,6 +349,8 @@ export function decodeAdjustmentsView(value: unknown): AdjustmentsView | null {
   }
   return {
     restoreEnabled: value.restore_enabled,
+    pasteEnabled: value.paste_enabled,
+    cropBarRow: value.crop_bar_row as number | null,
     beforeAfterOpen: value.before_after_open,
     stateLine: value.state_line,
     memoryLine: value.memory_line,

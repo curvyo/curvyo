@@ -17,6 +17,8 @@ import { CurveToBezierButton } from "@/components/CurveToBezierButton";
 import { FixtureLockBar } from "@/components/FixtureLockBar";
 import { selectedLockBar } from "@/lib/fixturesView";
 import { SelectToolbar } from "@/components/SelectToolbar";
+import { CropBar } from "@/components/CropBar";
+import { CropOverlay } from "@/components/CropOverlay";
 import { WidthEditToggle } from "@/components/WidthEditToggle";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
@@ -60,6 +62,7 @@ import { useOperationSettings } from "@/hooks/useOperationSettings";
 import { useGradient } from "@/hooks/useGradient";
 import { useOperationTools } from "@/hooks/useOperationTools";
 import { useAdjustments } from "@/hooks/useAdjustments";
+import { useCropBar } from "@/hooks/useCropBar";
 import { useBeforeAfter } from "@/hooks/useBeforeAfter";
 import { usePaneExclusion } from "@/hooks/usePaneExclusion";
 import { BeforeAfterPane } from "@/components/beforeAfter/BeforeAfterPane";
@@ -125,6 +128,7 @@ function Editor() {
   // The Adjustments group of a selected picture and its Before and after pane (`specs/0135`); the
   // pane and the font preview share the canvas area's one side pane.
   const adjust = useAdjustments(editor);
+  const cropBar = useCropBar(editor);
   const beforeAfter = useBeforeAfter(editor);
   usePaneExclusion(preview.store.open, beforeAfter.open, preview.close, beforeAfter.close);
   const { getSession } = editor;
@@ -239,7 +243,8 @@ function Editor() {
           {editor.tool === "select" && !gridBar && !editor.recognise.open && !editor.tiling.open && selectedLock ? (
             <FixtureLockBar row={selectedLock.row} setName={selectedLock.setName} api={fixtures} onReturnFocus={() => editor.containerRef.current?.focus()} />
           ) : null}
-          {editor.tool === "select" && !gridBar && !editor.recognise.open && !editor.tiling.open && !fixtures.view?.selected ? (
+          {cropBar.view ? <CropBar api={cropBar} onReturnFocus={() => editor.containerRef.current?.focus()} /> : null}
+          {editor.tool === "select" && !cropBar.view && !gridBar && !editor.recognise.open && !editor.tiling.open && !fixtures.view?.selected ? (
             <SelectToolbar
               moveOnly={editor.getSession()?.selection_move_only() ?? false}
               scaleStrokeWidth={editor.scaleStrokeWidth}
@@ -485,7 +490,12 @@ function Editor() {
           gradient={gradient}
           sketch={sketch}
           onDropFiles={project.importFiles}
-          overlay={<PresenceOverlay getSession={editor.getSession} />}
+          overlay={
+            <>
+              <PresenceOverlay getSession={editor.getSession} />
+              <CropOverlay api={cropBar} />
+            </>
+          }
           showPageFrames
           onToggleOperationsView={operationTools.toggleView}
           onToggleToolpathView={output.toggleRoute}

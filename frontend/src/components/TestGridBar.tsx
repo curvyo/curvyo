@@ -215,7 +215,7 @@ function AxisUnit({
           <Segments
             label={`${caption} parameter`}
             value={axis.param}
-            options={axis.offered.map((param) => ({ value: param, label: PARAM_WORD[param], width: param === "interval" ? 64 : param === "passes" ? 60 : 52 }))}
+            options={axis.offered.map((param) => ({ value: param, label: PARAM_WORD[param], width: param === "interval" || param === "strength" ? 64 : param === "passes" ? 60 : 52 }))}
             onPick={(param) => tool.setAxis(side, param)}
           />
         </div>
@@ -329,6 +329,22 @@ export function TestGridBar({ tool, view, onNewMaterial, onReturnFocus }: TestGr
               </button>
             ) : null}
           </div>
+          {view.picture !== null ? (
+            <div className="group/row relative flex min-w-0 max-w-full items-center">
+              <Divider />
+              <div className="flex min-h-9 min-w-0 max-w-full items-center py-1">
+                <Segments<"ramp" | "selected">
+                  label="Picture"
+                  value={view.picture.value}
+                  options={[
+                    { value: "ramp" as const, label: "Ramp", width: 56 },
+                    ...(view.picture.selectedOffered ? [{ value: "selected" as const, label: "Selected picture", width: 120 }] : []),
+                  ]}
+                  onPick={(source) => tool.setPicture(source)}
+                />
+              </div>
+            </div>
+          ) : null}
           {view.dither !== null ? (
             <div className="group/row relative flex min-w-0 max-w-full items-center">
               <Divider />

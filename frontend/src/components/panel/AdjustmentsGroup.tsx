@@ -1,4 +1,4 @@
-import { Columns2, RotateCcw } from "lucide-react";
+import { ClipboardPaste, Columns2, Copy, RotateCcw } from "lucide-react";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
@@ -133,6 +133,15 @@ function StepList({
     editField: (index, field, text) => adjust.editField(index, field.key, typedField(text)),
     stretch: (index) => void adjust.stretch(index),
     dragStart: (index, event) => start(index, event),
+    curve: (index) => ({
+      add: (input, output) => adjust.addCurvePoint(index, input, output),
+      move: (point, input, output) => void adjust.moveCurvePoint(index, point, input, output),
+      remove: (point) => void adjust.removeCurvePoint(index, point),
+    }),
+    straighten: (index) => void adjust.straightenCurve(index),
+    channelPreset: (index, preset) => void adjust.setChannelPreset(index, preset),
+    openCrop: (index) => void adjust.openCrop(index),
+    cropBarRow: adjust.view?.cropBarRow ?? null,
   };
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
     if (!(event.target as HTMLElement).hasAttribute("data-adjust-name") || event.altKey) return;
@@ -191,8 +200,9 @@ function StepList({
   );
 }
 
-/** The header: the name and the symbol buttons (`ux-notes.md` §3.1). Copy and Paste adjustments
- * come with slice 2. Restore original is greyed, never hidden, while there is nothing to restore. */
+/** The header: the name and the symbol buttons (`ux-notes.md` §3.1): Before and after, Copy and
+ * Paste adjustments, Restore original. Paste and Restore original are greyed, never hidden, while
+ * there is nothing to paste or restore. */
 function Header({ view, adjust, onToggleBeforeAfter }: { view: AdjustmentsView; adjust: AdjustmentsApi; onToggleBeforeAfter: () => void }) {
   return (
     <div className="flex h-7 items-center justify-between">
@@ -207,6 +217,24 @@ function Header({ view, adjust, onToggleBeforeAfter }: { view: AdjustmentsView; 
             className={HEADER_BUTTON}
           >
             <Columns2 aria-hidden size={16} strokeWidth={1.5} />
+          </button>
+        </Tooltip>
+        <Tooltip side="top" content="Copy adjustments">
+          <button type="button" aria-label="Copy adjustments" onClick={() => void adjust.copyAdjustments()} className={HEADER_BUTTON}>
+            <Copy aria-hidden size={16} strokeWidth={1.5} />
+          </button>
+        </Tooltip>
+        <Tooltip side="top" content="Paste adjustments">
+          <button
+            type="button"
+            aria-label="Paste adjustments"
+            aria-disabled={!view.pasteEnabled}
+            onClick={() => {
+              if (view.pasteEnabled) adjust.pasteAdjustments();
+            }}
+            className={HEADER_BUTTON}
+          >
+            <ClipboardPaste aria-hidden size={16} strokeWidth={1.5} />
           </button>
         </Tooltip>
         <Tooltip side="top" content="Restore original">
