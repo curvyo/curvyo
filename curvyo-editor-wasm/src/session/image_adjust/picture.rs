@@ -62,13 +62,18 @@ impl crate::session::Session {
     }
 
     /// The image leaf of picture `id` as drawn (a clone's carries its effective adjustments).
-    pub(super) fn picture_leaf(&self, id: NodeId) -> Option<ImageSnapshot> {
+    pub(in crate::session) fn picture_leaf(&self, id: NodeId) -> Option<ImageSnapshot> {
         image_leaf(self.object_read().get(id)?).cloned()
     }
 
     /// The working image of picture `id`, `None` when its bytes cannot be read.
     pub(super) fn picture_pixels(&self, id: NodeId) -> Option<Arc<WorkingImage>> {
         self.job_pixels(&self.picture_leaf(id)?.asset)
+    }
+
+    /// The working image's size of picture `id` in pixels.
+    pub(super) fn picture_size(&self, id: NodeId) -> Option<(u32, u32)> {
+        self.picture_pixels(id).map(|p| (p.width, p.height))
     }
 
     /// The Image operations of the active laser page that run picture `id`, in Operations-list
@@ -202,7 +207,7 @@ impl crate::session::Session {
                 (resolved.steps, Some(resolved.key))
             }
             None if registers.preset == curvyo_laser_core::adjust::Preset::Expert => (
-                registers.effective_steps(interval_um, || {
+                registers.effective_steps(interval_um, |_| {
                     curvyo_image_core::Analysis::of_plane(&curvyo_image_core::GreyPlane::white(
                         1, 1,
                     ))

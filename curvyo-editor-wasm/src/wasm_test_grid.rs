@@ -59,6 +59,11 @@ impl WasmSession {
         text_of(self.session.set_test_grid_dither(mode))
     }
 
+    /// The Picture segments of an Image grid (`ramp` or `selected`, `specs/0135` criterion 51).
+    pub fn set_test_grid_picture(&mut self, source: &str) -> String {
+        text_of(self.session.set_test_grid_picture(source))
+    }
+
     /// The material dropdown (`id` empty: no material).
     pub fn pick_test_grid_material(&mut self, id: &str) -> String {
         text_of(

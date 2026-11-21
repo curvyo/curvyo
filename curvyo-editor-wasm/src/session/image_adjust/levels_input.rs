@@ -76,7 +76,12 @@ impl crate::session::Session {
         let pixels = self.job_pixels(&leaf.asset)?;
         let plane = GreyPlane::of_rgba(&pixels);
         let mip = plane.mip_at_most(HISTOGRAM_PIXELS);
-        let steps = pixel_steps(&key.1, &corners, mip.width, mip.height);
+        let steps = pixel_steps(
+            &key.1,
+            &corners,
+            (pixels.width, pixels.height),
+            (mip.width, mip.height),
+        );
         let histogram = Arc::new(match run_steps(&grey_image(&mip), &steps) {
             Adjusted::Unchanged => Histogram::of(&mip),
             Adjusted::Grey(out) => Histogram::of(&out),

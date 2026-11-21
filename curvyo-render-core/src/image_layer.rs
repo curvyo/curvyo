@@ -5,7 +5,7 @@
 //! and its corners, the host owns the texture.
 
 use curvyo_document_core::{
-    AnchorSnapshot, AssetHash, ImageSnapshot, NewAnchor, Opacity, Point, Vec2,
+    AnchorSnapshot, AssetHash, ImageSnapshot, NewAnchor, Opacity, Point, UnitRect, Vec2,
 };
 
 use crate::glyphs::DrawList;
@@ -18,6 +18,9 @@ pub struct ImageQuad {
     /// The frame in document millimetres: the picture's top-left, top-right, bottom-right and
     /// bottom-left corners.
     pub corners: [Point; 4],
+    /// The part of the asset's unit square drawn into `corners` (a cropped picture shows its
+    /// visible part, `specs/0135` criterion 5).
+    pub texture: UnitRect,
     /// The opacity it is drawn with (its own times its ancestors').
     pub opacity: Opacity,
     /// The index of its artwork layer in [`DrawList::layers`].
@@ -31,6 +34,7 @@ impl DrawList {
         self.images.push(ImageQuad {
             asset: image.asset.clone(),
             corners: image.corners(),
+            texture: image.texture_rect(),
             opacity: image.shown_opacity,
             layer,
         });

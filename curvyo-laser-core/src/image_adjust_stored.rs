@@ -165,7 +165,7 @@ mod tests {
         );
         assert_eq!(read.dither, DitherSettings::DEFAULT);
         assert_eq!(
-            read.effective_steps(100, || unreachable!()),
+            read.effective_steps(100, |_| unreachable!()),
             vec![StepKind::Levels.default_step(100)]
         );
     }

@@ -294,7 +294,12 @@ impl Session {
         }
         // Width editing hides the box's handles so none covers a diamond (UX review U2).
         // A read-only entered group shows no handle, knob or pivot (`specs/0111` criterion 11).
-        if !self.select_box_tool() || self.width_edit_active() || self.in_read_only_group() {
+        // The Crop bar hides the picture's own handles (`specs/0135`, `ux-notes.md` §3.9).
+        if !self.select_box_tool()
+            || self.width_edit_active()
+            || self.in_read_only_group()
+            || self.crop_bar_open()
+        {
             return TransformDecorationInput::default();
         }
         let tolerances = self.transform_handle_tolerances();

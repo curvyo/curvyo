@@ -299,11 +299,20 @@ impl GpuImages {
                     depth,
                 }
             };
+            // A cropped picture shows its visible part of the texture (`specs/0135` criterion 5).
+            let t = quad.texture;
+            #[allow(clippy::cast_possible_truncation)]
+            let (u0, v0, u1, v1) = (
+                t.left as f32,
+                t.top as f32,
+                (t.left + t.width) as f32,
+                (t.top + t.height) as f32,
+            );
             let (tl, tr, br, bl) = (
-                corner(0, [0.0, 0.0]),
-                corner(1, [1.0, 0.0]),
-                corner(2, [1.0, 1.0]),
-                corner(3, [0.0, 1.0]),
+                corner(0, [u0, v0]),
+                corner(1, [u1, v0]),
+                corner(2, [u1, v1]),
+                corner(3, [u0, v1]),
             );
             vertices.extend([tl, tr, br, tl, br, bl]);
             let split = u32::try_from(list.layer_start(quad.layer)).unwrap_or(u32::MAX);
@@ -353,8 +362,11 @@ impl GpuImages {
 /// Whether every image pixel of `quad` covers at least [`NEAREST_FROM_PX`] screen pixels.
 fn sharp(quad: &ImageQuad, texture: &Texture, view: ViewTransform) -> bool {
     let c = quad.corners;
-    let across = c[0].vector_to(c[1]).length() * view.scale() / f64::from(texture.width.max(1));
-    let down = c[0].vector_to(c[3]).length() * view.scale() / f64::from(texture.height.max(1));
+    let (tw, th) = (quad.texture.width.max(1e-9), quad.texture.height.max(1e-9));
+    let across =
+        c[0].vector_to(c[1]).length() * view.scale() / (tw * f64::from(texture.width.max(1)));
+    let down =
+        c[0].vector_to(c[3]).length() * view.scale() / (th * f64::from(texture.height.max(1)));
     across.min(down) >= NEAREST_FROM_PX
 }
 

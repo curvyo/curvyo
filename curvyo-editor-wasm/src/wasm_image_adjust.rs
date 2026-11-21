@@ -62,8 +62,9 @@ impl WasmSession {
         self.session.cancel_adjust_strength();
     }
 
-    /// A press in the add toolbar: step `kind` (`denoise`, `levels`, `local_contrast`,
-    /// `contours`, `sharpen`) at its pipeline place. Whether written.
+    /// A press in the add toolbar: step `kind` (`crop`, `resize`, `channel_mix`, `denoise`,
+    /// `levels`, `curves`, `local_contrast`, `contours`, `sharpen`) at its pipeline place.
+    /// Whether written.
     pub fn add_adjust_step(&mut self, kind: &str) -> bool {
         self.session.add_adjust_step(kind)
     }
@@ -75,7 +76,75 @@ impl WasmSession {
             .edit_adjust_field(index, key, value)
             .err()
             .unwrap_or_default()
-            .to_owned()
+    }
+
+    /// A click on the curve of Curves row `index` at Input and Output %: a point there. Whether
+    /// written.
+    pub fn add_adjust_curve_point(&mut self, index: usize, input: u8, output: u8) -> bool {
+        self.session.add_adjust_curve_point(index, input, output)
+    }
+
+    /// A drag or arrow key of point `point` of Curves row `index` to Input and Output %, one step.
+    /// Whether written.
+    pub fn move_adjust_curve_point(
+        &mut self,
+        index: usize,
+        point: usize,
+        input: u8,
+        output: u8,
+    ) -> bool {
+        self.session
+            .move_adjust_curve_point(index, point, input, output)
+    }
+
+    /// Delete on point `point` of Curves row `index` (not an end point). Whether written.
+    pub fn remove_adjust_curve_point(&mut self, index: usize, point: usize) -> bool {
+        self.session.remove_adjust_curve_point(index, point)
+    }
+
+    /// The Straight curve button of Curves row `index`. Whether written.
+    pub fn straighten_adjust_curve(&mut self, index: usize) -> bool {
+        self.session.straighten_adjust_curve(index)
+    }
+
+    /// Channel preset cell `preset` (0 Luminance, 1 Red, 2 Green, 3 Blue) of Channel mix row
+    /// `index`. Whether written.
+    pub fn set_adjust_channel_preset(&mut self, index: usize, preset: usize) -> bool {
+        self.session.set_adjust_channel_preset(index, preset)
+    }
+
+    /// Copy adjustments of the selected picture, held for the session (no step; Paste turns on).
+    /// Whether there was a picture.
+    pub fn copy_adjustments(&mut self) -> bool {
+        self.session.copy_adjustments()
+    }
+
+    /// Paste adjustments onto the selected picture, one step "Paste adjustments". Whether
+    /// written.
+    pub fn paste_adjustments(&mut self) -> bool {
+        self.session.paste_adjustments()
+    }
+
+    /// The Crop bar and its canvas frame as JSON (`CropBarView`), `null` while closed; polled
+    /// each frame while a picture is selected.
+    pub fn crop_bar_json(&self) -> String {
+        self.session.crop_bar_json()
+    }
+
+    /// Crop on the canvas of Crop row `index`: the Crop bar opens. Whether it opened.
+    pub fn open_crop_bar(&mut self, index: usize) -> bool {
+        self.session.untracked_mut().open_crop_bar(index)
+    }
+
+    /// Done, Enter or Escape: the Crop bar leaves.
+    pub fn close_crop_bar(&mut self) {
+        self.session.untracked_mut().close_crop_bar();
+    }
+
+    /// The release of a drag of the crop frame or a handle: left, top, width, height in whole
+    /// %, one step. Whether written.
+    pub fn set_crop_rect(&mut self, left: u8, top: u8, width: u8, height: u8) -> bool {
+        self.session.set_crop_rect(left, top, width, height)
     }
 
     /// The power toggle of row `index`. Whether written.

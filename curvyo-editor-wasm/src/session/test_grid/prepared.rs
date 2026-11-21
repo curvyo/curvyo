@@ -199,7 +199,13 @@ impl Session {
         Ok(PreparedGrid {
             manufacturing: manufacturing.id,
             recipe: plain(recipe.to_value()),
-            items: grid_items(recipe, &laid, at, &font),
+            items: grid_items(
+                recipe,
+                &laid,
+                at,
+                &font,
+                self.grid_picture(recipe, &target).as_ref(),
+            ),
             rows: self.owned_rows(recipe)?,
             target,
         })

@@ -3,7 +3,7 @@
 //! Strength, the derived block, the add toolbar, the manual rows and the clone override row.
 
 use curvyo_document_core::{AdjustEntry, AdjustOwner};
-use curvyo_laser_core::adjust::{FieldSpec, ManualStep, Preset, StepKind};
+use curvyo_laser_core::adjust::{Band, CHANNEL_PRESETS, FieldSpec, ManualStep, Preset, StepKind};
 use curvyo_ui_core::{STRENGTH_RANGE_TEXT, move_step};
 use serde::Serialize;
 
@@ -48,7 +48,46 @@ pub struct StepFieldView {
     /// The decimals shown.
     pub decimals: u32,
     /// The refusal of a typed value out of range.
-    pub range: &'static str,
+    pub range: String,
+}
+
+/// The refusal of a Resize Width above the working image's `width` (criteria 5, 14).
+pub(super) fn resize_range_text(width: u32) -> String {
+    format!("Width is 16 to {width} px.")
+}
+
+/// One cell of a Channel mix row's Channel preset strip (`ux-notes.md` §3.8).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ChannelPresetView {
+    /// The visible cell text ("Red").
+    pub cell: &'static str,
+    /// The accessible name ("Red filter").
+    pub name: &'static str,
+    /// Whether the row's three weights are this preset's.
+    pub pressed: bool,
+}
+
+/// The extra body of a step row whose fields are not all plain numbers (`ux-notes.md` §3.8).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum StepBodyView {
+    /// Curves: the points (Input %, Output %) the graph draws, in Input order.
+    Curve {
+        /// The points.
+        points: Vec<[u8; 2]>,
+    },
+    /// Channel mix: the Channel preset strip.
+    ChannelMix {
+        /// The four cells.
+        presets: Vec<ChannelPresetView>,
+    },
+    /// Resize: the height that follows and the working image's size.
+    Resize {
+        /// The height in pixels the width gives (the ratio kept, never enlarged).
+        height_px: u32,
+        /// "Working image 2,400 × 1,800 px".
+        line: String,
+    },
 }
 
 /// One step row, manual or derived (`ux-notes.md` §3.4, §3.6).
@@ -81,6 +120,8 @@ pub struct StepRowView {
     /// A Levels row's histogram of its input (criterion 16): 256 bars, black to white, each 0 to
     /// 255 of the tallest; `None` for other rows and when the picture cannot be read.
     pub histogram: Option<Vec<u8>>,
+    /// The graph or strip of a Curves, Channel mix or Resize row; `None` for the others.
+    pub body: Option<StepBodyView>,
 }
 
 /// The derived block of a preset (criterion 28).
@@ -106,6 +147,10 @@ pub struct AddButtonView {
 pub struct AdjustmentsView {
     /// Whether Restore original is enabled (greyed, never hidden, criterion 59).
     pub restore_enabled: bool,
+    /// Whether Paste adjustments is enabled (greyed until a Copy, criterion 10).
+    pub paste_enabled: bool,
+    /// The Crop row the Crop bar edits (its "Crop on the canvas" pressed); `None` while closed.
+    pub crop_bar_row: Option<usize>,
     /// Whether the Before and after pane is open (the header button's pressed state).
     pub before_after_open: bool,
     /// "Not engraved yet", "Numbers for Image 1, 0.10 mm" or `None` (`ux-notes.md` §3.1 row 2).
@@ -124,7 +169,7 @@ pub struct AdjustmentsView {
     pub derived: Option<DerivedView>,
     /// Row 1 of the add toolbar (tone and detail); empty while a preset is active (P8).
     pub add_tone: Vec<AddButtonView>,
-    /// Row 2 (Crop, Resize, AI steps): none in slice 1.
+    /// Row 2 (Crop, Resize; the AI steps in slice 3), shown with any preset.
     pub add_geometry: Vec<AddButtonView>,
     /// The manual stack.
     pub steps: Vec<StepRowView>,
@@ -164,7 +209,7 @@ fn numbers(step: ManualStep) -> String {
         .join(", ")
 }
 
-fn field_views(step: ManualStep) -> Vec<StepFieldView> {
+pub(super) fn field_views(step: ManualStep) -> Vec<StepFieldView> {
     let fields = step.fields();
     step.kind()
         .fields()
@@ -177,7 +222,7 @@ fn field_views(step: ManualStep) -> Vec<StepFieldView> {
                 unit: spec.unit,
                 value: spec.shown(value),
                 decimals: decimals(spec.per_unit),
-                range: spec.range_text,
+                range: spec.range_text.to_owned(),
             })
         })
         .collect()
@@ -199,11 +244,61 @@ fn derived_row(step: ManualStep) -> StepRowView {
         up: false,
         down: false,
         histogram: None,
+        body: None,
     }
 }
 
-/// The manual row `index` of `entries` with `preset` active or not.
-fn manual_row(entries: &[AdjustEntry], index: usize, preset: bool) -> StepRowView {
+/// A number with a comma between thousands ("2,400").
+fn thousands(n: u32) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// The body of `step` beyond its fields, for a picture of `size` pixels when known.
+fn step_body(step: ManualStep, size: Option<(u32, u32)>) -> Option<StepBodyView> {
+    match step {
+        ManualStep::Curves { points, count } => Some(StepBodyView::Curve {
+            points: points[..usize::from(count)]
+                .iter()
+                .map(|&(i, o)| [i, o])
+                .collect(),
+        }),
+        ManualStep::ChannelMix { weights } => Some(StepBodyView::ChannelMix {
+            presets: CHANNEL_PRESETS
+                .iter()
+                .map(|&(name, w)| ChannelPresetView {
+                    cell: name.split(' ').next().unwrap_or(name),
+                    name,
+                    pressed: w == weights,
+                })
+                .collect(),
+        }),
+        ManualStep::Resize { width_px } => {
+            let (w, h) = size?;
+            Some(StepBodyView::Resize {
+                height_px: curvyo_image_core::resized_size(w, h, width_px).1,
+                line: format!("Working image {} × {} px", thousands(w), thousands(h)),
+            })
+        }
+        _ => None,
+    }
+}
+
+/// The manual row `index` of `entries` with `preset` active or not, for a picture of `size`
+/// pixels when known; a preset runs instead of the tone rows only (criterion 30).
+fn manual_row(
+    entries: &[AdjustEntry],
+    index: usize,
+    preset: bool,
+    size: Option<(u32, u32)>,
+) -> StepRowView {
     let read = entries[index].step().and_then(|stored| {
         let step = ManualStep::read(&stored.kind, |key| stored.fields.get(key).copied()).ok()?;
         Some((step, stored.enabled))
@@ -222,8 +317,10 @@ fn manual_row(entries: &[AdjustEntry], index: usize, preset: bool) -> StepRowVie
             down: false,
             accessible_name: "Unknown step, not run".to_owned(),
             histogram: None,
+            body: None,
         };
     };
+    let preset = preset && step.kind().band() == Band::Tone;
     let numbers = numbers(step);
     let (prefix, suffix) = if preset {
         ("Preset in use · ", ", preset in use")
@@ -240,11 +337,28 @@ fn manual_row(entries: &[AdjustEntry], index: usize, preset: bool) -> StepRowVie
         preset_in_use: preset,
         unknown: false,
         line: format!("{prefix}{numbers}"),
-        fields: field_views(step),
+        fields: {
+            let mut fields = field_views(step);
+            if let (ManualStep::Resize { .. }, Some((width, _)), Some(field)) =
+                (step, size, fields.first_mut())
+            {
+                field.range = resize_range_text(width.clamp(16, 8_192));
+            }
+            // A Crop field's range as it stands (UX review UX-2).
+            if let ManualStep::Crop { pct } = step {
+                for field in &mut fields {
+                    if let Some(text) = curvyo_ui_core::crop_range_text(pct, field.key) {
+                        field.range = text;
+                    }
+                }
+            }
+            fields
+        },
         up: move_step(entries, index, true).is_some(),
         down: move_step(entries, index, false).is_some(),
         accessible_name: format!("{}, {numbers}{suffix}", step.kind().name()),
         histogram: None,
+        body: step_body(step, size),
     }
 }
 
@@ -291,8 +405,21 @@ impl crate::session::Session {
         let preset = registers.preset;
         let active = preset != Preset::Expert;
         let entries = &shown.adjustments.steps;
+        let size = self.picture_size(target);
+        let add = |band: Band| {
+            StepKind::ALL
+                .into_iter()
+                .filter(|kind| kind.band() == band)
+                .map(|kind| AddButtonView {
+                    kind: kind.key(),
+                    name: format!("Add {}", kind.name()),
+                })
+                .collect::<Vec<_>>()
+        };
         Some(AdjustmentsView {
             restore_enabled: shown.adjustments.is_restorable(),
+            paste_enabled: self.can_paste_adjustments(),
+            crop_bar_row: self.crop_bar_row(),
             before_after_open: self.image_adjust.pane.open,
             state_line: state_line(&operations, shown_op),
             memory_line: resolved.as_ref().and_then(|r| {
@@ -324,24 +451,21 @@ impl crate::session::Session {
                 ),
                 rows: resolved
                     .as_ref()
-                    .map(|r| r.steps.iter().copied().map(derived_row).collect())
+                    .map(|r| {
+                        r.steps
+                            .iter()
+                            .copied()
+                            .filter(|s| s.kind().band() == Band::Tone)
+                            .map(derived_row)
+                            .collect()
+                    })
                     .unwrap_or_default(),
             }),
-            add_tone: if active {
-                Vec::new()
-            } else {
-                StepKind::ALL
-                    .into_iter()
-                    .map(|kind| AddButtonView {
-                        kind: kind.key(),
-                        name: format!("Add {}", kind.name()),
-                    })
-                    .collect()
-            },
-            add_geometry: Vec::new(),
+            add_tone: if active { Vec::new() } else { add(Band::Tone) },
+            add_geometry: add(Band::Geometry),
             steps: (0..entries.len())
                 .map(|i| {
-                    let mut row = manual_row(entries, i, active);
+                    let mut row = manual_row(entries, i, active, size);
                     if row.kind == StepKind::Levels.key() {
                         row.histogram = self
                             .levels_input(target, i)

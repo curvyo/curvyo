@@ -85,7 +85,9 @@ mod history_names;
 mod history_notice;
 mod hit_test;
 mod hit_test_object;
+mod image_adjust_copy;
 mod image_adjust_edit;
+mod image_adjust_points;
 mod image_clipboard_text;
 mod image_frame;
 mod image_import;
@@ -385,10 +387,14 @@ pub use history_notice::{
 };
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
+pub use image_adjust_copy::CopiedAdjustments;
 pub use image_adjust_edit::{
-    LEVELS_ORDER_TEXT, PICK_INTERVAL_UM, STRENGTH_RANGE_TEXT, add_step, edit_field, make_editable,
-    make_editable_notice, move_step, move_step_to, pick_preset, remove_step, set_dither,
-    set_enabled, set_strength, stretch_levels,
+    CURVE_ORDER_TEXT, LEVELS_ORDER_TEXT, PICK_INTERVAL_UM, STRENGTH_RANGE_TEXT, add_step,
+    add_step_with, crop_range_text, edit_field, make_editable, make_editable_notice, move_step,
+    move_step_to, pick_preset, remove_step, set_dither, set_enabled, set_strength, stretch_levels,
+};
+pub use image_adjust_points::{
+    add_curve_point, move_curve_point, remove_curve_point, set_channel_mix, straighten_curve,
 };
 pub use image_clipboard_text::{
     COPY_NEEDS_NEWER_BROWSER_NOTICE, COPYING_NOTICE, LINK_DROP_NOTICE, NOTHING_TO_PASTE_NOTICE,

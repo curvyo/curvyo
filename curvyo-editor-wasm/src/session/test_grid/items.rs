@@ -79,6 +79,7 @@ pub(in crate::session) fn grid_items(
     laid: &TestLayout,
     at: Point,
     font: &FontRef,
+    picture: Option<&super::picture::GridPicture>,
 ) -> GridItems {
     let cells = laid
         .cells
@@ -87,6 +88,13 @@ pub(in crate::session) fn grid_items(
             let mut tag = serde_json::Map::new();
             tag.insert("column".to_owned(), place.column.into());
             tag.insert("row".to_owned(), place.row.into());
+            let image = picture.map(|picture| {
+                picture.cell(
+                    (at.x + place.min.x, at.y + place.min.y),
+                    place.side.as_mm(),
+                    recipe.test.cell_strength(place.column, place.row),
+                )
+            });
             NewGridCell {
                 shape: Shape::Rect {
                     bounds: RectBounds {
@@ -98,6 +106,7 @@ pub(in crate::session) fn grid_items(
                 },
                 style: cell_style(&recipe.test),
                 tag,
+                image,
             }
         })
         .collect();

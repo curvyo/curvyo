@@ -4,13 +4,16 @@
 //! adjustments".
 
 use curvyo_document_core::{AdjustEntry, AdjustmentsWrite, EXPERT_PRESET};
-use curvyo_laser_core::adjust::{DitherSettings, ManualStep, Preset, StepKind};
+use curvyo_laser_core::adjust::{Band, DitherSettings, ManualStep, Preset, StepKind};
 use curvyo_laser_core::settings::ImageEdit;
 
 /// The refusal of a typed Strength out of range (criterion 26, as `0123` criterion 12).
 pub const STRENGTH_RANGE_TEXT: &str = "Strength is 0 to 100 %.";
 /// The refusal of a Black point that is not at least 2 % below the White point (criterion 5).
 pub const LEVELS_ORDER_TEXT: &str = "Black point is at least 2 % below White point.";
+/// The refusal of a Curves point that would pass its neighbour or move an end point's Input
+/// (criterion 5).
+pub const CURVE_ORDER_TEXT: &str = "Points stay in order; the end points stay at 0 and 100 %.";
 
 /// The Interval a preset pick sizes the screens by when the picture is in no Image operation
 /// (ADR 0072 amendment A3).
@@ -74,12 +77,19 @@ fn known_kind(entry: &AdjustEntry) -> Option<StepKind> {
 /// `ux-notes.md` §3.5); rows this build does not know do not count.
 #[must_use]
 pub fn add_step(entries: &[AdjustEntry], kind: StepKind, interval_um: u32) -> Vec<AdjustEntry> {
+    add_step_with(entries, kind.default_step(interval_um))
+}
+
+/// [`add_step`] of `step` with its fields as given (a Resize at the picture's width).
+#[must_use]
+pub fn add_step_with(entries: &[AdjustEntry], step: ManualStep) -> Vec<AdjustEntry> {
+    let kind = step.kind();
     let at = entries
         .iter()
         .rposition(|entry| known_kind(entry).is_some_and(|k| k <= kind))
         .map_or(0, |i| i + 1);
     let mut next = entries.to_vec();
-    next.insert(at, kind.default_step(interval_um).entry(true));
+    next.insert(at, step.entry(true));
     next
 }
 
@@ -94,21 +104,28 @@ fn manual(entries: &[AdjustEntry], index: usize) -> Option<(ManualStep, bool)> {
 /// to the field's step (criterion 5). `Ok(None)` when the row does not read or has no such field.
 ///
 /// # Errors
-/// The field's range text for a value out of range; [`LEVELS_ORDER_TEXT`] for Levels whose Black
-/// point would not be at least 2 % below its White point.
+/// The field's range text for a value out of range (a Crop field's range as it stands, from
+/// [`crop_range_text`]); [`LEVELS_ORDER_TEXT`] for Levels whose Black point would not be at least
+/// 2 % below its White point; [`CURVE_ORDER_TEXT`] for a Curves point out of order.
 pub fn edit_field(
     entries: &[AdjustEntry],
     index: usize,
     key: &str,
     typed: f64,
-) -> Result<Option<Vec<AdjustEntry>>, &'static str> {
+) -> Result<Option<Vec<AdjustEntry>>, String> {
     let Some((step, enabled)) = manual(entries, index) else {
         return Ok(None);
     };
     let Some(spec) = step.kind().fields().iter().find(|f| f.key == key) else {
         return Ok(None);
     };
-    let value = spec.typed(typed)?;
+    if let ManualStep::Crop { pct } = step
+        && let Some((min, max)) = crop_range(pct, key)
+        && !(f64::from(min)..=f64::from(max)).contains(&typed.round())
+    {
+        return Err(crop_range_text(pct, key).unwrap_or_default());
+    }
+    let value = spec.typed(typed).map_err(str::to_owned)?;
     let fields: Vec<(&str, i64)> = step
         .fields()
         .into_iter()
@@ -117,10 +134,39 @@ pub fn edit_field(
     let edited = ManualStep::read(step.kind().key(), |k| {
         fields.iter().find(|(f, _)| *f == k).map(|(_, v)| *v)
     })
-    .map_err(|_| LEVELS_ORDER_TEXT)?;
+    .map_err(|_| match step.kind() {
+        StepKind::Curves => CURVE_ORDER_TEXT.to_owned(),
+        _ => LEVELS_ORDER_TEXT.to_owned(),
+    })?;
     let mut next = entries.to_vec();
     next[index] = edited.entry(enabled);
     Ok(Some(next))
+}
+
+/// The range Crop field `key` takes in a crop of `pct` as it stands (criterion 5, UX review
+/// UX-2): Left and Top 0 to 100 minus Width or Height, Width and Height 1 to 100 minus Left or Top.
+fn crop_range([left, top, width, height]: [u8; 4], key: &str) -> Option<(u8, u8)> {
+    Some(match key {
+        "left_pct" => (0, 100 - width.min(100)),
+        "top_pct" => (0, 100 - height.min(100)),
+        "width_pct" => (1, 100 - left.min(99)),
+        "height_pct" => (1, 100 - top.min(99)),
+        _ => return None,
+    })
+}
+
+/// The refusal of Crop field `key` in a crop of `pct`: "Left is 0 to 50 %."; `None` for a key
+/// that is no Crop field.
+#[must_use]
+pub fn crop_range_text(pct: [u8; 4], key: &str) -> Option<String> {
+    let (min, max) = crop_range(pct, key)?;
+    let label = match key {
+        "left_pct" => "Left",
+        "top_pct" => "Top",
+        "width_pct" => "Width",
+        _ => "Height",
+    };
+    Some(format!("{label} is {min} to {max} %."))
 }
 
 /// The stack with the Levels row `index` set to Black and White point `points` (in %, from the
@@ -175,14 +221,25 @@ pub fn remove_step(entries: &[AdjustEntry], index: usize) -> Option<Vec<AdjustEn
     })
 }
 
+/// Whether a row of kind `other` is in the same band as a moved row of kind `moved`, so the
+/// move may pass it (criterion 3, `ux-notes.md` §3.7): tone steps among tone steps; the geometry
+/// band runs in its fixed order, so a geometry row passes only rows of its own kind.
+fn same_band(moved: StepKind, other: StepKind) -> bool {
+    match moved.band() {
+        Band::Tone => other.band() == Band::Tone,
+        Band::Geometry => other == moved,
+    }
+}
+
 /// The stack with row `index` moved one row up or down inside its band (criterion 3,
-/// `ux-notes.md` §3.7; every slice-1 kind is in the tone and detail band); `None` at the band's
-/// end or for a row this build does not know.
+/// `ux-notes.md` §3.7); `None` at the band's end or for a row this build does not know.
 #[must_use]
 pub fn move_step(entries: &[AdjustEntry], index: usize, up: bool) -> Option<Vec<AdjustEntry>> {
-    known_kind(entries.get(index)?)?;
+    let moved = known_kind(entries.get(index)?)?;
     let other = if up { index.checked_sub(1)? } else { index + 1 };
-    known_kind(entries.get(other)?)?;
+    if !same_band(moved, known_kind(entries.get(other)?)?) {
+        return None;
+    }
     let mut next = entries.to_vec();
     next.swap(index, other);
     Some(next)
@@ -196,8 +253,12 @@ pub fn move_step_to(entries: &[AdjustEntry], from: usize, to: usize) -> Option<V
     if from == to || to >= entries.len() {
         return None;
     }
+    let moved = known_kind(entries.get(from)?)?;
     let passed = &entries[from.min(to)..=from.max(to)];
-    if passed.iter().any(|entry| known_kind(entry).is_none()) {
+    if passed
+        .iter()
+        .any(|entry| known_kind(entry).is_none_or(|k| !same_band(moved, k)))
+    {
         return None;
     }
     let mut next = entries.to_vec();
@@ -206,15 +267,23 @@ pub fn move_step_to(entries: &[AdjustEntry], from: usize, to: usize) -> Option<V
     Some(next)
 }
 
-/// Make editable (criterion 29): Preset Expert and, in one write, the steps that ran (`resolved`,
-/// the derived steps at the shown operation's Interval) as ordinary switched-on rows in place of
-/// the manual tone steps that were "Preset in use"; the rows this build does not know stay after
-/// them. Strength is kept.
+/// Make editable (criterion 29): Preset Expert and, in one write, the tone steps that ran
+/// (`resolved`, the derived steps at the shown operation's Interval) as ordinary switched-on rows
+/// in place of the manual tone steps that were "Preset in use"; the geometry rows (Crop, Resize)
+/// stay as they were, before them, and the rows this build does not know after them. Strength is
+/// kept.
 #[must_use]
 pub fn make_editable(entries: &[AdjustEntry], resolved: &[ManualStep]) -> AdjustmentsWrite {
-    let steps = resolved
+    let steps = entries
         .iter()
-        .map(|step| step.entry(true))
+        .filter(|entry| known_kind(entry).is_some_and(|k| k.band() == Band::Geometry))
+        .cloned()
+        .chain(
+            resolved
+                .iter()
+                .filter(|step| step.kind().band() == Band::Tone)
+                .map(|step| step.entry(true)),
+        )
         .chain(
             entries
                 .iter()
@@ -240,237 +309,5 @@ pub fn make_editable_notice(operations: usize, shown: &str, interval_um: u32) ->
 }
 
 #[cfg(test)]
-mod tests {
-    use curvyo_laser_core::settings::Dither;
-    use serde_json::json;
-
-    use super::*;
-
-    fn kinds(entries: &[AdjustEntry]) -> Vec<String> {
-        entries
-            .iter()
-            .map(|e| e.step().map_or("?".to_owned(), |s| s.kind.clone()))
-            .collect()
-    }
-
-    /// Criterion 27, superseded by the Dither on the picture (2026-11-20): a pick writes the
-    /// Preset and the picture's Dither, no operation and no notice (the old test wrote the Dither
-    /// of every operation and said so).
-    #[test]
-    fn a_preset_pick_writes_the_pictures_dither() {
-        let current = DitherSettings {
-            threshold_pct: 30,
-            screen_angle_deg: 15,
-            ..DitherSettings::DEFAULT
-        };
-        let write = pick_preset(Preset::DotRaster, current, 200);
-        assert_eq!(write.preset.as_deref(), Some("dot_raster"));
-        assert_eq!((write.strength, write.steps), (None, None));
-        let (dither, damaged) = DitherSettings::read(write.dither.as_ref());
-        assert!(!damaged);
-        assert_eq!(
-            dither,
-            DitherSettings {
-                mode: Dither::Halftone,
-                threshold_pct: 30,
-                screen_size_um: 1_600,
-                screen_angle_deg: 45,
-            },
-            "8 x Interval 0.2, Angle 45, Threshold kept"
-        );
-        let expert = pick_preset(Preset::Expert, current, 200);
-        assert_eq!(expert.preset.as_deref(), Some("expert"));
-        assert_eq!(expert.dither, None, "Expert writes the Preset only");
-        let photo = pick_preset(Preset::Photo, current, PICK_INTERVAL_UM);
-        assert_eq!(
-            DitherSettings::read(photo.dither.as_ref()).0,
-            DitherSettings {
-                mode: Dither::Jarvis,
-                ..current
-            }
-        );
-        let fine = pick_preset(Preset::Newspaper, current, 10);
-        assert_eq!(
-            DitherSettings::read(fine.dither.as_ref()).0.screen_size_um,
-            200,
-            "clamped to 0.20 mm"
-        );
-    }
-
-    #[test]
-    fn a_dither_edit_writes_the_whole_register_and_nothing_else() {
-        let write = set_dither(DitherSettings::DEFAULT, ImageEdit::Dither(Dither::Grey)).unwrap();
-        assert_eq!(
-            (write.preset, write.strength, write.steps),
-            (None, None, None)
-        );
-        assert_eq!(write.dither.unwrap().fields.len(), 3);
-        assert_eq!(
-            set_dither(DitherSettings::DEFAULT, ImageEdit::Gamma(120)),
-            None
-        );
-        assert_eq!(
-            set_dither(DitherSettings::DEFAULT, ImageEdit::LowestPower(5)),
-            None
-        );
-    }
-
-    #[test]
-    fn strength_is_whole_percent_from_0_to_100() {
-        assert_eq!(set_strength(42.4).unwrap().strength, Some(42));
-        assert_eq!(set_strength(100.0).unwrap().strength, Some(100));
-        assert_eq!(set_strength(100.5), Err(STRENGTH_RANGE_TEXT));
-        assert_eq!(set_strength(-1.0), Err(STRENGTH_RANGE_TEXT));
-        assert_eq!(set_strength(f64::NAN), Err(STRENGTH_RANGE_TEXT));
-    }
-
-    /// Criterion 3: Sharpen then Levels, or Levels then Sharpen, ends in the pipeline order; a
-    /// second step of a kind goes after the first.
-    #[test]
-    fn a_new_step_goes_to_its_pipeline_place() {
-        let a = add_step(
-            &add_step(&[], StepKind::Sharpen, 100),
-            StepKind::Levels,
-            100,
-        );
-        let b = add_step(
-            &add_step(&[], StepKind::Levels, 100),
-            StepKind::Sharpen,
-            100,
-        );
-        assert_eq!(kinds(&a), ["levels", "sharpen"]);
-        assert_eq!(a, b);
-        let mut c = add_step(&a, StepKind::Levels, 100);
-        c = add_step(&c, StepKind::Denoise, 100);
-        assert_eq!(kinds(&c), ["denoise", "levels", "levels", "sharpen"]);
-        let sharpen = c[3].step().unwrap();
-        assert_eq!(
-            sharpen.fields["radius_um"], 100,
-            "the Interval as its radius"
-        );
-    }
-
-    #[test]
-    fn a_field_edit_rounds_to_the_step_and_refuses_out_of_range() {
-        let stack = add_step(&[], StepKind::Sharpen, 100);
-        let edited = edit_field(&stack, 0, "radius_um", 0.234).unwrap().unwrap();
-        assert_eq!(edited[0].step().unwrap().fields["radius_um"], 230);
-        assert_eq!(
-            edit_field(&stack, 0, "amount_pct", 501.0),
-            Err("Amount is 0 to 500 %.")
-        );
-        assert_eq!(edit_field(&stack, 0, "nothing", 1.0), Ok(None));
-        let levels = add_step(&[], StepKind::Levels, 100);
-        let up = edit_field(&levels, 0, "black_pct", 50.0).unwrap().unwrap();
-        assert_eq!(
-            edit_field(&up, 0, "white_pct", 51.0),
-            Err(LEVELS_ORDER_TEXT)
-        );
-    }
-
-    /// Criterion 2: off keeps the fields; remove; moves stay inside the band and skip nothing
-    /// this build does not know.
-    #[test]
-    fn switch_remove_and_move() {
-        let mut stack = add_step(&[], StepKind::Levels, 100);
-        stack = add_step(&stack, StepKind::Sharpen, 100);
-        stack.push(AdjustEntry::Unreadable(json!(1)));
-        let off = set_enabled(&stack, 0, false).unwrap();
-        assert!(!off[0].step().unwrap().enabled);
-        assert_eq!(
-            off[0].step().unwrap().fields,
-            stack[0].step().unwrap().fields
-        );
-        assert_eq!(set_enabled(&off, 0, false), None);
-        assert_eq!(set_enabled(&stack, 2, true), None);
-        assert_eq!(
-            kinds(&move_step(&stack, 1, true).unwrap()),
-            ["sharpen", "levels", "?"]
-        );
-        assert_eq!(move_step(&stack, 0, true), None, "the band's top");
-        assert_eq!(move_step(&stack, 1, false), None, "not past an unknown row");
-        assert_eq!(
-            move_step(&stack, 2, true),
-            None,
-            "an unknown row does not move"
-        );
-        assert_eq!(
-            kinds(&remove_step(&stack, 2).unwrap()),
-            ["levels", "sharpen"]
-        );
-        assert_eq!(remove_step(&stack, 3), None);
-    }
-
-    /// Criterion 5: Stretch writes Black and White of a Levels row, keeps Gamma and the switch.
-    #[test]
-    fn stretch_sets_the_two_points_of_a_levels_row() {
-        let mut stack = add_step(&[], StepKind::Levels, 100);
-        stack = edit_field(&stack, 0, "gamma_centi", 1.5).unwrap().unwrap();
-        stack = set_enabled(&stack, 0, false).unwrap();
-        stack = add_step(&stack, StepKind::Sharpen, 100);
-        let next = stretch_levels(&stack, 0, (3, 97)).unwrap();
-        let step = next[0].step().unwrap();
-        assert!(!step.enabled);
-        assert_eq!(
-            (
-                step.fields["black_pct"],
-                step.fields["white_pct"],
-                step.fields["gamma_centi"]
-            ),
-            (3, 97, 150)
-        );
-        assert_eq!(stretch_levels(&next, 0, (3, 97)), None, "nothing to write");
-        assert_eq!(stretch_levels(&stack, 1, (3, 97)), None, "no Levels row");
-    }
-
-    /// Criterion 2: a drag lands a row anywhere inside its band in one write; never past a row
-    /// this build does not know, never onto its own place.
-    #[test]
-    fn a_drag_moves_a_row_to_its_landing_place_in_one_write() {
-        let mut stack = add_step(&[], StepKind::Denoise, 100);
-        stack = add_step(&stack, StepKind::Levels, 100);
-        stack = add_step(&stack, StepKind::Sharpen, 100);
-        stack.push(AdjustEntry::Unreadable(json!(1)));
-        assert_eq!(
-            kinds(&move_step_to(&stack, 2, 0).unwrap()),
-            ["sharpen", "denoise", "levels", "?"]
-        );
-        assert_eq!(
-            kinds(&move_step_to(&stack, 0, 2).unwrap()),
-            ["levels", "sharpen", "denoise", "?"]
-        );
-        assert_eq!(move_step_to(&stack, 1, 1), None, "its own place");
-        assert_eq!(move_step_to(&stack, 0, 3), None, "not past an unknown row");
-        assert_eq!(
-            move_step_to(&stack, 3, 0),
-            None,
-            "an unknown row does not move"
-        );
-        assert_eq!(move_step_to(&stack, 0, 9), None, "past the end");
-    }
-
-    /// Criterion 29: Expert and the resolved steps in place of the manual tone steps; unknown
-    /// rows stay; Strength is not written.
-    #[test]
-    fn make_editable_replaces_the_tone_steps_with_the_resolved_ones() {
-        let mut stack = add_step(&[], StepKind::Contours, 100);
-        stack.push(AdjustEntry::Unreadable(json!("later")));
-        let resolved = [
-            StepKind::Denoise.default_step(100),
-            StepKind::Levels.default_step(100),
-        ];
-        let write = make_editable(&stack, &resolved);
-        assert_eq!(write.preset.as_deref(), Some("expert"));
-        assert_eq!(write.strength, None);
-        assert_eq!(write.dither, None, "the Dither is kept (amendment A3)");
-        assert_eq!(
-            kinds(write.steps.as_ref().unwrap()),
-            ["denoise", "levels", "?"]
-        );
-        assert_eq!(make_editable_notice(1, "Image 1", 100), None);
-        assert_eq!(
-            make_editable_notice(2, "Image 1", 100).as_deref(),
-            Some("Numbers fixed for Image 1, 0.10 mm.")
-        );
-    }
-}
+#[path = "image_adjust_edit_tests.rs"]
+mod tests;

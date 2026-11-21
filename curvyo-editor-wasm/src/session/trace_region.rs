@@ -75,7 +75,7 @@ impl Session {
         if part.regions.is_empty() {
             return None;
         }
-        let quad = self.trace_mask_image()?.corners();
+        let quad = self.trace_mask_image()?.full_corners();
         let operands = self.trace_part_operands(&part);
         let mut cache = self.trace.region.borrow_mut();
         if cache.as_ref().is_none_or(|c| !c.made_of(&operands, quad)) {

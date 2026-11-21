@@ -111,6 +111,7 @@ mod image_adjust_codec;
 mod image_adjust_commands;
 mod image_adjust_model;
 mod image_codec;
+mod image_crop;
 mod image_model;
 mod images;
 mod junction;
@@ -207,8 +208,8 @@ pub use operation_settings_commands::{
 };
 pub use test_grid_codec::{GridItem, TestGridSnapshot};
 pub use test_grid_commands::{
-    ADD_TEST_GRID_COMMIT_LABEL, EDIT_TEST_GRID_COMMIT_LABEL, GridItems, NewGridCell, NewGridLabel,
-    TestGridError,
+    ADD_TEST_GRID_COMMIT_LABEL, EDIT_TEST_GRID_COMMIT_LABEL, GridCellImage, GridItems, NewGridCell,
+    NewGridLabel, TestGridError,
 };
 pub use test_grid_object::{
     DerivedPart, DerivedRow, GridStep, NewGridObject, PLACE_TEST_GRID_COMMIT_LABEL, TestGridWrite,
@@ -358,8 +359,9 @@ pub use image_adjust_model::{
     AdjustDamage, AdjustEntry, AdjustError, AdjustOwner, AdjustStep, AdjustmentsWrite,
     DEFAULT_IMAGE_STRENGTH, EDIT_ADJUSTMENTS_COMMIT_LABEL, EXPERT_PRESET,
     FOLLOW_ORIGINAL_COMMIT_LABEL, ImageAdjustments, MAX_IMAGE_STRENGTH,
-    RESTORE_ORIGINAL_COMMIT_LABEL, ShownAdjustments, StoredDither,
+    PASTE_ADJUSTMENTS_COMMIT_LABEL, RESTORE_ORIGINAL_COMMIT_LABEL, ShownAdjustments, StoredDither,
 };
+pub use image_crop::{CROP_KIND, UnitRect, visible_rect};
 pub use image_model::{
     IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL, IMPORT_IMAGES_COMMIT_LABEL, ImageSnapshot,
     PASTE_IMAGE_COMMIT_LABEL, no_paint,

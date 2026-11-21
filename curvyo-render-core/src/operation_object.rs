@@ -58,13 +58,12 @@ fn restyle_path(path: &mut PathSnapshot, look: OperationLook, style: Style) {
 
 /// The frame of an image: its unit square placed by its placement, closed (criterion 19).
 fn frame_of(image: &ImageSnapshot, style: Style) -> PathSnapshot {
-    let anchors = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+    // The drawn frame: a cropped picture outlines its visible part (`specs/0135` criterion 5).
+    let anchors = image
+        .corners()
         .into_iter()
         .enumerate()
-        .map(|(i, (x, y))| {
-            let at = image.placement.apply_point(Point::new(x, y));
-            NewAnchor::corner(AnchorId::new(0, i as u64), at)
-        })
+        .map(|(i, at)| NewAnchor::corner(AnchorId::new(0, i as u64), at))
         .collect();
     PathSnapshot {
         id: image.id,

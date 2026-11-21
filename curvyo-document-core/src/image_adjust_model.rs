@@ -10,6 +10,8 @@ use serde::Serialize;
 /// edited, switched, moved or removed, Make editable; its history name is "Edit adjustments"
 /// (ADR 0072 §7).
 pub const EDIT_ADJUSTMENTS_COMMIT_LABEL: &str = "edit_adjustments";
+/// The label of Paste adjustments (`specs/0135` criterion 10); "Paste adjustments".
+pub const PASTE_ADJUSTMENTS_COMMIT_LABEL: &str = "paste_adjustments";
 /// The label of Restore original (`specs/0135` criterion 59); "Restore original".
 pub const RESTORE_ORIGINAL_COMMIT_LABEL: &str = "restore_original";
 /// The label of Original's on a clone's Adjustments override row (criterion 9); "Follow original".
