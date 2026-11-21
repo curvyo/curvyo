@@ -157,6 +157,7 @@ pub use manufacturing::{
     FixtureParams, MOTORISED_Z_OFF_COMMIT_LABEL, MOTORISED_Z_ON_COMMIT_LABEL, ManufacturingError,
     ManufacturingSnapshot, NewOutputPage, PICK_PROFILE_COMMIT_LABEL, PageCorner, PlacementSnapshot,
     ProfileChange, ProfileSets, RESET_PROFILE_COMMIT_LABEL, SAVE_AS_PROFILE_COMMIT_LABEL,
+    USE_MACHINE_SIZE_COMMIT_LABEL,
 };
 pub use manufacturing_fixture_commands::{
     ADD_CLAMP_COMMIT_LABEL, ADD_GRID_COMMIT_LABEL, ADD_HOLDER_COMMIT_LABEL, ADD_SCREW_COMMIT_LABEL,

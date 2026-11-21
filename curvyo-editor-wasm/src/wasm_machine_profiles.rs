@@ -90,6 +90,25 @@ impl WasmSession {
             .unwrap_or_default()
     }
 
+    /// The size the connected machine reports as an offer for the active page: `[width, height]`
+    /// in mm, empty when there is none (`specs/0131`).
+    pub fn machine_size_offer(&self, x_mm: f64, y_mm: f64) -> Vec<f64> {
+        self.session
+            .machine_size_offer(x_mm, y_mm)
+            .map(Vec::from)
+            .unwrap_or_default()
+    }
+
+    /// Whether the reported size is within the profile range (the offer's place is kept).
+    pub fn machine_size_reported(&self, x_mm: f64, y_mm: f64) -> bool {
+        self.session.machine_size_reported(x_mm, y_mm)
+    }
+
+    /// Use machine size: one undo step; whether anything changed.
+    pub fn use_machine_size(&mut self, x_mm: f64, y_mm: f64, now_ms: f64) -> bool {
+        self.session.use_machine_size(x_mm, y_mm, millis(now_ms))
+    }
+
     /// Duplicate: the new profile's id, empty when refused.
     pub fn duplicate_machine_profile(&mut self, id: &str, random: &[u8], now_ms: f64) -> String {
         self.session

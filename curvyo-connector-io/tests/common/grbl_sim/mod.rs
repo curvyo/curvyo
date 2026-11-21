@@ -56,6 +56,8 @@ pub struct SimConfig {
     /// The homing cycle ends in this alarm (8 pull-off, 9 switch not found): `ALARM:<n>`, the
     /// `ok` of `$H`, then GRBL restarts itself locked (banner and unlock message).
     pub homing_fails: Option<u16>,
+    /// `$130` and `$131`, the travel of X and Y in millimetres.
+    pub travel: [f64; 2],
 }
 
 impl Default for SimConfig {
@@ -75,6 +77,7 @@ impl Default for SimConfig {
             laser_on_in_hold: false,
             quiet_homing: false,
             homing_fails: None,
+            travel: [400.0, 300.0],
         }
     }
 }
@@ -166,8 +169,8 @@ impl GrblSim {
             (30, "1000"),
             (31, "0"),
             (32, if config.laser_mode { "1" } else { "0" }),
-            (130, "400.000"),
-            (131, "300.000"),
+            (130, &format!("{:.3}", config.travel[0])),
+            (131, &format!("{:.3}", config.travel[1])),
             (132, "0.000"),
         ] {
             settings.insert(n, v.to_owned());

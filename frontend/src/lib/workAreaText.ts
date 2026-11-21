@@ -17,3 +17,14 @@ function length(mm: number, unit: UnitSymbol): string {
 export function formatWorkArea(widthMm: number, heightMm: number, unit: UnitSymbol): string {
   return `${length(widthMm, unit)} × ${length(heightMm, unit)} ${unit}`;
 }
+
+/** The offer row's text, "Machine reports 40 × 85 cm", in the same unit as the Work area line
+ * above it (`specs/0131` UX notes §2). */
+export function machineReportsText(widthMm: number, heightMm: number, unit: UnitSymbol): string {
+  return `Machine reports ${formatWorkArea(widthMm, heightMm, unit)}`;
+}
+
+/** The screen-reader line after Use machine size (`specs/0131` UX notes §4). */
+export function workAreaStateText(widthMm: number, heightMm: number, unit: UnitSymbol): string {
+  return `Work area ${formatWorkArea(widthMm, heightMm, unit)}`;
+}

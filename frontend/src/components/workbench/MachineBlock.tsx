@@ -15,6 +15,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { ConnectorGroup } from "@/components/workbench/ConnectorGroup";
 import { ARMED_ACCENT_BUTTON, FIELD, ICON_BUTTON } from "@/components/workbench/machineStyles";
 import { MachineProfileList } from "@/components/workbench/MachineProfileList";
+import { MachineSizeOffer } from "@/components/workbench/MachineSizeOffer";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { MachineView, WorkbenchesApi } from "@/hooks/useWorkbenches";
@@ -29,6 +30,11 @@ const WRITE_FAILED = "Could not save the profile. Nothing was changed.";
 const ARMED_UPDATE = "Update profile. Overwrites the saved profile.";
 /** Why the connection fields are read-only. */
 const NO_CONNECTION = "Only saved profiles have a connection.";
+/** The write-failure alert after Use machine size: the copy and page did change (`specs/0131` UX
+ * notes §4). */
+const SIZE_WRITE_FAILED = "Could not save the profile.";
+/** How long after Use machine size a write failure is its own. */
+const SIZE_WRITE_WINDOW_MS = 5000;
 /** How long a notice stays. */
 const NOTICE_MS = 3000;
 
@@ -62,6 +68,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const profileButton = useRef<HTMLButtonElement>(null);
+  const sizePressedAt = useRef(Number.NEGATIVE_INFINITY);
   const update = useDeleteArm();
   const copy = machine.copy;
 
@@ -76,7 +83,10 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
     return () => window.clearTimeout(timer);
   }, [notice]);
   useEffect(() => {
-    setMachineWriteFailureHandler(() => show(WRITE_FAILED, "save", true));
+    setMachineWriteFailureHandler(() => {
+      const own = Date.now() - sizePressedAt.current < SIZE_WRITE_WINDOW_MS;
+      show(own ? SIZE_WRITE_FAILED : WRITE_FAILED, "save", true);
+    });
     return () => setMachineWriteFailureHandler(null);
   }, []);
   // A press on the canvas closes the list (UX notes §3).
@@ -93,6 +103,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
     setOpen(false);
     window.requestAnimationFrame(() => profileButton.current?.focus());
   };
+  const focusProfile = () => profileButton.current?.focus();
   const noticeAt = (anchor: string) =>
     notice?.anchor === anchor ? <FieldNotice notice={notice} /> : null;
 
@@ -231,6 +242,18 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
             {formatWorkArea(copy.width, copy.height, unit)}
           </span>
         </div>
+        <MachineSizeOffer
+          profileId={machine.connection === null ? null : (machine.profiles.find((row) => row.chosen)?.id ?? null)}
+          address={machine.connection?.connector_address.trim() ?? ""}
+          unit={unit}
+          api={api}
+          width={copy.width}
+          height={copy.height}
+          onFocusProfile={focusProfile}
+          onUsed={() => {
+            sizePressedAt.current = Date.now();
+          }}
+        />
         <CornerControl label="Origin corner" corner={copy.origin} onChange={(corner) => api.setOrigin(corner)} />
         <NumberField
           label="Max feed"

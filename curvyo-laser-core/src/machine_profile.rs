@@ -1,7 +1,7 @@
 //! The laser machine profile record with its limits and the built-in (ADR 0038 §2, §4, §5;
 //! `specs/0026-machine-profile` criteria 1, 2, 3 and 9).
 
-use curvyo_document_core::{DocumentSize, Length};
+use curvyo_document_core::{DocumentSize, Length, PRESET_MATCH_TOLERANCE};
 use serde::{Deserialize, Serialize};
 
 /// The id of the built-in profile; not a UUID, so no record file can carry it.
@@ -443,6 +443,21 @@ pub fn is_valid_name(name: &str) -> bool {
 #[must_use]
 pub fn is_valid_work_side(mm: f64) -> bool {
     mm.is_finite() && (MIN_WORK_MM..=MAX_WORK_MM).contains(&mm)
+}
+
+/// The size the connected machine reports (`$130`, `$131` in mm) as an offer for the page of
+/// work area `page` (`specs/0131`): `Some` when both sides are finite and within
+/// [`MIN_WORK_MM`]`..=`[`MAX_WORK_MM`] and either differs from `page` by more than
+/// [`PRESET_MATCH_TOLERANCE`]; otherwise `None`.
+#[must_use]
+pub fn machine_size_offer(page: DocumentSize, reported: [f64; 2]) -> Option<DocumentSize> {
+    if !reported.into_iter().all(is_valid_work_side) {
+        return None;
+    }
+    let tolerance = PRESET_MATCH_TOLERANCE.as_mm();
+    let differs = (reported[0] - page.width.as_mm()).abs() > tolerance
+        || (reported[1] - page.height.as_mm()).abs() > tolerance;
+    differs.then(|| DocumentSize::from_mm(reported[0], reported[1]))
 }
 
 /// "<base> copy", then "<base> copy 2", "<base> copy 3", ... until `taken` refuses it; the base

@@ -173,6 +173,7 @@ pub const FREE_STEPS: &[&str] = &[
     // the export step write the manufacturing, its fixture jobs and operations only.
     "air_assist_on",
     "air_assist_off",
+    "use_machine_size",
     "set_fixture_material",
     "set_start_machine_origin",
     "set_start_head_position",

@@ -194,6 +194,7 @@ const DOCUMENT_LEVEL_LABELS: &[&str] = &[
     // `specs/0029-laser-job-preview-and-output`: the page's machine and its output registers.
     "air_assist_on",
     "air_assist_off",
+    "use_machine_size",
     "set_fixture_material",
     "set_start_machine_origin",
     "set_start_head_position",

@@ -55,6 +55,9 @@ pub const AIR_ASSIST_ON_COMMIT_LABEL: &str = "air_assist_on";
 /// The label of the copy's Air assist switched off (`specs/0029` criterion 25).
 pub const AIR_ASSIST_OFF_COMMIT_LABEL: &str = "air_assist_off";
 
+/// The label of the copy and page taking the size the controller reports (`specs/0131`).
+pub const USE_MACHINE_SIZE_COMMIT_LABEL: &str = "use_machine_size";
+
 /// Which change writes the machine profile copy; each is one history step with its own label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProfileChange {
@@ -84,6 +87,8 @@ pub enum ProfileChange {
         /// The new state.
         on: bool,
     },
+    /// Use machine size: the work area the controller reports (`specs/0131`).
+    UseMachineSize,
 }
 
 impl ProfileChange {
@@ -103,6 +108,7 @@ impl ProfileChange {
             Self::MotorisedZ { on: false } => MOTORISED_Z_OFF_COMMIT_LABEL,
             Self::AirAssist { on: true } => AIR_ASSIST_ON_COMMIT_LABEL,
             Self::AirAssist { on: false } => AIR_ASSIST_OFF_COMMIT_LABEL,
+            Self::UseMachineSize => USE_MACHINE_SIZE_COMMIT_LABEL,
         }
     }
 }
