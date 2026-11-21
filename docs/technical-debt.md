@@ -2719,6 +2719,14 @@ for satin stitch (embroidery family) rather than here.
   run checks its bytes against `RUN_BYTES` (160 MiB) before each step; a real allocation failure
   in wasm still aborts. **Resolution:** fallible allocation of the step buffers if a measured
   out-of-memory appears below the budget.
+- **An image copied into another document loses its adjustments (criterion 10, slice 2,
+  2026-11-20, Proposal).** Copy and Paste adjustments, Duplicate and clones carry Preset,
+  Strength, Dither and stack; the app's object clipboard between documents is not part of slice
+  2, so a picture pasted into another project arrives as imported. **Resolution:** the object
+  clipboard story carries the image node's registers with its asset.
+- **The Crop bar has no entry chip on a handle (slice 2, 2026-11-20).** `ux-notes.md` §3.9's
+  double-click on a crop handle opening its entry chip is not built; the bar's four fields are the
+  exact route. **Resolution:** the chip with the Crop bar's next polish pass.
 
 ## `library_list` duplicates the format guards of `devices_list` (`0116`, 2026-11-15)
 

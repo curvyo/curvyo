@@ -403,5 +403,100 @@ one pass, where a split would pass most locals along:
 - `curvyo-document-core/src/clone_picture.rs` `picture_clone` (73) and `clone_read.rs` `walk`
   (66): the chain walk of ADR 0015 §6 with the adjustment source beside the style source.
 - `curvyo-document-core/src/lib.rs` is 504 lines of re-exports only.
+- Slice 2 (architect review A1): `curvyo-editor-wasm/src/gpu_images.rs` `prepare` (about 70)
+  builds the vertices of every quad in one pass, the texture rectangle of a cropped picture
+  included; `curvyo-editor-wasm/src/session/image_adjust/view.rs` `adjustments_view` (about 90)
+  still builds the group's view from one read of the picture, its operations and its resolved
+  steps, now with the add rows, Paste, the Crop bar row and the step bodies.
 - The Levels graph writes at a drag's release; the fields follow live only once the session has
   a held Levels edit like the held Strength (slice 2, with Curves).
+
+## Slice 2: the other manual steps, Copy and Paste, the picture grid
+
+Slice 2 = criteria 3, 5 (Crop, Resize, Channel mix, Curves), 6, 7, 10, 14, 51, 52, plus the parts
+of 17, 54 and 55 for the four steps. Branch `story/image-adjust-steps`. Design: ADR 0072 §3 (crop
+is the visible part), §6 and A9 (picture-grid cells), §8 (one bump per slice); ADR 0073 §2 to §4
+(fields, zones, arithmetic) and "Slice 2 decisions" a to e.
+
+**Format:** `CURRENT_FORMAT_VERSION` 52 (main holds 51 from slice 1, PR #435): the stored stack
+gains the kinds `crop`, `resize`, `channel_mix`, `curves` (a build of 51 would engrave the
+uncropped picture, ADR 0072 §8) and the grid cells tagged `grid_cell`. Golden
+`image_adjust_crop_v52.curvyo`. The README format row 52 is the lead's (status rows are
+separate). Material record format 4 is unchanged (it already carries the recipe's `picture` and
+`strength`). No new crate, no new dependency.
+
+### Part S: steps (Opus-level core, built here)
+
+- [x] S1 (image-core). `adjust_geometry.rs`: Crop (`floor(l·w/100)` to `ceil((l+wd)·w/100)`) and
+      Resize (separable area average, spans in 1/65536 px, integer weights, half up; reduces
+      only); `adjust_tone.rs`: Curves (Fritsch-Carlson in `f64 + - * /` sampled to 256 entries)
+      and Channel mix (`clamp(round((r·R + g·G + b·B) / 100))`, the grey conversion when it is
+      the first grey step, nothing on a picture that is already grey); `PixelStep` gains the four;
+      `AdjustRun` runs Crop and Resize per channel before grey; goldens `curves_s`,
+      `channel_mix_red_filter`, `crop_20pct`, `resize_half`; stepped == one-shot; budgets 40 ms
+      each on 4 Mpx (AC 5, 6, 7, 14, 17, 54, 55).
+- [x] S2 (laser-core). `StepKind` in pipeline order Crop, Resize, Channel mix, Denoise, Levels,
+      Curves, Local contrast, Contours, Sharpen with bands (geometry, tone); fields and ranges
+      (`left_pct top_pct width_pct height_pct`, `width_px`, `red_pct green_pct blue_pct`,
+      `in_k out_k`); the effective steps keep the geometry band with a preset and run in zone
+      order, stable; the analysis reads the picture after the geometry band; the pixel pitch of
+      the tone steps is the one after Crop and Resize (AC 3, 5, 7, 14, 30, 39).
+- [x] S3 (document-core). The visible frame: `ImageSnapshot::corners()` is the placement applied
+      to the enabled crops' unit rectangle (`full_corners()` for the trace mask); format 52;
+      golden `image_adjust_crop_v52.curvyo` (crop, resize, channel mix, curves, a damaged crop);
+      the asset's SHA-256 is unchanged by a crop (AC 5, 8, 18).
+- [x] S4 (ui-core). Insertion at the pipeline place for the new kinds, moves only inside a band
+      (the geometry band only between rows of one kind), Make editable keeps the geometry rows;
+      Curves point add, remove and edit (monotone In, the ends fixed); Channel preset fields;
+      Copy and Paste adjustments: one write of Preset, Strength, Dither and stack, "Paste
+      adjustments" (AC 2, 3, 5, 10, 29).
+- [x] S5 (editor-wasm). Group view rows and bodies of the four steps (Resize's working-image
+      line and derived height, Channel preset cells, Curves points), add toolbar with all nine,
+      the header's Copy and Paste state, bindings, contract fixtures (AC 1, 5, 10, 57).
+- [x] S6 (frontend). Step bodies (Curves graph with handles, Resize, Channel mix strip, Crop
+      fields), header Copy and Paste, decoders (AC 5, 10, 57).
+
+### Part G: the picture grid (C5 of slice 1)
+
+- [x] G1 (document-core, editor-wasm). The Image grid's Picture pick Ramp | Selected picture and the
+      Strength axis (Min, Max, Count, default 0, 100, 5) in the recipe as stored in format 4;
+      cells as image nodes tagged `grid_cell` with the picture's asset and four registers copied
+      at the pick and `image_strength` from the axis (decisions a to c); a picked cell writes
+      power, speed, passes and interval only (e; AC 51, 52).
+- [x] G2 (editor-wasm, frontend). The grid bar's Picture segments, the Strength axis, no Dither
+      segments with Selected picture (AC 51).
+
+### Validation
+
+Goldens with `CURVYO_UPDATE_GOLDEN=1`, the slice-1 goldens unchanged (an empty stack and a stack
+without the new kinds give the same bytes), stepped == one-shot runs, crop composition tests
+against the pixel rectangle, the affected crates' clippy, tests and docs; thread-CPU budgets in
+release.
+
+### Deviations (Proposal)
+
+- Resize stores `width_px` only (ADR 0073 §2): the height always follows the ratio, so the Keep
+  ratio toggle of `ux-notes.md` §3.8 is not built.
+- Channel mix on a picture whose every pixel is neutral, or after the picture is grey, changes
+  nothing (criterion 6); the Channel preset cells are Luminance 21/72/7, Red 100/0/0, Green
+  0/100/0, Blue 0/0/100.
+- Crop and Resize run per channel on the picture composited over white, so a picture with only
+  geometry steps burns and looks opaque.
+- The visible frame is the crops' unit rectangle in %, not the pixel rectangle: the drawn frame
+  can differ from the cropped pixels by less than one pixel.
+- The Crop bar (lead decision 2026-11-20): "Crop on the canvas" and adding a Crop open it in place
+  of the Select bar; the overlay draws the whole working image, the wash, the frame and eight
+  handles; a release is one step; Done, Enter and Escape leave; it follows the selection and the
+  Select tool. A double-click entry chip on a handle is not built (debt line). A cropped picture
+  draws only its visible part of the texture until its look is made (`ImageQuad::texture`).
+- Curves: a drag writes once at release; the In and Out fields show the point the graph picked.
+- The picture grid: Selected picture is offered while one picture is selected with the Test grid
+  tool (a new grid copies it at the press) or the selected grid holds one; an existing Ramp grid
+  becomes a picture grid by placing a new one. Strength is on the axis switches only while the
+  picture has a preset; back to the Ramp the axis takes another parameter (slice 1's recipe rule).
+- The picture grid's Strength when its axis is switched off again (architect review A5): the
+  cells hold the axis's values and the picture's own Strength is not kept, so they burn at 50; a
+  new Picture pick takes the picture's own. The cells fit the picture's visible (cropped) part.
+- Criterion 10, first sentence (an image copied to another document carries its registers),
+  **Proposal** (lead decision 2026-11-20): out of slice 2, the app's object clipboard is another
+  story; a debt line in `docs/technical-debt.md`. Duplicate and Paste adjustments are tested.
