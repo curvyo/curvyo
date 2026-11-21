@@ -189,7 +189,7 @@ adjustments". The hairline makes the rule visible without a word (P9).
 | Denoise | Strength 112, Detail kept 112 |
 | Contours | Line width 112 (mm), Sensitivity 112 |
 | Resize | Width 96 (px), the Keep ratio toggle 28 (`Link`, the Link corners look, pressed by default), Height 96 (px; derived ink `--field-derived-fg` while the lock is on); state line "Working image 2,400 × 1,800 px" (12 px muted) |
-| Channel mix | strip "Channel preset": Luminance, Red, Green, Blue (accessible names "Red filter" and so on; none pressed when the fields match none); Red 74, Green 74, Blue 72 |
+| Channel mix | strip "Channel preset": Luminance, Red, Green, Blue (accessible names "Red filter" and so on; none pressed when the fields match none); Red 112, Green 112, Blue 112 on the next row (UI review 2026-11-21: 74 px does not hold "Green 100 %") |
 | Crop | Left, Top (112 each); Width, Height (112 each), all %; **Crop on the canvas** (`Crop`, symbol, `aria-pressed` while the Crop bar is open) |
 | Remove background, Upscale, AI denoise | section 8 |
 
@@ -360,8 +360,8 @@ No notice after a download or a run (the state line changes). A run is one step 
 
 ## 11. Test grid (criterion 51; draft 05 E)
 
-- Row 1 of the Image grid's bar gains **Picture**: bar segments Ramp | Selected picture (after the
-  material). Selected picture is present while one picture is selected or the grid already holds one
+- The Image grid's bar gains **Picture**: bar segments Ramp | Selected picture, leading row 2 before the
+  Dither segments and Cell size (UI review 2026-11-21; drafted after the material on row 1). Selected picture is present while one picture is selected or the grid already holds one
   (P24).
 - With Selected picture and a Preset on it, the axis parameters of Columns and Rows gain **Strength**;
   Min 0 %, Max 100 %, Count 5 by default, editable as the other axes (P25, E8). With Ramp or Expert the
