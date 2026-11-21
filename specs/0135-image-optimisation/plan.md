@@ -1,6 +1,6 @@
 # Plan for image optimisation, slice 1: Presets and Strength (0135)
 
-**Status:** Done (PR #435, 2026-11-20).
+**Status:** Slice 1 Done (PR #435, 2026-11-20); Slice 2 Done (PR #441, 2026-11-21), see "Slice 2".
 
 Slice 1 = criteria 1, 2, 4, 5 (Denoise, Levels, Local contrast, Contours, Sharpen), 8, 9, 11 to 13,
 15 to 46, 51 to 62 (spec "Acceptance criteria" intro). Not in this build: slice 2 (Crop, Resize,
@@ -412,6 +412,8 @@ one pass, where a split would pass most locals along:
   a held Levels edit like the held Strength (slice 2, with Curves).
 
 ## Slice 2: the other manual steps, Copy and Paste, the picture grid
+
+**Status:** Done (PR #441, 2026-11-21, format 52).
 
 Slice 2 = criteria 3, 5 (Crop, Resize, Channel mix, Curves), 6, 7, 10, 14, 51, 52, plus the parts
 of 17, 54 and 55 for the four steps. Branch `story/image-adjust-steps`. Design: ADR 0072 §3 (crop
