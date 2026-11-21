@@ -130,6 +130,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0029-laser-job-preview-and-output` UX notes §12 (ADR 0065 §1, §3; ADR 0064 §11).
     ("air_assist_on", "Air assist on"),
     ("air_assist_off", "Air assist off"),
+    ("use_machine_size", "Use machine size"),
     ("set_fixture_material", "Pick fixture material"),
     ("set_start_machine_origin", "Start: Machine origin"),
     ("set_start_head_position", "Start: Head position"),
@@ -604,6 +605,7 @@ mod tests {
             ),
             (dc::AIR_ASSIST_ON_COMMIT_LABEL, "Air assist on"),
             (dc::AIR_ASSIST_OFF_COMMIT_LABEL, "Air assist off"),
+            (dc::USE_MACHINE_SIZE_COMMIT_LABEL, "Use machine size"),
         ] {
             assert_eq!(operation_name(label), name, "{label}");
             assert!(

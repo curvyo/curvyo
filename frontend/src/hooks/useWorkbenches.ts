@@ -137,6 +137,16 @@ export function useWorkbenches(editor: EditorSession) {
       setMotorisedZ: (on: boolean) => run((session) => session.set_motorised_z(on)),
       /** The Air assist switch of the page's profile copy: one undo step. */
       setAirAssist: (on: boolean) => run((session) => session.set_air_assist(on)),
+      /** The size the connected machine reports as an offer for this page, `[width, height]` in
+       * mm, or null (`specs/0131`); read on every render, no command. */
+      sizeOffer: (x: number, y: number): [number, number] | null => {
+        const offer = getSession()?.machine_size_offer(x, y);
+        return offer !== undefined && offer.length === 2 ? [offer[0], offer[1]] : null;
+      },
+      /** Whether the reported size is usable, so the offer row keeps its place. */
+      sizeReported: (x: number, y: number): boolean => getSession()?.machine_size_reported(x, y) ?? false,
+      /** Use machine size: one undo step, the library write of a saved profile. */
+      useSize: (x: number, y: number) => run((session) => session.use_machine_size(x, y, Date.now())) ?? false,
       reset: () => run((session) => session.reset_machine_profile()),
       saveAs: () => run((session) => session.save_machine_profile(randomBytes(), Date.now())) ?? "",
       update: () => run((session) => session.update_machine_profile(Date.now())) ?? "",

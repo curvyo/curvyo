@@ -47,10 +47,12 @@ impl Settings {
             .map(|v| v.round().min(f64::from(u32::MAX)) as u32)
     }
 
-    /// The travel of X and Y in millimetres, `$130` and `$131`.
+    /// The travel of X and Y in millimetres, `$130` and `$131`, always millimetres whatever `$13`
+    /// says; a value that is not finite is no value (JSON cannot carry it).
     #[must_use]
     pub fn travel(&self) -> Option<[f64; 2]> {
-        Some([self.number(130)?, self.number(131)?])
+        let finite = |n| self.number(n).filter(|v| v.is_finite());
+        Some([finite(130)?, finite(131)?])
     }
 
     /// Whether status reports are in inches, `$13`.
@@ -121,5 +123,21 @@ mod tests {
         assert!((s.to_mm(1.0) - 25.4).abs() < 1e-9);
         s.set(32, "0");
         assert_eq!(s.laser_mode(), Some(false));
+    }
+
+    #[test]
+    fn a_travel_that_is_not_finite_is_none_and_inches_do_not_convert_it() {
+        let mut s = Settings::default();
+        s.set(130, "inf");
+        s.set(131, "300");
+        assert_eq!(s.travel(), None);
+        s.set(130, "NaN");
+        assert_eq!(s.travel(), None);
+        s.set(130, "400");
+        s.set(131, "850");
+        s.set(13, "1");
+        assert_eq!(s.travel(), Some([400.0, 850.0]));
+        s.set(131, "");
+        assert_eq!(s.travel(), None);
     }
 }

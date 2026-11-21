@@ -10,7 +10,8 @@ use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::{
     Connection, CopyRead, LibraryWrite, MachineProfile, MachineProfiles, OriginCorner, ProfileCopy,
     clamp_address, clamp_baud, clamp_feed, clamp_name, clamp_port, clamp_power, clamp_work_area,
-    is_profile_id, new_profile_id, read_choice, read_copy, save_as_name, write_choice, write_copy,
+    is_profile_id, is_valid_work_side, machine_size_offer, new_profile_id, read_choice, read_copy,
+    save_as_name, write_choice, write_copy,
 };
 use curvyo_laser_core::{FixtureKind, FixturePart, job_parts};
 
@@ -427,6 +428,68 @@ impl Session {
             .outbox
             .push(HostWrite::Library(write));
         area.notice
+    }
+
+    /// The size the connected machine reports (`x_mm`, `y_mm`), offered for the active output
+    /// page (`specs/0131` criteria 1, 3, 4): derived on every read, no refusal is kept. `None`
+    /// outside a laser page, for a copy that is not in the library, and when the report is no
+    /// usable size or equals the copy's work area.
+    #[must_use]
+    pub fn machine_size_offer(&self, x_mm: f64, y_mm: f64) -> Option<[f64; 2]> {
+        let active = self.active_copy()?;
+        let id = active.read.copy.id.as_deref()?;
+        self.manufacturing.machine.profiles.find(id)?;
+        machine_size_offer(active.page, [x_mm, y_mm])
+            .map(|size| [size.width.as_mm(), size.height.as_mm()])
+    }
+
+    /// Whether the machine reports a usable size, `$130` and `$131` within the profile range:
+    /// the Machine block keeps the offer's place then, whether or not it differs (`specs/0131`
+    /// UX notes §2).
+    #[must_use]
+    pub fn machine_size_reported(&self, x_mm: f64, y_mm: f64) -> bool {
+        is_valid_work_side(x_mm) && is_valid_work_side(y_mm) && self.active_copy().is_some()
+    }
+
+    /// Use machine size (`specs/0131` criterion 2): after re-checking the offer, the copy and the
+    /// page take the reported size in one step; a user profile the copy points at takes the new
+    /// work area in a library write (its other values kept, no undo). Whether anything changed.
+    pub fn use_machine_size(&mut self, x_mm: f64, y_mm: f64, now_ms: i64) -> bool {
+        let Some([width, height]) = self.machine_size_offer(x_mm, y_mm) else {
+            return false;
+        };
+        let Some(active) = self.active_copy() else {
+            return false;
+        };
+        let area = DocumentSize::from_mm(width, height);
+        if !self.write_active_copy(
+            active.id,
+            &active.read.copy,
+            area,
+            ProfileChange::UseMachineSize,
+            None,
+        ) {
+            return false;
+        }
+        let record = active
+            .read
+            .copy
+            .id
+            .as_deref()
+            .and_then(|id| self.manufacturing.machine.profiles.find(id))
+            .filter(|record| !record.is_builtin())
+            .cloned();
+        if let Some(write) = record.and_then(|record| {
+            self.manufacturing.machine.profiles.update(
+                &record.id,
+                record.values.clone(),
+                area,
+                now_ms,
+            )
+        }) {
+            self.manufacturing.machine.push_library_write(write);
+        }
+        true
     }
 
     /// Duplicate (criterion 2): the new profile's id, made from `random`.
