@@ -140,7 +140,7 @@ impl Session {
 
     /// One bar commit on the selected grid, or on the tool's draft without one: `next` over the
     /// current recipe, kept as `field` = `typed` with its cause when it does not take.
-    fn bar_commit(
+    pub(super) fn bar_commit(
         &mut self,
         next: impl FnOnce(&Self, &Recipe) -> Result<(TestRecipe, Option<MaterialRef>), String>,
         field: &str,

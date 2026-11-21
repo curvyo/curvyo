@@ -20,7 +20,9 @@ mod fixture_snap;
 mod fixture_stored;
 mod grid_layout;
 mod image_adjust_cache;
+mod image_adjust_field_specs;
 mod image_adjust_fields;
+mod image_adjust_kinds;
 mod image_adjust_resolve;
 mod image_adjust_stored;
 mod image_dither;
@@ -104,9 +106,12 @@ pub mod adjust {
         ADJUST_WORK, ADJUSTED_BYTES, AdjustKey, AdjustedPicture, LOOK_BYTES, PyramidCache,
         RUN_BYTES, Resolved, reduced_level,
     };
-    pub use crate::image_adjust_fields::{FieldSpec, ManualStep, StepDamage, StepKind};
+    pub use crate::image_adjust_fields::{
+        Band, CHANNEL_PRESETS, FieldSpec, LUMINANCE_MIX, MAX_CURVE_POINTS, ManualStep, StepDamage,
+        StepKind,
+    };
     pub use crate::image_adjust_resolve::{
-        AdjustRegisters, DEFAULT_STRENGTH, StoredStep, adjust_picture, pixel_steps,
+        AdjustRegisters, DEFAULT_STRENGTH, StoredStep, adjust_picture, analysis_after, pixel_steps,
     };
     pub use crate::image_dither::DitherSettings;
     pub use crate::image_preset::{Preset, stretch_points};

@@ -31,8 +31,11 @@ pub struct TestGridView {
     pub shared: Vec<ValueView>,
     /// Crosshatch, Engrave only.
     pub crosshatch: Option<bool>,
-    /// The Dither strip, Image only (`specs/0123` criterion 44).
+    /// The Dither strip, Image with the Ramp only (`specs/0123` criterion 44; `specs/0135`
+    /// criterion 51: a picture grid's cells burn the picture's own dither, P32).
     pub dither: Option<DitherStripView>,
+    /// The Picture segments, Image only (`specs/0135` criterion 51).
+    pub picture: Option<super::picture::PictureSourceView>,
     /// Cell size in mm.
     pub cell_mm: f64,
     /// The Columns unit.
@@ -114,11 +117,14 @@ pub struct InvalidView {
     pub cause: String,
 }
 
-fn axis_view(recipe: &Recipe, side: Side) -> AxisFieldsView {
+/// The axis unit of `side`; Strength is offered only while `strength` (Selected picture with a
+/// preset, `specs/0135` criterion 51, P25).
+fn axis_view(recipe: &Recipe, side: Side, strength: bool) -> AxisFieldsView {
     let axis = recipe.test.axis(side);
     AxisFieldsView {
         param: axis.param().as_str(),
         offered: Param::of_kind(recipe.test.kind())
+            .chain((strength || axis.param() == Param::Strength).then_some(Param::Strength))
             .map(Param::as_str)
             .collect(),
         min: axis.min().number(),
@@ -166,6 +172,9 @@ impl Session {
         let material = self.picked_material(&recipe);
         let invalid = self.invalid_view(group);
         let kind = recipe.test.kind();
+        let picture = self.picture_source_view(group, &recipe);
+        let strength = picture.as_ref().is_some_and(|p| p.strength_offered);
+        let ramp = picture.as_ref().is_none_or(|p| p.value == "ramp");
         Some(TestGridView {
             group,
             id: group.map(|_| recipe.id.to_string()),
@@ -184,10 +193,11 @@ impl Session {
                 .collect(),
             crosshatch: (kind == curvyo_laser_core::settings::SetKind::Engrave)
                 .then(|| recipe.test.crosshatch()),
-            dither: recipe.test.dither().map(dither_strip),
+            dither: recipe.test.dither().filter(|_| ramp).map(dither_strip),
+            picture,
             cell_mm: recipe.test.cell().as_mm(),
-            columns: axis_view(&recipe, Side::Columns),
-            rows: axis_view(&recipe, Side::Rows),
+            columns: axis_view(&recipe, Side::Columns, strength),
+            rows: axis_view(&recipe, Side::Rows, strength),
             width_mm,
             height_mm,
             max_feed_mm_min: self.active_max_feed().get(),

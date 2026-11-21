@@ -37,6 +37,22 @@ pub struct NewGridCell {
     pub style: Style,
     /// Its `grid_cell` tag.
     pub tag: Plain,
+    /// With the Picture source "Selected picture" (`specs/0135` criterion 51, ADR 0072 §6): the
+    /// cell is an image node of the picked picture's asset at `placement` (fit into the square)
+    /// with the picture's registers and the cell's Strength, not the square primitive.
+    pub image: Option<GridCellImage>,
+}
+
+/// The picture of a cell of a picture grid (ADR 0073 slice 2 decisions a to c): a copy of the
+/// picked picture's asset reference and four registers, its Strength the cell's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GridCellImage {
+    /// The picture's asset, already in the project.
+    pub asset: crate::assets::AssetHash,
+    /// The map of the unit square into the cell.
+    pub placement: crate::affine::Affine,
+    /// The copied registers with the cell's Strength.
+    pub adjustments: crate::image_adjust_model::AdjustmentsWrite,
 }
 
 /// One label of a grid as the laser extension laid it out.
@@ -120,6 +136,18 @@ impl Document {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let cells = self.write_group(TreeParentId::Node(top), Some("Cells"));
         for cell in &items.cells {
+            if let Some(image) = &cell.image {
+                // invariant: creating a node under a group just written cannot fail, and its meta
+                // map can be read.
+                #[allow(clippy::unwrap_used)]
+                let leaf = tree.create(TreeParentId::Node(cells)).unwrap();
+                #[allow(clippy::unwrap_used)]
+                let meta = tree.get_meta(leaf).unwrap();
+                crate::image_codec::write_image(&meta, &image.asset, image.placement);
+                crate::image_adjust_codec::write_adjustments(&meta, &image.adjustments);
+                write_plain_map(&meta, KEY_GRID_CELL, &cell.tag);
+                continue;
+            }
             let leaf = self.grid_writer().write_one(
                 TreeParentId::Node(cells),
                 &DrawingNode::Primitive {

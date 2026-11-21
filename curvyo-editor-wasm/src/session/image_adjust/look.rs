@@ -198,6 +198,7 @@ impl crate::session::Session {
         if let Some(name) = shown {
             used.names.insert(name.clone());
             image.asset = name;
+            image.shows_look = true;
         }
     }
 

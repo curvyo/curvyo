@@ -5,21 +5,28 @@
 mod before_after;
 #[cfg(test)]
 mod budget_tests;
+mod clipboard;
 #[cfg(test)]
 mod contract_tests;
+mod crop_bar;
 mod levels_input;
 mod look;
 mod picture;
 #[cfg(test)]
-mod tests;
+mod slice2_tests;
+#[cfg(test)]
+pub(in crate::session) mod tests;
 mod view;
 
 use curvyo_document_core::{AdjustmentsWrite, NodeId};
 use curvyo_laser_core::adjust::{AdjustRegisters, DitherSettings, Preset, StepKind};
+use curvyo_laser_core::adjust::{CHANNEL_PRESETS, ManualStep};
 use curvyo_laser_core::settings::{Dither, ImageEdit, ImageField};
 use curvyo_ui_core::{
-    PICK_INTERVAL_UM, add_step, edit_field, make_editable, make_editable_notice, move_step,
-    move_step_to, pick_preset, remove_step, set_dither, set_enabled, set_strength,
+    CopiedAdjustments, PICK_INTERVAL_UM, add_curve_point, add_step, add_step_with, edit_field,
+    make_editable, make_editable_notice, move_curve_point, move_step, move_step_to, pick_preset,
+    remove_curve_point, remove_step, set_channel_mix, set_dither, set_enabled, set_strength,
+    straighten_curve,
 };
 
 /// The Adjustments group's session state, never saved.
@@ -36,6 +43,10 @@ pub(in crate::session) struct AdjustState {
     look: look::LookCache,
     /// The inputs of the Levels rows (criterion 16).
     levels: levels_input::LevelsInputs,
+    /// What Copy adjustments holds for the session (criterion 10, P16).
+    copied: Option<CopiedAdjustments>,
+    /// The picture and Crop row the Crop bar edits (`ux-notes.md` §3.9).
+    crop: Option<crop_bar::CropTarget>,
 }
 
 impl super::Session {
@@ -172,27 +183,117 @@ impl super::Session {
             return false;
         };
         let interval_um = self.shown_interval_um();
-        let next = add_step(&steps, kind, interval_um);
-        self.write_steps(next)
+        let next = match (
+            kind,
+            self.adjust_target().and_then(|t| self.picture_size(t)),
+        ) {
+            // A new Resize starts at the picture's width (criterion 14: it only reduces).
+            (StepKind::Resize, Some((width, _))) => add_step_with(
+                &steps,
+                ManualStep::Resize {
+                    width_px: width.clamp(16, 8_192),
+                },
+            ),
+            _ => add_step(&steps, kind, interval_um),
+        };
+        let crop_at = (kind == StepKind::Crop).then(|| {
+            next.iter()
+                .zip(&steps)
+                .position(|(a, b)| a != b)
+                .unwrap_or(steps.len())
+        });
+        let written = self.write_steps(next);
+        // Adding Crop also opens the Crop bar (`ux-notes.md` §3.5).
+        if written && let Some(at) = crop_at {
+            self.open_crop_bar(at);
+        }
+        written
+    }
+
+    /// A click on the curve of Curves row `index` at Input and Output % (criterion 5): a point
+    /// there, one step; `false` with 8 points or a point at that Input.
+    pub fn add_adjust_curve_point(&mut self, index: usize, input: u8, output: u8) -> bool {
+        self.shown_steps()
+            .and_then(|steps| add_curve_point(&steps, index, (input, output)))
+            .is_some_and(|next| self.write_steps(next))
+    }
+
+    /// A drag or an arrow key of point `point` of Curves row `index` to Input and Output %: the
+    /// end points move only vertically; one step.
+    pub fn move_adjust_curve_point(
+        &mut self,
+        index: usize,
+        point: usize,
+        input: u8,
+        output: u8,
+    ) -> bool {
+        self.shown_steps()
+            .and_then(|steps| move_curve_point(&steps, index, point, (input, output)))
+            .is_some_and(|next| self.write_steps(next))
+    }
+
+    /// Delete on point `point` of Curves row `index`; the end points stay.
+    pub fn remove_adjust_curve_point(&mut self, index: usize, point: usize) -> bool {
+        self.shown_steps()
+            .and_then(|steps| remove_curve_point(&steps, index, point))
+            .is_some_and(|next| self.write_steps(next))
+    }
+
+    /// The Straight curve button of Curves row `index`.
+    pub fn straighten_adjust_curve(&mut self, index: usize) -> bool {
+        self.shown_steps()
+            .and_then(|steps| straighten_curve(&steps, index))
+            .is_some_and(|next| self.write_steps(next))
+    }
+
+    /// Channel preset cell `preset` (0 Luminance, 1 Red, 2 Green, 3 Blue) of Channel mix row
+    /// `index`: its three weights, one step.
+    pub fn set_adjust_channel_preset(&mut self, index: usize, preset: usize) -> bool {
+        let Some(&(_, weights)) = CHANNEL_PRESETS.get(preset) else {
+            return false;
+        };
+        self.shown_steps()
+            .and_then(|steps| set_channel_mix(&steps, index, weights))
+            .is_some_and(|next| self.write_steps(next))
     }
 
     /// A field commit on row `index` (criterion 5), `typed` in the field's shown unit.
     ///
     /// # Errors
-    /// The field's range text, or the Levels order text; nothing is written.
+    /// The field's range text, or the Levels order text; nothing is written. Resize's Width
+    /// runs from 16 to the working image's width (criteria 5, 14).
     pub fn edit_adjust_field(
         &mut self,
         index: usize,
         key: &str,
         typed: f64,
-    ) -> Result<bool, &'static str> {
+    ) -> Result<bool, String> {
         let Some(steps) = self.shown_steps() else {
             return Ok(false);
         };
+        if key == "width_px"
+            && let Some(width) = self.resize_limit(&steps, index)
+            && typed.round() > f64::from(width)
+        {
+            return Err(view::resize_range_text(width));
+        }
         Ok(match edit_field(&steps, index, key, typed)? {
             Some(next) => self.write_steps(next),
             None => false,
         })
+    }
+
+    /// The working image's width when row `index` is a Resize row of the selected picture.
+    pub(super) fn resize_limit(
+        &self,
+        steps: &[curvyo_document_core::AdjustEntry],
+        index: usize,
+    ) -> Option<u32> {
+        let kind = &steps.get(index)?.step()?.kind;
+        (kind == StepKind::Resize.key())
+            .then(|| self.adjust_target().and_then(|t| self.picture_size(t)))
+            .flatten()
+            .map(|(w, _)| w.clamp(16, 8_192))
     }
 
     /// The power toggle of row `index` (criterion 2).

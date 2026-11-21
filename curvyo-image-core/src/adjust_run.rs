@@ -5,14 +5,32 @@ use crate::adjust_blur::SubPx;
 use crate::adjust_clahe::ClaheRun;
 use crate::adjust_denoise::DenoiseRun;
 use crate::adjust_detail::DetailRun;
+use crate::adjust_geometry::{crop_plane, resize_plane};
 use crate::adjust_plane::{GreyPlane, luminance, over_white};
-use crate::adjust_tone::TableRun;
+use crate::adjust_tone::{TableRun, channel_mix_grey};
 use crate::working::WorkingImage;
 
 /// One adjustment step in pixel units, as it runs (ADR 0073 §1): radii in 1/16 pixel of the
 /// step's input, greys and percentages as stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PixelStep {
+    /// Keeps the pixel rectangle of left, top, width and height in percent
+    /// ([`crate::crop_rect`]).
+    Crop {
+        /// Left, top, width and height, whole percent.
+        pct: [u8; 4],
+    },
+    /// Reduces the picture to this width in pixels, the height following
+    /// ([`crate::resized_size`]).
+    Resize {
+        /// The width in pixels.
+        width_px: u32,
+    },
+    /// How colour becomes grey: red, green and blue weights in whole percent (-200 to 200).
+    ChannelMix {
+        /// Red, green and blue.
+        weights: [i16; 3],
+    },
     /// The bilateral filter: Strength and Detail kept in percent.
     Denoise {
         /// Strength, 0 to 100 %.
@@ -28,6 +46,13 @@ pub enum PixelStep {
         white_pct: u8,
         /// Gamma in hundredths, 10 to 400.
         gamma_centi: u16,
+    },
+    /// The monotone curve through the first `count` of `points` (Input %, Output %).
+    Curves {
+        /// The points, Input strictly increasing; the ones past `count` unused.
+        points: [(u8, u8); 8],
+        /// How many points are used.
+        count: u8,
     },
     /// CLAHE with tiles of 2 x `radius`.
     LocalContrast {
@@ -57,12 +82,22 @@ pub enum PixelStep {
 impl PixelStep {
     /// Whether the step runs on each colour channel while the picture is still in colour.
     const fn per_channel(self) -> bool {
-        matches!(self, Self::Denoise { .. })
+        matches!(
+            self,
+            Self::Denoise { .. } | Self::Crop { .. } | Self::Resize { .. }
+        )
     }
 
     /// The step's run on `plane`, nothing worked yet.
     fn start(self, plane: &GreyPlane) -> StepRun {
         match self {
+            Self::Crop { pct } => StepRun::Geometry(Geometry::Crop(pct)),
+            Self::Resize { width_px } => StepRun::Geometry(Geometry::Resize(width_px)),
+            // The grey conversion is the step; on a grey plane it changes nothing (criterion 6).
+            Self::ChannelMix { .. } => StepRun::Table(TableRun::curves(&[])),
+            Self::Curves { points, count } => {
+                StepRun::Table(TableRun::curves(&points[..usize::from(count.min(8))]))
+            }
             Self::Denoise {
                 strength_pct,
                 detail_pct,
@@ -91,6 +126,7 @@ impl PixelStep {
 /// One step being worked on one plane.
 #[derive(Debug, Clone)]
 enum StepRun {
+    Geometry(Geometry),
     Denoise(Box<DenoiseRun>),
     Table(TableRun),
     Clahe(ClaheRun),
@@ -100,12 +136,28 @@ enum StepRun {
 impl StepRun {
     fn work(&mut self, plane: &mut GreyPlane, work: &mut u64) -> bool {
         match self {
+            Self::Geometry(step) => {
+                *work = work.saturating_sub(plane.pixels());
+                *plane = match *step {
+                    Geometry::Crop(pct) => crop_plane(plane, pct),
+                    Geometry::Resize(width_px) => resize_plane(plane, width_px),
+                };
+                true
+            }
             Self::Denoise(run) => run.work(plane, work),
             Self::Table(run) => run.work(plane, work),
             Self::Clahe(run) => run.work(plane, work),
             Self::Detail(run) => run.work(plane, work),
         }
     }
+}
+
+/// A geometry step, worked on a plane at once (a crop is a copy, a resize one pass of each
+/// axis).
+#[derive(Debug, Clone, Copy)]
+enum Geometry {
+    Crop([u8; 4]),
+    Resize(u32),
 }
 
 /// The adjusted image of a working image (ADR 0073 §7).
@@ -204,7 +256,7 @@ impl AdjustRun {
         let first_grey = steps.iter().position(|s| !s.per_channel());
         let planes = if steps.is_empty() {
             Planes::Unchanged
-        } else if first_grey == Some(0) {
+        } else if first_grey == Some(0) && !matches!(steps[0], PixelStep::ChannelMix { .. }) {
             Planes::Grey(GreyPlane::of_rgba(image))
         } else {
             Planes::Channels(Box::new(channels(image)))
@@ -242,7 +294,10 @@ impl AdjustRun {
                 && let Planes::Channels(channels) = &self.planes
             {
                 work = work.saturating_sub(CONVERT_WORK * channels[0].pixels());
-                self.planes = Planes::Grey(grey_of(channels));
+                self.planes = Planes::Grey(match self.steps[self.next] {
+                    PixelStep::ChannelMix { weights } => mixed_grey(channels, weights),
+                    _ => grey_of(channels),
+                });
             }
             let step = self.steps[self.next];
             let plane = match &mut self.planes {
@@ -327,6 +382,27 @@ fn grey_of(channels: &[GreyPlane; 3]) -> GreyPlane {
     }
 }
 
+/// The grey of three channel planes by Channel mix `weights` (criterion 6): a picture whose
+/// every pixel is neutral keeps its grey.
+fn mixed_grey(channels: &[GreyPlane; 3], weights: [i16; 3]) -> GreyPlane {
+    let [r, g, b] = channels;
+    let neutral = r.grey == g.grey && g.grey == b.grey;
+    GreyPlane {
+        width: r.width,
+        height: r.height,
+        grey: if neutral {
+            r.grey.clone()
+        } else {
+            r.grey
+                .iter()
+                .zip(&g.grey)
+                .zip(&b.grey)
+                .map(|((&r, &g), &b)| channel_mix_grey(r, g, b, weights))
+                .collect()
+        },
+    }
+}
+
 /// An opaque working image of three channel planes, with the input's original size, truncated
 /// and animated marks.
 fn rgba(
@@ -352,185 +428,5 @@ fn rgba(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn image() -> WorkingImage {
-        let pixels = (0..64_u8)
-            .flat_map(|i| [i * 4, 255 - i * 3, i, 200])
-            .collect();
-        WorkingImage {
-            width: 8,
-            height: 8,
-            pixels,
-            original_size: (8, 8),
-            truncated: false,
-            animated: false,
-        }
-    }
-
-    /// Criterion 56: a 16 Mpx picture runs within about 2 x its bytes in colour, 1.5 x grey.
-    #[test]
-    fn a_run_holds_the_source_and_one_buffer() {
-        let px = 16_000_000_u64;
-        let denoise = PixelStep::Denoise {
-            strength_pct: 30,
-            detail_pct: 60,
-        };
-        let levels = PixelStep::Levels {
-            black_pct: 0,
-            white_pct: 100,
-            gamma_centi: 120,
-        };
-        assert_eq!(peak_bytes(px, &[denoise, levels]), 2 * 4 * px);
-        assert_eq!(peak_bytes(px, &[levels, levels]), 6 * px, "1.5 x once grey");
-        assert_eq!(peak_bytes(px, &[]), 0);
-    }
-
-    /// Criterion 56: a step that does not fit is not run, nor any after it; the steps before it
-    /// are the picture.
-    #[test]
-    fn a_step_over_the_budget_is_not_run_with_those_after_it() {
-        let denoise = PixelStep::Denoise {
-            strength_pct: 40,
-            detail_pct: 50,
-        };
-        let levels = PixelStep::Levels {
-            black_pct: 20,
-            white_pct: 80,
-            gamma_centi: 100,
-        };
-        let px = 64;
-        // Levels first fits in 6 x, a following Denoise on the grey too; Denoise first needs 8 x.
-        let run = AdjustRun::within(&image(), &[levels, denoise], 6 * px);
-        assert_eq!(run.not_run(), None);
-        let run = AdjustRun::within(&image(), &[denoise, levels], 7 * px);
-        assert_eq!(run.not_run(), Some(0));
-        assert_eq!(run.finish(), Adjusted::Unchanged, "nothing ran");
-        let sharpen = PixelStep::Sharpen {
-            radius: SubPx(16),
-            amount_pct: 100,
-            threshold_pct: 0,
-        };
-        let run = AdjustRun::within(&image(), &[levels, sharpen], 5 * px);
-        assert_eq!(run.not_run(), Some(0));
-        let all = AdjustRun::within(&image(), &[levels, sharpen], u64::MAX);
-        assert_eq!(all.not_run(), None);
-        assert_eq!(all.finish(), run_steps(&image(), &[levels, sharpen]));
-    }
-
-    #[test]
-    fn no_step_is_unchanged_and_neutral_levels_give_the_0123_grey() {
-        assert_eq!(run_steps(&image(), &[]), Adjusted::Unchanged);
-        let neutral = PixelStep::Levels {
-            black_pct: 0,
-            white_pct: 100,
-            gamma_centi: 100,
-        };
-        assert_eq!(
-            run_steps(&image(), &[neutral]),
-            Adjusted::Grey(GreyPlane::of_rgba(&image()))
-        );
-    }
-
-    #[test]
-    fn denoise_alone_stays_in_colour_and_before_a_grey_step_runs_per_channel() {
-        let d = PixelStep::Denoise {
-            strength_pct: 0,
-            detail_pct: 50,
-        };
-        let Adjusted::Rgba(out) = run_steps(&image(), &[d]) else {
-            panic!("colour expected");
-        };
-        assert!(out.pixels.as_chunks::<4>().0.iter().all(|p| p[3] == 255));
-        assert_eq!(GreyPlane::of_rgba(&out), GreyPlane::of_rgba(&image()));
-        let neutral = PixelStep::Levels {
-            black_pct: 0,
-            white_pct: 100,
-            gamma_centi: 100,
-        };
-        assert_eq!(
-            run_steps(&image(), &[d, neutral]),
-            Adjusted::Grey(GreyPlane::of_rgba(&image()))
-        );
-    }
-
-    fn noisy(width: u32, height: u32) -> WorkingImage {
-        let mut seed = 7_u32;
-        let pixels = (0..width * height)
-            .flat_map(|i| {
-                seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-                let n = u8::try_from(seed >> 27).unwrap();
-                let g = u8::try_from((i % width) * 200 / width).unwrap() + n;
-                [g, g.wrapping_add(40), g / 2, 255 - n]
-            })
-            .collect();
-        WorkingImage {
-            width,
-            height,
-            pixels,
-            original_size: (width, height),
-            truncated: false,
-            animated: false,
-        }
-    }
-
-    /// Criterion 13: a run worked a few units at a time gives the bytes of the one-shot run,
-    /// for every slice-1 step, in colour and in grey.
-    #[test]
-    fn a_stepped_run_equals_the_one_shot_run() {
-        let image = noisy(41, 29);
-        let denoise = PixelStep::Denoise {
-            strength_pct: 70,
-            detail_pct: 40,
-        };
-        let stacks: [&[PixelStep]; 4] = [
-            &[denoise],
-            &[
-                denoise,
-                PixelStep::Levels {
-                    black_pct: 5,
-                    white_pct: 90,
-                    gamma_centi: 130,
-                },
-                PixelStep::LocalContrast {
-                    radius: SubPx(16 * 6),
-                    amount_pct: 120,
-                },
-                PixelStep::Sharpen {
-                    radius: SubPx(24),
-                    amount_pct: 200,
-                    threshold_pct: 3,
-                },
-            ],
-            &[PixelStep::Contours {
-                sigma: SubPx(20),
-                sensitivity_pct: 60,
-            }],
-            &[
-                PixelStep::Sharpen {
-                    radius: SubPx(40),
-                    amount_pct: 0,
-                    threshold_pct: 0,
-                },
-                denoise,
-            ],
-        ];
-        for steps in stacks {
-            let once = run_steps(&image, steps);
-            for work in [1, 50, 700] {
-                let mut run = AdjustRun::new(&image, steps);
-                let mut calls = 0;
-                while !run.advance(work) {
-                    calls += 1;
-                    assert!(calls < 100_000);
-                }
-                assert!(run.done());
-                if work == 1 {
-                    assert!(calls + 1 >= 29, "at least a call per row: {calls}");
-                }
-                assert_eq!(run.finish(), once, "{steps:?} at {work}");
-            }
-        }
-    }
-}
+#[path = "adjust_run_tests.rs"]
+mod tests;

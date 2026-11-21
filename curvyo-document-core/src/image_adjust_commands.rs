@@ -11,7 +11,7 @@ use crate::image_adjust_codec::{
 use crate::image_adjust_model::{
     AdjustError, AdjustOwner, AdjustmentsWrite, EDIT_ADJUSTMENTS_COMMIT_LABEL, EXPERT_PRESET,
     FOLLOW_ORIGINAL_COMMIT_LABEL, ImageAdjustments, MAX_IMAGE_STRENGTH,
-    RESTORE_ORIGINAL_COMMIT_LABEL, ShownAdjustments,
+    PASTE_ADJUSTMENTS_COMMIT_LABEL, RESTORE_ORIGINAL_COMMIT_LABEL, ShownAdjustments,
 };
 use crate::path_model::NodeId;
 use crate::paths::tree_id_of;
@@ -52,6 +52,29 @@ impl Document {
         target: NodeId,
         write: &AdjustmentsWrite,
     ) -> Result<bool, AdjustError> {
+        self.write_adjustments_as(target, write, EDIT_ADJUSTMENTS_COMMIT_LABEL)
+    }
+
+    /// Paste adjustments (criterion 10): [`Self::edit_image_adjustments`] with `write` holding the
+    /// copied picture's four registers, in one commit "Paste adjustments" (the clone rule of
+    /// criterion 9 applies).
+    ///
+    /// # Errors
+    /// As [`Self::edit_image_adjustments`].
+    pub fn paste_image_adjustments(
+        &self,
+        target: NodeId,
+        write: &AdjustmentsWrite,
+    ) -> Result<bool, AdjustError> {
+        self.write_adjustments_as(target, write, PASTE_ADJUSTMENTS_COMMIT_LABEL)
+    }
+
+    fn write_adjustments_as(
+        &self,
+        target: NodeId,
+        write: &AdjustmentsWrite,
+        label: &str,
+    ) -> Result<bool, AdjustError> {
         if write.strength.is_some_and(|s| s > MAX_IMAGE_STRENGTH) {
             return Err(AdjustError::StrengthOutOfRange);
         }
@@ -63,7 +86,7 @@ impl Document {
             own_copy(&target.meta, source);
         }
         write_adjustments(&target.meta, write);
-        self.commit_with_label(EDIT_ADJUSTMENTS_COMMIT_LABEL);
+        self.commit_with_label(label);
         Ok(true)
     }
 

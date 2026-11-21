@@ -194,6 +194,11 @@ impl Session {
     /// (criterion 20).
     pub(super) fn select_pointer_down(&mut self, point: Point, shift: bool) {
         self.limit_notice = None;
+        // While the Crop bar is open the picture cannot be moved; a press elsewhere leaves the
+        // bar and is an ordinary press (`specs/0135`, `ux-notes.md` §3.9).
+        if self.crop_bar_takes_press(point) {
+            return;
+        }
         // An object press ends a fixture selection: the two never mix (`specs/0102` crit. 8).
         self.clear_fixture_selection();
         self.sync_select_units();

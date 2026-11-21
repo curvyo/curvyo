@@ -139,7 +139,7 @@ impl Session {
         let Some(image) = self.trace_mask_image() else {
             return vec![TracePartClip::Nothing; count];
         };
-        let quad = image.corners();
+        let quad = image.full_corners();
         let areas: Vec<TracePartArea> = (0..count)
             .map(|index| self.trace_part_area(index, quad))
             .collect();

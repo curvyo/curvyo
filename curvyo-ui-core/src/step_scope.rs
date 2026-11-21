@@ -335,6 +335,7 @@ pub const EDIT_STEPS: &[&str] = &[
     // `specs/0135-image-optimisation`: the adjustments are what the picture is.
     "edit_adjustments",
     "restore_original",
+    "paste_adjustments",
     "follow_original",
     "trace_image",
     // `specs/0114-image-trace-mask`: the Trace tool's mask commands, as Create paths.

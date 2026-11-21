@@ -623,7 +623,15 @@ impl DocumentVersion {
 /// not run, a non-bool marker reads false; the laser extension counts them for the check line.
 /// Goldens: `image_adjust_v51.curvyo` and `image_adjust_damaged_v51.curvyo`; the older goldens
 /// stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 51;
+///
+/// Version 52 (`specs/0135-image-optimisation` slice 2, ADR 0072 §3, §6, §8): the stack may hold
+/// the kinds `crop` (`left_pct`, `top_pct`, `width_pct`, `height_pct`; the drawn frame is the
+/// placement's visible part, `image_placement` keeps the whole picture), `resize` (`width_px`),
+/// `channel_mix` (`red_pct`, `green_pct`, `blue_pct`) and `curves` (`in_0`..`in_7`, `out_0`..`out_7`, the pairs present are the points); the cells of
+/// an Image test grid with the Picture source are image nodes tagged `grid_cell`. A build that
+/// stops at 51 would engrave the uncropped picture, so this build's files are refused there by
+/// version; a file of 51 opens unchanged. Golden: `image_adjust_crop_v52.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 52;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

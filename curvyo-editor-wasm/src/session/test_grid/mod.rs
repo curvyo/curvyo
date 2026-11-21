@@ -5,6 +5,9 @@
 mod bar;
 mod canvas;
 mod items;
+mod picture;
+#[cfg(test)]
+mod picture_tests;
 mod place;
 mod prepared;
 #[cfg(test)]

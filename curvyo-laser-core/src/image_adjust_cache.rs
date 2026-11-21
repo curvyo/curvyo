@@ -15,7 +15,7 @@ use curvyo_document_core::{AssetHash, Length, Point};
 use curvyo_image_core::{AdjustRun, Adjusted, Analysis, PixelStep, WorkingImage, peak_bytes};
 
 use crate::image_adjust_fields::ManualStep;
-use crate::image_adjust_resolve::{AdjustRegisters, pixel_steps};
+use crate::image_adjust_resolve::{AdjustRegisters, analysis_after, pixel_steps};
 use crate::image_preset::Preset;
 use crate::job_raster_sample::GreyPyramid;
 
@@ -97,7 +97,8 @@ struct Held {
 
 #[derive(Debug, Default)]
 struct Entries {
-    analyses: HashMap<AssetHash, Arc<Analysis>>,
+    /// By asset and the geometry steps the picture is analysed after (criterion 39).
+    analyses: HashMap<(AssetHash, Vec<ManualStep>), Arc<Analysis>>,
     pictures: HashMap<AdjustKey, Held>,
     /// The adjustments being worked, least recently worked first, with the bytes each holds.
     running: Vec<(AdjustKey, AdjustRun, usize)>,
@@ -202,20 +203,28 @@ impl PyramidCache {
     /// Whether resolving `registers` needs no work: Expert, or the analysis of `asset` is held.
     #[must_use]
     pub fn resolvable(&self, asset: &AssetHash, registers: &AdjustRegisters) -> bool {
-        registers.preset == Preset::Expert || self.entries().analyses.contains_key(asset)
+        registers.preset == Preset::Expert
+            || self
+                .entries()
+                .analyses
+                .contains_key(&(asset.clone(), registers.geometry_steps()))
     }
 
-    /// The picture analysis of `asset` with the working image `image` (criterion 39), computed on
-    /// first use.
+    /// The picture analysis of `asset` with the working image `image` after the geometry steps
+    /// `geometry` (criterion 39), computed on first use.
     #[must_use]
-    pub fn analysis(&self, asset: &AssetHash, image: &WorkingImage) -> Arc<Analysis> {
-        if let Some(held) = self.entries().analyses.get(asset) {
+    pub fn analysis(
+        &self,
+        asset: &AssetHash,
+        image: &WorkingImage,
+        geometry: &[ManualStep],
+    ) -> Arc<Analysis> {
+        let key = (asset.clone(), geometry.to_vec());
+        if let Some(held) = self.entries().analyses.get(&key) {
             return Arc::clone(held);
         }
-        let analysis = Arc::new(Analysis::of(image));
-        self.entries()
-            .analyses
-            .insert(asset.clone(), Arc::clone(&analysis));
+        let analysis = Arc::new(analysis_after(image, geometry));
+        self.entries().analyses.insert(key, Arc::clone(&analysis));
         analysis
     }
 
@@ -230,10 +239,11 @@ impl PyramidCache {
         interval_um: u32,
         level: u32,
     ) -> Resolved {
-        let steps =
-            registers.effective_steps(interval_um, || (*self.analysis(asset, image)).clone());
-        let (width, height) = reduced_size(image, if steps.is_empty() { 0 } else { level });
-        let pixel = pixel_steps(&steps, frame, width, height);
+        let steps = registers.effective_steps(interval_um, |geometry| {
+            (*self.analysis(asset, image, geometry)).clone()
+        });
+        let input = reduced_size(image, if steps.is_empty() { 0 } else { level });
+        let pixel = pixel_steps(&steps, frame, (image.width, image.height), input);
         let level = if pixel.is_empty() { 0 } else { level };
         Resolved {
             steps,
@@ -353,7 +363,9 @@ impl PyramidCache {
     pub fn retain(&mut self, assets: &[&AssetHash]) {
         let assets: HashSet<&AssetHash> = assets.iter().copied().collect();
         let mut entries = self.entries();
-        entries.analyses.retain(|asset, _| assets.contains(asset));
+        entries
+            .analyses
+            .retain(|(asset, _), _| assets.contains(asset));
         entries
             .pictures
             .retain(|key, _| assets.contains(&key.asset));

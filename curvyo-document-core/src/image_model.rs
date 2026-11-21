@@ -6,6 +6,7 @@ use serde::Serialize;
 use crate::affine::Affine;
 use crate::assets::AssetHash;
 use crate::image_adjust_model::ImageAdjustments;
+use crate::image_crop::{UnitRect, visible_rect};
 use crate::path_model::NodeId;
 use crate::style_model::{Opacity, Stroke, Style};
 use crate::units::Point;
@@ -45,6 +46,10 @@ pub struct ImageSnapshot {
     /// The adjustments it shows (ADR 0072 §1, §2): its own registers, or for a clone's leaf those
     /// of the clone's adjustment source.
     pub adjustments: ImageAdjustments,
+    /// Whether `asset` names the drawn look of its adjusted picture (the session's canvas look,
+    /// `specs/0135` criterion 15), which is already cropped; as read it is the imported picture.
+    #[serde(skip)]
+    pub shows_look: bool,
 }
 
 impl ImageSnapshot {
@@ -58,14 +63,38 @@ impl ImageSnapshot {
             style: no_paint(),
             shown_opacity: Opacity::OPAQUE,
             adjustments: ImageAdjustments::default(),
+            shows_look: false,
         }
     }
 
-    /// The four corners of the frame in document millimetres: the picture's top-left, top-right,
-    /// bottom-right and bottom-left.
+    /// The part of the drawn asset that fills the frame of [`Self::corners`], in its unit square:
+    /// the visible part of the imported picture, or the whole of a look (already cropped).
+    #[must_use]
+    pub fn texture_rect(&self) -> UnitRect {
+        if self.shows_look {
+            UnitRect::WHOLE
+        } else {
+            visible_rect(&self.adjustments.steps)
+        }
+    }
+
+    /// The four corners of the drawn frame in document millimetres, top-left, top-right,
+    /// bottom-right and bottom-left: the placement applied to the visible part its Crop steps
+    /// keep (ADR 0072 §3), the whole picture without one. Bounds, hits, handles, the raster grid
+    /// and Cut read it.
     #[must_use]
     pub fn corners(&self) -> [Point; 4] {
-        [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+        visible_rect(&self.adjustments.steps)
+            .corners()
+            .map(|(x, y)| self.placement.apply_point(Point::new(x, y)))
+    }
+
+    /// The four corners of the whole picture's frame (the unit square, ADR 0017 §1), whatever it
+    /// crops: the trace mask's square.
+    #[must_use]
+    pub fn full_corners(&self) -> [Point; 4] {
+        UnitRect::WHOLE
+            .corners()
             .map(|(x, y)| self.placement.apply_point(Point::new(x, y)))
     }
 
