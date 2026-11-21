@@ -55,6 +55,11 @@
   "material": null,
   "materials": [],
   "max_feed_mm_min": 6000,
+  "picture": {
+    "selected_offered": false,
+    "strength_offered": false,
+    "value": "ramp"
+  },
   "rows": {
     "count": 5,
     "max": 6000.0,

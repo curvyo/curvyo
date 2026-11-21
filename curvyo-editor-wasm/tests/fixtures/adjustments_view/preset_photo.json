@@ -1,13 +1,24 @@
 {
-  "add_geometry": [],
+  "add_geometry": [
+    {
+      "kind": "crop",
+      "name": "Add Crop"
+    },
+    {
+      "kind": "resize",
+      "name": "Add Resize"
+    }
+  ],
   "add_tone": [],
   "before_after_open": false,
   "clone_row": null,
+  "crop_bar_row": null,
   "derived": {
     "line": "From preset Photo, Strength 50 %",
     "rows": [
       {
         "accessible_name": "Levels, Black 9 %, White 96 %, Gamma 0.83",
+        "body": null,
         "down": false,
         "enabled": true,
         "fields": [],
@@ -22,6 +33,7 @@
       },
       {
         "accessible_name": "Local contrast, Radius 10.0 mm, Amount 50 %",
+        "body": null,
         "down": false,
         "enabled": true,
         "fields": [],
@@ -36,6 +48,7 @@
       },
       {
         "accessible_name": "Sharpen, Radius 0.10 mm, Amount 120 %, Threshold 0 %",
+        "body": null,
         "down": false,
         "enabled": true,
         "fields": [],
@@ -95,6 +108,7 @@
   },
   "memory_line": null,
   "notice": null,
+  "paste_enabled": false,
   "presets": [
     {
       "cell": "Photo",

@@ -946,9 +946,18 @@ fn by_name(d: &Document, name: &str) -> NodeId {
         .unwrap()
 }
 
+/// A `document.json` saved by this build as the format-51 golden stores it.
+fn as_format_51(json: &[u8]) -> String {
+    String::from_utf8(json.to_vec()).unwrap().replacen(
+        "\"format_version\": 52,",
+        "\"format_version\": 51,",
+        1,
+    )
+}
+
 #[test]
-fn the_format_is_51() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 51);
+fn the_format_is_52() {
+    assert_eq!(CURRENT_FORMAT_VERSION, 52);
 }
 
 #[test]
@@ -1011,9 +1020,10 @@ fn the_golden_saves_back_unchanged_and_twice_the_same() {
         pack(&d, "0.1.0").unwrap(),
         "no adjusted pixel is stored"
     );
+    // Saved by a build of format 52 (slice 2): the same content under its own version.
     assert_eq!(
-        members(&first)["document.json"],
-        members(&bytes)["document.json"]
+        as_format_51(&members(&first)["document.json"]),
+        as_format_51(&members(&bytes)["document.json"])
     );
     assert_eq!(
         members(&first).keys().collect::<Vec<_>>(),
@@ -1076,9 +1086,10 @@ fn the_damaged_golden_opens_and_keeps_every_damaged_value() {
         .unwrap();
     assert_eq!(owner(&d, clone), AdjustOwner::CloneFollowing, "reads false");
     let saved = pack(&d, "0.1.0").unwrap();
+    // Saved by a build of format 52 (slice 2).
     assert_eq!(
-        members(&saved)["document.json"],
-        members(&bytes)["document.json"],
+        as_format_51(&members(&saved)["document.json"]),
+        as_format_51(&members(&bytes)["document.json"]),
         "never repaired on read"
     );
 }
@@ -1096,8 +1107,8 @@ fn a_file_of_the_next_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 52,
-            supported: 51
+            found: 53,
+            supported: 52
         })
     ));
 }

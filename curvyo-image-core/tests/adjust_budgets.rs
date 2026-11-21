@@ -133,6 +133,57 @@ fn each_step_and_the_photo_stack_stay_within_their_budgets() {
 /// The work one tick of the host gives an adjustment (`curvyo-laser-core`'s `ADJUST_WORK`).
 const TICK_WORK: u64 = 12_000_000;
 
+/// Criterion 55, slice 2: Channel mix, Curves, Crop and Resize each 40 ms on 4 Mpx.
+#[test]
+#[ignore = "budget benchmark, run in release"]
+fn the_slice_2_steps_stay_within_their_budgets() {
+    let image = picture();
+    let ms = Duration::from_millis;
+    // Curves after the grey conversion of a Levels step (40 ms of its own).
+    timed("channel mix", ms(40), || {
+        run_steps(
+            &image,
+            &[PixelStep::ChannelMix {
+                weights: [60, 30, 10],
+            }],
+        )
+    });
+    timed("curves", ms(40 + 40), || {
+        run_steps(
+            &image,
+            &grey_then(PixelStep::Curves {
+                points: [
+                    (0, 0),
+                    (25, 15),
+                    (75, 85),
+                    (100, 100),
+                    (0, 0),
+                    (0, 0),
+                    (0, 0),
+                    (0, 0),
+                ],
+                count: 4,
+            }),
+        )
+    });
+    timed("crop", ms(40), || {
+        run_steps(
+            &image,
+            &[PixelStep::Crop {
+                pct: [10, 10, 80, 80],
+            }],
+        )
+    });
+    timed("resize", ms(40), || {
+        run_steps(
+            &image,
+            &[PixelStep::Resize {
+                width_px: image.width / 2,
+            }],
+        )
+    });
+}
+
 /// Criterion 13: the Photo stack worked a tick at a time, no tick over 50 ms.
 #[test]
 #[ignore = "budget benchmark, run in release"]

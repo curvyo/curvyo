@@ -26,6 +26,7 @@
   "material": null,
   "materials": [],
   "max_feed_mm_min": 6000,
+  "picture": null,
   "rows": {
     "count": 5,
     "max": 6000.0,

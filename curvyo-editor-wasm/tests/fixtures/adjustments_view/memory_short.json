@@ -1,6 +1,19 @@
 {
-  "add_geometry": [],
+  "add_geometry": [
+    {
+      "kind": "crop",
+      "name": "Add Crop"
+    },
+    {
+      "kind": "resize",
+      "name": "Add Resize"
+    }
+  ],
   "add_tone": [
+    {
+      "kind": "channel_mix",
+      "name": "Add Channel mix"
+    },
     {
       "kind": "denoise",
       "name": "Add Denoise"
@@ -8,6 +21,10 @@
     {
       "kind": "levels",
       "name": "Add Levels"
+    },
+    {
+      "kind": "curves",
+      "name": "Add Curves"
     },
     {
       "kind": "local_contrast",
@@ -24,6 +41,7 @@
   ],
   "before_after_open": false,
   "clone_row": null,
+  "crop_bar_row": null,
   "derived": null,
   "dither": {
     "dither": "floyd_steinberg",
@@ -70,6 +88,7 @@
   },
   "memory_line": "The adjustments of this picture need more memory than is free. Its steps were not run.",
   "notice": null,
+  "paste_enabled": false,
   "presets": [
     {
       "cell": "Photo",
@@ -126,6 +145,7 @@
   "steps": [
     {
       "accessible_name": "Levels, Black 0 %, White 100 %, Gamma 1.00",
+      "body": null,
       "down": true,
       "enabled": true,
       "fields": [
@@ -422,6 +442,7 @@
     },
     {
       "accessible_name": "Sharpen, Radius 0.10 mm, Amount 100 %, Threshold 0 %",
+      "body": null,
       "down": false,
       "enabled": true,
       "fields": [

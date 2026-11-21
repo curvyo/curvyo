@@ -153,7 +153,16 @@ fn adjustments_states() -> Vec<(&'static str, Session)> {
     assert!(short.add_adjust_step("sharpen"));
     short.adjust_pictures().set_run_bytes(5 * 800);
     let _ = short.laser_job();
+    // Slice 2: one row of each new kind with its body, and Paste enabled after a Copy.
+    let (mut slice2, _) = engraved(1);
+    for kind in ["crop", "resize", "channel_mix", "curves"] {
+        assert!(slice2.add_adjust_step(kind));
+    }
+    assert!(slice2.add_adjust_curve_point(3, 40, 25));
+    assert!(slice2.set_adjust_channel_preset(2, 1));
+    assert!(slice2.copy_adjustments());
     vec![
+        ("slice2_steps", slice2),
         ("no_image", none),
         ("memory_short", short),
         ("preset_photo", photo),
@@ -220,6 +229,8 @@ fn the_states_are_what_they_are_named() {
     assert!(view("no_image").is_null());
     assert!(view("preset_photo")["derived"].is_object());
     assert_eq!(view("expert_steps")["steps"].as_array().unwrap().len(), 2);
+    assert_eq!(view("slice2_steps")["steps"].as_array().unwrap().len(), 4);
+    assert_eq!(view("slice2_steps")["paste_enabled"], true);
     assert_eq!(view("clone_original")["clone_row"], "original");
     assert_eq!(view("clone_own")["clone_row"], "own");
     assert!(

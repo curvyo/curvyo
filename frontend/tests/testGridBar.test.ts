@@ -150,3 +150,19 @@ test("an Image grid reads its Dither strip of six modes; Engrave and Cut have no
   grey.dither.modes.push({ value: "grey", label: "Grey" });
   assert.equal(decodeTestGridText(JSON.stringify(grey)), null, "Grey is no grid mode");
 });
+
+test("specs/0135 criterion 51: an Image grid reads its Picture segments; other kinds have none", () => {
+  const image = decodeTestGridText(raw("image_ordered"));
+  assert.deepEqual(image?.picture, { value: "ramp", selectedOffered: false, strengthOffered: false });
+  assert.equal(decodeTestGridText(raw("engrave_crosshatch"))?.picture, null);
+  const selected = parsed("image_ordered") as Record<string, unknown>;
+  selected.picture = { value: "selected", selected_offered: true, strength_offered: true };
+  selected.dither = null;
+  assert.equal(decodeTestGridText(JSON.stringify(selected))?.picture?.value, "selected");
+  const strength = parsed("image_ordered") as { columns: { param: string; offered: string[] } };
+  strength.columns.param = "strength";
+  strength.columns.offered.push("strength");
+  assert.equal(decodeTestGridText(JSON.stringify(strength))?.columns.param, "strength");
+  selected.picture = { value: "photo", selected_offered: true, strength_offered: true };
+  assert.equal(decodeTestGridText(JSON.stringify(selected)), null, "an unknown source is refused");
+});

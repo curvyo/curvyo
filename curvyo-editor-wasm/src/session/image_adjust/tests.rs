@@ -12,7 +12,7 @@ use curvyo_laser_core::job::MoveKind;
 use crate::session::Session;
 
 /// A `width` x `height` ramp, light to dark.
-pub(super) fn ramp_png(width: u32, height: u32) -> Vec<u8> {
+pub(in crate::session) fn ramp_png(width: u32, height: u32) -> Vec<u8> {
     let mut pixels = Vec::new();
     for y in 0..height {
         for x in 0..width {
@@ -31,13 +31,13 @@ pub(super) fn ramp_png(width: u32, height: u32) -> Vec<u8> {
     .unwrap()
 }
 
-fn laser_page() -> Session {
+pub(super) fn laser_page() -> Session {
     let mut s = Session::new(290_135);
     s.add_page_of_kind("curvyo.laser", None).unwrap();
     s
 }
 
-fn place(s: &Session, w: f64, h: f64) -> NodeId {
+pub(super) fn place(s: &Session, w: f64, h: f64) -> NodeId {
     let origin = s.active_manufacturing().unwrap().page.unwrap().origin;
     s.document
         .add_images(&[NewImage {
@@ -48,7 +48,7 @@ fn place(s: &Session, w: f64, h: f64) -> NodeId {
         .unwrap()[0]
 }
 
-fn image_op(s: &mut Session, items: &[NodeId], interval: f64) -> NodeId {
+pub(super) fn image_op(s: &mut Session, items: &[NodeId], interval: f64) -> NodeId {
     s.selection.set(items);
     let id = s.press_operation_kind("image", true).unwrap();
     s.selection.set(&[]);
@@ -60,7 +60,7 @@ fn image_op(s: &mut Session, items: &[NodeId], interval: f64) -> NodeId {
 }
 
 /// The burned dots of the job, per sweep, as one list.
-fn dots(s: &Session) -> Vec<Vec<u8>> {
+pub(super) fn dots(s: &Session) -> Vec<Vec<u8>> {
     let job = s.laser_job().unwrap();
     job.built
         .job
@@ -74,11 +74,11 @@ fn dots(s: &Session) -> Vec<Vec<u8>> {
         .collect()
 }
 
-fn undo_label(s: &mut Session) -> String {
+pub(super) fn undo_label(s: &mut Session) -> String {
     s.history_target_name(Direction::Undo).unwrap_or_default()
 }
 
-fn engraved() -> (Session, NodeId, NodeId) {
+pub(super) fn engraved() -> (Session, NodeId, NodeId) {
     let mut s = laser_page();
     let image = place(&s, 8.0, 4.0);
     let op = image_op(&mut s, &[image], 0.1);
@@ -99,8 +99,10 @@ fn c1_a_new_picture_shows_expert_and_an_empty_stack() {
     assert_eq!(view.presets[0].tooltip, "Photo (detailed) · Dither: Jarvis");
     assert_eq!(view.presets[4].cell, "Dots");
     assert!(view.strength.is_none() && view.derived.is_none());
-    assert_eq!(view.add_tone.len(), 5);
-    assert_eq!(view.add_tone[1].name, "Add Levels");
+    // Slice 2: seven tone and detail kinds, Crop and Resize in row 2.
+    assert_eq!(view.add_tone.len(), 7);
+    assert_eq!(view.add_tone[2].name, "Add Levels");
+    assert_eq!(view.add_geometry.len(), 2);
     assert!(!view.restore_enabled);
     assert_eq!(view.state_line.as_deref(), Some("Not engraved yet"));
     assert_eq!(view.clone_row, None);
@@ -173,7 +175,7 @@ fn c2_manual_rows_edit_in_place_and_show_preset_in_use() {
     assert!(!rows[0].up && rows[0].down);
     assert_eq!(
         s.edit_adjust_field(1, "amount_pct", 501.0),
-        Err("Amount is 0 to 500 %.")
+        Err("Amount is 0 to 500 %.".to_owned())
     );
     assert_eq!(s.edit_adjust_field(1, "amount_pct", 150.0), Ok(true));
     assert!(s.set_adjust_step_enabled(0, false));
@@ -616,7 +618,7 @@ fn c15_the_canvas_shows_the_adjusted_picture() {
 }
 
 /// An image placed on the first page, 8 x 4 mm.
-fn place_on_page(s: &Session) -> NodeId {
+pub(super) fn place_on_page(s: &Session) -> NodeId {
     s.document
         .add_images(&[NewImage {
             bytes: Arc::from(ramp_png(40, 20).as_slice()),

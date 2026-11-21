@@ -38,6 +38,7 @@ fn cell(column: u8, row: u8) -> NewGridCell {
         },
         style: Style::default(),
         tag: map(json!({"column": column, "row": row})),
+        image: None,
     }
 }
 
