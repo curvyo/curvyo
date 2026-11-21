@@ -1,6 +1,6 @@
 # Bed size from the controller: take the work area from the connected GRBL machine
 
-Status: Draft
+Status: Done (PR #443)
 Priority: Could
 Origin: Customer, first laser test, 2026-11-18. Translated: "It would be practical to take the bed size from the laser cutter when we get it." The laser reports 400 x 850 mm; the profile of the test said 400 x 300.
 
@@ -33,7 +33,7 @@ Frage 256 (BED-TARGET): What does the press change? **Decided A by the customer 
 ## Acceptance criteria (Fragen 255 B and 256 A, decided)
 
 1. Given a paired connector whose controller reports `$130=400.0`, `$131=850.0` and a copy with 400 x 300, then the Machine block shows "Machine reports 400 x 850 mm" and **Use machine size**; given a copy of equal size (tolerance 0.01 mm) the line is absent; given no connector, no controller or no reported travel, it is absent.
-2. Given the press, then the copy's work area and the output page become 400 x 850 mm in one undo step with the page behaviour of `0093` criterion 3 (content keeps its place from the page's top-left corner), and the library profile takes the new work area; the line goes away. For the built-in profile only the copy changes and "Differs from profile" shows as for any edit.
+2. Given the press, then the copy's work area and the output page become 400 x 850 mm in one undo step with the page behaviour of ADR 0042 section 4 (the page resizes about the origin corner), and the library profile takes the new work area; the line goes away. For the built-in profile only the copy changes and "Differs from profile" shows as for any edit.
 3. Given a reported value outside 1 to 10,000 mm or not finite, then no offer is shown.
 4. Given a reconnect to the same machine after the maker edited the work area by hand, then the offer returns (no refusal memory).
 5. Given the browser build, the line is absent. Given a second paired app, each shows its own offer.
