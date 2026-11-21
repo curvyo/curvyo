@@ -1100,9 +1100,9 @@ fn covers(tris: &[Vertex], p: Point, r: f64) -> bool {
 fn old_0110_spiro_document_opens_and_draws_through_its_controls() {
     // Superseded by 0135 slice 1 (2026-11-19): 51 is 0135.
     assert_eq!(
-        CURRENT_FORMAT_VERSION, 51,
+        CURRENT_FORMAT_VERSION, 52,
         "no format bump in 0115 (46 is 0112, 47 is 0113, 48 is 0029, 49 is 0124, 50 is 0123, \
-         51 is 0135)"
+         51 and 52 are 0135)"
     );
     let (doc, paths) = old_spiro_doc();
     let bytes = pack(&doc, "old").unwrap();

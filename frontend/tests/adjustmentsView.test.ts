@@ -10,6 +10,7 @@ import { decodeAdjustmentsText, decodeAdjustmentsView, PRESET_KEYS } from "../sr
 import { decodeBeforeAfterText, decodeBeforeAfterView } from "../src/lib/beforeAfterView.ts";
 import { breakEveryField } from "./contractWalk.ts";
 import { barsPath, levelsMarks } from "../src/lib/levelsGraph.ts";
+import { curvePath } from "../src/lib/curvePath.ts";
 
 const ROOT = new URL("../../curvyo-editor-wasm/tests/fixtures/", import.meta.url);
 
@@ -39,11 +40,34 @@ test("the Rust states decode, and nothing else is in the folders", () => {
     "memory_short",
     "no_image",
     "preset_photo",
+    "slice2_steps",
     "unknown_step",
   ]);
   assert.deepEqual(names("before_after_view"), ["no_image", "open_two_operations"]);
   for (const name of names("adjustments_view").filter((n) => n !== "no_image")) adjustments(name);
   for (const name of names("before_after_view")) assert.ok(decodeBeforeAfterText(raw("before_after_view", name)), name);
+});
+
+test("slice 2, criteria 5, 10: Crop, Resize, Channel mix and Curves rows with their bodies; Paste after a Copy", () => {
+  const view = adjustments("slice2_steps");
+  assert.deepEqual(view.steps.map((r) => r.kind), ["crop", "resize", "channel_mix", "curves"]);
+  assert.deepEqual(view.addGeometry.map((b) => b.kind), ["crop", "resize"]);
+  assert.equal(view.addTone.length, 7);
+  assert.equal(view.pasteEnabled, true);
+  assert.equal(view.steps[0].body, null);
+  assert.deepEqual(view.steps[1].body, { kind: "resize", heightPx: 20, line: "Working image 40 × 20 px" });
+  const mix = view.steps[2].body;
+  assert.ok(mix && mix.kind === "channel_mix");
+  assert.deepEqual(mix.presets.map((p) => p.pressed), [false, true, false, false]);
+  assert.deepEqual(view.steps[3].body, { kind: "curve", points: [[0, 0], [40, 25], [100, 100]] });
+  assert.equal(adjustments("expert_steps").pasteEnabled, false);
+});
+
+test("the Curves path starts and ends at the end points and stays inside the graph", () => {
+  const path = curvePath([[0, 0], [40, 25], [100, 100]]);
+  assert.ok(path.startsWith("M0.0 120.0"));
+  assert.ok(path.endsWith("120.0 0.0"));
+  assert.equal(curvePath([[0, 0]]), "");
 });
 
 test("no picture selected: the group is absent", () => {
@@ -88,7 +112,16 @@ test("criteria 1, 2: Expert lists the manual rows with their fields; an off row 
   ]);
   assert.ok(view.steps[0].fields.some((f) => f.key === "black_pct" && f.unit === "%"));
   assert.match(view.steps[1].line, /^Off/);
-  assert.deepEqual(view.addTone.map((b) => b.kind), ["denoise", "levels", "local_contrast", "contours", "sharpen"]);
+  // Slice 2: Channel mix and Curves join the tone row.
+  assert.deepEqual(view.addTone.map((b) => b.kind), [
+    "channel_mix",
+    "denoise",
+    "levels",
+    "curves",
+    "local_contrast",
+    "contours",
+    "sharpen",
+  ]);
 });
 
 test("criterion 16: a Levels row carries 256 bars of its input, other rows none", () => {

@@ -81,6 +81,16 @@ test("criterion 3: a drag lands inside the source row's band only", () => {
   assert.equal(bandBreak(rows, 1), false);
 });
 
+test("criterion 3: Crop and Resize are band A, split from the tone rows by a hairline", () => {
+  const rows = [row("crop"), row("crop"), row("resize"), row("channel_mix"), row("curves")];
+  assert.equal(bandBreak(rows, 1), false, "two Crop rows share band A");
+  assert.equal(bandBreak(rows, 2), false, "Crop and Resize share band A");
+  assert.equal(bandBreak(rows, 3), true, "a hairline above the first tone row");
+  assert.deepEqual(dropSlots(rows, 0), { first: 0, last: 2 }, "a Crop passes only Crops");
+  assert.deepEqual(dropSlots(rows, 2), { first: 2, last: 3 }, "Resize stays in its place");
+  assert.deepEqual(dropSlots(rows, 4), { first: 3, last: 5 }, "a tone row never lands in band A");
+});
+
 test("the open rows follow a move, a remove and an add", () => {
   assert.deepEqual([...openAfterMove(new Set([1]), 1, 2)], [2]);
   assert.deepEqual([...openAfterMove(new Set([2]), 1, 2)].sort(), [1]);

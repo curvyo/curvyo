@@ -468,6 +468,11 @@ fn kind_key(s: &ManualStep) -> &'static str {
         ManualStep::LocalContrast { .. } => "local_contrast",
         ManualStep::Contours { .. } => "contours",
         ManualStep::Sharpen { .. } => "sharpen",
+        // Slice 2 kinds; no preset derives them.
+        ManualStep::Crop { .. } => "crop",
+        ManualStep::Resize { .. } => "resize",
+        ManualStep::ChannelMix { .. } => "channel_mix",
+        ManualStep::Curves { .. } => "curves",
     }
 }
 
@@ -479,6 +484,11 @@ fn c3_derived_steps_are_in_pipeline_order() {
         ManualStep::LocalContrast { .. } => 2,
         ManualStep::Contours { .. } => 3,
         ManualStep::Sharpen { .. } => 4,
+        // Slice 2 kinds; no preset derives them.
+        ManualStep::Crop { .. }
+        | ManualStep::Resize { .. }
+        | ManualStep::ChannelMix { .. }
+        | ManualStep::Curves { .. } => 5,
     };
     for preset in PRESETS {
         for (_, a) in analyses() {

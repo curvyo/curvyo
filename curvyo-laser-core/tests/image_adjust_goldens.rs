@@ -87,7 +87,13 @@ fn the_golden_reads_every_register_of_every_picture() {
         .collect();
     assert_eq!(
         kinds,
-        StepKind::ALL,
+        [
+            StepKind::Denoise,
+            StepKind::Levels,
+            StepKind::LocalContrast,
+            StepKind::Contours,
+            StepKind::Sharpen
+        ],
         "every slice-1 kind, in pipeline order"
     );
     assert!(!manual.steps[4].enabled, "Sharpen is switched off");
@@ -141,8 +147,8 @@ fn a_picture_in_two_operations_derives_its_steps_at_each_interval() {
         "the picture holds the dither the operation held"
     );
     let analysis = Analysis::of(&ramp());
-    let fine = photo.effective_steps(100, || analysis.clone());
-    let wide = photo.effective_steps(200, || analysis.clone());
+    let fine = photo.effective_steps(100, |_| analysis.clone());
+    let wide = photo.effective_steps(200, |_| analysis.clone());
     assert_eq!(fine.len(), wide.len());
     for (a, b) in fine.iter().zip(&wide) {
         assert_eq!(a.kind(), b.kind());
@@ -170,7 +176,7 @@ fn the_damaged_golden_counts_each_reason() {
     assert_eq!(entries.steps.len(), 7);
     assert_eq!(entries.broken_steps(), 6);
     assert_eq!(
-        entries.effective_steps(100, || unreachable!()),
+        entries.effective_steps(100, |_| unreachable!()),
         vec![ManualStep::Levels {
             black_pct: 3,
             white_pct: 97,

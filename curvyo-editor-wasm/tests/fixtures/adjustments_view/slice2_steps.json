@@ -1,0 +1,368 @@
+{
+  "add_geometry": [
+    {
+      "kind": "crop",
+      "name": "Add Crop"
+    },
+    {
+      "kind": "resize",
+      "name": "Add Resize"
+    }
+  ],
+  "add_tone": [
+    {
+      "kind": "channel_mix",
+      "name": "Add Channel mix"
+    },
+    {
+      "kind": "denoise",
+      "name": "Add Denoise"
+    },
+    {
+      "kind": "levels",
+      "name": "Add Levels"
+    },
+    {
+      "kind": "curves",
+      "name": "Add Curves"
+    },
+    {
+      "kind": "local_contrast",
+      "name": "Add Local contrast"
+    },
+    {
+      "kind": "contours",
+      "name": "Add Contours"
+    },
+    {
+      "kind": "sharpen",
+      "name": "Add Sharpen"
+    }
+  ],
+  "before_after_open": false,
+  "clone_row": null,
+  "crop_bar_row": 0,
+  "derived": null,
+  "dither": {
+    "dither": "floyd_steinberg",
+    "mode_field": null,
+    "modes": [
+      {
+        "label": "Threshold",
+        "value": "threshold"
+      },
+      {
+        "label": "Ordered",
+        "value": "ordered"
+      },
+      {
+        "label": "Floyd-Steinberg",
+        "value": "floyd_steinberg"
+      },
+      {
+        "label": "Jarvis",
+        "value": "jarvis"
+      },
+      {
+        "label": "Atkinson",
+        "value": "atkinson"
+      },
+      {
+        "label": "Stucki",
+        "value": "stucki"
+      },
+      {
+        "label": "Grey",
+        "value": "grey"
+      },
+      {
+        "label": "Halftone dots",
+        "value": "halftone"
+      },
+      {
+        "label": "Line screen",
+        "value": "line_screen"
+      }
+    ],
+    "screen_fields": []
+  },
+  "memory_line": null,
+  "notice": null,
+  "paste_enabled": true,
+  "presets": [
+    {
+      "cell": "Photo",
+      "key": "photo",
+      "name": "Photo (detailed)",
+      "pressed": false,
+      "tooltip": "Photo (detailed) · Dither: Jarvis"
+    },
+    {
+      "cell": "Graphics",
+      "key": "graphics",
+      "name": "Graphics (flat areas)",
+      "pressed": false,
+      "tooltip": "Graphics (flat areas) · Dither: Ordered"
+    },
+    {
+      "cell": "Black and white",
+      "key": "black_white",
+      "name": "Black and white (hard edges)",
+      "pressed": false,
+      "tooltip": "Black and white (hard edges) · Dither: Threshold 50 %"
+    },
+    {
+      "cell": "Line art",
+      "key": "line_art",
+      "name": "Line art (outlines and handwriting)",
+      "pressed": false,
+      "tooltip": "Line art (outlines and handwriting) · Dither: Threshold 50 %"
+    },
+    {
+      "cell": "Dots",
+      "key": "dot_raster",
+      "name": "Dot raster (round dots)",
+      "pressed": false,
+      "tooltip": "Dot raster (round dots) · Dither: Halftone"
+    },
+    {
+      "cell": "Newspaper",
+      "key": "newspaper",
+      "name": "Newspaper (retro screen)",
+      "pressed": false,
+      "tooltip": "Newspaper (retro screen) · Dither: Lines"
+    },
+    {
+      "cell": "Expert",
+      "key": "expert",
+      "name": "Expert",
+      "pressed": true,
+      "tooltip": "Expert · Dither unchanged"
+    }
+  ],
+  "restore_enabled": true,
+  "state_line": null,
+  "steps": [
+    {
+      "accessible_name": "Crop, Left 0 %, Top 0 %, Width 100 %, Height 100 %",
+      "body": null,
+      "down": false,
+      "enabled": true,
+      "fields": [
+        {
+          "decimals": 0,
+          "key": "left_pct",
+          "label": "Left",
+          "range": "Left is 0 to 0 %.",
+          "unit": "%",
+          "value": 0.0
+        },
+        {
+          "decimals": 0,
+          "key": "top_pct",
+          "label": "Top",
+          "range": "Top is 0 to 0 %.",
+          "unit": "%",
+          "value": 0.0
+        },
+        {
+          "decimals": 0,
+          "key": "width_pct",
+          "label": "Width",
+          "range": "Width is 1 to 100 %.",
+          "unit": "%",
+          "value": 100.0
+        },
+        {
+          "decimals": 0,
+          "key": "height_pct",
+          "label": "Height",
+          "range": "Height is 1 to 100 %.",
+          "unit": "%",
+          "value": 100.0
+        }
+      ],
+      "histogram": null,
+      "index": 0,
+      "kind": "crop",
+      "line": "Left 0 %, Top 0 %, Width 100 %, Height 100 %",
+      "name": "Crop",
+      "preset_in_use": false,
+      "unknown": false,
+      "up": false
+    },
+    {
+      "accessible_name": "Resize, Width 40 px",
+      "body": {
+        "height_px": 20,
+        "kind": "resize",
+        "line": "Working image 40 × 20 px"
+      },
+      "down": false,
+      "enabled": true,
+      "fields": [
+        {
+          "decimals": 0,
+          "key": "width_px",
+          "label": "Width",
+          "range": "Width is 16 to 40 px.",
+          "unit": "px",
+          "value": 40.0
+        }
+      ],
+      "histogram": null,
+      "index": 1,
+      "kind": "resize",
+      "line": "Width 40 px",
+      "name": "Resize",
+      "preset_in_use": false,
+      "unknown": false,
+      "up": false
+    },
+    {
+      "accessible_name": "Channel mix, Red 100 %, Green 0 %, Blue 0 %",
+      "body": {
+        "kind": "channel_mix",
+        "presets": [
+          {
+            "cell": "Luminance",
+            "name": "Luminance",
+            "pressed": false
+          },
+          {
+            "cell": "Red",
+            "name": "Red filter",
+            "pressed": true
+          },
+          {
+            "cell": "Green",
+            "name": "Green filter",
+            "pressed": false
+          },
+          {
+            "cell": "Blue",
+            "name": "Blue filter",
+            "pressed": false
+          }
+        ]
+      },
+      "down": true,
+      "enabled": true,
+      "fields": [
+        {
+          "decimals": 0,
+          "key": "red_pct",
+          "label": "Red",
+          "range": "Red is -200 to 200 %.",
+          "unit": "%",
+          "value": 100.0
+        },
+        {
+          "decimals": 0,
+          "key": "green_pct",
+          "label": "Green",
+          "range": "Green is -200 to 200 %.",
+          "unit": "%",
+          "value": 0.0
+        },
+        {
+          "decimals": 0,
+          "key": "blue_pct",
+          "label": "Blue",
+          "range": "Blue is -200 to 200 %.",
+          "unit": "%",
+          "value": 0.0
+        }
+      ],
+      "histogram": null,
+      "index": 2,
+      "kind": "channel_mix",
+      "line": "Red 100 %, Green 0 %, Blue 0 %",
+      "name": "Channel mix",
+      "preset_in_use": false,
+      "unknown": false,
+      "up": false
+    },
+    {
+      "accessible_name": "Curves, In 0 %, Out 0 %, In 40 %, Out 25 %, In 100 %, Out 100 %",
+      "body": {
+        "kind": "curve",
+        "points": [
+          [
+            0,
+            0
+          ],
+          [
+            40,
+            25
+          ],
+          [
+            100,
+            100
+          ]
+        ]
+      },
+      "down": false,
+      "enabled": true,
+      "fields": [
+        {
+          "decimals": 0,
+          "key": "in_0",
+          "label": "In",
+          "range": "Points are 0 to 100 %.",
+          "unit": "%",
+          "value": 0.0
+        },
+        {
+          "decimals": 0,
+          "key": "out_0",
+          "label": "Out",
+          "range": "Points are 0 to 100 %.",
+          "unit": "%",
+          "value": 0.0
+        },
+        {
+          "decimals": 0,
+          "key": "in_1",
+          "label": "In",
+          "range": "Points are 0 to 100 %.",
+          "unit": "%",
+          "value": 40.0
+        },
+        {
+          "decimals": 0,
+          "key": "out_1",
+          "label": "Out",
+          "range": "Points are 0 to 100 %.",
+          "unit": "%",
+          "value": 25.0
+        },
+        {
+          "decimals": 0,
+          "key": "in_2",
+          "label": "In",
+          "range": "Points are 0 to 100 %.",
+          "unit": "%",
+          "value": 100.0
+        },
+        {
+          "decimals": 0,
+          "key": "out_2",
+          "label": "Out",
+          "range": "Points are 0 to 100 %.",
+          "unit": "%",
+          "value": 100.0
+        }
+      ],
+      "histogram": null,
+      "index": 3,
+      "kind": "curves",
+      "line": "In 0 %, Out 0 %, In 40 %, Out 25 %, In 100 %, Out 100 %",
+      "name": "Curves",
+      "preset_in_use": false,
+      "unknown": false,
+      "up": true
+    }
+  ],
+  "strength": null
+}

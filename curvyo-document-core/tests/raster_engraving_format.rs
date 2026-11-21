@@ -241,6 +241,7 @@ fn place_image_grid(d: &Document, mfg: NodeId) -> NodeId {
                 },
                 style: gradient_style(),
                 tag: map(json!({"column": column, "row": row})),
+                image: None,
             });
             let interval = [0.05, 0.1][usize::from(column)];
             let power = [20.0, 100.0][usize::from(row)];
@@ -359,7 +360,7 @@ fn damaged_bytes() -> Vec<u8> {
 /// `document.json` with the format number of a newer build put back to 50.
 fn as_format_50(json: &[u8]) -> String {
     String::from_utf8(json.to_vec()).unwrap().replacen(
-        "\"format_version\": 51,",
+        "\"format_version\": 52,",
         "\"format_version\": 50,",
         1,
     )
@@ -372,7 +373,7 @@ fn row(d: &Document, at: usize) -> curvyo_document_core::OperationSnapshot {
 #[test]
 fn the_format_is_50() {
     // Superseded by 0135 slice 1 (2026-11-19): format 51.
-    assert_eq!(CURRENT_FORMAT_VERSION, 51);
+    assert_eq!(CURRENT_FORMAT_VERSION, 52);
 }
 
 #[test]
@@ -503,8 +504,8 @@ fn a_file_of_the_next_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 52,
-            supported: 51
+            found: 53,
+            supported: 52
         })
     ));
 }

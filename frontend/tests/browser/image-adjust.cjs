@@ -111,7 +111,7 @@ async function waitFor(url) {
     assert.ok(tops[0] === tops[2] && tops[3] === tops[6] && tops[2] < tops[3], `two fixed rows ${tops}`);
     assert.equal(await group().getByRole('slider', { name: 'Strength' }).count(), 0, 'no Strength with Expert');
     assert.equal(await group().getByRole('button', { name: 'Restore original' }).getAttribute('aria-disabled'), 'true', 'greyed, not hidden');
-    assert.equal(await group().getByRole('toolbar', { name: 'Add adjustment' }).getByRole('button').count(), 5);
+    assert.equal(await group().getByRole('toolbar', { name: 'Add adjustment' }).getByRole('button').count(), 9, 'slice 2: seven tone kinds and Crop, Resize');
 
     // Every preset changes the dots (canvas) and the pane's After.
     const lookAt = async () => p.screenshot({ clip: { x: 520, y: 470, width: 110, height: 90 } }).then((b) => require('node:crypto').createHash('md5').update(b).digest('hex'));

@@ -39,6 +39,10 @@ const GOLDENS: &[(&str, &[u8])] = goldens![
     "local_contrast_clahe",
     "denoise_bilateral",
     "contours_dog",
+    "curves_s",
+    "channel_mix_red_filter",
+    "crop_20pct",
+    "resize_half",
 ];
 
 /// Writes `image` as the golden `name` when `CURVYO_UPDATE_GOLDEN` is set (native only).
@@ -185,6 +189,61 @@ fn contours_dog() {
         &[PixelStep::Contours {
             sigma: SubPx(16),
             sensitivity_pct: 60,
+        }],
+    );
+}
+
+#[test]
+fn curves_s() {
+    golden(
+        "curves_s",
+        "photo",
+        &[PixelStep::Curves {
+            points: [
+                (0, 0),
+                (25, 15),
+                (75, 85),
+                (100, 100),
+                (0, 0),
+                (0, 0),
+                (0, 0),
+                (0, 0),
+            ],
+            count: 4,
+        }],
+    );
+}
+
+#[test]
+fn channel_mix_red_filter() {
+    golden(
+        "channel_mix_red_filter",
+        "photo",
+        &[PixelStep::ChannelMix {
+            weights: [100, 0, 0],
+        }],
+    );
+}
+
+#[test]
+fn crop_20pct() {
+    golden(
+        "crop_20pct",
+        "photo",
+        &[PixelStep::Crop {
+            pct: [20, 20, 60, 60],
+        }],
+    );
+}
+
+#[test]
+fn resize_half() {
+    let photo = picture("photo");
+    golden(
+        "resize_half",
+        "photo",
+        &[PixelStep::Resize {
+            width_px: photo.width / 2,
         }],
     );
 }
