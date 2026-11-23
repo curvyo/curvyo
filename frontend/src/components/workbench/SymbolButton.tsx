@@ -5,6 +5,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { GLYPH, ICON_BUTTON } from "@/components/workbench/machineStyles";
 
 const OFF = "aria-disabled:opacity-40 aria-disabled:hover:bg-transparent";
+/** The pressed look of a toggle, as the Link corners toggle has it. */
+const ACTIVE = "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:bg-[var(--toolbar-icon-active-bg)]";
 
 interface SymbolButtonProps {
   name: string;
@@ -16,6 +18,8 @@ interface SymbolButtonProps {
   side?: "left" | "top";
   tabIndex?: number;
   buttonRef?: (node: HTMLButtonElement | null) => void;
+  /** A toggle that opens a region: `aria-expanded`, `aria-controls` and the pressed look. */
+  toggle?: { expanded: boolean; controls: string };
   onFocus?: () => void;
   onKeyDown?: (event: KeyboardEvent) => void;
   onPress: () => void;
@@ -34,6 +38,7 @@ export function SymbolButton({
   side = "left",
   tabIndex,
   buttonRef,
+  toggle,
   onFocus,
   onKeyDown,
   onPress,
@@ -58,9 +63,11 @@ export function SymbolButton({
           aria-label={name}
           aria-disabled={!enabled}
           aria-busy={busy || undefined}
+          aria-expanded={toggle?.expanded}
+          aria-controls={toggle?.expanded ? toggle.controls : undefined}
           aria-describedby={cause === null ? describedBy : causeId}
           tabIndex={tabIndex}
-          className={`${ICON_BUTTON} ${OFF}`}
+          className={`${ICON_BUTTON} ${OFF} ${toggle?.expanded ? ACTIVE : ""}`}
           onFocus={onFocus}
           onKeyDown={onKeyDown}
           onClick={() => {

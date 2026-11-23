@@ -16,6 +16,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod connector;
+mod connector_jog;
 mod connector_link;
 mod connector_send;
 mod connector_start;
@@ -132,6 +133,9 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         connector::connector_forget,
         connector::connector_send_job,
         connector::connector_command,
+        connector_jog::connector_jog_hold,
+        connector_jog::connector_jog_keep,
+        connector_jog::connector_jog_release,
         connector::connector_list_command,
         connector::connector_watch,
         connector::connector_unwatch,

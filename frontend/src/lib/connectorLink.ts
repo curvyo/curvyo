@@ -184,8 +184,12 @@ export function discardedName(
 ): string | null {
   const waited = last?.state.name === "AwaitingLocalStart" && Boolean(last.requested_by);
   const mine = session?.role === "Member" && last?.requested_by === session.clientName;
-  if (!waited || !mine || ownStop || next.state.name !== "Idle") return null;
-  return last?.job_name ?? "the job";
+  // A waiting Home carries no job; thrown away it leaves a kept Ready job where it was
+  // (`specs/0118` 37, UX notes W25).
+  const home = last?.job === null;
+  const ended = next.state.name === "Idle" || (home && next.state.name === "Ready");
+  if (!waited || !mine || ownStop || !ended) return null;
+  return home ? "Home" : (last?.job_name ?? "the job");
 }
 
 /** Whether the name of a send in progress stays: while its job arrives, and while it waits behind

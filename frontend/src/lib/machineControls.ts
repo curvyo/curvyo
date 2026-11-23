@@ -7,6 +7,7 @@ import {
   type Line,
   type StatusMessage,
   clearsRefusal,
+  confirmsHome,
   controllerWord,
   errorLine,
   PAUSE_PENDING_TEXT,
@@ -19,11 +20,13 @@ import {
 } from "./connectorText.ts";
 import { withName } from "./sendLine.ts";
 
-/** What Home shows: whether a press does something, the busy look, and the tooltip's second line. */
+/** What Home shows: whether a press does something, the busy look, and the tooltip's second line.
+ * `name` is "Confirm home" while a member's Home waits for this owner app (`specs/0118` 37, W27). */
 export interface HomeButton {
   enabled: boolean;
   busy: boolean;
   cause: string | null;
+  name?: "Home" | "Confirm home";
 }
 
 /** GRBL's states in which the connector refuses Home outside Alarm (`specs/0127` G4, `0118` M3). */
@@ -36,7 +39,13 @@ export function homeButton(entry: LinkEntry): HomeButton {
   if (entry.busy === "home" || status?.state.name === "Homing") {
     return { enabled: false, busy: true, cause: "Homing" };
   }
+  // A member's Home waits: this owner app's Home slot confirms it, not armed (`0128` V15).
+  if (confirmsHome(status, entry.session) && !entry.lost) {
+    return { enabled: entry.busy === null, busy: false, cause: null, name: "Confirm home" };
+  }
   switch (status?.state.name) {
+    case "Jogging":
+      return off("Jogging");
     case "Running":
     case "Paused":
       return off("A job is running");
@@ -60,6 +69,48 @@ export function homeButton(entry: LinkEntry): HomeButton {
   }
   if (entry.busy !== null) return off(null);
   return { enabled: true, busy: false, cause: null };
+}
+
+/** Why the pad's arrows are greyed, the first cause that applies (UX notes, Disabled arrows); `null`
+ * when a press does something. `own` is whether a press of this pad is under way: its own jog is no
+ * cause, another app's is ("Jogging"). Laser mode and "Not homed" are no causes. */
+export function jogCause(entry: LinkEntry, own: boolean): string | null {
+  const status = entry.status;
+  if (entry.lost) return "Connection lost";
+  if (status === null || status === undefined) {
+    if (entry.reading || entry.readError === null) return "Testing";
+    return errorLine(entry.readError).text;
+  }
+  switch (status.state.name) {
+    case "Homing":
+      return "Homing";
+    case "Jogging":
+      return own ? null : "Jogging";
+    case "Running":
+    case "Paused":
+      return "A job is running";
+    case "AwaitingLocalStart":
+      return waitingText(status, entry.session);
+    case "Receiving":
+      return "Sending";
+    case "Alarm":
+      return "Alarm";
+    case "NoController":
+      return status.detail ?? "No controller";
+    default:
+      break;
+  }
+  const word = controllerWord(status);
+  return word !== null ? `Controller state: ${word}` : null;
+}
+
+/** "Work offset on the controller: X <x>, Y <y>" when the controller carries an offset beyond
+ * 0.001 mm (`specs/0118` 14); Curvyo writes no `G10`, `G92` or `G54`. */
+export function workOffsetNotice(status: StatusMessage | null): string | null {
+  const offset = status?.work_offset ?? null;
+  if (offset === null || (Math.abs(offset[0]) <= 0.001 && Math.abs(offset[1]) <= 0.001)) return null;
+  const shown = (value: number) => String(Math.round(value * 1000) / 1000);
+  return `Work offset on the controller: X ${shown(offset[0])}, Y ${shown(offset[1])}`;
 }
 
 /** What Pause shows: the same three things as Home. */
@@ -139,7 +190,7 @@ export function controlsLine(entry: LinkEntry, own: OwnPress = NO_PRESS): Contro
   // The name and size of this app's job only; a job of another app reads as plain "Ready".
   const id = status.job?.job_id ?? null;
   const held = entry.held !== null && (entry.held.jobId === null || entry.held.jobId === id) ? entry.held : null;
-  if (entry.discarded && status.state.name === "Idle") {
+  if (entry.discarded && (status.state.name === "Idle" || (entry.discarded === "Home" && status.state.name === "Ready"))) {
     return { ...pressed({ text: `Not started: ${entry.discarded}`, failure: false }), muted: true };
   }
   const line = jobStateLine(status, held, entry.session);

@@ -58,6 +58,7 @@ fn state_name(state: State) -> &'static str {
         State::Ready => "Ready",
         State::AwaitingLocalStart => "AwaitingLocalStart",
         State::Homing => "Homing",
+        State::Jogging => "Jogging",
         State::Running => "Running",
         State::Paused => "Paused",
         State::Done { .. } => "Done",
@@ -271,6 +272,9 @@ mod tests {
             requested_by: None,
             job_name: None,
             sent_by: None,
+            homed: false,
+            machine_position: None,
+            work_offset: None,
         };
         assert!(starts_after_send(true, Some(&done)));
     }

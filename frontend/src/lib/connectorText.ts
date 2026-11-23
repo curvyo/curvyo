@@ -6,7 +6,7 @@
 /** The state of the connector's job, as the protocol sends it (`State` in `curvyo-connector-core`). */
 export type JobState =
   | {
-      name: "NoController" | "Idle" | "Receiving" | "Ready" | "AwaitingLocalStart" | "Homing" | "Running" | "Paused" | "Alarm";
+      name: "NoController" | "Idle" | "Receiving" | "Ready" | "AwaitingLocalStart" | "Homing" | "Jogging" | "Running" | "Paused" | "Alarm";
     }
   | { name: "Done"; result: "Completed" | "Stopped" | "Failed" };
 
@@ -27,6 +27,12 @@ export interface StatusMessage {
   job_name?: string | null;
   /** The client that sent the held job, from a configured connector (`specs/0128`). */
   sent_by?: string | null;
+  /** The controller has been homed since the connector identified it (`specs/0118` 13); absent when false. */
+  homed?: boolean;
+  /** The head's machine position, when the controller reported it (`specs/0118` 14). */
+  machine_position?: [number, number, number] | null;
+  /** The controller's work coordinate offset, when it reported one (`specs/0118` 14). */
+  work_offset?: [number, number, number] | null;
 }
 
 /** Who this app is on the connector (`specs/0128` A26): from the login answer, not stored. */
@@ -214,7 +220,7 @@ export function refusalText(reason: string, alarm: string | null): string {
 /** The states in which a job or a homing is in flight: a dropped connection is then "Connection
  * lost" (`specs/0118` M9). */
 export function jobIsActive(state: JobState): boolean {
-  return ["Receiving", "Ready", "AwaitingLocalStart", "Homing", "Running", "Paused"].includes(state.name);
+  return ["Receiving", "Ready", "AwaitingLocalStart", "Homing", "Jogging", "Running", "Paused"].includes(state.name);
 }
 
 /** Whether a pushed status ends a shown refusal (UX notes §8, "A refusal stays until the next
@@ -243,8 +249,17 @@ export interface JobButtons {
 /** What an owner app's Start slot confirms (`specs/0128` UX notes 8.2): a member's waiting start
  * or resume; `null` for a member app, no request, or the foreground wait for Enter. */
 export function confirmKind(status: StatusMessage | null, session: Session | null): "Confirm start" | "Confirm resume" | null {
-  if (status?.state.name !== "AwaitingLocalStart" || !status.requested_by || session?.role !== "Owner") return null;
+  // A waiting Home carries no job: it is confirmed in the Home slot (`confirmsHome`).
+  if (status?.state.name !== "AwaitingLocalStart" || !status.requested_by || status.job === null || session?.role !== "Owner") return null;
   return (status.job?.line ?? 0) > 0 ? "Confirm resume" : "Confirm start";
+}
+
+/** Whether an owner app's Home slot confirms a member's waiting Home (`specs/0118` 37, W27): the
+ * waiting request carries a requester and no job. */
+export function confirmsHome(status: StatusMessage | null, session: Session | null): boolean {
+  return (
+    status?.state.name === "AwaitingLocalStart" && !!status.requested_by && status.job === null && session?.role === "Owner"
+  );
 }
 
 export function jobButtons(
@@ -270,7 +285,8 @@ export function jobButtons(
       if (confirm !== null) return { ...none, send: true, start: true, startName: confirm, stop: true };
       return { ...none, send: true, stop: true };
     case "Homing":
-      // Stop ends a homing too and never asks (`specs/0118` criterion 5).
+    case "Jogging":
+      // Stop ends a homing or a jog too and never asks (`specs/0118` criteria 5, 10).
       return { ...none, stop: true };
     case "Running":
       // A pending pause is cancelled by Resume; Pause shows it as waiting (`specs/0133` H3, H6).
@@ -340,6 +356,8 @@ export function waitingText(status: StatusMessage, session: Session | null): str
   if (!member) return "Waiting for the start at the machine";
   const line = status.job?.line ?? 0;
   if (session?.role === "Owner") {
+    // A member's Home waits without a job (`specs/0118` 37).
+    if (status.job === null) return fitName((n) => `Home requested by ${n}`, member);
     return line > 0
       ? fitName((n) => `Resume requested by ${n} at line ${formatCount(line)}`, member)
       : fitName((n) => `Start requested by ${n}`, member);
@@ -368,6 +386,9 @@ export function jobStateLine(status: StatusMessage, held: HeldJob | null, sessio
       return neutral(waitingText(status, session));
     case "Homing":
       return neutral("Homing");
+    case "Jogging":
+      // The state of any jog on the connector, in every app (`specs/0118` 19, W23); no bar, no counts.
+      return neutral("Jogging");
     case "Running":
       return neutral(status.pause_pending === true ? PAUSE_PENDING_TEXT : "Running");
     case "Paused":

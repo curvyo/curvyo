@@ -692,7 +692,11 @@ export function PropertiesPanel({
             address={output.view.send.address}
             profile={
               manufacturing?.machine
-                ? { laserMode: manufacturing.machine.copy.laser_mode, maxPower: manufacturing.machine.copy.max_power }
+                ? {
+                    laserMode: manufacturing.machine.copy.laser_mode,
+                    maxPower: manufacturing.machine.copy.max_power,
+                    origin: manufacturing.machine.copy.origin,
+                  }
                 : null
             }
           />
