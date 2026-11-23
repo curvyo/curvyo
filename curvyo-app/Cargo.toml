@@ -59,6 +59,11 @@ curvyo-connector-io = { path = "../curvyo-connector-io", version = "0.1.0", defa
 # (`specs/0087-image-clipboard-and-drop` criterion 6); on Linux the import dialog's preview also
 # decodes through its bounded decoder and ceilings (adrs.md decision 6), never through gdk-pixbuf.
 curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
+# The recovery copies' commands (`specs/0136-autosave-and-restore`, ADR 0079): the record codec and
+# the prune plan of `curvyo-ui-core`, the copy check of `curvyo-document-core`; the host still never
+# opens a document.
+curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+curvyo-ui-core = { path = "../curvyo-ui-core", version = "0.1.0" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # An SVG's preview reads the file through the importer of Import SVG and its hostile-input limits
@@ -68,9 +73,7 @@ curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
 # Its texts are matched and laid out as Import SVG does it (`curvyo-ui-core`'s font matching and
 # text conversion, `curvyo-text-core`'s engine; `FontKind` of `curvyo-document-core`), with the
 # fonts the page lists, read through `curvyo-storage-io`; no new crate.
-curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
-curvyo-ui-core = { path = "../curvyo-ui-core", version = "0.1.0" }
 # The machine profile record names and limits (ADR 0038 §1, §3): which file names are records and
 # how much of each is read; the commands parse nothing.
 curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }

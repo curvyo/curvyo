@@ -48,6 +48,7 @@ mod project;
 #[cfg(target_os = "linux")]
 mod raster;
 mod raw_ipc;
+mod recovery;
 mod state;
 mod svg_export;
 #[cfg(target_os = "linux")]
@@ -81,6 +82,16 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         project::set_shared,
         project::save_project_bytes,
         project::quit_app,
+        recovery::recovery_list,
+        recovery::recovery_begin,
+        recovery::recovery_write_asset,
+        recovery::recovery_write_copy,
+        recovery::recovery_delete_copy,
+        recovery::recovery_end,
+        recovery::recovery_read_copy,
+        recovery::recovery_asset_names,
+        recovery::recovery_read_asset,
+        recovery::recovery_file_base,
         job_export::pick_job_export_path,
         job_export::write_job_export,
         svg_export::pick_svg_export_path,
@@ -191,6 +202,7 @@ fn main() {
         .manage(device_keys::OpenStore::default())
         .manage(connector::ConnectorState::default())
         .manage(fonts::FontFiles::default())
+        .manage(recovery::RecoveryLocks::default())
         .manage(fonts::GrantedFontPaths::default())
         .invoke_handler(commands())
         // The window's close button and Alt+F4: a project with unsaved changes holds the close and

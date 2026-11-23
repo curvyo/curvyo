@@ -20,6 +20,7 @@ mod font_subfolders;
 mod font_sync_files;
 mod fonts;
 mod recent_workspaces;
+mod recovery_copies;
 mod room_keys;
 mod svg_fonts;
 mod workspace;
@@ -55,6 +56,7 @@ pub use recent_workspaces::{
     MAX_RECENT_WORKSPACES, RECENT_WORKSPACES_FILE, RECENT_WORKSPACES_FORMAT, RecentWorkspace,
     RecentWorkspaces, RecentWorkspacesError,
 };
+pub use recovery_copies::{ListedCopy, RecoveryError, RecoveryFolder, SessionLock};
 pub use room_keys::{decode_room_keys, encode_room_keys};
 pub use workspace::{
     MARKER_DIR, MARKER_FILE, ScannedEntry, ScannedKind, WORKSPACE_FORMAT_VERSION, WorkspaceError,
