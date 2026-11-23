@@ -103,12 +103,28 @@ impl Connection {
         text: &str,
         deadline: Instant,
     ) -> Result<SentJob, SendError> {
+        self.send_kind(job_id, JobKind::Job, name, text, deadline)
+    }
+
+    /// [`Self::send_job_with_id`] for a job of `kind`: a frame (`specs/0118` 2b) is sent the same
+    /// way and answered with `JobAccepted` once the connector has checked its words.
+    ///
+    /// # Errors
+    /// As [`Self::send_job`]; a frame with a word it may not hold is `NotAFrame`.
+    pub fn send_kind(
+        &mut self,
+        job_id: Uuid,
+        kind: JobKind,
+        name: &str,
+        text: &str,
+        deadline: Instant,
+    ) -> Result<SentJob, SendError> {
         let bytes = text.len() as u64;
         let sha256 = hex::encode(digest::digest(&digest::SHA256, text.as_bytes()).as_ref());
         self.send(&Message::SubmitJob {
             job_id,
             name: name.to_owned(),
-            kind: JobKind::Job,
+            kind,
             bytes,
             sha256,
         })?;
