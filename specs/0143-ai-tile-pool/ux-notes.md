@@ -1,0 +1,3 @@
+# UX notes for the AI tile pool
+
+There is no new UI in this story. The step row of Upscale and AI denoise keeps the determinate progress bar (tiles done of tiles total, updated at most 10 times a second) and the Cancel button exactly as `0135` and its UX notes define them; Cancel returns the row to idle within 1 s and stores nothing. The only new text is one quiet line in the step row, "Running on one core", shown once per step when the pool size is 1 (final wording by the implementer, plain and not a warning, no error colour, no dialog); nothing else is said about workers, cores or memory, and there is no setting for the number of workers. The faster step is the whole visible change.

@@ -502,3 +502,148 @@ release.
 - Criterion 10, first sentence (an image copied to another document carries its registers),
   **Proposal** (lead decision 2026-11-20): out of slice 2, the app's object clipboard is another
   story; a debt line in `docs/technical-debt.md`. Duplicate and Paste adjustments are tested.
+
+## Slice 3: AI tools (Remove background, Upscale, AI denoise)
+
+Slice 3 = criteria 47 to 50 and 63 to 66, plus the parts of 3, 17, 18, 23, 24, 54, 55, 58 and 59
+for the AI steps. Branch `story/image-ai-tools`. Design: ADR 0075 (runtime, crate, models), ADR
+0076 (download on demand, pinned manifest, device cache, the one network use), ADR 0077 (derived
+PNG assets, result record, limits, pruning). The three ADRs stay `needs-customer`: the customer
+accepts them with this PR. Customer answers: Fragen 273 C, 274 B, 275 A, 280 A, 281 A; Frage 282
+default A (Cloudflare R2; an operating runbook only, the app knows the URL alone).
+
+**Format:** `CURRENT_FORMAT_VERSION` 53: the stack gains the kinds `upscale`, `ai_denoise`,
+`remove_background` with the `result` record, and the container gains `assets/derived/` (an older
+build would burn the picture without the stored result, ADR 0077 §9). Golden
+`image_adjust_ai_v53.curvyo` and a damaged variant. The README format row is the lead's.
+
+**Model files:** not available to this build. `curvyo-imageai-core/models.toml` carries the three
+models with **placeholder** hashes and sizes (marked `placeholder = true`); a release gate test
+(`CURVYO_RELEASE_MODELS=1`) fails while a placeholder remains and runs as a pending CI step. The
+runtime is tested end to end with tiny ONNX test nets built in code (identity, nearest x4,
+channel mean) and a fake downloader. Step 0 of ADR 0075 §7 (measured times of the real models) is
+the customer's runbook (`docs/runbooks/ai-models.md`).
+
+### Part I: AI tools
+
+- [x] I1 (image-core). `adjust_result.rs`: the stored results applied in integers (ADR 0077 §3):
+      Upscale replaces the picture by the stored pixels, AI denoise blends `in + (ai - in) ·
+      s / 100` half away from zero, Remove background resizes the mask to the picture, maps it by
+      Threshold and Edge softness and applies it last; `PixelStep` gains the three with the result
+      asset's hash; `AdjustRun` reads the stored pixels from a [`StoredPixels`] map handed in;
+      `adjust_hash.rs`: the input hash (new edge `image-core → sha2`, workspace pin); goldens
+      `mask_stored`, `upscale_stored_2x`, `denoise_ai_stored`; the blend budget 60 ms on 4 Mpx
+      (AC 47, 48, 54, 55).
+- [x] I2 (laser-core). `StepKind` gains Upscale, AI denoise (geometry band) and Remove background
+      (a third band, last); fields (`factor`, `strength_pct`, `softness_pct`, `threshold_pct`);
+      `StoredStep.result`; the effective steps carry the result's hash into the pixel steps; a
+      step without a usable result leaves the picture unburnable (ADR 0077 §4) and an input hash
+      that differs marks it Out of date; the check lines "<n> stored AI results of <image name>
+      are out of date." (AC 3, 23, 47, 48, 66).
+- [x] I3 (document-core). The step's `result` record (`asset`, `model`, `model_version`,
+      `input_hash`, `width_px`, `height_px`); the asset class Derived, written as
+      `assets/derived/<hash>.png` after the originals, read bounded and hash-checked; limits 64
+      MiB per result and 512 MiB per document, separate from the pictures' 512 MiB; pruning at
+      save to what the tree or this session refers to; format 53; goldens (AC 48, 59, 66).
+- [x] I4 (imageai-core, new crate, ADR 0075). `MODELS` checked against `models.toml`
+      (`tests/model_record.rs`: licence allow list, sizes, the placeholder release gate);
+      `verify`, `Model::load` (verify, then parse; custom domains refused), `remove_background`
+      (320 x 320), `upscale` (256 px tiles, 16 px overlap, x2 by a 2 x 2 box of x4) and `denoise`
+      with `Poll` between tiles; ONNX test nets built in code; `cargo tree -i` CI check that
+      laser-core and image-core never depend on it (AC 50, 63, 64).
+- [x] I5 (ui-core). The AI kinds in the add order and bands; the commands Run result (one undo
+      step "Run Remove background" / "Run Upscale" / "Run AI denoise", the derived asset written
+      with the record), Remove stored result, the limits refused before the write with the
+      messages of `ux-notes.md` §8; the budget numbers (AC 24, 47, 48, 66).
+- [x] I6 (editor-wasm). Group view rows and bodies of the AI steps (state lines, stored size, Out
+      of date, Upscale sizes, budget line); the Run input (the step's input pixels and hash) and
+      the worker entry that runs a model on bytes handed in; the job input decodes the stored
+      results (a missing one skips the picture with the unreadable-image warning); the model list
+      for the frontend (AC 47, 48, 63 to 66).
+- [x] I7 (frontend). `modelStore.ts` (IndexedDB 4 MiB chunks, `persist()`, quota check),
+      `modelDownload.ts` (the one `fetch`: no credentials, referrer, query or body, `Range`
+      resume, verify before commit, the states of ADR 0076 §7), the AI worker, the step bodies,
+      consent box, progress and Cancel, the About licence entries, CSP `connect-src` (AC 47, 57,
+      63 to 65).
+- [x] I8 (docs, CI). The runbook (`docs/runbooks/ai-models.md`): which files to obtain and
+      convert, upstream sources and licences, the names and paths to upload, where the hashes go;
+      `docs/technical-debt.md` entries; the `cargo tree` check and the pending release gate in CI
+      (AC 50, 58).
+
+### Deviations (Proposal)
+
+- The real models were not available: `models.toml` holds placeholder pins (64 zeros, the
+  upstream sizes), so no download passes the checksum until the customer pins the converted
+  files (`docs/runbooks/ai-models.md`); ADR 0075 §7 step 0 (measured times) is not done.
+- The desktop app caches models in the webview's IndexedDB like the browser; the
+  `curvyo-storage-io` commands of ADR 0076 §8 are a debt line. There is no About dialog, so the
+  models' licence list is not shown yet (debt line; the data is in `ai_models_json`).
+- A malformed `result` record makes the whole entry unreadable (kept, not run, counted in "could
+  not run"); a missing or wrong-hash derived asset is a missing result (the picture is skipped
+  with the unreadable-image line, ADR 0077 §4).
+- Stored results are hashed at open (a mismatching member is missing); the session set of ADR
+  0077 §5 holds what this session wrote or saw referred to at a save.
+- The Upscale factor field takes 2 or 4 (3 is refused as out of range); the stored Upscale and
+  AI denoise results are RGBA PNGs (opaque, the input composited over white).
+- A preview at a reduced level reads AI denoise's stored output at the nearest pixel; the job
+  (level 0) reads it exactly.
+- `ui-core` does not depend on `curvyo-imageai-core` (the editor names the models); the CI check
+  allows both as dependents.
+- The model state and its texts live in the session view (Rust), the frontend reports the
+  states; the consent box is in place of the Run row.
+- Mechanical test changes: the format pins 52 to 53 and the slice-2 tester's row-2 list now
+  includes the AI steps (spec criterion 47, `ux-notes.md` §3.5).
+
+### Step 0 measured (ADR 0075 §7, 2026-11-21, local test `curvyo-imageai-core/tests/real_models.rs`)
+
+The customer's converted files on `rten` 0.26, natively in release on the build host (one thread;
+the browser's wasm with SIMD is slower, so these are lower bounds), 1 Mpx input:
+
+| Model | Ops | Max difference to ONNX Runtime 1.32 | 1 Mpx natively | Target (browser) |
+|---|---|---|---|---|
+| `u2netp` | all supported | 1 grey level | 0.3 s | < 5 s |
+| `realesr-general-x4v3` (x4, 25 tiles) | all supported | 1 grey level | 16.3 s | < 30 s |
+| `scunet-color-real-psnr` (25 tiles) | all supported | 1 grey level | 25.8 s | < 30 s |
+
+The comparison script is `tools/models/compare_ort.py`.
+
+**In Chromium (2026-11-21):** the real files served by a local fake host, temporary local pins in
+an uncommitted build, the whole path (consent, download, AI worker, wasm with `+simd128`, which
+`.cargo/config.toml` already sets for every wasm build since ADR 0028, so `rten` runs its SIMD
+kernels), one 1000 x 1000 picture, headless Chromium on the 8-core build host, one worker thread:
+
+| Step | Run (wall) | Target | Peak RSS of the largest process | Longest frame gap of the page |
+|---|---|---|---|---|
+| Remove background | 2.2 s | < 5 s | 0.63 GB | 0.27 s |
+| Upscale (x4 model, 25 tiles, stored x2) | 143 s | < 30 s | 0.69 GB | 0.40 s |
+| AI denoise (25 tiles) | 470 s | < 30 s | 1.28 GB | 0.48 s |
+
+Cancel during a Run ends it in 0.18 s (the worker is terminated); the page draws and answers
+throughout (the longest gap includes storing the result). wasm is about 9x (Upscale) and 18x (AI
+denoise) the native single-thread time. Remove background meets its target; Upscale and AI
+denoise miss theirs by 5x and 16x: rejected (lead decision 2026-11-21).
+
+**The fallbacks (lead decision 2026-11-21, shipped):** `realesr-animevideov3` (x4, 16
+convolutions) for Upscale and `ffdnet-color` (noise level 15/255 fixed in the file) for AI
+denoise, converted with `tools/models/export_onnx.py`; every op runs on `rten` 0.26, max difference
+to ONNX Runtime 1 grey level (Upscale mean 1.2e-5, AI denoise 4.7e-5 levels), max difference to
+torch below 5e-6.
+
+| Step (1 Mpx) | Natively, one thread | Chromium, wasm SIMD, one worker | Peak RSS of the largest process | Target |
+|---|---|---|---|---|
+| Remove background (`u2netp`) | 0.3 s | 2.1 s | 0.75 GB | < 5 s, met |
+| Upscale (`realesr-animevideov3`, stored x2) | 9.5 s | 74 s | 0.77 GB | < 30 s, 2.5x over |
+| AI denoise (`ffdnet-color`) | 2.5 s | 74 s | 1.03 GB | < 30 s, 2.5x over |
+
+Smaller tiles do not help the time: a 128 px tile with the 16 px overlap computes 1.78x the
+picture against 1.31x at 256 px (the overlap's share grows), so the 256 px tile stays; it only
+lowers memory, which is not the limit (1 GB). The page stays responsive (longest frame gap 0.57 s
+around storing a result); Cancel 0.18 s. Both fallbacks miss by less than 3x and ship with the
+progress bar and Cancel; the next step is in the ADR 0075 note (Proposal).
+
+### Validation
+
+Core goldens with `CURVYO_UPDATE_GOLDEN=1`, the slice-1 and slice-2 goldens unchanged; the
+imageai-core tests run the test nets natively (and the crate is on the wasm32 check); the
+frontend tests run the download and store with a fake `fetch` and a fake IndexedDB; a project with
+stored results burns the same G-code with no model and no network (criterion 48's test).

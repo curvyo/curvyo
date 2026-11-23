@@ -34,3 +34,29 @@ The model output differs slightly between CPUs (ADR 0075 §8); the dots must not
 - Saving can shrink a file (pruned results); a history state from an earlier session may need a Run again.
 - Files with upscaled pictures grow by tens of megabytes; the budget line in the group shows it.
 - Amends ADR 0017 §2 by a note on acceptance (a second asset class with its own pruning and limits).
+
+## Note 2026-11-23: what slice 3 built (architect review; for the customer's acceptance with the PR)
+
+**In plain words (for the customer).** Stored AI results are saved in the project file exactly as
+described, with the 64 MB and 512 MB limits, and removed at save when nothing refers to them; undo
+after a save still finds a result removed in the same session. One part is not built yet: in a
+shared workspace the result picture is not sent to the other people, so on their side the step
+shows its result as missing (the picture is not burned there until someone runs the step again).
+
+What changes against the text above:
+- Decision 1: the store keeps originals and derived results in two maps of `AssetStore`
+  (`curvyo-document-core/src/assets.rs`), not a class field; the container side is
+  `container_assets.rs`, the API `derived_assets.rs` (`insert_derived_asset`,
+  `derived_asset_bytes`, `referenced_derived_assets`). A derived member is hashed on read; a
+  mismatch, an oversized member or one past 512 MiB is a missing result.
+- Decision 3: the integer application is `curvyo-image-core/src/adjust_result.rs` (not
+  `adjust_mask.rs`), the input hash `adjust_hash.rs`.
+- Decision 5: the results the tree refers to when a file is opened count as this session's
+  (`mark_referenced_derived_assets`), so a save after their removal keeps them for undo.
+- Decision 6: the limit and the budget line count every derived result the store holds, also
+  re-runs of this session that nothing refers to any more (kept for undo until the project is
+  opened again).
+- Decision 7: not built. The workspace sync, the background writer and adopting a document push
+  only the pictures' and fonts' assets (`image_assets`, `received_assets` in
+  `curvyo-editor-wasm`); a peer sees decision 4's missing state. Debt in
+  `docs/technical-debt.md`.

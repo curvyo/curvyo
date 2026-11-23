@@ -314,6 +314,24 @@ appears or disappears in the same frame, without animation.
 No notice after a download or a run (the state line changes). A run is one step "Run Remove background"
 (criterion 24).
 
+**UI review 2026-11-23 (build of slice 3 and `0143`; amends the table above):**
+- Remove background's fields are Edge softness 136 and Threshold 120 on two rows: at 124 and 100 the
+  values "20" and "100" were cut off (the field's label takes its width).
+- Line order under the Run row: refusal, "Stored result ...", Out of date, then the model's line of
+  ADR 0076 decision 7. While ready it reads "Model on this computer (2.4 MB)." with the outline
+  **Remove model** (was "Remove"), wrapping under the line. No model line under the consent box.
+- Leaving the consent (another tab, another selection, folding the row) cancels it like Escape;
+  Escape there no longer also runs the canvas's Escape; Download has the 400 ms guard.
+- Focus: Escape, Cancel, Download, the end of a Run, Remove model and Remove stored result put the
+  focus on the button that replaces the pressed one (Run, Try again, Cancel), not on the page.
+- Folded line 2 of an out-of-date step begins with the 12 px triangle.
+- **Model licence** (ADR 0076 decision 9; there is no About dialog, Proposal): the last line of every
+  AI step body is a folded disclosure that lists name, version, licence, copyright, upstream
+  repository (plain text), "Converted to ONNX by Curvyo, weights unchanged." and the training data
+  note, whether the model is on the device or not.
+- `0143`: the quiet line is part of the progress line, "Running on one core · 62 %" (folded line 2
+  the same), muted, no colour.
+
 ## 9. Linked clone of an image (criterion 9; draft 05 A, B)
 
 - The clone block of `0049` as built for image roots (no Style row) gains the third override row

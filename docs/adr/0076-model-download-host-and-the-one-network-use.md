@@ -71,3 +71,26 @@ Curvyo's only network use today goes to places the maker set up (sync relay, mac
 - If the host is lost, the AI tools cannot download; stored results, every other step and the job keep working. The fallback is a new release with a new host constant, not a bundled model.
 - `0029` criterion 35 gains its one exception (spec "Changes to accepted specs"); a request of any other kind needs its own ADR.
 - **For the PO and UX:** decision 7's paused, withdrawn and storage lines are new texts (Proposal); decision 6 removes the stored consent preference; draft 04's host name becomes `models.curvyo.org`.
+
+## Note 2026-11-23: what slice 3 built (architect review; for the customer's acceptance with the PR)
+
+**In plain words (for the customer).** The download works as described, from
+`models.curvyo.org`, with no cookie, no referrer and nothing about your picture. Two parts are
+not built yet: the desktop app keeps the models in its webview storage like the browser does (so
+the system may clear them and they download again), and there is no About dialog yet listing the
+models' licences. The three files are now about 10.5 MB in total, not 82 MB (ADR 0075 note
+2026-11-23).
+
+What changes against the text above:
+- Context and Consequences: the three pinned files total 10,527,577 bytes; storage and traffic
+  per device are about 10.5 MB, not 82 MB.
+- Decision 4: the desktop CSP (`curvyo-app/tauri.conf.json`, `csp` and `devCsp`) gains
+  `https://models.curvyo.org` in `connect-src`. The web app sets no CSP today (GitHub Pages sends
+  none), so there is nothing to amend there; a future web CSP lists this origin.
+- Decision 8 (desktop): not built. Both builds use the IndexedDB chunk store
+  (`frontend/src/lib/modelStore.ts`); the four `curvyo-storage-io` commands are a debt
+  (`docs/technical-debt.md`, "The desktop app caches models in the webview's IndexedDB").
+- Decision 9: the data is served by the wasm (`ai_models_json`) and beside each file on the host
+  (`LICENSE.txt`); the About dialog is a debt ("No About licence list exists yet").
+- Decision 12: the host settings and upload steps are the runbook `docs/runbooks/ai-models.md`
+  (Frage 282 default A, Cloudflare R2), not `docs/technical-debt.md`.
