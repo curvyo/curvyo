@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronUp, Crop, MoveHorizontal, Power, PowerOff, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Crop, MoveHorizontal, Power, PowerOff, Trash2, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 
 import { AdjustGlyph } from "@/components/panel/AdjustGlyphs";
+import { AiStepBody } from "@/components/panel/AiStepBody";
 import { type CurveActions, CurvesGraph } from "@/components/panel/CurvesGraph";
 import { EntryField } from "@/components/panel/EntryField";
 import { LevelsGraph } from "@/components/panel/LevelsGraph";
@@ -10,6 +11,7 @@ import { PresetStrip } from "@/components/panel/PresetStrip";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import { fieldStep, fieldText, typedField } from "@/lib/adjustText";
+import type { AiSteps } from "@/lib/aiSteps";
 import type { StepField, StepRow } from "@/lib/adjustmentsView";
 
 const CONTROL =
@@ -37,6 +39,8 @@ export interface StepActions {
   openCrop: (index: number) => void;
   /** The Crop row the Crop bar edits, or `null`. */
   cropBarRow: number | null;
+  /** The AI steps' Run, download and stored-result commands (slice 3). */
+  ai: AiSteps | null;
 }
 
 interface RowProps {
@@ -52,6 +56,10 @@ interface RowProps {
   onFocusRow: () => void;
   actions: StepActions;
 }
+
+/** Remove background's fields (UI review 2026-11-23): "Edge softness 20 %" needs 136 px, so
+ * Threshold (120, "100 %") wraps to its own row of the 228 px body column. */
+const MASK_FIELD_WIDTHS: Record<string, number> = { softness_pct: 136, threshold_pct: 120 };
 
 function FieldView({
   row,
@@ -218,6 +226,10 @@ export function AdjustStepRow(props: RowProps) {
         </div>
         {props.unfolded && !row.unknown ? null : (
           <p title={row.line} className="h-4 truncate pl-5 text-[11px] leading-4 tabular-nums text-[var(--panel-muted-fg)]">
+            {/* An out-of-date stored result: the 12 px warn triangle before "Out of date · " (§8). */}
+            {row.line.startsWith("Out of date") ? (
+              <TriangleAlert aria-hidden size={12} strokeWidth={1.5} className="mr-1 inline-block align-[-2px] text-[var(--toolbar-icon)]" />
+            ) : null}
             {row.line}
           </p>
         )}
@@ -256,9 +268,24 @@ export function AdjustStepRow(props: RowProps) {
                   onReturnFocus={() => undefined}
                 />
               ) : null}
-              {row.fields.map((field) => (
-                <FieldView key={field.key} row={row} field={field} actions={actions} />
-              ))}
+              {row.kind === "upscale" ? (
+                <PresetStrip
+                  label="Factor"
+                  width="w-[120px]"
+                  tooltipSide="top"
+                  cells={["2", "4"].map((f) => ({ id: f, content: `${f}\u00d7`, label: `${f}\u00d7`, tooltip: "" }))}
+                  value={String(row.fields.find((f) => f.key === "factor")?.value ?? 2)}
+                  onPress={(id) => {
+                    const field = row.fields.find((f) => f.key === "factor");
+                    if (field) actions.editField(index, field, id);
+                  }}
+                  onReturnFocus={() => undefined}
+                />
+              ) : (
+                row.fields.map((field) => (
+                  <FieldView key={field.key} row={row} field={field} actions={actions} width={row.kind === "remove_background" ? MASK_FIELD_WIDTHS[field.key] : undefined} />
+                ))
+              )}
               {row.kind === "crop" ? (
                 <Tooltip side="top" content="Crop on the canvas">
                   <button
@@ -284,6 +311,7 @@ export function AdjustStepRow(props: RowProps) {
                   <p className="h-4 w-full text-xs text-[var(--panel-muted-fg)]">{row.body.line}</p>
                 </>
               ) : null}
+              {row.body?.kind === "ai" ? <AiStepBody index={index} body={row.body} steps={actions.ai} /> : null}
             </>
           )}
           {row.kind === "levels" ? (

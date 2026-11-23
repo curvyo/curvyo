@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
+import { useAiSteps } from "@/hooks/useAiSteps";
+import type { AiSteps } from "@/lib/aiSteps";
 import type { WasmSession } from "@/lib/editorSession";
 import { type AdjustmentsView, decodeAdjustmentsText, type PresetKey, type StepKindKey } from "@/lib/adjustmentsView";
 
@@ -61,6 +63,8 @@ export interface AdjustmentsApi {
   /** Own on a clone's override row: a full copy of the original's adjustments, one step. */
   ownAdjustments: () => boolean;
   followOriginal: () => boolean;
+  /** The AI steps' Run, download and stored results (slice 3). */
+  ai: AiSteps;
 }
 
 /**
@@ -73,6 +77,7 @@ export function useAdjustments(editor: EditorHandle): AdjustmentsApi {
   const [local, setLocal] = useState(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const view = useMemo(() => decodeAdjustmentsText(getSession()?.adjustments_view_json() ?? ""), [getSession, syncRevision, local]);
+  const ai = useAiSteps(getSession, sync, view !== null);
 
   const act = useCallback(
     <T,>(none: T, run: (session: WasmSession) => T): T => {
@@ -118,7 +123,8 @@ export function useAdjustments(editor: EditorHandle): AdjustmentsApi {
       restoreOriginal: () => act(false, (s) => s.restore_original_adjustments()),
       ownAdjustments: () => act(false, (s) => s.own_adjustments()),
       followOriginal: () => act(false, (s) => s.follow_original_adjustments()),
+      ai,
     }),
-    [view, act],
+    [view, act, ai],
   );
 }

@@ -61,13 +61,14 @@ export function parseStrength(text: string): number | null {
 }
 
 /** A step list band (`ux-notes.md` §3.7): A Crop, Resize, Upscale, AI denoise; B the tone and
- * detail steps; C Remove background. Slices 1 and 2 have bands A and B; an unknown row has none. */
-export type Band = "A" | "B" | "unknown";
+ * detail steps; C Remove background. An unknown row has none. */
+export type Band = "A" | "B" | "C" | "unknown";
 
 /** The band of a row. */
 export function bandOf(row: Pick<StepRow, "kind">): Band {
   if (row.kind === "unknown") return "unknown";
-  return row.kind === "crop" || row.kind === "resize" ? "A" : "B";
+  if (row.kind === "remove_background") return "C";
+  return row.kind === "crop" || row.kind === "resize" || row.kind === "upscale" || row.kind === "ai_denoise" ? "A" : "B";
 }
 
 /** Whether a hairline separates row `index` from the one before it: the bands differ. */
@@ -75,8 +76,9 @@ export function bandBreak(rows: readonly StepRow[], index: number): boolean {
   return index > 0 && bandOf(rows[index - 1]) !== bandOf(rows[index]);
 }
 
-/** What a dragged row may pass: the tone rows of band B among themselves; band A runs in its fixed
- * order, so a geometry row passes only rows of its own kind (the session's `same_band`). */
+/** What a dragged row may pass: the tone rows of band B among themselves, masks among masks; band
+ * A runs in its fixed order, so a geometry row passes only rows of its own kind (the session's
+ * `same_band`). */
 function passGroup(row: Pick<StepRow, "kind">): string {
   return bandOf(row) === "A" ? row.kind : bandOf(row);
 }

@@ -63,6 +63,25 @@ export function AdjustGlyph({ kind }: { kind: StepKindKey | "unknown" }) {
           <path d="M2.5 2.5v11h11" strokeWidth={1} />
         </>
       ) : null}
+      {kind === "upscale" ? (
+        <>
+          <rect x={5.5} y={5.5} width={5} height={5} />
+          <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" />
+        </>
+      ) : null}
+      {kind === "ai_denoise" ? (
+        <>
+          <path d="M3 5h3M3 9h4M3 13h3" />
+          <path d="M11.5 2.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" />
+        </>
+      ) : null}
+      {kind === "remove_background" ? (
+        <>
+          <rect x={2.5} y={2.5} width={11} height={11} strokeDasharray="2 2" />
+          <circle cx={8} cy={6.5} r={2} />
+          <path d="M4.5 13c.5-2.5 2-3.5 3.5-3.5s3 1 3.5 3.5" />
+        </>
+      ) : null}
       {kind === "unknown" ? (
         <>
           <rect x={2.5} y={2.5} width={11} height={11} strokeDasharray="2 2" />

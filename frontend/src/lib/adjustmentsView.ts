@@ -25,7 +25,19 @@ export const STEP_KINDS = [
   "local_contrast",
   "contours",
   "sharpen",
+  "upscale",
+  "ai_denoise",
+  "remove_background",
 ] as const;
+
+/** The AI step kinds (slice 3), each run by a downloaded model. */
+export const AI_KINDS = ["upscale", "ai_denoise", "remove_background"] as const;
+
+/** The model kinds the AI steps run (`curvyo-imageai-core` `ModelKind`). */
+export const MODEL_KINDS = ["background", "upscale", "denoise"] as const;
+
+/** One model kind. */
+export type ModelKindKey = (typeof MODEL_KINDS)[number];
 
 /** One step kind, also its glyph's name. */
 export type StepKindKey = (typeof STEP_KINDS)[number];
@@ -70,11 +82,47 @@ export interface ChannelPreset {
   pressed: boolean;
 }
 
-/** The body of a Curves, Channel mix or Resize row beyond its plain fields. */
+/** The download or the Run in progress, with Cancel (`ux-notes.md` §8). */
+export interface AiProgress {
+  /** "Downloading 21 of 64 MB" or "Running · 62 %". */
+  line: string;
+  /** 0 to 1. */
+  fraction: number;
+}
+
+/** The body of an AI step row (`ux-notes.md` §8, criteria 47, 48, 63 to 66). */
+export interface AiBody {
+  kind: "ai";
+  /** The model the Run needs. */
+  model: ModelKindKey;
+  /** "Run" or "Try again". */
+  run: string;
+  /** The consent line before the first download; the body shows Cancel and Download. */
+  consent: string | null;
+  progress: AiProgress | null;
+  /** The model's state line, `null` when ready. */
+  state: string | null;
+  /** The state line is an alert (checksum). */
+  alert: boolean;
+  /** The model is on this device: the Storage line offers Remove (criterion 64). */
+  modelReady: boolean;
+  /** "Stored result 2.1 MB". */
+  stored: string | null;
+  /** "Out of date. The stored result still burns." */
+  outOfDate: string | null;
+  /** Upscale's size line or its refusal. */
+  sizeLine: string | null;
+  sizeRefused: boolean;
+  /** The refusal of the last Run (a limit). */
+  refusal: string | null;
+}
+
+/** The body of a Curves, Channel mix, Resize or AI row beyond its plain fields. */
 export type StepBody =
   | { kind: "curve"; points: [number, number][] }
   | { kind: "channel_mix"; presets: ChannelPreset[] }
-  | { kind: "resize"; heightPx: number; line: string };
+  | { kind: "resize"; heightPx: number; line: string }
+  | AiBody;
 
 /** One step row, manual or derived. */
 export interface StepRow {
@@ -138,11 +186,13 @@ export interface AdjustmentsView {
   derived: Derived | null;
   /** Row 1 of the add toolbar; empty while a preset is active. */
   addTone: AddButton[];
-  /** Row 2: Crop and Resize, shown with any preset. */
+  /** Row 2: Crop, Resize, Upscale, AI denoise, Remove background, shown with any preset. */
   addGeometry: AddButton[];
   steps: StepRow[];
   /** The clone's Adjustments override row; `null` for an image. */
   cloneRow: "original" | "own" | null;
+  /** "Stored results 120 MB of 512 MB" while the document holds any (criterion 66). */
+  storedResults: { line: string; warns: boolean } | null;
   /** The notice of the last edit. */
   notice: string | null;
 }
@@ -255,7 +305,55 @@ function asStepBody(value: unknown): StepBody | null | undefined {
   if (value.kind === "resize" && whole(value.height_px) && typeof value.line === "string") {
     return { kind: "resize", heightPx: value.height_px, line: value.line };
   }
+  if (value.kind === "ai") return asAiBody(value) ?? undefined;
   return undefined;
+}
+
+function asAiProgress(value: unknown): AiProgress | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value) || typeof value.line !== "string" || !finite(value.fraction)) return undefined;
+  return { line: value.line, fraction: Math.min(1, Math.max(0, value.fraction)) };
+}
+
+function asAiBody(value: Record<string, unknown>): AiBody | null {
+  const progress = asAiProgress(value.progress);
+  if (
+    !oneOf(MODEL_KINDS, value.model) ||
+    typeof value.run !== "string" ||
+    !textOrNull(value.consent) ||
+    progress === undefined ||
+    !textOrNull(value.state) ||
+    typeof value.alert !== "boolean" ||
+    typeof value.model_ready !== "boolean" ||
+    !textOrNull(value.stored) ||
+    !textOrNull(value.out_of_date) ||
+    !textOrNull(value.size_line) ||
+    typeof value.size_refused !== "boolean" ||
+    !textOrNull(value.refusal)
+  ) {
+    return null;
+  }
+  return {
+    kind: "ai",
+    model: value.model,
+    run: value.run,
+    consent: value.consent,
+    progress,
+    state: value.state,
+    alert: value.alert,
+    modelReady: value.model_ready,
+    stored: value.stored,
+    outOfDate: value.out_of_date,
+    sizeLine: value.size_line,
+    sizeRefused: value.size_refused,
+    refusal: value.refusal,
+  };
+}
+
+function asBudget(value: unknown): { line: string; warns: boolean } | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value) || typeof value.line !== "string" || typeof value.warns !== "boolean") return undefined;
+  return { line: value.line, warns: value.warns };
 }
 
 function asStepRow(value: unknown): StepRow | null {
@@ -328,6 +426,7 @@ export function decodeAdjustmentsView(value: unknown): AdjustmentsView | null {
   const addGeometry = list(value.add_geometry, asAddButton);
   const steps = list(value.steps, asStepRow);
   const cloneRow = value.clone_row;
+  const storedResults = asBudget(value.stored_results);
   if (
     typeof value.restore_enabled !== "boolean" ||
     typeof value.paste_enabled !== "boolean" ||
@@ -343,6 +442,7 @@ export function decodeAdjustmentsView(value: unknown): AdjustmentsView | null {
     addGeometry === null ||
     steps === null ||
     !(cloneRow === null || cloneRow === "original" || cloneRow === "own") ||
+    storedResults === undefined ||
     !textOrNull(value.notice)
   ) {
     return null;
@@ -362,6 +462,7 @@ export function decodeAdjustmentsView(value: unknown): AdjustmentsView | null {
     addGeometry,
     steps,
     cloneRow,
+    storedResults,
     notice: value.notice,
   };
 }

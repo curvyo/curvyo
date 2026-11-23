@@ -111,7 +111,9 @@ async function waitFor(url) {
     assert.ok(tops[0] === tops[2] && tops[3] === tops[6] && tops[2] < tops[3], `two fixed rows ${tops}`);
     assert.equal(await group().getByRole('slider', { name: 'Strength' }).count(), 0, 'no Strength with Expert');
     assert.equal(await group().getByRole('button', { name: 'Restore original' }).getAttribute('aria-disabled'), 'true', 'greyed, not hidden');
-    assert.equal(await group().getByRole('toolbar', { name: 'Add adjustment' }).getByRole('button').count(), 9, 'slice 2: seven tone kinds and Crop, Resize');
+    // ux-notes §3.5: row 1 the seven tone kinds, row 2 Crop, Resize and the three AI steps (slice 3).
+    const adds = await group().getByRole('toolbar', { name: 'Add adjustment' }).getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent.trim()));
+    assert.deepEqual(adds, ['Channel mix', 'Denoise', 'Levels', 'Curves', 'Local contrast', 'Contours', 'Sharpen', 'Crop', 'Resize', 'Upscale', 'AI denoise', 'Remove background'].map((n) => `Add ${n}`), `the add toolbar: ${adds}`);
 
     // Every preset changes the dots (canvas) and the pane's After.
     const lookAt = async () => p.screenshot({ clip: { x: 520, y: 470, width: 110, height: 90 } }).then((b) => require('node:crypto').createHash('md5').update(b).digest('hex'));
