@@ -1,5 +1,7 @@
 # Plan for the AI tile pool
 
+**Status:** Done (PR #447, 2026-11-23, merged with `0135` slice 3).
+
 Built on `story/image-ai-tools` (stacked on `0135` slice 3, one PR, lead 2026-11-21).
 
 ## Affected crates/modules
