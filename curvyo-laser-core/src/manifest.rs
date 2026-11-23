@@ -25,8 +25,11 @@ pub(crate) fn grid_params() -> Vec<Param> {
         kind: ParamKind::Length {
             min: Length::from_mm(min),
             max: Length::from_mm(max),
+            step: 1.0,
+            decimals: 2,
         },
         default: ParamValue::Length(Length::from_mm(default)),
+        shown_when: None,
     };
     vec![
         length("spacing", "Spacing", 0.5, 1000.0, 10.0),

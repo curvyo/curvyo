@@ -26,8 +26,20 @@ impl Manifest {
     pub fn workbench(&self) -> Option<&WorkbenchContribution> {
         self.contributions
             .iter()
-            .map(|Contribution::Workbench(workbench)| workbench)
-            .next()
+            .find_map(|contribution| match contribution {
+                Contribution::Workbench(workbench) => Some(workbench),
+                Contribution::Generator(_) => None,
+            })
+    }
+
+    /// The generator kinds this extension contributes, in order.
+    pub fn generators(&self) -> impl Iterator<Item = &GeneratorKind> {
+        self.contributions
+            .iter()
+            .filter_map(|contribution| match contribution {
+                Contribution::Generator(kind) => Some(kind),
+                Contribution::Workbench(_) => None,
+            })
     }
 }
 
@@ -37,6 +49,43 @@ impl Manifest {
 pub enum Contribution {
     /// A manufacturing workbench: its tabs, toolbox cards and fixture kinds.
     Workbench(WorkbenchContribution),
+    /// A parametric generator: parameters in, closed outlines out (ADR 0079 §2).
+    Generator(GeneratorKind),
+}
+
+/// A kind of generated object the Generators tool offers (`specs/0141-parametric-generators`).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GeneratorKind {
+    /// The kind id inside the extension (`gear`); stored as `<extension id>/<id>`.
+    pub id: &'static str,
+    /// The name of a new object and of the bar segment ("Gear").
+    pub label: &'static str,
+    /// The Lucide glyph name of the segment and the layer row ("Cog").
+    pub icon: &'static str,
+    /// The parameter groups of the Generator block, in order.
+    pub groups: Vec<ParamGroup>,
+}
+
+impl GeneratorKind {
+    /// Every parameter of every group, in order.
+    pub fn params(&self) -> impl Iterator<Item = &Param> {
+        self.groups.iter().flat_map(|group| group.params.iter())
+    }
+
+    /// The parameters as one list, the schema `Param::read` and `ShownWhen` work on.
+    #[must_use]
+    pub fn schema(&self) -> Vec<Param> {
+        self.params().cloned().collect()
+    }
+}
+
+/// A heading and its parameter rows in the Generator block.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ParamGroup {
+    /// The heading ("Teeth").
+    pub label: &'static str,
+    /// The rows, in order.
+    pub params: Vec<Param>,
 }
 
 /// A manufacturing workbench the shell draws from data (`ManifestWorkbench`, ADR 0032 §3).

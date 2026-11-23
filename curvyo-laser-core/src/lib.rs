@@ -307,7 +307,24 @@ pub use record_envelope::{
 /// callers.
 pub use record_envelope::{is_record_id as is_profile_id, new_record_id as new_profile_id};
 
-use curvyo_extension_core::NoticeContext;
+use curvyo_extension_core::{Extension, Manifest, NoticeContext};
+
+/// The laser workbench as a compiled-in extension (ADR 0079 §1): `manifest` and `notice` only.
+#[derive(Debug, Clone, Copy)]
+pub struct Laser;
+
+/// The one value the registry holds (`curvyo-ui-core/src/extensions.rs`).
+pub static LASER: Laser = Laser;
+
+impl Extension for Laser {
+    fn manifest(&self) -> Manifest {
+        manifest()
+    }
+
+    fn notice(&self, id: &str, context: &NoticeContext) -> Option<String> {
+        notice(id, context)
+    }
+}
 
 /// The text of the notice `id`, `None` while it does not apply or for an unknown id.
 #[must_use]

@@ -3,21 +3,26 @@
 //!
 //! An extension is an ordinary workspace crate with plain functions and one [`Manifest`] value.
 //! The shell's registration module (`curvyo-ui-core/src/extensions.rs`) lists the compiled-in
-//! manifests and dispatches by extension id; there is no `Extension` trait until a second
-//! extension crate exists (ADR 0034 §3). The contract is `0.x` and unstable (`CHANGELOG.md`).
+//! [`Extension`] values and dispatches by extension id (ADR 0079 §1: the trait exists since the
+//! second extension crate). The contract is `0.x` and unstable (`CHANGELOG.md`).
 
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod drawing;
+mod extension;
 mod manifest;
 mod notice;
 mod param;
 
 pub use drawing::LineSegment;
+pub use extension::{
+    Bound, Clamp, ClosedPath, Cubic, Edit, Extension, GenerateRequest, Generated, Handle, Part,
+    ScaleFactor, Seed,
+};
 pub use manifest::{
-    Block, Contribution, FixtureKind, Manifest, Tab, ToolboxCard, ToolboxCommand,
-    WorkbenchContribution,
+    Block, Contribution, FixtureKind, GeneratorKind, Manifest, ParamGroup, Tab, ToolboxCard,
+    ToolboxCommand, WorkbenchContribution,
 };
 pub use notice::NoticeContext;
-pub use param::{Param, ParamKind, ParamValue, StoredParams};
+pub use param::{ChoiceOption, Degrees, Param, ParamKind, ParamValue, ShownWhen, StoredParams};
