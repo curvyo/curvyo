@@ -13,6 +13,7 @@ members = [
     "curvyo-text-core",
     "curvyo-svg-core",
     "curvyo-image-core",
+    "curvyo-imageai-core",
     "curvyo-ui-core",
     "curvyo-crypto-core",
     "curvyo-sync-core",

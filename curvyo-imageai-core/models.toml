@@ -1,0 +1,62 @@
+# The pinned AI models of `specs/0135-image-optimisation` slice 3 (ADR 0075 §4, ADR 0076 §1, §2).
+#
+# `src/models.rs` holds the same list as Rust constants (`MODELS`); `tests/model_record.rs`
+# checks that both agree, that each licence is permissive, that each file is under its size
+# target, and (with CURVYO_RELEASE_MODELS=1, the release gate) that no placeholder is left.
+#
+# The pins are the files converted on 2026-11-21 (`docs/runbooks/ai-models.md` §2) and uploaded to
+# the host. A new conversion is a new `version` with its own `sha256` and `bytes`, in this file and
+# in `src/models.rs`, in one commit. `placeholder = true` (64 zeros) marks a model whose file is not
+# pinned yet; such a pin never loads.
+
+[[model]]
+kind = "background"
+name = "u2netp"
+version = "1"
+sha256 = "47bb7b9d53f1eebde658cfb63aa5e110e6fcab39b50779eb2e5522e5dfe182ed"
+bytes = 4_611_299
+placeholder = false
+licence = "Apache-2.0"
+copyright = "Copyright (c) 2020 Xuebin Qin"
+upstream = "https://github.com/xuebinqin/U-2-Net"
+upstream_file = "saved_models/u2netp/u2netp.pth"
+training_data = "DUTS-TR (research saliency dataset; terms: research use)"
+opset = 17
+input = "1x3x320x320, RGB, ImageNet mean and deviation"
+
+[[model]]
+kind = "upscale"
+name = "realesr-animevideov3"
+version = "1"
+sha256 = "b5dc4e5c20f404247a91ee0cc1014c79f2940274b2586e67b129d8369cb7c1a8"
+# The local conversion of 2026-11-21 (`tools/models/export_onnx.py`).
+bytes = 2_492_873
+placeholder = false
+licence = "BSD-3-Clause"
+copyright = "Copyright (c) 2021, Xintao Wang"
+upstream = "https://github.com/xinntao/Real-ESRGAN"
+# upstream sha256 b8a8376811077954d82ca3fcf476f1ac3da3e8a68a4f4d71363008000a18b75d
+upstream_file = "releases/download/v0.2.5.0/realesr-animevideov3.pth"
+training_data = "Anime video frames with synthetic degradations (Real-ESRGAN AnimeVideo-v3; research data)"
+opset = 17
+input = "1x3x256x256, RGB 0 to 1; output 1x3x1024x1024 (SRVGGNetCompact, 16 convolutions)"
+
+[[model]]
+kind = "denoise"
+name = "ffdnet-color"
+version = "1"
+sha256 = "91328fb58c0184b31c8ecfbf934df889a47f29ffd13ea0a1b7c40a706ed880a0"
+# The local conversion of 2026-11-21 (`tools/models/export_onnx.py`).
+bytes = 3_423_405
+placeholder = false
+licence = "MIT"
+copyright = "Copyright (c) 2019 Kai Zhang"
+upstream = "https://github.com/cszn/KAIR"
+# upstream sha256 286f04f7e3a20254c067ba95efb5d3339f4fc8a09a365a93cd469184d4cdb279
+upstream_file = "https://github.com/cszn/KAIR/releases/download/v1.0/ffdnet_color.pth"
+training_data = "BSD400, ImageNet validation and Waterloo Exploration pictures with Gaussian noise (research sets)"
+opset = 17
+input = "1x3x256x256, RGB 0 to 1; noise level 15/255 fixed inside the file; output the same"
+
+# Rejected 2026-11-21 (ADR 0075 note): realesr-general-x4v3 (143 s in Chromium on 1 Mpx) and
+# scunet-color-real-psnr (470 s); `tools/models/export_onnx.py` can still export them.

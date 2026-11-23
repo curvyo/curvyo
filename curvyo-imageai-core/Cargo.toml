@@ -1,0 +1,23 @@
+[package]
+name = "curvyo-imageai-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Runs the three Curvyo image models on a picture with the weights handed in as bytes (pure compute, wasm-compatible; ADR 0075)."
+
+[lints]
+workspace = true
+
+[dependencies]
+curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
+# The ONNX runtime (ADR 0075 decision 1): the exact version `vectrace` pins (one copy in the
+# tree), ONNX loading only. MIT OR Apache-2.0, pure Rust; already locked and in the editor wasm.
+rten = { version = "=0.26.0", default-features = false, features = ["onnx_format"] }
+rten-tensor = { version = "=0.26.0", default-features = false }
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+# `tests/model_record.rs` reads `models.toml` against the compiled-in list.
+toml.workspace = true
