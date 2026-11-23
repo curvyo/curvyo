@@ -23,6 +23,27 @@ impl Session {
     /// groups of one compound path per glyph, in one step. A text with a missing face refuses the
     /// whole command (criterion 29).
     pub fn object_to_path(&mut self) -> ObjectToPathOutcome {
+        // Generated objects convert through their own step (a gear one path, a box its plates);
+        // the rest of the selection follows below as a second step.
+        let generated = self.selected_generated();
+        if !generated.is_empty() {
+            let others: Vec<NodeId> = self
+                .selection
+                .ids()
+                .iter()
+                .copied()
+                .filter(|id| !generated.contains(id))
+                .collect();
+            if !self.convert_selected_generated() {
+                return ObjectToPathOutcome::Ignored;
+            }
+            if others.is_empty() {
+                return ObjectToPathOutcome::Converted;
+            }
+            let mut selected = others;
+            selected.extend(self.selection.ids().iter().copied());
+            self.selection.set(&selected);
+        }
         self.recording(|this| {
             this.flush_select_bar_preview();
             this.select.cancel_entry();

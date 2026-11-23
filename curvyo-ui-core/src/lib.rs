@@ -327,7 +327,14 @@ pub use document_presets_view::{
     PresetEntry, PresetGroupView, PresetsView, orientation_swap, preset_pick_size, presets_view,
 };
 pub use ellipse_tool::EllipseTool;
-pub use extensions::{ExtensionSettings, manifest, manifests, notice};
+pub mod instance;
+pub mod instance_handles;
+mod instance_notice;
+pub mod instance_preview;
+pub use extensions::{
+    ExtensionSettings, active_extension_settings, generate_object, manifest, manifests, notice,
+    set_active_extension_settings,
+};
 pub use face_style_pick::{
     Greyed, Pressed, StyleButton, StyleButtons, StylePress, WEIGHT_STEPS, family_target,
     family_tile, italic_target, press_italic, press_weight, style_buttons, weight_target,

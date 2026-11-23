@@ -522,14 +522,36 @@ pub(crate) fn commit_group(
             g,
         );
     }
+    // A resize of a generated object writes its parameters through the generator, in the same
+    // step as the rest (`specs/0141-parametric-generators`, ADR 0079 §6).
+    let (resized, results): (Vec<ObjectSnapshot>, Vec<ObjectSnapshot>) = results
+        .into_iter()
+        .partition(|result| crate::instance::is_resize(document, result));
     let results = &results;
+    // Every resize is worked out before anything is written: one the generator refuses leaves
+    // the whole gesture unwritten, never a half-saved batch.
+    let settings = crate::active_extension_settings();
+    let plans: Result<Vec<_>, _> = resized
+        .iter()
+        .map(|result| crate::instance::plan_resize(document, &settings, result))
+        .collect();
+    let Ok(plans) = plans else {
+        return false;
+    };
     document.batch(label, |document| {
+        let mut resized_ok = true;
+        for plan in &plans {
+            resized_ok &= crate::instance::apply_resize(document, plan, label).is_ok();
+        }
+        if results.is_empty() {
+            return resized_ok;
+        }
         let outcome = document.transform_objects(results, with_width);
         if with_width && outcome == Err(ObjectEditError::InvalidStrokeWidth) {
             // Anything else means an object is gone: nothing is left to write.
-            return document.transform_objects(results, false).is_ok();
+            return document.transform_objects(results, false).is_ok() && resized_ok;
         }
-        outcome.is_ok()
+        outcome.is_ok() && resized_ok
     })
 }
 
@@ -552,7 +574,7 @@ pub(crate) const fn group_label(handle: EditHandle) -> &'static str {
 #[cfg(test)]
 mod tests {
     use curvyo_document_core::{
-        AnchorId, CornerRadii, Document, InnerRatio, NewAnchor, NodeId, PointCount,
+        Affine, AnchorId, CornerRadii, Document, InnerRatio, NewAnchor, NodeId, PointCount,
     };
 
     use super::*;
@@ -574,6 +596,55 @@ mod tests {
         );
         document.rotate_object(&rotated).expect("rotates");
         document.object(id).expect("exists")
+    }
+
+    /// A resize the generator refuses leaves the whole gesture unwritten: the other generated
+    /// object of the selection is not half-saved (`specs/0141-parametric-generators`).
+    #[test]
+    fn a_refused_generator_resize_writes_nothing_of_the_batch() {
+        let document = Document::new(1);
+        let settings = crate::ExtensionSettings::default();
+        let gear = crate::instance::place(
+            &document,
+            &settings,
+            "curvyo.generators/gear",
+            Point::new(0.0, 0.0),
+        )
+        .expect("gear");
+        let boxed = crate::instance::place(
+            &document,
+            &settings,
+            "curvyo.generators/box",
+            Point::new(200.0, 0.0),
+        )
+        .expect("box");
+        let mapped = |id: NodeId, factor: f64| {
+            let ObjectSnapshot::Path(path) = document.object(id).expect("exists") else {
+                panic!("a path");
+            };
+            ObjectSnapshot::Path(path.mapped(Affine::scale(factor, factor)))
+        };
+        let before = document.generated(gear).expect("gear").record;
+        let steps = document.own_step_count();
+        let results = [mapped(gear, 2.0), mapped(boxed, 1e-12)];
+        assert!(!commit_group(
+            &document,
+            &results,
+            StrokeScaling::Keep,
+            "transform_resize",
+            None
+        ));
+        assert_eq!(document.generated(gear).expect("gear").record, before);
+        assert_eq!(document.own_step_count(), steps, "no step was written");
+        // The same gear alone resizes.
+        assert!(commit_group(
+            &document,
+            &results[..1],
+            StrokeScaling::Keep,
+            "transform_resize",
+            None
+        ));
+        assert_ne!(document.generated(gear).expect("gear").record, before);
     }
 
     fn scale(sx: f64, sy: f64) -> GroupMap {
@@ -720,6 +791,7 @@ mod tests {
             ScaleModes {
                 stroke: StrokeScaling::Proportional,
                 radius: CornerRadiusScaling::Proportional,
+                proportional: false,
             },
             None,
         );

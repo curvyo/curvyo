@@ -105,6 +105,10 @@ pub struct ScaleModes {
     pub stroke: StrokeScaling,
     /// "Scale corner radius".
     pub radius: CornerRadiusScaling,
+    /// Whether every resize is proportional, as if Ctrl were held: the selection is generated
+    /// objects only (`specs/0141-parametric-generators` criterion 5). Set by the session, not by
+    /// a switch of the maker.
+    pub proportional: bool,
 }
 
 /// The modifiers and modes a resize drag runs with: Shift (center pivot,
@@ -138,7 +142,7 @@ impl ResizeOptions<'_> {
             start_box.max,
             direction,
             local_delta,
-            (self.shift, self.ctrl),
+            (self.shift, self.ctrl || self.modes.proportional),
             self.prior,
         )
     }

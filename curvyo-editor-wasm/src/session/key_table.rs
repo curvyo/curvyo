@@ -70,6 +70,8 @@ pub(super) enum KeyAction {
     /// criterion 4, Proposal).
     Flip(FlipAxis),
     StartPlacement,
+    /// Enter in the Generators tool places the chosen kind (`specs/0141` UX notes §13).
+    PlaceGenerated,
     /// Tab in the Pen with a last node (`0072` criterion 12).
     OpenPenEntry,
     /// The key is taken from the page and does nothing (`0072` criterion 14).
@@ -147,7 +149,11 @@ fn enter_action(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
     } else if offset_enter_acts(input, state) {
         KeyAction::OpenOffsetChip
     } else if placement_enter_acts(input, state) {
-        KeyAction::StartPlacement
+        if state.tool == Tool::Generators {
+            KeyAction::PlaceGenerated
+        } else {
+            KeyAction::StartPlacement
+        }
     } else if enter_acts(input, state) {
         KeyAction::EnterGroup
     } else {
@@ -175,7 +181,7 @@ fn offset_enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
 fn placement_enter_acts(input: &KeyInput<'_>, state: KeyState) -> bool {
     matches!(
         state.tool,
-        Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar
+        Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Generators
     ) && !input.repeat
         && !input.dom_blocked
         && !input.ctrl

@@ -23,6 +23,9 @@ pub enum RowKind {
     Path,
     /// A compound path.
     CompoundPath,
+    /// An object a generator made (`specs/0141-parametric-generators`); the row's `generator`
+    /// names which.
+    Generated,
     /// A rectangle.
     Rectangle,
     /// An ellipse.
@@ -82,6 +85,7 @@ impl RowKind {
             Self::Group => "Group",
             Self::Path => "Path",
             Self::CompoundPath => "Compound path",
+            Self::Generated => "Generated object",
             Self::Rectangle => "Rectangle",
             Self::Ellipse => "Ellipse",
             Self::Polygon => "Polygon",
@@ -107,6 +111,7 @@ impl RowKind {
             Self::Group => "group",
             Self::Path => "path",
             Self::CompoundPath => "compound-path",
+            Self::Generated => "generated",
             Self::Rectangle => "rectangle",
             Self::Ellipse => "ellipse",
             Self::Polygon => "polygon",
@@ -220,6 +225,8 @@ pub struct LayerRow {
     pub read_only: bool,
     /// A row of a laser page's own tree (`specs/0106` criteria 17 to 19): named as there.
     pub page_tree: bool,
+    /// For a generated object, the label of its generator ("Gear"): the row's name and glyph.
+    pub generator: Option<String>,
     /// A fixture row's kind word and Active state (`specs/0102` criterion 12); `None` elsewhere.
     pub fixture: Option<FixtureLine>,
 }
@@ -583,6 +590,7 @@ impl<'a> Tree<'a> {
             via: None,
             read_only: false,
             page_tree: false,
+            generator: None,
             fixture: None,
         }
     }
@@ -614,6 +622,28 @@ impl LayerRows {
             {
                 row.name = dimension_row_name(dimension, unit);
                 row.text = dimension_row_text(dimension, unit);
+            }
+        }
+        self
+    }
+
+    /// Shows the rows of generated objects as what they are (`specs/0141` UX notes §3): `label_of`
+    /// answers the generator's label for a generated object and `None` for any other node. A row
+    /// without a name of its own is named `"<Label> <id>"`.
+    #[must_use]
+    pub fn with_generated(mut self, label_of: impl Fn(NodeId) -> Option<String>) -> Self {
+        for row in self
+            .rows
+            .iter_mut()
+            .filter(|r| matches!(r.kind, RowKind::Path | RowKind::CompoundPath))
+        {
+            if let Some(label) = label_of(row.id) {
+                row.kind = RowKind::Generated;
+                if !row.named {
+                    row.name = format!("{label} {}", row.id.short_id());
+                    row.text.clone_from(&row.name);
+                }
+                row.generator = Some(label);
             }
         }
         self

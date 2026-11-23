@@ -248,6 +248,13 @@ impl SelectTool {
         self.modes.stroke = stroke_scaling;
     }
 
+    /// Whether the next resize drag or typed size keeps the proportions whatever Ctrl says: the
+    /// selection is generated objects only (`specs/0141-parametric-generators` criterion 5).
+    /// Set by the session before a press; a drag in flight keeps the value it started with.
+    pub fn set_proportional_resize(&mut self, proportional: bool) {
+        self.modes.proportional = proportional;
+    }
+
     /// Sets the corner-radius mode for the *next* resize drag or typed size:
     /// a drag already in flight and an open entry keep the value they
     /// started with (criterion 23).
@@ -992,6 +999,7 @@ mod tests {
         param_min_side_mm: 1e9,
         param_centre_yield_mm: 2.0,
         move_only: false,
+        corners_only: false,
         yielded: crate::YieldedHandles::NONE,
     };
 

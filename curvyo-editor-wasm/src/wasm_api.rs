@@ -38,6 +38,7 @@ fn tool_from_str(name: &str) -> Result<Tool, JsValue> {
         "text" => Ok(Tool::Text),
         "trace" => Ok(Tool::Trace),
         "test-grid" => Ok(Tool::TestGrid),
+        "generators" => Ok(Tool::Generators),
         other => Err(JsValue::from_str(&format!("unknown tool: {other}"))),
     }
 }
@@ -214,6 +215,7 @@ impl WasmSession {
             Tool::Text => "text".to_string(),
             Tool::Trace => "trace".to_string(),
             Tool::TestGrid => "test-grid".to_string(),
+            Tool::Generators => "generators".to_string(),
         }
     }
 

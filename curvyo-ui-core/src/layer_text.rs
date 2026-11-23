@@ -79,9 +79,10 @@ pub fn row_accessible_name(row: &LayerRow) -> String {
     if row.page_tree {
         return page_tree_name(row);
     }
-    let kind = match row.kind {
-        crate::layer_rows::RowKind::Clone => "linked clone".to_owned(),
-        other => other.word().to_lowercase(),
+    let kind = match (&row.generator, row.kind) {
+        (Some(label), _) => label.to_lowercase(),
+        (None, crate::layer_rows::RowKind::Clone) => "linked clone".to_owned(),
+        (None, other) => other.word().to_lowercase(),
     };
     let mut parts = vec![row.name.clone(), kind];
     if !row.overrides_line.is_empty() {

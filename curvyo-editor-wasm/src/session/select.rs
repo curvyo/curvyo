@@ -182,6 +182,8 @@ impl Session {
         }
         // A whole test grid keeps its box and centre move only (`specs/0028` ux-notes 6.5).
         tolerances.move_only = self.whole_test_grid_selected();
+        // Generated objects resize proportionally from their corners (`0141` criterion 5).
+        tolerances.corners_only = self.selection_all_generated();
         // A shape handle under a drawn gradient handle yields (`specs/0124` criterion 6).
         tolerances.yielded = self.gradient_yielded(tolerances);
         tolerances
@@ -194,6 +196,11 @@ impl Session {
     /// (criterion 20).
     pub(super) fn select_pointer_down(&mut self, point: Point, shift: bool) {
         self.limit_notice = None;
+        self.sync_generated_resize_mode();
+        // A press on a knob of a generated object drags its parameter (`0141` UX notes §9).
+        if self.generator_knob_press(point) {
+            return;
+        }
         // While the Crop bar is open the picture cannot be moved; a press elsewhere leaves the
         // bar and is an ordinary press (`specs/0135`, `ux-notes.md` §3.9).
         if self.crop_bar_takes_press(point) {
@@ -244,6 +251,7 @@ impl Session {
             .filter_map(|object| self.document.object(object.id()))
             .collect();
         self.refuse_read_only_drag();
+        let _ = self.refuse_unavailable_generated_resize();
         // If a move drag began, start snapping.
         if self.select.drag_in_flight() {
             self.begin_snapping_drag_for_selection();
@@ -366,6 +374,9 @@ impl Session {
         self.pointer_position = Some(point);
         self.held.shift = shift;
         self.held.ctrl = ctrl;
+        if self.generator_knob_drag_end(point) {
+            return;
+        }
         self.sync_select_units();
         let objects = self.objects();
         if self.select_release_checks(&objects).is_none() {
@@ -461,6 +472,9 @@ impl Session {
     /// lets a drag in flight note the pointer (the dead zone, once left,
     /// stays left).
     pub(super) fn select_hover(&mut self, point: Point, modifiers: Modifiers) {
+        if self.generator_knob_drag_move(point) {
+            return;
+        }
         self.sync_select_units();
         self.select
             .pointer_moved(point, modifiers, &mut self.selection);
@@ -514,6 +528,7 @@ impl Session {
         ctrl: bool,
     ) -> DoubleClickHint {
         self.sync_select_units();
+        self.sync_generated_resize_mode();
         // Inside a group of a laser page only a nested group is entered, one level (`specs/0111`
         // criterion 11); every edit a double-click opens elsewhere is refused silently.
         if self.in_read_only_group() {
@@ -532,6 +547,7 @@ impl Session {
             (shift, ctrl),
         );
         self.select.mint_conversion_ids(&mut self.minter);
+        let _ = self.refuse_unavailable_generated_resize();
         match outcome {
             SelectDoubleClickOutcome::Hit(_) => {
                 self.node.cancel_drag();

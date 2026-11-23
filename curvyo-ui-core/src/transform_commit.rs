@@ -197,6 +197,16 @@ pub(crate) fn commit_resize(
                 None,
             );
         }
+        // A generated object resizes through its generator, with the rest of the step.
+        ObjectSnapshot::Path(_) if document.generated(id).is_some() => {
+            let _ = commit_group(
+                document,
+                std::slice::from_ref(result),
+                stroke_scaling,
+                group_label(EditHandle::Move),
+                None,
+            );
+        }
         ObjectSnapshot::Path(path) if path.curve_kind == curvyo_document_core::CurveKind::Spiro => {
             let _ = commit_group(
                 document,

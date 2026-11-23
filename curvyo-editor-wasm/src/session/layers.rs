@@ -99,9 +99,12 @@ impl Session {
     pub(super) fn refuse_drawing_into_layer(&mut self) -> bool {
         let starts_object = match self.tool {
             Tool::Pen => !self.pen_path_unfinished(),
-            Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Text | Tool::TestGrid => {
-                true
-            }
+            Tool::Rectangle
+            | Tool::Ellipse
+            | Tool::PolygonStar
+            | Tool::Text
+            | Tool::TestGrid
+            | Tool::Generators => true,
             Tool::Select | Tool::Node | Tool::Offset | Tool::Trace | Tool::Measure => false,
         };
         if !starts_object || self.context_group().is_some() {

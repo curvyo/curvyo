@@ -82,6 +82,9 @@ pub struct NodeToolbarState {
     /// The selection holds linked clones only: the bar holds the sentence that a clone has no
     /// nodes (`specs/0049-linked-clone` criterion 26).
     pub clone_only: bool,
+    /// The selection holds generated objects only: the bar holds the sentence that they have no
+    /// nodes (`specs/0141-parametric-generators` UX notes §8).
+    pub generated_only: bool,
     /// Join: the current selection is exactly two endpoint nodes of
     /// open paths (same path or two different objects), not the two
     /// ends of a 2-anchor open path (acceptance criterion 8).
@@ -853,6 +856,7 @@ impl NodeTool {
             can_make_line: segment_is_line == Some(false),
             can_make_curve: segment_is_line == Some(true),
             clone_only: false,
+            generated_only: false,
             can_join: join_block.is_none(),
             can_split: self.can_split(document),
             join_block,

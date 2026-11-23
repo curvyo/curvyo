@@ -129,6 +129,8 @@ impl Session {
     /// directly; every other command calls [`Session::recording`].
     pub(super) fn recording_unguarded<R>(&mut self, body: impl FnOnce(&mut Self) -> R) -> R {
         self.sync_context();
+        // The write below reads the per-user extension settings (a resize of a generated object).
+        curvyo_ui_core::set_active_extension_settings(&self.manufacturing.extensions);
         let move_only = self.edit_scope() == curvyo_ui_core::Scope::MoveOnly;
         // The repair count belongs to this command alone (review S2).
         let _ = self.document.take_clone_repair();
@@ -182,6 +184,19 @@ impl Session {
     ) -> R {
         self.history.step_name = Some(name);
         let result = self.recording_unguarded(body);
+        self.history.step_name = None;
+        result
+    }
+
+    /// [`Session::recording`] (the move-only guard stays) with every step `body` writes named
+    /// `name` on the stacks and in the History tab; `None` keeps the label's name.
+    pub(super) fn recording_named_guarded<R: Default>(
+        &mut self,
+        name: Option<String>,
+        body: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.history.step_name = name;
+        let result = self.recording(body);
         self.history.step_name = None;
         result
     }

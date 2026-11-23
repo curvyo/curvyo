@@ -153,6 +153,10 @@ pub struct TransformHandleTolerances {
     /// A group box shows only its centre move handle: no resize, rotate or skew handle is drawn
     /// or hit (a test grid's size comes from its fields, `specs/0028` `ux-notes.md` 6.5).
     pub move_only: bool,
+    /// The selection is generated objects only: they resize proportionally from the corners, so
+    /// no edge resize handle and no skew handle is drawn or hit (`specs/0141-parametric-generators`
+    /// criterion 5, UX notes §8).
+    pub corners_only: bool,
     /// The handles that yield to a gradient handle drawn within 8 px of them: neither drawn nor
     /// hit (`specs/0124-gradient-fill` criterion 6).
     pub yielded: YieldedHandles,
@@ -185,8 +189,21 @@ impl TransformHandleTolerances {
             param_min_side_mm: mm(PARAM_MIN_SIDE_PX),
             param_centre_yield_mm: mm(CENTRE_YIELD_PX),
             move_only: false,
+            corners_only: false,
             yielded: YieldedHandles::NONE,
         }
+    }
+
+    /// Whether `handle` is one of the edge resize or skew handles that a corners-only selection
+    /// does not have.
+    #[must_use]
+    pub fn drops_for_corners_only(&self, handle: EditHandle) -> bool {
+        self.corners_only
+            && match handle {
+                EditHandle::Resize(direction) => !is_corner(direction),
+                EditHandle::Skew(_) => true,
+                EditHandle::Rotate(_) | EditHandle::Move | EditHandle::Param(_) => false,
+            }
     }
 }
 

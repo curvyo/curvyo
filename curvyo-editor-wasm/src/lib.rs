@@ -98,6 +98,8 @@ mod wasm_formats;
 #[cfg(target_arch = "wasm32")]
 mod wasm_fracture;
 #[cfg(target_arch = "wasm32")]
+mod wasm_generators;
+#[cfg(target_arch = "wasm32")]
 mod wasm_gradient;
 #[cfg(target_arch = "wasm32")]
 mod wasm_group;

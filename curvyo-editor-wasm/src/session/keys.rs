@@ -231,7 +231,7 @@ impl Session {
             Tool::Offset => self.offset_drag_in_flight() || self.select.drag_in_flight(),
             Tool::Measure => self.dimension_drag_in_flight(),
             Tool::Trace => self.trace.mask.drag.is_some(),
-            Tool::Pen | Tool::Text | Tool::TestGrid => false,
+            Tool::Pen | Tool::Text | Tool::TestGrid | Tool::Generators => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
         // A click-to-create placement is an operation in flight (`0052` criterion 8).
@@ -415,24 +415,13 @@ impl Session {
             {
                 KeyOutcome::Consumed
             }
-            KeyAction::OpenEntry(key) => {
-                let objects = self.objects();
-                match self
-                    .select
-                    .open_entry_for_key(&objects, &self.selection, key)
-                {
-                    Ok(()) => {
-                        self.select.mint_conversion_ids(&mut self.minter);
-                        KeyOutcome::EntryOpened
-                    }
-                    Err(KeyEntryRefusal::NothingSelected) => KeyOutcome::Hint(KeyHint::SelectFirst),
-                }
-            }
+            KeyAction::OpenEntry(key) => self.open_entry_key(key),
             KeyAction::Delete => {
                 self.delete_selected();
                 KeyOutcome::Deleted
             }
             KeyAction::StartPlacement => self.start_placement_key(),
+            KeyAction::PlaceGenerated => self.place_generated_key(),
             KeyAction::OpenPenEntry => {
                 if self.open_pen_entry() {
                     KeyOutcome::PenEntryOpened
@@ -498,6 +487,9 @@ impl Session {
         if self.page_drag.take().is_some() {
             return true;
         }
+        if self.cancel_generator_knob_drag() {
+            return true;
+        }
         match self.tool {
             Tool::Select => {
                 let was = self.select.drag_in_flight();
@@ -521,7 +513,7 @@ impl Session {
                 self.cancel_offset_drag() || marquee
             }
             Tool::Measure => self.measure_escape(),
-            Tool::Pen | Tool::Text | Tool::Trace | Tool::TestGrid => false,
+            Tool::Pen | Tool::Text | Tool::Trace | Tool::TestGrid | Tool::Generators => false,
         }
     }
 
@@ -662,7 +654,8 @@ impl Session {
             | Tool::Text
             | Tool::Measure
             | Tool::Trace
-            | Tool::TestGrid => false,
+            | Tool::TestGrid
+            | Tool::Generators => false,
             Tool::Node => self.node.clear_selection(),
             Tool::Select | Tool::Offset => {
                 let had = !self.selection.is_empty();
@@ -747,7 +740,7 @@ impl Session {
                 | Tool::Text
                 | Tool::Measure
                 | Tool::Trace
-                | Tool::TestGrid => {}
+                | Tool::TestGrid | Tool::Generators => {}
             }
         });
     }
@@ -767,6 +760,33 @@ fn read_only_key(action: KeyAction) -> bool {
             | KeyAction::EnterGroup
             | KeyAction::SetTool(Tool::Select)
     )
+}
+
+impl Session {
+    /// S, R, M and K: opens the numeric entry of the selection. K and the skew chip leave generated
+    /// objects alone, so with only those selected they do nothing; a size entry of an object from an
+    /// unavailable generator is refused with a status (`0141` UX notes §8, §12).
+    fn open_entry_key(&mut self, key: curvyo_ui_core::EntryKey) -> KeyOutcome {
+        use curvyo_ui_core::EntryKey;
+        if matches!(key, EntryKey::SkewX | EntryKey::SkewY) && self.selection_all_generated() {
+            return KeyOutcome::Consumed;
+        }
+        self.sync_generated_resize_mode();
+        let objects = self.objects();
+        match self
+            .select
+            .open_entry_for_key(&objects, &self.selection, key)
+        {
+            Ok(()) => {
+                self.select.mint_conversion_ids(&mut self.minter);
+                if self.refuse_unavailable_generated_resize() {
+                    return KeyOutcome::Consumed;
+                }
+                KeyOutcome::EntryOpened
+            }
+            Err(KeyEntryRefusal::NothingSelected) => KeyOutcome::Hint(KeyHint::SelectFirst),
+        }
+    }
 }
 
 #[cfg(test)]

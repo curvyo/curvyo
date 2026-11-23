@@ -52,7 +52,7 @@ impl GroupDrag {
             &self.start_box,
             self.handle,
             (self.origin.down_at, current),
-            (shift, ctrl),
+            (shift, ctrl || self.proportional_resize()),
             self.signs,
         )
     }
@@ -72,9 +72,14 @@ impl GroupDrag {
             &self.start_box,
             direction,
             (self.origin.down_at, current),
-            (shift, ctrl),
+            (shift, ctrl || self.proportional_resize()),
             self.signs,
         )
+    }
+
+    /// Whether this drag is a resize that keeps the proportions whatever Ctrl says.
+    fn proportional_resize(&self) -> bool {
+        self.modes.proportional && matches!(self.handle, EditHandle::Resize(_))
     }
 
     /// Notes a preview frame at `current` (the signs of criterion 15).

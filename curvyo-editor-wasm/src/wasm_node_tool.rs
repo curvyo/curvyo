@@ -48,6 +48,7 @@ pub struct NodeToolbarState {
     pub can_join: bool,
     pub can_split: bool,
     pub clone_only: bool,
+    pub generated_only: bool,
     /// Why Join is disabled (`specs/0053-node-marquee-selection/` criterion 19): 0 enabled,
     /// 1 not exactly two nodes, 2 not end nodes, 3 another reason (no reason line).
     pub join_block: u8,
@@ -73,6 +74,7 @@ impl From<SessionNodeToolbarState> for NodeToolbarState {
             can_join: state.can_join,
             can_split: state.can_split,
             clone_only: state.clone_only,
+            generated_only: state.generated_only,
             join_block: match state.join_block {
                 None => 0,
                 Some(JoinBlock::Count(_)) => 1,
