@@ -1,6 +1,6 @@
 # Test grid and materials: a Test grid tool that resolves into ordinary operations, a Materials tab with one material shared by all lasers, tests judged and kept by id
 
-Status: Done (PR #353); revision 2026-11-19 (Draft, not built): the Test grid button is hidden, not dimmed, off laser pages (criterion 1, Revision)
+Status: Done (PR #353); revision 2026-11-19 (Draft, not built): the Test grid button is hidden, not dimmed, off laser pages (criterion 1, Revision); revision 2026-11-20 (Draft, not built): more picks than Best and round Engrave cells, see `0146` `material-test-picks`
 Priority: Must
 Origin: Customer (laser redesign after the demo of PR #333, answers to Fragen 192 to 211, 2026-11-12; decisions in `docs/design-drafts/2026-11-laser-redesign/README.md`). Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
@@ -89,6 +89,7 @@ As a maker with a new sheet of material I want to place a test grid from one too
 | ADR 0054 | folded grid row, `op_grid` | one row for the grid | derived ordinary operations and a grid object (12, 15) |
 | ADR 0055 | record `machine`, `sets` per kind, `history`; remembered grid values | one machine per record | shared across lasers (record format 2), photos next to the record, test records and tombstoned ids, the remembered grid values per machine stay (Proposal) |
 | `0111` | draft screens 02, 04, 05 | drafts | built here |
+| `0146` (Draft, 2026-11-20) | 12 (cell look), 23, 24 (one Best cell) | Engrave cells filled squares; one tapped Best cell | Engrave cells filled circles; Best, Second best, Fastest and Deepest picks (`0146` criteria 1 to 9, 18 to 22) |
 
 ## Out of scope
 
