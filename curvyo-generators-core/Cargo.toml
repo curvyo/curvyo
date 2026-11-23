@@ -1,0 +1,18 @@
+[package]
+name = "curvyo-generators-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The parametric generators extension (ADR 0079): a gear and a laser box with finger joints, pure functions from parameters to closed outlines."
+
+[lints]
+workspace = true
+
+[dependencies]
+curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
+curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+# `sin`, `cos`, `tan`, `acos`: the same bits on every target, so two peers write equal outlines
+# (ADR 0029 §5, ADR 0079 §2). MIT OR Apache-2.0, already in `Cargo.lock`.
+libm.workspace = true
+serde_json.workspace = true

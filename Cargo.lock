@@ -1094,6 +1094,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "curvyo-generators-core"
+version = "0.1.0"
+dependencies = [
+ "curvyo-document-core",
+ "curvyo-extension-core",
+ "libm",
+ "serde_json",
+]
+
+[[package]]
 name = "curvyo-geometry-core"
 version = "0.1.0"
 dependencies = [
@@ -1254,6 +1264,7 @@ version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
  "curvyo-extension-core",
+ "curvyo-generators-core",
  "curvyo-geometry-core",
  "curvyo-image-core",
  "curvyo-laser-core",

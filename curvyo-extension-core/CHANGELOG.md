@@ -4,6 +4,14 @@ The contract is `0.x` and unstable (ADR 0034 §5). Parameter keys and fixture ki
 publishes are written into project files (ADR 0033 §3): renaming one is a format change with a
 migration in that extension.
 
+## Unreleased (`specs/0141-parametric-generators`, ADR 0079)
+
+- The `Extension` trait (`manifest`, `notice`, `generate`); the registry holds `&'static dyn Extension`.
+- `Contribution::Generator(GeneratorKind)` with `ParamGroup`s; the generator contract
+  (`GenerateRequest`, `Edit`, `Generated`, `Part`, `ClosedPath`, `Cubic`, `Handle`, `Clamp`, `Seed`).
+- Parameter kinds `Count`, `Angle`, `Switch`, `Choice`; `Length` gains `step` and `decimals`; `Param`
+  gains `shown_when`. Stored encodings `{"deg": n}`, `{"count": n}`, `{"on": b}`, `{"choice": "id"}`.
+
 ## Unreleased (`specs/0026-machine-profile`)
 
 - Block kind `MachineProfile { label }`: the machine profile picker and the copy's fields, drawn
