@@ -403,6 +403,50 @@ jobs:
           done
           exit $status
 
+  # ADR 0075 decision 1 (`specs/0135` criterion 50): the job never needs a model. The model
+  # runtime crate `curvyo-imageai-core` is depended on only by `curvyo-ui-core` and
+  # `curvyo-editor-wasm`; `curvyo-laser-core` and `curvyo-image-core` never reach it.
+  imageai-boundary:
+    name: dependency edges (image models)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+      - name: Assert who depends on curvyo-imageai-core
+        run: |
+          set -euo pipefail
+          for crate in curvyo-laser-core curvyo-image-core; do
+            if cargo tree -p "$crate" -e normal --prefix none --format '{p}' | grep -q '^curvyo-imageai-core '; then
+              echo "::error::$crate depends on curvyo-imageai-core (ADR 0075 decision 1)"
+              exit 1
+            fi
+          done
+          dependents=$(cargo tree -i curvyo-imageai-core -e normal --depth 1 --prefix none --format '{p}' \
+            | tail -n +2 | sed -E 's/ v.*//' | sort -u | tr '\n' ' ')
+          echo "dependents: $dependents"
+          for d in $dependents; do
+            case "$d" in
+              curvyo-ui-core|curvyo-editor-wasm) ;;
+              *) echo "::error::$d depends on curvyo-imageai-core (ADR 0075 decision 1)"; exit 1 ;;
+            esac
+          done
+      - name: Release gate, no placeholder model hash
+        # `docs/runbooks/ai-models.md`: the three ONNX files are uploaded and their hashes pinned
+        # in `curvyo-imageai-core/models.toml`; a placeholder pin fails the job.
+        env:
+          CURVYO_RELEASE_MODELS: "1"
+        run: cargo test -q -p curvyo-imageai-core --test model_record release_gate
+      - name: One rten in the lock file (vectrace's and ours)
+        # ADR 0075 §5: `curvyo-imageai-core` pins the `rten` that vectrace's tag uses, so the wasm
+        # holds one copy; a bump of either side that splits them fails here.
+        run: |
+          versions=$(grep -A1 '^name = "rten"$' Cargo.lock | grep -c '^version')
+          if [ "$versions" != 1 ]; then
+            echo "::error::Cargo.lock has $versions versions of rten; bump curvyo-imageai-core and the vectrace tag together"
+            exit 1
+          fi
+
   # ADR 0011 §6: every *-core crate builds for wasm32-unknown-unknown, and CI
   # asserts *which* dependency would silently break that build rather than
   # only noticing that it broke. Ubuntu only, per ADR 0011 §7.

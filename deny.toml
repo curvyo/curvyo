@@ -62,6 +62,10 @@ name = "curvyo-svg-core"
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-image-core"
+# The on-device image models crate (ADR 0075): first-party, like the other core crates.
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-imageai-core"
 
 # The first-party sketch solver adapter follows ADR 0006, like the other core crates.
 [[licenses.exceptions]]

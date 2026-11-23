@@ -11,6 +11,11 @@
             "description": "The Import button's GTK file chooser uses the gtk version Tauri links; gtk 0.19 conflicts with it (links = gtk-3). Moves with Tauri.",
             "matchPackageNames": ["gtk"],
             "enabled": false
+        },
+        {
+            "description": "rten moves with the vectrace tag (one rten in the wasm, ADR 0075 §5; CI checks the lock file): one PR for every rten crate and vectrace.",
+            "matchPackageNames": ["rten", "rten-tensor", "vectrace"],
+            "groupName": "rten and vectrace"
         }
     ]
 }
