@@ -17,8 +17,10 @@ fn rejected(out: &curvyo_connector_core::Output) -> Option<RejectReason> {
 }
 
 fn accepted(out: &curvyo_connector_core::Output) -> bool {
-    out.messages
-        .contains(&Message::JobAccepted { job_id: job_id() })
+    out.messages.contains(&Message::JobAccepted {
+        job_id: job_id(),
+        position: None,
+    })
 }
 
 fn announce(rig: &mut Rig, text: &str) {
@@ -39,7 +41,7 @@ fn chunks_assemble_to_the_original_and_the_job_is_ready() {
         assert!(accepted(&last.unwrap()));
         assert_eq!(rig.machine.state(), State::Ready);
         let job = rig.machine.held_job().unwrap();
-        assert_eq!(job.text, JOB_TEXT);
+        assert_eq!(job.text.as_ref(), JOB_TEXT);
         assert_eq!(job.kind, kind);
         assert_eq!(sha256_hex(&job.text), sha256_hex(JOB_TEXT));
     }

@@ -8,9 +8,9 @@ use curvyo_connector_core::{Event, StartRule};
 
 use curvyo_connector_core::ControllerConfig;
 
-use super::{
-    ControllerChoice, Exchange, Hub, Inner, SerialSettings, fake_of, machine_for, serial_port_of,
-};
+use super::{ControllerChoice, Exchange, Hub, Inner, SerialSettings, machine_for};
+use crate::controller::Controller;
+use crate::fake_controller::FakeController;
 use crate::grbl::GrblController;
 
 impl Hub {
@@ -131,7 +131,9 @@ impl Hub {
 
     /// The machine starts afresh with the controller of `choice` under `rule`.
     pub(super) fn rebuild(&self, inner: &mut Inner, choice: &ControllerChoice, rule: StartRule) {
+        let kept = inner.machine.take_list();
         inner.machine = machine_for(choice, rule);
+        inner.machine.restore(kept);
         inner.controller = fake_of(choice);
         inner.serial_port = serial_port_of(choice);
         inner.pending_write.clear();
@@ -151,5 +153,22 @@ impl Hub {
         let mut inner = self.lock();
         inner.controller = Some(controller);
         inner.machine.handle(Event::ControllerConnected);
+    }
+}
+
+pub(super) fn serial_port_of(choice: &ControllerChoice) -> Option<String> {
+    match choice {
+        ControllerChoice::Serial(serial) => Some(serial.port.clone()),
+        _ => None,
+    }
+}
+
+pub(super) fn fake_of(choice: &ControllerChoice) -> Option<Box<dyn Controller>> {
+    match choice {
+        ControllerChoice::Fake(f) => Some(Box::new(FakeController::new(
+            f.lines_per_second,
+            f.alarm_at_line,
+        ))),
+        _ => None,
     }
 }

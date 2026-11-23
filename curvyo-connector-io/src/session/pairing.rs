@@ -87,6 +87,6 @@ impl Session {
                 },
             )
             && self.become_authenticated(socket, name, role)
-            && send(socket, self.hub.status())
+            && self.send_list_and_status(socket)
     }
 }

@@ -27,6 +27,10 @@ enum Kind {
     Login,
     Job,
     Home,
+    /// `MoveJob`, `RemoveJob`, `SetRunNext`: the job list.
+    List,
+    /// `MoveJob`: only an owner reorders.
+    Reorder,
     OwnerCall,
 }
 
@@ -37,6 +41,8 @@ fn kind(message: &Message) -> Kind {
         Message::ApplyConfig { .. } => Kind::ApplyConfig,
         Message::Pair { .. } | Message::Auth { .. } => Kind::Login,
         Message::Home => Kind::Home,
+        Message::MoveJob { .. } => Kind::Reorder,
+        Message::RemoveJob { .. } | Message::SetRunNext { .. } => Kind::List,
         Message::GetConfig
         | Message::IssueCode { .. }
         | Message::ListClients
@@ -71,7 +77,9 @@ pub fn admit(mode: Mode, peer: Option<Role>, message: &Message) -> Result<(), Er
         Mode::Configured => match (kind, peer) {
             (Kind::Login, _) | (_, Some(Role::Owner)) => Ok(()),
             (Kind::ListPorts | Kind::ApplyConfig, _)
-            | (Kind::OwnerCall | Kind::Home, Some(Role::Member)) => Err(ErrorCode::OwnerRequired),
+            | (Kind::OwnerCall | Kind::Home | Kind::Reorder, Some(Role::Member)) => {
+                Err(ErrorCode::OwnerRequired)
+            }
             (_, None) => Err(ErrorCode::PairingRequired),
             (_, Some(Role::Member)) => Ok(()),
         },
@@ -156,6 +164,22 @@ mod tests {
             ("Stop", Message::Stop),
             ("Unlock", Message::Unlock),
             ("Home", Message::Home),
+            (
+                "MoveJob",
+                Message::MoveJob {
+                    job_id: id,
+                    from: 1,
+                    to: 2,
+                },
+            ),
+            ("RemoveJob", Message::RemoveJob { job_id: id }),
+            (
+                "SetRunNext",
+                Message::SetRunNext {
+                    job_id: id,
+                    on: true,
+                },
+            ),
             ("GetConfig", Message::GetConfig),
             (
                 "IssueCode",
@@ -227,6 +251,9 @@ mod tests {
             "Stop: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "Unlock: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "Home: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
+            "MoveJob: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
+            "RemoveJob: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
+            "SetRunNext: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "GetConfig: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired OwnerRequired",
             "IssueCode: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired OwnerRequired",
             "ListClients: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired OwnerRequired",

@@ -52,8 +52,8 @@ struct Session {
     updates: Option<Receiver<Message>>,
     limiter: StatusLimiter,
     pairing: Option<Pairing>,
-    /// Whether this connection sent a `SubmitJob`.
-    submitted: bool,
+    /// The jobs this connection announced.
+    submitted: Vec<uuid::Uuid>,
     /// When the last frame came in.
     last_frame: Instant,
     /// The logged-in client: its name and role.
@@ -130,7 +130,7 @@ pub fn serve(
         updates: None,
         limiter: StatusLimiter::default(),
         pairing: None,
-        submitted: false,
+        submitted: Vec::new(),
         last_frame: Instant::now(),
         peer: None,
         peer_ip,
@@ -138,8 +138,10 @@ pub fn serve(
         maintenance_epoch: None,
     };
     session.run(&mut socket, deadline, shutdown);
-    if session.submitted {
-        session.hub.client_disconnected(Instant::now());
+    if !session.submitted.is_empty() {
+        session
+            .hub
+            .client_disconnected(&session.submitted, Instant::now());
     }
     if session.pairing.take().is_some() {
         session.hub.pair_failed();
@@ -254,8 +256,9 @@ impl Session {
     fn flush_statuses(&mut self, socket: &mut Socket, now: Instant) -> bool {
         if let Some(updates) = &self.updates {
             while let Ok(message) = updates.try_recv() {
-                if matches!(message, Message::Welcome { .. }) {
-                    // A changed controller goes out at once, before the status that follows.
+                if matches!(message, Message::Welcome { .. } | Message::JobList { .. }) {
+                    // A changed controller and every change of the list go out at once, in
+                    // order, before the status that follows.
                     if !send(socket, message) {
                         return false;
                     }
@@ -372,7 +375,9 @@ impl Session {
             | Message::GetLog { .. }
             | Message::Reset { .. }) => self.on_owner_call(socket, owner_call, peer),
             other => {
-                self.submitted |= matches!(other, Message::SubmitJob { .. });
+                if let Message::SubmitJob { job_id, .. } = &other {
+                    self.submitted.push(*job_id);
+                }
                 let answers = self.hub.handle_message(other, peer, now);
                 if answers.iter().any(|m| matches!(m, Message::Status { .. })) {
                     self.limiter.answered(now);
@@ -390,7 +395,12 @@ impl Session {
             );
         };
         self.limiter.answered(Instant::now());
-        self.become_authenticated(socket, name, role) && send(socket, self.hub.status())
+        self.become_authenticated(socket, name, role) && self.send_list_and_status(socket)
+    }
+
+    /// The job list, then the current status: a connection starts with both (`specs/0132` L3).
+    pub(super) fn send_list_and_status(&mut self, socket: &mut Socket) -> bool {
+        send(socket, self.hub.job_list()) && send(socket, self.hub.status())
     }
 
     /// The connection is now `name` with `role`: it gets the statuses and is told who it is.

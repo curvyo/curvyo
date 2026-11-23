@@ -1,0 +1,1 @@
+{"type":"JobList","current":null,"waiting":[{"job_id":"00000000-0000-0000-0000-000000000009","name":"box.gcode","lines":412,"bytes":4301,"sent_by":"Phone","position":0,"interrupted_at":1234},{"job_id":"00000000-0000-0000-0000-000000000002","name":"sign.gcode","lines":412,"bytes":4301,"sent_by":"Phone","position":1}]}

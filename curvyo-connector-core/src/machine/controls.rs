@@ -1,6 +1,7 @@
 //! How the job machine takes the job controls and the events of the controller side.
 
 use super::{ControllerCommand, Event, Machine, Output, StartRule, Waiting, count};
+use crate::job_list::End;
 use crate::message::{ErrorCode, JobResult, Message, State};
 
 impl Machine {
@@ -46,6 +47,7 @@ impl Machine {
                         },
                         out,
                     );
+                    self.job_ended(End::Stopped, out);
                 }
             }
             (Message::Pause, State::Homing) => {
@@ -87,11 +89,15 @@ impl Machine {
             Event::ControllerLostWith { detail } => self.lose(Some(&detail), out),
             Event::StopUnconfirmed => self.lose(Some("Could not confirm the machine stopped"), out),
             Event::Alarm { text } => {
+                let in_flight = self.in_flight();
                 self.discard();
                 if self.state != State::Alarm || self.alarm.is_none() {
                     // The first alarm's text stands until the alarm clears (`specs/0127` G13).
                     self.alarm = Some(text);
                     self.set(State::Alarm, out);
+                }
+                if in_flight {
+                    self.job_ended(End::Alarm, out);
                 }
             }
             Event::AlarmCleared if self.state == State::Alarm => {
@@ -132,6 +138,7 @@ impl Machine {
     /// The controller is gone: a job in flight is dropped and named in a detail that stays
     /// through the reconnect (`specs/0127` G15, UX notes V7).
     fn lose(&mut self, text: Option<&str>, out: &mut Output) {
+        let in_flight = self.in_flight();
         let line = self.held.as_ref().map_or(0, |h| h.line);
         let loss = match self.state {
             _ if self.waits_for_resume() => {
@@ -156,6 +163,14 @@ impl Machine {
             Some(detail) => self.set_with(State::NoController, detail, true, out),
             None => self.set(State::NoController, out),
         }
+        if in_flight {
+            self.job_ended(End::Lost, out);
+        }
+    }
+
+    /// A job runs, is paused, or waits for its resume.
+    fn in_flight(&self) -> bool {
+        matches!(self.state, State::Running | State::Paused) || self.waits_for_resume()
     }
 
     fn on_job_event(&mut self, event: Event, out: &mut Output) {
@@ -179,6 +194,7 @@ impl Machine {
                     },
                     out,
                 );
+                self.job_ended(End::Completed, out);
             }
             Event::JobFailed { elapsed_ms } if self.state == State::Running => {
                 held.elapsed_ms = elapsed_ms;
@@ -188,6 +204,7 @@ impl Machine {
                     },
                     out,
                 );
+                self.job_ended(End::Failed, out);
             }
             Event::JobFailedWith { elapsed_ms, detail } => {
                 held.elapsed_ms = elapsed_ms;
@@ -195,6 +212,7 @@ impl Machine {
                     result: JobResult::Failed,
                 };
                 self.set_with(done, detail, false, out);
+                self.job_ended(End::Failed, out);
             }
             Event::Held if self.state == State::Running && !self.stop_pending => {
                 self.set(State::Paused, out);
@@ -213,6 +231,7 @@ impl Machine {
                     result: JobResult::Stopped,
                 };
                 self.set(done, out);
+                self.job_ended(End::Stopped, out);
             }
             _ => {}
         }

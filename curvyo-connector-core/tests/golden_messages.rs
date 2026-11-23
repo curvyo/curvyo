@@ -123,7 +123,13 @@ fn all() -> Vec<(&'static str, Message)> {
                 token: "c2VjcmV0LXRva2Vu".into(),
             },
         ),
-        ("job_accepted", Message::JobAccepted { job_id: job_id() }),
+        (
+            "job_accepted",
+            Message::JobAccepted {
+                job_id: job_id(),
+                position: None,
+            },
+        ),
         (
             "job_rejected",
             Message::JobRejected {

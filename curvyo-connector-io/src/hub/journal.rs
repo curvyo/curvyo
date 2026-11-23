@@ -1,7 +1,9 @@
 //! Which changes of the job machine reach `jobs.log`, `admin.log` and the terminal, with the
 //! clients behind them (`0064` Q18, `specs/0127` G7, `specs/0128` A14, A15, A18).
 
-use curvyo_connector_core::{Confirmation, Message, People, RejectReason, State};
+use std::time::Duration;
+
+use curvyo_connector_core::{Confirmation, ListLog, Message, People, RejectReason, State};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -9,6 +11,9 @@ use super::{Hub, Inner};
 use crate::admin_log::AdminEvent;
 use crate::hub_log::{logged_outcome, rejection_line, terminal_alarm};
 use crate::job_log::{LogPeople, LogResult};
+
+/// The shortest time between two writes of the running job's line.
+const LINE_PERIOD: Duration = Duration::from_secs(1);
 
 fn log_people(people: Option<&People>) -> LogPeople {
     people.map_or_else(LogPeople::default, |p| LogPeople {
@@ -47,8 +52,9 @@ impl Hub {
     pub(super) fn log_rejection(&self, inner: &Inner, job_id: Uuid, reason: RejectReason) {
         let name = inner
             .submitted
-            .as_ref()
-            .filter(|(id, _)| *id == job_id)
+            .iter()
+            .rev()
+            .find(|(id, _)| *id == job_id)
             .map(|(_, name)| name.clone())
             .unwrap_or_default();
         let result = LogResult::Rejected(format!("{reason:?}"));
@@ -56,6 +62,56 @@ impl Hub {
         let line =
             rejection_line(reason).unwrap_or_else(|| format!("Job {name}: {}", result.text()));
         let _ = inner.notices.send(line);
+    }
+
+    /// A change of the job list that `admin.log` records (`specs/0132` L6).
+    pub(super) fn log_list_change(&self, inner: &Inner, log: &ListLog) {
+        match log {
+            ListLog::Removed {
+                job_id,
+                name,
+                sent_by,
+                by,
+            } => {
+                let event = AdminEvent::JobRemoved {
+                    job_name: name.clone(),
+                    job_id: job_id.to_string(),
+                    sent_by: sent_by.clone(),
+                };
+                self.append_admin(inner, by, &event);
+            }
+            ListLog::RunNext {
+                job_id,
+                name,
+                by,
+                on,
+            } => {
+                let event = AdminEvent::RunNextSet {
+                    job_name: name.clone(),
+                    job_id: job_id.to_string(),
+                    on: *on,
+                };
+                self.append_admin(inner, by, &event);
+            }
+        }
+    }
+
+    /// What a restart dropped from the stored job list, one `admin.log` line each.
+    pub(super) fn log_restore(&self, loaded: &crate::job_store::Loaded) {
+        let Ok(inner) = self.inner.lock() else { return };
+        if let Some(detail) = &loaded.list_dropped {
+            let event = AdminEvent::JobListDropped {
+                detail: detail.clone(),
+            };
+            self.append_admin(&inner, "", &event);
+        }
+        for dropped in &loaded.restored.dropped {
+            let event = AdminEvent::JobDropped {
+                job_name: dropped.name.clone(),
+                detail: dropped.detail.clone(),
+            };
+            self.append_admin(&inner, "", &event);
+        }
     }
 
     /// A start or resume that waited ran: `admin.log` and the terminal (A14).
@@ -142,5 +198,56 @@ impl Hub {
             _ => format!("Press Enter to start {job}"),
         };
         let _ = inner.notices.send(line);
+    }
+}
+
+impl Inner {
+    /// Writes the job list to the state directory when it changed: new texts, then the list,
+    /// then deleted texts. The line of the running job is written at most once a second, or at
+    /// once when `force_line`.
+    pub(super) fn sync_store(&mut self, at: Duration, force_line: bool) {
+        let inner = self;
+        if inner.frozen {
+            return;
+        }
+        let mut stored = inner.machine.stored();
+        let texts = inner.machine.stored_texts();
+        let ids: std::collections::HashSet<_> = texts.iter().map(|(id, _)| *id).collect();
+        let line = stored.current.as_ref().map_or(0, |c| c.line);
+        let write = match &inner.last_stored {
+            None => true,
+            Some((last, written_at)) => {
+                let mut same = last.clone();
+                let last_line = same.current.as_ref().map_or(0, |c| c.line);
+                if let Some(c) = same.current.as_mut() {
+                    c.line = line;
+                }
+                let due = at.saturating_sub(*written_at) >= LINE_PERIOD;
+                same != stored || (line != last_line && (due || force_line))
+            }
+        };
+        if !write {
+            return;
+        }
+        for (id, text) in texts {
+            if inner.stored_ids.insert(id) {
+                inner.store.write_text(id, text);
+            }
+        }
+        inner.store.write_list(&stored);
+        let gone: Vec<_> = inner
+            .stored_ids
+            .iter()
+            .filter(|id| !ids.contains(id))
+            .copied()
+            .collect();
+        for id in gone {
+            inner.stored_ids.remove(&id);
+            inner.store.remove_text(id);
+        }
+        if let Some(c) = stored.current.as_mut() {
+            c.line = line;
+        }
+        inner.last_stored = Some((stored, at));
     }
 }

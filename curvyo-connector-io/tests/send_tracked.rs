@@ -10,9 +10,7 @@ use std::sync::{Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use common::{JOB, WAIT, rig, state_of};
-use curvyo_connector_core::{
-    JobKind, MAX_CHUNK_BYTES, Message, RejectReason, Resolution, SendWatch, State,
-};
+use curvyo_connector_core::{JobKind, MAX_CHUNK_BYTES, Message, Resolution, SendWatch, State};
 use curvyo_connector_io::client::{CONNECT_TIMEOUT, ClientError, Connection, open_paired};
 use curvyo_connector_io::job_send::new_job_id;
 use curvyo_connector_io::record::PairingRecord;
@@ -56,14 +54,20 @@ fn an_accepted_send_resolves_once_and_the_connector_holds_the_job() {
     let (_, status) = rig.open(&record);
     assert_eq!(state_of(&status), State::Ready);
     assert_eq!(
-        observe_shared(&watch, &Message::JobAccepted { job_id: id }),
+        observe_shared(
+            &watch,
+            &Message::JobAccepted {
+                job_id: id,
+                position: None
+            }
+        ),
         None,
         "a replayed answer commits nothing again"
     );
 }
 
 #[test]
-fn a_second_send_is_refused_busy_and_the_held_job_stays() {
+fn a_second_send_joins_the_list_and_the_held_job_stays() {
     let rig = rig(20);
     let record = rig.pair("Laptop");
     let address = rig.address();
@@ -85,12 +89,14 @@ fn a_second_send_is_refused_busy_and_the_held_job_stays() {
         deadline(),
     )
     .unwrap();
-    assert_eq!(
-        end,
-        SendEnd::Resolved(Resolution::Rejected(RejectReason::Busy))
-    );
-    let (_, status) = rig.open(&record);
+    assert_eq!(end, SendEnd::Resolved(Resolution::Accepted));
+    let (connection, status) = rig.open(&record);
     assert_eq!(state_of(&status), State::Ready);
+    let Some(Message::JobList { waiting, .. }) = connection.job_list else {
+        panic!("a connection starts with the list");
+    };
+    assert_eq!(waiting.len(), 1);
+    assert_eq!(waiting[0].name, "two");
 }
 
 #[test]
@@ -247,6 +253,11 @@ fn b5_an_idle_watcher_reports_the_loss_once_and_ends() {
             seen.recv_timeout(WAIT).unwrap(),
             WatchEvent::Status(_)
         ));
+        // The list the connection started with follows its first status.
+        assert!(matches!(
+            seen.recv_timeout(WAIT).unwrap(),
+            WatchEvent::JobList(_)
+        ));
         rig_server.shutdown();
         assert!(matches!(seen.recv_timeout(WAIT).unwrap(), WatchEvent::Lost));
         handle.join().unwrap();
@@ -292,9 +303,7 @@ fn the_accepting_connection_comes_back_open_and_a_refusal_hands_back_none() {
         deadline(),
     )
     .unwrap();
-    assert_eq!(
-        end,
-        SendEnd::Resolved(Resolution::Rejected(RejectReason::Busy))
-    );
+    // `specs/0132`: a send behind a running job is listed; its sender does not start it.
+    assert_eq!(end, SendEnd::Resolved(Resolution::Accepted));
     assert!(connection.is_none());
 }

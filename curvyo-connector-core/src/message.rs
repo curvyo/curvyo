@@ -33,6 +33,8 @@ pub enum RejectReason {
     LaserModeOff,
     /// The controller's laser mode could not be read (GRBL without `$32` in `$$`, G34).
     LaserModeUnknown,
+    /// The job list holds 20 jobs or 256 MiB (`specs/0132`).
+    ListFull,
 }
 
 /// How a job ended.
@@ -115,6 +117,29 @@ pub struct ControllerSettings {
     pub s_max: Option<u32>,
     /// The travel of X and Y (GRBL `$130`, `$131`).
     pub travel: Option<[Millimetres; 2]>,
+}
+
+/// One job of the connector's job list (`specs/0132`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ListEntry {
+    /// The job.
+    pub job_id: Uuid,
+    /// The name sent with it.
+    pub name: String,
+    /// Its lines.
+    pub lines: u32,
+    /// Its size in bytes.
+    pub bytes: u64,
+    /// The client that sent it.
+    pub sent_by: String,
+    /// 1-based place among the waiting jobs; 0 for the current job and an interrupted one.
+    pub position: u32,
+    /// Marked "Run next automatically"; left out when false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub run_next: bool,
+    /// A job that ran when the connector stopped: the line it had reached.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interrupted_at: Option<u32>,
 }
 
 /// The code of an `Error` message.
@@ -235,6 +260,27 @@ pub enum Message {
     /// Runs the controller's homing cycle (GRBL `$H`), from `Idle`, `Ready`, `Done` or `Alarm`
     /// (`specs/0118`); never sent on its own by the app or the connector.
     Home,
+    /// Moves a waiting job from place `from` to place `to` (both 1-based; owner).
+    MoveJob {
+        /// The job.
+        job_id: Uuid,
+        /// The place the app saw it at.
+        from: u32,
+        /// The place it moves to.
+        to: u32,
+    },
+    /// Removes a waiting job (its sender, or an owner).
+    RemoveJob {
+        /// The job.
+        job_id: Uuid,
+    },
+    /// Sets or clears "Run next automatically" on a waiting job (its sender, or an owner).
+    SetRunNext {
+        /// The job.
+        job_id: Uuid,
+        /// The new value.
+        on: bool,
+    },
     /// Asks for the serial ports of the connector's host (maintenance or owner).
     ListPorts,
     /// Configures the connector: in maintenance mode the sender becomes its owner; in configured
@@ -335,10 +381,23 @@ pub enum Message {
         /// The token for later `Auth`.
         token: String,
     },
-    /// The job is assembled and `Ready`.
+    /// The job is assembled: `Ready`, or in the job list at `position`.
     JobAccepted {
         /// The job.
         job_id: Uuid,
+        /// The 1-based place among the waiting jobs; left out when the job became current.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        position: Option<u32>,
+    },
+    /// The job list, pushed on every change and before a connection's first `Status`.
+    JobList {
+        /// The current job, if the connector holds one.
+        current: Option<ListEntry>,
+        /// An interrupted job first, then the waiting jobs in order.
+        waiting: Vec<ListEntry>,
+        /// "Chain stopped: `<state>`" until the next start.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
     },
     /// The job is refused.
     JobRejected {

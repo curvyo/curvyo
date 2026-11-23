@@ -6,7 +6,7 @@ use crate::message::{ErrorCode, Message};
 pub const MAX_FRAME_BYTES: usize = 1024 * 1024;
 
 /// Every `type` of protocol version 0, to tell "unknown type" from "malformed".
-const KNOWN_TYPES: [&str; 35] = [
+const KNOWN_TYPES: [&str; 39] = [
     "Hello",
     "Pair",
     "Auth",
@@ -27,6 +27,10 @@ const KNOWN_TYPES: [&str; 35] = [
     "RevokeClient",
     "GetLog",
     "Reset",
+    "MoveJob",
+    "RemoveJob",
+    "SetRunNext",
+    "JobList",
     "Welcome",
     "Authenticated",
     "Ports",

@@ -216,7 +216,13 @@ fn a_job_walks_from_plug_in_to_done_with_the_fake_controller() {
     rig.app(submit(JOB_TEXT, JobKind::Job));
     let out = rig.app(chunk(0, JOB_TEXT));
     assert_eq!(rig.machine.state(), State::Ready);
-    assert_eq!(out.messages[0], Message::JobAccepted { job_id: job_id() });
+    assert_eq!(
+        out.messages[0],
+        Message::JobAccepted {
+            job_id: job_id(),
+            position: None
+        }
+    );
 
     let out = rig.app(Message::Start { job_id: job_id() });
     assert_eq!(
@@ -477,7 +483,13 @@ fn a_zero_byte_job_is_accepted_without_chunks() {
             ..
         }
     ));
-    assert_eq!(out.messages[1], Message::JobAccepted { job_id: job_id() });
+    assert_eq!(
+        out.messages[1],
+        Message::JobAccepted {
+            job_id: job_id(),
+            position: None
+        }
+    );
     assert!(matches!(
         &out.messages[2],
         Message::Status {

@@ -95,6 +95,8 @@ pub struct Connection {
     pub spki: SpkiHash,
     /// This client's name and role, from `Authenticated` after a login or pairing.
     pub session: Option<(String, Role)>,
+    /// The job list the connector sent before the first `Status` (`specs/0132` L3).
+    pub job_list: Option<Message>,
 }
 
 fn is_idle(error: &tungstenite::Error) -> bool {
@@ -242,6 +244,7 @@ pub fn connect_on(
             .seen()
             .ok_or_else(|| ClientError::Tls("no key was presented".to_owned()))?,
         session: None,
+        job_list: None,
     };
     connection.greet(deadline)?;
     Ok(connection)
@@ -395,6 +398,7 @@ impl Connection {
                 Message::Authenticated { client_name, role } => {
                     self.session = Some((client_name, role));
                 }
+                list @ Message::JobList { .. } => self.job_list = Some(list),
                 status @ Message::Status { .. } => return Ok(status),
                 Message::Error {
                     code: ErrorCode::PairingRequired,
@@ -425,7 +429,10 @@ impl Connection {
                 Frame::Core(Message::Authenticated { client_name, role }) => {
                     self.session = Some((client_name, role));
                 }
-                Frame::Core(Message::Status { .. } | Message::Welcome { .. }) | Frame::Io(_) => {}
+                Frame::Core(
+                    Message::Status { .. } | Message::Welcome { .. } | Message::JobList { .. },
+                )
+                | Frame::Io(_) => {}
                 Frame::Core(answer) => return Ok(answer),
             }
         }

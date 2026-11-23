@@ -22,6 +22,7 @@ pub mod hub_log;
 pub mod identity;
 pub mod job_log;
 pub mod job_send;
+pub mod job_store;
 pub mod log_tail;
 pub mod maintenance;
 pub mod pairing;

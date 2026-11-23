@@ -57,6 +57,36 @@ pub enum AdminEvent {
         /// A resume rather than a start.
         resume: bool,
     },
+    /// An owner removed a job another client sent from the job list.
+    JobRemoved {
+        /// The job's name.
+        job_name: String,
+        /// The job's id.
+        job_id: String,
+        /// Who sent it.
+        sent_by: String,
+    },
+    /// "Run next automatically" was set or cleared on a listed job.
+    RunNextSet {
+        /// The job's name.
+        job_name: String,
+        /// The job's id.
+        job_id: String,
+        /// The new value.
+        on: bool,
+    },
+    /// A stored job did not come back after a restart: its name, then its id and the cause.
+    JobDropped {
+        /// The job's name.
+        job_name: String,
+        /// `<id> <cause>`.
+        detail: String,
+    },
+    /// The stored job list could not be read: every stored job was dropped.
+    JobListDropped {
+        /// The cause.
+        detail: String,
+    },
 }
 
 /// `owner` or `member`, as the file and `curvyoctl` write a role.
@@ -98,6 +128,28 @@ impl AdminEvent {
                     format!("{job_name} {job_id}{tail}"),
                 )
             }
+            Self::JobRemoved {
+                job_name,
+                job_id,
+                sent_by,
+            } => (
+                "job-removed",
+                job_name.clone(),
+                format!("{job_id} sent by {sent_by}"),
+            ),
+            Self::RunNextSet {
+                job_name,
+                job_id,
+                on,
+            } => (
+                "run-next-set",
+                job_name.clone(),
+                format!("{job_id} {}", if *on { "on" } else { "off" }),
+            ),
+            Self::JobDropped { job_name, detail } => {
+                ("job-dropped", job_name.clone(), detail.clone())
+            }
+            Self::JobListDropped { detail } => ("job-list-dropped", String::new(), detail.clone()),
         }
     }
 }
