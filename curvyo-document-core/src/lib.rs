@@ -79,6 +79,11 @@ mod dimension_commands;
 mod dimension_keep;
 mod dimension_model;
 mod dimension_read;
+mod generated_codec;
+mod generated_commands;
+#[cfg(test)]
+mod generated_damage_tests;
+mod generated_outline;
 pub use dimension_commands::{ConvertedPath, DimensionConversion};
 pub use dimension_model::{
     CONVERT_DIMENSION_COMMIT_LABEL, CREATE_DIMENSION_COMMIT_LABEL, CurveSlot, DimensionKind,
@@ -349,6 +354,11 @@ pub use format_library_file::{
     MAX_USER_FILE_BYTES, MAX_USER_FORMATS, MAX_USER_GROUPS, USER_FILE_FORMAT, describe_error,
 };
 pub use format_library_import::ImportReport;
+pub use generated_codec::{GeneratedRecord, GeneratedSnapshot, orthonormalised};
+pub use generated_commands::{
+    ADD_GENERATED_COMMIT_LABEL, CHANGE_PARAMETER_COMMIT_LABEL, CONVERT_GENERATED_COMMIT_LABEL,
+    GeneratedError, KEY_SUBJECT_KIND, KEY_SUBJECT_PARAM,
+};
 pub use group_tree::MAX_GROUP_DEPTH;
 pub use groups::{GROUP_COMMIT_LABEL, UNGROUP_COMMIT_LABEL};
 pub use guides::{GuideMarking, SET_GUIDE_COMMIT_LABEL};

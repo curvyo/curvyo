@@ -76,6 +76,10 @@ pub enum ObjectEditError {
     /// [`Document::transform_objects`] is not finite: nothing was written.
     #[error("every coordinate and angle must be finite")]
     NonFiniteGeometry,
+    /// A generated object only moves, turns and flips; a result that scales or skews it is not a
+    /// transform of the object (a resize writes its parameters, ADR 0079 §6).
+    #[error("a generated object only moves, turns and flips")]
+    GeneratedNotRigid,
     /// A path result given to [`Document::transform_objects`] for an object that
     /// is still a primitive is not one closed outline of at least two anchors with
     /// different ids: nothing was written.
@@ -963,6 +967,9 @@ pub(crate) fn translate_meta(meta: &loro::LoroMap, offset: Vec2) {
         shape_codec::LeafKind::Image => crate::image_codec::translate_image_meta(meta, offset),
         shape_codec::LeafKind::Dimension => {
             crate::dimension_codec::translate_dimension_meta(meta, offset);
+        }
+        shape_codec::LeafKind::Generated => {
+            crate::generated_codec::translate_generated_meta(meta, offset);
         }
     }
 }

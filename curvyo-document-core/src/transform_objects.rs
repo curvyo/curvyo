@@ -50,6 +50,12 @@ enum Planned<'a> {
         anchors: Vec<(loro::LoroMovableList, usize, &'a AnchorSnapshot)>,
         result: &'a ObjectSnapshot,
     },
+    /// A generated object: only its frame is written, and only for a move, turn or flip
+    /// (ADR 0079 §4; a resize goes through the generator and is not a transform).
+    Generated {
+        meta: loro::LoroMap,
+        frame: crate::affine::Affine,
+    },
     /// A clone whose result is a clone: only its link is written, with the origin it was
     /// computed for (`specs/0049-linked-clone` criterion 15).
     Clone {
@@ -178,6 +184,12 @@ impl Document {
                     (meta, result)
                 }
                 Planned::Clone { .. } | Planned::Dimension { .. } | Planned::Image { .. } => {
+                    continue;
+                }
+                Planned::Generated { meta, frame } => {
+                    if crate::generated_codec::read_frame(meta) != Some(*frame) {
+                        crate::generated_codec::write_frame(meta, *frame);
+                    }
                     continue;
                 }
                 Planned::Text { meta, result } => {
@@ -347,6 +359,7 @@ impl Document {
 }
 
 /// The plan for one result, resolved against the document before any write.
+#[allow(clippy::too_many_lines)] // One dispatch over every leaf kind.
 fn plan_one<'a>(
     tree: &loro::LoroTree,
     result: &'a ObjectSnapshot,
@@ -371,6 +384,9 @@ fn plan_one<'a>(
     }
     if crate::clone_codec::is_clone_meta(&meta) {
         return plan_clone(tree, meta, result);
+    }
+    if crate::generated_codec::is_generated_meta(&meta) {
+        return plan_generated(meta, result);
     }
     if crate::dimension_codec::is_dimension_meta(&meta) {
         return match result {
@@ -451,6 +467,42 @@ fn plan_one<'a>(
         }
         _ => Err(ObjectEditError::NoSuchObject),
     }
+}
+
+/// The plan for a generated node: the result is its outline moved by a rigid map, which the new
+/// frame carries. A result that is not such a map (a resize, a skew, a node edit) is refused.
+fn plan_generated(
+    meta: loro::LoroMap,
+    result: &ObjectSnapshot,
+) -> Result<Planned<'_>, ObjectEditError> {
+    let ObjectSnapshot::Path(path) = result else {
+        return Err(ObjectEditError::NoSuchObject);
+    };
+    let snapshot = crate::generated_codec::read_snapshot(path.id, &meta)
+        .ok_or(ObjectEditError::NoSuchObject)?;
+    let current =
+        crate::generated_outline::outline(&snapshot, crate::style_codec::read_style(&meta));
+    if current.all_anchors().count() != path.all_anchors().count() {
+        return Err(ObjectEditError::GeneratedNotRigid);
+    }
+    let map = crate::outline_map::outline_map(&current, path)
+        .ok_or(ObjectEditError::GeneratedNotRigid)?;
+    // A resize is the generator's business (it changes parameters, not a hidden transform).
+    let unit = |x: f64, y: f64| (x * x + y * y - 1.0).abs() <= 1e-6;
+    if !unit(map.a, map.b) || !unit(map.c, map.d) || (map.a * map.c + map.b * map.d).abs() > 1e-6 {
+        return Err(ObjectEditError::GeneratedNotRigid);
+    }
+    let frame = crate::generated_codec::orthonormalised(map.compose(snapshot.frame));
+    if !crate::generated_codec::frame_is_valid(frame) {
+        return Err(ObjectEditError::NonFiniteGeometry);
+    }
+    // The frame stays as stored when the turn is nothing but rounding.
+    let frame = if frame.approx_eq(snapshot.frame, 1e-12) {
+        snapshot.frame
+    } else {
+        frame
+    };
+    Ok(Planned::Generated { meta, frame })
 }
 
 /// The plan for a clone node: a clone result keeps the link (refused when a peer re-pointed the

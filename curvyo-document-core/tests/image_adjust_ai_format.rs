@@ -176,6 +176,19 @@ fn read_or_write(name: &str, make: impl Fn() -> Vec<u8>) -> Vec<u8> {
     std::fs::read(path).unwrap()
 }
 
+/// The golden's `document.json` as this build writes it: the golden is a format 53 file, the
+/// save says 54 (`specs/0141-parametric-generators`); everything else must be equal.
+fn document_json_at_54(bytes: &[u8]) -> Vec<u8> {
+    String::from_utf8(members(bytes)["document.json"].clone())
+        .unwrap()
+        .replacen(
+            "\"format_version\": 53",
+            &format!("\"format_version\": {CURRENT_FORMAT_VERSION}"),
+            1,
+        )
+        .into_bytes()
+}
+
 fn golden() -> Vec<u8> {
     read_or_write(GOLDEN, || pack(&golden_document(), "0.1.0").unwrap())
 }
@@ -256,7 +269,6 @@ fn by_name(d: &Document, name: &str) -> curvyo_document_core::ImageSnapshot {
 
 #[test]
 fn the_golden_is_format_53_and_reads_back_every_stored_result() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 53);
     let bytes = golden();
     let files = members(&bytes);
     let manifest: Value = serde_json::from_slice(&files["manifest.json"]).unwrap();
@@ -297,7 +309,7 @@ fn the_golden_saves_back_unchanged_and_derived_members_come_after_the_originals(
     let saved = pack(&d, "0.1.0").unwrap();
     assert_eq!(
         members(&saved)["document.json"],
-        members(&bytes)["document.json"]
+        document_json_at_54(&bytes)
     );
     assert_eq!(saved, pack(&d, "0.1.0").unwrap(), "a save is deterministic");
     let mut archive = zip::ZipArchive::new(Cursor::new(&saved)).unwrap();
@@ -352,7 +364,7 @@ fn the_damaged_golden_opens_and_keeps_what_it_cannot_read() {
     let saved = pack(&d, "0.1.0").unwrap();
     assert_eq!(
         members(&saved)["document.json"],
-        members(&bytes)["document.json"],
+        document_json_at_54(&bytes),
         "never repaired"
     );
 }

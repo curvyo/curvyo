@@ -160,6 +160,17 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
                 RawLeaf::Dimension(Box::new(dimension))
             });
     }
+    if crate::generated_codec::is_generated_meta(meta) {
+        return crate::generated_codec::read_snapshot(id, meta).map_or(
+            RawLeaf::Unreadable(id),
+            |generated| {
+                RawLeaf::Path(crate::generated_outline::outline(
+                    &generated,
+                    crate::style_codec::read_style(meta),
+                ))
+            },
+        );
+    }
     if read_shape_tag(meta).as_deref() == Some("sketch") {
         return crate::sketch_read::read(id, meta).map_or(RawLeaf::Unreadable(id), |sketch| {
             RawLeaf::Sketch(Box::new(sketch))

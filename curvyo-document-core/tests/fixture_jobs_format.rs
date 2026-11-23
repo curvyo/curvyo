@@ -247,7 +247,7 @@ fn the_round_trip_golden_reads_back_every_job_switch_and_tick() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 53);
+    assert_eq!(CURRENT_FORMAT_VERSION, 54);
     let read = open_unchanged(&bytes);
     assert_eq!(read.len(), 4);
     let engrave = &read[0].jobs[0];
@@ -375,8 +375,8 @@ fn a_file_of_format_42_is_refused() {
         // Superseded by `0110` (format 42), `0028` (format 43), `0111` (format 44), `0114`
         // (format 45), `0112` (format 46) and `0113` (format 47): the next number is 48.
         Err(OpenError::FormatTooNew {
-            found: 54,
-            supported: 53
+            found: 55,
+            supported: 54
         })
     ));
 }
