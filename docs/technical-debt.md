@@ -2805,3 +2805,12 @@ relay-side blob store beside the snapshot (a protocol change, so an ADR).
 `read_font_document` returns text only (the first 1 MiB), so licence and readme files travel as
 UTF-8 text and a PDF document of a font folder does not travel. **Resolution:** a bytes command
 for font documents beside `read_font_document`.
+
+## Connector: waiting jobs live in RAM, 512 MB is the floor (`0132` slice 1, 2026-11-23)
+
+The connector keeps every waiting job's text in memory next to the file in `jobs/`: up to 20 jobs
+and 256 MiB of waiting texts plus the current job's 64 MiB, so about 320 MiB at most. A Pi with
+512 MB of RAM runs, a Pi with less may not. **Resolution:** read a waiting job's text from `jobs/`
+when it becomes current (the file is already there) and keep only its entry in memory. It needs
+the controller to take a streamed text instead of an `Arc<str>`, so it waits for a real case.
+

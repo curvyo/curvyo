@@ -323,3 +323,14 @@ Frage 246 (CONN-OWNER): Who is the owner of a connector?
   workspace keys).
 - C: Only the `curvyoctl` that set it up; apps never manage or confirm.
 - Recommendation: A. Default if unanswered: A.
+
+## Amendment 2026-11-23: the job list (spec `0132`, slice 1)
+
+The management messages gain the job list on the same socket, protocol 0, additive: `MoveJob`,
+`RemoveJob`, `SetRunNext` and the pushed `JobList` (before a connection's first `Status`);
+`JobAccepted` carries `position` and `RejectReason::ListFull` exists. The access table (decision
+3) gains the list rows: a member adds jobs, removes and flags its own, never reorders; an owner
+does all; in foreground mode every paired client acts as an owner. `jobs/` joins the state
+directory (decision 9): `<job_id>.gcode` and `list.json`, written by one thread outside the hub's
+lock, deleted by Reset. `admin.log` gains `job-removed`, `run-next-set`, `job-dropped` and
+`job-list-dropped`. No new crate, no new dependency. Details: `specs/0132-connector-job-queue/adrs.md`.

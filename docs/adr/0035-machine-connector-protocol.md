@@ -119,7 +119,9 @@ needs no CAM code and no document.
    - The SPAKE2 exchange of §4 is two `PairSpake { message }` frames each way, defined in
      `connector-io`, not in core (the browser never sends them).
 7. **Job rules.** One job at a time per connector; a second `SubmitJob` while one is held gets
-   `Busy`. The connector keeps running a job when the app disconnects; any paired connection can
+   `Busy` (amended 2026-11-23 by spec `0132`: it is added to the job list behind the current job
+   and answered with `JobAccepted { position }`, `ListFull` beyond 20 jobs or 256 MiB; `Busy`
+   stays for a frame, a homing and `Alarm`; one job still runs at a time). The connector keeps running a job when the app disconnects; any paired connection can
    read the state and send `Stop` at any time (spec `0064` criterion 6). `Stop` and `Pause` are
    idempotent. With "require a local start" on (CONN-SAFETY default A, off by default), `Start`
    leads to `AwaitingLocalStart` until the button on the connector's host. The job is GRBL-family

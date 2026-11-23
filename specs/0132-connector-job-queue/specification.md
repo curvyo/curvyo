@@ -1,6 +1,6 @@
 # Job list on the connector: send jobs while the laser works, reorder, start
 
-Status: Ready for slice 1 (adrs.md and ux-notes.md done 2026-11-23). Slice 1 = criteria 1 to 9, 11 and 14; criteria 12 and 13 are slice 2 after `0118` run-from-line. Fragen 301 (start press), 302 (slicing) and 303 (member flag) are applied by their defaults and vetoable at the demo
+Status: Slice 1 Done (PR #448); slice 2 (criteria 12 and 13, restart from the interrupted line) is built together with the remaining `0118` slices (run-from-line, jog, frame, focus). Fragen 302 (QUEUE-SPLIT) A, 301 (QUEUE-START-ARM) A, 303 (QUEUE-MEMBER-FLAG) A, answered by the customer 2026-11-23
 Priority: Should
 Origin: Customer, first laser test, 2026-11-18. Translated: "The owner needs a job list so that jobs can be sent while the laser cutter is still working. The owner can then change the order and press start."
 
