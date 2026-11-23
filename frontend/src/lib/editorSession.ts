@@ -99,6 +99,23 @@ export async function openSession(bytes: Uint8Array): Promise<WasmSession> {
   return session;
 }
 
+/** Restore of a recovery copy (`specs/0136-autosave-and-restore` criterion 5): `bytes` is the
+ * assembled container; the session is dirty and has no file.
+ * @throws the sentence of the open error; nothing changed. */
+export async function openRecoveredSession(bytes: Uint8Array): Promise<WasmSession> {
+  await loadOnce();
+  await formatsFileReady();
+  await extensionsFileReady();
+  await machineProfilesReady();
+  await materialFilesReady();
+  const session = WasmSession.open_recovered(mintPeerId(), bytes);
+  applyFormats(session);
+  applyExtensions(session);
+  applyMachineProfiles(session);
+  applyMaterials(session);
+  return session;
+}
+
 /** Open… of any file (`specs/0024-svg-import-export` criterion 1): the session reads `bytes` as an
  * SVG drawing or a `.curvyo` project by their content. `fileName` names the file in the notice of
  * an SVG that brought in nothing.

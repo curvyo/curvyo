@@ -55,7 +55,7 @@ type Action =
   | { kind: "quit" }
   | { kind: "handover"; path: string; bytes: number[] }
   /** A workspace action (`specs/0095-workspace`): `then` runs once the check let it. */
-  | { kind: "then"; ends: ReplacingKind; then: () => Promise<void> | void };
+  | { kind: "then"; ends: ReplacingKind; then: () => Promise<void> | void; subject?: string };
 
 /** Who asked: a button of the File tab, or something outside it (a chord, the window close, the
  * operating system handing over a file). */
@@ -70,6 +70,8 @@ export interface InlineCheck {
   origin: Origin;
   /** The view to return to on Cancel when the check was raised from outside the File tab. */
   previous: { tab: string; open: boolean } | null;
+  /** What a Restore would open, for its sentence (`specs/0136-autosave-and-restore`). */
+  subject?: string;
 }
 
 interface PendingCheck extends InlineCheck {
@@ -128,7 +130,16 @@ export interface ProjectApi {
   saveNow: () => Promise<"saved" | "cancelled" | "failed">;
   /** A workspace action that replaces or ends the open project (`specs/0095-workspace` criteria
    * 9, 17, 21): the unsaved-changes check when needed, then `then`. Cancel calls `refocus`. */
-  replaceThen: (ends: ReplacingKind, then: () => Promise<void> | void, refocus?: () => void) => void;
+  replaceThen: (
+    ends: ReplacingKind,
+    then: () => Promise<void> | void,
+    refocus?: () => void,
+    subject?: string,
+  ) => void;
+  /** Opens a restored recovery copy (`specs/0136-autosave-and-restore` criterion 5) as an unsaved
+   * project named `fileName` (`null` for Untitled): dirty, no file, Save asks where. Whether it
+   * opened; a refusal raised the error dialog and the open project is untouched. */
+  openRecovered: (bytes: Uint8Array, fileName: string | null) => Promise<boolean>;
   /** Opens the bytes of the workspace document at `path` (criterion 9); `title` is its place
    * ("Box job/Sides/Lid.curvyo"). Whether it opened; a refusal raised the error dialog. */
   openWorkspaceDocument: (
@@ -158,6 +169,9 @@ interface ProjectDeps {
    * open dialog is "Can't open project" unless one is given. */
   onOpenError: (message: string, title?: string) => void;
   onSaveError: (message: string) => void;
+  /** Runs before the app quits: the project's recovery copy goes (`specs/0136-autosave-and-restore`
+   * criterion 3). */
+  onQuit?: () => Promise<void> | void;
 }
 
 const SAVE_FAILED = "This project couldn't be saved.";
@@ -375,6 +389,30 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       }
       await invoke("confirm_workspace_document_opened", { path }).catch(() => undefined);
       setInfo({ fileName, path: title });
+      return true;
+    },
+    [busy, setInfo],
+  );
+
+  const openRecovered = useCallback(
+    async (bytes: Uint8Array, fileName: string | null) => {
+      if (!busy.enter()) {
+        return false;
+      }
+      const { editor, onOpenError } = depsRef.current;
+      try {
+        await whileBusy(editor, bytes.length, svg_busy_notice(true, fileName ?? "Untitled"), () =>
+          editor.openRecovered(bytes),
+        );
+      } catch (error) {
+        onOpenError(String(error), OPEN_FILE_TITLE);
+        return false;
+      } finally {
+        busy.leave();
+      }
+      // An unsaved project no file holds: the host forgets any path, and Save asks where.
+      await invoke("reset_project").catch(() => undefined);
+      setInfo({ fileName, path: null, suggestedName: fileName });
       return true;
     },
     [busy, setInfo],
@@ -603,6 +641,9 @@ export function useProject(deps: ProjectDeps): ProjectApi {
 
   const quit = useCallback(async () => {
     quittingRef.current = true;
+    // Whatever ended the project (Discard, a Save, nothing to lose) ended its recovery copy too:
+    // it must not be offered as a crash at the next start.
+    await Promise.resolve(depsRef.current.onQuit?.()).catch(() => undefined);
     try {
       await invoke("quit_app");
     } catch {
@@ -708,7 +749,8 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         (inFileTab ? null : { tab: panel.view.activeTab, open: panelOpen.isOpen() });
       checkCounter.current += 1;
       const kind = action.kind === "then" ? action.ends : action.kind;
-      setCheck({ id: checkCounter.current, kind, origin, previous, action });
+      const subject = action.kind === "then" ? action.subject : undefined;
+      setCheck({ id: checkCounter.current, kind, origin, previous, action, subject });
       if (!inFileTab) {
         // Not the maker's choice: the saved hidden or shown state stays as it was.
         panelOpen.setOpen(true, false);
@@ -932,8 +974,9 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     exportSvg: (options: SvgExportOptions, mouse: boolean) => void exportSvg(options, mouse),
     save: () => void save(false),
     saveNow: () => save(false),
-    replaceThen: (ends: ReplacingKind, then: () => Promise<void> | void, refocus?: () => void) =>
-      request({ kind: "then", ends, then }, refocus ? { refocus } : "outside"),
+    replaceThen: (ends: ReplacingKind, then: () => Promise<void> | void, refocus?: () => void, subject?: string) =>
+      request({ kind: "then", ends, then, subject }, refocus ? { refocus } : "outside"),
+    openRecovered,
     openWorkspaceDocument,
     resetToEmpty: async () => {
       const inFileTab = depsRef.current.panel.view.activeTab === "file";

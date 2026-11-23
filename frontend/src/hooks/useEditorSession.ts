@@ -52,7 +52,7 @@ import { type FlipApi, useFlip } from "@/hooks/useFlip";
 import { type AlignApi, type AlignBarState, useAlign } from "@/hooks/useAlign";
 import { NO_ALIGN_BAR, readAlignBar, sameAlignBar } from "@/lib/alignBar";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
-import { createSession, openFileSession, openSession } from "@/lib/editorSession";
+import { createSession, openFileSession, openRecoveredSession, openSession } from "@/lib/editorSession";
 import { moveWorkspaceLink } from "@/lib/workspaceLink";
 import type { WasmSession } from "@/lib/editorSession";
 import { freeCanvasArea, type GuideState, readGuideState } from "@/lib/guideText";
@@ -947,6 +947,10 @@ export interface EditorSession {
    * be opened (see `@/lib/editorSession`'s `openSession`) — the caller
    * shows it, this hook does not. */
   openProject: (bytes: Uint8Array) => Promise<void>;
+  /** Restore (`specs/0136-autosave-and-restore` criterion 5): swaps in a restored recovery copy as
+   * an unsaved project.
+   * @throws the sentence of the open error; the open project is untouched. */
+  openRecovered: (bytes: Uint8Array) => Promise<void>;
   /** Open… of any file (`specs/0024-svg-import-export` criterion 1): swaps in the session the
    * bytes give, an SVG drawing or a project. Resolves with whether it was an SVG (an untitled,
    * dirty project) and the notice to show (empty for none).
@@ -1777,6 +1781,16 @@ export function useEditorSession(
       // The texts' faces are matched against the full listing, never a partial one at start.
       await fontListingReady();
       const session = await openSession(bytes);
+      sendFontLists(session);
+      await attachSession(session);
+    },
+    [attachSession],
+  );
+
+  const openRecovered = useCallback(
+    async (bytes: Uint8Array) => {
+      await fontListingReady();
+      const session = await openRecoveredSession(bytes);
       sendFontLists(session);
       await attachSession(session);
     },
@@ -3312,6 +3326,7 @@ export function useEditorSession(
     onKeyUp,
     newProject,
     openProject,
+    openRecovered,
     openFile,
     importBegin,
     lastCanvasPointer,

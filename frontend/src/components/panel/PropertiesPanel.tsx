@@ -48,6 +48,7 @@ import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import type { PanelOpenApi } from "@/hooks/usePanelOpen";
 import type { ProjectApi } from "@/hooks/useProject";
+import type { RecoveryApi } from "@/hooks/useRecovery";
 import type { WorkspaceApi } from "@/hooks/useWorkspace";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import { useMakeWorkspace } from "@/hooks/useMakeWorkspace";
@@ -84,6 +85,8 @@ interface PropertiesPanelProps {
   panelOpen: PanelOpenApi;
   /** The open project: the File tab shows it and the strip carries its dirty dot. */
   project: ProjectApi;
+  /** The recovery copies a crash left and the failed-write line (`specs/0136`). */
+  recovery: RecoveryApi;
   /** The open workspace (`specs/0095-workspace`): the File tab's Workspace section, desktop only. */
   workspace: WorkspaceApi;
   /** The workspace's sharing in the Share tab (`specs/0095-workspace` criteria 25 to 28). */
@@ -137,6 +140,7 @@ export function PropertiesPanel({
   document: doc,
   panelOpen,
   project,
+  recovery,
   workspace,
   workspaceSync,
   devices,
@@ -362,6 +366,7 @@ export function PropertiesPanel({
         open={open}
         bodyId={panelId}
         fileDirty={project.dirty}
+        fileRecovery={recovery.rows.length > 0}
         shareMark={membership.unread}
         desktop={isTauri}
         onToggle={(event) => {
@@ -496,6 +501,7 @@ export function PropertiesPanel({
             {doc.view.content === "file" ? (
               <FileTab
                 project={project}
+                recovery={recovery}
                 desktop={isTauri}
                 version={appVersion()}
                 tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}

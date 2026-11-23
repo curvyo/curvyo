@@ -2,6 +2,8 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import type { FileCommandName, InlineCheck, ProjectApi } from "@/hooks/useProject";
+import { RecoveryBlock } from "@/components/panel/RecoveryBlock";
+import type { RecoveryApi } from "@/hooks/useRecovery";
 import { TEMPLATE_NAME } from "@/lib/guideText";
 
 /** The name of the Import SVG… button and its tooltip (UX notes: the control's name only). */
@@ -34,6 +36,9 @@ interface FileTabProps {
   /** The Workspace section (`specs/0095-workspace` `ux-notes.md` section 1), appended below Export
    * SVG and above Quit; the desktop build only. */
   workspace?: ReactNode;
+  /** The copies a crash left (`specs/0136-autosave-and-restore` criterion 4): a block above the
+   * project block while any waits. */
+  recovery?: RecoveryApi;
 }
 
 /** What the buttons need besides the project. */
@@ -54,11 +59,13 @@ export function FileTab({
   exportSvg,
   extensions,
   workspace,
+  recovery,
 }: FileTabProps) {
   const { info, dirty, check } = project;
   const buttonProps = { project, desktop, tooltipFor, onReturnFocus };
   return (
     <div className="flex flex-col">
+      {recovery ? <RecoveryBlock recovery={recovery} onReturnFocus={onReturnFocus} /> : null}
       <ProjectBlock
         fileName={info.fileName}
         path={info.path}
@@ -66,6 +73,7 @@ export function FileTab({
         missing={info.missing ?? false}
         deleted={info.deletedStatus ?? ""}
         desktop={desktop}
+        failure={recovery?.failure ?? null}
       />
       <div className="mt-3 h-[100px]">
         {check ? (
@@ -101,7 +109,9 @@ function ProjectBlock({
   missing,
   deleted,
   desktop,
+  failure,
 }: {
+  failure: string | null;
   fileName: string | null;
   path: string | null;
   dirty: boolean;
@@ -122,6 +132,12 @@ function ProjectBlock({
         name
       )}
       <p className="text-xs text-[var(--panel-muted-fg)]">{projectStatus(fileName, dirty, missing, deleted)}</p>
+      {failure ? (
+        // The failed write of the recovery copy (`specs/0136` criterion 13), until the next success.
+        <p role="alert" className="text-xs text-[var(--field-invalid)]">
+          {failure}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -218,7 +234,7 @@ function UnsavedCheck({
     const timer = window.setTimeout(() => setArmed(true), DISCARD_ARM_MS);
     return () => window.clearTimeout(timer);
   }, []);
-  const sentence = checkSentence(fileName, check.kind);
+  const sentence = checkSentence(fileName, check.kind, check.subject);
   const sentenceId = useId();
   return (
     <div
