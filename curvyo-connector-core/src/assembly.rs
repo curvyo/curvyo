@@ -1,6 +1,7 @@
 //! Assembles a checked job from its chunks (size, order, ASCII, hash).
 
 use std::fmt::Write as _;
+use std::sync::Arc;
 
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -22,7 +23,7 @@ pub struct Job {
     /// Job or frame.
     pub kind: JobKind,
     /// The G-code text.
-    pub text: String,
+    pub text: Arc<str>,
 }
 
 /// Why a chunk was not taken.
@@ -72,6 +73,18 @@ impl Assembly {
             text: String::new(),
             pending_cr: false,
         })
+    }
+
+    /// The announced hash.
+    #[must_use]
+    pub fn sha256(&self) -> &str {
+        &self.sha256
+    }
+
+    /// The announced size in bytes.
+    #[must_use]
+    pub fn bytes(&self) -> u64 {
+        self.bytes
     }
 
     /// The job being assembled.
@@ -146,9 +159,46 @@ impl Assembly {
             job_id: self.job_id,
             name: self.name,
             kind: self.kind,
-            text: self.text,
+            text: Arc::from(self.text),
         })
     }
+}
+
+/// Checks a whole stored text as chunks would be (size, ASCII, hash); the refusal's reason.
+///
+/// # Errors
+/// The [`RejectReason`] a chunked send of this text would get.
+pub(crate) fn check_whole(
+    job_id: Uuid,
+    name: &str,
+    bytes: u64,
+    sha256: &str,
+    text: &str,
+) -> Result<Job, RejectReason> {
+    let mut assembly = Assembly::begin(
+        job_id,
+        name.to_owned(),
+        JobKind::Job,
+        bytes,
+        sha256.to_owned(),
+    )?;
+    let mut rest = text;
+    let mut index = 0;
+    while !rest.is_empty() {
+        let mut end = rest.len().min(MAX_CHUNK_BYTES);
+        while !rest.is_char_boundary(end) {
+            end -= 1;
+        }
+        let (part, tail) = rest.split_at(end);
+        match assembly.push(job_id, index, part) {
+            Ok(()) => {}
+            Err(ChunkError::Reject(reason)) => return Err(reason),
+            Err(ChunkError::UnknownJob) => return Err(RejectReason::HashMismatch),
+        }
+        rest = tail;
+        index += 1;
+    }
+    assembly.finish()
 }
 
 #[cfg(test)]

@@ -16,6 +16,8 @@ use crate::token::Token;
 pub enum WatchEvent {
     /// A `Status`, the first one right after connecting.
     Status(Message),
+    /// A `JobList`: the first one right after connecting, then every change (`specs/0132`).
+    JobList(Message),
     /// The controller changed (identified, lost): the `Welcome` the connector sent again.
     Controller(Option<ControllerInfo>),
     /// The connection dropped; the watcher will try again.
@@ -76,7 +78,11 @@ pub fn watch(
         match open_paired(address, spki, token, CONNECT_TIMEOUT) {
             Ok((mut connection, status)) => {
                 active = is_active(&status);
+                let first_list = connection.job_list.take();
                 on_event(WatchEvent::Status(status));
+                if let Some(list) = first_list {
+                    on_event(WatchEvent::JobList(list));
+                }
                 let ended = loop {
                     if stop.load(Ordering::Relaxed) {
                         return;
@@ -85,6 +91,9 @@ pub fn watch(
                         Ok(Some(Frame::Core(status @ Message::Status { .. }))) => {
                             active = is_active(&status);
                             on_event(WatchEvent::Status(status));
+                        }
+                        Ok(Some(Frame::Core(list @ Message::JobList { .. }))) => {
+                            on_event(WatchEvent::JobList(list));
                         }
                         Ok(Some(Frame::Core(Message::Welcome { controller, .. }))) => {
                             on_event(WatchEvent::Controller(controller));

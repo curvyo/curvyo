@@ -38,6 +38,9 @@ pub struct SentJob {
     pub lines: u32,
     /// Its size in bytes.
     pub bytes: u64,
+    /// Its place among the waiting jobs when the connector listed it behind another job;
+    /// `None` when it became the current job.
+    pub position: Option<u32>,
 }
 
 /// A fresh random job id.
@@ -124,12 +127,18 @@ impl Connection {
             if let Some(reason) = rejection(&message, job_id) {
                 return Err(SendError::Rejected(reason));
             }
-            if message == (Message::JobAccepted { job_id }) {
+            if let Message::JobAccepted {
+                job_id: accepted,
+                position,
+            } = message
+                && accepted == job_id
+            {
                 let lines = u32::try_from(text.lines().count()).unwrap_or(u32::MAX);
                 return Ok(SentJob {
                     job_id,
                     lines,
                     bytes,
+                    position,
                 });
             }
         }

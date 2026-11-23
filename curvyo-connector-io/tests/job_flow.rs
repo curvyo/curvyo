@@ -49,16 +49,13 @@ fn q13_refusals_are_named_and_logged() {
         SendError::Rejected(RejectReason::TooLarge)
     );
     connection.send_job("one.gcode", JOB, deadline()).unwrap();
-    assert_eq!(
-        connection
-            .send_job("two.gcode", JOB, deadline())
-            .unwrap_err(),
-        SendError::Rejected(RejectReason::Busy)
-    );
+    // `specs/0132`: a second job is listed behind the first, not refused.
+    let second = connection.send_job("two.gcode", JOB, deadline()).unwrap();
+    assert_eq!(second.position, Some(1));
     let log = rig.log();
     assert!(log.contains("\tbinary.bin\tRejected: NotAscii\t"), "{log}");
     assert!(log.contains("\thuge.gcode\tRejected: TooLarge\t"), "{log}");
-    assert!(log.contains("\ttwo.gcode\tRejected: Busy\t"), "{log}");
+    assert!(!log.contains("two.gcode\tRejected"), "{log}");
     // The refused jobs held nothing: the first one is still ready.
     connection.send(&Message::GetStatus).unwrap();
     assert_eq!(state_of(&wait_for(&mut connection, |_| true)), State::Ready);

@@ -1,6 +1,7 @@
 //! Who has to agree before a start runs (architect addendum D5): the start rule, a member's
 //! request, an owner's confirmation and the people of the held job.
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::{ControllerCommand, Machine, Output, Waiting};
@@ -21,7 +22,7 @@ pub enum StartRule {
 
 /// Who sent a message: a client's name and role. The host itself (terminal, signal, reset) is
 /// an owner without a name.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Peer {
     /// The client's name; empty for the host.
     pub name: String,
@@ -141,6 +142,8 @@ impl Machine {
 
     /// `Start { job_id }` from `peer`.
     pub(super) fn start(&mut self, job_id: Uuid, peer: &Peer, out: &mut Output) {
+        // The first waiting job becomes current, `Ready`, and starts as any `Ready` job does.
+        let _promoted = self.promote(job_id, peer, out);
         let held_id = self.held.as_ref().map(|h| h.job.job_id);
         let rule = self.options.start_rule;
         let owner_wait = rule == StartRule::OwnerConfirms
@@ -158,6 +161,9 @@ impl Machine {
         }
         if self.state != State::Ready {
             Self::wrong_state(out);
+            if !self.list.is_empty() {
+                self.refresh_list(out);
+            }
         } else if held_id != Some(job_id) {
             Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
         } else if rule == StartRule::LocalPress

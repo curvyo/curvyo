@@ -7,7 +7,7 @@ mod owner;
 mod pairing;
 mod setup;
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{Receiver, Sender, channel};
@@ -22,12 +22,13 @@ use uuid::Uuid;
 use crate::admin_log::{AdminEvent, AdminLog};
 use crate::clients::Clients;
 use crate::controller::Controller;
-use crate::fake_controller::FakeController;
 use crate::grbl::Timing;
 use crate::job_log::{JobLog, LogPeople, LogResult};
+use crate::job_store::{self, JobStore};
 use crate::pairing_code::PairingCodes;
 use crate::spki::SpkiHash;
 
+use link::{fake_of, serial_port_of};
 pub use setup::{ExitReason, HubMode};
 
 /// Settings of the fake controller.
@@ -89,7 +90,16 @@ pub(crate) struct Inner {
     codes: PairingCodes,
     subscribers: Vec<Sender<Message>>,
     pub(crate) job_name: String,
-    submitted: Option<(Uuid, String)>,
+    /// The jobs announced lately, by id, for the log line of a refusal.
+    submitted: Vec<(Uuid, String)>,
+    /// The job list's files in the state directory.
+    store: JobStore,
+    /// The texts on disk or on their way.
+    stored_ids: HashSet<Uuid>,
+    /// `list.json` as last written, and when its line was.
+    last_stored: Option<(curvyo_connector_core::StoredList, Duration)>,
+    /// The job list is not written any more (the connector is stopping a running job).
+    frozen: bool,
     pub(crate) notices: Sender<String>,
     /// Bytes the controller produced outside the serial thread's turn.
     pending_write: Vec<u8>,
@@ -172,23 +182,6 @@ fn machine_for(choice: &ControllerChoice, start_rule: StartRule) -> Machine {
     }
 }
 
-fn serial_port_of(choice: &ControllerChoice) -> Option<String> {
-    match choice {
-        ControllerChoice::Serial(serial) => Some(serial.port.clone()),
-        _ => None,
-    }
-}
-
-fn fake_of(choice: &ControllerChoice) -> Option<Box<dyn Controller>> {
-    match choice {
-        ControllerChoice::Fake(f) => Some(Box::new(FakeController::new(
-            f.lines_per_second,
-            f.alarm_at_line,
-        ))),
-        _ => None,
-    }
-}
-
 impl Hub {
     /// A hub in foreground mode, and the receiver of its terminal notices (one line each).
     #[must_use]
@@ -205,6 +198,8 @@ impl Hub {
             machine.handle(Event::ControllerConnected);
         }
         let info = controller.as_ref().and_then(|c| c.info());
+        let loaded = job_store::load(&settings.state_dir);
+        machine.restore(loaded.restored.items.clone());
         let hub = Self {
             inner: Mutex::new(Inner {
                 machine,
@@ -213,7 +208,11 @@ impl Hub {
                 codes: PairingCodes::default(),
                 subscribers: Vec::new(),
                 job_name: String::new(),
-                submitted: None,
+                submitted: Vec::new(),
+                store: JobStore::new(&settings.state_dir),
+                stored_ids: HashSet::new(),
+                last_stored: None,
+                frozen: false,
                 notices,
                 pending_write: Vec::new(),
                 mode: HubMode::Foreground,
@@ -231,6 +230,18 @@ impl Hub {
             settings,
             exit: Mutex::new(None),
         };
+        hub.log_restore(&loaded);
+        {
+            let mut inner = hub.lock();
+            inner.stored_ids = inner
+                .machine
+                .stored_texts()
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            // What a restart found is on disk already; nothing is written until it changes.
+            inner.last_stored = Some((inner.machine.stored(), Duration::ZERO));
+        }
         (hub, receiver)
     }
 
@@ -332,10 +343,20 @@ impl Hub {
         direct
     }
 
-    /// A connection that sent a job ended: a job still being received is dropped.
-    pub fn client_disconnected(&self, now: Instant) {
+    /// A connection that sent the jobs `job_ids` ended: those still being received are dropped,
+    /// no other.
+    pub fn client_disconnected(&self, job_ids: &[Uuid], now: Instant) {
         let mut inner = self.lock();
-        self.apply(&mut inner, Event::ClientDisconnected, now, &mut Vec::new());
+        for job_id in job_ids {
+            let event = Event::TransferAbandoned { job_id: *job_id };
+            self.apply(&mut inner, event, now, &mut Vec::new());
+        }
+    }
+
+    /// The `JobList` as a connection gets it before its first `Status`.
+    #[must_use]
+    pub fn job_list(&self) -> Message {
+        self.lock().machine.job_list()
     }
 
     /// A line for the connector's terminal.
@@ -357,6 +378,10 @@ impl Hub {
             return None;
         }
         let name = inner.job_name.clone();
+        // The job is written as interrupted at its line, then the list stays as it is.
+        inner.sync_store(self.at(now), true);
+        inner.store.flush();
+        inner.frozen = true;
         self.apply(
             &mut inner,
             Event::Message(Message::Stop, Peer::host()),
@@ -392,8 +417,13 @@ impl Hub {
         let mut queue = VecDeque::from([event]);
         while let Some(event) = queue.pop_front() {
             if let Event::Message(Message::SubmitJob { job_id, name, .. }, _) = &event {
-                inner.submitted = Some((*job_id, name.clone()));
+                inner.submitted.retain(|(id, _)| id != job_id);
+                inner.submitted.push((*job_id, name.clone()));
+                if inner.submitted.len() > 64 {
+                    inner.submitted.remove(0);
+                }
             }
+
             let before = inner.machine.state();
             let people = inner.machine.people().cloned();
             let output = inner.machine.handle(event);
@@ -414,16 +444,23 @@ impl Hub {
             if let Some(confirmation) = &output.confirmed {
                 self.log_confirmation(inner, confirmation);
             }
+            for log in &output.list_log {
+                self.log_list_change(inner, log);
+            }
             for message in output.messages {
                 self.route(inner, message, direct);
             }
             self.log_outcome(inner, before, people);
+            if let Some(next) = output.follow_up {
+                queue.push_front(next);
+            }
+            inner.sync_store(at, false);
         }
     }
 
     fn route(&self, inner: &mut Inner, message: Message, direct: &mut Vec<Message>) {
         match message {
-            Message::Status { .. } => inner
+            Message::Status { .. } | Message::JobList { .. } => inner
                 .subscribers
                 .retain(|s| s.send(message.clone()).is_ok()),
             Message::JobAccepted { .. } => {

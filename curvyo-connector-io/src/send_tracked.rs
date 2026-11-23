@@ -82,10 +82,15 @@ pub fn send_tracked_open(
     };
     let (mut connection, _) = open()?;
     match connection.send_job_with_id(job_id, name, text, deadline) {
-        Ok(_) => Ok((
-            end_of(observe_shared(watch, &Message::JobAccepted { job_id })),
-            Some(connection),
-        )),
+        Ok(sent) => {
+            let accepted = Message::JobAccepted {
+                job_id,
+                position: sent.position,
+            };
+            // A job behind another one is not started by its sender (`specs/0134` S6).
+            let keep = sent.position.is_none().then_some(connection);
+            Ok((end_of(observe_shared(watch, &accepted)), keep))
+        }
         Err(SendError::Rejected(reason)) => Ok((
             end_of(observe_shared(
                 watch,
@@ -104,7 +109,14 @@ pub fn send_tracked_open(
             }
             Ok((
                 match open() {
-                    Ok((_, status)) => end_of(observe_shared(watch, &status)),
+                    Ok((fresh, status)) => {
+                        // The list comes first on a connection: it names a job that waits.
+                        let listed = fresh
+                            .job_list
+                            .as_ref()
+                            .and_then(|list| observe_shared(watch, list));
+                        end_of(listed.or_else(|| observe_shared(watch, &status)))
+                    }
                     Err(_) => SendEnd::Unresolved(error),
                 },
                 None,

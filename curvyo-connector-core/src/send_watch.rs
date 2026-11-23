@@ -8,7 +8,8 @@ use crate::message::{Message, RejectReason, State};
 /// How a sent job ended its way to the connector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Resolution {
-    /// The connector holds the job (`JobAccepted`, or a `Status` that carries its progress).
+    /// The connector holds the job (`JobAccepted`, a `JobList` that names it, or a `Status` that
+    /// carries its progress).
     Accepted,
     /// The connector refused it.
     Rejected(RejectReason),
@@ -54,9 +55,23 @@ impl SendWatch {
             return None;
         }
         let resolution = match message {
-            Message::JobAccepted { job_id } if *job_id == self.job_id => Resolution::Accepted,
+            Message::JobAccepted { job_id, .. } if *job_id == self.job_id => Resolution::Accepted,
             Message::JobRejected { job_id, reason } if *job_id == self.job_id => {
                 Resolution::Rejected(*reason)
+            }
+            // The list a connection starts with (or a push) names a job it holds, current or
+            // waiting (`specs/0132` L7); it never proves the job lost, the `Status` after it does.
+            Message::JobList {
+                current, waiting, ..
+            } => {
+                let listed = current
+                    .iter()
+                    .chain(waiting)
+                    .any(|e| e.job_id == self.job_id);
+                if !listed {
+                    return None;
+                }
+                Resolution::Accepted
             }
             Message::Status { state, job, .. } => {
                 let ours = job.as_ref().is_some_and(|p| p.job_id == self.job_id);
@@ -119,7 +134,10 @@ mod tests {
     fn job_accepted_and_rejected_decide_at_any_time() {
         let mut accepted = SendWatch::new(ID);
         assert_eq!(
-            accepted.observe(&Message::JobAccepted { job_id: ID }),
+            accepted.observe(&Message::JobAccepted {
+                job_id: ID,
+                position: None
+            }),
             Some(Resolution::Accepted)
         );
         let mut rejected = SendWatch::new(ID);
@@ -135,7 +153,13 @@ mod tests {
     #[test]
     fn an_answer_for_another_job_decides_nothing() {
         let mut watch = SendWatch::new(ID);
-        assert_eq!(watch.observe(&Message::JobAccepted { job_id: OTHER }), None);
+        assert_eq!(
+            watch.observe(&Message::JobAccepted {
+                job_id: OTHER,
+                position: None
+            }),
+            None
+        );
         assert_eq!(
             watch.observe(&Message::JobRejected {
                 job_id: OTHER,
@@ -215,11 +239,20 @@ mod tests {
         let mut watch = SendWatch::new(ID);
         watch.transfer_ended();
         assert_eq!(
-            watch.observe(&Message::JobAccepted { job_id: ID }),
+            watch.observe(&Message::JobAccepted {
+                job_id: ID,
+                position: None
+            }),
             Some(Resolution::Accepted)
         );
         assert_eq!(watch.observe(&status(State::Ready, Some(ID))), None);
-        assert_eq!(watch.observe(&Message::JobAccepted { job_id: ID }), None);
+        assert_eq!(
+            watch.observe(&Message::JobAccepted {
+                job_id: ID,
+                position: None
+            }),
+            None
+        );
         assert_eq!(watch.observe(&status(State::Idle, None)), None);
 
         let mut lost = SendWatch::new(ID);
@@ -229,6 +262,45 @@ mod tests {
             Some(Resolution::NotReceived)
         );
         assert_eq!(lost.observe(&status(State::Ready, Some(ID))), None);
+    }
+
+    #[test]
+    fn a_job_list_that_names_the_job_accepts_it_and_one_without_it_decides_nothing() {
+        let entry = |job_id| crate::message::ListEntry {
+            job_id,
+            name: "a.gcode".into(),
+            lines: 1,
+            bytes: 3,
+            sent_by: "Phone".into(),
+            position: 1,
+            run_next: false,
+            interrupted_at: None,
+        };
+        let list = |current, waiting| Message::JobList {
+            current,
+            waiting,
+            note: None,
+        };
+        let mut waiting = SendWatch::new(ID);
+        waiting.transfer_ended();
+        assert_eq!(waiting.observe(&list(None, vec![entry(OTHER)])), None);
+        assert_eq!(
+            waiting.observe(&list(None, vec![entry(OTHER), entry(ID)])),
+            Some(Resolution::Accepted)
+        );
+        let mut head = SendWatch::new(ID);
+        assert_eq!(
+            head.observe(&list(Some(entry(ID)), vec![])),
+            Some(Resolution::Accepted)
+        );
+        // After the lists, the status of a connection that lacks the job decides as before.
+        let mut gone = SendWatch::new(ID);
+        gone.transfer_ended();
+        assert_eq!(gone.observe(&list(None, vec![])), None);
+        assert_eq!(
+            gone.observe(&status(State::Idle, None)),
+            Some(Resolution::NotReceived)
+        );
     }
 
     #[test]

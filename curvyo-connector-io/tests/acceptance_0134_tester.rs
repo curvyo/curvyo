@@ -15,7 +15,6 @@ use common::grbl_sim::SimConfig;
 use common::{JOB, WAIT, rig, rig_with, state_of, wait_for, wait_state};
 use curvyo_connector_core::{Event, JobKind, Message, RejectReason, State};
 use curvyo_connector_io::client::Connection;
-use curvyo_connector_io::job_send::SendError;
 
 const HOME_FIRST: &str =
     include_str!("../../curvyo-laser-core/tests/fixtures/output/grbl/home_first.gcode");
@@ -87,7 +86,7 @@ fn ss1_after_done_the_machine_is_free_again_and_a_second_job_starts() {
 }
 
 #[test]
-fn ss2_a_held_job_of_another_or_the_same_app_refuses_the_send_as_busy_and_starts_nothing() {
+fn ss2_a_held_job_of_another_or_the_same_app_is_listed_behind_it_and_starts_nothing() {
     let rig = rig(2000);
     let record = rig.pair("Laptop");
     let (mut first, _) = rig.open(&record);
@@ -95,15 +94,11 @@ fn ss2_a_held_job_of_another_or_the_same_app_refuses_the_send_as_busy_and_starts
     let held = first.send_job("held.gcode", JOB, deadline()).unwrap();
     wait_state(&mut first, State::Ready);
     // another app
-    assert_eq!(
-        second.send_job("x.gcode", JOB, deadline()).unwrap_err(),
-        SendError::Rejected(RejectReason::Busy)
-    );
+    let x = second.send_job("x.gcode", JOB, deadline()).unwrap();
+    assert_eq!(x.position, Some(1));
     // the same app, same connection
-    assert_eq!(
-        first.send_job("y.gcode", JOB, deadline()).unwrap_err(),
-        SendError::Rejected(RejectReason::Busy)
-    );
+    let y = first.send_job("y.gcode", JOB, deadline()).unwrap();
+    assert_eq!(y.position, Some(2));
     first.send(&Message::GetStatus).unwrap();
     let status = wait_for(&mut first, |_| true);
     assert_eq!(state_of(&status), State::Ready);

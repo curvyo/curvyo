@@ -1,17 +1,22 @@
 //! The job state machine of one connector: events in, new state and messages out, no clock.
 
+mod arrival;
 mod confirm;
 mod controls;
 mod home;
+mod list;
 
 pub use confirm::{Confirmation, Peer, People, StartRule};
+pub use list::ListLog;
 
 use uuid::Uuid;
 
-use crate::assembly::{Assembly, ChunkError, Job};
+use crate::assembly::{Assembly, Job};
 pub(crate) use crate::count::count;
-use crate::message::{ErrorCode, JobKind, Message, Progress, RejectReason, State};
+use crate::job_list::JobList;
+use crate::message::{ErrorCode, Message, Progress, RejectReason, State};
 use crate::millimetres::Millimetres;
+use list::Transfer;
 
 /// Settings of the machine.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -73,6 +78,18 @@ pub enum Event {
     /// A client connection that sent a job ended; a job still being received is dropped
     /// (back to `Idle`), a job that is `Ready` or further is not affected.
     ClientDisconnected,
+    /// The connection that sent the job `job_id` ended: that job's transfer is dropped if it is
+    /// still arriving, and no other (`specs/0125` S19, `specs/0132` L2).
+    TransferAbandoned {
+        /// The job.
+        job_id: Uuid,
+    },
+    /// The chain's decision when a job ended (made inside the machine, carried out by the
+    /// caller as the next event): the first waiting job `job_id` starts.
+    RunNext {
+        /// The job.
+        job_id: Uuid,
+    },
     /// The controller holds the job (asked for or not): `Running` becomes `Paused`.
     Held,
     /// The controller runs the held job again.
@@ -133,6 +150,10 @@ pub struct Output {
     pub commands: Vec<ControllerCommand>,
     /// A start or resume that waited ran: who asked and who agreed, for `admin.log`.
     pub confirmed: Option<Confirmation>,
+    /// Changes of the job list that `admin.log` records.
+    pub list_log: Vec<ListLog>,
+    /// An event the caller applies next, with the same rules as any other (the chain).
+    pub follow_up: Option<Event>,
 }
 
 /// What `AwaitingLocalStart` waits to start.
@@ -149,6 +170,7 @@ enum Waiting {
 #[derive(Debug, Clone)]
 struct Held {
     job: Job,
+    sha256: String,
     lines: u32,
     line: u32,
     elapsed_ms: u64,
@@ -189,6 +211,14 @@ pub struct Machine {
     requester: Option<String>,
     /// Who sent the job being received.
     sender: String,
+    /// The jobs behind the current one.
+    list: JobList,
+    /// Jobs for the list whose chunks are still arriving.
+    transfers: Vec<Transfer>,
+    /// "Chain stopped: `<state>`" until the next start.
+    note: Option<String>,
+    /// The last `JobList` pushed.
+    last_list: Option<Message>,
 }
 
 /// Controller states in which no job may start (`specs/0127` G4): the door, check mode, sleep.
@@ -217,6 +247,10 @@ impl Machine {
             homed_from: State::Idle,
             requester: None,
             sender: String::new(),
+            list: JobList::default(),
+            transfers: Vec::new(),
+            note: None,
+            last_list: None,
         }
     }
 
@@ -305,8 +339,11 @@ impl Machine {
                     self.set(State::Idle, &mut out);
                 }
             }
+            Event::TransferAbandoned { job_id } => self.abandon(job_id, &mut out),
+            Event::RunNext { job_id } => self.run_next(job_id, &mut out),
             other => self.on_controller(other, &mut out),
         }
+        self.announce_list(&mut out);
         out
     }
 
@@ -374,9 +411,9 @@ impl Machine {
                 kind,
                 bytes,
                 sha256,
-            } => {
-                self.sender.clone_from(&peer.name);
-                self.submit(job_id, name, kind, bytes, sha256, out);
+            } => self.submit(job_id, name, kind, (bytes, sha256), &peer.name, out),
+            Message::MoveJob { .. } | Message::RemoveJob { .. } | Message::SetRunNext { .. } => {
+                self.list_message(&message, peer, out);
             }
             Message::JobChunk {
                 job_id,
@@ -396,99 +433,6 @@ impl Machine {
                 ErrorCode::UnexpectedMessage,
                 "The connector does not accept this message.",
             ),
-        }
-    }
-
-    fn submit(
-        &mut self,
-        job_id: Uuid,
-        name: String,
-        kind: JobKind,
-        bytes: u64,
-        sha256: String,
-        out: &mut Output,
-    ) {
-        match self.state {
-            State::NoController => Self::reject(out, job_id, RejectReason::NoController),
-            State::Idle | State::Done { .. } if self.laser_off => {
-                Self::reject(out, job_id, RejectReason::LaserModeOff);
-            }
-            State::Idle | State::Done { .. } if self.laser_unknown => {
-                Self::reject(out, job_id, RejectReason::LaserModeUnknown);
-            }
-            State::Idle | State::Done { .. }
-                if self
-                    .word
-                    .as_deref()
-                    .is_some_and(|w| BUSY_WORDS.contains(&w)) =>
-            {
-                Self::reject(out, job_id, RejectReason::Busy);
-            }
-            State::Idle | State::Done { .. } => {
-                match Assembly::begin(job_id, name, kind, bytes, sha256) {
-                    Err(reason) => Self::reject(out, job_id, reason),
-                    Ok(assembly) => {
-                        self.held = None;
-                        self.set(State::Receiving, out);
-                        if assembly.is_full() {
-                            self.complete(assembly, out);
-                        } else {
-                            self.assembly = Some(assembly);
-                        }
-                    }
-                }
-            }
-            _ => Self::reject(out, job_id, RejectReason::Busy),
-        }
-    }
-
-    fn chunk(&mut self, job_id: Uuid, index: u32, text: &str, out: &mut Output) {
-        let Some(assembly) = self.assembly.as_mut() else {
-            Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
-            return;
-        };
-        match assembly.push(job_id, index, text) {
-            Ok(()) if assembly.is_full() => {
-                if let Some(assembly) = self.assembly.take() {
-                    self.complete(assembly, out);
-                }
-            }
-            Ok(()) => {}
-            Err(ChunkError::UnknownJob) => {
-                Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
-            }
-            Err(ChunkError::Reject(reason)) => {
-                let held_id = assembly.job_id();
-                self.assembly = None;
-                Self::reject(out, held_id, reason);
-                self.set(State::Idle, out);
-            }
-        }
-    }
-
-    fn complete(&mut self, assembly: Assembly, out: &mut Output) {
-        let job_id = assembly.job_id();
-        match assembly.finish() {
-            Ok(job) => {
-                let lines = u32::try_from(job.text.lines().count()).unwrap_or(u32::MAX);
-                self.held = Some(Held {
-                    job,
-                    lines,
-                    line: 0,
-                    elapsed_ms: 0,
-                    people: People {
-                        sent_by: std::mem::take(&mut self.sender),
-                        started_by: None,
-                        confirmed_by: None,
-                    },
-                });
-                out.messages.push(Message::JobAccepted { job_id });
-                self.set(State::Ready, out);
-            }
-            Err(reason) => {
-                Self::reject(out, job_id, reason);
-                self.set(State::Idle, out);
-            }
         }
     }
 }

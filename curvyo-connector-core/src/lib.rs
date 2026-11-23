@@ -14,6 +14,7 @@ mod codec;
 mod config;
 mod count;
 mod handshake;
+mod job_list;
 mod machine;
 mod message;
 mod millimetres;
@@ -29,12 +30,17 @@ pub use config::{
 };
 pub use count::count;
 pub use handshake::{Handshake, Outcome, PROTOCOL_VERSION};
+pub use job_list::{
+    Chain, Dropped, End, Entry, Item, JobList, MAX_BYTES, MAX_ENTRIES, Restored, StoredCurrent,
+    StoredList, next as chain_next, restore,
+};
 pub use machine::{
-    Confirmation, ControllerCommand, Event, Machine, Options, Output, Peer, People, StartRule,
+    Confirmation, ControllerCommand, Event, ListLog, Machine, Options, Output, Peer, People,
+    StartRule,
 };
 pub use message::{
-    ControllerInfo, ControllerSettings, ErrorCode, JobKind, JobResult, Message, Progress,
-    RejectReason, State,
+    ControllerInfo, ControllerSettings, ErrorCode, JobKind, JobResult, ListEntry, Message,
+    Progress, RejectReason, State,
 };
 pub use millimetres::Millimetres;
 pub use send_watch::{Resolution, SendWatch};

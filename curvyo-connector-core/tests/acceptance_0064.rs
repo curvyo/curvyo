@@ -95,7 +95,10 @@ fn all_messages() -> Vec<Message> {
         Message::Paired {
             token: "tok".into(),
         },
-        Message::JobAccepted { job_id: j1() },
+        Message::JobAccepted {
+            job_id: j1(),
+            position: None,
+        },
         Message::JobRejected {
             job_id: j1(),
             reason: RejectReason::Busy,
@@ -305,7 +308,10 @@ fn p2_fixed_encoding_per_message() {
             json!({"type": "JobChunk", "job_id": uuid, "index": 4, "text": "G1"}),
         ),
         (
-            Message::JobAccepted { job_id: j1() },
+            Message::JobAccepted {
+                job_id: j1(),
+                position: None,
+            },
             json!({"type": "JobAccepted", "job_id": uuid}),
         ),
         (
@@ -556,12 +562,12 @@ fn p8_chunks_assemble_and_job_is_accepted() {
     f.send(chunk(j1(), 0, &text[..5]));
     f.send(chunk(j1(), 1, &text[5..12]));
     let last = f.send(chunk(j1(), 2, &text[12..]));
-    assert!(
-        last.messages
-            .contains(&Message::JobAccepted { job_id: j1() })
-    );
+    assert!(last.messages.contains(&Message::JobAccepted {
+        job_id: j1(),
+        position: None
+    }));
     assert_eq!(f.state(), State::Ready);
-    assert_eq!(f.machine.held_job().unwrap().text, text);
+    assert_eq!(f.machine.held_job().unwrap().text.as_ref(), text);
 }
 
 // P8: a Frame job is assembled the same way.
@@ -585,7 +591,7 @@ fn p8_one_byte_chunks_assemble() {
         f.send(chunk(j1(), u32::try_from(i).unwrap(), &c.to_string()));
     }
     assert_eq!(f.state(), State::Ready);
-    assert_eq!(f.machine.held_job().unwrap().text, text);
+    assert_eq!(f.machine.held_job().unwrap().text.as_ref(), text);
 }
 
 // P8 edge: a zero-byte job (empty text, sha256 of nothing) is accepted with no chunk at all:
@@ -595,12 +601,12 @@ fn p8_one_byte_chunks_assemble() {
 fn p8_zero_byte_job_is_accepted() {
     let mut f = idle();
     let out = f.send(submit(j1(), JobKind::Job, ""));
-    assert!(
-        out.messages
-            .contains(&Message::JobAccepted { job_id: j1() })
-    );
+    assert!(out.messages.contains(&Message::JobAccepted {
+        job_id: j1(),
+        position: None
+    }));
     assert_eq!(f.state(), State::Ready);
-    assert_eq!(f.machine.held_job().unwrap().text, "");
+    assert_eq!(f.machine.held_job().unwrap().text.as_ref(), "");
 }
 
 // P8 edge: a CR LF pair split across two chunks is one newline and is accepted.
@@ -785,16 +791,20 @@ fn p12_chunk_for_unknown_job_id_leaves_assembly_untouched() {
     assert!(has_error(&out), "Error for unknown job_id");
     assert_eq!(f.state(), State::Receiving, "assembly untouched");
     let ok = f.send(chunk(j1(), 1, &text[3..]));
-    assert!(ok.messages.contains(&Message::JobAccepted { job_id: j1() }));
+    assert!(ok.messages.contains(&Message::JobAccepted {
+        job_id: j1(),
+        position: None
+    }));
 }
 
 // ---------------------------------------------------------------------------
 // P13 to P15: busy, no controller, same job twice
 // ---------------------------------------------------------------------------
 
-// P13: in any non-Idle job state another SubmitJob gets Busy and the held job is untouched.
+// P13 (amended by `specs/0132` criterion 1): in any job state from Receiving to Paused another
+// SubmitJob is added to the job list, answered with its place, and the held job is untouched.
 #[test]
-fn p13_submit_while_busy_gets_busy_and_keeps_held_job() {
+fn p13_submit_while_busy_joins_the_list_and_keeps_held_job() {
     for state in [
         State::Receiving,
         State::Ready,
@@ -804,10 +814,18 @@ fn p13_submit_while_busy_gets_busy_and_keeps_held_job() {
     ] {
         let mut f = in_state(state, "G0\n");
         let before = f.machine.held_job().cloned();
-        let out = f.send(submit(j2(), JobKind::Job, "G1\n"));
+        let first = f.send(submit(j2(), JobKind::Job, "G1\n"));
         assert!(
-            rejected_with(&out, j2(), RejectReason::Busy),
-            "{state:?}: Busy"
+            first.messages.is_empty(),
+            "{state:?}: nothing before the chunks"
+        );
+        let out = f.send(chunk(j2(), 0, "G1\n"));
+        assert!(
+            out.messages.contains(&Message::JobAccepted {
+                job_id: j2(),
+                position: Some(1)
+            }),
+            "{state:?}: added to the list"
         );
         assert_eq!(f.state(), state, "{state:?} unchanged");
         assert_eq!(

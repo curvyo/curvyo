@@ -599,8 +599,9 @@ fn q13_refusals_name_the_reason_hold_nothing_and_are_logged() {
     assert_eq!(get_status(&mut c).0, State::Idle);
     // busy
     let held = submit(&mut c, "held.gcode", &job_text(3));
-    let err = c.send_job("second.gcode", "G1\n", deadline()).unwrap_err();
-    assert_eq!(err, SendError::Rejected(RejectReason::Busy));
+    // `specs/0132`: a second send is listed behind the held job, not refused.
+    let second = c.send_job("second.gcode", "G1\n", deadline()).unwrap();
+    assert_eq!(second.position, Some(1));
     let (state, job, _) = get_status(&mut c);
     assert_eq!(state, State::Ready);
     assert_eq!(job.unwrap().0, held, "the held job is untouched");
@@ -609,7 +610,6 @@ fn q13_refusals_name_the_reason_hold_nothing_and_are_logged() {
         "umlaut.gcode\tRejected: NotAscii",
         "big.txt\tRejected: TooLarge",
         "hash.gcode\tRejected: HashMismatch",
-        "second.gcode\tRejected: Busy",
     ] {
         assert!(log.contains(needle), "{needle} missing in\n{log}");
     }
@@ -879,13 +879,14 @@ fn q18_every_outcome_appends_one_time_name_result_line() {
         .map(|e| e.unwrap().file_name().into_string().unwrap())
         .collect();
     names.sort();
-    // `specs/0128` adds `admin.log` (A18) and `lock` (A21).
+    // `specs/0128` adds `admin.log` (A18) and `lock` (A21), `specs/0132` the folder `jobs`.
     assert_eq!(
         names,
         [
             "admin.log",
             "clients.json",
             "identity.pem",
+            "jobs",
             "jobs.log",
             "lock"
         ],
