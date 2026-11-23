@@ -1,6 +1,6 @@
 # Parametric generators: laser boxes with finger joints and gears, as live objects with typed parameters
 
-Status: Ready (2026-11-23; Fragen 277, 278, 308 and 309 answered; `adrs.md`, ADR 0079 (Accepted) and `ux-notes.md` exist)
+Status: Done (PR #455; Ready 2026-11-23; Fragen 277, 278, 308 and 309 answered; `adrs.md`, ADR 0079 (Accepted) and `ux-notes.md` exist)
 Priority: Could
 Origin: Customer (2026-11-19, translated): generators for laser boxes (finger joints etc.) and gears (module, tooth count, diameter, solid, spokes, cut-outs, centre bore, keyway ...). Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
