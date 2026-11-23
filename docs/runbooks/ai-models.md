@@ -3,7 +3,7 @@
 The customer's operating duty (Frage 280 A, Frage 282 default A; ADR 0075 §4, §7, ADR 0076 §2,
 §9, §12). Curvyo ships **no model**: the app downloads each file on demand from
 `https://models.curvyo.org` and checks it against a SHA-256 compiled into the app. The three
-files below are converted and pinned (2026-11-21, §2 and §4); until they are uploaded at the
+files below are converted and pinned (2026-11-21, §2 and §4); if they are not uploaded at the
 paths of §3, a download ends with "Model host not reachable." or "This model is no longer
 available." Stored results and every other step work regardless.
 
@@ -69,8 +69,8 @@ conversion is a new `version` and a new hash.
 ## 4. Where the hashes go
 
 **Done 2026-11-21 (lead):** the three files of the table in §2 are pinned in `models.toml` and
-`src/models.rs`. The CI release gate stays `continue-on-error` until the upload is verified by a
-GET of the three URLs. For a later model version:
+`src/models.rs`. The upload was verified on 2026-11-23 by a GET of the three URLs (pinned bytes, `Range`, CORS);
+the CI release gate no longer has `continue-on-error`. For a later model version:
 
 In **one commit**, for each model:
 

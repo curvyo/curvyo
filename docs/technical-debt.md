@@ -2742,10 +2742,14 @@ for satin stitch (embroidery family) rather than here.
   does not work around a lost host except through stored results. **Resolution:** the runbook
   `docs/runbooks/ai-models.md` (slice 3) lists the three files, their conversion, the upload paths,
   where the pinned hashes go and the host settings; bundling was rejected by the customer.
-- **The upload of the pinned model files is not verified yet (slice 3, 2026-11-21).** The three
-  files are pinned (runbook §2, §4); the release gate step in CI (`imageai-boundary`) stays
-  `continue-on-error` until a GET of the three URLs on `models.curvyo.org` returns the pinned
-  bytes. **Resolution:** the lead drops `continue-on-error` after that check.
+- **`Cache-Control` is missing on `models.curvyo.org` (slice 3, 2026-11-23).** The upload of the
+  three pinned files was verified on 2026-11-23: GET returns the pinned bytes (SHA-256 and sizes
+  match), `Range` answers 206 with `Content-Range`, CORS is `*` with `Range` allowed and the
+  headers exposed. The `Cache-Control: public, max-age=31536000, immutable` header of the runbook
+  is not sent on the `.onnx` and `LICENSE.txt` files, so the CDN edge does not keep them for a
+  year. The app downloads with `cache: "no-store"` and keeps its own copy, so nothing breaks;
+  it only costs origin traffic. **Resolution:** the customer adds the header at the host (runbook
+  section 5).
 - **Upscale misses the 30 s target on machines with few cores (slice 3 and `0143`, 2026-11-23).**
   With the pool of ADR 0078, 1 Mpx takes 19.8 s (Upscale) and 6.9 s (AI denoise) on 8 cores in
   Chromium; with one or two logical cores (N = 1) about 80 s and 27 s, behind a progress bar,
