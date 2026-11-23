@@ -295,3 +295,76 @@ the late `$J=`, no `M3`/`M4`/`S>0`. Fake: a position moved by jogs in injected t
 **Spec points, no customer question.** Criterion 16's "byte log per corner" is `jog.ts`'s corner
 table plus simulator bytes per sign; 21's "clamp per corner" is per `$23` and travel; 18's 300 ms is
 checked per hub tick (cancel by 350 ms).
+
+## Second slice 2b (frame)
+
+Architect, 2026-11-23, criteria 22 to 28 (Fragen 308 A, 310 C, 311 A), ux-notes W28 to W38. **No new
+ADR, crate, dependency or `format_version`**; wire additive in protocol 0. All is **(Proposal)**.
+
+**F1. Frame text, `curvyo-laser-core` (pure, wasm32).** `job_frame.rs` ("the outline a job's frame
+traces"): `FrameShape { Rectangle, RubberBand }`, `outline(&Job, shape) -> Option<Vec<PointUm>>` over
+both ends of every `Burn` and `Sweep` move (fixture blocks included; `Travel`, `RunOut`, `Z` not).
+Rectangle from the box corner nearest the machine origin, X first; Rubber band the convex hull
+(monotone chain, exact `i128` cross products on µm), counter-clockwise in machine coordinates, from the
+point nearest the machine origin. No burn move: `None` ("Nothing to frame"). *Amended (Frage 335 B):* the outline is taken from `job_build::build_frame_job`, which plans a block with items and no power or speed (4 a) at stand-in numbers (lowest power, the machine's maximum feed, one pass; never written, the frame is `S0` at its own feed); the wasm frame cause ignores the 4 a blocks and measures 4 b on that job (`outside_the_bed`). `job_frame_grbl.rs` ("the
+GRBL bytes of a frame") behind `job_write::write_frame`: comments, `G21`, `G90` (`G91` for Head
+position), `G17`, `M5`, `M9`, then `G1 X Y F<f> S0` to each point and back to the first; `f =
+min(3,000 mm/min, profile max_feed)`, GRBL's planner caps each axis at `$110`/`$111` (*rejected:* the
+connector rewriting `F` after the hash check). No `G0` (ignores `F`), no `$H` (Home then machine origin
+frames as Machine origin); Head position runs relative from `Job::home` and back to it. Goldens
+`frame_rectangle`, `frame_rubber_band`, `frame_head_position`, `frame_corners_{bl,br,tl,tr}.gcode`.
+
+**F2. Send path and wire.** Wasm `frame_bytes(page, shape)` from the cached job, with the causes "Nothing to
+frame" and "Outside the work area" (4 b). App: new `connector_frame.rs` (`connector_send.rs` is 493
+lines): raw body, fresh paired connection, `SubmitJob { kind: Frame }` and one chunk, answer as
+`CommandAnswer`; no watch, start or list; `job_send.rs` takes the kind as a parameter. **Wire:**
+`JobKind::Frame` exists (`0064` P2). New `State::Framing`, `RejectReason::NotAFrame`,
+`Status.frame_id: Option<Uuid>` (omitted when `None`; set in `Framing` and while a frame waits, since
+`journal.rs` reads "no job" as a waiting Home). One chunk at most (`TooLarge`). Goldens
+`status_framing.json`, `status_awaiting_frame.json`, `submit_frame.json`, `reject_not_a_frame.json`.
+
+**F3. Core check, `src/frame_text.rs`** ("the lines a frame may hold"): comments, `G21`, `G90`,
+`G91`, `G17`, `M5`, `M9`, `G1` with `X`, `Y`, `F` > 0, `S0`, `M5` before the first `G1`; any other
+word (`M3`, `M4`, `M8`, `S` > 0, `Z`, `$`, `G0`, `G10`, `G92`, `G54`) is `NotAFrame`.
+`FrameMoves::fits(box, mpos, wco)` tests the targets in machine coordinates against `jog::TravelBox`.
+Since the check proves laser off, `$32=0` or unknown does not refuse a frame (UX W31); jobs keep G34.
+
+**F4. Rules, `machine/frame.rs`** ("how the job machine runs a frame job"),
+both machines. `SubmitJob { Frame }`, before the list, in `Idle`, `Ready`, `Done` without a busy word
+assembles in its own slot `frame: Option<FrameRun>` beside `held`, state unchanged (the Ready job stays
+held); `Busy` in every other state or with a frame arriving (`0132` L2 amended). Last chunk: hash,
+ASCII, F3 (else `JobRejected`), the state checked again, `JobAccepted`, `motion_from` = that state
+(`Done` kept), then the start rule as Home: `LocalPress` or a member under `OwnerConfirms` wait
+(`Waiting::Frame`), else `ControllerCommand::Frame { job_id, homed }` and `Framing`. In `Framing`:
+`Status` keeps the Ready job's `Progress` (`Progress` events never touch `held.line`); `SubmitJob`
+`Busy`; `Start`, `Home`, `Jog`, `Pause`, `Resume` `WrongState` "Framing."; `JobFinished` returns to
+`motion_from` (no `Done`, result, `RunNext` or `jobs.log` result); `JobFailed*` return with the
+detail; `Alarm` drops a Ready job (M3); a closing client does not end it. **Stop**: fake at once, GRBL
+"Stopping" until `Stopped` (G12 holds before the reset: no alarm), then `motion_from` with the job and
+`homed` kept; Stop from anyone discards a waiting frame.
+
+**F5. A member's frame (308 A).** As J7's Home, waiting with `requested_by`, `frame_id`, no job. The
+owner's Confirm frame (W36), Enter and `curvyoctl confirm-start` send `Start { job_id: frame_id }`; a
+member's is `WrongState`; `Confirms::Frame` with the frame's id, `admin.log` names Frame. *Rejected:*
+the owner's own Frame press confirming (it carries the owner's page).
+
+**F6. `-io`.** The hub passes `machine.frame_job()` with `Frame`; `jobs.log` `Frame: <client>`
+(golden). `grbl/frame.rs` ("the frame's start: the travel check, then the stream"): homed with
+`$130`/`$131` and WCO known, a miss of `fits` is `JobFailedWith` "Outside the travel by <n> mm" and no
+byte (else GRBL's limits, as jog); then `prepare` and `Stream` as a job (flow, G12, loss clock). Fake:
+runs the lines in injected time, moving its position.
+
+**F7. Frontend and tests (no sleeps).** `connectorText.ts`: `Framing`, `jobButtons.frame` (W31
+order), W32 rows; Framing's busy look comes from the status (Stop stays pressable, M11). Ring (W33):
+`Frame::page_point` (laser-core, inverse of `machine_point`) via wasm; Head position offsets from the
+first Framing position. Tests: laser-core goldens, box/hull tables; core F3 per word, `fits` per
+corner, F4 per state in both machines (the next Start runs the held job, never listed), F5 rows;
+simulator `tests/grbl_frame.rs` (`M5` first, no `M3`/`M4`/`S`>0, Stop mid-frame back to `Ready` with
+the same id, outside the travel writes nothing); app `connector_frame`; frontend `jobButtons`. Spec
+points for the PO: 22's "in Home's group" is W28's row; 25's "G0/G1" is `G1 … S0`; 28 adds corners.
+
+Frage 334 (MC-FRAME-TRAVEL): What if a frame would leave the travel of a homed machine?
+- **A** Refused before the head moves: "Outside the travel by <n> mm".
+- **B** Clamped to the travel edge, as a jog.
+- **C** No check; GRBL's soft or hard limits stop it with an alarm.
+Recommendation **A** (a clamped frame shows a wrong outline). Default if unanswered: **A**.

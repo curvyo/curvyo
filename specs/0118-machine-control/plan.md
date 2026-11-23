@@ -106,3 +106,58 @@ Phase 3: docs
   the late `$J=`, no `M3`/`M4`/`S` above 0), `tests/jog_fake.rs` (running connector, fake controller).
 - App: `connector_command` unit tests. Frontend: `tests/jog_0118.test.ts`.
 - Full gate of `CLAUDE.md` §7, `cargo deny`, `python3 -I scripts/check_docs.py`. The browser check is the tester's.
+
+# Plan for Machine control, slice 2b (frame)
+
+Criteria 22 to 28 of the second slice; Fragen 308 A, 310 C, 311 A, 334 A. Design: architect addendum
+F1 to F7 in `adrs.md`, UX notes W28 to W38. Branch `story/machine-frame`. No new crate, dependency or
+`format_version`; protocol stays 0 (additive `State::Framing`, `RejectReason::NotAFrame`,
+`Status.frame_id`). Old golden files stay byte-identical, except that the nine `curvyo-editor-wasm`
+`output_view` view goldens gain an additive `frame` block (view JSON, not a file format; **(Proposal)**). Commits (conventional, scope = crate, at
+most five): laser-core, connector (core, `-io`, server, ctl), app and frontend, docs.
+
+## Affected crates/modules
+- `curvyo-laser-core`: new `job_frame.rs` (outline: box and hull), `job_write_frame.rs` (the bytes; named like the other writers for the 0093 file-name rule),
+  `job_write::write_frame`; goldens `frame_rectangle`, `frame_rubber_band`, `frame_head_position`,
+  `frame_corners_{bl,br,tl,tr}.gcode`.
+- `curvyo-connector-core`: `message.rs` (`State::Framing`, `RejectReason::NotAFrame`,
+  `Status.frame_id`), new `frame_text.rs` (the lines a frame may hold, `FrameMoves::fits`),
+  `machine/frame.rs` (the rules), `machine/confirm.rs` (`Confirms::Frame`, a member's frame waits),
+  `machine/event.rs` (`ControllerCommand::Frame`), `access.rs` unchanged (a frame is a `Job`).
+  Goldens `status_framing.json`, `status_awaiting_frame.json`, `submit_frame.json`,
+  `reject_not_a_frame.json`.
+- `curvyo-connector-io`: new `grbl/frame.rs` (travel check, then the stream), `fake_controller.rs`
+  (runs the lines in injected time), `hub` (`frame_job()` passed, `jobs.log` `Frame: <client>`),
+  `admin_log.rs` (Frame named), simulator support.
+- `curvyo-connector-ctl`: `confirm-start` confirms a waiting frame.
+- `curvyo-editor-wasm`, `curvyo-app`: `frame_bytes`, new `connector_frame.rs`, `connector.rs` `"frame"`.
+- `frontend`: Frame row, frame pick, `connectorText.ts`, causes, head ring, "Confirm frame".
+- `docs`: ADR amendments, design-system rows (done), technical debt.
+
+## Tasks
+Phase 1: laser-core, core, `-io`, simulator
+- [x] 1. `job_frame.rs`: box and convex hull over burn and sweep ends, `None` without a burn (22, 23, 27; F1)
+- [x] 2. `job_frame_grbl.rs` and `write_frame`: `M5`, `M9`, `G1 … S0` at the capped feed, Head position
+        relative and back to the start; goldens per pick, shape and corner (24, 25, 28; F1)
+- [x] 3. Wire: `State::Framing`, `Status.frame_id`, `RejectReason::NotAFrame`, goldens (22, 26; F2)
+- [x] 4. `frame_text.rs`: every word a frame may hold, `fits` per corner (25, 28; F3, Frage 334)
+- [x] 5. Rules: Frame accepted in Idle, Ready, Done, a Ready job kept, never listed, `Busy` elsewhere,
+        refused words are `NotAFrame`, Stop, Jog, Home, Start in Framing, Alarm (22, 26, 28; F4)
+- [x] 6. A member's frame waits for an owner, `Confirms::Frame`, `LocalPress` waits (37 analogue, 308 A; F5)
+- [x] 7. GRBL: travel check then stream, `M5` first, no `M3`/`M4`/`S` above 0, Stop mid-frame, outside the
+        travel writes nothing, `$32=0` does not refuse (25, 28; F6, Frage 334)
+- [x] 8. Fake controller runs a frame in injected time; hub passes the frame, `jobs.log` line (22; F6)
+Phase 2: app and frontend
+- [x] 9. `frame_bytes` (wasm), `connector_frame.rs`, `"frame"` command (22, 24, 27; F2)
+- [x] 9a. An operation without power or speed frames its geometry: `build_frame_job` with stand-in numbers,
+        the wasm cause ignores 4 a and measures the bed on that job (27; F1 amended, Frage 335 B)
+- [x] 10. Frontend: Frame row, pick, causes, "Framing", "Confirm frame", head ring (22 to 27; W28 to W38, F7)
+Phase 3: docs
+- [x] 11. ADR amendments, technical debt (28)
+
+## Validation
+- laser-core: `tests/frame_goldens_0118.rs` (goldens, `M5` first, no `G0`, no `S` above 0, box and hull tables).
+- Core: `tests/frame_0118.rs` (F3 per word, `fits` per corner, F4 per state in both machines, F5 rows, goldens).
+- `-io`: `tests/grbl_frame.rs` (simulator), `tests/frame_fake.rs` (running connector, fake controller).
+- App: `connector_frame` unit tests. Frontend: `tests/frame_0118.test.ts`.
+- Full gate of `CLAUDE.md` §7, `cargo deny`, `python3 -I scripts/check_docs.py`. The browser check is the tester's.

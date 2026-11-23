@@ -2931,3 +2931,12 @@ look at the demo decides which of them the customer wants.
   of them, so it may sit within 4 px of the Rounded knob. Below 96 px and for dense stars (ratio
   below 0.2, many points) the same happens. **Resolution:** a look at the demo; the knobs could
   take a second ring of positions or the Curve knob could yield to Rounded.
+
+## The fake controller's frame ends by its line pace, not by its head (`0118` slice 2b, F6, 2026-11-23)
+
+The fake controller finishes a frame when its lines have run at the set rate, while its head traces
+the outline at the frame feed; the two timelines differ, so a fast fake line rate ends the frame
+before the head arrived. The GRBL controller ends a frame only after the planner is idle.
+
+**Resolution:** accepted; the fake serves tests and demos without a machine, and the simulator tests
+cover the real order.
