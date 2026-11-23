@@ -54,6 +54,16 @@ fn c5_crop_narrows_the_frame_and_the_dots_and_resize_starts_at_the_width() {
             line: "Working image 40 × 20 px".to_owned()
         })
     );
+    // UX review: the line follows a Width edit (the size the Resize gives).
+    assert_eq!(s.edit_adjust_field(1, "width_px", 20.0), Ok(true));
+    assert_eq!(
+        s.adjustments_view().unwrap().steps[1].body,
+        Some(StepBodyView::Resize {
+            height_px: 10,
+            line: "Working image 20 × 10 px".to_owned()
+        })
+    );
+    assert_eq!(s.edit_adjust_field(1, "width_px", 40.0), Ok(true));
     assert!(
         !resize.up && !resize.down,
         "the geometry band keeps its order"
@@ -62,7 +72,8 @@ fn c5_crop_narrows_the_frame_and_the_dots_and_resize_starts_at_the_width() {
     assert!(s.pick_adjust_preset("photo"));
     let view = s.adjustments_view().unwrap();
     assert!(view.steps.iter().all(|r| !r.preset_in_use));
-    assert!(view.add_tone.is_empty() && view.add_geometry.len() == 2);
+    // Slice 3: row 2 also holds the three AI steps.
+    assert!(view.add_tone.is_empty() && view.add_geometry.len() == 5);
     let derived = view.derived.unwrap().rows;
     assert!(
         derived

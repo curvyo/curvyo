@@ -198,6 +198,7 @@ impl crate::session::Session {
         let pixels = self.job_pixels(&leaf.asset);
         let (steps, key) = match pixels {
             Some(pixels) => {
+                self.hold_stored_results(&self.adjust_pictures(), &registers);
                 let resolved = self.adjust_pictures().resolve(
                     (&leaf.asset, &pixels, &leaf.corners()),
                     &registers,

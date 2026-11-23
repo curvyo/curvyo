@@ -378,7 +378,7 @@ fn s16_a_refused_send_leaves_the_project_bytes_unchanged() {
     // Superseded by 0135 slice 1 (2026-11-19): format 51 is `0135`'s, not this story's.
     assert_eq!(
         curvyo_document_core::CURRENT_FORMAT_VERSION,
-        52,
+        53,
         "no format_version change"
     );
 }

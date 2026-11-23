@@ -227,6 +227,7 @@ impl crate::session::Session {
         }
         let key = self.job_pixels(&image.asset).and_then(|pixels| {
             let registers = AdjustRegisters::read(&adjustments);
+            self.hold_stored_results(&look.pyramids, &registers);
             let level = look_level(pixels.width, pixels.height);
             let resolved = look.pyramids.resolve(
                 (&image.asset, &pixels, &corners),

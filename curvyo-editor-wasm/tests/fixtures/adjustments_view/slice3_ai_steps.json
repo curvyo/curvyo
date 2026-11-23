@@ -1,0 +1,283 @@
+{
+  "add_geometry": [
+    {
+      "kind": "crop",
+      "name": "Add Crop"
+    },
+    {
+      "kind": "resize",
+      "name": "Add Resize"
+    },
+    {
+      "kind": "upscale",
+      "name": "Add Upscale"
+    },
+    {
+      "kind": "ai_denoise",
+      "name": "Add AI denoise"
+    },
+    {
+      "kind": "remove_background",
+      "name": "Add Remove background"
+    }
+  ],
+  "add_tone": [
+    {
+      "kind": "channel_mix",
+      "name": "Add Channel mix"
+    },
+    {
+      "kind": "denoise",
+      "name": "Add Denoise"
+    },
+    {
+      "kind": "levels",
+      "name": "Add Levels"
+    },
+    {
+      "kind": "curves",
+      "name": "Add Curves"
+    },
+    {
+      "kind": "local_contrast",
+      "name": "Add Local contrast"
+    },
+    {
+      "kind": "contours",
+      "name": "Add Contours"
+    },
+    {
+      "kind": "sharpen",
+      "name": "Add Sharpen"
+    }
+  ],
+  "before_after_open": false,
+  "clone_row": null,
+  "crop_bar_row": null,
+  "derived": null,
+  "dither": {
+    "dither": "floyd_steinberg",
+    "mode_field": null,
+    "modes": [
+      {
+        "label": "Threshold",
+        "value": "threshold"
+      },
+      {
+        "label": "Ordered",
+        "value": "ordered"
+      },
+      {
+        "label": "Floyd-Steinberg",
+        "value": "floyd_steinberg"
+      },
+      {
+        "label": "Jarvis",
+        "value": "jarvis"
+      },
+      {
+        "label": "Atkinson",
+        "value": "atkinson"
+      },
+      {
+        "label": "Stucki",
+        "value": "stucki"
+      },
+      {
+        "label": "Grey",
+        "value": "grey"
+      },
+      {
+        "label": "Halftone dots",
+        "value": "halftone"
+      },
+      {
+        "label": "Line screen",
+        "value": "line_screen"
+      }
+    ],
+    "screen_fields": []
+  },
+  "memory_line": null,
+  "notice": null,
+  "paste_enabled": false,
+  "presets": [
+    {
+      "cell": "Photo",
+      "key": "photo",
+      "name": "Photo (detailed)",
+      "pressed": false,
+      "tooltip": "Photo (detailed) · Dither: Jarvis"
+    },
+    {
+      "cell": "Graphics",
+      "key": "graphics",
+      "name": "Graphics (flat areas)",
+      "pressed": false,
+      "tooltip": "Graphics (flat areas) · Dither: Ordered"
+    },
+    {
+      "cell": "Black and white",
+      "key": "black_white",
+      "name": "Black and white (hard edges)",
+      "pressed": false,
+      "tooltip": "Black and white (hard edges) · Dither: Threshold 50 %"
+    },
+    {
+      "cell": "Line art",
+      "key": "line_art",
+      "name": "Line art (outlines and handwriting)",
+      "pressed": false,
+      "tooltip": "Line art (outlines and handwriting) · Dither: Threshold 50 %"
+    },
+    {
+      "cell": "Dots",
+      "key": "dot_raster",
+      "name": "Dot raster (round dots)",
+      "pressed": false,
+      "tooltip": "Dot raster (round dots) · Dither: Halftone"
+    },
+    {
+      "cell": "Newspaper",
+      "key": "newspaper",
+      "name": "Newspaper (retro screen)",
+      "pressed": false,
+      "tooltip": "Newspaper (retro screen) · Dither: Lines"
+    },
+    {
+      "cell": "Expert",
+      "key": "expert",
+      "name": "Expert",
+      "pressed": true,
+      "tooltip": "Expert · Dither unchanged"
+    }
+  ],
+  "restore_enabled": true,
+  "state_line": null,
+  "steps": [
+    {
+      "accessible_name": "Upscale, Factor 2 ×",
+      "body": {
+        "alert": false,
+        "consent": null,
+        "kind": "ai",
+        "model": "upscale",
+        "model_ready": false,
+        "out_of_date": null,
+        "progress": null,
+        "refusal": null,
+        "run": "Run",
+        "size_line": "40 × 20 px to 80 × 40 px",
+        "size_refused": false,
+        "state": "Model not downloaded yet (2.4 MB).",
+        "stored": null
+      },
+      "down": false,
+      "enabled": true,
+      "fields": [
+        {
+          "decimals": 0,
+          "key": "factor",
+          "label": "Factor",
+          "range": "Factor is 2× or 4×.",
+          "unit": "×",
+          "value": 2.0
+        }
+      ],
+      "histogram": null,
+      "index": 0,
+      "kind": "upscale",
+      "line": "Factor 2 ×",
+      "name": "Upscale",
+      "preset_in_use": false,
+      "unknown": false,
+      "up": false
+    },
+    {
+      "accessible_name": "AI denoise, Strength 50 %",
+      "body": {
+        "alert": false,
+        "consent": "Downloads the AI denoise model (ffdnet-color, 3.3 MB) once from models.curvyo.org. Your picture does not leave this computer.",
+        "kind": "ai",
+        "model": "denoise",
+        "model_ready": false,
+        "out_of_date": null,
+        "progress": null,
+        "refusal": null,
+        "run": "Run",
+        "size_line": null,
+        "size_refused": false,
+        "state": "Model not downloaded yet (3.3 MB).",
+        "stored": null
+      },
+      "down": false,
+      "enabled": true,
+      "fields": [
+        {
+          "decimals": 0,
+          "key": "strength_pct",
+          "label": "Strength",
+          "range": "Strength is 0 to 100 %.",
+          "unit": "%",
+          "value": 50.0
+        }
+      ],
+      "histogram": null,
+      "index": 1,
+      "kind": "ai_denoise",
+      "line": "Strength 50 %",
+      "name": "AI denoise",
+      "preset_in_use": false,
+      "unknown": false,
+      "up": false
+    },
+    {
+      "accessible_name": "Remove background, Edge softness 5 %, Threshold 50 %",
+      "body": {
+        "alert": false,
+        "consent": null,
+        "kind": "ai",
+        "model": "background",
+        "model_ready": true,
+        "out_of_date": null,
+        "progress": null,
+        "refusal": null,
+        "run": "Run",
+        "size_line": null,
+        "size_refused": false,
+        "state": "Model on this computer (4.4 MB).",
+        "stored": null
+      },
+      "down": false,
+      "enabled": true,
+      "fields": [
+        {
+          "decimals": 0,
+          "key": "softness_pct",
+          "label": "Edge softness",
+          "range": "Edge softness is 0 to 20 %.",
+          "unit": "%",
+          "value": 5.0
+        },
+        {
+          "decimals": 0,
+          "key": "threshold_pct",
+          "label": "Threshold",
+          "range": "Threshold is 0 to 100 %.",
+          "unit": "%",
+          "value": 50.0
+        }
+      ],
+      "histogram": null,
+      "index": 2,
+      "kind": "remove_background",
+      "line": "Edge softness 5 %, Threshold 50 %",
+      "name": "Remove background",
+      "preset_in_use": false,
+      "unknown": false,
+      "up": false
+    }
+  ],
+  "stored_results": null,
+  "strength": null
+}

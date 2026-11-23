@@ -7,6 +7,18 @@
     {
       "kind": "resize",
       "name": "Add Resize"
+    },
+    {
+      "kind": "upscale",
+      "name": "Add Upscale"
+    },
+    {
+      "kind": "ai_denoise",
+      "name": "Add AI denoise"
+    },
+    {
+      "kind": "remove_background",
+      "name": "Add Remove background"
     }
   ],
   "add_tone": [
@@ -199,5 +211,6 @@
       "up": true
     }
   ],
+  "stored_results": null,
   "strength": null
 }

@@ -311,8 +311,17 @@ impl Session {
                         {
                             adjust.strength = strength;
                         }
+                        // ADR 0077 §3, §4: the stored AI results are held for the job; one
+                        // that cannot be read skips the picture as unreadable.
+                        let cache = self.adjust_pictures();
+                        let pixels = self
+                            .job_pixels(&asset)
+                            .filter(|_| self.hold_stored_results(&cache, &adjust));
+                        if let Some(pixels) = &pixels {
+                            adjust.stale_results = cache.stale_results(&asset, pixels, &adjust);
+                        }
                         LeafGeometry::Image {
-                            pixels: self.job_pixels(&asset),
+                            pixels,
                             frame,
                             asset,
                             adjust,

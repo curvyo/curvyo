@@ -161,7 +161,16 @@ fn adjustments_states() -> Vec<(&'static str, Session)> {
     assert!(slice2.add_adjust_curve_point(3, 40, 25));
     assert!(slice2.set_adjust_channel_preset(2, 1));
     assert!(slice2.copy_adjustments());
+    // Slice 3: one row of each AI kind; Upscale not downloaded, AI denoise asking for consent,
+    // Remove background ready.
+    let (mut ai, _) = engraved(1);
+    for kind in ["upscale", "ai_denoise", "remove_background"] {
+        assert!(ai.add_adjust_step(kind));
+    }
+    assert!(ai.set_ai_model_state("denoise", "asking", 0));
+    assert!(ai.set_ai_model_state("background", "ready", 0));
     vec![
+        ("slice3_ai_steps", ai),
         ("slice2_steps", slice2),
         ("no_image", none),
         ("memory_short", short),
