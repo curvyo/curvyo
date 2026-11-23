@@ -2739,8 +2739,34 @@ for satin stitch (embroidery family) rather than here.
 - **Operating the model origin and CDN is a customer operating duty (Frage 280 A, 2026-11-19).**
   A domain, an origin bucket and a CDN in front, plus an upload per model version (ADR 0076),
   must be kept alive for the AI tools to download on demand (models are never bundled); the app
-  does not work around a lost host except through stored results. **Resolution:** a documented
-  runbook with the model upload and CDN settings; bundling was rejected by the customer.
+  does not work around a lost host except through stored results. **Resolution:** the runbook
+  `docs/runbooks/ai-models.md` (slice 3) lists the three files, their conversion, the upload paths,
+  where the pinned hashes go and the host settings; bundling was rejected by the customer.
+- **The upload of the pinned model files is not verified yet (slice 3, 2026-11-21).** The three
+  files are pinned (runbook §2, §4); the release gate step in CI (`imageai-boundary`) stays
+  `continue-on-error` until a GET of the three URLs on `models.curvyo.org` returns the pinned
+  bytes. **Resolution:** the lead drops `continue-on-error` after that check.
+- **Upscale misses the 30 s target on machines with few cores (slice 3 and `0143`, 2026-11-23).**
+  With the pool of ADR 0078, 1 Mpx takes 19.8 s (Upscale) and 6.9 s (AI denoise) on 8 cores in
+  Chromium; with one or two logical cores (N = 1) about 80 s and 27 s, behind a progress bar,
+  Cancel and "Running on one core". Firefox and the desktop webviews are not measured.
+  **Resolution:** native inference in the desktop app (ADR 0078 option D) or a WebGPU runtime,
+  each its own ADR, when a maker reports it.
+- **The desktop app caches models in the webview's IndexedDB, not in its data folder (slice 3,
+  Proposal).** ADR 0076 §8 names `curvyo-storage-io` commands (`model_append`, `model_commit`,
+  `model_read`, `model_remove`); this slice uses the browser store in both builds, so a desktop
+  model can be evicted like a browser one (it then downloads again after the consent line).
+  **Resolution:** the four app commands and a desktop `ModelStore` behind the same interface.
+- **Stored AI results are not sent to workspace peers (slice 3, 2026-11-23).** ADR 0077 §7
+  has derived assets travel as asset records; the sync, the background writer and adopting a
+  document push only the pictures' and fonts' assets (`image_assets`, `received_assets` in
+  `curvyo-editor-wasm`), so a peer sees the step's result as missing and does not burn the
+  picture until it runs the step. **Resolution:** include `referenced_derived_assets` in those
+  three paths and store a received derived record with `insert_derived_asset`.
+- **No About licence list exists yet (slice 3).** ADR 0076 §9 puts the models' licences,
+  attribution and training data in the About dialog; the app has no About dialog. The data is in
+  `ai_models_json()` and beside each file on the host (`LICENSE.txt`). **Resolution:** the About
+  dialog story lists the models (and the OCR weights, `docs/third-party-assets.md`).
 - **The step drag's ghost is the row's name, not the row (2026-11-20).** The `0101` reorder drag
   shows a picture of the dragged row; the Adjustments list shows its name in a 70 % chip.
   **Resolution:** draw the row itself as the ghost when the list gets a second drag polish pass.

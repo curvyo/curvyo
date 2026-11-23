@@ -72,3 +72,65 @@ All three need conversion from PyTorch to ONNX; that conversion is ours (decisio
 - A young runtime maintainer (`rten`), as in ADR 0028; ONNX Runtime Web and `tract` stay documented fallbacks for the same files.
 - The weights' licences rest on the repositories' statements; their training sets are research datasets, accepted (Frage 281 A, decision 9) and named in the About licence list.
 - Amends by notes on acceptance: ADR 0011 §2 (new crate) and §6 (the `rayon` check), ADR 0028 §4 (the exception covers this crate).
+
+## Note 2026-11-21: step 0 measured (implementer; Proposal, for the customer's acceptance)
+
+The three converted files run on `rten` 0.26 with every operator supported; their output differs
+from ONNX Runtime 1.32 by at most 1 grey level. On a 1 Mpx picture (`specs/0135` `plan.md`,
+"Step 0 measured"): natively on one thread 0.3 s, 16.3 s and 25.8 s; in Chromium through the AI
+worker with wasm SIMD (`+simd128`, already on for every wasm build) **2.2 s (Remove background),
+143 s (Upscale), 470 s (AI denoise)**, peak 1.3 GB in the worker's process; Cancel 0.2 s; the page
+stays responsive. Remove background meets decision 7's target; Upscale misses it 5x and AI denoise
+16x.
+
+Lead decision (2026-11-21): the two slow models are rejected (kept in the table above as measured
+options) and the decision-7 fallbacks ship: **`realesr-animevideov3`** (BSD-3-Clause, 2.5 MB ONNX)
+for Upscale and **`ffdnet-color`** (MIT, KAIR, 3.4 MB ONNX, the noise level fixed at 15/255 in the
+file; Gaussian noise only, it does not remove JPEG blocks) for AI denoise. Both run every operator
+on `rten` 0.26, 1 grey level from ONNX Runtime; on 1 Mpx natively 9.5 s and 2.5 s, **in Chromium
+74 s and 74 s**, peak about 1 GB, Cancel 0.2 s. A 128 px tile would not help (more overlap).
+
+Proposal (next step, each its own ADR): the fallbacks miss the 30 s target 2.5x on one wasm thread.
+The cheapest gain is **`rten` on wasm threads**: `rten` already parallelises natively through
+`rayon`; in wasm that needs `SharedArrayBuffer`, i.e. the web app and the desktop webview served
+cross-origin isolated (`Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy:
+require-corp`, the model host's files with `Cross-Origin-Resource-Policy: cross-origin`), a wasm
+build with atomics (`build-std`, nightly or a target feature set) and a thread pool in the worker
+(`wasm-bindgen-rayon`); on 4 to 8 cores this should reach the target. The alternative is ONNX
+Runtime Web with WebGPU (a second runtime, about 10 MB of wasm, inference in TypeScript, WebGPU
+not everywhere in WebKitGTK).
+
+## Note 2026-11-21: tiles on a pool (implementer, ADR 0078 accepted as a Proposal)
+
+§2 gains the tile functions of ADR 0078 §2 (`tile_count`, `upscale_tile`, `denoise_tile`,
+`assemble`, `TileOutput`); `upscale` and `denoise` are a loop over them, pinned by hash to the
+output before the change. §3: Upscale and AI denoise run their tiles on a pool of AI workers
+(worker 0 plus `min(cores - 1, 8, 1 GiB / M) - 1` extras, made per Run), each the editor wasm with
+its own memory; Remove background stays one run on worker 0. Measured in `specs/0143` `plan.md`.
+
+## Note 2026-11-23: what slice 3 built (architect review; for the customer's acceptance with the PR)
+
+**In plain words (for the customer).** Two of the three AI models changed after measuring them in
+the browser: the first choices for Upscale and AI denoise took 2.5 and 8 minutes on a 1 megapixel
+picture. Upscale now uses the smaller Real-ESRGAN model trained on anime video frames
+(`realesr-animevideov3`, BSD-3-Clause) and AI denoise uses FFDNet (`ffdnet-color`, MIT), which
+removes grain-like noise but **not JPEG blocks**. Remove background is unchanged (U²-Netp). The
+three files together are about 10.5 MB instead of about 82 MB. On an 8-core machine Upscale
+takes about 20 s and AI denoise about 7 s (ADR 0078); on a one- or two-core machine about 80 s
+and 27 s. Both new models were trained on research data, like the first ones (Frage 281 A).
+
+What changes against the text above:
+- Models table and decision 9: Upscale is `realesr-animevideov3` (upstream release `v0.2.5.0`,
+  training data: anime video frames with synthetic degradations), AI denoise is `ffdnet-color`
+  (`cszn/KAIR` release `v1.0`, noise level fixed at 15/255 inside the ONNX file; training data
+  BSD400, ImageNet validation and Waterloo Exploration with Gaussian noise). `models.toml` holds
+  the pins, upstream hashes and training data notes.
+- Decision 1: the only dependent built is `curvyo-editor-wasm` (the session commands live in the
+  editor session, not in `curvyo-ui-core`); the CI job `imageai-boundary` allows both. Direct
+  edges are `rten` and `rten-tensor` (both `=0.26.0`, already locked through `vectrace`), no new
+  third-party crate. When `vectrace` moves to another `rten`, both pins move in the same change.
+- Decision 2: the progress callback is `&mut dyn FnMut(done, total) -> bool`, not a `Poll` type;
+  `AiError::TooLarge` carries the result size; the tile functions are ADR 0078 §2.
+- Decision 4: `models.toml` and `src/models.rs` are kept equal by hand and checked by
+  `tests/model_record.rs` (no generator); the conversion is `tools/models/export_onnx.py`, the
+  maintainer's steps `docs/runbooks/ai-models.md`.
