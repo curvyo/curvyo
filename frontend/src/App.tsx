@@ -1,7 +1,7 @@
 import { usePlaceOn } from "@/hooks/usePlaceOn";
 import { useSketch } from "@/hooks/useSketch";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { Canvas } from "@/components/Canvas";
 import { CanvasArea } from "@/components/CanvasArea";
@@ -44,6 +44,7 @@ import { useEditorSession } from "@/hooks/useEditorSession";
 import { useClosePathState } from "@/hooks/usePenCue";
 import { useDocumentPanel } from "@/hooks/useDocumentPanel";
 import { usePanelOpen } from "@/hooks/usePanelOpen";
+import { type RecoveryApi, useRecovery } from "@/hooks/useRecovery";
 import { useProject } from "@/hooks/useProject";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useWorkspaceSync } from "@/hooks/useWorkspaceSync";
@@ -168,12 +169,20 @@ function Editor() {
     onPress: editor.text.path.pressOnPath,
     onRelease: editor.text.path.release,
   };
+  const recoveryRef = useRef<RecoveryApi | null>(null);
   const project = useProject({
     editor,
     panelOpen,
     panel: documentPanel,
     onOpenError: (message: string, title = "Can't open project") => setOpenError({ message, title }),
     onSaveError: setSaveErrorMessage,
+    onQuit: () => recoveryRef.current?.end(),
+  });
+  // The recovery copy of the open project and the offer of the copies a crash left
+  // (`specs/0136-autosave-and-restore`).
+  const recovery = useRecovery({ editor, project, panelOpen, panel: documentPanel });
+  useEffect(() => {
+    recoveryRef.current = recovery;
   });
   // Ctrl+V and Ctrl+C for images (`specs/0087-image-clipboard-and-drop`).
   useImageClipboard(editor, project.pasteImage, project.pasteFiles);
@@ -515,6 +524,7 @@ function Editor() {
           }
         />
         <PropertiesPanel
+          recovery={recovery}
           sketch={sketch}
           workbenches={workbenches}
           editor={editor}

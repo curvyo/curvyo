@@ -1,6 +1,6 @@
 # Plan for autosave and restore (0136)
 
-**Status:** Building. Branch `story/autosave-and-restore`. Design: ADR 0079 (`docs/adr/0079-recovery-copies.md`), `adrs.md`, `ux-notes.md`.
+**Status:** Built, gate run (see the PR). Branch `story/autosave-and-restore`. Design: ADR 0079 (`docs/adr/0079-recovery-copies.md`), `adrs.md`, `ux-notes.md`.
 No new crate, no new dependency, `.curvyo` `format_version` unchanged (`recovery.json` is a new record at format 1).
 
 ## Affected crates and modules
@@ -21,25 +21,25 @@ No new crate, no new dependency, `.curvyo` `format_version` unchanged (`recovery
 ## Tasks (tests first; each names its criteria)
 
 ### Part A: pure rules (`curvyo-ui-core`), commit 1
-- [ ] A1 `recovery_schedule` tests with a fake clock, then code. Criteria 1, 8, 13. Tests: step after a gap of 5 min or more is due at once; steps within the window give exactly one trailing write at expiry; no step since the last write: nothing is due; a clean project is never due and a due write on a clean project deletes the copy (only when a copy was written); a step during `writing()` stays pending; a failure does not count as a write and retries on the next step or 5 min after the attempt; the failure notice shows once and clears on the next success, a new failure after a success shows again; `ended()` resets everything.
-- [ ] A2 `recovery_record` codec with goldens in `curvyo-ui-core/tests/fixtures/recovery/` (current, newer refused, truncated, with and without `base`). Criteria 4, 6, 7, 9.
-- [ ] A3 `recovery_prune`. Criterion 12 and 11. Tests: newest unlocked kept whatever its size; locked never deleted and not counted; the newest plus 20 stay, a 22nd drops the oldest; 200 MB counts asset bytes; oldest first.
-- [ ] A4 `recovery_text`: row lines, damaged lines, help line, failure sentences, accessible names, "(recovered)" name. Criteria 4, 5, 6, 7, 9, 13.
-- [ ] A5 `curvyo-document-core::container`: `pack_recovery` (a flag on `pack_members`, no share record, no asset members), `assemble(copy, assets)`, `check_recovery_copy` (manifest and central directory, accepts an asset-less container, same named errors as Open). Round trip `pack_recovery` + `assemble` + `unpack` equals the original (assets and derived assets included). Criteria 1, 5, 7.
+- [x] A1 `recovery_schedule` tests with a fake clock, then code. Criteria 1, 8, 13. Tests: step after a gap of 5 min or more is due at once; steps within the window give exactly one trailing write at expiry; no step since the last write: nothing is due; a clean project is never due and a due write on a clean project deletes the copy (only when a copy was written); a step during `writing()` stays pending; a failure does not count as a write and retries on the next step or 5 min after the attempt; the failure notice shows once and clears on the next success, a new failure after a success shows again; `ended()` resets everything.
+- [x] A2 `recovery_record` codec with goldens in `curvyo-ui-core/tests/fixtures/recovery/` (current, newer refused, truncated, with and without `base`). Criteria 4, 6, 7, 9.
+- [x] A3 `recovery_prune`. Criterion 12 and 11. Tests: newest unlocked kept whatever its size; locked never deleted and not counted; the newest plus 20 stay, a 22nd drops the oldest; 200 MB counts asset bytes; oldest first.
+- [x] A4 `recovery_text`: row lines, damaged lines, help line, failure sentences, accessible names, "(recovered)" name. Criteria 4, 5, 6, 7, 9, 13.
+- [x] A5 `curvyo-document-core::container`: `pack_recovery` (a flag on `pack_members`, no share record, no asset members), `assemble(copy, assets)`, `check_recovery_copy` (manifest and central directory, accepts an asset-less container, same named errors as Open). Round trip `pack_recovery` + `assemble` + `unpack` equals the original (assets and derived assets included). Criteria 1, 5, 7.
 
 ### Part B: host (`curvyo-storage-io`, `curvyo-app`), commit 2
-- [ ] B1 `recovery_copies` over a temp dir: write order assets, copy, record (temp then rename), a crash between leaves the previous copy intact, list with lock state (a held lock is listed as locked), read, delete copy (keeps `lock`), delete folder, startup cleanup of unlocked folders without `recovery.json`. Criteria 2, 3, 9, 11.
-- [ ] B2 `curvyo-app/src/recovery.rs` commands (`recovery_begin`, `recovery_write_asset`, `recovery_write_copy`, `recovery_delete_copy`, `recovery_end`, `recovery_list`, `recovery_read`, `recovery_path`), `app_local_data_dir()`, raw bytes over IPC, `base` of the saved file recorded by the host. Criteria 3, 6, 9, 10.
+- [x] B1 `recovery_copies` over a temp dir: write order assets, copy, record (temp then rename), a crash between leaves the previous copy intact, list with lock state (a held lock is listed as locked), read, delete copy (keeps `lock`), delete folder, startup cleanup of unlocked folders without `recovery.json`. Criteria 2, 3, 9, 11.
+- [x] B2 `curvyo-app/src/recovery.rs` commands (`recovery_begin`, `recovery_write_asset`, `recovery_write_copy`, `recovery_delete_copy`, `recovery_end`, `recovery_list`, `recovery_read`, `recovery_path`), `app_local_data_dir()`, raw bytes over IPC, `base` of the saved file recorded by the host. Criteria 3, 6, 9, 10.
 
 ### Part C: session and worker (`curvyo-editor-wasm`), commit 3
-- [ ] C1 `recovery_writer` (replica imports the deltas, packs `pack_recovery`) and the `WasmRecoveryWriter` surface; tests: the packed copy assembles and opens equal to the session's document after several deltas; a reseed after a wipe. Criteria 1, 2.
-- [ ] C2 Session calls: `recovery_version_changed`, `recovery_export` (delta since the last handed version, never mid gesture), asset hand-over by name. Criterion 1, 2.
-- [ ] C3 CPU-time test in `tests/cpu_time`-based budget file for the main-thread part on 10,000 objects. Criterion 2.
+- [x] C1 `recovery_writer` (replica imports the deltas, packs `pack_recovery`) and the `WasmRecoveryWriter` surface; tests: the packed copy assembles and opens equal to the session's document after several deltas; a reseed after a wipe. Criteria 1, 2.
+- [x] C2 Session calls: `recovery_version_changed`, `recovery_export` (delta since the last handed version, never mid gesture), asset hand-over by name. Criterion 1, 2.
+- [x] C3 CPU-time test (`curvyo-editor-wasm/tests/recovery_export_budget.rs`, uses `tests/cpu_time`) for the main-thread part on 10,000 objects. Criterion 2.
 
 ### Part D: frontend, commit 4
-- [ ] D1 `recoveryStore.ts` (IndexedDB `curvyo-recovery`, Web Locks; guarded), `recoveryWriter.ts` worker, `useRecovery.ts` (schedule loop, key, hooks into Save success, Discard, clean Close, New, quit, Restore adopting the key). Criteria 1, 3, 5, 8, 9, 11, 13.
-- [ ] D2 `RecoveryBlock.tsx` in the File tab (rows, Restore, armed Discard, damaged look, roving focus, start view of Frage 317 A, failed-write line and canvas notice). Criteria 4 to 7, 13 and the UX notes.
-- [ ] D3 Docs: `docs/requirements.md` (R-SYS-010 extended, R-SYS-013), `docs/technical-debt.md` entry if absent, this plan ticked.
+- [x] D1 `recoveryStore.ts` (IndexedDB `curvyo-recovery`, Web Locks; guarded), `recoveryWriter.ts` worker, `useRecovery.ts` (schedule loop, key, hooks into Save success, Discard, clean Close, New, quit, Restore adopting the key). Criteria 1, 3, 5, 8, 9, 11, 13.
+- [x] D2 `RecoveryBlock.tsx` in the File tab (rows, Restore, armed Discard, damaged look, roving focus, start view of Frage 317 A, failed-write line and canvas notice). Criteria 4 to 7, 13 and the UX notes.
+- [x] D3 Docs (R-SYS-013 status; `adrs.md` implementation notes; the `technical-debt.md` entry was already in): `docs/requirements.md` (R-SYS-010 extended, R-SYS-013), `docs/technical-debt.md` entry if absent, this plan ticked.
 
 ## Validation
 

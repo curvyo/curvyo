@@ -81,6 +81,9 @@ interface PanelStripProps {
   desktop?: boolean;
   /** The project has unsaved changes: the File tab carries a dot, also while the body is hidden. */
   fileDirty: boolean;
+  /** Copies a crash left wait in the File tab: its name says so, with no mark on the button
+   * (`specs/0136-autosave-and-restore` `ux-notes.md` section 8). */
+  fileRecovery?: boolean;
   /** An unread membership notice: the Share tab carries a dot (`specs/0097` ux-notes 2.1). */
   shareMark?: boolean;
   snappingEnabled: boolean;
@@ -122,6 +125,7 @@ export function PanelStrip({
   open,
   bodyId,
   fileDirty,
+  fileRecovery = false,
   shareMark = false,
   snappingEnabled,
   onToggleSnapping,
@@ -215,7 +219,7 @@ export function PanelStrip({
           const trigger = (
             <TabsTrigger
               value={tab.name}
-              aria-label={dot ? `${tab.label}, unsaved changes` : mark ? membership_word("tab-new-notice") : (toggle?.name ?? tab.label)}
+              aria-label={tab.name === "file" && (dot || fileRecovery) ? `${tab.label}${dot ? ", unsaved changes" : ""}${fileRecovery ? ", unsaved work from a crash" : ""}` : mark ? membership_word("tab-new-notice") : (toggle?.name ?? tab.label)}
               aria-selected={open && tab.name === active}
               disabled={!tab.enabled}
               aria-disabled={tab.enabled ? undefined : true}

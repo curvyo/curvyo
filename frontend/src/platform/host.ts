@@ -257,6 +257,18 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   write_extensions_file: (args) => window.localStorage.setItem(EXTENSIONS_KEY, String(args?.text)),
   // The connector row says "Needs the desktop app" in the browser and never calls these
   // (`specs/0064-machine-connector`, UX notes §9).
+  // The recovery copies live in this browser's IndexedDB (`recoveryStore`'s browser store), never
+  // through these desktop commands (`specs/0136-autosave-and-restore`).
+  recovery_list: () => notInTheBrowser("recovery_list"),
+  recovery_begin: () => notInTheBrowser("recovery_begin"),
+  recovery_write_asset: () => notInTheBrowser("recovery_write_asset"),
+  recovery_write_copy: () => notInTheBrowser("recovery_write_copy"),
+  recovery_delete_copy: () => notInTheBrowser("recovery_delete_copy"),
+  recovery_end: () => notInTheBrowser("recovery_end"),
+  recovery_read_copy: () => notInTheBrowser("recovery_read_copy"),
+  recovery_asset_names: () => notInTheBrowser("recovery_asset_names"),
+  recovery_read_asset: () => notInTheBrowser("recovery_read_asset"),
+  recovery_file_base: () => notInTheBrowser("recovery_file_base"),
   connector_pairing: () => notInTheBrowser("connector_pairing"),
   connector_test: () => notInTheBrowser("connector_test"),
   connector_pair: () => notInTheBrowser("connector_pair"),

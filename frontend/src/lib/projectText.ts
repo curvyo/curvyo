@@ -18,7 +18,9 @@ export type ReplacingKind =
   | "close-workspace"
   | "delete-open"
   // Share workspace closes the open document while it prepares every file (criterion 25).
-  | "share-workspace";
+  | "share-workspace"
+  // `specs/0136-autosave-and-restore`: Restore of a recovery copy replaces the open project.
+  | "restore";
 
 /** The file name of a path, either separator, without the folders. */
 export function baseName(path: string): string {
@@ -60,14 +62,17 @@ const ENDS: Record<ReplacingKind, string> = {
   "close-workspace": "close the workspace",
   "delete-open": "delete it",
   "share-workspace": "share the workspace",
+  restore: "restore it",
 };
 
 /** The sentence of the inline check: what is at stake, what each answer does and that discarding
  * cannot be taken back. */
-export function checkSentence(fileName: string | null, kind: ReplacingKind): string {
+export function checkSentence(fileName: string | null, kind: ReplacingKind, restoring?: string): string {
   const subject =
     fileName === null ? "This project has" : `${shortName(fileName, SENTENCE_NAME_MAX)} has`;
-  return `${subject} unsaved changes. Save them before you ${ENDS[kind]}? Discarded changes cannot be brought back.`;
+  // A Restore names the copy it would open ("... before you restore Poster.curvyo?").
+  const ends = kind === "restore" && restoring ? `restore ${shortName(restoring, SENTENCE_NAME_MAX)}` : ENDS[kind];
+  return `${subject} unsaved changes. Save them before you ${ends}? Discarded changes cannot be brought back.`;
 }
 
 /** The longest name the check's sentence shows whole: the sentence keeps within the four lines
