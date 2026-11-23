@@ -40,6 +40,7 @@ mod outline_nesting;
 mod outline_touch;
 mod path_measure;
 mod pattern;
+mod point_fit;
 mod region_contact;
 mod segment;
 mod spiro;
@@ -81,6 +82,7 @@ pub use pattern::{
     PATTERN_MAX_PIECES, PATTERN_MAX_WORK, PATTERN_NOTE_PIECES, PatternError, PatternFrame,
     PatternOutline, PatternPiece, pattern_pieces, pattern_pieces_of,
 };
+pub use point_fit::{FitError, PointPair, SimilarityFit, fit_similarity};
 pub use segment::{
     BentHandles, Subdivision, bend_segment_handles, nearest_point_on_segment, segment_bounds,
     subdivide_at_parameter,
