@@ -2836,3 +2836,22 @@ and 256 MiB of waiting texts plus the current job's 64 MiB, so about 320 MiB at 
 when it becomes current (the file is already there) and keep only its entry in memory. It needs
 the controller to take a streamed text instead of an `Arc<str>`, so it waits for a real case.
 
+## The jog's hold is paced by time, not by position (`0118` slice 2a, adrs J6, 2026-11-23)
+
+A held jog writes increments of a tenth of a second and never queues more than about a quarter of a
+second of motion, counted by the nominal feed. GRBL's acceleration makes the real motion lag the
+nominal one, so the queue can hold a few millimetres more than the count says; the jog cancel
+(`0x85`) flushes it, and a connector that dies leaves at most that queue. The travel clamp uses the
+position of the last report and the end of the last written line, never a live position.
+
+**Resolution:** accepted; a live position loop would need GRBL's `Bf:` and `MPos` in every report and
+buys nothing the cancel does not already give.
+
+## "Homed since connect" is the connector's belief, not the machine's (`0118` slice 2a, J5, 2026-11-23)
+
+The flag is set by the end of a `$H` and cleared by an alarm, a loss, a reconnect and a reset the
+connector did not ask for. A machine whose steppers lost steps, or whose axes were moved by hand
+with the motors released after homing, is still "homed", so the travel clamp trusts a position that
+is no longer true; a controller without limit switches that reports `ok` to `$H` is trusted too.
+
+**Resolution:** accepted; GRBL's own soft limits (`$20`) stay the last guard, as for any sender.

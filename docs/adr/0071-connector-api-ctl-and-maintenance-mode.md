@@ -334,3 +334,14 @@ does all; in foreground mode every paired client acts as an owner. `jobs/` joins
 directory (decision 9): `<job_id>.gcode` and `list.json`, written by one thread outside the hub's
 lock, deleted by Reset. `admin.log` gains `job-removed`, `run-next-set`, `job-dropped` and
 `job-list-dropped`. No new crate, no new dependency. Details: `specs/0132-connector-job-queue/adrs.md`.
+
+## Amendment 2026-11-23: a member's Home waits (spec `0118`, slice 2a, criterion 37)
+
+Decision 7 now covers Home as built: a **member's** `Home` is no longer refused with
+`OwnerRequired` (decision 3's table row changes to "yes" for a member) but goes to
+`AwaitingLocalStart` with `requested_by` and no job, and runs when an owner sends `Home`, when
+`curvyoctl confirm-start` finds a waiting request without a job, or never (Stop from anyone
+discards it). A second member's `Home` meanwhile is `WrongState`. `admin.log` records the
+confirmation as `start-confirmed`, subject the requester, detail `Home`; `jobs.log` writes the
+request as `Home: <client>`. `Jog` and `JogKeep` join the owner-only rows of the table (`JogStop`
+passes). `Confirmation` in core names what ran (`Start`, `Resume`, `Home`).

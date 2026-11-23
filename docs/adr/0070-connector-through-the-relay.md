@@ -321,3 +321,13 @@ Frage 221 (CONN-REMOTE-START): May a job be started from outside the workshop?
 - B: Through the relay, a local start at the machine is always required.
 - C: Through the relay, a local start is required for everyone but your own devices.
 - Recommendation: C. Default if unanswered: B.
+
+## Amendment 2026-11-23: a jog is no start (spec `0118`, slice 2a, Frage 308 A)
+
+Decision 2's list of commands that wait under `--require-local-start` gains Home (built in the
+first slice of `0118`) but not **Jog**: a jog step is one short move with the laser off, and a
+confirmation of each step would be meaningless. A jog is an owner's command and refused for a
+member (`OwnerRequired`); in foreground mode every paired app acts as an owner. The guarantees
+that replace the wait: the laser is off for the whole move (`M5` and `M9` first), a hold ends
+without a keep-alive after 300 ms, Stop and the release end it at once, and a jog is refused
+while a job runs, pauses, waits or homes.

@@ -158,3 +158,16 @@ needs no CAM code and no document.
 - Not decided: the GRBL streaming state machine (character counting, `ok`/`error` handling) and
   where its pure part lives; framing a job's outline; multi-user leases on the relay
   (ADR 0004 §4); end-to-end protection through the relay. Each is its story's decision.
+
+## Amendment 2026-11-23: jog and "homed since connect" (spec `0118`, slice 2a)
+
+Protocol 0, additive (section 6): the app sends `Jog { axis: "X" | "Y", direction: "Plus" | "Minus",
+step: "0.1" | "1" | "10" | "50", hold? }`, `JogKeep` and `JogStop`; `State` gains `Jogging`; `Status`
+gains `homed`, `machine_position` and `work_offset`, each left out when false or unknown, so every
+earlier golden file stays byte-identical. `step` is a closed set, never a number, and no feed is on
+the wire: the feeds are constants of `curvyo-connector-core` (3,000, 3,000, 1,000 and 300 mm/min),
+capped by the controller's `$110` and `$111`. `JogStop` is not `Stop`: a release that arrives after
+the jog ended does nothing, so it can never discard a `Ready` job. The dead-man (300 ms without a
+`JogKeep`) counts on an injected clock: the hub passes the time since its start to the job machine
+on every 50 ms tick and before each jog message, and core has no clock of its own. Details:
+`specs/0118-machine-control/adrs.md`, "Second slice 2a (jog)", J1 to J9.
