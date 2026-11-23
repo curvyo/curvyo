@@ -24,7 +24,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::connector_link::{
     CommandAnswer, FileSendError, LinkError, OTHER_TEXT, PairAnswer, PairingView, SendAnswer,
-    TestAnswer, owner_label,
+    TestAnswer, effective_role, owner_label,
 };
 use crate::connector_send::{PendingSends, report_resolution, send_pending};
 use crate::device_keys::{OpenStore, StoreProblem};
@@ -222,7 +222,10 @@ fn run_test(address: &str, default_port: u16, record: &PairingRecord) -> TestAns
             version: connection.greeting.version.clone(),
             connector_name: connection.greeting.name.clone(),
             status: Box::new(status),
-            role: connection.session.as_ref().map(|(_, role)| *role),
+            role: effective_role(
+                connection.greeting.mode.as_ref(),
+                connection.session.as_ref().map(|(_, role)| *role),
+            ),
             client_name: connection.session.as_ref().map(|(name, _)| name.clone()),
             owner_label: owner_label(connection.greeting.mode.as_ref()),
         },

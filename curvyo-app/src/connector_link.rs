@@ -109,6 +109,15 @@ pub(crate) fn owner_label(mode: Option<&ConnectorMode>) -> Option<String> {
     }
 }
 
+/// The role the connector grants this app: a foreground connector has no owners, so every paired
+/// app acts as owner there (`specs/0132` ADR L4); the UI follows that, not the paired label.
+pub(crate) fn effective_role(mode: Option<&ConnectorMode>, role: Option<Role>) -> Option<Role> {
+    match (mode, role) {
+        (Some(ConnectorMode::Foreground), Some(_)) => Some(Role::Owner),
+        _ => role,
+    }
+}
+
 impl TestAnswer {
     pub(crate) fn controller_name(controller: Option<ControllerInfo>) -> Option<String> {
         controller.map(|c| c.name)
@@ -269,6 +278,21 @@ pub(crate) struct PairingView {
 mod tests {
     use super::*;
     use curvyo_connector_io::spki::SpkiHash;
+
+    #[test]
+    fn a_foreground_connector_treats_every_paired_app_as_owner() {
+        let configured = ConnectorMode::Configured { owner: None };
+        assert_eq!(
+            effective_role(Some(&ConnectorMode::Foreground), Some(Role::Member)),
+            Some(Role::Owner)
+        );
+        assert_eq!(effective_role(Some(&ConnectorMode::Foreground), None), None);
+        assert_eq!(
+            effective_role(Some(&configured), Some(Role::Member)),
+            Some(Role::Member)
+        );
+        assert_eq!(effective_role(None, Some(Role::Member)), Some(Role::Member));
+    }
 
     #[test]
     fn pairing_refusals_become_the_texts_of_the_row() {

@@ -321,6 +321,7 @@ impl RunningServer {
     /// The first file that could not be deleted.
     pub fn wipe(self) -> Result<(), StateDirError> {
         self.close();
+        self.hub.freeze_store();
         state_dir::empty(&self.state_dir)
     }
 
