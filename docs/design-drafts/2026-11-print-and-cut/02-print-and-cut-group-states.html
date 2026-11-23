@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>02 · Print and cut group states</title><style>
+:root{--canvas-bg:#E8E8EB;--toolbar-bg:#DCDCE0;--panel-bg:#DCDCE0;--toolbar-icon:#3A3A3F;--toolbar-icon-active-bg:#2F6FEE;
+--accent:#2F6FEE;--editor-accent:#2F6FEE;--panel-muted-fg:#5A5A5F;--lane-line:#7B7B7F;--destructive:#B3261E;--field-invalid:#B3261E;
+--field-border:color-mix(in srgb,#3A3A3F 60%,transparent);--line25:color-mix(in srgb,#3A3A3F 25%,transparent);
+--panel-elevation-shadow:0 2px 8px rgba(0,0,0,0.24)}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--toolbar-icon);font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px}
+.sheet{padding:16px 20px 24px}
+h1{font-size:16px;margin:0 0 4px}
+.lead{font-size:12px;color:var(--panel-muted-fg);margin:0 0 14px;max-width:1180px;line-height:1.45}
+.cols{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+figure{margin:0}
+figcaption{font-size:12px;font-weight:600;margin:0 0 6px;line-height:1.35;width:280px}
+figcaption span{display:block;font-weight:400;color:var(--panel-muted-fg)}
+.panel{width:280px;background:var(--panel-bg);padding:12px 24px 12px 12px;display:flex;flex-direction:column;gap:4px;position:relative}
+.ctx{font-size:11px;color:var(--panel-muted-fg);height:20px;display:flex;align-items:center;border-bottom:1px solid var(--line25);margin-bottom:4px}
+.ctx.b{border-bottom:0;border-top:1px solid var(--line25);margin:4px 0 0}
+.new{outline:1.5px dashed var(--panel-muted-fg);outline-offset:2px;border-radius:4px}
+.sh{height:28px;display:flex;align-items:center;gap:4px;font-size:14px}
+.sh .sum{margin-left:auto;font-size:12px;color:var(--panel-muted-fg);display:flex;gap:4px;align-items:center;font-variant-numeric:tabular-nums}
+.sheetl{font-size:12px;line-height:16px}
+.sheetl .m{color:var(--panel-muted-fg)}
+.sheetl b{font-size:13px;font-weight:400}
+.cl{display:flex;height:16px;font-size:12px;color:var(--panel-muted-fg)}
+.cl span:nth-child(1){width:24px}
+.cl span:nth-child(2){width:90px;padding-left:2px}
+.mr{display:flex;align-items:center;height:28px}
+.mr .n{width:14px;text-align:center;font-weight:600;font-size:13px;margin-right:4px}
+.mr .n.g{color:var(--panel-muted-fg)}
+.f{height:28px;width:86px;background:#fff;border:1px solid var(--field-border);border-radius:5px;display:flex;align-items:center;padding:0 6px;gap:3px;font-variant-numeric:tabular-nums;flex:none}
+.f+.f{margin-left:4px}
+.f .v{font-size:13px;margin-left:auto}
+.f .u{font-size:12px;color:var(--panel-muted-fg)}
+.f.wide{width:98px}
+.f.ro{background:transparent;border-color:transparent}
+.f.ro .v{color:var(--panel-muted-fg)}
+.f.focus{border:2px solid var(--editor-accent)}
+.f.tol{width:120px}
+.f.tol .lb{font-size:12px;color:var(--panel-muted-fg);flex:1}
+.ib{width:24px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;flex:none;position:relative}
+.ib.first{margin-left:2px}
+.ib.dis{opacity:.4}
+.ib.focus{box-shadow:inset 0 0 0 2px var(--editor-accent)}
+.ib.slot{visibility:hidden}
+.sub{font-size:12px;line-height:16px;padding-left:18px}
+.sub.m{color:var(--panel-muted-fg)}
+.hr{height:1px;background:var(--line25);margin:8px 0}
+.st{font-size:12px;line-height:16px}
+.st.m{color:var(--panel-muted-fg)}
+dl{margin:0;display:grid;grid-template-columns:88px 1fr;row-gap:0;font-size:12px;line-height:16px;font-variant-numeric:tabular-nums}
+dt{color:var(--panel-muted-fg)}dd{margin:0}
+.wl{display:flex;gap:6px;align-items:flex-start;font-size:12px;line-height:16px;padding:2px 0}
+.wl svg{flex:none}
+.btns{display:flex;gap:4px;margin-top:4px}
+.btn{height:28px;width:120px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;border:1px solid var(--field-border)}
+.btn.dis{opacity:.4}
+.tip{position:absolute;z-index:5;background:#2A2A2E;color:#fff;font-size:12px;line-height:1.35;padding:5px 7px;border-radius:4px;white-space:nowrap;box-shadow:var(--panel-elevation-shadow)}
+.tip i{font-style:normal;color:#C9C9CE;display:block}
+.out{font-size:11px;font-weight:600;color:var(--panel-muted-fg);height:20px;display:flex;align-items:flex-end}
+.ann{font-size:11px;color:var(--panel-muted-fg);margin-top:6px;line-height:1.4;width:280px}
+.ann b{color:var(--toolbar-icon)}
+.spin{animation:none}
+</style></head><body><div class="sheet">
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="locate" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 12h3M19 12h3M12 2v3M12 19v3"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></g></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="warn" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></g></symbol>
+<symbol id="alert" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></g></symbol>
+<symbol id="load" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.22-8.56" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+<symbol id="down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+</defs></svg>
+
+<h1>02 · The Print and cut group of a laser page's Operations tab (0121 UX notes section 4)</h1>
+<p class="lead">Real tokens, 280 px panel body (244 px content). The group sits between the Fixture jobs section and the Output group (P9); shown only while a placed Drawing page on this laser page has a marks object. Rows: number 14, X 86, Y 86, Take head position 24, Clear 24 (absent on an empty row). Plain fields, units inside, no sliders. Dashed outline = the new group.</p>
+
+<div class="cols">
+
+<figure><figcaption>A · Not measured, machine connected (Idle)<span>Empty rows, no Clear. Focus on mark 1's Take head position. Apply and Reset greyed with their reason.</span></figcaption>
+<div class="panel"><div class="ctx">Fixture jobs · 2</div>
+<div class="new">
+<div class="sh"><svg width="16" height="16"><use href="#down"/></svg>Print and cut<span class="sum">Not measured</span></div>
+<div class="sheetl"><span class="m">Sheet</span> <b>Coaster</b><br><span class="m">Registration marks, 4 marks</span></div>
+<div class="cl"><span></span><span>X</span><span>Y</span></div>
+<div class="mr"><span class="n">1</span><div class="f"><span class="v"></span><span class="u">mm</span></div><div class="f"><span class="v"></span><span class="u">mm</span></div><span class="ib first focus"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib slot"></span></div>
+<div class="mr"><span class="n">2</span><div class="f"><span class="v"></span><span class="u">mm</span></div><div class="f"><span class="v"></span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib slot"></span></div>
+<div class="mr"><span class="n">3</span><div class="f"><span class="v"></span><span class="u">mm</span></div><div class="f"><span class="v"></span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib slot"></span></div>
+<div class="mr"><span class="n">4</span><div class="f"><span class="v"></span><span class="u">mm</span></div><div class="f"><span class="v"></span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib slot"></span></div>
+<div class="hr"></div>
+<div class="st m">Measure at least 2 marks</div>
+<div class="btns"><span class="btn dis">Apply</span><span class="btn dis">Reset placement</span></div>
+</div>
+<div class="ctx b">Output</div></div>
+<p class="ann">Tab order: header, mark 1 X, Y, Take, (Clear), mark 2 ..., Apply, Reset placement. Apply tooltip "Measure at least 2 marks"; Reset "Nothing to reset".</p>
+</figure>
+
+<figure><figcaption>B · Measuring: mark 3 reading, then the machine runs<span>Two rows filled (Clear present). Mark 3 busy. Below: the same rows while the machine is Running, Take greyed with the cause.</span></figcaption>
+<div class="panel"><div class="new">
+<div class="sh"><svg width="16" height="16"><use href="#down"/></svg>Print and cut<span class="sum">2 of 4 measured</span></div>
+<div class="cl"><span></span><span>X</span><span>Y</span></div>
+<div class="mr"><span class="n">1</span><div class="f"><span class="v">22.40</span><span class="u">mm</span></div><div class="f"><span class="v">31.85</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">2</span><div class="f"><span class="v">122.31</span><span class="u">mm</span></div><div class="f"><span class="v">34.98</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">3</span><div class="f"><span class="v"></span><span class="u">mm</span></div><div class="f"><span class="v"></span><span class="u">mm</span></div><span class="ib first focus" aria-busy="true"><svg width="16" height="16"><use href="#load"/></svg></span><span class="ib slot"></span></div>
+<div class="mr"><span class="n">4</span><div class="f"><span class="v"></span><span class="u">mm</span></div><div class="f"><span class="v"></span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib slot"></span></div>
+<div class="hr"></div>
+<dl><dt>Moved</dt><dd>21.87, 30.12 mm</dd><dt>Turned</dt><dd>1.80°</dd><dt>Scale</dt><dd>100.03 %</dd></dl>
+<div class="st m">2 marks: no error check</div>
+<div class="f tol" style="margin-top:4px"><span class="lb">Tolerance</span><span class="v">0.50</span><span class="u">mm</span></div>
+<div class="btns"><span class="btn">Apply</span><span class="btn dis">Reset placement</span></div>
+</div>
+<div style="height:16px"></div>
+<div class="mr"><span class="n">3</span><div class="f"><span class="v"></span><span class="u">mm</span></div><div class="f"><span class="v"></span><span class="u">mm</span></div><span class="ib first dis focus"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib slot"></span></div>
+<div class="tip" style="left:120px;bottom:-26px">Take head position<i>Machine is moving</i></div>
+</div>
+<p class="ann">After a read, focus moves to the next unmeasured row's button (P18). Greyed, not hidden (P17): Clear never moves under the pointer.</p>
+</figure>
+
+<figure><figcaption>C · Fit OK (4 marks)<span>Largest error not above the tolerance: plain ink, no glyph. Header summary carries the error.</span></figcaption>
+<div class="panel"><div class="new">
+<div class="sh"><svg width="16" height="16"><use href="#down"/></svg>Print and cut<span class="sum">Error 0.21 mm</span></div>
+<div class="sheetl"><span class="m">Sheet</span> <b>Coaster</b><br><span class="m">Registration marks, 4 marks</span></div>
+<div class="cl"><span></span><span>X</span><span>Y</span></div>
+<div class="mr"><span class="n">1</span><div class="f"><span class="v">22.40</span><span class="u">mm</span></div><div class="f"><span class="v">31.85</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">2</span><div class="f"><span class="v">122.31</span><span class="u">mm</span></div><div class="f"><span class="v">34.98</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">3</span><div class="f"><span class="v">120.12</span><span class="u">mm</span></div><div class="f"><span class="v">104.95</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">4</span><div class="f"><span class="v">20.30</span><span class="u">mm</span></div><div class="f"><span class="v">101.66</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="hr"></div>
+<dl><dt>Moved</dt><dd>21.87, 30.12 mm</dd><dt>Turned</dt><dd>1.80°</dd><dt>Scale</dt><dd>100.10 %</dd><dt>Error</dt><dd>Largest 0.21 mm, RMS 0.15 mm</dd></dl>
+<div class="f tol" style="margin-top:4px"><span class="lb">Tolerance</span><span class="v">0.50</span><span class="u">mm</span></div>
+<div class="btns"><span class="btn">Apply</span><span class="btn dis">Reset placement</span></div>
+</div></div>
+<p class="ann">Apply: one step "Fit sheet to marks"; then Apply greys ("The sheet is on the fit"), Reset placement enables, the placement line reads "On the fit".</p>
+</figure>
+
+<figure><figcaption>D · Warn: error above tolerance, scale off, mark 4 gone<span>Warn lines in the OutputChecks look, never red: Apply still works. Mark 4 was deleted on the sheet; its row stays read-only until Clear.</span></figcaption>
+<div class="panel"><div class="new">
+<div class="sh"><svg width="16" height="16"><use href="#down"/></svg>Print and cut<span class="sum"><svg width="14" height="14"><use href="#warn"/></svg>Error 0.74 mm</span></div>
+<div class="sheetl"><span class="m">Sheet</span> <b>Coaster</b><br><span class="m">Registration marks, 3 marks</span></div>
+<div class="cl"><span></span><span>X</span><span>Y</span></div>
+<div class="mr"><span class="n">1</span><div class="f"><span class="v">22.40</span><span class="u">mm</span></div><div class="f"><span class="v">31.85</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">2</span><div class="f"><span class="v">116.52</span><span class="u">mm</span></div><div class="f"><span class="v">34.80</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">3</span><div class="f"><span class="v">115.03</span><span class="u">mm</span></div><div class="f"><span class="v">100.21</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n g">4</span><div class="f ro"><span class="v">20.30</span><span class="u">mm</span></div><div class="f ro"><span class="v">101.66</span><span class="u">mm</span></div><span class="ib first slot"></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="sub m">Mark 4 is gone from the sheet</div>
+<div class="hr"></div>
+<dl><dt>Moved</dt><dd>21.90, 30.25 mm</dd><dt>Turned</dt><dd>1.62°</dd><dt>Scale</dt><dd>94.20 %</dd></dl>
+<div class="wl"><svg width="16" height="16"><use href="#warn"/></svg><span>Largest error 0.74 mm; check mark 3<br>RMS 0.41 mm, tolerance 0.50 mm</span></div>
+<div class="f tol"><span class="lb">Tolerance</span><span class="v">0.50</span><span class="u">mm</span></div>
+<div class="wl"><svg width="16" height="16"><use href="#warn"/></svg><span>Scale 94.20 %: was the sheet printed at 100 %?</span></div>
+<div class="btns"><span class="btn">Apply</span><span class="btn dis">Reset placement</span></div>
+</div></div>
+<p class="ann">One polite atomic status holds the fit block and the warn lines, updated after a commit, never per keystroke.</p>
+</figure>
+
+<figure><figcaption>E · Typed only (no connector), 2 marks, moved by hand after Apply<span>No Take head position: the fields grow to 98 px. "Apply again" and Reset placement after a hand move.</span></figcaption>
+<div class="panel"><div class="new">
+<div class="sh"><svg width="16" height="16"><use href="#down"/></svg>Print and cut<span class="sum">2 of 2 measured</span></div>
+<div class="sheetl"><span class="m">Sheet</span> <b>Label sheet A4</b><br><span class="m">Registration marks, 2 marks</span></div>
+<div class="cl"><span></span><span style="width:102px">X</span><span>Y</span></div>
+<div class="mr"><span class="n">1</span><div class="f wide"><span class="v">-12.50</span><span class="u">mm</span></div><div class="f wide"><span class="v">8.00</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">3</span><div class="f wide focus"><span class="v">187.25</span><span class="u">mm</span></div><div class="f wide"><span class="v">270.10</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="hr"></div>
+<dl><dt>Moved</dt><dd>-2.50, -2.00 mm</dd><dt>Turned</dt><dd>-0.35°</dd><dt>Scale</dt><dd>99.98 %</dd></dl>
+<div class="st m">2 marks: no error check</div>
+<div class="f tol" style="margin-top:4px"><span class="lb">Tolerance</span><span class="v">0.50</span><span class="u">mm</span></div>
+<div class="st m" style="margin-top:2px">Placement differs from the fit</div>
+<div class="btns"><span class="btn">Apply again</span><span class="btn dis">Reset placement</span></div>
+</div></div>
+<p class="ann">Rows follow the marks of the sheet (here 1 and 3). The hand move dropped the Reset target ("Nothing to reset"). Enter in a field commits and moves to the next field (P14).</p>
+</figure>
+
+<figure><figcaption>F · Too close, an invalid entry, a failed read<span>All measured places within 1 mm: no fit. A field with a refused value. A read that failed.</span></figcaption>
+<div class="panel"><div class="new">
+<div class="sh"><svg width="16" height="16"><use href="#down"/></svg>Print and cut<span class="sum"><svg width="14" height="14"><use href="#warn"/></svg>Too close</span></div>
+<div class="cl"><span></span><span>X</span><span>Y</span></div>
+<div class="mr"><span class="n">1</span><div class="f"><span class="v">64.10</span><span class="u">mm</span></div><div class="f"><span class="v">80.02</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">2</span><div class="f"><span class="v">64.12</span><span class="u">mm</span></div><div class="f"><span class="v">80.05</span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="mr"><span class="n">3</span><div class="f" style="border:2px solid var(--field-invalid)"><span class="v">12,4.5</span><span class="u">mm</span></div><div class="f"><span class="v"></span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib"><svg width="16" height="16"><use href="#x"/></svg></span></div>
+<div class="sub">Enter a number from -10000 to 10000</div>
+<div class="mr"><span class="n">4</span><div class="f"><span class="v"></span><span class="u">mm</span></div><div class="f"><span class="v"></span><span class="u">mm</span></div><span class="ib first"><svg width="16" height="16"><use href="#locate"/></svg></span><span class="ib slot"></span></div>
+<div class="wl" style="padding-left:18px" role="alert"><svg width="14" height="14" style="color:var(--destructive)"><use href="#alert"/></svg><span>Could not read the head position: Timed out</span></div>
+<div class="hr"></div>
+<div class="wl"><svg width="16" height="16"><use href="#warn"/></svg><span>Marks too close to fit</span></div>
+<div class="btns"><span class="btn dis">Apply</span><span class="btn dis">Reset placement</span></div>
+</div></div>
+<p class="ann">With three distinct places of which two coincide, the fit is computed and the warn line reads "Marks 1 and 2 are measured at the same place" (E4).</p>
+</figure>
+
+</div></div></body></html>

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>01 · Registration marks on a Drawing page</title><style>
+:root{--canvas-bg:#E8E8EB;--pasteboard-bg:#B8B8BE;--toolbar-bg:#DCDCE0;--panel-bg:#DCDCE0;--toolbar-icon:#3A3A3F;
+--toolbar-icon-active-bg:#2F6FEE;--accent:#2F6FEE;--editor-accent:#2F6FEE;--panel-muted-fg:#5A5A5F;--lane-line:#7B7B7F;
+--field-border:color-mix(in srgb,#3A3A3F 60%,transparent);--line25:color-mix(in srgb,#3A3A3F 25%,transparent);
+--field-invalid:#B3261E;--destructive:#B3261E;--panel-elevation-shadow:0 2px 8px rgba(0,0,0,0.24)}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--toolbar-icon);font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px}
+.sheet{padding:16px 20px 24px}
+h1{font-size:16px;margin:0 0 4px}
+.lead{font-size:12px;color:var(--panel-muted-fg);margin:0 0 14px;max-width:1100px;line-height:1.45}
+.cols{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+figure{margin:0}
+figcaption{font-size:12px;font-weight:600;margin:0 0 6px;line-height:1.35;max-width:560px}
+figcaption span{display:block;font-weight:400;color:var(--panel-muted-fg)}
+.pwrap{display:flex;flex:none}
+.strip{width:32px;background:var(--panel-bg);border-left:1px solid var(--line25);display:flex;flex-direction:column;align-items:center;padding-top:10px;gap:4px}
+.strip i{width:28px;height:28px;border-radius:5px;display:block}
+.strip i.on{background:var(--toolbar-icon-active-bg)}
+.panel{width:280px;background:var(--panel-bg);padding:12px 24px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.hdr{height:24px;display:flex;align-items:center;gap:8px;font-size:14px}
+.hdr .s{font-size:12px;color:var(--panel-muted-fg);margin-left:auto}
+.row{display:flex;align-items:center;gap:8px;height:28px}
+.row .lb{width:60px;font-size:14px}
+.f{height:28px;background:#fff;border:1px solid var(--field-border);border-radius:5px;display:flex;align-items:center;padding:0 6px;gap:4px;font-variant-numeric:tabular-nums}
+.f .lb{font-size:12px;color:var(--panel-muted-fg);flex:1}
+.f .v{font-size:13px}
+.f .u{font-size:12px;color:var(--panel-muted-fg)}
+.btn{height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;border:1px solid var(--field-border);width:244px}
+.new{outline:1.5px dashed var(--panel-muted-fg);outline-offset:2px}
+.rule{height:1px;background:var(--line25);margin:8px 0}
+.strips{display:flex;gap:4px}
+.strips span{flex:1;height:28px;border:1px solid var(--lane-line);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.strips span.on{background:color-mix(in srgb,#2F6FEE 28%,white);font-weight:600}
+.blk{font-size:12px;font-weight:600}
+.cv{position:relative;background:var(--pasteboard-bg);width:420px;height:330px;border-radius:2px;overflow:hidden;flex:none}
+.crumb{position:absolute;left:12px;top:12px;background:var(--toolbar-bg);border-radius:8px;height:28px;display:flex;align-items:center;padding:0 10px;font-size:12px;box-shadow:var(--panel-elevation-shadow);gap:6px}
+.crumb b{font-weight:600}
+.notice{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:var(--toolbar-bg);border:2px solid var(--field-invalid);border-radius:8px;padding:6px 8px;font-size:12px;box-shadow:var(--panel-elevation-shadow);white-space:nowrap}
+.ann{font-size:11px;color:var(--panel-muted-fg);margin-top:6px;line-height:1.4;max-width:420px}
+</style></head><body><div class="sheet">
+<h1>01 · Registration marks on a Drawing page (0121 UX notes sections 2 and 3)</h1>
+<p class="lead">Real tokens, 280 px panel body plus its 32 px strip. Dashed outline = new control. Canvas scale 3 px per mm; the page is 120 × 90 mm, the artwork box 100 × 70 mm, marks 10 mm inside it, numbered clockwise from the top-left (P3). Marks are black artwork: circle 6 mm, crosshair 8 mm, line 0.25 mm, digit 3 mm up and right (P5).</p>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+<g id="mk"><circle r="9" fill="none" stroke="#000" stroke-width="0.75"/><path d="M-12 0H12M0 -12V12" stroke="#000" stroke-width="0.75"/></g>
+</defs></svg>
+
+<div class="cols">
+<figure><figcaption>A · Document tab, nothing selected<span>Add registration marks under Fit to content, the same look; above the Background block. Absent on Sketch and Laser pages.</span></figcaption>
+<div class="pwrap"><div class="panel">
+<div class="hdr">Coaster <span class="s">Custom</span></div>
+<div class="strips"><span>A4</span><span>A5</span><span>A6</span></div>
+<div class="strips"><span class="on">Portrait</span><span>Landscape</span></div>
+<div class="rule"></div>
+<div class="row"><span class="lb">Width</span><div class="f" style="width:176px"><span class="v" style="margin-left:auto">120</span><span class="u">mm</span></div></div>
+<div class="row"><span class="lb">Height</span><div class="f" style="width:176px"><span class="v" style="margin-left:auto">90</span><span class="u">mm</span></div></div>
+<div class="btn">Fit to content</div>
+<div class="btn new">Add registration marks</div>
+<div class="rule"></div>
+<div class="row"><span class="blk">Background</span></div>
+</div><div class="strip"><i class="on"></i><i></i><i></i><i></i></div></div>
+</figure>
+
+<figure><figcaption>B · After the press: object selected<span>One object; dashed selection box around all marks and digits, no handles (P6). The Style tab shows its block.</span></figcaption>
+<div class="cv"><svg width="420" height="330">
+<rect x="30" y="30" width="360" height="270" fill="var(--canvas-bg)"/>
+<rect x="60" y="60" width="300" height="210" rx="18" fill="#F2C94C" stroke="#000" stroke-width="1"/>
+<circle cx="210" cy="165" r="60" fill="#2D6A4F"/>
+<g><use href="#mk" x="90" y="90"/><text x="101" y="84" font-size="9" font-weight="600">1</text></g>
+<g><use href="#mk" x="330" y="90"/><text x="341" y="84" font-size="9" font-weight="600">2</text></g>
+<g><use href="#mk" x="330" y="240"/><text x="341" y="234" font-size="9" font-weight="600">3</text></g>
+<g><use href="#mk" x="90" y="240"/><text x="101" y="234" font-size="9" font-weight="600">4</text></g>
+<rect x="76" y="72" width="278" height="182" fill="none" stroke="#fff" stroke-width="3"/>
+<rect x="76" y="72" width="278" height="182" fill="none" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3"/>
+</svg></div>
+<p class="ann">Drag, arrows, typed X and Y, Align move it; Copy, Paste, Linked clone as a group. Resize and rotate handles are absent (the test grid rule, Frage 206 A).</p>
+</figure>
+
+<figure><figcaption>C · Style tab of the marks object<span>Replaces Stroke, Fill and Markers (P7). Add mark is absent with 4 marks.</span></figcaption>
+<div class="pwrap"><div class="panel new" style="outline-offset:-4px">
+<div class="hdr"><b style="font-weight:600">Registration marks</b><span class="s">4 marks</span></div>
+<div class="f" style="width:120px"><span class="lb">Size</span><span class="v">6</span><span class="u">mm</span></div>
+<div class="f" style="width:120px"><span class="lb">Line width</span><span class="v">0.25</span><span class="u">mm</span></div>
+<div style="height:8px"></div>
+<div class="hdr"><b style="font-weight:600">Registration marks</b><span class="s">Mark 3 of 3 marks</span></div>
+<div class="f" style="width:120px"><span class="lb">Size</span><span class="v">6</span><span class="u">mm</span></div>
+<div class="f" style="width:120px"><span class="lb">Line width</span><span class="v">0.25</span><span class="u">mm</span></div>
+<div class="btn">Add mark 2</div>
+<p class="ann" style="margin:0">Second state: mark 2 deleted, mark 3 selected inside. The button names the lowest missing number and puts it at its corner.</p>
+</div><div class="strip"><i></i><i class="on"></i><i></i><i></i></div></div>
+</figure>
+
+<figure><figcaption>D · Entered, mark 3 selected, Delete at 2 marks refused<span>Crumb as 0050; outside dimmed; one mark's box (circle square plus digit), no handles. With 2 left, Delete is refused (P8).</span></figcaption>
+<div class="cv"><svg width="420" height="330">
+<rect x="30" y="30" width="360" height="270" fill="var(--canvas-bg)"/>
+<g opacity=".35"><rect x="60" y="60" width="300" height="210" rx="18" fill="#F2C94C" stroke="#000" stroke-width="1"/><circle cx="210" cy="165" r="60" fill="#2D6A4F"/></g>
+<g><use href="#mk" x="90" y="90"/><text x="101" y="84" font-size="9" font-weight="600">1</text></g>
+<g><use href="#mk" x="330" y="240"/><text x="341" y="234" font-size="9" font-weight="600">3</text></g>
+<rect x="318" y="225" width="32" height="27" fill="none" stroke="#fff" stroke-width="3"/>
+<rect x="318" y="225" width="32" height="27" fill="none" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3"/>
+</svg>
+<div class="crumb">Coaster › <b>Registration marks</b></div>
+<div class="notice" role="alert">Registration marks need at least 2 marks.</div>
+</div>
+<p class="ann">Layers: one row "Registration marks" (Crosshair glyph), expandable to "Mark 1", "Mark 3" in number order.</p>
+</figure>
+</div>
+</div></body></html>
