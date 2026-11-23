@@ -1,4 +1,4 @@
-import { ClipboardPaste, Columns2, Copy, RotateCcw } from "lucide-react";
+import { ClipboardPaste, Columns2, Copy, RotateCcw, TriangleAlert } from "lucide-react";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
@@ -142,6 +142,7 @@ function StepList({
     channelPreset: (index, preset) => void adjust.setChannelPreset(index, preset),
     openCrop: (index) => void adjust.openCrop(index),
     cropBarRow: adjust.view?.cropBarRow ?? null,
+    ai: adjust.ai,
   };
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
     if (!(event.target as HTMLElement).hasAttribute("data-adjust-name") || event.altKey) return;
@@ -372,6 +373,18 @@ export function AdjustmentsGroup({ adjust, view, onToggleBeforeAfter, onReturnFo
       {addRows.length > 0 || view.steps.length > 0 ? <Hairline /> : null}
       {addRows.length > 0 ? <AddToolbar rows={addRows} onAdd={add} /> : null}
       {view.steps.length > 0 ? <StepList rows={view.steps} adjust={adjust} open={open} setOpen={setOpen} /> : null}
+      {view.storedResults !== null ? (
+        <>
+          <Hairline />
+          <p
+            data-stored-results=""
+            className={`flex h-4 items-center gap-1 text-xs ${view.storedResults.warns ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
+          >
+            {view.storedResults.warns ? <TriangleAlert aria-hidden size={12} strokeWidth={1.5} /> : null}
+            {view.storedResults.line}
+          </p>
+        </>
+      ) : null}
     </div>
   );
 }

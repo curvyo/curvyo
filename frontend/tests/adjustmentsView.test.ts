@@ -41,6 +41,7 @@ test("the Rust states decode, and nothing else is in the folders", () => {
     "no_image",
     "preset_photo",
     "slice2_steps",
+    "slice3_ai_steps",
     "unknown_step",
   ]);
   assert.deepEqual(names("before_after_view"), ["no_image", "open_two_operations"]);
@@ -51,7 +52,8 @@ test("the Rust states decode, and nothing else is in the folders", () => {
 test("slice 2, criteria 5, 10: Crop, Resize, Channel mix and Curves rows with their bodies; Paste after a Copy", () => {
   const view = adjustments("slice2_steps");
   assert.deepEqual(view.steps.map((r) => r.kind), ["crop", "resize", "channel_mix", "curves"]);
-  assert.deepEqual(view.addGeometry.map((b) => b.kind), ["crop", "resize"]);
+  // Slice 3 adds the AI steps to row 2.
+  assert.deepEqual(view.addGeometry.map((b) => b.kind), ["crop", "resize", "upscale", "ai_denoise", "remove_background"]);
   assert.equal(view.addTone.length, 7);
   assert.equal(view.pasteEnabled, true);
   assert.equal(view.steps[0].body, null);
@@ -61,6 +63,21 @@ test("slice 2, criteria 5, 10: Crop, Resize, Channel mix and Curves rows with th
   assert.deepEqual(mix.presets.map((p) => p.pressed), [false, true, false, false]);
   assert.deepEqual(view.steps[3].body, { kind: "curve", points: [[0, 0], [40, 25], [100, 100]] });
   assert.equal(adjustments("expert_steps").pasteEnabled, false);
+});
+
+test("slice 3, criteria 47, 63, 65: one row of each AI step with its model state", () => {
+  const view = adjustments("slice3_ai_steps");
+  assert.deepEqual(view.steps.map((r) => r.kind), ["upscale", "ai_denoise", "remove_background"]);
+  const [up, denoise, mask] = view.steps.map((r) => r.body);
+  assert.ok(up && up.kind === "ai" && denoise && denoise.kind === "ai" && mask && mask.kind === "ai");
+  assert.equal(up.model, "upscale");
+  assert.equal(up.run, "Run");
+  assert.equal(up.state, "Model not downloaded yet (2.4 MB).");
+  assert.equal(up.sizeLine, "40 × 20 px to 80 × 40 px");
+  assert.ok(denoise.consent?.startsWith("Downloads the AI denoise model (ffdnet-color, "));
+  assert.equal(mask.modelReady, true);
+  assert.equal(mask.stored, null);
+  assert.equal(view.storedResults, null);
 });
 
 test("the Curves path starts and ends at the end points and stays inside the graph", () => {
