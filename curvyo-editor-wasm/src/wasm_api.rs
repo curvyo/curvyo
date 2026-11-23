@@ -142,6 +142,18 @@ impl WasmSession {
         Ok(Self::of(session))
     }
 
+    /// Opens a restored recovery copy (`bytes` made by `WasmAssembler`) as an unsaved project:
+    /// dirty, no file (`specs/0136-autosave-and-restore` criterion 5).
+    ///
+    /// # Errors
+    /// As [`WasmSession::open`].
+    pub fn open_recovered(peer: u64, bytes: &[u8]) -> Result<WasmSession, JsValue> {
+        let mut session = Session::open_recovered(peer, bytes)
+            .map_err(|err| JsValue::from_str(crate::session::map_open_error(&err)))?;
+        session.show_default_view();
+        Ok(Self::of(session))
+    }
+
     /// Packs the current document into `.curvyo` container bytes for a save, recording the
     /// application version (`app_version`) in the file and which state went into the bytes. Call
     /// `mark_saved` once the host reports the bytes written.

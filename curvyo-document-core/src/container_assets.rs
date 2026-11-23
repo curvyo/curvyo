@@ -43,12 +43,12 @@ pub(crate) fn write_assets(
 }
 
 /// The hash a member name `assets/derived/<64 hex>.png` names.
-fn derived_hash(name: &str) -> Option<AssetHash> {
+pub(crate) fn derived_hash(name: &str) -> Option<AssetHash> {
     AssetHash::parse(name.strip_prefix(DERIVED_DIR)?.strip_suffix(".png")?)
 }
 
 /// The hash a member name `assets/<64 hex>.<ext>` names.
-fn member_hash(name: &str) -> Option<AssetHash> {
+pub(crate) fn member_hash(name: &str) -> Option<AssetHash> {
     let file = name.strip_prefix(ASSETS_DIR)?;
     let (hash, extension) = file.split_once('.')?;
     EXTENSIONS.contains(&extension).then_some(())?;

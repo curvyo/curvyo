@@ -176,6 +176,17 @@ impl Document {
         }
         Self::from_loro_snapshot(peer_id, updates).map_err(|_| SyncError::Malformed)
     }
+
+    /// A document from the bytes of [`Document::export_loro_snapshot`], bound to `peer_id`: the
+    /// seed of a replica (a recovery worker's) that then takes [`Document::export_updates`] deltas.
+    /// Unlike [`Document::from_updates`] it also reads a snapshot of a document whose history was
+    /// wiped.
+    ///
+    /// # Errors
+    /// [`SyncError::Malformed`] for bytes that are no snapshot this build reads.
+    pub fn from_snapshot(peer_id: u64, bytes: &[u8]) -> Result<Self, SyncError> {
+        Self::from_loro_snapshot(peer_id, bytes).map_err(|_| SyncError::Malformed)
+    }
 }
 
 /// The updates behind the history epoch of the sender: `[epoch length: u32][epoch][updates]`. The
