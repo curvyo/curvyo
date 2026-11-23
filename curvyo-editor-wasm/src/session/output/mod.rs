@@ -5,6 +5,7 @@
 mod commands;
 mod export;
 mod fixture_pick;
+mod frame;
 mod gate_facts;
 mod input;
 mod job_cache;
@@ -27,6 +28,8 @@ use curvyo_document_core::NodeId;
 
 pub use export::ExportedJob;
 pub use fixture_pick::FixtureOutputView;
+#[cfg(target_arch = "wasm32")]
+pub use frame::shape_of;
 pub use play::PlayView;
 pub use send::{SendView, SentJobFile, send_notice};
 pub use tab_facts::RowRunView;
@@ -55,4 +58,6 @@ pub(in crate::session) struct OutputState {
     exports: export::Exports,
     /// The one pending send and the link to the connector (`send.rs`).
     send: send::SendState,
+    /// The head ring of a running frame (`frame.rs`); session state, never saved.
+    frame_head: Option<frame::FrameHead>,
 }

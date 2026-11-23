@@ -53,6 +53,7 @@ test("SS9: the group view decodes starts and the job number", () => {
     total: null,
     export: { enabled: true, tooltip: null, file_type: "GRBL G-code", extension: "gcode" },
     toolpath_view: false,
+    frame: { enabled: false, cause: "Nothing to frame" },
     send: { enabled: true, profile_id: "p", address: "a", starts: true, job: 4 },
   };
   assert.equal(decodeOutputGroup(view)?.send?.starts, true);

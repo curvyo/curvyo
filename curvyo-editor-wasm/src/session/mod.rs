@@ -129,6 +129,8 @@ pub use fixtures::{
 };
 pub use library_sync::LibraryEdit;
 pub use materials::{MaterialWrite, MaterialsView};
+#[cfg(target_arch = "wasm32")]
+pub use output::shape_of as output_frame_shape;
 pub use output::{ExportedJob, OutputGroupView, PlayView, SendView, SentJobFile, send_notice};
 pub use test_grid::TestGridView;
 mod generators;

@@ -32,6 +32,8 @@ pub struct OutputGroupView {
     pub send: Option<super::send::SendView>,
     /// Whether the page's Toolpath view is pressed.
     pub toolpath_view: bool,
+    /// The Frame button (`specs/0118` 2b).
+    pub frame: super::frame::FrameView,
 }
 
 /// The Start pick (criterion 38; UX P29): one value of three, no disabled state.
@@ -293,6 +295,7 @@ impl Session {
             },
             send,
             toolpath_view: self.toolpath_view_pressed(job.manufacturing),
+            frame: self.frame_view(&job),
         })
     }
 

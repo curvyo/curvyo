@@ -30,6 +30,10 @@
       "file_type": "GRBL G-code",
       "tooltip": "Nothing runs. Assign items to an operation."
     },
+    "frame": {
+      "cause": "Nothing to frame",
+      "enabled": false
+    },
     "machine": "Generic laser · GRBL",
     "start": {
       "damaged": false,

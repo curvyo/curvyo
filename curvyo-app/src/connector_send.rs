@@ -459,6 +459,7 @@ mod tests {
             homed: false,
             machine_position: None,
             work_offset: None,
+            frame_id: None,
         };
         assert!(send_pending(&map, "p"));
         assert_eq!(

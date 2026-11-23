@@ -1,3 +1,4 @@
+import { useFramePage } from "@/hooks/useFramePage";
 import { Frame, TriangleAlert } from "lucide-react";
 import { selectedRow } from "@/lib/fixturesView";
 import { FixturesTab } from "@/components/workbench/FixturesTab";
@@ -328,6 +329,14 @@ export function PropertiesPanel({
   const manufacturing = workbenches.view;
   const contribution = contributionOf(workbenches.list, manufacturing?.process);
   const page = workbenches.list.page;
+  // The Frame row's page API: its pick is per page, the rest asks the session (`specs/0118` 2b).
+  const frame = useFramePage(
+    output.session.get,
+    output.session.sync,
+    page.id ?? "",
+    output.view?.frame ?? { enabled: false, cause: "Nothing to frame" },
+    output.view?.start.value === "head_position",
+  );
   // The kind chip sits in the header of the page-scoped tabs only (`specs/0098` criterion 6).
   const pageScoped = ["document", "style", "layers", "snapping", "grid", "sketches", "parameters", "materials", "fixtures"].includes(
     doc.view.content,
@@ -749,6 +758,7 @@ export function PropertiesPanel({
         {!aboutActive && doc.view.content === "operations" && output.view?.send ? (
           // The fixed footer under the column's scroll: Stop is never scrolled away (`specs/0118` W1).
           <MachineControls
+            frame={frame}
             profileId={output.view.send.profileId}
             address={output.view.send.address}
             profile={

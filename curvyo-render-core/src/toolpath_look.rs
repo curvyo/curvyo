@@ -255,10 +255,19 @@ pub fn build_toolpath(
         list.extend(ring(centre, RING_DIAMETER_PX * px, 1.5 * px, OP_INK));
     }
     if let Some(h) = head {
-        list.extend(ring(h.at, 20.0 * px, 4.0 * px, SELECTION_CASING));
-        list.extend(ring(h.at, 16.0 * px, 2.0 * px, OP_INK));
-        list.extend(circle(h.at, 2.0 * px, OP_INK));
+        list.extend(head_ring(h.at, view));
     }
+    list
+}
+
+/// The head of the play bar and of a running frame: a ring with its casing and a dot, constant
+/// in screen size (`specs/0029` UX notes 5, `specs/0118` W33).
+#[must_use]
+pub fn head_ring(at: Point, view: ViewTransform) -> DrawList {
+    let px = 1.0 / view.scale();
+    let mut list = ring(at, 20.0 * px, 4.0 * px, SELECTION_CASING);
+    list.extend(ring(at, 16.0 * px, 2.0 * px, OP_INK));
+    list.extend(circle(at, 2.0 * px, OP_INK));
     list
 }
 

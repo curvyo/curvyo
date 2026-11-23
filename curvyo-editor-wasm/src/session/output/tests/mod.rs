@@ -3,6 +3,7 @@
 
 mod clone_raster_tests;
 mod export_tests;
+mod frame_tests;
 mod group_tests;
 mod image_kind_tests;
 mod play_tests;

@@ -159,6 +159,14 @@ export interface OutputGroup {
   /** `null` without a connector address on the profile. */
   send: SendButton | null;
   toolpathView: boolean;
+  /** The Frame button (`specs/0118` 2b). */
+  frame: FrameButton;
+}
+
+/** What the page says of the Frame button: whether it frames, and the cause if not. */
+export interface FrameButton {
+  enabled: boolean;
+  cause: string | null;
 }
 
 /** The ring of a run in the Toolpath view: the row's digit, or `null` for the fixture glyph. */
@@ -357,6 +365,13 @@ function asSend(value: unknown): SendButton | null | undefined {
   return { enabled: value.enabled, cause, text, profileId: value.profile_id, address: value.address, starts, job };
 }
 
+/** The Frame button of a group; `null` for a broken value. */
+function asFrame(value: unknown): FrameButton | null {
+  if (!isObject(value) || typeof value.enabled !== "boolean") return null;
+  if (value.cause !== null && typeof value.cause !== "string") return null;
+  return { enabled: value.enabled, cause: value.cause };
+}
+
 /** The output group from its JSON value; `null` for `null` (another page) or a broken value. */
 export function decodeOutputGroup(value: unknown): OutputGroup | null {
   if (!isObject(value)) return null;
@@ -365,6 +380,7 @@ export function decodeOutputGroup(value: unknown): OutputGroup | null {
   const total = asTotal(value.total);
   const exportButton = asExport(value.export);
   const send = asSend(value.send);
+  const frame = asFrame(value.frame);
   if (
     typeof value.machine !== "string" ||
     typeof value.toolpath_view !== "boolean" ||
@@ -372,11 +388,12 @@ export function decodeOutputGroup(value: unknown): OutputGroup | null {
     checks === null ||
     total === undefined ||
     exportButton === null ||
-    send === undefined
+    send === undefined ||
+    frame === null
   ) {
     return null;
   }
-  return { machine: value.machine, start, checks, total, export: exportButton, send, toolpathView: value.toolpath_view };
+  return { machine: value.machine, start, checks, total, export: exportButton, send, toolpathView: value.toolpath_view, frame };
 }
 
 /** The ring labels of the Toolpath view; `null` for a broken value. */

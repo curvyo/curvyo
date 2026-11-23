@@ -115,7 +115,7 @@ pub use theme::{
 pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
 pub use toolpath_look::{
     MAX_ARROWS, RING_DIAMETER_PX, RING_OFFSET_PX, ToolpathArrow, ToolpathHead, ToolpathLook,
-    ToolpathSegment, ToolpathStroke, build_toolpath,
+    ToolpathSegment, ToolpathStroke, build_toolpath, head_ring,
 };
 pub use trace_mask_overlay::{
     TraceLassoDraft, TraceMaskOutline, TraceMaskOverlay, TraceMaskSelection,

@@ -30,6 +30,10 @@
       "file_type": "GRBL G-code",
       "tooltip": "Start is damaged. Pick one above."
     },
+    "frame": {
+      "cause": "Nothing to frame",
+      "enabled": false
+    },
     "machine": "Diode 10 W · GRBL",
     "start": {
       "damaged": true,
