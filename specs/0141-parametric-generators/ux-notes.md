@@ -27,7 +27,7 @@ exposed parameter list and its handles use them unchanged; section 9 names the o
 - **Rail budget conflict.** Column A is full (row "Tool rail budget with Measure": "a further tool is a
   customer decision"). The card grows from 92px to 136px, column A ends at 624px; in the smallest window
   (560px) it scrolls under Tools by the existing rule, 64px instead of 20px. No card moves. This needs
-  the customer: decided 2026-11-23 (Frage 309 A, section 14).
+  the customer: decided 2026-11-23 (Frage 327 A, section 14).
 - **No flyout.** The rail opens nothing (row "Rail tooltip and notice placement"). Box and Gear are
   chosen in the tool's bar, so a later generator is one more segment, not one more rail button.
 - **Generators bar.** In the overlay row, centred like the polygon/star bar: one pill, 36px row, one
@@ -257,12 +257,12 @@ different Teeth a typed value gives each gear its own module.
 
 ## 12. A file with an unknown generator kind (criterion 7)
 
-- The file opens; each such object shows its stored outline (ADR 0079 §5; drawn, cut, moved, rotated,
+- The file opens; each such object shows its stored outline (ADR 0080 §5; drawn, cut, moved, rotated,
   copied, deleted, converted; no resize or number change). Once after the open, the canvas notice slot
   shows a status (5s): "2 objects come from a generator this version does not have. They are shown as
   plain outlines." (one: "1 object comes from ..."). No dialog, no banner, no per-object mark.
 - Opening does not mark the file changed (the precedent of the converted sketch page). Whether a save keeps
-  the unknown record is decided (ADR 0079 §5): a save keeps it unchanged. A resize of such an object is
+  the unknown record is decided (ADR 0080 §5): a save keeps it unchanged. A resize of such an object is
   refused with a status notice (wording: "This object comes from a generator this version does not have;
   it cannot be resized.").
 
@@ -278,7 +278,7 @@ different Teeth a typed value gives each gear its own module.
 
 ## 14. Questions and flags (resolved 2026-11-23)
 
-1. **GEN-RAIL (Frage 309): decided.** The Generators tool sits in the More tools card with Offset, Measure
+1. **GEN-RAIL (Frage 327): decided.** The Generators tool sits in the More tools card with Offset, Measure
    and Grid, simply there for now (option A of the question; the column ends 624px and scrolls 64px in the
    smallest window as drawn in section 1). The rails must later be reworked to scroll so they fit the screen
    size; on a small screen all rails could be one column, below each other (`docs/technical-debt.md`).
@@ -287,7 +287,7 @@ different Teeth a typed value gives each gear its own module.
    is one object in the UI and not enterable, Convert to paths gives the group of plates; criterion 1 is met
    by the bar's segments and placing switches to the Style tab (section 2); `0065` criterion 3 is read as
    third-party only (section 2).
-3. **Architect (`adrs.md`): answered** in ADR 0079 §2 and §5 (schema elements; an unknown record survives a
+3. **Architect (`adrs.md`): answered** in ADR 0080 §2 and §5 (schema elements; an unknown record survives a
    save).
 4. **For `0099`:** its revision UX notes can point to sections 4 and 9 instead of a second design. This
    reads criterion 24's "a value field each" as the Params field, not the panel `ValueField` (no drag in

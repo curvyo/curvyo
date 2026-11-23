@@ -614,7 +614,7 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "gradient_fill_damaged_one_stop_v49.curvyo",
         "gradient_fill_damaged_unordered_v49.curvyo",
         "gradient_fill_damaged_paint_without_gradient_v49.curvyo",
-        // The damaged generated leaf of `0141` (ADR 0079 §4).
+        // The damaged generated leaf of `0141` (ADR 0080 §4).
         "generated_damaged_v54.curvyo",
     ];
     let mut opened = 0;

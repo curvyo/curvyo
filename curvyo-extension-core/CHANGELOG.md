@@ -4,7 +4,7 @@ The contract is `0.x` and unstable (ADR 0034 §5). Parameter keys and fixture ki
 publishes are written into project files (ADR 0033 §3): renaming one is a format change with a
 migration in that extension.
 
-## Unreleased (`specs/0141-parametric-generators`, ADR 0079)
+## Unreleased (`specs/0141-parametric-generators`, ADR 0080)
 
 - The `Extension` trait (`manifest`, `notice`, `generate`); the registry holds `&'static dyn Extension`.
 - `Contribution::Generator(GeneratorKind)` with `ParamGroup`s; the generator contract

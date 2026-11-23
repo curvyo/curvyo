@@ -1,4 +1,4 @@
-//! The `Extension` trait and the generator contract (ADR 0079 §1, §2): what the registry holds and
+//! The `Extension` trait and the generator contract (ADR 0080 §1, §2): what the registry holds and
 //! what a generator receives and returns.
 
 use curvyo_document_core::{Point, Vec2};

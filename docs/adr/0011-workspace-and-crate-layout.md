@@ -210,13 +210,13 @@ for the cost of one `lib.rs`: doing it now is a speculative crate
    > `curvyo-image-core` (the decoded working image, pure) and `libm` (a workspace dependency,
    > bit-identical `pow`), both building for `wasm32-unknown-unknown`.
 
-   > **Note 2026-11-23 ([ADR 0079](0079-generated-objects-extension-trait-and-parametric-instances.md) §3,
-   > spec `0141`; 0079 accepted 2026-11-23):** new crate `curvyo-generators-core` (the second
+   > **Note 2026-11-23 ([ADR 0080](0080-generated-objects-extension-trait-and-parametric-instances.md) §3,
+   > spec `0141`; 0080 accepted 2026-11-23):** new crate `curvyo-generators-core` (the second
    > extension: parametric outlines for boxes and gears from typed values; `→ extension-core,
    > document-core, libm`), in the wasm32 list; `ui-core → generators-core`. The `Extension`
    > trait lives in `curvyo-extension-core`. Observed while writing it: `editor-wasm →
    > laser-core` exists in `Cargo.toml` although the 2026-11-02 note lists only `editor-wasm →
-   > extension-core`; recorded in `docs/technical-debt.md`, not changed by 0079.
+   > extension-core`; recorded in `docs/technical-debt.md`, not changed by 0080.
 
    **No `*-core` crate depends on `*-io`, on `*-app`, on `vecmanf-editor-wasm`
    or on the frontend, ever.** This is the `CLAUDE.md` §6 rule, and the crate

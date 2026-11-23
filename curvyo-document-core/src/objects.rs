@@ -77,7 +77,7 @@ pub enum ObjectEditError {
     #[error("every coordinate and angle must be finite")]
     NonFiniteGeometry,
     /// A generated object only moves, turns and flips; a result that scales or skews it is not a
-    /// transform of the object (a resize writes its parameters, ADR 0079 §6).
+    /// transform of the object (a resize writes its parameters, ADR 0080 §6).
     #[error("a generated object only moves, turns and flips")]
     GeneratedNotRigid,
     /// A path result given to [`Document::transform_objects`] for an object that

@@ -159,7 +159,7 @@ impl Session {
     }
 
     /// Whether the selection holds a generated object whose generator is unknown or switched off:
-    /// it is kept as stored and cannot be resized or changed by number (ADR 0079 §5).
+    /// it is kept as stored and cannot be resized or changed by number (ADR 0080 §5).
     pub(in crate::session) fn selection_has_unavailable_generated(&self) -> bool {
         self.selected_generated().iter().any(|id| {
             self.document.generated(*id).is_some_and(|snapshot| {

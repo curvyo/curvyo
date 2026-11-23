@@ -100,7 +100,7 @@ Architect, 2026-11-06. Slice 2 of `0063` (concept A). Frage 157 A and 158 A assu
 
 ## Revision 2026-11-19 (sketch instances, criteria 23 to 31)
 
-- 2026-11-23: **Instance mechanism decided in [ADR 0079](../../docs/adr/0079-generated-objects-extension-trait-and-parametric-instances.md)
+- 2026-11-23: **Instance mechanism decided in [ADR 0080](../../docs/adr/0080-generated-objects-extension-trait-and-parametric-instances.md)
   §6 and §9** (proposed, `needs-customer`), shared with the generated objects of `0141`: the sketch
   holds `exposed_params` (one atomic list of `{ id, min, max }`, criterion 23); a clone holds its
   own values in one atomic map `instance_params` keyed by `ParameterId` (absent = the sketch's

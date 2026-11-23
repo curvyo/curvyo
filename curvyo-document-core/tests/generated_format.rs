@@ -1,4 +1,4 @@
-//! Format 54 (`specs/0141-parametric-generators` criteria 5 to 7, ADR 0079 §4, §5): the generated
+//! Format 54 (`specs/0141-parametric-generators` criteria 5 to 7, ADR 0080 §4, §5): the generated
 //! leaf, its goldens (`generated_v54`, `generated_unknown_kind_v54`; the damaged one is checked in
 //! the crate), open exactly as stored, move writes only the frame, a resize is refused here,
 //! node edits are refused, an unknown kind survives a save, Convert to paths. The goldens are
@@ -224,7 +224,7 @@ fn the_golden_says_54_and_a_file_of_53_still_opens() {
     assert!(
         manifest.contains("\"format_version\":54") || manifest.contains("\"format_version\": 54")
     );
-    // A file of 53 opens unchanged (ADR 0079 §4).
+    // A file of 53 opens unchanged (ADR 0080 §4).
     assert!(unpack(2, include_bytes!("fixtures/image_adjust_ai_v53.curvyo")).is_ok());
 }
 

@@ -2862,14 +2862,14 @@ is no longer true; a controller without limit switches that reports `ok` to `$H`
 ADR 0034 §2 and the ADR 0011 note of 2026-11-02 list `editor-wasm → extension-core` only, but
 `curvyo-editor-wasm/Cargo.toml` depends on `curvyo-laser-core`, and the session calls it in many
 modules (settings, operations, job, fixtures, materials, library sync); ui-core calls it outside
-`extensions.rs` as well. The `Extension` trait of ADR 0079 covers only the registry dispatch and
+`extensions.rs` as well. The `Extension` trait of ADR 0080 covers only the registry dispatch and
 does not absorb these calls. **Resolution:** an ADR that either records the edge as accepted (the
 laser is a compiled-in, trusted extension the session drives) or moves the calls behind ui-core;
 trigger: a second manufacturing extension that needs the same session plumbing.
 
 ## Rails scroll and a single column on small screens (customer, 2026-11-23)
 
-Adding the Generators tool to the More tools card (spec `0141`, Frage 309) makes the tool rails taller;
+Adding the Generators tool to the More tools card (spec `0141`, Frage 327) makes the tool rails taller;
 in the smallest window (560 px) column A already scrolls under the Tools card by an ad-hoc rule.
 **Resolution:** rework the rails so that they scroll to fit any screen height, and on a small screen
 show all rails as one column, below each other (customer, 2026-11-23: "simply there for now").

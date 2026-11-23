@@ -1,4 +1,4 @@
-//! The parametric generators extension (ADR 0079, `specs/0141-parametric-generators`): a spur
+//! The parametric generators extension (ADR 0080, `specs/0141-parametric-generators`): a spur
 //! gear and a laser box with finger joints, each a pure function from stored parameters to closed
 //! outlines in millimetres.
 //!

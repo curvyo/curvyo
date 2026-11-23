@@ -144,7 +144,7 @@ pub(crate) enum LeafKind {
     Image,
     /// A dimension object (`shape = "dimension"`, ADR 0027 §1).
     Dimension,
-    /// A generated object (`shape = "generated"`, ADR 0079 §4): reads as a path, writes its own
+    /// A generated object (`shape = "generated"`, ADR 0080 §4): reads as a path, writes its own
     /// registers.
     Generated,
 }

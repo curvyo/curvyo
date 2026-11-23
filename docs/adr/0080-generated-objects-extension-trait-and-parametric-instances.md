@@ -1,10 +1,10 @@
-# ADR 0079: Generated objects, the `Extension` trait and one parametric-instance mechanism
+# ADR 0080: Generated objects, the `Extension` trait and one parametric-instance mechanism
 
-**Status:** Accepted (customer, 2026-11-23: Frage 308 GEN-STORED A; Frage 309 GEN-RAIL: the Generators tool goes
+**Status:** Accepted (customer, 2026-11-23: Frage 326 GEN-STORED A; Frage 327 GEN-RAIL: the Generators tool goes
 into the More tools card). Proposed by the architect 2026-11-23, `needs-customer` (document model, file format, plugin
 interface). The customer decided the route (spec `0141` Frage 277 A: box and gear through the
 extension contract; Frage 278 A: a live object sharing one instance mechanism with the sketch
-instances of `0099` criteria 23 to 31; EXT-NEXT A: extract the trait now). Frage 308
+instances of `0099` criteria 23 to 31; EXT-NEXT A: extract the trait now). Frage 326
 (GEN-STORED) answered A. Specs: [`0141`](../../specs/0141-parametric-generators/specification.md),
 [`0099`](../../specs/0099-sketch-pages/specification.md) revision 2026-11-19. Amends
 [ADR 0034](0034-extension-contract-compiled-in.md) §3, §4, §8 (the trait trigger is met); adds a
@@ -120,7 +120,7 @@ one. Box and Gear are that second one. Three facts shape the design:
    - style keys as on a path; a clone of it reads its outline as of any outline root (ADR 0045).
    The document reads `frame × parts` as the leaf's geometry in every build (one leaf, several
    outlines; the UI never enters it); no consumer of outlines changes. A known kind is not
-   regenerated on open (never rewrite on read); Frage 308.
+   regenerated on open (never rewrite on read); Frage 326.
    Damage refuses the file: `generated` not a map, a `kind` that is not `<id>/<kind>`, a seed
    outside u32, no part or an empty part, a subpath not `2 + 6n` finite numbers within ±1e7, a frame that
    is not six finite numbers or holds scale or shear beyond 1e-9. `params` are opaque to
@@ -211,7 +211,7 @@ one. Box and Gear are that second one. Three facts shape the design:
 
 ## Customer question
 
-**Frage 308 (GEN-STORED): opening a file with a box or gear.** A: it opens exactly as saved; a
+**Frage 326 (GEN-STORED): opening a file with a box or gear.** A: it opens exactly as saved; a
 later Curvyo with a better generator changes it only when you change a number (recommended: what
 was cut stays what you cut, and every build can open it). B: rebuilt from the numbers on every open
 (after an update the outline may differ from what you cut; every view, export and the laser job
