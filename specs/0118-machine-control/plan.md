@@ -49,3 +49,60 @@ no new dependency, no `format_version` change; protocol stays 0 (additive `Home`
 - Frontend: `tests/machine_control_0118.test.ts`; the `0125` and `0127` line tests now read the
   footer's line.
 - Full gate of `CLAUDE.md` §7 and `cargo deny`. The browser check is the tester's.
+
+# Plan for Machine control, slice 2a (jog and a member's Home)
+
+Criteria 8 to 21 and 37 of the second slice; Fragen 308 A, 309 A, 315 A. Design: architect addendum
+J1 to J9 in `adrs.md`, UX notes W16 to W27. Branch `story/machine-jog`. No new crate, dependency or
+`format_version`; protocol stays 0 (additive `Jog`, `JogKeep`, `JogStop`, `State::Jogging`, three
+`Status` fields). Old golden files stay byte-identical (new fields are left out when empty).
+Commits (conventional, scope = crate, at most five): core, `-io` (server and ctl), app, frontend, docs.
+
+## Affected crates/modules
+- `curvyo-connector-core`: new `jog.rs` (steps, feeds, travel clamp, dead-man constant),
+  `machine/jog.rs` (how the machine takes the jog messages and events, `Clock` dead-man),
+  `machine/event.rs` (`Event` moved out of `machine/mod.rs`, which would pass 500 lines),
+  `message.rs`, `codec.rs` (42 known types), `access.rs` (`Kind::Motion`; a member's Home passes),
+  `machine/confirm.rs` and `home.rs` (a member's Home waits, `Confirmation.what`). Goldens
+  `command_jog*.json`, `command_jog_keep.json`, `command_jog_stop.json`, `status_jogging.json`,
+  `status_homed_positions.json`, `status_awaiting_home.json`.
+- `curvyo-connector-io`: new `grbl/jog.rs` (`$J=`, the laser-off guarantee, the hold, the cancel),
+  `grbl/controller.rs`, `grbl/replies.rs`, `fake_controller.rs` (position moved by jogs),
+  `hub/jog.rs` (`Hub::jog`, the clock tick, the `jobs.log` line per pad session), `session.rs`
+  (a closing session ends its hold), `admin_log.rs`, `hub/journal.rs` (Home confirmed).
+  Simulator (test support) gains `$J=`, `0x85`, the `Jog` word, `error:15`.
+- `curvyo-connector-ctl`: `confirm-start` confirms a waiting Home.
+- `curvyo-app`: `connector.rs` (`"jog"`), new `connector_jog.rs` (hold, keep, release).
+- `frontend`: `lib/jog.ts`, `JogPad.tsx`, `MachineControls.tsx`, `useMachineControls`,
+  `connectorText.ts`, `machineControls.ts` (causes), the member's "Confirm home".
+- `docs`: ADR amendments (0070, 0071, 0035 section 6), `docs/design-system.md` rows, `docs/technical-debt.md`.
+
+## Tasks
+Phase 1: core, `-io`, server, goldens, simulator
+- [ ] 1. Wire: `Jog`, `JogKeep`, `JogStop`, `State::Jogging`, `Status.homed`, `machine_position`,
+        `work_offset`, goldens, old goldens unchanged (15, 16, 18, 19, 21; J1)
+- [ ] 2. `jog.rs`: steps, feeds, `TravelBox`, `clamp` with a table per travel, `$23` and edge (16, 17, 21; J2)
+- [ ] 3. Access table: `Kind::Motion` owner-only, `JogStop` and a member's Home pass (12, 37; J7)
+- [ ] 4. Core rules for both machines: Jog per state, refusals in words, queue of one step, Stop and
+        `JogStop` cancel, `JogEnded`, `JogFailed`, Alarm and loss end the jog, a Ready job is kept (8, 10, 12, 19, 20; J3)
+- [ ] 5. Dead-man by `Event::Clock`: 299 ms keeps, 300 ms cancels (18; J4)
+- [ ] 6. Homed since connect and the positions in `Status` (13, 14; J5)
+- [ ] 7. A member's Home waits, an owner or `curvyoctl confirm-start` confirms, Stop discards, a second
+        Home is `WrongState`, `admin.log` names Home (12, 37; J7)
+- [ ] 8. GRBL: `M5` before the first motion, `$J=` per sign, feed cap, clamp, hold increments, `0x85`
+        repeated until Idle, the stop of G12 after 2 s, `error:15`, the `Jog` word is no foreign state (9, 10, 16, 17, 18; J6)
+- [ ] 9. Fake controller position moved by jogs in injected time (18, 21; J9)
+- [ ] 10. Hub: clock tick, `Hub::jog`, `jobs.log` line per pad session, session close ends a hold (11, 12, 18; J4, J7)
+Phase 2: app and frontend
+- [ ] 11. App `connector_command` "jog", `connector_jog` hold, keep, release (15, 18, 21; J8)
+- [ ] 12. Frontend: `jog.ts` corner table and press reducer, `JogPad`, causes, "Jogging", "Not homed",
+        work-offset notice, member without pad, "Confirm home" (15 to 20, 37; W16 to W27)
+Phase 3: docs
+- [ ] 13. ADR amendments, design-system rows, technical debt (21)
+
+## Validation
+- Core: `tests/jog_0118.rs` (J3 table, Clock, clamp, J5, J7 rows, goldens), `access.rs` table.
+- `-io`: `tests/grbl_jog.rs` (simulator bytes per sign, `M5` first, `0x85`, release, keep loss and
+  the late `$J=`, no `M3`/`M4`/`S` above 0), `tests/jog_fake.rs` (running connector, fake controller).
+- App: `connector_command` unit tests. Frontend: `tests/jog_0118.test.ts`.
+- Full gate of `CLAUDE.md` §7, `cargo deny`, `python3 -I scripts/check_docs.py`. The browser check is the tester's.

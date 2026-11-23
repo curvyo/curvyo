@@ -214,3 +214,84 @@ change that accepted rule and needs a customer question; not proposed.
 
 No other conflict. Not changed: criteria 1, 2, 5, 7 (UX notes section 13 lists its own word-level
 points for the product owner).
+
+## Second slice 2a (jog)
+
+Architect, 2026-11-23, criteria 8 to 21 and 37 (Fragen 308 A, 309 A, 315 A). **No new ADR, crate,
+dependency or `format_version`**; wire additive in protocol 0 (ADR 0035 §6). All is **(Proposal)**.
+
+**J1. Wire.** App to connector: `Jog { axis: "X"|"Y", direction: "Plus"|"Minus", step, hold }`
+(`hold` left out when false), `JogKeep`, `JogStop` (`KNOWN_TYPES` 39 to 42). `step` is the closed set
+of Frage 315 A (`"0.1"`, `"1"`, `"10"`, `"50"`), never a number. No feed on the wire: feeds are core
+constants (criterion 16; a typed feed is Frage 315 B, not chosen). `JogStop` is not `Stop`: a release
+arriving after the jog ended must not discard a Ready job; outside `Jogging` it does nothing. New
+`State::Jogging`; `Status` gains `homed`, `machine_position`, `work_offset` (13, 14). Axes are
+machine axes (the arrow map per origin corner is the app's, J8). Goldens: one per new message,
+`status_jogging.json`, `status_homed_positions.json`, `status_awaiting_home.json`; old ones unchanged.
+
+**J2. Core modules.** `src/jog.rs` ("the jog steps, their feeds and the travel clamp"): `JogStep`,
+`Feed` (mm/min newtype), `feed(step)` (3,000 / 3,000 / 1,000 / 300), `TravelBox`, `clamp(from, axis,
+delta, box) -> Option<Millimetres>` with tolerance `EDGE = 0.01 mm` (`None`: at the edge, write
+nothing). `machine/jog.rs` ("how the job machine takes jog messages and jog events"); `Event`
+moves to `machine/event.rs` (refactor commit) if `machine/mod.rs` passes 500 lines.
+
+**J3. Rules (both machines).** `Jog` in `Idle`, `Ready`, `Done` gives `ControllerCommand::Jog { axis,
+sign, distance, feed, homed }` (or `JogHold`) and `Jogging`; the state it came from is kept as for
+Home (`homed_from` becomes `motion_from`). Refused, `WrongState` with criterion 8's words, in
+`Receiving`, `Running`, `Paused`, `AwaitingLocalStart`, `Homing`, `NoController`, `Alarm` and with
+`BUSY_WORDS`. In `Jogging`: one more step is taken once, later ones dropped with the answer `Status`
+(criterion 19); `Home`, `Start` refused ("Jogging"), `SubmitJob` `Busy`, `Pause` "No job to pause";
+`Stop` and `JogStop` give `JogCancel` (fake: back at once; GRBL: "Stopping" until `JogEnded`). New
+internal events `JogEnded`, `JogFailed { detail }` (`error:15`, built text), `ControllerReset`.
+`Alarm` drops a Ready job (M3); `--require-local-start` does not hold a jog (Frage 308 A).
+
+**J4. Dead-man; the clock stays outside core.** Core takes `Event::Clock(Duration)` from the hub
+on every `TICK` (50 ms, `hub/link.rs`) and before each jog message; a hold or `JogKeep` sets
+`deadline = now + JOG_DEAD_MAN` (300 ms), a `Clock` past it gives `JogCancel`. A session that started
+a hold hands the hub a `JogStop` when it closes.
+
+**J5. Homed since connect.** Core's flag: set by `Event::Homed` in any state (also the `ok` to a
+job's own `$H`); cleared by `Alarm`, `ControllerLost*`, `ControllerConnected`, `StopUnconfirmed` and
+`ControllerReset`, which `on_banner` emits for an unasked banner outside a stream (emits nothing
+today); a stop's own reset and the jog cancel keep it. `Event::Position` also carries `MPos`, `WCO`.
+
+**J6. GRBL (`-io/src/grbl/jog.rs`, "the `$J=` lines and the jog cancel, from the press to Idle").**
+- Laser off (criterion 9): `spindle_off` is true after the connector's own `M5`, false once a job
+  line is written; the first motion line follows `M5\nM9\n` unless true. `$J=` carries no M or S word.
+- Step: `$J=G91 G21 X<d> F<f>`, `f` capped at `$110`/`$111` (`Settings::max_rate`), owed as
+  `Owed::Jog`. Clamp when homed and `$130`/`$131` known: box `[-travel, 0]`, or `[0, travel]` for an
+  axis with its `$23` bit set whose position after homing is 0 within `EDGE` (force-origin build).
+- Hold: increments of `feed x 0.1 s`, at most about 0.25 s of motion queued (`HOLD_AHEAD`), each
+  clamped, so a dead connector stops the head within that (*rejected:* one `$J=` to the edge, UGS).
+- Cancel: `0x85`, repeated at each report while a `$J=` is owed or the word is `Jog` (GRBL ignores
+  `0x85` outside Jog, so a `$J=` still in its buffer would run); `JogEnded` at `Idle` with nothing
+  owed; not `Idle` within 2 s: the stop of G12. Fast polling while jogging.
+
+**J7. A member's Home (criterion 37), `access.rs`, `confirm.rs`.** `Kind::Home` joins `Kind::Job`
+(member "yes"); new `Kind::Motion` (`Jog`, `JogKeep`): member `OwnerRequired`, else as `Job`;
+`JogStop` is `Kind::Job`. A member's Home in `Idle`/`Ready`/`Done`/`Alarm` goes to `request(
+Waiting::Home)`; an owner's `Home` there confirms; a second `Home` waiting is `WrongState`; `Stop`
+from anyone discards it. `shown_requester` drops its `Waiting::Home` exclusion; no `job` (M5).
+`Confirmation` gets `what: Start | Resume | Home` (for `resume`) and `job_id: Option<Uuid>`;
+`admin.log` "start confirmed" names Home; `curvyoctl confirm-start` sends `Home` when `requested_by`
+is set and `job` absent. `jobs.log`: `Jog: <client>` once per run of one client's jogs, ended by any
+other `jobs.log` line or client (criterion 12's pad session without a clock; golden).
+
+**J8. App and frontend.** `connector_command` takes `"jog"` with `{ axis, direction, step }` (fresh
+connection, as Home). Hold: new `curvyo-app/src/connector_jog.rs` (`connector.rs` is 825 lines):
+`connector_jog_hold` keeps a paired connection per profile, `connector_jog_keep` forwards one
+`JogKeep` per webview call, `connector_jog_release` sends `JogStop` and closes; Rust sends no
+keep-alive of its own, so a frozen webview stops the head. Frontend: `src/lib/jog.ts` (pure: arrow
+to axis per origin corner; press reducer: release before 300 ms is a step, else hold, keep every
+100 ms), `JogPad.tsx` in `MachineControls.tsx`, jog calls in `useMachineControls`, `connectorText.ts`
+gains `Jogging`, `jobButtons.jog`, "Not homed", the work-offset Notice (beyond 0.001 mm); no pad
+for a member (`Authenticated`); open/closed and step are per-app view state.
+
+**J9. Tests, no sleeps.** Core: J3 per state in both machines, J4 by `Clock` (299 ms keeps, 300 ms
+cancels), `clamp` per travel/`$23`/edge, J5, J7 rows, goldens. Simulator gains `$J=`, `Jog`, `0x85`,
+`error:15`; `tests/grbl_jog.rs`: bytes per sign, `M5` first, `0x85` on Stop, release, keep loss and
+the late `$J=`, no `M3`/`M4`/`S>0`. Fake: a position moved by jogs in injected time; 18 by CPU time.
+
+**Spec points, no customer question.** Criterion 16's "byte log per corner" is `jog.ts`'s corner
+table plus simulator bytes per sign; 21's "clamp per corner" is per `$23` and travel; 18's 300 ms is
+checked per hub tick (cancel by 350 ms).

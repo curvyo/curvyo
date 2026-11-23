@@ -1,6 +1,6 @@
 # Job list on the connector: send jobs while the laser works, reorder, start
 
-Status: Slice 1 Done (PR #448); slice 2 (criteria 12 and 13, restart from the interrupted line) is built together with the remaining `0118` slices (run-from-line, jog, frame, focus). Fragen 302 (QUEUE-SPLIT) A, 301 (QUEUE-START-ARM) A, 303 (QUEUE-MEMBER-FLAG) A, answered by the customer 2026-11-23
+Status: Slice 1 Done (PR #448); slice 2 (criteria 12 and 13, restart from the interrupted line) is one PR with `0118` sub-slice 2e (run-from-line, `0118` criteria 38 and 39), after `0118` 2a (homed since connect, machine position and work offset, `0118` criteria 9, 13, 14); `0118` 2b to 2d are not needed. Fragen 302 (QUEUE-SPLIT) A, 301 (QUEUE-START-ARM) A, 303 (QUEUE-MEMBER-FLAG) A, answered by the customer 2026-11-23
 Priority: Should
 Origin: Customer, first laser test, 2026-11-18. Translated: "The owner needs a job list so that jobs can be sent while the laser cutter is still working. The owner can then change the order and press start."
 
@@ -51,6 +51,7 @@ Frage 259 (QUEUE-NEXT): When a job completes, what starts next? **Decided B by t
     c. the laser is off and stays off until the first line of the job text: the connector sends `M5` first, and the start state of line n is reconstructed from the job text before it (the last modal values of distance mode `G90`/`G91`, units, plane, feed `F`, spindle `S`, motion mode and coolant `M7`/`M8`/`M9`, `M3`/`M4` is held back and re-sent after the move), never assumed;
     d. the move to the start of line n is a travel at a safe feed in absolute mode with the laser off, then the modal state is set, then `M3`/`M4` with the stored `S` resumes, then line n; if the job text before line n cannot be reconstructed (unknown modal word, G-code the connector does not parse), the restart is refused.
     Tests on the fake controller: refused after reset, power loss and Alarm; refused without confirmation; accepted after Home with the preamble checked line by line (laser off during the move); modal reconstruction table (G91, feed change, S change, M8 before line n).
+    Slice 2 (Proposal): built on `0118` criteria 9 (laser off), 13 (homed since connect), 14 (machine position and work offset), 38 (the run-from-line primitive) and 39 (what the stored interruption holds); only interrupted jobs restart from a line (`0118` Frage 314 A).
 13. `admin.log` records every restart from a line with the owner, job and line.
 14. Gate green, `docs/design-system.md` row for the list.
 
