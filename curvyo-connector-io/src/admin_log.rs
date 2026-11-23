@@ -57,6 +57,11 @@ pub enum AdminEvent {
         /// A resume rather than a start.
         resume: bool,
     },
+    /// A member's Home that waited was confirmed (`specs/0118` 37); the line names Home.
+    HomeConfirmed {
+        /// Who asked for it.
+        requester: String,
+    },
     /// An owner removed a job another client sent from the job list.
     JobRemoved {
         /// The job's name.
@@ -127,6 +132,9 @@ impl AdminEvent {
                     requester.clone(),
                     format!("{job_name} {job_id}{tail}"),
                 )
+            }
+            Self::HomeConfirmed { requester } => {
+                ("start-confirmed", requester.clone(), "Home".to_owned())
             }
             Self::JobRemoved {
                 job_name,
@@ -281,5 +289,32 @@ mod tests {
             let mode = std::fs::metadata(log.path()).unwrap().permissions().mode();
             assert_eq!(mode & 0o777, 0o600);
         }
+    }
+
+    /// `specs/0118` slice 2a: a confirmed Home is the same event with the detail `Home`; its
+    /// golden is a file of its own, the first one stays as it was.
+    #[test]
+    fn a_confirmed_home_is_a_start_confirmed_line_that_names_home() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = AdminLog::new(dir.path());
+        let t = |s: i64| OffsetDateTime::from_unix_timestamp(1_795_010_771 + s).unwrap();
+        log.append(
+            t(0),
+            "Laptop",
+            &AdminEvent::HomeConfirmed {
+                requester: "Phone".into(),
+            },
+        )
+        .unwrap();
+        log.append(
+            t(60),
+            "",
+            &AdminEvent::HomeConfirmed {
+                requester: "odd\tname".into(),
+            },
+        )
+        .unwrap();
+        let text = std::fs::read_to_string(dir.path().join(ADMIN_LOG_FILE)).unwrap();
+        assert_eq!(text, include_str!("../tests/fixtures/admin_home.log"));
     }
 }

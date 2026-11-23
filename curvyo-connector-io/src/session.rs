@@ -3,6 +3,7 @@
 
 #[cfg(test)]
 mod gate_tests;
+mod motion;
 mod owner;
 mod pairing;
 
@@ -64,6 +65,8 @@ struct Session {
     close: Option<Arc<AtomicBool>>,
     /// The hub's maintenance epoch this connection was greeted in; it closes when it moves (A6).
     maintenance_epoch: Option<u64>,
+    /// This connection started a held jog and has not released it: closing ends it (J4).
+    holding: bool,
 }
 
 #[allow(clippy::result_large_err)] // the signature tungstenite's callback asks for
@@ -136,12 +139,19 @@ pub fn serve(
         peer_ip,
         close: None,
         maintenance_epoch: None,
+        holding: false,
     };
     session.run(&mut socket, deadline, shutdown);
     if !session.submitted.is_empty() {
         session
             .hub
             .client_disconnected(&session.submitted, Instant::now());
+    }
+    if session.holding
+        && let Some(peer) = &session.peer
+    {
+        // A closed connection ends the hold it started at once (`specs/0118` criterion 18).
+        let _ = session.hub.jog(Message::JogStop, peer, Instant::now());
     }
     if session.pairing.take().is_some() {
         session.hub.pair_failed();
@@ -358,10 +368,8 @@ impl Session {
     fn on_logged_in(&mut self, socket: &mut Socket, message: Message, peer: &Peer) -> bool {
         let now = Instant::now();
         match message {
-            Message::Home => {
-                let answers = self.hub.home(peer, now);
-                self.limiter.answered(now);
-                answers.into_iter().all(|m| send(socket, m))
+            Message::Home | Message::Jog { .. } | Message::JogKeep | Message::JogStop => {
+                self.on_motion(socket, message, peer, now)
             }
             Message::Unlock => {
                 let status = self.hub.unlock(peer, now);

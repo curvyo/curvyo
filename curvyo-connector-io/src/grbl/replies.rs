@@ -25,7 +25,7 @@ const RESET_WHILE_MOVING: u16 = 3;
 const BF_SLACK: usize = 1;
 
 /// The states of GRBL that map to the job machine's own states (G4).
-const OWN_STATES: [&str; 4] = ["Idle", "Run", "Hold", "Alarm"];
+const OWN_STATES: [&str; 5] = ["Idle", "Run", "Hold", "Alarm", "Jog"];
 
 impl GrblController {
     fn alarm_words(&self) -> String {
@@ -36,10 +36,44 @@ impl GrblController {
         }
     }
 
-    fn update_position(&mut self, report: &Report) {
+    /// The machine position and the work offset, told to the job machine when they changed.
+    fn update_machine_position(&mut self, report: &Report) {
         if let Some(wco) = report.wco {
             self.wco = wco.map(|v| self.settings.to_mm(v));
+            self.wco_seen = true;
         }
+        let machine = match (report.mpos, report.wpos) {
+            (Some(m), _) => Some(m.map(|v| self.settings.to_mm(v))),
+            (None, Some(w)) if self.wco_seen => {
+                let w = w.map(|v| self.settings.to_mm(v));
+                Some([w[0] + self.wco[0], w[1] + self.wco[1], w[2] + self.wco[2]])
+            }
+            _ => None,
+        };
+        self.mpos = machine;
+        if let Some(m) = machine.filter(|_| self.home_pending) {
+            self.home_pending = false;
+            self.home_mpos = Some([m[0], m[1]]);
+        }
+        let told = (machine, self.wco_seen.then_some(self.wco));
+        let near = |a: Option<[f64; 3]>, b: Option<[f64; 3]>| match (a, b) {
+            (Some(a), Some(b)) => a
+                .iter()
+                .zip(b)
+                .all(|(x, y)| (x - y).abs() <= SAME_POSITION_MM),
+            (a, b) => a.is_none() == b.is_none(),
+        };
+        if machine.is_some() && !(near(told.0, self.told.0) && near(told.1, self.told.1)) {
+            self.told = told;
+            self.events.push(Event::MachinePosition {
+                machine: machine.map(|m| m.map(Millimetres)),
+                offset: told.1.map(|o| o.map(Millimetres)),
+            });
+        }
+    }
+
+    fn update_position(&mut self, report: &Report) {
+        self.update_machine_position(report);
         let work = match (report.wpos, report.mpos) {
             (Some(w), _) => Some(w.map(|v| self.settings.to_mm(v))),
             (None, Some(m)) => {
@@ -99,6 +133,7 @@ impl GrblController {
             return;
         }
         self.on_job_report(report);
+        self.jog_report(report);
     }
 
     /// Whether `Bf:` shows more bytes in GRBL's receive buffer than the job's lines in flight
@@ -162,8 +197,10 @@ impl GrblController {
     /// `ok` (`code` `None`) or `error:<code>`.
     pub(super) fn on_answer(&mut self, code: Option<u16>, at: Duration) {
         if let Some(owed) = self.owed.pop_front() {
-            if owed == Owed::Home {
-                self.on_home_answer(code);
+            match owed {
+                Owed::Home => self.on_home_answer(code),
+                Owed::Jog(_) => self.on_jog_answer(code, at),
+                Owed::Line(_) => {}
             }
             return;
         }
@@ -172,6 +209,7 @@ impl GrblController {
         let Some(stream) = self.stream.as_mut() else {
             return;
         };
+        let was_homing = stream.homing();
         let Some(job_line) = stream.answer() else {
             if !stopping {
                 // A foreign answer would let the count overflow GRBL's buffer (G28).
@@ -189,6 +227,11 @@ impl GrblController {
             stream.finished_at_report = Some(reports);
         }
         self.events.push(Event::Progress { line, elapsed_ms });
+        if was_homing && code.is_none() {
+            // The job's own `$H` ended: the controller is homed (`specs/0118` J5).
+            self.home_pending = true;
+            self.events.push(Event::Homed);
+        }
         if let Some(code) = code.filter(|_| !stopping) {
             let detail = texts::failed_at(job_line, &texts::error_text(code));
             self.begin_stop(Some(detail), at);
@@ -227,6 +270,7 @@ impl GrblController {
             self.deferred_alarm = true;
             return;
         }
+        self.jog = None;
         if self.stream.take().is_some() {
             // Every unsent line is discarded; the reset switches the spindle off (G13).
             self.out.push(RESET);
@@ -252,6 +296,10 @@ impl GrblController {
                 elapsed_ms: stream.elapsed_ms(),
                 detail,
             });
+        } else {
+            // A reset nobody here asked for: the position is not trusted, a jog is over.
+            self.jog = None;
+            self.events.push(Event::ControllerReset);
         }
     }
 
@@ -259,6 +307,8 @@ impl GrblController {
         let Some(stop) = self.stop.take() else {
             return;
         };
+        self.jog = None;
+        self.spindle_off = true;
         self.out.extend_from_slice(b"M5\nM9\n");
         self.owed.extend([Owed::Line(3), Owed::Line(3)]);
         let elapsed_ms = self.stream.take().map_or(0, |s| s.elapsed_ms());

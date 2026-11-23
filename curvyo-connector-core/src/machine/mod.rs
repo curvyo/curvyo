@@ -3,11 +3,16 @@
 mod arrival;
 mod confirm;
 mod controls;
+mod event;
 mod home;
+mod jog;
 mod list;
 
-pub use confirm::{Confirmation, Peer, People, StartRule};
+pub use confirm::{Confirmation, Confirms, Peer, People, StartRule};
+pub use event::{ControllerCommand, Event};
 pub use list::ListLog;
+
+use std::time::Duration;
 
 use uuid::Uuid;
 
@@ -16,6 +21,7 @@ pub(crate) use crate::count::count;
 use crate::job_list::JobList;
 use crate::message::{ErrorCode, Message, Progress, RejectReason, State};
 use crate::millimetres::Millimetres;
+use jog::JogRun;
 use list::Transfer;
 
 /// Settings of the machine.
@@ -23,122 +29,6 @@ use list::Transfer;
 pub struct Options {
     /// Who has to agree before a `Start` runs (architect addendum D5).
     pub start_rule: StartRule,
-}
-
-/// Something that happened: a message from the app or an event from the controller side.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Event {
-    /// A message from a paired, greeted client, or from the host itself.
-    Message(Message, Peer),
-    /// A controller was attached.
-    ControllerConnected,
-    /// The controller was lost; a job in flight is dropped and named in the detail.
-    ControllerLost,
-    /// The controller was lost for the reason in `detail`, which the app shows in place of the
-    /// line count; a job in flight is dropped (`specs/0142`, the homing cap).
-    ControllerLostWith {
-        /// The sentence ("Lost the controller: homing took longer than 120 s").
-        detail: String,
-    },
-    /// The controller got through `line` lines; `elapsed_ms` is counted by the caller.
-    Progress {
-        /// Lines done.
-        line: u32,
-        /// Milliseconds since the start.
-        elapsed_ms: u64,
-    },
-    /// The controller reports its position.
-    Position([Millimetres; 3]),
-    /// The controller ran every line.
-    JobFinished {
-        /// Milliseconds since the start.
-        elapsed_ms: u64,
-    },
-    /// The controller reported an error while running.
-    JobFailed {
-        /// Milliseconds since the start.
-        elapsed_ms: u64,
-    },
-    /// The controller failed the job, running or paused, for the reason in `detail`.
-    JobFailedWith {
-        /// Milliseconds since the start.
-        elapsed_ms: u64,
-        /// The sentence the app shows ("Failed at line 12: No feed rate (error 22)").
-        detail: String,
-    },
-    /// The controller raised an alarm.
-    Alarm {
-        /// Its text.
-        text: String,
-    },
-    /// The alarm was cleared.
-    AlarmCleared,
-    /// The button on the connector's host was pressed.
-    LocalStartPressed,
-    /// A client connection that sent a job ended; a job still being received is dropped
-    /// (back to `Idle`), a job that is `Ready` or further is not affected.
-    ClientDisconnected,
-    /// The connection that sent the job `job_id` ended: that job's transfer is dropped if it is
-    /// still arriving, and no other (`specs/0125` S19, `specs/0132` L2).
-    TransferAbandoned {
-        /// The job.
-        job_id: Uuid,
-    },
-    /// The chain's decision when a job ended (made inside the machine, carried out by the
-    /// caller as the next event): the first waiting job `job_id` starts.
-    RunNext {
-        /// The job.
-        job_id: Uuid,
-    },
-    /// The controller holds the job (asked for or not): `Running` becomes `Paused`.
-    Held,
-    /// The controller runs the held job again.
-    Resumed,
-    /// The controller confirms that a stop ended: the job is `Done { Stopped }`.
-    Stopped,
-    /// The controller could not confirm a stop: the job is dropped, `NoController`.
-    StopUnconfirmed,
-    /// Why there is no controller ("Port /dev/ttyUSB0 not found"); only in `NoController`.
-    NoControllerDetail {
-        /// The sentence.
-        detail: String,
-    },
-    /// The controller reports a state outside the job's states ("Door"); `None` once it left it.
-    ControllerWord(Option<String>),
-    /// Whether the controller's laser mode is off: jobs are refused while it is (G34).
-    LaserModeOff(bool),
-    /// Whether the controller's laser mode could not be read: jobs are refused while so (G34).
-    LaserModeUnknown(bool),
-    /// The controller ended its homing cycle (GRBL's `ok` to `$H`, `specs/0118` M2).
-    Homed,
-    /// The controller refused the homing cycle and stays where it was (GRBL `error:<n>` to `$H`).
-    HomingFailed {
-        /// The sentence the app shows ("Homing is not enabled (error 5)").
-        detail: String,
-    },
-    /// The controller cannot hold now (a job's `$H` runs) and holds at its first safe moment;
-    /// `Running` keeps the pause pending until `Held` (`specs/0133` P3).
-    PauseDeferred,
-}
-
-/// What the transport has to tell the controller.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ControllerCommand {
-    /// Stream the held job.
-    Start {
-        /// The job.
-        job_id: Uuid,
-    },
-    /// Hold the stream.
-    Pause,
-    /// Continue the stream.
-    Resume,
-    /// End the stream.
-    Stop,
-    /// Leave the controller's alarm lock.
-    Unlock,
-    /// Run the controller's homing cycle.
-    Home,
 }
 
 /// The result of one event.
@@ -205,8 +95,17 @@ pub struct Machine {
     laser_unknown: bool,
     /// What `AwaitingLocalStart` waits to start.
     waiting: Waiting,
-    /// The state a homing started from (`Idle`, `Ready` or `Alarm`), and returns to.
-    homed_from: State,
+    /// The state a homing or a jog started from (`Idle`, `Ready`, `Done` or `Alarm`), and returns to.
+    motion_from: State,
+    /// The controller has been homed since it was identified (`specs/0118` 13).
+    homed: bool,
+    /// The jog the controller runs.
+    jog: Option<JogRun>,
+    /// The last `Clock` of the caller, for the jog's dead-man.
+    now: Duration,
+    /// The head's machine position and the work offset, as the controller reported them.
+    mpos: Option<[Millimetres; 3]>,
+    wco: Option<[Millimetres; 3]>,
     /// Who pressed the start or resume that waits in `AwaitingLocalStart`.
     requester: Option<String>,
     /// Who sent the job being received.
@@ -244,7 +143,12 @@ impl Machine {
             laser_off: false,
             laser_unknown: false,
             waiting: Waiting::Start,
-            homed_from: State::Idle,
+            motion_from: State::Idle,
+            homed: false,
+            jog: None,
+            now: Duration::ZERO,
+            mpos: None,
+            wco: None,
             requester: None,
             sender: String::new(),
             list: JobList::default(),
@@ -301,6 +205,7 @@ impl Machine {
                 | State::Paused
                 | State::AwaitingLocalStart
                 | State::Homing
+                | State::Jogging
                 | State::Done { .. }
         );
         // A waiting Home starts no job, so it names none.
@@ -325,6 +230,9 @@ impl Machine {
             requested_by: self.shown_requester(),
             job_name: self.shown_job().map(|h| h.job.name.clone()),
             sent_by: self.shown_job().map(|h| h.people.sent_by.clone()),
+            homed: self.homed,
+            machine_position: self.mpos,
+            work_offset: self.wco,
         }
     }
 
@@ -339,6 +247,7 @@ impl Machine {
                     self.set(State::Idle, &mut out);
                 }
             }
+            Event::Clock(now) => self.on_clock(now, &mut out),
             Event::TransferAbandoned { job_id } => self.abandon(job_id, &mut out),
             Event::RunNext { job_id } => self.run_next(job_id, &mut out),
             other => self.on_controller(other, &mut out),
@@ -366,8 +275,14 @@ impl Machine {
     }
 
     fn enter(&mut self, state: State, out: &mut Output) {
-        if !matches!(state, State::Running | State::Paused | State::Homing) {
+        if !matches!(
+            state,
+            State::Running | State::Paused | State::Homing | State::Jogging
+        ) {
             self.stop_pending = false;
+        }
+        if state != State::Jogging {
+            self.jog = None;
         }
         self.pause_pending &= state == State::Running;
         self.state = state;
@@ -427,7 +342,10 @@ impl Machine {
                 out.commands.push(ControllerCommand::Unlock);
             }
             Message::Unlock => {}
-            Message::Home => self.home(out),
+            Message::Home => self.home(peer, out),
+            Message::Jog { .. } | Message::JogKeep | Message::JogStop => {
+                self.jog_message(&message, out);
+            }
             _ => Self::error(
                 out,
                 ErrorCode::UnexpectedMessage,

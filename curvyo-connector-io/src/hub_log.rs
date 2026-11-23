@@ -125,6 +125,9 @@ mod tests {
             requested_by: None,
             job_name: None,
             sent_by: None,
+            homed: false,
+            machine_position: None,
+            work_offset: None,
         }
     }
 

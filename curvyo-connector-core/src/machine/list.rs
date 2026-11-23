@@ -398,6 +398,7 @@ impl Machine {
                     State::Ready
                         | State::AwaitingLocalStart
                         | State::Homing
+                        | State::Jogging
                         | State::Running
                         | State::Paused
                 )

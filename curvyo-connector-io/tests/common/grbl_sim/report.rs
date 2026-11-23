@@ -30,6 +30,8 @@ impl GrblSim {
             if h.complete { "Hold:0" } else { "Hold:1" }
         } else if self.planner.is_empty() {
             "Idle"
+        } else if self.jogging() {
+            "Jog"
         } else {
             "Run"
         }

@@ -113,6 +113,9 @@ fn all_messages() -> Vec<Message> {
             requested_by: None,
             job_name: None,
             sent_by: None,
+            homed: false,
+            machine_position: None,
+            work_offset: None,
         },
         Message::Error {
             code: ErrorCode::Malformed,
@@ -221,6 +224,17 @@ fn in_state(state: State, text: &str) -> FakeController {
         State::Homing => {
             let mut f = idle();
             f.send(Message::Home);
+            f
+        }
+        // `specs/0118` slice 2a: added so the match stays exhaustive; `jog_0118.rs` has its table.
+        State::Jogging => {
+            let mut f = idle();
+            f.send(Message::Jog {
+                axis: curvyo_connector_core::JogAxis::X,
+                direction: curvyo_connector_core::JogDirection::Plus,
+                step: curvyo_connector_core::JogStep::One,
+                hold: false,
+            });
             f
         }
     }
@@ -389,6 +403,9 @@ fn p3_status_nulls_are_present() {
         requested_by: None,
         job_name: None,
         sent_by: None,
+        homed: false,
+        machine_position: None,
+        work_offset: None,
     })
     .unwrap();
     let v: Value = serde_json::from_str(&text).unwrap();
@@ -416,6 +433,9 @@ fn p3_status_with_job_and_position_round_trips() {
         requested_by: None,
         job_name: None,
         sent_by: None,
+        homed: false,
+        machine_position: None,
+        work_offset: None,
     };
     let text = encode(&msg).unwrap();
     assert_eq!(decode(&text).unwrap(), msg);

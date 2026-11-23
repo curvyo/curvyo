@@ -4,7 +4,7 @@
 use std::sync::mpsc::Sender;
 use std::time::Instant;
 
-use curvyo_connector_core::{Event, StartRule};
+use curvyo_connector_core::{Event, StartRule, State};
 
 use curvyo_connector_core::ControllerConfig;
 
@@ -44,6 +44,10 @@ impl Hub {
         self.publish_info(inner);
         for event in advance.events {
             self.apply(inner, event, now, &mut Vec::new());
+        }
+        if inner.machine.state() == State::Jogging {
+            // The dead-man of a held jog counts on the machine's clock (`specs/0118` J4).
+            self.apply(inner, Event::Clock(at), now, &mut Vec::new());
         }
         let Some(notice) = advance.close else {
             return false;

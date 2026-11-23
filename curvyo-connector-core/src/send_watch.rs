@@ -97,6 +97,7 @@ const fn holds_progress(state: State) -> bool {
         State::Ready
             | State::AwaitingLocalStart
             | State::Homing
+            | State::Jogging
             | State::Running
             | State::Paused
             | State::Done { .. }
@@ -127,6 +128,9 @@ mod tests {
             requested_by: None,
             job_name: None,
             sent_by: None,
+            homed: false,
+            machine_position: None,
+            work_offset: None,
         }
     }
 

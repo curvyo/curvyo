@@ -3,9 +3,11 @@
 
 pub mod controller;
 pub mod flow;
+mod hold;
 pub mod home;
 mod homing;
 pub mod identify;
+pub mod jog;
 pub mod prepare;
 mod replies;
 pub mod reply;

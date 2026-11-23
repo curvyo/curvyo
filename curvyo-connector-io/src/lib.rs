@@ -14,6 +14,7 @@ pub mod clients;
 pub mod config_file;
 pub mod controller;
 pub mod fake_controller;
+mod fake_jog;
 pub mod frames;
 pub mod grbl;
 pub mod hex;

@@ -15,6 +15,7 @@ mod config;
 mod count;
 mod handshake;
 mod job_list;
+mod jog;
 mod machine;
 mod message;
 mod millimetres;
@@ -34,9 +35,10 @@ pub use job_list::{
     Chain, Dropped, End, Entry, Item, JobList, MAX_BYTES, MAX_ENTRIES, Restored, StoredCurrent,
     StoredList, next as chain_next, restore,
 };
+pub use jog::{EDGE, Feed, JOG_DEAD_MAN, JogAxis, JogDirection, JogStep, TravelBox, clamp};
 pub use machine::{
-    Confirmation, ControllerCommand, Event, ListLog, Machine, Options, Output, Peer, People,
-    StartRule,
+    Confirmation, Confirms, ControllerCommand, Event, ListLog, Machine, Options, Output, Peer,
+    People, StartRule,
 };
 pub use message::{
     ControllerInfo, ControllerSettings, ErrorCode, JobKind, JobResult, ListEntry, Message,

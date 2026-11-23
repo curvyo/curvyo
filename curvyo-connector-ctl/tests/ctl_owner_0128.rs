@@ -23,6 +23,35 @@ fn wait_state(c: &mut curvyo_connector_io::client::Connection, want: fn(State) -
     }
 }
 
+/// `specs/0118` slice 2a, criterion 37: a member's Home waits and `confirm-start` confirms it.
+#[test]
+fn c37_a_members_home_is_confirmed_from_curvyoctl_and_audited_as_home() {
+    let c = connector();
+    let mut marc = computer("marc-laptop");
+    marc.setup(&c);
+    let code = code_of(&marc.ok(&["pair", "--name", "Phone"]));
+    let mut phone = app_login(&c, &app_pairs(&c, &code));
+    phone.send(&Message::Home).unwrap();
+    wait_state(&mut phone, |s| s == State::AwaitingLocalStart);
+    let status = marc.ok(&["status"]);
+    assert!(
+        status.contains("State:      Home requested by Phone\n"),
+        "{status}"
+    );
+    assert_eq!(marc.ok(&["confirm-start"]), "Homing, requested by Phone\n");
+    wait_state(&mut phone, |s| s == State::Homing);
+    wait_state(&mut phone, |s| s == State::Idle);
+    let audit = marc.ok(&["audit", "--last", "3"]);
+    assert!(
+        audit.contains("start confirmed: Home, requested by Phone"),
+        "{audit}"
+    );
+    // A second Home that waits can be thrown away with `stop`.
+    phone.send(&Message::Home).unwrap();
+    wait_state(&mut phone, |s| s == State::AwaitingLocalStart);
+    assert_eq!(marc.ok(&["stop"]), "Discarded Home\n");
+}
+
 #[test]
 fn a10_a13_a14_a15_a18_a_member_start_confirmed_from_curvyoctl() {
     let c = connector();

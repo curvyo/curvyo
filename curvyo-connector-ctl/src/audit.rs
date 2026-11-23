@@ -86,6 +86,10 @@ mod tests {
                 "start confirmed: sign.gcode, requested by Phone",
             ),
             (
+                ("start-confirmed", "Phone", "Home"),
+                "start confirmed: Home, requested by Phone",
+            ),
+            (
                 ("start-confirmed", "Phone", "sign.gcode 67e5 resume"),
                 "resume confirmed: sign.gcode, requested by Phone",
             ),

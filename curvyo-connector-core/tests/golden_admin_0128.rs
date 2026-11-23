@@ -183,6 +183,9 @@ fn all() -> Vec<(&'static str, Message)> {
                 requested_by: Some("Phone".into()),
                 job_name: Some("sign.gcode".into()),
                 sent_by: Some("Phone".into()),
+                homed: false,
+                machine_position: None,
+                work_offset: None,
             },
         ),
     ]
