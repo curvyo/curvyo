@@ -2,9 +2,11 @@ import { CircleAlert, FileUp, House, LockOpen, Pause, Play, Square, TriangleAler
 import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useId, useRef, useState } from "react";
 
 import { GLYPH, SMALL } from "@/components/workbench/machineStyles";
+import { JobList } from "@/components/panel/JobList";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
 import { type MachineControlsModel, useMachineControls } from "@/hooks/useMachineControls";
 import { notStartedLine } from "@/lib/connectorLink";
+import { firstWaiting, listFull, senderText, startName } from "@/lib/jobList";
 import { confirmKind, formatCount, formatElapsed, jobButtons } from "@/lib/connectorText";
 import {
   type ControlsLine,
@@ -13,6 +15,7 @@ import {
   countsName,
   footerNotice,
   homeButton,
+  ownFailureBelow,
   sendFailureBelow,
   pauseButton,
   pausePending,
@@ -124,7 +127,7 @@ function ControlsBody({ model }: { model: MachineControlsModel }) {
   const quiet =
     status?.state.name === "Ready" && (model.entry.startStep || (startedJob !== null && startedJob === status.job?.job_id));
   // A refused page send while a job is held reads under that job's line, said once (P17).
-  const refused = notStarted === null ? sendFailureBelow(model.entry) : null;
+  const refused = notStarted === null ? (sendFailureBelow(model.entry) ?? ownFailureBelow(model.entry, model.own)) : null;
   const polite = line !== null && !line.alerts && notStarted === null && refused === null && !quiet ? line.text : spoken;
   const alert =
     notStarted !== null ? `${line?.text ?? "Ready"}. ${notStarted}` : (refused ?? (line?.alerts ? line.text : ""));
@@ -136,6 +139,7 @@ function ControlsBody({ model }: { model: MachineControlsModel }) {
         failure={notStarted ?? refused}
         onUnlockFocus={() => (unlockHadFocus.current = true)}
       />
+      <JobList model={model} />
       <p role="status" className="sr-only">
         {polite}
       </p>
@@ -166,14 +170,19 @@ function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRe
   const home = homeButton(entry);
   const pause = pauseButton(entry);
   const resume = buttons.startName === "Resume";
+  // With no job to start but one waiting, Start takes the first waiting job and names it
+  // (`specs/0132` criterion 4, Frage 301 A).
+  const stateName = entry.status?.state.name;
+  const next = stateName === "Idle" || stateName === "Done" ? firstWaiting(entry.jobList) : null;
+  const full = listFull(entry.jobList);
   const items: Item[] = [
     { key: "home", name: "Home", enabled: home.enabled, busy: home.busy, cause: home.cause, icon: <House {...GLYPH} />, press: () => model.command("home") },
-    { key: "send", name: "Send job...", enabled: buttons.send && idle, busy: entry.busy === "send", icon: <FileUp {...GLYPH} />, press: model.send },
+    { key: "send", name: "Send job...", enabled: buttons.send && idle && !full, busy: entry.busy === "send", cause: full ? "List full" : null, icon: <FileUp {...GLYPH} />, press: model.send },
     {
       key: "start",
-      name: buttons.startName,
+      name: next !== null ? startName(next) : buttons.startName,
       // Greyed while the page's own Start is in flight (`0134` P6).
-      enabled: buttons.start && idle && !entry.startStep,
+      enabled: (buttons.start || next !== null) && idle && !entry.startStep,
       busy: entry.busy === (resume ? "resume" : "start"),
       // The job block's state line names the requester and the job (`0128` UX notes 8.2).
       describedBy: confirm !== null ? "machine-controls-state" : undefined,
@@ -240,6 +249,8 @@ function JobBlock({
   if (line === null) return null;
   const status = entry.status;
   const name = countsName(entry, own);
+  const me = entry.session?.clientName ?? null;
+  const sender = status?.sent_by ? senderText(status.sent_by, me) : null;
   const stateName = status?.state.name;
   const elapsed = line.bar !== null && (stateName === "Running" || stateName === "Paused" || stateName === "Done");
   return (
@@ -294,7 +305,7 @@ function JobBlock({
         </div>
       ) : null}
       <div aria-live="off" className="flex items-center justify-between gap-1 text-xs">
-        <JobName name={name ?? ""} />
+        <JobName name={name ?? ""} sender={name ? sender : null} />
         {line.bar !== null ? (
           <span className="shrink-0 tabular-nums text-[var(--toolbar-icon)]">
             {formatCount(line.bar.line)} / {formatCount(line.bar.lines)} lines
@@ -306,13 +317,14 @@ function JobBlock({
 }
 
 /** The job's name, cut in the middle so the extension stays (`0064` UX notes §8). */
-function JobName({ name }: { name: string }) {
+function JobName({ name, sender = null }: { name: string; sender?: string | null }) {
   const dot = name.lastIndexOf(".");
   const [stem, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
   return (
     <span className="flex min-w-0 text-[var(--panel-muted-fg)]" title={name || undefined}>
       <span className="truncate">{stem}</span>
       <span className="shrink-0">{extension}</span>
+      {sender !== null ? <span className="shrink-0">, {sender}</span> : null}
     </span>
   );
 }

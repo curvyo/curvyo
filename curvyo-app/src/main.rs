@@ -132,6 +132,7 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         connector::connector_forget,
         connector::connector_send_job,
         connector::connector_command,
+        connector::connector_list_command,
         connector::connector_watch,
         connector::connector_unwatch,
         connector_send::connector_send_page_job,

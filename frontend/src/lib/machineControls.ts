@@ -14,6 +14,7 @@ import {
   jobButtons,
   jobLineAlerts,
   jobStateLine,
+  refusalText,
   waitingText,
 } from "./connectorText.ts";
 import { withName } from "./sendLine.ts";
@@ -130,7 +131,7 @@ export function controlsLine(entry: LinkEntry, own: OwnPress = NO_PRESS): Contro
   if (own.sending && entry.sendingName !== null) {
     return pressed({ text: `Sending ${entry.sendingName}`, failure: false });
   }
-  if (own.failure !== null) return pressed(own.failure);
+  if (own.failure !== null && ownFailureBelow(entry, own) === null) return pressed(own.failure);
   if (entry.sendFailure !== null && !holdsJob(entry)) return pressed({ text: entry.sendFailure.text, failure: true });
   if (entry.pageSend !== null) return pressed({ text: withName("Sending ", entry.pageSend.name), failure: false });
   const status = entry.status;
@@ -157,6 +158,19 @@ function holdsJob(entry: LinkEntry): boolean {
   return !entry.lost && status !== null && status.job !== null && HOLDING.includes(status.state.name);
 }
 
+/** The footer send's "List full" while the connector holds a job: it reads under the job's line,
+ * which stays (`specs/0132` UX notes section 5, `0134` P17); `null` when there is none. */
+export function ownFailureBelow(entry: LinkEntry, own: OwnPress): string | null {
+  const text = own.failure?.text ?? null;
+  return text !== null && text === refusalText("ListFull", null) && holdsJob(entry) ? text : null;
+}
+
+/** What the footer's own send keeps as the held job: nothing while the connector holds a job
+ * already, because the job it sent waits in the list and must not take the name of the current one. */
+export function heldAfterSend(entry: LinkEntry, held: NonNullable<LinkEntry["held"]>): LinkEntry["held"] {
+  return holdsJob(entry) ? null : held;
+}
+
 /** A page send's failure while the connector holds a job: it reads under the job's line, which
  * stays with its bar ("Waiting for the start at the machine", "Running"; `specs/0134` UX notes
  * section 6, P17); `null` when there is none or it is the line itself. */
@@ -171,9 +185,13 @@ export function countsName(entry: LinkEntry, own: OwnPress = NO_PRESS): string |
   if (own.sending) return entry.sendingName;
   if (entry.pageSend !== null) return entry.pageSend.name;
   const held = entry.held;
-  if (held === null) return null;
   const job = entry.status?.job ?? null;
-  if (job !== null) return held.jobId === null || held.jobId === job.job_id ? held.name : null;
+  // Another app's job names itself: the connector's name for it, with its sender (`0132` UX 1).
+  if (job !== null) {
+    if (held !== null && (held.jobId === null || held.jobId === job.job_id)) return held.name;
+    return entry.status?.job_name || null;
+  }
+  if (held === null) return null;
   return held.jobId === null && own.failure !== null ? held.name : null;
 }
 

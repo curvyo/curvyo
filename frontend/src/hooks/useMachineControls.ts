@@ -18,7 +18,8 @@ import {
   errorLine,
   refusalText,
 } from "@/lib/connectorText";
-import { type OwnPress, SETTLES, refusalEnds } from "@/lib/machineControls";
+import { type JobListMessage, type ListCall } from "@/lib/jobList";
+import { type OwnPress, SETTLES, heldAfterSend, refusalEnds } from "@/lib/machineControls";
 import { invoke } from "@/platform/host";
 
 /** A command of the toolbar or Unlock. */
@@ -29,6 +30,11 @@ export interface MachineControlsModel {
   own: OwnPress;
   send: () => void;
   command: (kind: Command) => void;
+  /** A press in the job list (`specs/0132`); resolves when the connector answered. */
+  listPress: (call: ListCall) => Promise<void>;
+  /** The last list press found the list changed meanwhile: "The list changed" until the next
+   * press in the list or push (UX notes section 4). */
+  listChanged: boolean;
 }
 
 /** "Connector busy": the connector refused a command that no longer fits (UX notes section 5). */
@@ -61,6 +67,8 @@ function settle(profileId: string, done: (s: StatusMessage | null) => boolean, m
  * block need not be mounted. The caller keys the component on the profile and address. */
 export function useMachineControls(profileId: string, address: string, enabled: boolean): MachineControlsModel {
   const [failure, setFailure] = useState<Line | null>(null);
+  // The list the line "The list changed" was shown against: a newer push ends it.
+  const [changedAt, setChangedAt] = useState<JobListMessage | null | undefined>(undefined);
   const entry = useLinkEntry(profileId, address, enabled, true);
   const lastStatus = useRef<StatusMessage | null>(null);
   // The state "No job to pause" was given in; it ends with any other (`specs/0133` H8).
@@ -75,6 +83,27 @@ export function useMachineControls(profileId: string, address: string, enabled: 
     }
     lastStatus.current = next;
   }, [entry.status]);
+
+  const latestList = useRef(entry.jobList);
+  useEffect(() => {
+    latestList.current = entry.jobList;
+  }, [entry.jobList]);
+  const listChanged = changedAt !== undefined && changedAt === entry.jobList;
+
+  const listPress = async (call: ListCall) => {
+    if (!enabled) return;
+    setChangedAt(undefined);
+    const answer = await invoke<{ kind: string; error?: LinkError }>("connector_list_command", {
+      profileId,
+      address,
+      call,
+    }).catch(() => ({ kind: "failed", error: { kind: "other", message: "Connector error" } as LinkError }));
+    if (answer.kind === "stale" || answer.kind === "ownerRequired") {
+      setChangedAt(latestList.current);
+    } else if (answer.kind === "failed" && answer.error) {
+      fail(answer.error);
+    }
+  };
 
   const show = (line: Line | null) => {
     refusedAt.current = null;
@@ -102,19 +131,22 @@ export function useMachineControls(profileId: string, address: string, enabled: 
   const send = () =>
     guard("send", async () => {
       show(null);
+      // A job sent behind a held one waits in the list: it does not take the held name.
+      const before = linkStore.get(profileId);
+      const keep = (name: string, lines: number, bytes: number) => heldAfterSend(before, { name, lines, bytes, jobId: null });
       const answer = await invoke<SendAnswer>("connector_send_job", { profileId, address }).catch(
         (): SendAnswer => ({ kind: "failed", error: { kind: "other", message: "Connector error" } }),
       );
       linkStore.patch(profileId, { sendingName: null });
       if (answer.kind === "ready") {
-        linkStore.patch(profileId, { held: { name: answer.name, lines: answer.lines, bytes: answer.bytes, jobId: null } });
+        linkStore.patch(profileId, { held: keep(answer.name, answer.lines, answer.bytes) ?? before.held });
         await refresh();
       } else if (answer.kind === "rejected") {
-        linkStore.patch(profileId, { held: { name: answer.name, lines: 0, bytes: 0, jobId: null } });
+        linkStore.patch(profileId, { held: keep(answer.name, 0, 0) ?? before.held });
         show({ text: refusalText(answer.reason, entry.status?.alarm ?? null), failure: true });
       } else if (answer.kind === "unreadable") {
         // The counts line names the chosen file, as for a refused job (`0064` UX notes §8).
-        linkStore.patch(profileId, { held: { name: answer.name, lines: 0, bytes: 0, jobId: null } });
+        linkStore.patch(profileId, { held: keep(answer.name, 0, 0) ?? before.held });
         show({ text: UNREADABLE_TEXT, failure: true });
       } else if (answer.kind === "failed") {
         fail(answer.error);
@@ -154,5 +186,7 @@ export function useMachineControls(profileId: string, address: string, enabled: 
     own: { sending: entry.busy === "send", failure },
     send,
     command,
+    listPress,
+    listChanged,
   };
 }

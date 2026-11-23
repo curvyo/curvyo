@@ -48,6 +48,8 @@ pub enum SendMachine {
     /// Anything else: a job is held or waits, the machine homes, is in alarm, has no controller,
     /// or the controller reports a word such as `Door` (`0127` G4).
     Holds,
+    /// The job list holds its 20 jobs: a send would be refused (`specs/0132`, UX notes J10).
+    Full,
 }
 
 impl SendMachine {
@@ -58,6 +60,7 @@ impl SendMachine {
     pub fn parse(state: &str, controller_word: &str) -> Self {
         match state {
             "" => Self::Unknown,
+            "ListFull" => Self::Full,
             "Idle" | "Done" if controller_word.is_empty() => Self::Free,
             _ => Self::Holds,
         }
@@ -89,6 +92,8 @@ pub enum SendCause {
     KeyChanged,
     /// A send is running.
     Sending,
+    /// The job list is full (`specs/0132`).
+    ListFull,
 }
 
 /// The Send button's state.
@@ -133,7 +138,10 @@ pub fn send_button(
             SendLink::NotPaired => Some(SendCause::NotPaired),
             SendLink::NoLongerPaired => Some(SendCause::NoLongerPaired),
             SendLink::KeyChanged => Some(SendCause::KeyChanged),
-            SendLink::Browser | SendLink::Paired => sending.then_some(SendCause::Sending),
+            SendLink::Browser | SendLink::Paired if sending => Some(SendCause::Sending),
+            SendLink::Browser | SendLink::Paired => {
+                (machine == SendMachine::Full).then_some(SendCause::ListFull)
+            }
         }
     };
     SendButton {
@@ -371,5 +379,34 @@ mod tests {
             );
             assert!(button.enabled, "{state}");
         }
+    }
+
+    #[test]
+    fn a_full_job_list_greys_send_with_its_cause_after_the_other_causes() {
+        let paired = |sending, machine| {
+            send_button(
+                &gate(vec![]),
+                OutputFormat::Grbl,
+                SendLink::Paired,
+                sending,
+                machine,
+            )
+        };
+        let full = paired(false, SendMachine::parse("ListFull", ""));
+        assert!(!full.enabled);
+        assert_eq!(full.cause, Some(SendCause::ListFull));
+        assert!(!full.starts);
+        assert_eq!(
+            paired(true, SendMachine::Full).cause,
+            Some(SendCause::Sending)
+        );
+        let unpaired = send_button(
+            &gate(vec![]),
+            OutputFormat::Grbl,
+            SendLink::NotPaired,
+            false,
+            SendMachine::Full,
+        );
+        assert_eq!(unpaired.cause, Some(SendCause::NotPaired));
     }
 }

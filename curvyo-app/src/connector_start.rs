@@ -188,11 +188,16 @@ mod tests {
         m
     }
 
+    /// Whether a send would become the current job (`specs/0132`: any other accepted send is
+    /// listed behind it and starts nothing).
     fn accepts_a_job(m: &mut Machine) -> bool {
+        let before = m.state();
         let out = m.handle(submit(Uuid::from_u128(9)));
-        !out.messages
+        let refused = out
+            .messages
             .iter()
-            .any(|message| matches!(message, Message::JobRejected { .. }))
+            .any(|message| matches!(message, Message::JobRejected { .. }));
+        !refused && before != State::Receiving && m.state() == State::Receiving
     }
 
     #[test]

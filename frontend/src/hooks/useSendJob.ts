@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 
 import type { JobExportEditor } from "@/hooks/useJobExport";
+import { listFull } from "@/lib/jobList";
 import { linkStore } from "@/hooks/useLinkEntry";
 import { type LinkEntry } from "@/lib/connectorLink";
 import { controllerWord } from "@/lib/connectorText";
@@ -25,6 +26,8 @@ export interface SendApi {
  * connection is lost (UX notes section 3: "Connection lost" only sends). */
 function machineOf(entry: LinkEntry): [string, string] {
   const status = entry.lost ? null : entry.status;
+  // A full job list greys Send with its cause (`specs/0132` UX notes J10).
+  if (status !== null && listFull(entry.jobList)) return ["ListFull", ""];
   return [status?.state.name ?? "", controllerWord(status) ?? ""];
 }
 
