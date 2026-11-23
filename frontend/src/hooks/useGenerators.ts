@@ -49,8 +49,9 @@ export function useGeneratorKinds(editor: GeneratorsEditor): GeneratorKindsApi {
 export interface GeneratorBlockApi {
   /** The one selected generated object's rows, `null` for no block. */
   view: GeneratedView | null;
-  /** The clamp notice of the last edit, an overlay for three seconds. */
-  notice: string | null;
+  /** The clamp notice of the last edit and the key of the edited row it sits under, an overlay
+   * for three seconds. */
+  notice: { key: string; text: string } | null;
   /** A number, switch or choice into a row; `"committed"`, `"unchanged"` or `"invalid:<code>"`. */
   setValue: (key: string, value: number | boolean | string) => string;
   /** A value stepped into a row, drawn on the canvas without writing (UX notes §7). */
@@ -70,7 +71,7 @@ export function useGeneratorBlock(editor: GeneratorsEditor): GeneratorBlockApi {
     const session = getSession();
     return session ? decodeGeneratedView(session.generated_panel_json()) : null;
   }, [getSession, syncRevision]);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ key: string; text: string } | null>(null);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -99,7 +100,7 @@ export function useGeneratorBlock(editor: GeneratorsEditor): GeneratorBlockApi {
       }
       window.clearTimeout(timer.current);
       const text = (answer.notices ?? []).join(" ");
-      setNotice(text === "" ? null : text);
+      setNotice(text === "" ? null : { key, text });
       if (text !== "") {
         timer.current = window.setTimeout(() => setNotice(null), NOTICE_MS);
       }

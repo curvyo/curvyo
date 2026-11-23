@@ -86,6 +86,24 @@ function ChoiceRow({
   );
 }
 
+/** A clamp notice under the edited row (UX notes §6): the "Action notice" status look, an
+ * overlay that moves no row and takes no focus. */
+function ClampNotice({ text }: { text: string }) {
+  return (
+    <p
+      role="status"
+      className="pointer-events-none absolute top-full right-0 z-10 mt-1 w-max max-w-[244px] break-words rounded-md p-2 text-right text-xs"
+      style={{
+        background: "var(--toolbar-bg)",
+        color: "var(--toolbar-icon)",
+        boxShadow: "var(--panel-elevation-shadow)",
+      }}
+    >
+      {text}
+    </p>
+  );
+}
+
 /**
  * The Generator block of the Style tab (`specs/0141-parametric-generators` criteria 1 to 4, UX
  * notes §3): drawn only from the generator's schema, a heading per group and a field per row,
@@ -113,57 +131,45 @@ export function GeneratorBlock({
     }
   }
   return (
-    <div role="group" aria-label={view.label} className="relative flex flex-col gap-4" data-generator-block>
+    <div role="group" aria-label={view.label} className="flex flex-col gap-4" data-generator-block>
       {groups.map((group) => (
         <section key={group.label} className="flex flex-col gap-2">
           <h3 className="text-sm text-[var(--toolbar-icon)]">{group.label}</h3>
-          {group.rows.map((row) => {
-            switch (row.kind.kind) {
-              case "switch":
-                return (
-                  <div key={row.key} className="flex h-7 items-center">
-                    <PanelSwitch
-                      label={row.label}
-                      checked={row.value === true}
-                      onCheckedChange={(on) => api.setValue(row.key, on)}
-                      onReturnFocus={onReturnFocus}
-                    />
-                  </div>
-                );
-              case "choice":
-                return <ChoiceRow key={row.key} row={row} api={api} onReturnFocus={onReturnFocus} />;
-              default:
-                return <NumberRow key={row.key} row={row} api={api} onReturnFocus={onReturnFocus} />;
-            }
-          })}
+          {group.rows.map((row) => (
+            // Each row is the anchor of its clamp notice, 4 px under it (UX notes §6).
+            <div key={row.key} className="relative w-fit">
+              {row.kind.kind === "switch" ? (
+                <div className="flex h-7 items-center">
+                  <PanelSwitch
+                    label={row.label}
+                    checked={row.value === true}
+                    onCheckedChange={(on) => api.setValue(row.key, on)}
+                    onReturnFocus={onReturnFocus}
+                  />
+                </div>
+              ) : row.kind.kind === "choice" ? (
+                <ChoiceRow row={row} api={api} onReturnFocus={onReturnFocus} />
+              ) : (
+                <NumberRow row={row} api={api} onReturnFocus={onReturnFocus} />
+              )}
+              {api.notice?.key === row.key ? <ClampNotice text={api.notice.text} /> : null}
+            </div>
+          ))}
         </section>
       ))}
       <button
         type="button"
         data-generator-convert
-        onClick={(event) => {
+        onClick={() => {
           api.convert();
-          if (event.detail > 0) {
-            onReturnFocus();
-          }
+          // The button leaves the tree with the block, by pointer or by key: focus goes to the
+          // canvas (UX notes §11).
+          onReturnFocus();
         }}
         className="h-7 w-[244px] rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
         Convert to paths
       </button>
-      {api.notice ? (
-        <p
-          role="status"
-          className="pointer-events-none absolute right-0 top-0 z-10 max-w-[244px] break-words rounded-md px-2 py-1 text-right text-xs"
-          style={{
-            background: "var(--toolbar-bg)",
-            color: "var(--toolbar-icon)",
-            boxShadow: "var(--panel-elevation-shadow)",
-          }}
-        >
-          {api.notice}
-        </p>
-      ) : null}
     </div>
   );
 }

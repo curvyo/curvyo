@@ -338,7 +338,8 @@ export function PropertiesPanel({
       : doc.view.content === "document"
       ? page.name
       : doc.view.content === "style"
-        ? panel.view.subject
+        ? // A generated object is named by its kind ("Gear", "Box"; `specs/0141` UX notes §3).
+          (generators.view?.label ?? panel.view.subject)
         : doc.view.content === "fonts"
           ? fontsSubject(editor.text.fonts)
           : doc.view.content === "share"
