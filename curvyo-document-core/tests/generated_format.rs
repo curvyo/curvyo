@@ -86,7 +86,8 @@ fn only_generated(d: &Document) -> NodeId {
 
 #[test]
 fn the_format_is_54_and_the_golden_opens_exactly_as_stored() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 54);
+    // The generated objects came with format 54; `0121` (print and cut) is 55 on top.
+    const { assert!(CURRENT_FORMAT_VERSION >= 54) };
     let d = unpack(2, &golden()).unwrap();
     let id = only_generated(&d);
     let stored = d.generated(id).unwrap();

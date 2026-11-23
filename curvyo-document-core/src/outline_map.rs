@@ -49,7 +49,8 @@ pub(crate) fn object_map(before: &ObjectSnapshot, after: &ObjectSnapshot) -> Opt
             ObjectSnapshot::Primitive(_)
             | ObjectSnapshot::Text(_)
             | ObjectSnapshot::Image(_)
-            | ObjectSnapshot::Dimension(_) => None,
+            | ObjectSnapshot::Dimension(_)
+            | ObjectSnapshot::RegistrationMark(_) => None,
         }
     }
     outline_map(drawn(before)?, drawn(after)?)

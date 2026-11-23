@@ -14,9 +14,10 @@ pub fn takes_gradient(object: &ObjectSnapshot) -> bool {
         ObjectSnapshot::Path(_) | ObjectSnapshot::Primitive(_) => true,
         ObjectSnapshot::Clone(clone) => !clone.is_picture(),
         ObjectSnapshot::Text(_) => !is_single_line_text(object),
-        ObjectSnapshot::Image(_) | ObjectSnapshot::Sketch(_) | ObjectSnapshot::Dimension(_) => {
-            false
-        }
+        ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => false,
     }
 }
 

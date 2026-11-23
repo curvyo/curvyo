@@ -96,6 +96,8 @@ impl Session {
             && !self.selection_only_dimensions()
             // A whole test grid is no original (`specs/0028` UX notes §6.5).
             && !self.whole_test_grid_selected()
+            // A marks object only moves (`specs/0121` UX notes §3.2).
+            && !self.marks_selected()
     }
 
     /// Linked clone (criteria 1 to 3, 5, 52): one clone above each selected object in one commit,

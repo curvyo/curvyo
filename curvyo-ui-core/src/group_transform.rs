@@ -91,6 +91,10 @@ fn apply_by_kind(
             dimension.mapped_by(map_affine(dimension.id, map)),
         ));
     }
+    // A registration mark takes every map into its centre only (ADR 0081 §1).
+    if let ObjectSnapshot::RegistrationMark(mark) = object {
+        return ObjectSnapshot::RegistrationMark(mark.mapped_by(map_affine(mark.id, map)));
+    }
     // A text takes every map whole: a uniform scale into its size, the rest into its placement
     // (`specs/0074-text-objects` criterion 26); it never converts.
     if let ObjectSnapshot::Text(text) = object {
@@ -119,7 +123,8 @@ fn apply_by_kind(
                     | ObjectSnapshot::Clone(_)
                     | ObjectSnapshot::Text(_)
                     | ObjectSnapshot::Image(_)
-                    | ObjectSnapshot::Dimension(_),
+                    | ObjectSnapshot::Dimension(_)
+                    | ObjectSnapshot::RegistrationMark(_),
                     _,
                 ) => object.clone(),
             }
@@ -177,7 +182,8 @@ fn scale_by_magnitudes(
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Text(_)
             | ObjectSnapshot::Image(_)
-            | ObjectSnapshot::Dimension(_),
+            | ObjectSnapshot::Dimension(_)
+            | ObjectSnapshot::RegistrationMark(_),
             _,
         ) => object.clone(),
         (ObjectSnapshot::Primitive(_), Some(path)) if is_stretch(sx, sy) => {
@@ -1035,6 +1041,7 @@ mod tests {
         let pivot = Point::new(7.0, -2.0);
         let points = |object: &ObjectSnapshot| -> Vec<Point> {
             match object {
+                ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),

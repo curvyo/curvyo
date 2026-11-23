@@ -81,6 +81,7 @@ fn objects(document: &Document) -> Vec<ObjectSnapshot> {
 
 fn style_of(snapshot: &ObjectSnapshot) -> &Style {
     match snapshot {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

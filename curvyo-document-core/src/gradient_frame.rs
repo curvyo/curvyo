@@ -241,7 +241,9 @@ impl ObjectSnapshot {
             Self::Path(path) => path.gradient_box(),
             Self::Clone(clone) => clone.gradient_box(),
             Self::Text(text) => text.gradient_box(),
-            Self::Sketch(_) | Self::Image(_) | Self::Dimension(_) => None,
+            Self::Sketch(_) | Self::Image(_) | Self::Dimension(_) | Self::RegistrationMark(_) => {
+                None
+            }
         }
     }
 }

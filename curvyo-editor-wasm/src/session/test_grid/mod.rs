@@ -169,7 +169,9 @@ impl Session {
     /// Test grid bar: the selection is one whole test grid (UX G3, G4).
     #[must_use]
     pub fn select_bar_hides_grid_commands(&self) -> bool {
-        self.tool == super::Tool::Select && self.whole_test_grid_selected()
+        // A marks object too: it only moves (`specs/0121` UX notes §3.2).
+        self.tool == super::Tool::Select
+            && (self.whole_test_grid_selected() || self.marks_selected())
     }
 
     /// Every grid whose derived operations lie on a laser page, with its id and page.

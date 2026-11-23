@@ -745,6 +745,8 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             || name.starts_with("trace_mask_")
             // `0123-raster-engraving` (format 50) is a later build: its image and grid are named.
             || name.starts_with("raster_engraving_")
+            // `0121-print-and-cut` (format 54) is a later build: a marks object is a group.
+            || name.starts_with("print_and_cut_")
             || name.contains("damaged")
             || name.contains("truncated")
             || name.contains("too_deep")

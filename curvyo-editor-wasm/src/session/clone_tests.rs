@@ -17,6 +17,7 @@ fn rect(session: &Session, x: f64) -> NodeId {
 
 fn kind_of(session: &Session, id: NodeId) -> &'static str {
     match session.document.object(id) {
+        Some(ObjectSnapshot::RegistrationMark(_)) => unreachable!("no registration mark here"),
         Some(ObjectSnapshot::Path(_)) => "path",
         Some(ObjectSnapshot::Clone(_)) => "clone",
         Some(ObjectSnapshot::Primitive(_)) => "primitive",

@@ -61,6 +61,7 @@ fn col(r: u8, g: u8, b: u8) -> Color {
 }
 fn outline(o: &ObjectSnapshot) -> Vec<(f64, f64)> {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -223,6 +224,7 @@ fn transform(d: &Document, ids: &[NodeId], g: Affine) {
     let results: Vec<ObjectSnapshot> = ids
         .iter()
         .map(|&id| match d.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

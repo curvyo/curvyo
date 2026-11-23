@@ -44,13 +44,18 @@ impl Session {
     #[must_use]
     pub fn style_scope(&self) -> StyleScope {
         let (objects, selection) = self.style_subject();
-        style_scope_in(
+        let mut scope = style_scope_in(
             self.style_tool(),
             &objects,
             &selection,
             self.node.selection(),
             &self.units(),
-        )
+        );
+        // A marks object reads as itself, not "Group of 4 objects" (`specs/0121` UX review).
+        if self.marks_selected() {
+            "Registration marks".clone_into(&mut scope.subject);
+        }
+        scope
     }
 
     /// The objects and the selection the panel reads: the document's, and in edit mode on a new
@@ -101,14 +106,8 @@ impl Session {
     /// drag; which rows are shown follows the committed document.
     #[must_use]
     pub fn style_panel_state(&self) -> Option<StylePanelState> {
-        let (committed, selection) = self.style_subject();
-        let scope = style_scope_in(
-            self.style_tool(),
-            &committed,
-            &selection,
-            self.node.selection(),
-            &self.units(),
-        );
+        let (committed, _) = self.style_subject();
+        let scope = self.style_scope();
         if !self.style.is_active() {
             return style_panel_state(&committed, &committed, &scope);
         }

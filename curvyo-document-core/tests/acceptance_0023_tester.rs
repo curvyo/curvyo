@@ -614,6 +614,8 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
             || name.starts_with("operation_tools_")
             // `0123-raster-engraving` (format 50) is a later build: a test grid is a group.
             || name.starts_with("raster_engraving_")
+            // `0121-print-and-cut` (format 54) is a later build: a marks object is a group.
+            || name.starts_with("print_and_cut_")
         {
             continue;
         }
@@ -894,6 +896,9 @@ fn replicas_one_peer_groups_while_another_moves_a_member() {
     let _ = orig;
     // The member really moved by (7, 3) relative to where it was grouped.
     match moved {
+        curvyo_document_core::ObjectSnapshot::RegistrationMark(_) => {
+            unreachable!("no registration mark here")
+        }
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Dimension(_) => {

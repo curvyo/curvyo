@@ -1,7 +1,8 @@
 //! The laser workbench extension (ADR 0034 §1): its manifest, the outlines of its fixtures, the
 //! text of its notices, its machine profiles (ADR 0038, ADR 0039) and the rules of its operations
-//! (ADR 0046 §5) with their settings and test grids (ADR 0054). It receives document data and
-//! record texts as arguments and never writes.
+//! (ADR 0046 §5) with their settings and test grids (ADR 0054), and the Print and cut reading of
+//! a placed sheet (ADR 0081 §5). It receives document data and record texts as arguments and
+//! never writes.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(
@@ -87,6 +88,10 @@ mod operation_settings_rule;
 mod operation_summary;
 mod output_settings;
 mod overhang;
+#[path = "print_and_cut.rs"]
+mod print_and_cut_reading;
+#[path = "print_and_cut_text.rs"]
+mod print_and_cut_words;
 mod record_envelope;
 mod steps;
 mod test_cell_fill;
@@ -134,6 +139,20 @@ pub mod operations {
         FixtureJobRead, cuts_last, fixture_block, insert_index, may_move, run_sequence,
     };
     pub use crate::operation_summary::{Hidden, Leaf, LeafStatus, Summary, leaf_status, summarize};
+}
+
+/// Print and cut (`specs/0121-print-and-cut`, ADR 0081 §5): the reading of a placed sheet's
+/// measures into the fit and its warnings, and their words.
+pub mod print_and_cut {
+    pub use crate::print_and_cut_reading::{
+        Apply, FitState, FitSummary, MIN_SPREAD, MIRROR_MARGIN_MM, MarkRow, PrintAndCut, RowKind,
+        SAME_PLACEMENT_MM, SCALE_USABLE, SCALE_WARN, SheetInput, Warning, head_position_um,
+        machine_mm, read_print_and_cut,
+    };
+    /// The words of the Print and cut group.
+    pub mod text {
+        pub use crate::print_and_cut_words::*;
+    }
 }
 
 /// The laser job of `specs/0029-laser-job-preview-and-output` (ADR 0064): the format-neutral

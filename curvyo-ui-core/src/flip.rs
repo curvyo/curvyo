@@ -188,7 +188,9 @@ fn outlines(object: &ObjectSnapshot) -> Vec<Outline> {
             vec![outline_of(&anchors, outline.closed)]
         }
         // Never reached: `looks_the_same` compares images by their placement only.
-        ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_) => Vec::new(),
+        ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => Vec::new(),
         ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)

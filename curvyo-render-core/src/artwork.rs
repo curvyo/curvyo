@@ -148,6 +148,16 @@ fn draw_one(
         // A dimension is drawn by its marks over the artwork, laid out for the view by the
         // session (`specs/0070-measure-and-dimension`, ADR 0027); it is never artwork.
         ObjectSnapshot::Dimension(_) => {}
+        // A registration mark is artwork: its circle, cross and digit (ADR 0081 §1).
+        ObjectSnapshot::RegistrationMark(mark) => {
+            draw_path(
+                list,
+                &curvyo_document_core::mark_path(mark),
+                gradient,
+                view,
+                budgets,
+            );
+        }
     }
 }
 
@@ -183,7 +193,7 @@ fn draw_guide(
         // An image is never a guide (ADR 0019); it draws as itself.
         ObjectSnapshot::Image(image) => list.push_image(image),
         // A dimension's marks are drawn by the session, over the artwork.
-        ObjectSnapshot::Dimension(_) => {}
+        ObjectSnapshot::Dimension(_) | ObjectSnapshot::RegistrationMark(_) => {}
         ObjectSnapshot::Text(_) | ObjectSnapshot::Sketch(_) => {
             if let Some(path) = object.drawn_path() {
                 let outlines: Vec<OutlineRef<'_>> = path

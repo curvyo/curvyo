@@ -589,7 +589,8 @@ impl Session {
                 | ObjectSnapshot::Clone(_)
                 | ObjectSnapshot::Text(_)
                 | ObjectSnapshot::Image(_)
-                | ObjectSnapshot::Dimension(_) => object.clone(),
+                | ObjectSnapshot::Dimension(_)
+                | ObjectSnapshot::RegistrationMark(_) => object.clone(),
             })
             .collect()
     }

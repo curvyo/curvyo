@@ -318,6 +318,9 @@ pub enum ObjectSnapshot {
     /// A linked dimension (`specs/0070-measure-and-dimension`, ADR 0027): a guide by kind with no
     /// outline; drawn by its own marks, never output.
     Dimension(Box<crate::dimension_model::DimensionSnapshot>),
+    /// A registration mark (`specs/0121-print-and-cut`, ADR 0081 §1): drawn by its own lines,
+    /// printed and exported, never burnt; a transform moves its centre only.
+    RegistrationMark(crate::registration_mark_model::RegistrationMarkSnapshot),
 }
 
 impl ObjectSnapshot {
@@ -331,6 +334,7 @@ impl ObjectSnapshot {
             Self::Text(snapshot) => &snapshot.style,
             Self::Image(snapshot) => &snapshot.style,
             Self::Dimension(snapshot) => &snapshot.style,
+            Self::RegistrationMark(snapshot) => &snapshot.style,
             Self::Sketch(snapshot) => &snapshot.resolved.style,
         }
     }
@@ -345,6 +349,7 @@ impl ObjectSnapshot {
             Self::Text(snapshot) => &mut snapshot.style,
             Self::Image(snapshot) => &mut snapshot.style,
             Self::Dimension(snapshot) => &mut snapshot.style,
+            Self::RegistrationMark(snapshot) => &mut snapshot.style,
             Self::Sketch(snapshot) => &mut snapshot.resolved.style,
         }
     }
@@ -381,7 +386,10 @@ impl ObjectSnapshot {
             Self::Clone(clone) if clone.is_picture() => None,
             Self::Clone(clone) => Some(&clone.resolved),
             Self::Text(text) => text.outline.as_deref().map(|outline| &outline.glyphs),
-            Self::Primitive(_) | Self::Image(_) | Self::Dimension(_) => None,
+            Self::Primitive(_)
+            | Self::Image(_)
+            | Self::Dimension(_)
+            | Self::RegistrationMark(_) => None,
         }
     }
 
@@ -395,6 +403,7 @@ impl ObjectSnapshot {
             Self::Text(snapshot) => snapshot.id,
             Self::Image(snapshot) => snapshot.id,
             Self::Dimension(snapshot) => snapshot.id,
+            Self::RegistrationMark(snapshot) => snapshot.id,
             Self::Sketch(snapshot) => snapshot.id,
         }
     }
@@ -416,7 +425,7 @@ impl ObjectSnapshot {
             Self::Image(snapshot) => {
                 Angle::from_radians(snapshot.placement.b.atan2(snapshot.placement.a))
             }
-            Self::Dimension(_) => Angle::from_radians(0.0),
+            Self::Dimension(_) | Self::RegistrationMark(_) => Angle::from_radians(0.0),
         }
     }
 
@@ -485,6 +494,9 @@ impl ObjectSnapshot {
             Self::Dimension(dimension) => Self::Dimension(Box::new(
                 dimension.mapped_by(Affine::rotation_about(pivot, angle)),
             )),
+            Self::RegistrationMark(mark) => {
+                Self::RegistrationMark(mark.mapped_by(Affine::rotation_about(pivot, angle)))
+            }
         }
     }
 
@@ -514,6 +526,9 @@ impl ObjectSnapshot {
             Self::Image(image) => Self::Image(image.mapped_by(Affine::translation(offset))),
             Self::Dimension(dimension) => {
                 Self::Dimension(Box::new(dimension.mapped_by(Affine::translation(offset))))
+            }
+            Self::RegistrationMark(mark) => {
+                Self::RegistrationMark(mark.mapped_by(Affine::translation(offset)))
             }
         }
     }

@@ -4,6 +4,9 @@
 /// The move commands of criterion 5: they change where a whole object is (position, matrix,
 /// removal), never what it is.
 pub const MOVE_STEPS: &[&str] = &[
+    // `specs/0121-print-and-cut`: Apply and Reset placement write a placement's matrix only.
+    "apply_print_and_cut",
+    "reset_print_and_cut",
     "translate_objects",
     "duplicate_objects",
     "linked_clone",
@@ -195,6 +198,11 @@ pub const FREE_STEPS: &[&str] = &[
     "convert_generated",
     "add_text",
     "create_dimension",
+    // `specs/0121-print-and-cut`: marks are created, the measures live on the laser page.
+    "insert_registration_marks",
+    "add_registration_mark",
+    "print_and_cut_measure",
+    "print_and_cut_tolerance",
     "go_to_version",
     "clone_version",
     "remove_orphan_clones",
@@ -219,6 +227,8 @@ pub const FREE_STEPS: &[&str] = &[
 /// The edit commands of criterion 9 that have a label today. Any label in none of the three lists
 /// is an edit as well (Proposal: unknown future commands default to guarded).
 pub const EDIT_STEPS: &[&str] = &[
+    // `specs/0121-print-and-cut`: Size and Line width of the selected marks object.
+    "registration_mark_size",
     "convert_sketch_to_path",
     "extend_path",
     "connect_paths",

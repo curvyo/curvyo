@@ -44,7 +44,8 @@ impl TemplateNode {
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Text(_)
             | ObjectSnapshot::Image(_)
-            | ObjectSnapshot::Dimension(_) => 0,
+            | ObjectSnapshot::Dimension(_)
+            | ObjectSnapshot::RegistrationMark(_) => 0,
         }
     }
 }
@@ -156,7 +157,9 @@ impl Document {
                 return Some(id);
             }
             ObjectSnapshot::Text(text) => return Some(self.create_text_uncommitted(text)),
-            ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_) => return None,
+            ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_)
+            | ObjectSnapshot::RegistrationMark(_) => return None,
             ObjectSnapshot::Sketch(sketch) => &sketch.resolved,
             ObjectSnapshot::Path(path) => path,
             ObjectSnapshot::Clone(clone) => &clone.resolved,

@@ -68,6 +68,9 @@ fn box_of(object: &ObjectSnapshot) -> Option<(Point, Point)> {
             None => corners(&[Point::new(text.placement.e, text.placement.f)]),
         },
         ObjectSnapshot::Dimension(_) => None,
+        ObjectSnapshot::RegistrationMark(mark) => {
+            Some(crate::registration_mark_lines::mark_lines(mark).bounds())
+        }
     }
 }
 

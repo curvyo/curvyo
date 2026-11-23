@@ -36,7 +36,8 @@ pub(super) fn leaf_geometry(object: &ObjectSnapshot, map: Affine) -> Option<Leaf
                 closed: drawn.closed,
             }]
         }
-        ObjectSnapshot::Dimension(_) => return None,
+        // Neither a dimension nor a registration mark ever burns (ADR 0027, ADR 0081 §3).
+        ObjectSnapshot::Dimension(_) | ObjectSnapshot::RegistrationMark(_) => return None,
         _ => path_outlines(object.drawn_path()?, map),
     };
     Some(match placed_gradient(object, map) {

@@ -215,7 +215,8 @@ impl Document {
                         | ObjectSnapshot::Primitive(_)
                         | ObjectSnapshot::Text(_)
                         | ObjectSnapshot::Image(_)
-                        | ObjectSnapshot::Dimension(_) => return None,
+                        | ObjectSnapshot::Dimension(_)
+                        | ObjectSnapshot::RegistrationMark(_) => return None,
                     };
                     path.id = *target;
                     let (first, rest) = outlines.split_first()?;

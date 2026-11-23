@@ -719,6 +719,9 @@ impl Session {
             this.flush_style_preview();
             match this.tool {
                 Tool::Select => {
+                    if this.refuse_marks_delete() {
+                        return;
+                    }
                     let objects = this.objects();
                     // What the notice counts: the selected objects and groups (criterion 31).
                     this.deleted_objects = this.selected_units().len();

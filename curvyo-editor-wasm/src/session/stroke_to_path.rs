@@ -50,6 +50,7 @@ impl Session {
         // A placed page has no stroke of its own: hidden (`specs/0100` UX review).
         !self.selection.is_empty()
             && !self.selection_only_dimensions()
+            && !self.marks_selected()
             && self.selected_placement().is_none()
     }
 

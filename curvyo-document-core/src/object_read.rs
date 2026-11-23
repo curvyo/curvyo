@@ -171,6 +171,10 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
             },
         );
     }
+    if crate::registration_mark_codec::is_registration_mark_meta(meta) {
+        return crate::registration_mark_codec::read_mark_snapshot(id, meta)
+            .map_or(RawLeaf::Unreadable(id), RawLeaf::RegistrationMark);
+    }
     if read_shape_tag(meta).as_deref() == Some("sketch") {
         return crate::sketch_read::read(id, meta).map_or(RawLeaf::Unreadable(id), |sketch| {
             RawLeaf::Sketch(Box::new(sketch))

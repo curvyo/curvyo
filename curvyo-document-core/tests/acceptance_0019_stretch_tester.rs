@@ -80,6 +80,7 @@ fn conversion(d: &Document, id: NodeId, n: u64, base: u64) -> PathSnapshot {
 
 fn kind(d: &Document, id: NodeId) -> &'static str {
     match d.object(id).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -101,6 +102,7 @@ fn a_conversion_keeps_id_position_and_style_in_one_commit() {
         .unwrap();
     d.edit_style(&[s], &StyleEdit::FillEnabled(true)).unwrap();
     let style_before = match d.object(s).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

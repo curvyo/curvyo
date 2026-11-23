@@ -109,7 +109,8 @@ pub(crate) fn is_open(object: &ObjectSnapshot) -> bool {
         | ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_)
-        | ObjectSnapshot::Dimension(_) => false,
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => false,
         ObjectSnapshot::Primitive(primitive) => {
             !outline_of_rotated(&primitive.shape, primitive.rotation).closed
         }
@@ -229,7 +230,8 @@ pub(crate) fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, b
         | ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_)
-        | ObjectSnapshot::Dimension(_) => Vec::new(),
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => Vec::new(),
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
             vec![(

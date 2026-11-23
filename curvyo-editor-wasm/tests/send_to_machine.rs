@@ -372,10 +372,11 @@ fn s16_a_listed_send_commits_and_the_format_stays() {
     // `0132`: a second send while the job is held is listed, accepted and commits as lasered.
     let second = press(&mut s, &mut normal(&rig)).unwrap();
     assert_eq!(second, SendEnd::Resolved(Resolution::Accepted));
-    // Superseded by 0135 slice 1 (2026-11-19): format 51 is `0135`'s, not this story's.
+    // Superseded by 0135 slice 1 (2026-11-19): format 51 is `0135`'s, not this story's; 54 is
+    // `0141`'s and 55 `0121`'s.
     assert_eq!(
         curvyo_document_core::CURRENT_FORMAT_VERSION,
-        54,
+        55,
         "no format_version change"
     );
 }

@@ -42,6 +42,10 @@ pub enum RowKind {
     Image,
     /// A dimension object (`specs/0070-measure-and-dimension`).
     Dimension,
+    /// A registration mark (`specs/0121-print-and-cut`).
+    RegistrationMark,
+    /// A marks object: a group of registration marks (`specs/0121` UX notes §3.2).
+    RegistrationMarks,
     /// The laser page a laser page's tree is rooted at (`specs/0106` criterion 17).
     PageRoot,
     /// A placed page on a laser page (`specs/0106` criterion 18).
@@ -67,6 +71,7 @@ impl RowKind {
             NodeKind::Leaf(ObjectSnapshot::Text(_)) => Self::Text,
             NodeKind::Leaf(ObjectSnapshot::Image(_)) => Self::Image,
             NodeKind::Leaf(ObjectSnapshot::Dimension(_)) => Self::Dimension,
+            NodeKind::Leaf(ObjectSnapshot::RegistrationMark(_)) => Self::RegistrationMark,
             NodeKind::Leaf(ObjectSnapshot::Primitive(primitive)) => match primitive.shape {
                 Shape::Rect { .. } => Self::Rectangle,
                 Shape::Ellipse { .. } => Self::Ellipse,
@@ -94,6 +99,8 @@ impl RowKind {
             Self::Text => "Text",
             Self::Image => "Image",
             Self::Dimension => "Dimension",
+            Self::RegistrationMark => "Registration mark",
+            Self::RegistrationMarks => "Registration marks",
             Self::PageRoot => "Page",
             Self::PlacedPage => "Placed page",
             Self::Fixtures => "Fixtures",
@@ -120,6 +127,8 @@ impl RowKind {
             Self::Text => "text",
             Self::Image => "image",
             Self::Dimension => "dimension",
+            Self::RegistrationMark => "registration-mark",
+            Self::RegistrationMarks => "registration-marks",
             Self::PageRoot => "page-root",
             Self::PlacedPage => "placed-page",
             Self::Fixtures => "fixtures",
@@ -339,6 +348,10 @@ fn shown_name(read: &NodeRead, kind: RowKind) -> (String, bool) {
             curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Text(text)) => {
                 (text.default_name(), false)
             }
+            // "Mark 3": a mark shows its number (`specs/0121` UX notes §3.2).
+            curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::RegistrationMark(mark)) => {
+                (format!("Mark {}", mark.number), false)
+            }
             // "Dimension 12.5 mm", "not linked" appended (`0070` criterion 17); in millimetres
             // (Proposal: the row has no display unit at hand).
             curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Dimension(dimension)) => (
@@ -452,7 +465,16 @@ impl<'a> Tree<'a> {
                 below_selected[parent] = true;
             }
         }
-        let kinds: Vec<RowKind> = nodes.iter().map(|read| RowKind::of(&read.kind)).collect();
+        let mut kinds: Vec<RowKind> = nodes.iter().map(|read| RowKind::of(&read.kind)).collect();
+        // A group of registration marks is a marks object, with its own glyph.
+        for (at, read) in nodes.iter().enumerate() {
+            if let Some(&parent) = read.parent.and_then(|p| index.get(&p))
+                && kinds[parent] == RowKind::Group
+                && kinds[at] == RowKind::RegistrationMark
+            {
+                kinds[parent] = RowKind::RegistrationMarks;
+            }
+        }
         let mut names: Vec<(String, bool)> = nodes
             .iter()
             .zip(&kinds)

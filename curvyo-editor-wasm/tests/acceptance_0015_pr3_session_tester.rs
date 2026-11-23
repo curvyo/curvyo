@@ -94,6 +94,7 @@ fn points(d: &Document) -> Vec<(f64, f64)> {
     let mut out = Vec::new();
     for id in d.object_ids() {
         match d.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

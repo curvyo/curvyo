@@ -180,6 +180,10 @@ impl<'t, 'a> Parts<'t, 'a> {
             }),
             // A dimension is never output (ADR 0027).
             ObjectSnapshot::Dimension(_) => None,
+            // A registration mark is printed (ADR 0081 §3).
+            ObjectSnapshot::RegistrationMark(mark) => {
+                Some(crate::svg_export_marks::mark_node(mark, t, state))
+            }
         }
     }
 
@@ -207,6 +211,11 @@ impl<'t, 'a> Parts<'t, 'a> {
                 })
             }
             ObjectSnapshot::Dimension(_) => None,
+            ObjectSnapshot::RegistrationMark(mark) => Some(crate::svg_export_marks::mark_node(
+                mark,
+                self.t,
+                ExportState::default(),
+            )),
             ObjectSnapshot::Sketch(sketch) => self.shape(
                 &ObjectSnapshot::Path(sketch.resolved.clone()),
                 ExportState::default(),

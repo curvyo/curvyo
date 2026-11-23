@@ -271,6 +271,9 @@ impl Writer<'_> {
         if state.locked {
             self.attr("sodipodi:insensitive", "true");
         }
+        for (name, value) in &state.data {
+            self.attr_name(name, value);
+        }
     }
 
     /// `opacity` below 1.

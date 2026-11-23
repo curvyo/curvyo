@@ -385,6 +385,14 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("move_dimension", "Move dimension"),
     ("edit_dimension_nodes", "Edit nodes"),
     ("convert_dimension", "Convert to path"),
+    // `specs/0121-print-and-cut` (ADR 0081 §2, §4, §7).
+    ("insert_registration_marks", "Add registration marks"),
+    ("add_registration_mark", "Add registration mark"),
+    ("registration_mark_size", "Registration mark size"),
+    ("print_and_cut_measure", "Measure mark"),
+    ("print_and_cut_tolerance", "Print and cut tolerance"),
+    ("apply_print_and_cut", "Fit sheet to marks"),
+    ("reset_print_and_cut", "Reset sheet placement"),
     ("load_template", "Template"),
     // `specs/0069-tiling` criterion 37.
     ("tile", "Tile"),

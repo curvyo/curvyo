@@ -33,6 +33,8 @@ pub(crate) enum RawLeaf {
     Image(crate::image_model::ImageSnapshot),
     /// A dimension: never an original; resolved after every other leaf (ADR 0027 §3).
     Dimension(Box<crate::dimension_model::DimensionSnapshot>),
+    /// A registration mark: never an original on its own (ADR 0081 §1).
+    RegistrationMark(crate::registration_mark_model::RegistrationMarkSnapshot),
     /// A leaf whose registers cannot be read (merge residue of a text): left out.
     Unreadable(NodeId),
 }
@@ -59,6 +61,7 @@ impl RawLeaf {
             Self::Text(text) => text.id,
             Self::Image(image) => image.id,
             Self::Dimension(dimension) => dimension.id,
+            Self::RegistrationMark(mark) => mark.id,
             Self::TextClone(parts) => parts.id,
             Self::Clone(id, ..) | Self::BrokenClone(id) | Self::Unreadable(id) => *id,
         }
@@ -243,9 +246,10 @@ pub(crate) fn resolve_in(leaves: Vec<RawLeaf>, structure: Option<&Structure>) ->
             | RawLeaf::Text(_)
             | RawLeaf::Image(_)
             | RawLeaf::TextClone(_) => State::Root,
-            RawLeaf::BrokenClone(_) | RawLeaf::Dimension(_) | RawLeaf::Unreadable(_) => {
-                State::NotOrigin
-            }
+            RawLeaf::BrokenClone(_)
+            | RawLeaf::Dimension(_)
+            | RawLeaf::RegistrationMark(_)
+            | RawLeaf::Unreadable(_) => State::NotOrigin,
             RawLeaf::Clone(..) => State::Pending,
         })
         .collect();
@@ -458,6 +462,7 @@ fn assemble(
             RawLeaf::Text(text) => Some(ObjectSnapshot::Text(text)),
             RawLeaf::Image(image) => Some(ObjectSnapshot::Image(image)),
             RawLeaf::Dimension(dimension) => Some(ObjectSnapshot::Dimension(dimension)),
+            RawLeaf::RegistrationMark(mark) => Some(ObjectSnapshot::RegistrationMark(mark)),
             RawLeaf::TextClone(parts) => {
                 text_clones.push((i, *parts));
                 None

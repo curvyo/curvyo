@@ -65,7 +65,8 @@ impl Session {
                 ObjectSnapshot::Primitive(_) => PRIMITIVE_NODES,
                 ObjectSnapshot::Sketch(_)
                 | ObjectSnapshot::Image(_)
-                | ObjectSnapshot::Dimension(_) => 0,
+                | ObjectSnapshot::Dimension(_)
+                | ObjectSnapshot::RegistrationMark(_) => 0,
             })
             .sum();
         nodes > PREVIEW_NODE_LIMIT

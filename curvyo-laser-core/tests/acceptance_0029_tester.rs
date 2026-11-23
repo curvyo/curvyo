@@ -78,14 +78,13 @@ fn c31_every_named_golden_exists_in_its_format_folder_and_reads() {
     }
     // `specs/0123` criterion 40 adds the `raster_*` goldens to this folder and replaces
     // `image_skipped` (0029 criterion 18) by `raster_threshold`; they are checked there.
+    // `specs/0121` criterion 17 adds `print_and_cut_cut_line`, checked in `job_output_goldens.rs`.
     let count = std::fs::read_dir(&dir)
         .unwrap()
         .filter(|e| {
-            !e.as_ref()
-                .unwrap()
-                .file_name()
-                .to_string_lossy()
-                .starts_with("raster_")
+            let name = e.as_ref().unwrap().file_name();
+            let name = name.to_string_lossy();
+            !name.starts_with("raster_") && !name.starts_with("print_and_cut_")
         })
         .count();
     assert_eq!(
@@ -759,7 +758,7 @@ fn c32_project_format_48_and_the_page_registers_read() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 54);
+    assert_eq!(CURRENT_FORMAT_VERSION, 55);
     let dir =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../curvyo-document-core/tests/fixtures");
     let bytes = std::fs::read(dir.join("laser_output_v48.curvyo")).unwrap();

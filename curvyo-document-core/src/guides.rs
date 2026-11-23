@@ -154,6 +154,8 @@ pub(crate) fn effective_guide(
         | crate::primitive_model::ObjectSnapshot::Image(_) => own(object.id()),
         // A dimension is a guide by kind (ADR 0027 §1).
         crate::primitive_model::ObjectSnapshot::Dimension(_) => true,
+        // A mark prints: never a guide (ADR 0081 §3).
+        crate::primitive_model::ObjectSnapshot::RegistrationMark(_) => false,
     }
 }
 

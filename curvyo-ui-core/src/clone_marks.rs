@@ -252,7 +252,8 @@ fn outline_of(object: &ObjectSnapshot) -> Option<&curvyo_document_core::PathSnap
         ObjectSnapshot::Primitive(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_)
-        | ObjectSnapshot::Dimension(_) => None,
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => None,
     }
 }
 

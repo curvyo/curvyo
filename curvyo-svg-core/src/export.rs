@@ -53,6 +53,9 @@ pub struct ExportState {
     pub opacity: f64,
     /// The key a `use` or a `textPath` names this node by.
     pub key: Option<usize>,
+    /// `data-*` attributes, written in order after the flags (a registration mark's kind and
+    /// number, `specs/0121-print-and-cut`); the names are fixed by the exporter.
+    pub data: Vec<(&'static str, String)>,
 }
 
 impl Default for ExportState {
@@ -63,6 +66,7 @@ impl Default for ExportState {
             locked: false,
             opacity: 1.0,
             key: None,
+            data: Vec::new(),
         }
     }
 }

@@ -41,7 +41,10 @@ pub fn restyled(
         ObjectSnapshot::Image(image) => {
             return Some(ObjectSnapshot::Path(frame_of(image, style)));
         }
-        ObjectSnapshot::Clone(_) | ObjectSnapshot::Sketch(_) | ObjectSnapshot::Dimension(_) => {
+        ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => {
             return None;
         }
     }

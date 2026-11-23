@@ -96,7 +96,9 @@ mod tests {
             crate::ObjectSnapshot::Clone(c) => c.resolved.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Text(t) => t.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Sketch(s) => s.style.stroke.width.as_mm(),
-            crate::ObjectSnapshot::Image(_) | crate::ObjectSnapshot::Dimension(_) => {
+            crate::ObjectSnapshot::Image(_)
+            | crate::ObjectSnapshot::Dimension(_)
+            | crate::ObjectSnapshot::RegistrationMark(_) => {
                 unreachable!("no image in this test")
             }
         }
@@ -109,7 +111,9 @@ mod tests {
             crate::ObjectSnapshot::Clone(c) => c.resolved.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Text(t) => t.style.stroke.width.as_mm(),
             crate::ObjectSnapshot::Sketch(s) => s.style.stroke.width.as_mm(),
-            crate::ObjectSnapshot::Image(_) | crate::ObjectSnapshot::Dimension(_) => {
+            crate::ObjectSnapshot::Image(_)
+            | crate::ObjectSnapshot::Dimension(_)
+            | crate::ObjectSnapshot::RegistrationMark(_) => {
                 unreachable!("no image in this test")
             }
         }

@@ -118,6 +118,9 @@ mod offset_view;
 mod open_error;
 mod operations;
 mod output;
+mod print_and_cut;
+mod print_and_cut_overlay;
+mod registration_marks;
 #[cfg_attr(not(target_arch = "wasm32"), allow(unused_imports))] // the wasm bridge takes it
 pub use fixtures::{
     AddTarget, ApplyCandidate, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow,
@@ -638,6 +641,8 @@ pub struct Session {
     held_clones: clone_view::HeldCache,
     /// What the last Group or Ungroup said, until the host has taken it (`grouping.rs`).
     grouping_result: Option<grouping::GroupingResult>,
+    /// The Print and cut group's chosen sheet (`specs/0121`).
+    print_and_cut: print_and_cut::PrintAndCutState,
     /// What a screen reader hears about the context, until the host has taken it.
     context_announcement: Option<String>,
     /// The active layer and the layer notice (`layers.rs`).
@@ -811,6 +816,7 @@ impl Session {
             gradient: gradient::GradientState::default(),
             held_clones: clone_view::HeldCache::default(),
             grouping_result: None,
+            print_and_cut: print_and_cut::PrintAndCutState::default(),
             context_announcement: None,
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),
@@ -933,6 +939,7 @@ impl Session {
             gradient: gradient::GradientState::default(),
             held_clones: clone_view::HeldCache::default(),
             grouping_result: None,
+            print_and_cut: print_and_cut::PrintAndCutState::default(),
             context_announcement: None,
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),

@@ -60,6 +60,7 @@ fn link(d: &Document, original: NodeId) -> NodeId {
 /// The drawn outline of any object as a path.
 fn drawn(d: &Document, id: NodeId) -> PathSnapshot {
     match d.object(id).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
@@ -133,6 +134,7 @@ fn mapped_results(d: &Document, ids: &[NodeId], g: Affine) -> Vec<ObjectSnapshot
             .collect();
     ids.iter()
         .map(|&id| match d.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),

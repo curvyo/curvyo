@@ -94,6 +94,7 @@ fn objects(s: &Session) -> Vec<ObjectSnapshot> {
 
 fn oid(o: &ObjectSnapshot) -> NodeId {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -183,6 +184,7 @@ fn is_path(o: &ObjectSnapshot) -> bool {
 
 fn style_debug(o: &ObjectSnapshot) -> String {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -196,6 +198,7 @@ fn style_debug(o: &ObjectSnapshot) -> String {
 /// Anchors (point, handle_in, handle_out, kind) of every outline of a path.
 fn anchors_of(o: &ObjectSnapshot) -> Vec<NewAnchor> {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -210,6 +213,7 @@ fn anchors_of(o: &ObjectSnapshot) -> Vec<NewAnchor> {
 fn rotate_about_centre(d: &Document, id: NodeId, radians: f64) {
     let o = d.object(id).unwrap();
     let c = match &o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -395,6 +399,7 @@ fn bezier_samples(a: &[NewAnchor], closed: bool, per: usize) -> Vec<Point> {
 /// Dense polyline of the drawn outline of an object (primitives through their path form).
 fn polyline(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -1082,6 +1087,7 @@ fn ac03_node_counts_style_slot_identity() {
 
 fn otp_markers(o: &ObjectSnapshot) -> curvyo_document_core::Markers {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -2459,6 +2465,7 @@ fn hostile_typed_skew_input_writes_nothing() {
 
 fn stroke_mm(o: &ObjectSnapshot) -> f64 {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

@@ -55,7 +55,9 @@ pub(super) fn cull_box(object: &ObjectSnapshot) -> CullBox {
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Sketch(_) => true,
             ObjectSnapshot::Text(text) => text.outline.is_some(),
-            ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_) => false,
+            ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_)
+            | ObjectSnapshot::RegistrationMark(_) => false,
         };
     if !cullable {
         return CullBox::Always;

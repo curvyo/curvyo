@@ -40,6 +40,11 @@ enum Planned<'a> {
         meta: loro::LoroMap,
         result: &'a ObjectSnapshot,
     },
+    /// A registration mark: its centre moves, size and line stay (ADR 0081 §1).
+    RegistrationMark {
+        meta: loro::LoroMap,
+        result: &'a ObjectSnapshot,
+    },
     Primitive {
         meta: loro::LoroMap,
         current: Shape,
@@ -183,7 +188,10 @@ impl Document {
                     write_sketch(meta, result)?;
                     (meta, result)
                 }
-                Planned::Clone { .. } | Planned::Dimension { .. } | Planned::Image { .. } => {
+                Planned::Clone { .. }
+                | Planned::Dimension { .. }
+                | Planned::RegistrationMark { .. }
+                | Planned::Image { .. } => {
                     continue;
                 }
                 Planned::Generated { meta, frame } => {
@@ -252,7 +260,8 @@ impl Document {
                         | ObjectSnapshot::Clone(_)
                         | ObjectSnapshot::Text(_)
                         | ObjectSnapshot::Image(_)
-                        | ObjectSnapshot::Dimension(_) => true,
+                        | ObjectSnapshot::Dimension(_)
+                        | ObjectSnapshot::RegistrationMark(_) => true,
                     };
                     shape_codec::write_converted_path_fields(meta, anchors, closed);
                     (meta, result)
@@ -289,6 +298,12 @@ fn write_frame_only(plan: &Planned<'_>) -> bool {
         Planned::Dimension { meta, result } => {
             if let ObjectSnapshot::Dimension(dimension) = result {
                 crate::dimension_codec::write_moved(meta, dimension);
+            }
+            true
+        }
+        Planned::RegistrationMark { meta, result } => {
+            if let ObjectSnapshot::RegistrationMark(mark) = result {
+                crate::registration_mark_codec::write_moved(meta, mark);
             }
             true
         }
@@ -358,6 +373,24 @@ impl Document {
     }
 }
 
+/// The plan for a dimension or a registration mark, `None` for every other leaf.
+fn plan_mark_or_dimension<'a>(
+    meta: &loro::LoroMap,
+    result: &'a ObjectSnapshot,
+) -> Option<Result<Planned<'a>, ObjectEditError>> {
+    let meta = meta.clone();
+    if crate::dimension_codec::is_dimension_meta(&meta) {
+        return Some(match result {
+            ObjectSnapshot::Dimension(_) => Ok(Planned::Dimension { meta, result }),
+            _ => Err(ObjectEditError::NoSuchObject),
+        });
+    }
+    crate::registration_mark_codec::is_registration_mark_meta(&meta).then(|| match result {
+        ObjectSnapshot::RegistrationMark(_) => Ok(Planned::RegistrationMark { meta, result }),
+        _ => Err(ObjectEditError::NoSuchObject),
+    })
+}
+
 /// The plan for one result, resolved against the document before any write.
 #[allow(clippy::too_many_lines)] // One dispatch over every leaf kind.
 fn plan_one<'a>(
@@ -388,11 +421,8 @@ fn plan_one<'a>(
     if crate::generated_codec::is_generated_meta(&meta) {
         return plan_generated(meta, result);
     }
-    if crate::dimension_codec::is_dimension_meta(&meta) {
-        return match result {
-            ObjectSnapshot::Dimension(_) => Ok(Planned::Dimension { meta, result }),
-            _ => Err(ObjectEditError::NoSuchObject),
-        };
+    if let Some(planned) = plan_mark_or_dimension(&meta, result) {
+        return planned;
     }
     if crate::image_codec::is_image_meta(&meta) {
         return match result {
@@ -541,7 +571,8 @@ fn plan_clone<'a>(
         | ObjectSnapshot::Primitive(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_)
-        | ObjectSnapshot::Dimension(_) => Err(ObjectEditError::NoSuchObject),
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => Err(ObjectEditError::NoSuchObject),
     }
 }
 
@@ -602,6 +633,7 @@ fn is_finite(object: &ObjectSnapshot) -> bool {
         ObjectSnapshot::Text(text) => text.placement.is_finite() && text.size.as_mm().is_finite(),
         ObjectSnapshot::Image(image) => image.placement.is_finite(),
         ObjectSnapshot::Dimension(dimension) => dimension.kept.is_finite(),
+        ObjectSnapshot::RegistrationMark(mark) => point(mark.centre),
         ObjectSnapshot::Sketch(sketch) => sketch.placement.is_finite(),
         ObjectSnapshot::Path(path) => {
             rotation
