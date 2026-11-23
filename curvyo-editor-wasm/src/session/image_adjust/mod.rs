@@ -2,6 +2,10 @@
 //! 60; `ux-notes.md` §3 to §5, §9): the picture, its Image operations and the edits of its
 //! registers, each one undo step.
 
+mod ai;
+#[cfg(test)]
+mod ai_tests;
+mod ai_view;
 mod before_after;
 #[cfg(test)]
 mod budget_tests;
@@ -12,11 +16,15 @@ mod crop_bar;
 mod levels_input;
 mod look;
 mod picture;
+mod rows_view;
 #[cfg(test)]
 mod slice2_tests;
 #[cfg(test)]
 pub(in crate::session) mod tests;
 mod view;
+
+#[allow(unused_imports)] // the host bridge and the tests read them
+pub use ai::{AiRunInput, ModelState};
 
 use curvyo_document_core::{AdjustmentsWrite, NodeId};
 use curvyo_laser_core::adjust::{AdjustRegisters, DitherSettings, Preset, StepKind};
@@ -47,6 +55,8 @@ pub(in crate::session) struct AdjustState {
     copied: Option<CopiedAdjustments>,
     /// The picture and Crop row the Crop bar edits (`ux-notes.md` §3.9).
     crop: Option<crop_bar::CropTarget>,
+    /// The AI steps' runs and model states (slice 3).
+    ai: ai::AiState,
 }
 
 impl super::Session {

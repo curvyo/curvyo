@@ -296,7 +296,17 @@ fn c3_new_steps_are_inserted_at_their_pipeline_place() {
         .iter()
         .map(|b| b["kind"].as_str().unwrap().to_owned())
         .collect();
-    assert_eq!(geo, ["crop", "resize"]);
+    // Slice 3 (criterion 47): row 2 also offers the AI steps after Crop and Resize.
+    assert_eq!(
+        geo,
+        [
+            "crop",
+            "resize",
+            "upscale",
+            "ai_denoise",
+            "remove_background"
+        ]
+    );
 }
 
 #[test]
@@ -383,10 +393,8 @@ fn c5_c14_resize_is_16_to_the_working_width_and_only_reduces() {
         .as_str()
         .unwrap()
         .to_owned();
-    assert!(
-        line.contains("32") && line.contains("16"),
-        "the working-image line: {line}"
-    );
+    // UX review 2026-11-23: the line gives the size this Resize makes, so it follows Width.
+    assert_eq!(line, "Working image 16 × 8 px", "the working-image line");
     // Above the working image's width there is never an enlargement: the dots are those of the
     // whole width.
     assert!(fx.s.edit_adjust_field(0, "width_px", 32.0).is_ok());

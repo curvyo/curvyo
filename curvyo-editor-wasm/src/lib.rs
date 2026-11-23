@@ -17,6 +17,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod ai_glue;
 mod background_writer;
 pub mod centre_lines_glue;
 pub mod centre_lines_wire;
@@ -260,6 +261,8 @@ mod wasm_fixture_sets;
 mod wasm_fixtures;
 #[cfg(target_arch = "wasm32")]
 mod wasm_image_adjust;
+#[cfg(target_arch = "wasm32")]
+mod wasm_image_ai;
 #[cfg(target_arch = "wasm32")]
 mod wasm_machine_profiles;
 #[cfg(target_arch = "wasm32")]

@@ -2,12 +2,14 @@
 //! 25, 26, 28, 30, 59, 60; `ux-notes.md` §3, §9, §15): header, state line, Preset strip,
 //! Strength, the derived block, the add toolbar, the manual rows and the clone override row.
 
-use curvyo_document_core::{AdjustEntry, AdjustOwner};
-use curvyo_laser_core::adjust::{Band, CHANNEL_PRESETS, FieldSpec, ManualStep, Preset, StepKind};
-use curvyo_ui_core::{STRENGTH_RANGE_TEXT, move_step};
+use curvyo_document_core::AdjustOwner;
+use curvyo_laser_core::adjust::{Band, ManualStep, Preset, StepKind};
+use curvyo_ui_core::STRENGTH_RANGE_TEXT;
 use serde::Serialize;
 
 use super::picture::PictureOperation;
+pub(super) use super::rows_view::field_views;
+use super::rows_view::{derived_row, manual_row};
 use crate::session::operations::image_view::{DitherView, dither_view};
 
 /// One cell of the Preset strip (criterion 25, `ux-notes.md` §3.2).
@@ -68,7 +70,7 @@ pub struct ChannelPresetView {
 }
 
 /// The extra body of a step row whose fields are not all plain numbers (`ux-notes.md` §3.8).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum StepBodyView {
     /// Curves: the points (Input %, Output %) the graph draws, in Input order.
@@ -88,6 +90,8 @@ pub enum StepBodyView {
         /// "Working image 2,400 × 1,800 px".
         line: String,
     },
+    /// An AI step: Run, the model's state, the stored result (`ux-notes.md` §8).
+    Ai(Box<super::ai_view::AiBodyView>),
 }
 
 /// One step row, manual or derived (`ux-notes.md` §3.4, §3.6).
@@ -169,197 +173,16 @@ pub struct AdjustmentsView {
     pub derived: Option<DerivedView>,
     /// Row 1 of the add toolbar (tone and detail); empty while a preset is active (P8).
     pub add_tone: Vec<AddButtonView>,
-    /// Row 2 (Crop, Resize; the AI steps in slice 3), shown with any preset.
+    /// Row 2 (Crop, Resize, Upscale, AI denoise, Remove background), shown with any preset.
     pub add_geometry: Vec<AddButtonView>,
     /// The manual stack.
     pub steps: Vec<StepRowView>,
     /// The clone's Adjustments override row: "original" or "own"; `None` for an image.
     pub clone_row: Option<&'static str>,
+    /// "Stored results 120 MB of 512 MB" while the document holds any (criterion 66).
+    pub stored_results: Option<super::ai_view::BudgetView>,
     /// The notice of the last edit, kept until read.
     pub notice: Option<String>,
-}
-
-/// The decimals of a field whose shown unit has `per_unit` steps.
-fn decimals(per_unit: i64) -> u32 {
-    per_unit.max(1).ilog10()
-}
-
-fn field_text(spec: &FieldSpec, value: i64) -> String {
-    let shown = spec.shown(value);
-    let digits = decimals(spec.per_unit) as usize;
-    let number = format!("{shown:.digits$}");
-    if spec.unit.is_empty() {
-        format!("{} {number}", spec.label)
-    } else {
-        format!("{} {number} {}", spec.label, spec.unit)
-    }
-}
-
-/// The numbers of `step` as line 2 shows them.
-fn numbers(step: ManualStep) -> String {
-    let fields = step.fields();
-    step.kind()
-        .fields()
-        .iter()
-        .filter_map(|spec| {
-            let value = fields.iter().find(|(k, _)| *k == spec.key)?.1;
-            Some(field_text(spec, value))
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-pub(super) fn field_views(step: ManualStep) -> Vec<StepFieldView> {
-    let fields = step.fields();
-    step.kind()
-        .fields()
-        .iter()
-        .filter_map(|spec| {
-            let value = fields.iter().find(|(k, _)| *k == spec.key)?.1;
-            Some(StepFieldView {
-                key: spec.key,
-                label: spec.label,
-                unit: spec.unit,
-                value: spec.shown(value),
-                decimals: decimals(spec.per_unit),
-                range: spec.range_text.to_owned(),
-            })
-        })
-        .collect()
-}
-
-/// A derived, read-only row.
-fn derived_row(step: ManualStep) -> StepRowView {
-    let numbers = numbers(step);
-    StepRowView {
-        index: None,
-        kind: step.kind().key(),
-        name: step.kind().name(),
-        enabled: true,
-        preset_in_use: false,
-        unknown: false,
-        accessible_name: format!("{}, {numbers}", step.kind().name()),
-        line: numbers,
-        fields: Vec::new(),
-        up: false,
-        down: false,
-        histogram: None,
-        body: None,
-    }
-}
-
-/// A number with a comma between thousands ("2,400").
-fn thousands(n: u32) -> String {
-    let digits = n.to_string();
-    let mut out = String::new();
-    for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c);
-    }
-    out
-}
-
-/// The body of `step` beyond its fields, for a picture of `size` pixels when known.
-fn step_body(step: ManualStep, size: Option<(u32, u32)>) -> Option<StepBodyView> {
-    match step {
-        ManualStep::Curves { points, count } => Some(StepBodyView::Curve {
-            points: points[..usize::from(count)]
-                .iter()
-                .map(|&(i, o)| [i, o])
-                .collect(),
-        }),
-        ManualStep::ChannelMix { weights } => Some(StepBodyView::ChannelMix {
-            presets: CHANNEL_PRESETS
-                .iter()
-                .map(|&(name, w)| ChannelPresetView {
-                    cell: name.split(' ').next().unwrap_or(name),
-                    name,
-                    pressed: w == weights,
-                })
-                .collect(),
-        }),
-        ManualStep::Resize { width_px } => {
-            let (w, h) = size?;
-            Some(StepBodyView::Resize {
-                height_px: curvyo_image_core::resized_size(w, h, width_px).1,
-                line: format!("Working image {} × {} px", thousands(w), thousands(h)),
-            })
-        }
-        _ => None,
-    }
-}
-
-/// The manual row `index` of `entries` with `preset` active or not, for a picture of `size`
-/// pixels when known; a preset runs instead of the tone rows only (criterion 30).
-fn manual_row(
-    entries: &[AdjustEntry],
-    index: usize,
-    preset: bool,
-    size: Option<(u32, u32)>,
-) -> StepRowView {
-    let read = entries[index].step().and_then(|stored| {
-        let step = ManualStep::read(&stored.kind, |key| stored.fields.get(key).copied()).ok()?;
-        Some((step, stored.enabled))
-    });
-    let Some((step, enabled)) = read else {
-        return StepRowView {
-            index: Some(index),
-            kind: "unknown",
-            name: "Unknown step",
-            enabled: false,
-            preset_in_use: false,
-            unknown: true,
-            line: "Not run · from a newer Curvyo".to_owned(),
-            fields: Vec::new(),
-            up: false,
-            down: false,
-            accessible_name: "Unknown step, not run".to_owned(),
-            histogram: None,
-            body: None,
-        };
-    };
-    let preset = preset && step.kind().band() == Band::Tone;
-    let numbers = numbers(step);
-    let (prefix, suffix) = if preset {
-        ("Preset in use · ", ", preset in use")
-    } else if enabled {
-        ("", "")
-    } else {
-        ("Off · ", ", off")
-    };
-    StepRowView {
-        index: Some(index),
-        kind: step.kind().key(),
-        name: step.kind().name(),
-        enabled,
-        preset_in_use: preset,
-        unknown: false,
-        line: format!("{prefix}{numbers}"),
-        fields: {
-            let mut fields = field_views(step);
-            if let (ManualStep::Resize { .. }, Some((width, _)), Some(field)) =
-                (step, size, fields.first_mut())
-            {
-                field.range = resize_range_text(width.clamp(16, 8_192));
-            }
-            // A Crop field's range as it stands (UX review UX-2).
-            if let ManualStep::Crop { pct } = step {
-                for field in &mut fields {
-                    if let Some(text) = curvyo_ui_core::crop_range_text(pct, field.key) {
-                        field.range = text;
-                    }
-                }
-            }
-            fields
-        },
-        up: move_step(entries, index, true).is_some(),
-        down: move_step(entries, index, false).is_some(),
-        accessible_name: format!("{}, {numbers}{suffix}", step.kind().name()),
-        histogram: None,
-        body: step_body(step, size),
-    }
 }
 
 /// The memory line of a picture whose steps from `not_run` on did not fit (criterion 56): it names
@@ -406,6 +229,7 @@ impl crate::session::Session {
         let active = preset != Preset::Expert;
         let entries = &shown.adjustments.steps;
         let size = self.picture_size(target);
+        let stale = self.stale_rows(&registers);
         let add = |band: Band| {
             StepKind::ALL
                 .into_iter()
@@ -462,7 +286,7 @@ impl crate::session::Session {
                     .unwrap_or_default(),
             }),
             add_tone: if active { Vec::new() } else { add(Band::Tone) },
-            add_geometry: add(Band::Geometry),
+            add_geometry: [add(Band::Geometry), add(Band::Mask)].concat(),
             steps: (0..entries.len())
                 .map(|i| {
                     let mut row = manual_row(entries, i, active, size);
@@ -470,6 +294,12 @@ impl crate::session::Session {
                         row.histogram = self
                             .levels_input(target, i)
                             .map(|h| super::levels_input::bars(&h));
+                    }
+                    if let Some(step) = registers.steps.get(i).and_then(|s| s.step)
+                        && let Some((body, folded)) = self.ai_body(entries, i, step, &stale)
+                    {
+                        row.line = format!("{folded}{}", row.line);
+                        row.body = Some(StepBodyView::Ai(Box::new(body)));
                     }
                     row
                 })
@@ -479,6 +309,7 @@ impl crate::session::Session {
                 AdjustOwner::CloneFollowing => Some("original"),
                 AdjustOwner::CloneOwn => Some("own"),
             },
+            stored_results: self.budget_view(),
             notice: self.image_adjust.notice.clone(),
         })
     }

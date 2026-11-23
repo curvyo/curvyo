@@ -29,6 +29,8 @@ curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }
 # The working images of the canvas, decoded from the assets (ADR 0017 §5).
 curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
+# The AI steps' model runs in the worker and the pinned model list (ADR 0075 decision 3).
+curvyo-imageai-core = { path = "../curvyo-imageai-core", version = "0.1.0" }
 curvyo-render-core = { path = "../curvyo-render-core", version = "0.1.0" }
 curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
 # Cooperative editing (ADR 0031 decision 1): the client session and the keys it seals with.
@@ -40,6 +42,8 @@ serde_json.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
+# The AI tests pin their tiny test net by its SHA-256 (`src/session/image_adjust/ai_tests.rs`).
+sha2.workspace = true
 # `tests/acceptance_0005.rs` counts Loro changes / reads op keys to verify
 # "one interaction = one commit" and the per-register write table.
 loro.workspace = true

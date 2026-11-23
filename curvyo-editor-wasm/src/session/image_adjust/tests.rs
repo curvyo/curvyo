@@ -99,10 +99,11 @@ fn c1_a_new_picture_shows_expert_and_an_empty_stack() {
     assert_eq!(view.presets[0].tooltip, "Photo (detailed) · Dither: Jarvis");
     assert_eq!(view.presets[4].cell, "Dots");
     assert!(view.strength.is_none() && view.derived.is_none());
-    // Slice 2: seven tone and detail kinds, Crop and Resize in row 2.
+    // Slice 2: seven tone and detail kinds, Crop and Resize in row 2; slice 3 adds Upscale, AI
+    // denoise and Remove background to row 2.
     assert_eq!(view.add_tone.len(), 7);
     assert_eq!(view.add_tone[2].name, "Add Levels");
-    assert_eq!(view.add_geometry.len(), 2);
+    assert_eq!(view.add_geometry.len(), 5);
     assert!(!view.restore_enabled);
     assert_eq!(view.state_line.as_deref(), Some("Not engraved yet"));
     assert_eq!(view.clone_row, None);
