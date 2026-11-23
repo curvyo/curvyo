@@ -405,6 +405,14 @@ pub(crate) fn connector_send_job(
     }
 }
 
+/// The frame that waits or runs, from the status.
+fn frame_id(status: &Message) -> Option<Uuid> {
+    match status {
+        Message::Status { frame_id, .. } => *frame_id,
+        _ => None,
+    }
+}
+
 /// The message a job button sends; `None` for an unknown command or a Start with no Ready job.
 fn command_message(
     command: &str,
@@ -425,6 +433,10 @@ fn command_message(
         "home" => Message::Home,
         // One step of the jog pad (`specs/0118` 16); a held press has its own commands.
         "jog" => jog?.message(false),
+        // The owner confirms a member's waiting frame with the frame's id (`specs/0118` 2b, F5).
+        "confirm_frame" => Message::Start {
+            job_id: frame_id(status)?,
+        },
         _ => return None,
     })
 }
@@ -786,6 +798,7 @@ mod tests {
             homed: false,
             machine_position: None,
             work_offset: None,
+            frame_id: None,
         }
     }
 

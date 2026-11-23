@@ -41,6 +41,8 @@ struct DrawKey {
     generation: u64,
     view: ViewTransform,
     fraction: f64,
+    /// The frame's ring shows instead of the play bar's head (W34).
+    frame_ring: bool,
 }
 
 /// One ring's label and where the frontend puts it, in CSS px of the canvas (UX P26).
@@ -302,6 +304,7 @@ impl Session {
             generation: job.generation,
             view,
             fraction,
+            frame_ring: self.frame_head_shown(),
         };
         let cache = &self.output.draw;
         if let Some((held, list)) = cache.list.borrow().as_ref()
@@ -312,7 +315,7 @@ impl Session {
         #[cfg(test)]
         cache.lists.set(cache.lists.get() + 1);
         let (look, _) = self.toolpath_look(&job);
-        let head = (fraction < 1.0).then(|| {
+        let head = (fraction < 1.0 && !key.frame_ring).then(|| {
             let head = job.timeline.head_at(&job.built.job, fraction);
             let origin = look_origin(self, &job);
             ToolpathHead {

@@ -6,7 +6,7 @@
 /** The state of the connector's job, as the protocol sends it (`State` in `curvyo-connector-core`). */
 export type JobState =
   | {
-      name: "NoController" | "Idle" | "Receiving" | "Ready" | "AwaitingLocalStart" | "Homing" | "Jogging" | "Running" | "Paused" | "Alarm";
+      name: "NoController" | "Idle" | "Receiving" | "Ready" | "AwaitingLocalStart" | "Homing" | "Jogging" | "Framing" | "Running" | "Paused" | "Alarm";
     }
   | { name: "Done"; result: "Completed" | "Stopped" | "Failed" };
 
@@ -33,6 +33,8 @@ export interface StatusMessage {
   machine_position?: [number, number, number] | null;
   /** The controller's work coordinate offset, when it reported one (`specs/0118` 14). */
   work_offset?: [number, number, number] | null;
+  /** The frame that runs or waits for a confirmation (`specs/0118` 2b); absent otherwise. */
+  frame_id?: string | null;
 }
 
 /** Who this app is on the connector (`specs/0128` A26): from the login answer, not stored. */
@@ -220,7 +222,7 @@ export function refusalText(reason: string, alarm: string | null): string {
 /** The states in which a job or a homing is in flight: a dropped connection is then "Connection
  * lost" (`specs/0118` M9). */
 export function jobIsActive(state: JobState): boolean {
-  return ["Receiving", "Ready", "AwaitingLocalStart", "Homing", "Jogging", "Running", "Paused"].includes(state.name);
+  return ["Receiving", "Ready", "AwaitingLocalStart", "Homing", "Jogging", "Framing", "Running", "Paused"].includes(state.name);
 }
 
 /** Whether a pushed status ends a shown refusal (UX notes §8, "A refusal stays until the next
@@ -258,8 +260,17 @@ export function confirmKind(status: StatusMessage | null, session: Session | nul
  * waiting request carries a requester and no job. */
 export function confirmsHome(status: StatusMessage | null, session: Session | null): boolean {
   return (
-    status?.state.name === "AwaitingLocalStart" && !!status.requested_by && status.job === null && session?.role === "Owner"
+    status?.state.name === "AwaitingLocalStart" &&
+    !!status.requested_by &&
+    status.job === null &&
+    !status.frame_id &&
+    session?.role === "Owner"
   );
+}
+
+/** Whether an owner app's Frame slot confirms a member's waiting frame (`specs/0118` 2b, W36). */
+export function confirmsFrame(status: StatusMessage | null, session: Session | null): boolean {
+  return status?.state.name === "AwaitingLocalStart" && !!status.requested_by && !!status.frame_id && session?.role === "Owner";
 }
 
 export function jobButtons(
@@ -286,7 +297,8 @@ export function jobButtons(
       return { ...none, send: true, stop: true };
     case "Homing":
     case "Jogging":
-      // Stop ends a homing or a jog too and never asks (`specs/0118` criteria 5, 10).
+    case "Framing":
+      // Stop ends a homing, a jog or a frame too and never asks (`specs/0118` criteria 5, 10, 26).
       return { ...none, stop: true };
     case "Running":
       // A pending pause is cancelled by Resume; Pause shows it as waiting (`specs/0133` H3, H6).
@@ -356,7 +368,8 @@ export function waitingText(status: StatusMessage, session: Session | null): str
   if (!member) return "Waiting for the start at the machine";
   const line = status.job?.line ?? 0;
   if (session?.role === "Owner") {
-    // A member's Home waits without a job (`specs/0118` 37).
+    // A member's Home or frame waits without a job (`specs/0118` 37, 2b).
+    if (status.frame_id) return fitName((n) => `Frame requested by ${n}`, member);
     if (status.job === null) return fitName((n) => `Home requested by ${n}`, member);
     return line > 0
       ? fitName((n) => `Resume requested by ${n} at line ${formatCount(line)}`, member)
@@ -389,6 +402,9 @@ export function jobStateLine(status: StatusMessage, held: HeldJob | null, sessio
     case "Jogging":
       // The state of any jog on the connector, in every app (`specs/0118` 19, W23); no bar, no counts.
       return neutral("Jogging");
+    case "Framing":
+      // A frame is no job: neutral, no bar (`specs/0118` 22, W32).
+      return neutral("Framing");
     case "Running":
       return neutral(status.pause_pending === true ? PAUSE_PENDING_TEXT : "Running");
     case "Paused":

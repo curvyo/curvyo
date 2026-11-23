@@ -34,6 +34,9 @@ pub(in crate::session) struct PageJob {
     pub gate: Gate,
     /// What the Operations tab reads of it beyond the gate, built once per job (criterion 36 d).
     pub tab: OnceLock<TabFacts>,
+    /// The job its frame traces when a block has no power or speed, built once on the first
+    /// read (`specs/0118` Frage 335 B).
+    pub frame: OnceLock<super::frame::FrameJob>,
 }
 
 /// What a job was built from: equal keys give an equal job.
@@ -89,6 +92,11 @@ impl JobCache {
     /// resolved steps.
     pub(in crate::session) fn pictures(&self) -> curvyo_laser_core::adjust::PyramidCache {
         self.plans.borrow().pictures()
+    }
+
+    /// `f` on the job's plan cache.
+    pub(super) fn with_plans<R>(&self, f: impl FnOnce(&mut PlanCache) -> R) -> R {
+        f(&mut self.plans.borrow_mut())
     }
 
     /// An empty plan cache sharing the job's grey pyramids, for the Operations view's preview.
@@ -310,6 +318,7 @@ impl Session {
             timeline,
             gate,
             tab: OnceLock::new(),
+            frame: OnceLock::new(),
         }
     }
 }

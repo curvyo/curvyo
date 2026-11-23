@@ -83,7 +83,8 @@ impl Session {
     /// Play or Pause at the clock `now_ms`: Play starts from the slider, or from 0 at the end
     /// (criterion 37). Whether it is playing now.
     pub fn toggle_play(&mut self, now_ms: f64) -> bool {
-        if self.output.play.playing.take().is_some() {
+        if self.output.play.playing.take().is_some() || self.frame_head_shown() {
+            // One ring means one head: Play pauses while the frame's ring shows (W34).
             return false;
         }
         let Some(job) = self.laser_job() else {

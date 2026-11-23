@@ -46,6 +46,8 @@ export function homeButton(entry: LinkEntry): HomeButton {
   switch (status?.state.name) {
     case "Jogging":
       return off("Jogging");
+    case "Framing":
+      return off("Framing");
     case "Running":
     case "Paused":
       return off("A job is running");
@@ -86,6 +88,8 @@ export function jogCause(entry: LinkEntry, own: boolean): string | null {
       return "Homing";
     case "Jogging":
       return own ? null : "Jogging";
+    case "Framing":
+      return "Framing";
     case "Running":
     case "Paused":
       return "A job is running";
@@ -190,7 +194,7 @@ export function controlsLine(entry: LinkEntry, own: OwnPress = NO_PRESS): Contro
   // The name and size of this app's job only; a job of another app reads as plain "Ready".
   const id = status.job?.job_id ?? null;
   const held = entry.held !== null && (entry.held.jobId === null || entry.held.jobId === id) ? entry.held : null;
-  if (entry.discarded && (status.state.name === "Idle" || (entry.discarded === "Home" && status.state.name === "Ready"))) {
+  if (entry.discarded && (status.state.name === "Idle" || ((entry.discarded === "Home" || entry.discarded === "Frame") && status.state.name === "Ready"))) {
     return { ...pressed({ text: `Not started: ${entry.discarded}`, failure: false }), muted: true };
   }
   const line = jobStateLine(status, held, entry.session);
@@ -272,6 +276,8 @@ export const SETTLES: Record<
 > = {
   start: { done: () => true, ms: 0 },
   home: { done: () => true, ms: 0 },
+  // The connector's answer ends the press; the status then drives the busy look (`specs/0118` W29).
+  frame: { done: () => true, ms: 0 },
   // A pending pause is the connector's answer: from there the status drives Pause (`specs/0133`).
   resume: { done: (s) => s?.state.name !== "Paused" && !pausePending(s), ms: 3_000 },
   pause: { done: (s) => s?.state.name !== "Running" || pausePending(s), ms: 3_000 },

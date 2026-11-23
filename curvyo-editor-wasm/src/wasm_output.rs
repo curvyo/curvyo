@@ -185,6 +185,27 @@ impl WasmSession {
         })
     }
 
+    /// The frame text of the active laser page for the connector (`specs/0118` 2b): `shape` is
+    /// `rectangle` or `rubber_band`; `undefined` while the page cannot be framed ("Nothing to
+    /// frame", "Outside the work area"). Nothing is written to the project, no history step.
+    #[must_use]
+    pub fn frame_bytes(&self, shape: &str) -> Option<Vec<u8>> {
+        self.session
+            .frame_bytes(crate::session::output_frame_shape(shape))
+    }
+
+    /// The head ring of a running frame at the controller's position in millimetres; `relative`
+    /// for Head position, where it is the offset from where the frame began. Whether the page
+    /// has a job to show it on.
+    pub fn set_frame_head(&mut self, x_mm: f64, y_mm: f64, relative: bool) -> bool {
+        self.session.set_frame_head(x_mm, y_mm, relative)
+    }
+
+    /// The frame ended: the ring leaves. Whether one was shown.
+    pub fn clear_frame_head(&mut self) -> bool {
+        self.session.clear_frame_head()
+    }
+
     /// The connector accepted the job of `token` (`0125` S10): the step "Send job to machine"
     /// and Lasered at `now_ms`. The notice as `"<ms>:<text>"`, empty when there is none and for
     /// an unknown token.

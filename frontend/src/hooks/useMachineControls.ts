@@ -31,6 +31,12 @@ export interface MachineControlsModel {
   own: OwnPress;
   send: () => void;
   command: (kind: Command) => void;
+  /** Frame (`specs/0118` 2b): sends the page's frame text; the answer is the connector's. */
+  frame: (bytes: () => Uint8Array | undefined) => void;
+  /** An owner's press on "Confirm frame" (W36). */
+  confirmFrame: () => void;
+  /** This app sent the frame that runs: only this app draws the head ring (W33). */
+  sentFrame: boolean;
   /** A press in the job list (`specs/0132`); resolves when the connector answered. */
   listPress: (call: ListCall) => Promise<void>;
   /** The last list press found the list changed meanwhile: "The list changed" until the next
@@ -77,10 +83,25 @@ function settle(profileId: string, done: (s: StatusMessage | null) => boolean, m
  * block need not be mounted. The caller keys the component on the profile and address. */
 export function useMachineControls(profileId: string, address: string, enabled: boolean): MachineControlsModel {
   const [failure, setFailure] = useState<Line | null>(null);
+  const [sentFrame, setSentFrame] = useState(false);
   // The list the line "The list changed" was shown against: a newer push ends it.
   const [changedAt, setChangedAt] = useState<JobListMessage | null | undefined>(undefined);
   const entry = useLinkEntry(profileId, address, enabled, true);
   const lastStatus = useRef<StatusMessage | null>(null);
+  // The ring of this app's frame leaves with it, and a member's frame discarded while it waited
+  // never runs: the next frame, of any app, starts unsent.
+  const framingSeen = useRef(false);
+  const lastFrameStatus = useRef<StatusMessage | null>(null);
+  useEffect(() => {
+    const was = lastFrameStatus.current;
+    lastFrameStatus.current = entry.status;
+    const waited = was?.state.name === "AwaitingLocalStart" && Boolean(was.frame_id);
+    if (entry.status?.state.name === "Framing") framingSeen.current = true;
+    else if (framingSeen.current || (waited && entry.status?.state.name !== "AwaitingLocalStart")) {
+      framingSeen.current = false;
+      setSentFrame(false);
+    }
+  }, [entry.status]);
   // The state "No job to pause" was given in; it ends with any other (`specs/0133` H8).
   const refusedAt = useRef<string | null>(null);
 
@@ -191,6 +212,44 @@ export function useMachineControls(profileId: string, address: string, enabled: 
       }
     });
 
+  /** The answer of a frame press: a busy connector reads "Connector busy" as for Home. */
+  const frameAnswered = async (answer: CommandAnswer) => {
+    if (answer.kind === "failed") {
+      fail(answer.error);
+    } else if (answer.kind === "wrongState") {
+      show({ text: BUSY_TEXT, failure: true });
+      await refresh();
+    } else {
+      await refresh();
+    }
+    setSentFrame(answer.kind === "done");
+  };
+
+  const frame = (bytes: () => Uint8Array | undefined) =>
+    guard("frame", async () => {
+      show(null);
+      setSentFrame(false);
+      const text = bytes();
+      if (text === undefined) return;
+      const answer = await invoke<CommandAnswer>("connector_send_frame", { profileId, address }, text).catch(
+        (): CommandAnswer => ({ kind: "failed", error: { kind: "other", message: "Connector error" } }),
+      );
+      await frameAnswered(answer);
+    });
+
+  const confirmFrame = () =>
+    guard("frame", async () => {
+      show(null);
+      setSentFrame(false);
+      const answer = await invoke<CommandAnswer>("connector_command", { profileId, address, command: "confirm_frame" }).catch(
+        (): CommandAnswer => ({ kind: "failed", error: { kind: "other", message: "Connector error" } }),
+      );
+      // A confirmed member's frame draws no ring here: the requester's page placement is theirs (W35).
+      if (answer.kind === "failed") fail(answer.error);
+      else if (answer.kind === "wrongState") show({ text: BUSY_TEXT, failure: true });
+      await refresh();
+    });
+
   const jogFailed = (answer: CommandAnswer): boolean => {
     if (answer.kind === "failed") {
       fail(answer.error);
@@ -229,6 +288,9 @@ export function useMachineControls(profileId: string, address: string, enabled: 
     own: { sending: entry.busy === "send", failure },
     send,
     command,
+    frame,
+    confirmFrame,
+    sentFrame,
     listPress,
     listChanged,
     jog,

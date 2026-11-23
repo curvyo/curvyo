@@ -30,6 +30,10 @@
       "file_type": "GRBL G-code",
       "tooltip": "Fixture jobs have no material. Pick one above."
     },
+    "frame": {
+      "cause": null,
+      "enabled": true
+    },
     "machine": "Generic laser · GRBL",
     "start": {
       "damaged": false,

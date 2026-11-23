@@ -285,7 +285,8 @@ impl Session {
         let active = self.active_operations()?;
         let grids = self.grid_looks(&active.operations);
         let table = self.look_table_with(&active, &grids)?;
-        if let Some(toolpath) = self.toolpath_overlay() {
+        if let Some(mut toolpath) = self.toolpath_overlay() {
+            toolpath.extend(self.frame_head_overlay(view).unwrap_or_default());
             return Some((self.toolpath_artwork(objects, &table), toolpath));
         }
         let operations_view = self.operations_view_on();
@@ -334,6 +335,7 @@ impl Session {
         }
         out.extend(dots);
         self.chips_overlay(&mut overlay, rows, view);
+        overlay.extend(self.frame_head_overlay(view).unwrap_or_default());
         Some((out, overlay))
     }
 

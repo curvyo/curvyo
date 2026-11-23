@@ -35,6 +35,8 @@ export interface OutputApi {
   exportJob: () => Promise<void>;
   /** Send to machine and the connector's state (`specs/0125`). */
   send: SendApi;
+  /** The editor's session, for the Frame row's page API (`specs/0118` 2b). */
+  session: { get: () => WasmSession | null; sync: () => void };
 }
 
 /** The output group's API for `editor`; `projectFile` names the project for the file name. */
@@ -70,5 +72,6 @@ export function useOutput(
   const toggleRoute = useCallback((page: string) => run((s) => s.toggle_toolpath_view(page)), [run]);
   const exportJob = useJobExport(editor, projectFile, onError);
   const send = useSendJob(editor);
-  return { view, setFixtureMaterial, setStart, selectItems, selectRunning, toggleRoute, exportJob, send };
+  const session = useMemo(() => ({ get: getSession, sync }), [getSession, sync]);
+  return { view, setFixtureMaterial, setStart, selectItems, selectRunning, toggleRoute, exportJob, send, session };
 }

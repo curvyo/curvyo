@@ -21,7 +21,7 @@ import { notStartedText } from "./sendText.ts";
 
 /** The one press of a profile's connector controls that waits for its answer; the others of the
  * Machine block and the Machine controls footer are greyed meanwhile (`specs/0118` M11). */
-export type Busy = "test" | "pair" | "send" | "start" | "resume" | "pause" | "stop" | "unlock" | "home";
+export type Busy = "test" | "pair" | "send" | "start" | "resume" | "pause" | "stop" | "unlock" | "home" | "frame";
 
 /** What the page knows of the pairing of a profile; `unknown` until it was read. */
 export type Link = "unknown" | "paired" | "not_paired" | "no_longer_paired" | "key_changed";
@@ -173,9 +173,9 @@ const EMPTY: LinkEntry = {
   discarded: null,
 };
 
-/** The job's name when `next` shows that a member's own waiting request was discarded by someone
- * else (`specs/0128` UX notes V16): it waited, now nothing is held, and this app did not press
- * Stop; `null` otherwise. */
+/** The job's name, "Home" or "Frame" when `next` shows that a member's own waiting request was
+ * discarded by someone else (`specs/0128` UX notes V16): it waited, now nothing is held, and this
+ * app did not press Stop; `null` otherwise. */
 export function discardedName(
   last: StatusMessage | null,
   next: StatusMessage,
@@ -184,12 +184,13 @@ export function discardedName(
 ): string | null {
   const waited = last?.state.name === "AwaitingLocalStart" && Boolean(last.requested_by);
   const mine = session?.role === "Member" && last?.requested_by === session.clientName;
-  // A waiting Home carries no job; thrown away it leaves a kept Ready job where it was
-  // (`specs/0118` 37, UX notes W25).
-  const home = last?.job === null;
-  const ended = next.state.name === "Idle" || (home && next.state.name === "Ready");
+  // A waiting frame carries its id (`specs/0118` 2b, W35); a waiting Home carries no job. Thrown
+  // away, either leaves a kept Ready job where it was (`specs/0118` 37, UX notes W25).
+  const frame = Boolean(last?.frame_id);
+  const home = !frame && last?.job === null;
+  const ended = next.state.name === "Idle" || ((home || frame) && next.state.name === "Ready");
   if (!waited || !mine || ownStop || !ended) return null;
-  return home ? "Home" : (last?.job_name ?? "the job");
+  return frame ? "Frame" : home ? "Home" : (last?.job_name ?? "the job");
 }
 
 /** Whether the name of a send in progress stays: while its job arrives, and while it waits behind

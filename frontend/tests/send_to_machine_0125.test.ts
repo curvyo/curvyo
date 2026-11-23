@@ -73,6 +73,7 @@ test("S1: the group view decodes the send button and its absence", () => {
     total: null,
     export: { enabled: true, tooltip: null, file_type: "GRBL G-code", extension: "gcode" },
     toolpath_view: false,
+    frame: { enabled: false, cause: "Nothing to frame" },
   };
   assert.equal(decodeOutputGroup(view)?.send, null);
   const send = { enabled: false, cause: "not_paired", profile_id: "p1", address: "192.168.1.20:7447" };

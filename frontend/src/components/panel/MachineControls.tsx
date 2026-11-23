@@ -3,8 +3,10 @@ import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useId, u
 
 import { GLYPH, SMALL } from "@/components/workbench/machineStyles";
 import { JobList } from "@/components/panel/JobList";
+import { FrameRow } from "@/components/panel/FrameRow";
 import { JogPad } from "@/components/panel/JogPad";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
+import { type FramePage } from "@/hooks/useFramePage";
 import { type MachineControlsModel, useMachineControls } from "@/hooks/useMachineControls";
 import { useJogView } from "@/hooks/useJogView";
 import { notStartedLine } from "@/lib/connectorLink";
@@ -32,6 +34,8 @@ interface Props {
   address: string;
   /** The page profile's Laser mode and Max power, for the settings warning lines (W9). */
   profile: ProfileValues | null;
+  /** The active page's Frame API (`specs/0118` 2b). */
+  frame: FramePage;
 }
 
 interface ProfileValues {
@@ -52,7 +56,7 @@ export function MachineControls(props: Props) {
   return <MachineControlsFor key={`${props.profileId}|${props.address}`} {...props} />;
 }
 
-function MachineControlsFor({ profileId, address, profile }: Props) {
+function MachineControlsFor({ profileId, address, profile, frame }: Props) {
   const heading = useId();
   const model = useMachineControls(profileId, address, isTauri);
   const notice = footerNotice(model.entry, isTauri);
@@ -74,7 +78,7 @@ function MachineControlsFor({ profileId, address, profile }: Props) {
       ) : paired ? (
         <>
           <Warnings model={model} profile={profile} />
-          <ControlsBody model={model} corner={profile?.origin ?? "bottom_left"} />
+          <ControlsBody model={model} corner={profile?.origin ?? "bottom_left"} frame={frame} />
         </>
       ) : null}
     </section>
@@ -103,7 +107,7 @@ function Warnings({ model, profile }: { model: MachineControlsModel; profile: Pr
   );
 }
 
-function ControlsBody({ model, corner }: { model: MachineControlsModel; corner: Corner }) {
+function ControlsBody({ model, corner, frame }: { model: MachineControlsModel; corner: Corner; frame: FramePage }) {
   // Unlock leaves the tree when the alarm clears; a keyboard user who pressed it lands on the
   // toolbar's current button instead of the page body.
   const toolbar = useRef<HTMLDivElement>(null);
@@ -165,6 +169,7 @@ function ControlsBody({ model, corner }: { model: MachineControlsModel; corner: 
       <p role="alert" className="sr-only">
         {alert}
       </p>
+      <FrameRow model={model} frame={frame} />
       <Toolbar
         model={model}
         toolbarRef={toolbar}

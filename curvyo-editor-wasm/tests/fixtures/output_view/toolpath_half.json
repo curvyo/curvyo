@@ -19,6 +19,10 @@
       "file_type": "GRBL G-code",
       "tooltip": null
     },
+    "frame": {
+      "cause": null,
+      "enabled": true
+    },
     "machine": "Generic laser · GRBL",
     "start": {
       "damaged": false,

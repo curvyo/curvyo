@@ -55,6 +55,10 @@
       "file_type": "GRBL G-code",
       "tooltip": "Cut 1 has no power and speed."
     },
+    "frame": {
+      "cause": "Outside the work area",
+      "enabled": false
+    },
     "machine": "Generic laser · GRBL",
     "start": {
       "damaged": false,
