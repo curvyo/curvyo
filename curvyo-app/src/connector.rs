@@ -22,6 +22,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
+use crate::connector_jog::JogRequest;
 use crate::connector_link::{
     CommandAnswer, FileSendError, LinkError, OTHER_TEXT, PairAnswer, PairingView, SendAnswer,
     TestAnswer, effective_role, owner_label,
@@ -42,6 +43,8 @@ const JOB_DIR_FILE: &str = "connector-job-dir.txt";
 pub(crate) struct ConnectorState {
     watchers: Mutex<HashMap<String, Arc<AtomicBool>>>,
     pub(crate) pending: PendingSends,
+    /// The held jogs (`specs/0118` J8).
+    pub(crate) holds: crate::connector_jog::Holds,
 }
 
 /// The name of a profile's record in the credential store (addendum A8).
@@ -84,7 +87,7 @@ fn store_error(problem: StoreProblem) -> LinkError {
     }
 }
 
-fn job_state(status: &Message) -> JobState {
+pub(crate) fn job_state(status: &Message) -> JobState {
     match status {
         Message::Status { state, .. } => *state,
         _ => JobState::NoController,
@@ -403,7 +406,12 @@ pub(crate) fn connector_send_job(
 }
 
 /// The message a job button sends; `None` for an unknown command or a Start with no Ready job.
-fn command_message(command: &str, status: &Message, list: Option<&Message>) -> Option<Message> {
+fn command_message(
+    command: &str,
+    status: &Message,
+    list: Option<&Message>,
+    jog: Option<JogRequest>,
+) -> Option<Message> {
     Some(match command {
         "start" => Message::Start {
             job_id: ready_job_id(status, list)?,
@@ -415,6 +423,8 @@ fn command_message(command: &str, status: &Message, list: Option<&Message>) -> O
         "unlock" => Message::Unlock,
         // The homing cycle (`specs/0118`); the connector refuses it while a job runs.
         "home" => Message::Home,
+        // One step of the jog pad (`specs/0118` 16); a held press has its own commands.
+        "jog" => jog?.message(false),
         _ => return None,
     })
 }
@@ -429,6 +439,7 @@ pub(crate) fn connector_command(
     profile_id: String,
     address: String,
     command: String,
+    jog: Option<JogRequest>,
 ) -> CommandAnswer {
     let record = match load_record(&app, &open, &profile_id) {
         Ok(record) => record,
@@ -444,7 +455,8 @@ pub(crate) fn connector_command(
         Ok(opened) => opened,
         Err(e) => return CommandAnswer::Failed { error: e.into() },
     };
-    let Some(message) = command_message(&command, &status, connection.job_list.as_ref()) else {
+    let Some(message) = command_message(&command, &status, connection.job_list.as_ref(), jog)
+    else {
         return CommandAnswer::WrongState;
     };
     match connection.command(&message, job_state(&status)) {
@@ -648,6 +660,7 @@ pub(crate) fn connector_unwatch(state: State<'_, ConnectorState>, profile_id: St
 #[cfg(test)]
 mod tests {
     use super::*;
+    use curvyo_connector_core::{JogAxis, JogDirection, JogStep};
     use curvyo_connector_io::hub::{ControllerChoice, FakeSettings};
     use curvyo_connector_io::server::{RunningServer, ServerConfig};
 
@@ -770,6 +783,9 @@ mod tests {
             requested_by: None,
             job_name: None,
             sent_by: None,
+            homed: false,
+            machine_position: None,
+            work_offset: None,
         }
     }
 
@@ -796,6 +812,34 @@ mod tests {
     }
 
     #[test]
+    fn jog_maps_to_one_step_message_and_needs_its_request() {
+        let request = JogRequest {
+            axis: JogAxis::Y,
+            direction: JogDirection::Minus,
+            step: JogStep::Tenth,
+        };
+        let idle = status(JobState::Idle, None);
+        assert_eq!(
+            command_message("jog", &idle, None, Some(request)),
+            Some(Message::Jog {
+                axis: JogAxis::Y,
+                direction: JogDirection::Minus,
+                step: JogStep::Tenth,
+                hold: false,
+            })
+        );
+        assert_eq!(command_message("jog", &idle, None, None), None);
+        // The request's words are the wire's: closed sets, never a number.
+        let parsed: JogRequest =
+            serde_json::from_str(r#"{"axis":"X","direction":"Plus","step":"0.1"}"#).unwrap();
+        assert_eq!(parsed.step, JogStep::Tenth);
+        assert!(
+            serde_json::from_str::<JogRequest>(r#"{"axis":"X","direction":"Plus","step":"7"}"#)
+                .is_err()
+        );
+    }
+
+    #[test]
     fn home_maps_to_the_home_message_in_any_state_and_unknown_words_to_none() {
         for state in [
             JobState::Idle,
@@ -804,21 +848,21 @@ mod tests {
             JobState::Running,
         ] {
             assert_eq!(
-                command_message("home", &status(state, None), None),
+                command_message("home", &status(state, None), None, None),
                 Some(Message::Home)
             );
         }
         let id = Uuid::nil();
         assert_eq!(
-            command_message("start", &status(JobState::Ready, Some(id)), None),
+            command_message("start", &status(JobState::Ready, Some(id)), None, None),
             Some(Message::Start { job_id: id })
         );
         assert_eq!(
-            command_message("start", &status(JobState::Idle, None), None),
+            command_message("start", &status(JobState::Idle, None), None, None),
             None
         );
         assert_eq!(
-            command_message("reboot", &status(JobState::Idle, None), None),
+            command_message("reboot", &status(JobState::Idle, None), None, None),
             None
         );
     }

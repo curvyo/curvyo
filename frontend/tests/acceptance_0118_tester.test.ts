@@ -286,10 +286,11 @@ test("section 8: browser, not paired, no longer paired, key changed, no store, p
 // Criterion 1 and W1 to W5, W11, section 10, 11: layout facts on the component sources
 // ---------------------------------------------------------------------------------------------
 
-test("W3 / c1: the toolbar order is Home, Send job..., Start / Resume, Pause, Stop with the notes' glyphs", () => {
+// Amended in place by slice 2a (`specs/0118` criterion 15, UX notes W3): Jog joins Home's group.
+test("W3 / c1: the toolbar order is Home, Jog, Send job..., Start / Resume, Pause, Stop with the notes' glyphs", () => {
   const keys = [...TOOLBAR.matchAll(/key: "(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(keys.slice(0, 5), ["home", "send", "start", "pause", "stop"]);
-  assert.match(TOOLBAR, /name: "Home"[^\n]*<House /);
+  assert.deepEqual(keys.slice(0, 6), ["home", "jog", "send", "start", "pause", "stop"]);
+  assert.match(TOOLBAR, /name: home\.name \?\? "Home"[^\n]*<House /);
   assert.match(TOOLBAR, /name: "Send job\.\.\."[^\n]*<FileUp /);
   assert.match(TOOLBAR, /<Play /);
   assert.match(TOOLBAR, /name: "Pause"[^\n]*<Pause /);

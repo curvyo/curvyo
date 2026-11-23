@@ -19,6 +19,7 @@ import {
   refusalText,
 } from "@/lib/connectorText";
 import { type JobListMessage, type ListCall } from "@/lib/jobList";
+import { type JogRequest } from "@/lib/jog";
 import { type OwnPress, SETTLES, heldAfterSend, refusalEnds } from "@/lib/machineControls";
 import { invoke } from "@/platform/host";
 
@@ -35,6 +36,15 @@ export interface MachineControlsModel {
   /** The last list press found the list changed meanwhile: "The list changed" until the next
    * press in the list or push (UX notes section 4). */
   listChanged: boolean;
+  /** The jog pad (`specs/0118` 16, 18): one step, a hold that resolves with whether the connector
+   * took it, a keep-alive of the held press, and its release. */
+  jog: {
+    step: (request: JogRequest) => void;
+    hold: (request: JogRequest) => Promise<boolean>;
+    /** Resolves with whether the hold lives on; `false` ends the press. */
+    keep: () => Promise<boolean>;
+    release: () => void;
+  };
 }
 
 /** "Connector busy": the connector refused a command that no longer fits (UX notes section 5). */
@@ -181,6 +191,39 @@ export function useMachineControls(profileId: string, address: string, enabled: 
       }
     });
 
+  const jogFailed = (answer: CommandAnswer): boolean => {
+    if (answer.kind === "failed") {
+      fail(answer.error);
+    } else if (answer.kind === "wrongState") {
+      // The state moved on (a job started, an alarm): the fresh status names the cause.
+      void refresh();
+    }
+    return answer.kind === "done";
+  };
+  const lostAnswer = (): CommandAnswer => ({ kind: "failed", error: { kind: "other", message: "Connector error" } });
+  const jog = {
+    step: (request: JogRequest) => {
+      if (!enabled) return;
+      void invoke<CommandAnswer>("connector_command", { profileId, address, command: "jog", jog: request })
+        .catch(lostAnswer)
+        .then(jogFailed);
+    },
+    hold: async (request: JogRequest) => {
+      if (!enabled) return false;
+      const answer = await invoke<CommandAnswer>("connector_jog_hold", { profileId, address, jog: request }).catch(lostAnswer);
+      return jogFailed(answer);
+    },
+    keep: async () => {
+      // Quiet when nothing is held any more: the release came first.
+      const answer = await invoke<CommandAnswer>("connector_jog_keep", { profileId }).catch(lostAnswer);
+      if (answer.kind === "failed") jogFailed(answer);
+      return answer.kind === "done";
+    },
+    release: () => {
+      void invoke<CommandAnswer>("connector_jog_release", { profileId }).catch(lostAnswer);
+    },
+  };
+
   return {
     entry,
     own: { sending: entry.busy === "send", failure },
@@ -188,5 +231,6 @@ export function useMachineControls(profileId: string, address: string, enabled: 
     command,
     listPress,
     listChanged,
+    jog,
   };
 }

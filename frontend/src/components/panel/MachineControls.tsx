@@ -1,11 +1,14 @@
-import { CircleAlert, FileUp, House, LockOpen, Pause, Play, Square, TriangleAlert } from "lucide-react";
+import { CircleAlert, FileUp, House, LockOpen, Move, Pause, Play, Square, TriangleAlert } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, type RefObject, useEffect, useId, useRef, useState } from "react";
 
 import { GLYPH, SMALL } from "@/components/workbench/machineStyles";
 import { JobList } from "@/components/panel/JobList";
+import { JogPad } from "@/components/panel/JogPad";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
 import { type MachineControlsModel, useMachineControls } from "@/hooks/useMachineControls";
+import { useJogView } from "@/hooks/useJogView";
 import { notStartedLine } from "@/lib/connectorLink";
+import { type Corner } from "@/lib/jog";
 import { firstWaiting, listFull, senderText, startName } from "@/lib/jobList";
 import { confirmKind, formatCount, formatElapsed, jobButtons } from "@/lib/connectorText";
 import {
@@ -16,6 +19,7 @@ import {
   footerNotice,
   homeButton,
   ownFailureBelow,
+  workOffsetNotice,
   sendFailureBelow,
   pauseButton,
   pausePending,
@@ -33,6 +37,8 @@ interface Props {
 interface ProfileValues {
   laserMode: boolean;
   maxPower: number;
+  /** The profile's origin corner: which arrow drives which machine axis (`specs/0118` W20). */
+  origin: Corner;
 }
 
 /**
@@ -68,7 +74,7 @@ function MachineControlsFor({ profileId, address, profile }: Props) {
       ) : paired ? (
         <>
           <Warnings model={model} profile={profile} />
-          <ControlsBody model={model} />
+          <ControlsBody model={model} corner={profile?.origin ?? "bottom_left"} />
         </>
       ) : null}
     </section>
@@ -82,9 +88,12 @@ function Warnings({ model, profile }: { model: MachineControlsModel; profile: Pr
   const warnings = shown && profile !== null
     ? controller_warnings(profile.laserMode, profile.maxPower, info.settings?.laser_mode ?? undefined, info.settings?.s_max ?? undefined)
     : [];
+  // A work offset on the controller is told, never written or changed (`specs/0118` 14).
+  const offset = workOffsetNotice(model.entry.status);
+  const shownWarnings = offset === null ? warnings : [...warnings, offset];
   return (
     <div role="status" className="flex flex-col gap-1 text-xs text-[var(--toolbar-icon)] empty:-mb-2">
-      {warnings.map((text) => (
+      {shownWarnings.map((text) => (
         <p key={text} className="flex items-start gap-1">
           <TriangleAlert {...SMALL} className="mt-0.5 shrink-0" />
           <span>{text}</span>
@@ -94,11 +103,16 @@ function Warnings({ model, profile }: { model: MachineControlsModel; profile: Pr
   );
 }
 
-function ControlsBody({ model }: { model: MachineControlsModel }) {
+function ControlsBody({ model, corner }: { model: MachineControlsModel; corner: Corner }) {
   // Unlock leaves the tree when the alarm clears; a keyboard user who pressed it lands on the
   // toolbar's current button instead of the page body.
   const toolbar = useRef<HTMLDivElement>(null);
   const unlockHadFocus = useRef(false);
+  const padId = useId();
+  const [view, setView] = useJogView();
+  // A member's app has no pad: rights are drawn, not greyed (`specs/0118` 12, W25).
+  const jogs = model.entry.session?.role !== "Member";
+  const padOpen = jogs && view.open;
   const status = model.entry.status;
   const inAlarm = status?.state.name === "Alarm";
   useEffect(() => {
@@ -124,8 +138,10 @@ function ControlsBody({ model }: { model: MachineControlsModel }) {
   const notStarted = notStartedLine(model.entry);
   // Quiet from the confirm until the started job leaves Ready (the start's answer can come first).
   const startedJob = model.entry.startedJob;
+  // "Jogging" is not said either: each step would be read (`specs/0118` W23).
   const quiet =
-    status?.state.name === "Ready" && (model.entry.startStep || (startedJob !== null && startedJob === status.job?.job_id));
+    status?.state.name === "Jogging" ||
+    (status?.state.name === "Ready" && (model.entry.startStep || (startedJob !== null && startedJob === status.job?.job_id)));
   // A refused page send while a job is held reads under that job's line, said once (P17).
   const refused = notStarted === null ? (sendFailureBelow(model.entry) ?? ownFailureBelow(model.entry, model.own)) : null;
   const polite = line !== null && !line.alerts && notStarted === null && refused === null && !quiet ? line.text : spoken;
@@ -140,13 +156,20 @@ function ControlsBody({ model }: { model: MachineControlsModel }) {
         onUnlockFocus={() => (unlockHadFocus.current = true)}
       />
       <JobList model={model} />
+      {padOpen ? (
+        <JogPad id={padId} model={model} corner={corner} step={view.step} onStep={(step) => setView({ ...view, step })} />
+      ) : null}
       <p role="status" className="sr-only">
         {polite}
       </p>
       <p role="alert" className="sr-only">
         {alert}
       </p>
-      <Toolbar model={model} toolbarRef={toolbar} />
+      <Toolbar
+        model={model}
+        toolbarRef={toolbar}
+        jog={jogs ? { open: padOpen, controls: padId, toggle: () => setView({ ...view, open: !view.open }) } : null}
+      />
     </>
   );
 }
@@ -158,11 +181,27 @@ interface Item {
   busy: boolean;
   cause?: string | null;
   describedBy?: string;
+  /** A toggle that opens the jog pad. */
+  toggle?: { expanded: boolean; controls: string };
   icon: ReactNode;
   press: () => void;
 }
 
-function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRef: RefObject<HTMLDivElement | null> }) {
+interface JogToggle {
+  open: boolean;
+  controls: string;
+  toggle: () => void;
+}
+
+function Toolbar({
+  model,
+  toolbarRef,
+  jog,
+}: {
+  model: MachineControlsModel;
+  toolbarRef: RefObject<HTMLDivElement | null>;
+  jog: JogToggle | null;
+}) {
   const { entry } = model;
   const confirm = confirmKind(entry.status, entry.session);
   const buttons = jobButtons(entry.status?.state ?? null, pausePending(entry.status), confirm);
@@ -176,7 +215,21 @@ function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRe
   const next = stateName === "Idle" || stateName === "Done" ? firstWaiting(entry.jobList) : null;
   const full = listFull(entry.jobList);
   const items: Item[] = [
-    { key: "home", name: "Home", enabled: home.enabled, busy: home.busy, cause: home.cause, icon: <House {...GLYPH} />, press: () => model.command("home") },
+    { key: "home", name: home.name ?? "Home", enabled: home.enabled, busy: home.busy, cause: home.cause, describedBy: home.name === "Confirm home" ? "machine-controls-state" : undefined, icon: <House {...GLYPH} />, press: () => model.command("home") },
+    // Opening moves nothing, so the toggle is never greyed while paired (`specs/0118` 15, 20).
+    ...(jog === null
+      ? []
+      : [
+          {
+            key: "jog",
+            name: "Jog",
+            enabled: true,
+            busy: false,
+            toggle: { expanded: jog.open, controls: jog.controls },
+            icon: <Move {...GLYPH} />,
+            press: jog.toggle,
+          } satisfies Item,
+        ]),
     { key: "send", name: "Send job...", enabled: buttons.send && idle && !full, busy: entry.busy === "send", cause: full ? "List full" : null, icon: <FileUp {...GLYPH} />, press: model.send },
     {
       key: "start",
@@ -209,13 +262,14 @@ function Toolbar({ model, toolbarRef }: { model: MachineControlsModel; toolbarRe
   return (
     <div ref={toolbarRef} role="toolbar" aria-label="Machine" className="flex gap-1">
       {items.map((item, at) => (
-        <div key={item.key} className={at === 0 ? "mr-1 flex" : "flex"}>
+        <div key={item.key} className={item.key === (jog === null ? "home" : "jog") ? "mr-1 flex" : "flex"}>
           <SymbolButton
             name={item.name}
             enabled={item.enabled}
             busy={item.busy}
             cause={item.cause}
             describedBy={item.describedBy}
+            toggle={item.toggle}
             side="top"
             tabIndex={rover === at ? 0 : -1}
             buttonRef={(node) => {
