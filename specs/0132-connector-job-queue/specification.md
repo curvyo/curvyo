@@ -1,6 +1,6 @@
 # Job list on the connector: send jobs while the laser works, reorder, start
 
-Status: Draft
+Status: Ready for slice 1 (adrs.md and ux-notes.md done 2026-11-23). Slice 1 = criteria 1 to 9, 11 and 14; criteria 12 and 13 are slice 2 after `0118` run-from-line. Fragen 301 (start press), 302 (slicing) and 303 (member flag) are applied by their defaults and vetoable at the demo
 Priority: Should
 Origin: Customer, first laser test, 2026-11-18. Translated: "The owner needs a job list so that jobs can be sent while the laser cutter is still working. The owner can then change the order and press start."
 
