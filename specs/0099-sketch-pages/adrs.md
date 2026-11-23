@@ -97,3 +97,16 @@ Architect, 2026-11-06. Slice 2 of `0063` (concept A). Frage 157 A and 158 A assu
 10. Criterion 1 test wording: "belongs to its sketch page only" also needs the sketch overlapping a
     drawing page to be no member of that drawing page (ADR 0043 §1); suggest the test place the
     sketch across a neighbouring drawing page's edge.
+
+## Revision 2026-11-19 (sketch instances, criteria 23 to 31)
+
+- 2026-11-23: **Instance mechanism decided in [ADR 0079](../../docs/adr/0079-generated-objects-extension-trait-and-parametric-instances.md)
+  §6 and §9** (proposed, `needs-customer`), shared with the generated objects of `0141`: the sketch
+  holds `exposed_params` (one atomic list of `{ id, min, max }`, criterion 23); a clone holds its
+  own values in one atomic map `instance_params` keyed by `ParameterId` (absent = the sketch's
+  value, the nearest own value on a chain wins; criteria 24, 27, 28); document-core solves a clone
+  with its values in the read pass, once per distinct value set, keeping the last valid geometry
+  (26, 31); one `curvyo-ui-core/src/instance.rs` for the schema, the edit (`change_parameter`), the
+  preview memo, the handles (25) and Convert to paths / Unlink with own values (29). Its own
+  `format_version` bump and goldens when the revision lands (30). The 16 ms budget of criterion 31
+  stands. Still missing before Ready: UX notes for Expose and the handles.

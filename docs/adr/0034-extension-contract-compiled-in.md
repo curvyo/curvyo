@@ -6,6 +6,8 @@ the wasm host story); ADR 0005 §1 to §8 and §2 (wasm host in the MVP) stay as
 of [ADR 0006](0006-license.md) for extensions. Adds crates to
 [ADR 0011](0011-workspace-and-crate-layout.md) §2 and §3. Specs: `0065`, `0093` criterion 11.
 
+Note 2026-11-23: §3, §4 and §8 amended by [ADR 0079](0079-generated-objects-extension-trait-and-parametric-instances.md) (accepted 2026-11-23, spec `0141`): the second extension crate `curvyo-generators-core` meets the §3 trigger; the registry holds `&'static dyn Extension` (`manifest`, `notice`, `generate`) instead of `match id`; §4 gains `Contribution::Generator`, the parameter kinds Count, Angle, Switch and Choice, and a closed-path type.
+
 ## Context
 
 The customer decided on 2026-10-17 (spec `0065`, EXT-ROUTE): extensions may be compiled in as

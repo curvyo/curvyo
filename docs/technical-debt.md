@@ -2856,3 +2856,43 @@ with the motors released after homing, is still "homed", so the travel clamp tru
 is no longer true; a controller without limit switches that reports `ok` to `$H` is trusted too.
 
 **Resolution:** accepted; GRBL's own soft limits (`$20`) stay the last guard, as for any sender.
+
+## `curvyo-editor-wasm` depends on `curvyo-laser-core` directly (observed in `0141`, 2026-11-23)
+
+ADR 0034 §2 and the ADR 0011 note of 2026-11-02 list `editor-wasm → extension-core` only, but
+`curvyo-editor-wasm/Cargo.toml` depends on `curvyo-laser-core`, and the session calls it in many
+modules (settings, operations, job, fixtures, materials, library sync); ui-core calls it outside
+`extensions.rs` as well. The `Extension` trait of ADR 0079 covers only the registry dispatch and
+does not absorb these calls. **Resolution:** an ADR that either records the edge as accepted (the
+laser is a compiled-in, trusted extension the session drives) or moves the calls behind ui-core;
+trigger: a second manufacturing extension that needs the same session plumbing.
+
+## Rails scroll and a single column on small screens (customer, 2026-11-23)
+
+Adding the Generators tool to the More tools card (spec `0141`, Frage 309) makes the tool rails taller;
+in the smallest window (560 px) column A already scrolls under the Tools card by an ad-hoc rule.
+**Resolution:** rework the rails so that they scroll to fit any screen height, and on a small screen
+show all rails as one column, below each other (customer, 2026-11-23: "simply there for now").
+Trigger: the next card that grows, or the first report of a hidden tool on a small screen.
+
+## Thread-local extension settings in `curvyo-ui-core` (observed in `0141`, 2026-11-23)
+
+`curvyo-ui-core/src/extensions.rs` keeps the session's `ExtensionSettings` in a thread-local
+(`set_active_extension_settings`, set by `Session::recording_unguarded`), read by
+`group_transform::commit_group` for the resize of a generated object. This is ambient state in a
+`*-core` crate (CLAUDE.md §6: callers pass everything in): a commit path not entered through the
+session reads stale or default settings (everything enabled). **Resolution:** `commit_group` and its
+eight callers take `&ExtensionSettings` (or it joins `ScaleModes`), and the thread-local goes.
+Trigger: the next change to `commit_group`'s signature, or before `0099`'s instance arm lands.
+
+## Generator UX review leftovers (observed in `0141`, 2026-11-23)
+
+UX review of `0141` was fixed except for three deferred items (UX notes §9, §10, §13), all additive:
+(1) one Generator block for several selected generated objects of one kind, with Mixed where values
+differ and a typed value writing all; today a multi-selection shows no block; (2) the knob's hover
+dimension look and the double-click entry chip of a knob; (3) step names read from the step's own fields
+(`gk`, `gp`) so that the History tab shows "Gear: Teeth" after a reopen; today the kind-specific name
+lives in the session's undo stack and a reopened file shows the label's fallback ("Change parameter").
+**Resolution:** (1) a shared-value read over several objects in `instance.rs`; (2) the knob overlay and an
+entry chip in the session; (3) the history row reads the step's fields in `curvyo-document-core`.
+Trigger: the first customer report, or `0099`'s instance arm.
