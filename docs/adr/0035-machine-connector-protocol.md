@@ -171,3 +171,17 @@ the jog ended does nothing, so it can never discard a `Ready` job. The dead-man 
 `JogKeep`) counts on an injected clock: the hub passes the time since its start to the job machine
 on every 50 ms tick and before each jog message, and core has no clock of its own. Details:
 `specs/0118-machine-control/adrs.md`, "Second slice 2a (jog)", J1 to J9.
+
+## Amendment 2026-11-23: the frame (spec `0118`, slice 2b)
+
+Protocol 0, additive (section 6): `State` gains `Framing`, `RejectReason` gains `NotAFrame`, and
+`Status` gains `frame_id`, left out when there is no frame, so every earlier golden file stays
+byte-identical. `JobKind::Frame` (section 6, P2) now has its rules: a frame is assembled in a slot
+of its own beside the held job (a `Ready` job stays held and is never listed), is at most one chunk
+(`TooLarge` above), and the connector reads its words before anything moves: only `G21`, `G90`,
+`G91`, `G17`, `M5`, `M9` and `G1` with `X`, `Y`, `F` above 0 and `S0`, `M5` and `G21` and a distance
+mode before the first `G1`; anything else is `NotAFrame`. A frame can therefore never turn the laser
+on, which is why `$32=0` does not refuse it. A homed machine's frame is checked against the travel
+before the first byte (`Outside the travel by <n> mm`, Frage 334 A). A member's frame waits for an
+owner, who confirms it with `Start { job_id: frame_id }` (`Confirms::Frame`, `admin.log` names Frame).
+Details: `specs/0118-machine-control/adrs.md` F1 to F7.
