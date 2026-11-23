@@ -2,6 +2,7 @@ import type { FixtureKind } from "@/lib/fixturesView";
 import { FixtureGlyph } from "@/components/workbench/FixtureGlyphs";
 import {
   Box,
+  Crosshair,
   ChevronDown,
   ChevronRight,
   Circle,
@@ -66,6 +67,9 @@ const KIND_GLYPHS: Record<string, Glyph> = {
   image: Image,
   // A dimension (`specs/0070-measure-and-dimension` UX notes §9).
   dimension: Ruler,
+  // Registration marks and a mark (`specs/0121-print-and-cut` UX notes §3.2).
+  "registration-marks": Crosshair,
+  "registration-mark": Crosshair,
   // A laser page's tree (`specs/0106` UX notes §5): its placed pages and the Fixtures row.
   "placed-page": Frame,
   fixtures: Grid3x3,

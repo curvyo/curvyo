@@ -51,6 +51,8 @@ interface DocumentSectionProps {
   /** A laser page's Machine and Fixtures blocks, or the notice of its switched-off extension
    * (`specs/0098` criteria 13, 18 b); nothing on another page. */
   machine?: ReactNode;
+  /** Add registration marks on a Drawing page (`specs/0121` UX notes §2). */
+  registrationMarks?: ReactNode;
   onReturnFocus: () => void;
 }
 
@@ -68,6 +70,7 @@ export function DocumentSection({
   background,
   workbenches,
   machine,
+  registrationMarks,
   onReturnFocus,
 }: DocumentSectionProps) {
   const { view } = doc;
@@ -216,6 +219,7 @@ export function DocumentSection({
           )}
         </div>
       )}
+      {registrationMarks}
       <div
         aria-hidden
         className="my-1 h-px"

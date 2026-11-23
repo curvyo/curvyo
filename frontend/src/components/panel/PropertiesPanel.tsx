@@ -27,6 +27,9 @@ import { useTextLayout } from "@/hooks/useTextLayout";
 import { focusCurrentFont, fontsSubject } from "@/lib/textText";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
+import { PrintAndCutSection } from "@/components/panel/PrintAndCutSection";
+import { RegistrationMarksBlock } from "@/components/panel/RegistrationMarksBlock";
+import type { PrintAndCutApi } from "@/hooks/usePrintAndCut";
 import { DocumentSection } from "@/components/panel/DocumentSection";
 import { ExportSvgSection } from "@/components/panel/ExportSvgSection";
 import { FileTab } from "@/components/panel/FileTab";
@@ -107,6 +110,8 @@ interface PropertiesPanelProps {
   fixtures: FixturesApi;
   /** The fixture jobs of the active laser page (`specs/0103-fixture-jobs`). */
   fixtureJobs: FixtureJobsApi;
+  /** Registration marks and the Print and cut group (`specs/0121-print-and-cut`). */
+  printAndCut: PrintAndCutApi;
   /** The Settings block of the selected operations (`specs/0028-material-test-library`). */
   operationSettings: OperationSettingsApi;
   /** The operation tools: the fold of a row, its options and the kind press status (`specs/0111`). */
@@ -152,6 +157,7 @@ export function PropertiesPanel({
   operations,
   fixtures,
   fixtureJobs,
+  printAndCut,
   operationSettings,
   operationTools,
   materials,
@@ -573,6 +579,20 @@ export function PropertiesPanel({
               <GridSection grid={grid} disabled={snapping.view.hasDrag} onReturnFocus={returnFocus}/>
             ) : doc.view.content === "document" ? (
               <DocumentSection
+                registrationMarks={
+                  printAndCut.marksOffered ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        printAndCut.addMarks();
+                        returnFocus();
+                      }}
+                      className="h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                    >
+                      Add registration marks
+                    </button>
+                  ) : null
+                }
                 document={doc}
                 formats={formats}
                 background={background}
@@ -617,7 +637,9 @@ export function PropertiesPanel({
                   <PlacedPageBlock text={placedPage} />
                   {/* A placed page has no style of its own: no Stroke, no Fill (`specs/0106`
                       criterion 12). */}
-                  {placedPage === "" ? (
+                  {printAndCut.marks ? (
+                    <RegistrationMarksBlock api={printAndCut} onReturnFocus={returnFocus} />
+                  ) : placedPage === "" ? (
                     <StyleSection
                       panel={panel}
                       gradient={gradient}
@@ -644,6 +666,15 @@ export function PropertiesPanel({
                     onPickMaterial={(id) => output.setFixtureMaterial(id)}
                     onReturnFocus={returnFocus}
                     pickRequest={fixturePickRequest}
+                  />
+                }
+                notCut={printAndCut.view?.not_cut ?? null}
+                printAndCut={
+                  <PrintAndCutSection
+                    api={printAndCut}
+                    profileId={output.view?.send?.profileId ?? null}
+                    address={output.view?.send?.address ?? ""}
+                    onReturnFocus={returnFocus}
                   />
                 }
                 outputGroup={

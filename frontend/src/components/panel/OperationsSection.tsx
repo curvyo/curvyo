@@ -37,6 +37,11 @@ interface OperationsSectionProps {
   onReturnFocus: () => void;
   /** The Fixture jobs section (`specs/0103-fixture-jobs`), drawn under the list. */
   fixtureJobs?: ReactNode;
+  /** The Print and cut group, between Fixture jobs and Output (`specs/0121` UX notes P9). */
+  printAndCut?: ReactNode;
+  /** The muted, unselectable row of a placed sheet's marks: "Registration marks (not cut)"
+   * (`specs/0121` criterion 5). */
+  notCut?: string | null;
   /** The output group (`specs/0029` UX 6.3), drawn after the Fixture jobs section. */
   outputGroup?: ReactNode;
   /** The Settings block's commands (`specs/0028-material-test-library`). */
@@ -80,7 +85,7 @@ function entryOfRow(entries: ListEntry[]): number[] {
 /** The names of the two section groups (`ux-notes.md` 4.3). */
 const SECTION_NAMES = { marking: "Marking", cutting: "Cutting" } as const;
 
-export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, outputGroup, settings, tools, onEditMaterial }: OperationsSectionProps) {
+export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, printAndCut, notCut, outputGroup, settings, tools, onEditMaterial }: OperationsSectionProps) {
   const { view, notice, dropKey, dropBadge } = api;
   /** A coarse pointer takes the 64 px rows (`specs/0029` P25). */
   const coarse = useMemo(() => window.matchMedia?.("(pointer: coarse)").matches ?? false, []);
@@ -486,7 +491,13 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
           onReturnFocus={onReturnFocus}
         />
       ) : null}
+      {notCut ? (
+        <p aria-disabled className="px-1 text-xs text-[var(--panel-muted-fg)]">
+          {notCut}
+        </p>
+      ) : null}
       {fixtureJobs}
+      {printAndCut}
       {outputGroup}
       {notice && notice !== settings.skip ? (
         <p role="status" className="text-xs text-[var(--toolbar-icon)]">
