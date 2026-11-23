@@ -5,8 +5,8 @@ mod common;
 
 use common::{fixture, job_id};
 use curvyo_connector_core::{
-    CodecError, ControllerInfo, ErrorCode, JobKind, JobResult, MAX_FRAME_BYTES, Message,
-    Millimetres, Progress, RejectReason, State, decode, encode,
+    CodecError, ControllerInfo, ErrorCode, JobKind, JobResult, JogAxis, JogDirection, JogStep,
+    MAX_FRAME_BYTES, Message, Millimetres, Progress, RejectReason, State, decode, encode,
 };
 
 const HASH: &str = "afdfb1bfea4a611e31fc3372a8960825bb26d849ab5c4de252388c182ac1b7cd";
@@ -37,6 +37,9 @@ fn status(
         requested_by: None,
         job_name: None,
         sent_by: None,
+        homed: false,
+        machine_position: None,
+        work_offset: None,
     }
 }
 
@@ -59,7 +62,7 @@ fn controller() -> ControllerInfo {
     }
 }
 
-/// One value per golden file under `tests/fixtures/messages/`; the 18 types all appear.
+/// One value per golden file under `tests/fixtures/messages/`; the 21 types all appear.
 #[allow(clippy::too_many_lines)] // one flat table, a split would only hide a row
 fn all() -> Vec<(&'static str, Message)> {
     vec![
@@ -101,6 +104,26 @@ fn all() -> Vec<(&'static str, Message)> {
         ("stop", Message::Stop),
         ("command_unlock", Message::Unlock),
         ("command_home", Message::Home),
+        (
+            "command_jog",
+            Message::Jog {
+                axis: JogAxis::X,
+                direction: JogDirection::Plus,
+                step: JogStep::One,
+                hold: false,
+            },
+        ),
+        (
+            "command_jog_hold",
+            Message::Jog {
+                axis: JogAxis::Y,
+                direction: JogDirection::Minus,
+                step: JogStep::Tenth,
+                hold: true,
+            },
+        ),
+        ("command_jog_keep", Message::JogKeep),
+        ("command_jog_stop", Message::JogStop),
         (
             "welcome",
             Message::Welcome {
@@ -162,6 +185,41 @@ fn all() -> Vec<(&'static str, Message)> {
                 None,
             ),
         ),
+        ("status_jogging", status(State::Jogging, None, None, None)),
+        (
+            "status_homed_positions",
+            Message::Status {
+                state: State::Idle,
+                job: None,
+                position: Some([-12.5, -30.0, 0.0].map(Millimetres)),
+                alarm: None,
+                detail: None,
+                pause_pending: false,
+                requested_by: None,
+                job_name: None,
+                sent_by: None,
+                homed: true,
+                machine_position: Some([-112.5, -130.0, 0.0].map(Millimetres)),
+                work_offset: Some([100.0, 100.0, 0.0].map(Millimetres)),
+            },
+        ),
+        (
+            "status_awaiting_home",
+            Message::Status {
+                state: State::AwaitingLocalStart,
+                job: None,
+                position: None,
+                alarm: None,
+                detail: None,
+                pause_pending: false,
+                requested_by: Some("Phone".into()),
+                job_name: None,
+                sent_by: None,
+                homed: false,
+                machine_position: None,
+                work_offset: None,
+            },
+        ),
         (
             "status_alarm",
             status(State::Alarm, None, None, Some("ALARM:1 Hard limit")),
@@ -186,7 +244,7 @@ fn every_message_matches_its_golden_file_and_round_trips() {
 }
 
 #[test]
-fn the_goldens_cover_all_eighteen_types() {
+fn the_goldens_cover_all_twenty_one_types() {
     let mut types: Vec<String> = all()
         .iter()
         .map(|(_, m)| {
@@ -196,7 +254,7 @@ fn the_goldens_cover_all_eighteen_types() {
         .collect();
     types.sort();
     types.dedup();
-    assert_eq!(types.len(), 18);
+    assert_eq!(types.len(), 21);
 }
 
 #[test]

@@ -49,6 +49,7 @@ pub enum IoFrame {
 
 /// What one text frame holds.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)] // one value per frame, never stored in bulk
 pub enum Frame {
     /// A message of core's protocol.
     Core(Message),

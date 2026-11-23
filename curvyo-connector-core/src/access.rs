@@ -26,7 +26,8 @@ enum Kind {
     ApplyConfig,
     Login,
     Job,
-    Home,
+    /// `Jog`, `JogKeep`: moving the head by hand is an owner's (Frage 308 A).
+    Motion,
     /// `MoveJob`, `RemoveJob`, `SetRunNext`: the job list.
     List,
     /// `MoveJob`: only an owner reorders.
@@ -40,7 +41,7 @@ fn kind(message: &Message) -> Kind {
         Message::ListPorts => Kind::ListPorts,
         Message::ApplyConfig { .. } => Kind::ApplyConfig,
         Message::Pair { .. } | Message::Auth { .. } => Kind::Login,
-        Message::Home => Kind::Home,
+        Message::Jog { .. } | Message::JogKeep => Kind::Motion,
         Message::MoveJob { .. } => Kind::Reorder,
         Message::RemoveJob { .. } | Message::SetRunNext { .. } => Kind::List,
         Message::GetConfig
@@ -49,16 +50,16 @@ fn kind(message: &Message) -> Kind {
         | Message::RevokeClient { .. }
         | Message::GetLog { .. }
         | Message::Reset { .. } => Kind::OwnerCall,
-        // The job and control messages, `GetStatus`, `Unlock`, and the answers only a connector
-        // sends (the job machine refuses those as unexpected).
+        // The job and control messages, `GetStatus`, `Unlock`, `Home` (a member's waits for an
+        // owner, `specs/0118` 37), `JogStop`, and the answers only a connector sends (the job machine refuses those as unexpected).
         _ => Kind::Job,
     }
 }
 
 /// Whether `peer` (`None`: not logged in) may send `message` in `mode`; the refusal's code when
 /// not. `Pair` and `Auth` pass outside maintenance mode: the session's login rules decide them.
-/// A member's `Home` is refused under the owner rule, since homing moves the machine and has no
-/// confirmation of its own (Proposal).
+/// A member's `Home` passes: the job machine holds it until an owner confirms (`specs/0118` 37);
+/// a member's `Jog` and `JogKeep` are refused, `JogStop` passes.
 ///
 /// # Errors
 /// The `ErrorCode` of the refusal.
@@ -77,7 +78,7 @@ pub fn admit(mode: Mode, peer: Option<Role>, message: &Message) -> Result<(), Er
         Mode::Configured => match (kind, peer) {
             (Kind::Login, _) | (_, Some(Role::Owner)) => Ok(()),
             (Kind::ListPorts | Kind::ApplyConfig, _)
-            | (Kind::OwnerCall | Kind::Home | Kind::Reorder, Some(Role::Member)) => {
+            | (Kind::OwnerCall | Kind::Motion | Kind::Reorder, Some(Role::Member)) => {
                 Err(ErrorCode::OwnerRequired)
             }
             (_, None) => Err(ErrorCode::PairingRequired),
@@ -115,6 +116,7 @@ mod tests {
     use super::*;
     use crate::admin::{LogName, Role};
     use crate::config::{ConnectorConfig, ControllerConfig};
+    use crate::jog::{JogAxis, JogDirection, JogStep};
 
     fn config() -> ConnectorConfig {
         ConnectorConfig {
@@ -164,6 +166,17 @@ mod tests {
             ("Stop", Message::Stop),
             ("Unlock", Message::Unlock),
             ("Home", Message::Home),
+            (
+                "Jog",
+                Message::Jog {
+                    axis: JogAxis::X,
+                    direction: JogDirection::Plus,
+                    step: JogStep::One,
+                    hold: false,
+                },
+            ),
+            ("JogKeep", Message::JogKeep),
+            ("JogStop", Message::JogStop),
             (
                 "MoveJob",
                 Message::MoveJob {
@@ -250,7 +263,10 @@ mod tests {
             "Resume: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "Stop: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "Unlock: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
-            "Home: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
+            "Home: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
+            "Jog: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
+            "JogKeep: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
+            "JogStop: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "MoveJob: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
             "RemoveJob: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "SetRunNext: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",

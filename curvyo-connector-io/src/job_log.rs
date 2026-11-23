@@ -30,6 +30,8 @@ pub enum LogResult {
     Unlock(String),
     /// The app of this name sent `Home` and the connector took it (`specs/0118` M8); no job name.
     Home(String),
+    /// The app of this name started a jog pad session (`specs/0118` criterion 12); no job name.
+    Jog(String),
     /// A start that waited for an owner was withdrawn or discarded (`specs/0128` A14).
     Discarded,
 }
@@ -58,6 +60,7 @@ impl LogResult {
             Self::Rejected(reason) => format!("Rejected: {}", clean(reason)),
             Self::Unlock(client) => format!("Unlock: {}", clean(client)),
             Self::Home(client) => format!("Home: {}", clean(client)),
+            Self::Jog(client) => format!("Jog: {}", clean(client)),
             Self::Discarded => "Discarded".to_owned(),
         }
     }

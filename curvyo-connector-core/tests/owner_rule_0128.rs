@@ -6,8 +6,8 @@ mod common;
 
 use common::{JOB_TEXT, chunk, job_id, last_status, submit};
 use curvyo_connector_core::{
-    Confirmation, ControllerCommand, ErrorCode, Event, JobKind, JobResult, Machine, Message,
-    Options, Output, Peer, People, Role, StartRule, State,
+    Confirmation, Confirms, ControllerCommand, ErrorCode, Event, JobKind, JobResult, Machine,
+    Message, Options, Output, Peer, People, Role, StartRule, State,
 };
 
 const OWNER_RULE: Options = Options {
@@ -121,10 +121,10 @@ fn a14_an_owner_confirms_with_the_job_id_and_the_confirmation_is_reported() {
     assert_eq!(
         out.confirmed,
         Some(Confirmation {
-            job_id: job_id(),
+            job_id: Some(job_id()),
             requested_by: "Phone".into(),
             confirmed_by: Some("Laptop".into()),
-            resume: false,
+            what: Confirms::Start,
         })
     );
     assert_eq!(rig.requested_by(), None);
@@ -166,7 +166,7 @@ fn a13_a_members_resume_waits_and_an_owner_resumes_it() {
     let out = rig.start(&laptop());
     assert_eq!(out.commands, vec![ControllerCommand::Resume]);
     assert_eq!(rig.machine.state(), State::Running);
-    assert!(out.confirmed.unwrap().resume);
+    assert_eq!(out.confirmed.unwrap().what, Confirms::Resume);
 }
 
 #[test]
@@ -202,14 +202,65 @@ fn a14_an_owners_resume_of_a_waiting_resume_waits_for_the_controller_on_a_real_m
     assert_eq!(rig.machine.state(), State::Running);
 }
 
+/// Amended in `specs/0118` slice 2a (criterion 37): a member's Home no longer answers
+/// `OwnerRequired`; it waits for an owner's Home, `confirm-start` or Stop.
 #[test]
-fn a_members_home_is_refused_under_the_owner_rule() {
+fn a_members_home_waits_for_an_owner_who_confirms_it() {
     let mut rig = Rig::ready(&phone(), false);
     let out = rig.from(&phone(), Message::Home);
-    assert_eq!(error_code(&out), Some(ErrorCode::OwnerRequired));
-    assert_eq!(out.commands, Vec::new());
+    assert_eq!(error_code(&out), None);
+    assert_eq!(out.commands, Vec::new(), "nothing reaches the controller");
+    assert_eq!(rig.machine.state(), State::AwaitingLocalStart);
+    // A waiting Home names its requester and no job (adrs M5).
+    assert!(matches!(
+        last_status(&out),
+        Message::Status { requested_by: Some(name), job: None, job_name: None, sent_by: None, .. }
+            if name == "Phone"
+    ));
+    // A second Home meanwhile, from a member, does not fit.
+    let out = rig.from(&phone(), Message::Home);
+    assert_eq!(error_code(&out), Some(ErrorCode::WrongState));
+    // An owner's Home confirms it.
     let out = rig.from(&laptop(), Message::Home);
     assert_eq!(out.commands, vec![ControllerCommand::Home]);
+    assert_eq!(rig.machine.state(), State::Homing);
+    assert_eq!(
+        out.confirmed,
+        Some(Confirmation {
+            job_id: None,
+            requested_by: "Phone".into(),
+            confirmed_by: Some("Laptop".into()),
+            what: Confirms::Home,
+        })
+    );
+}
+
+#[test]
+fn stop_from_anyone_discards_a_waiting_home_and_keeps_the_ready_job() {
+    for stopper in [phone(), laptop()] {
+        let mut rig = Rig::ready(&phone(), false);
+        rig.from(&phone(), Message::Home);
+        let out = rig.from(&stopper, Message::Stop);
+        assert_eq!(out.commands, Vec::new());
+        assert_eq!(rig.machine.state(), State::Ready);
+        assert_eq!(rig.requested_by(), None);
+    }
+}
+
+#[test]
+fn an_owners_home_runs_at_once_and_a_members_home_is_refused_where_an_owners_is() {
+    let mut rig = Rig::ready(&laptop(), false);
+    let out = rig.from(&laptop(), Message::Home);
+    assert_eq!(out.commands, vec![ControllerCommand::Home]);
+    // While homing, a member's Home is the same refusal-free no-op as an owner's.
+    let out = rig.from(&phone(), Message::Home);
+    assert_eq!(out.commands, Vec::new());
+    // While a job runs, a member's Home says why instead of waiting.
+    let mut rig = Rig::ready(&phone(), false);
+    rig.start(&laptop());
+    let out = rig.from(&phone(), Message::Home);
+    assert_eq!(error_code(&out), Some(ErrorCode::WrongState));
+    assert_eq!(rig.machine.state(), State::Running);
 }
 
 #[test]

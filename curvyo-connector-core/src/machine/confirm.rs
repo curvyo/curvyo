@@ -47,17 +47,28 @@ impl Peer {
     }
 }
 
-/// A start or resume that waited and ran.
+/// What a confirmation let run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Confirms {
+    /// A job's start.
+    Start,
+    /// A paused job's resume.
+    Resume,
+    /// A homing cycle (`specs/0118` 37).
+    Home,
+}
+
+/// A start, resume or home that waited and ran.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Confirmation {
-    /// The job.
-    pub job_id: Uuid,
+    /// The job; `None` for a Home.
+    pub job_id: Option<Uuid>,
     /// Who asked for it.
     pub requested_by: String,
     /// The owner who agreed; `None` for Enter on the connector's terminal.
     pub confirmed_by: Option<String>,
-    /// A resume rather than a start.
-    pub resume: bool,
+    /// What ran.
+    pub what: Confirms,
 }
 
 /// The clients behind the held job, for its `jobs.log` line (A15).
@@ -87,14 +98,16 @@ impl Machine {
     /// The member whose request waits, as `Status.requested_by` carries it (owner rule only).
     pub(super) fn shown_requester(&self) -> Option<String> {
         let shown = self.options.start_rule == StartRule::OwnerConfirms
-            && self.state == State::AwaitingLocalStart
-            && self.waiting != Waiting::Home;
+            && self.state == State::AwaitingLocalStart;
         self.requester.clone().filter(|_| shown)
     }
 
     /// The held job as the owner rule's `Status` names it (configured mode only).
     pub(super) fn shown_job(&self) -> Option<&super::Held> {
+        // A waiting Home starts no job, so it names none (`specs/0118` M5).
+        let waits_home = self.state == State::AwaitingLocalStart && self.waiting == Waiting::Home;
         let shown = self.options.start_rule == StartRule::OwnerConfirms
+            && !waits_home
             && matches!(
                 self.state,
                 State::Ready
@@ -102,12 +115,14 @@ impl Machine {
                     | State::Running
                     | State::Paused
                     | State::Homing
+                    | State::Jogging
                     | State::Done { .. }
             );
         self.held.as_ref().filter(|_| shown)
     }
 
-    /// The owner rule's part of `Resume`, `Stop` and `Home`; true when the message was taken here.
+    /// The owner rule's part of `Resume`, `Stop` and the confirming `Home`; true when the message
+    /// was taken here.
     pub(super) fn takes_as_request(
         &mut self,
         message: &Message,
@@ -119,8 +134,15 @@ impl Machine {
         }
         let member = peer.role == Role::Member;
         match message {
-            Message::Home if member => {
-                Self::error(out, ErrorCode::OwnerRequired, "Only an owner may home.");
+            Message::Home
+                if self.state == State::AwaitingLocalStart && self.waiting == Waiting::Home =>
+            {
+                // An owner's Home confirms the waiting one; a second member's is refused.
+                if member {
+                    Self::wrong_state(out);
+                } else {
+                    self.run_waiting(Some(peer), out);
+                }
             }
             Message::Resume if member && self.state == State::Paused && !self.stop_pending => {
                 self.request(Waiting::Resume, peer, out);
@@ -190,7 +212,7 @@ impl Machine {
         }
     }
 
-    fn request(&mut self, waiting: Waiting, peer: &Peer, out: &mut Output) {
+    pub(super) fn request(&mut self, waiting: Waiting, peer: &Peer, out: &mut Output) {
         self.waiting = waiting;
         self.requester = Some(peer.name.clone());
         self.set(State::AwaitingLocalStart, out);
@@ -201,6 +223,17 @@ impl Machine {
         let requested_by = self.requester.take().unwrap_or_default();
         let resume = self.waiting == Waiting::Resume;
         let confirmed_by = owner.map(|p| p.name.clone());
+        if self.waiting == Waiting::Home {
+            out.confirmed = Some(Confirmation {
+                job_id: None,
+                requested_by,
+                confirmed_by,
+                what: Confirms::Home,
+            });
+            out.commands.push(ControllerCommand::Home);
+            self.set(State::Homing, out);
+            return;
+        }
         let Some(held) = self.held.as_mut() else {
             self.set(State::Idle, out);
             return;
@@ -211,10 +244,14 @@ impl Machine {
         }
         held.people.confirmed_by.clone_from(&confirmed_by);
         out.confirmed = Some(Confirmation {
-            job_id,
+            job_id: Some(job_id),
             requested_by,
             confirmed_by,
-            resume,
+            what: if resume {
+                Confirms::Resume
+            } else {
+                Confirms::Start
+            },
         });
         if resume {
             self.state = State::Paused;

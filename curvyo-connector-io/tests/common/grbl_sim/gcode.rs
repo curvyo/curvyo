@@ -74,6 +74,53 @@ impl GrblSim {
         self.print("ok");
     }
 
+    /// A `$J=` line (relative, millimetres): refused while locked, while homing or when soft
+    /// limits would be crossed; else a jog block that takes the time its feed asks for.
+    fn jog_line(&mut self, text: &str) {
+        let mut delta = [0.0; 3];
+        let mut feed = None;
+        for (letter, value) in words(text) {
+            match letter {
+                'X' | 'Y' | 'Z' => delta[usize::from(letter as u8 - b'X')] = value,
+                'F' => feed = Some(value),
+                _ => {}
+            }
+        }
+        let Some(feed) = feed.filter(|f| *f > 0.0) else {
+            self.print("error:22");
+            return;
+        };
+        if self.alarm {
+            self.print("error:9");
+            return;
+        }
+        let from = self.planned;
+        let target = [from[0] + delta[0], from[1] + delta[1], from[2] + delta[2]];
+        let t = self.config.travel;
+        let outside = target[0] < -t[0] - 1e-9
+            || target[0] > 1e-9
+            || target[1] < -t[1] - 1e-9
+            || target[1] > 1e-9;
+        if self.config.soft_limits && outside {
+            self.print("error:15");
+            return;
+        }
+        let length = delta.iter().map(|d| d * d).sum::<f64>().sqrt();
+        // One simulated step is 10 ms.
+        let total = ((length * 60.0 / feed) / 0.01).ceil().max(1.0);
+        // invariant: a positive finite step count far below u32::MAX in these tests.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let total = total as u32;
+        self.planned = target;
+        self.push_block(Block::Jog {
+            from: self.pos,
+            target,
+            total,
+            left: total,
+        });
+        self.print("ok");
+    }
+
     fn gcode(&mut self, line: &str) {
         let mut target = self.planned;
         let mut motion = false;
@@ -126,7 +173,9 @@ impl GrblSim {
             return;
         }
         let upper = line.to_ascii_uppercase();
-        if upper.starts_with('$') {
+        if let Some(jog) = upper.strip_prefix("$J=") {
+            self.jog_line(jog);
+        } else if upper.starts_with('$') {
             self.system(&upper);
         } else if self.alarm {
             self.print("error:9");

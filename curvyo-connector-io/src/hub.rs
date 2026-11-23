@@ -3,6 +3,7 @@
 
 mod journal;
 mod link;
+mod motion;
 mod owner;
 mod pairing;
 mod setup;
@@ -134,6 +135,8 @@ pub struct Hub {
     clients: Clients,
     job_log: JobLog,
     admin_log: AdminLog,
+    /// The client whose jogs the last `jobs.log` line named; any other line clears it.
+    jog_run: Mutex<Option<String>>,
     settings: HubSettings,
     exit: Mutex<Option<Sender<ExitReason>>>,
 }
@@ -227,6 +230,7 @@ impl Hub {
             clients: Clients::new(&settings.state_dir),
             job_log: JobLog::new(&settings.state_dir),
             admin_log: AdminLog::new(&settings.state_dir),
+            jog_run: Mutex::new(None),
             settings,
             exit: Mutex::new(None),
         };
@@ -318,29 +322,6 @@ impl Hub {
             &mut Vec::new(),
         );
         inner.machine.status()
-    }
-
-    /// `Home` from the client `peer` (`specs/0118` M8): one `jobs.log` line and one terminal
-    /// line when the connector takes it; the answers for that client alone, the status when there
-    /// is no other answer (in `Homing` a second Home changes nothing).
-    pub fn home(&self, peer: &Peer, now: Instant) -> Vec<Message> {
-        let mut inner = self.lock();
-        self.turn(&mut inner, &[], now);
-        let before = inner.machine.state();
-        let mut direct = Vec::new();
-        let event = Event::Message(Message::Home, peer.clone());
-        self.apply(&mut inner, event, now, &mut direct);
-        let after = inner.machine.state();
-        if after != before && matches!(after, State::Homing | State::AwaitingLocalStart) {
-            let client = peer.name.as_str();
-            let _ = inner.notices.send(format!("Home sent by {client}"));
-            let result = LogResult::Home(client.to_owned());
-            self.append_job_line(&inner, "", &result, &LogPeople::default());
-        }
-        if direct.is_empty() {
-            direct.push(inner.machine.status());
-        }
-        direct
     }
 
     /// A connection that sent the jobs `job_ids` ended: those still being received are dropped,

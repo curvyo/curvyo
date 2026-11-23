@@ -55,6 +55,26 @@ impl Settings {
         Some([finite(130)?, finite(131)?])
     }
 
+    /// The homing direction mask, `$23`: bit 0 for X, bit 1 for Y.
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // clamped just before
+    pub fn homing_dir_mask(&self) -> u8 {
+        // invariant: a finite value clamped to 0..=255.
+        self.number(23)
+            .filter(|v| v.is_finite())
+            .map_or(0, |v| v.clamp(0.0, 255.0) as u8)
+    }
+
+    /// The controller's maximum rate on `axis` in millimetres a minute, `$110` or `$111`.
+    #[must_use]
+    pub fn max_rate(&self, axis: curvyo_connector_core::JogAxis) -> Option<f64> {
+        let number = match axis {
+            curvyo_connector_core::JogAxis::X => 110,
+            curvyo_connector_core::JogAxis::Y => 111,
+        };
+        self.number(number).filter(|v| v.is_finite() && *v > 0.0)
+    }
+
     /// Whether status reports are in inches, `$13`.
     #[must_use]
     pub fn reports_inches(&self) -> bool {
@@ -123,6 +143,20 @@ mod tests {
         assert!((s.to_mm(1.0) - 25.4).abs() < 1e-9);
         s.set(32, "0");
         assert_eq!(s.laser_mode(), Some(false));
+    }
+
+    #[test]
+    fn the_homing_mask_and_the_axis_rates_are_read() {
+        use curvyo_connector_core::JogAxis;
+        let mut s = Settings::default();
+        assert_eq!(s.homing_dir_mask(), 0);
+        assert_eq!(s.max_rate(JogAxis::X), None);
+        s.set(23, "3");
+        s.set(110, "5000.000");
+        s.set(111, "0");
+        assert_eq!(s.homing_dir_mask(), 3);
+        assert_eq!(s.max_rate(JogAxis::X), Some(5000.0));
+        assert_eq!(s.max_rate(JogAxis::Y), None, "a zero rate is no cap");
     }
 
     #[test]

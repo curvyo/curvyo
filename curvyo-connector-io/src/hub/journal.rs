@@ -3,7 +3,9 @@
 
 use std::time::Duration;
 
-use curvyo_connector_core::{Confirmation, ListLog, Message, People, RejectReason, State};
+use curvyo_connector_core::{
+    Confirmation, Confirms, ListLog, Message, People, RejectReason, State,
+};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -33,6 +35,11 @@ impl Hub {
         people: &LogPeople,
     ) {
         let at = OffsetDateTime::now_utc();
+        // Any line ends the run of one client's jogs (`specs/0118` criterion 12).
+        *self
+            .jog_run
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
         if let Err(e) = self.job_log.append(at, name, result, people) {
             let _ = inner.notices.send(format!("Cannot write the job log: {e}"));
         }
@@ -114,38 +121,55 @@ impl Hub {
         }
     }
 
-    /// A start or resume that waited ran: `admin.log` and the terminal (A14).
+    /// A start, resume or home that waited ran: `admin.log` and the terminal (A14,
+    /// `specs/0118` 37).
     pub(super) fn log_confirmation(&self, inner: &Inner, confirmation: &Confirmation) {
-        let name = inner
-            .machine
-            .held_job()
-            .map(|j| j.name.clone())
-            .unwrap_or_default();
+        let name = match confirmation.what {
+            Confirms::Home => "Home".to_owned(),
+            _ => inner
+                .machine
+                .held_job()
+                .map(|j| j.name.clone())
+                .unwrap_or_default(),
+        };
         let Some(owner) = &confirmation.confirmed_by else {
             // Enter on the terminal: the host confirmed.
             let event = Self::confirmed_event(confirmation, &name);
             self.append_admin(inner, "", &event);
             return;
         };
-        let verb = if confirmation.resume {
-            "Resumed"
-        } else {
-            "Started"
+        let verb = match confirmation.what {
+            Confirms::Start => "Started",
+            Confirms::Resume => "Resumed",
+            Confirms::Home => "Homing",
         };
-        let _ = inner.notices.send(format!(
-            "{verb} {name}, confirmed by {owner} for {}",
-            confirmation.requested_by
-        ));
+        let line = if confirmation.what == Confirms::Home {
+            format!(
+                "{verb}, confirmed by {owner} for {}",
+                confirmation.requested_by
+            )
+        } else {
+            format!(
+                "{verb} {name}, confirmed by {owner} for {}",
+                confirmation.requested_by
+            )
+        };
+        let _ = inner.notices.send(line);
         let event = Self::confirmed_event(confirmation, &name);
         self.append_admin(inner, owner, &event);
     }
 
     fn confirmed_event(confirmation: &Confirmation, name: &str) -> AdminEvent {
-        AdminEvent::StartConfirmed {
-            requester: confirmation.requested_by.clone(),
-            job_name: name.to_owned(),
-            job_id: confirmation.job_id.to_string(),
-            resume: confirmation.resume,
+        match confirmation.job_id {
+            Some(job_id) => AdminEvent::StartConfirmed {
+                requester: confirmation.requested_by.clone(),
+                job_name: name.to_owned(),
+                job_id: job_id.to_string(),
+                resume: confirmation.what == Confirms::Resume,
+            },
+            None => AdminEvent::HomeConfirmed {
+                requester: confirmation.requested_by.clone(),
+            },
         }
     }
 
@@ -184,6 +208,11 @@ impl Hub {
             _ => inner.job_name.as_str(),
         };
         let line = match &status {
+            Message::Status {
+                requested_by: Some(member),
+                job: None,
+                ..
+            } => format!("Home requested by {member}"),
             Message::Status {
                 requested_by: Some(member),
                 ..

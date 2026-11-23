@@ -15,6 +15,8 @@ pub enum Owed {
     Line(usize),
     /// The Home command's `$H`.
     Home,
+    /// A jog's `$J=` line, with its bytes.
+    Jog(usize),
 }
 
 impl Owed {
@@ -22,7 +24,7 @@ impl Owed {
     #[must_use]
     pub fn bytes(self) -> usize {
         match self {
-            Self::Line(bytes) => bytes,
+            Self::Line(bytes) | Self::Jog(bytes) => bytes,
             Self::Home => HOME_LINE.len(),
         }
     }
@@ -62,6 +64,7 @@ impl GrblController {
                 self.alarmed = false;
                 self.alarm_code = None;
                 self.locked = false;
+                self.home_pending = true;
                 self.events.push(Event::Homed);
             }
             Some(code) => self.events.push(Event::HomingFailed {

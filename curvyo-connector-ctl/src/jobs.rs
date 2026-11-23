@@ -56,10 +56,12 @@ fn state_words(s: &Seen<'_>) -> String {
             Some(member) if line > 0 => {
                 format!("Resume requested by {member} at line {}", number(line))
             }
+            Some(member) if s.job.is_none() => format!("Home requested by {member}"),
             Some(member) => format!("Start requested by {member}"),
             None => "Waiting for the start at the machine".to_owned(),
         },
         State::Homing => "Homing".to_owned(),
+        State::Jogging => "Jogging".to_owned(),
         State::Running => format!(
             "Running, line {} / {}, {}",
             number(line),
@@ -158,17 +160,28 @@ pub fn confirm_start(ctx: &mut Context, positionals: &[String]) -> Result<String
     };
     let mut owner = connect::owner(ctx, connector)?;
     let who = owner.entry.name.clone();
-    let (job_id, line, requester, job_name) = {
+    let (waiting, requester) = {
         let s = status_of(&owner)?;
         match (s.state, s.requested_by, s.job) {
             (State::AwaitingLocalStart, Some(member), Some(progress)) => (
-                progress.job_id,
-                progress.line,
+                Some((progress.job_id, progress.line, s.job_name.to_owned())),
                 member.to_owned(),
-                s.job_name.to_owned(),
             ),
+            // A member's Home waits without a job (`specs/0118` 37).
+            (State::AwaitingLocalStart, Some(member), None) => (None, member.to_owned()),
             _ => return Err(CtlError::refused(format!("no start is waiting on {who}"))),
         }
+    };
+    let Some((job_id, line, job_name)) = waiting else {
+        if let Some(wanted) = job
+            && wanted != "Home"
+        {
+            return Err(CtlError::refused(format!(
+                "{who} waits for Home, not {wanted}"
+            )));
+        }
+        command(&mut owner, &Message::Home, State::AwaitingLocalStart)?;
+        return Ok(format!("Homing, requested by {requester}\n"));
     };
     if let Some(wanted) = job
         && wanted != job_name
@@ -198,18 +211,25 @@ pub fn confirm_start(ctx: &mut Context, positionals: &[String]) -> Result<String
 /// The failure in words.
 pub fn stop(ctx: &mut Context, name: Option<&str>) -> Result<String, CtlError> {
     let mut owner = connect::owner(ctx, name)?;
-    let (state, line, job_name) = {
+    let (state, line, job_name, s_job_none) = {
         let s = status_of(&owner)?;
-        (s.state, s.job.map_or(0, |j| j.line), s.job_name.to_owned())
+        (
+            s.state,
+            s.job.map_or(0, |j| j.line),
+            s.job_name.to_owned(),
+            s.job.is_none(),
+        )
     };
     let text = match state {
         State::Running | State::Paused => format!("Stopped {job_name} at line {}\n", number(line)),
         State::AwaitingLocalStart if line > 0 => {
             format!("Stopped {job_name} at line {}\n", number(line))
         }
+        State::AwaitingLocalStart if s_job_none => "Discarded Home\n".to_owned(),
         State::Receiving | State::Ready | State::AwaitingLocalStart | State::Homing => {
             format!("Discarded {job_name}\n")
         }
+        State::Jogging => "Stopped the jog\n".to_owned(),
         _ => return Ok("No job\n".to_owned()),
     };
     command(&mut owner, &Message::Stop, state)?;

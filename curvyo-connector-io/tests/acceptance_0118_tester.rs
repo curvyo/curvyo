@@ -1790,6 +1790,9 @@ fn golden_the_three_new_messages_have_exactly_these_bytes() {
         requested_by: None,
         job_name: None,
         sent_by: None,
+        homed: false,
+        machine_position: None,
+        work_offset: None,
     };
     assert_eq!(
         read("status_homing.json").trim_end(),

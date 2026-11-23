@@ -1,13 +1,15 @@
 //! How the job machine takes `Home` and the controller's homing events (`specs/0118` M3, M5).
 
-use super::{BUSY_WORDS, ControllerCommand, Event, Machine, Output, StartRule, Waiting};
+use super::{BUSY_WORDS, ControllerCommand, Event, Machine, Output, Peer, StartRule, Waiting};
+use crate::admin::Role;
 use crate::message::{ErrorCode, State};
 
 impl Machine {
     /// `Home` from the app: homes from `Idle`, `Ready`, `Done` or `Alarm` (a `Ready` job is kept),
-    /// waits for the local press under `StartRule::LocalPress`, and is refused with its cause in
-    /// every other state; in `Homing` it changes nothing.
-    pub(super) fn home(&mut self, out: &mut Output) {
+    /// waits for the local press under `StartRule::LocalPress` and for an owner under the owner
+    /// rule when `peer` is a member (`specs/0118` 37), and is refused with its cause in every
+    /// other state; in `Homing` it changes nothing.
+    pub(super) fn home(&mut self, peer: &Peer, out: &mut Output) {
         let busy_word = self
             .word
             .as_deref()
@@ -21,6 +23,10 @@ impl Machine {
             State::Homing => return,
             State::Running | State::Paused => Some("A job is running.".to_owned()),
             State::Receiving => Some("A job is arriving.".to_owned()),
+            State::Jogging => Some("Jogging.".to_owned()),
+            State::AwaitingLocalStart if self.waiting == Waiting::Home => {
+                Some("A home waits.".to_owned())
+            }
             State::AwaitingLocalStart => Some("A start waits at the machine.".to_owned()),
             State::NoController => Some("No controller.".to_owned()),
         };
@@ -28,18 +34,20 @@ impl Machine {
             Self::error(out, ErrorCode::WrongState, &message);
             return;
         }
-        self.homed_from = match self.state {
+        self.motion_from = match self.state {
             State::Ready => State::Ready,
             State::Alarm => State::Alarm,
             _ => State::Idle,
         };
-        if self.homed_from == State::Idle {
+        if self.motion_from == State::Idle {
             // A done job's result is over: homing from `Done` returns to `Idle`.
             self.discard();
         }
         if self.options.start_rule == StartRule::LocalPress {
             self.waiting = Waiting::Home;
             self.set(State::AwaitingLocalStart, out);
+        } else if self.options.start_rule == StartRule::OwnerConfirms && peer.role == Role::Member {
+            self.request(Waiting::Home, peer, out);
         } else {
             out.commands.push(ControllerCommand::Home);
             self.set(State::Homing, out);
@@ -64,7 +72,7 @@ impl Machine {
     /// Back to the state the homing started from: `Ready` with the kept job, `Alarm` with its
     /// text, else `Idle`.
     pub(super) fn end_homing(&mut self, out: &mut Output) {
-        let back = match self.homed_from {
+        let back = match self.motion_from {
             State::Alarm => State::Alarm,
             _ if self.held.is_some() => State::Ready,
             _ => State::Idle,
@@ -77,12 +85,13 @@ impl Machine {
         match event {
             Event::Homed => {
                 // GRBL leaves the alarm by homing.
+                self.homed = true;
                 self.alarm = None;
-                self.homed_from = State::Idle;
+                self.motion_from = State::Idle;
                 self.end_homing(out);
             }
             Event::HomingFailed { detail } => {
-                let back = match self.homed_from {
+                let back = match self.motion_from {
                     State::Alarm => State::Alarm,
                     _ if self.held.is_some() => State::Ready,
                     _ => State::Idle,

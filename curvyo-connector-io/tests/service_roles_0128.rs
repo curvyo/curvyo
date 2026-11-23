@@ -61,7 +61,15 @@ fn a9_a_member_gets_owner_required_for_every_owner_call_and_nothing_changes() {
             config: fake_config(5),
             client_name: "Phone".into(),
         },
-        Message::Home,
+        // Amended in `specs/0118` slice 2a: a member's `Home` waits for an owner (criterion 37),
+        // a member's `Jog` is an owner's call.
+        Message::Jog {
+            axis: curvyo_connector_core::JogAxis::X,
+            direction: curvyo_connector_core::JogDirection::Plus,
+            step: curvyo_connector_core::JogStep::One,
+            hold: false,
+        },
+        Message::JogKeep,
     ];
     let before = (s.file("clients.json"), s.file("connector.toml"));
     for call in calls {

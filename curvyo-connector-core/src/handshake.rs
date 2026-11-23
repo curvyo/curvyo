@@ -7,6 +7,7 @@ pub const PROTOCOL_VERSION: u32 = 0;
 
 /// What the transport does with a message after the handshake looked at it.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)] // one value per message, never stored in bulk
 pub enum Outcome {
     /// `Hello` passed: answer with `Welcome`.
     Hello,

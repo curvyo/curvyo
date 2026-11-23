@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::admin::{ClientEntry, ConnectorMode, LogName, Role, Secret};
 use crate::config::ConnectorConfig;
+use crate::jog::{JogAxis, JogDirection, JogStep};
 use crate::millimetres::Millimetres;
 
 /// What a job is: the work itself or its outline at low power.
@@ -64,6 +65,8 @@ pub enum State {
     AwaitingLocalStart,
     /// The controller runs its homing cycle (`Home`); a kept `Ready` job is carried along.
     Homing,
+    /// The controller moves the head for a jog (`specs/0118`); a kept `Ready` job is carried along.
+    Jogging,
     /// The controller is running the job.
     Running,
     /// The job is paused.
@@ -260,6 +263,23 @@ pub enum Message {
     /// Runs the controller's homing cycle (GRBL `$H`), from `Idle`, `Ready`, `Done` or `Alarm`
     /// (`specs/0118`); never sent on its own by the app or the connector.
     Home,
+    /// Moves the head one step (or, with `hold`, until `JogKeep` stops coming) with the laser off;
+    /// an owner only (`specs/0118` criteria 16, 18).
+    Jog {
+        /// The machine axis.
+        axis: JogAxis,
+        /// The way along it.
+        direction: JogDirection,
+        /// The distance of one press.
+        step: JogStep,
+        /// A held press: the head keeps moving while `JogKeep` arrives; left out when false.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        hold: bool,
+    },
+    /// Keeps a held jog alive; the connector stops it when none arrives for 300 ms.
+    JogKeep,
+    /// Ends a jog at once (a released press); not `Stop`: outside a jog it does nothing.
+    JogStop,
     /// Moves a waiting job from place `from` to place `to` (both 1-based; owner).
     MoveJob {
         /// The job.
@@ -433,6 +453,16 @@ pub enum Message {
         /// Under the owner rule: the client that sent the held job.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sent_by: Option<String>,
+        /// The controller has been homed since the connector identified it (`specs/0118` 13);
+        /// left out when false.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        homed: bool,
+        /// The head's machine position, when the controller reported it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        machine_position: Option<[Millimetres; 3]>,
+        /// The controller's work coordinate offset, when the controller reported it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        work_offset: Option<[Millimetres; 3]>,
     },
     /// A refusal that keeps the connection open, except where stated.
     Error {

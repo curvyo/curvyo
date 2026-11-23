@@ -50,11 +50,14 @@ impl Machine {
                     self.job_ended(End::Stopped, out);
                 }
             }
-            (Message::Pause, State::Homing) => {
+            (Message::Pause, State::Homing | State::Jogging) => {
                 Self::error(out, ErrorCode::WrongState, "No job to pause");
             }
+            (Message::Stop, State::Jogging) => self.cancel_jog(true, out),
             (Message::Stop, State::Homing) => self.stop_homing(out),
             (Message::Stop, State::AwaitingLocalStart) if self.waiting == Waiting::Home => {
+                // Stop from anyone discards a waiting Home.
+                self.requester = None;
                 self.end_homing(out);
             }
             (Message::Stop, State::Receiving | State::Ready | State::AwaitingLocalStart) => {
@@ -71,7 +74,10 @@ impl Machine {
     pub(super) fn on_controller(&mut self, event: Event, out: &mut Output) {
         if self.state == State::NoController {
             match event {
-                Event::ControllerConnected => self.set(State::Idle, out),
+                Event::ControllerConnected => {
+                    self.homed = false;
+                    self.set(State::Idle, out);
+                }
                 Event::LaserModeOff(off) => self.laser_off = off,
                 Event::LaserModeUnknown(unknown) => self.laser_unknown = unknown,
                 Event::NoControllerDetail { detail }
@@ -89,6 +95,7 @@ impl Machine {
             Event::ControllerLostWith { detail } => self.lose(Some(&detail), out),
             Event::StopUnconfirmed => self.lose(Some("Could not confirm the machine stopped"), out),
             Event::Alarm { text } => {
+                self.homed = false;
                 let in_flight = self.in_flight();
                 self.discard();
                 if self.state != State::Alarm || self.alarm.is_none() {
@@ -103,6 +110,9 @@ impl Machine {
             Event::AlarmCleared if self.state == State::Alarm => {
                 self.alarm = None;
                 self.set(State::Idle, out);
+            }
+            Event::MachinePosition { machine, offset } => {
+                self.on_machine_position(machine, offset, out);
             }
             Event::Position(position) => {
                 self.position = Some(position);
@@ -131,6 +141,26 @@ impl Machine {
             {
                 self.on_homing(event, out);
             }
+            Event::Homed => {
+                // A job's own `$H` ended in `ok`.
+                if !self.homed {
+                    self.homed = true;
+                    out.messages.push(self.status());
+                }
+            }
+            Event::ControllerReset => {
+                self.homed = false;
+                if self.state == State::Jogging {
+                    self.on_jogging(Event::ControllerReset, out);
+                } else {
+                    out.messages.push(self.status());
+                }
+            }
+            event @ (Event::JogEnded | Event::JogFailed { .. } | Event::Stopped)
+                if self.state == State::Jogging =>
+            {
+                self.on_jogging(event, out);
+            }
             other => self.on_job_event(other, out),
         }
     }
@@ -138,6 +168,9 @@ impl Machine {
     /// The controller is gone: a job in flight is dropped and named in a detail that stays
     /// through the reconnect (`specs/0127` G15, UX notes V7).
     fn lose(&mut self, text: Option<&str>, out: &mut Output) {
+        self.homed = false;
+        self.mpos = None;
+        self.wco = None;
         let in_flight = self.in_flight();
         let line = self.held.as_ref().map_or(0, |h| h.line);
         let loss = match self.state {
@@ -147,9 +180,11 @@ impl Machine {
             State::Running | State::Paused => {
                 Some(format!("Lost the controller at line {}", count(line)))
             }
-            State::Receiving | State::Ready | State::AwaitingLocalStart | State::Homing => {
-                Some("Lost the controller".to_owned())
-            }
+            State::Receiving
+            | State::Ready
+            | State::AwaitingLocalStart
+            | State::Homing
+            | State::Jogging => Some("Lost the controller".to_owned()),
             _ => None,
         };
         let detail = text.map(str::to_owned).or(loss);

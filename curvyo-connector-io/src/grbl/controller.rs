@@ -10,6 +10,7 @@ use crate::controller::{Advance, Controller};
 use crate::grbl::Timing;
 use crate::grbl::home::Owed;
 use crate::grbl::identify::{Failure, Identify, Outcome};
+use crate::grbl::jog::Jog;
 use crate::grbl::prepare::prepare;
 use crate::grbl::reply::{Lines, Reply, parse};
 use crate::grbl::settings::Settings;
@@ -49,7 +50,13 @@ pub struct GrblController {
     last_poll: Option<Duration>,
     pub(super) reports: u64,
     pub(super) wco: [f64; 3],
+    /// A report carried the work offset since the connector identified the controller.
+    pub(super) wco_seen: bool,
     pub(super) position: Option<[f64; 3]>,
+    /// The head's machine position as the last report showed it, when the report allows it.
+    pub(super) mpos: Option<[f64; 3]>,
+    /// The machine position and offset the job machine was last told.
+    pub(super) told: (Option<[f64; 3]>, Option<[f64; 3]>),
     pub(super) word: Option<String>,
     pub(super) alarmed: bool,
     pub(super) alarm_code: Option<u16>,
@@ -66,6 +73,14 @@ pub struct GrblController {
     pub(super) expect_banner: bool,
     /// When the unanswered `$H` went out; the homing cap counts from it (`specs/0142`).
     pub(super) homing_since: Option<Duration>,
+    /// The jog that runs or is being cancelled (`specs/0118` J6).
+    pub(super) jog: Option<Jog>,
+    /// The last spindle word the connector wrote was its own `M5`: no job line since.
+    pub(super) spindle_off: bool,
+    /// Machine X and Y at the first report after a homing ended, for the travel box.
+    pub(super) home_mpos: Option<[f64; 2]>,
+    /// A homing ended and the next report shows where the head stands.
+    pub(super) home_pending: bool,
 }
 
 impl GrblController {
@@ -92,7 +107,10 @@ impl GrblController {
             last_poll: None,
             reports: 0,
             wco: [0.0; 3],
+            wco_seen: false,
             position: None,
+            mpos: None,
+            told: (None, None),
             word: None,
             alarmed: false,
             alarm_code: None,
@@ -104,6 +122,10 @@ impl GrblController {
             deferred_alarm: false,
             expect_banner: false,
             homing_since: None,
+            jog: None,
+            spindle_off: false,
+            home_mpos: None,
+            home_pending: false,
         }
     }
 
@@ -117,6 +139,7 @@ impl GrblController {
         self.closed = true;
         self.stream = None;
         self.stop = None;
+        self.jog = None;
     }
 
     fn on_identify(&mut self, outcome: Outcome, at: Duration) {
@@ -198,7 +221,12 @@ impl GrblController {
     }
 
     fn poll_period(&self) -> Duration {
-        if self.stream.is_some() || self.stop.is_some() || self.alarmed || self.home_in_flight() {
+        if self.stream.is_some()
+            || self.stop.is_some()
+            || self.alarmed
+            || self.home_in_flight()
+            || self.jogging()
+        {
             self.timing.poll_fast
         } else {
             self.timing.poll_slow
@@ -225,6 +253,7 @@ impl GrblController {
             // one waits for the `$H` to end and has no limit (`specs/0133` P4).
             stream.hold = Hold::Running;
         }
+        self.jog_time(at);
         if self
             .last_poll
             .is_none_or(|last| at >= last + self.poll_period())
@@ -296,6 +325,7 @@ impl GrblController {
                 detail: texts::failed_at(refused.line, refused.cause.text()),
             }),
             Ok(lines) => {
+                self.spindle_off = false;
                 let mut stream = Stream::new(lines, at);
                 stream.fill(self.owed_bytes(), &mut self.out);
                 if stream.all_answered() {
@@ -325,6 +355,8 @@ impl GrblController {
                 matches!(stream.hold, Hold::Requested(_)),
             ),
             None if self.home_in_flight() => (false, true, false),
+            // A jog that did not settle: hold, then reset, as for a stream.
+            None if self.jogging() => (false, false, false),
             None => return,
         };
         let limits = (self.timing.hold, self.timing.banner);
@@ -337,50 +369,6 @@ impl GrblController {
             at,
             &mut self.out,
         ));
-    }
-
-    /// `!` at once, or, while the job's `$H` runs (GRBL ignores `!` then), nothing yet: the hold
-    /// is deferred to `$H`'s answer and core is told (`specs/0133` P4).
-    fn pause(&mut self, at: Duration) {
-        if self.stop.is_some() {
-            return;
-        }
-        let Some(stream) = self.stream.as_mut().filter(|s| s.hold == Hold::Running) else {
-            return;
-        };
-        if stream.homing() {
-            stream.hold = Hold::Deferred;
-            self.events.push(Event::PauseDeferred);
-        } else {
-            self.out.push(crate::grbl::stop::HOLD);
-            stream.hold = Hold::Requested(Some(at + self.timing.hold));
-        }
-    }
-
-    /// `~` from a hold, sent or complete; a deferred pause is only cancelled.
-    fn resume(&mut self) {
-        if self.stop.is_some() {
-            return;
-        }
-        let Some(stream) = self.stream.as_mut() else {
-            return;
-        };
-        match stream.hold {
-            Hold::Deferred => stream.hold = Hold::Running,
-            Hold::Held { .. } | Hold::Requested(None) => {
-                self.out.push(b'~');
-                stream.hold = Hold::Resuming;
-            }
-            Hold::Running | Hold::Requested(Some(_)) | Hold::Resuming => {}
-        }
-    }
-
-    fn unlock(&mut self) {
-        if self.alarmed {
-            self.out.extend_from_slice(b"$X\n");
-            // The hub prints "Unlock sent by <client>"; G33 asks for no second line.
-            self.owed.push_back(Owed::Line(3));
-        }
     }
 }
 
@@ -408,6 +396,9 @@ impl Controller for GrblController {
             ControllerCommand::Stop => self.begin_stop(None, at),
             ControllerCommand::Unlock => self.unlock(),
             ControllerCommand::Home => self.home(),
+            ControllerCommand::Jog { .. }
+            | ControllerCommand::JogHold { .. }
+            | ControllerCommand::JogCancel => self.jog_command(command, at),
         }
         std::mem::take(&mut self.events)
     }

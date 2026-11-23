@@ -7,6 +7,7 @@ use std::time::Duration;
 use curvyo_connector_core::{ControllerCommand, ControllerInfo, Event, Job};
 
 use crate::controller::{Advance, Controller};
+use crate::fake_jog::FakeHead;
 
 /// How long the fake controller's homing cycle takes (`specs/0118` M6).
 pub const FAKE_HOMING: Duration = Duration::from_secs(2);
@@ -35,6 +36,8 @@ pub struct FakeController {
     run: Option<Run>,
     /// When the homing cycle ends; `None` while not homing.
     homing_until: Option<Duration>,
+    /// The head, moved by jogs.
+    head: FakeHead,
 }
 
 impl FakeController {
@@ -47,6 +50,7 @@ impl FakeController {
             alarm_at_line,
             run: None,
             homing_until: None,
+            head: FakeHead::default(),
         }
     }
 
@@ -100,6 +104,20 @@ impl FakeController {
             }
             ControllerCommand::Unlock => {}
             ControllerCommand::Home => self.homing_until = Some(at + FAKE_HOMING),
+            ControllerCommand::Jog {
+                axis,
+                direction,
+                distance,
+                feed,
+                ..
+            } => self.head.step((*axis, *direction), distance.0, feed.0, at),
+            ControllerCommand::JogHold {
+                axis,
+                direction,
+                feed,
+                ..
+            } => self.head.hold((*axis, *direction), feed.0, at),
+            ControllerCommand::JogCancel => self.head.cancel(at),
         }
     }
 
@@ -108,10 +126,13 @@ impl FakeController {
     pub fn run_until(&mut self, at: Duration) -> Vec<Event> {
         if self.homing_until.is_some_and(|until| at >= until) {
             self.homing_until = None;
-            return vec![Event::Homed];
+            let mut events = vec![Event::Homed];
+            events.extend(self.head.home());
+            return events;
         }
+        let mut events = self.head.run_until(at);
         let Some(mut run) = self.run else {
-            return Vec::new();
+            return events;
         };
         Self::catch_up(&mut run, at);
         let done = run.ran_ms.saturating_mul(u64::from(self.lines_per_second)) / 1000;
@@ -122,7 +143,6 @@ impl FakeController {
         if let Some(n) = alarm {
             line = n;
         }
-        let mut events = Vec::new();
         if line != run.reported {
             run.reported = line;
             events.push(Event::Progress {

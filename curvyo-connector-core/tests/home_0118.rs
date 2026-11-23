@@ -96,6 +96,9 @@ fn m1_home_and_homing_match_their_golden_files() {
                 requested_by: None,
                 job_name: None,
                 sent_by: None,
+                homed: false,
+                machine_position: None,
+                work_offset: None,
             },
         ),
         (
@@ -110,6 +113,9 @@ fn m1_home_and_homing_match_their_golden_files() {
                 requested_by: None,
                 job_name: None,
                 sent_by: None,
+                homed: false,
+                machine_position: None,
+                work_offset: None,
             },
         ),
     ];

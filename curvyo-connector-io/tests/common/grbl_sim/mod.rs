@@ -58,6 +58,8 @@ pub struct SimConfig {
     pub homing_fails: Option<u16>,
     /// `$130` and `$131`, the travel of X and Y in millimetres.
     pub travel: [f64; 2],
+    /// `$20=1`: a `$J=` line that ends outside `[-travel, 0]` is refused with `error:15`.
+    pub soft_limits: bool,
 }
 
 impl Default for SimConfig {
@@ -78,6 +80,7 @@ impl Default for SimConfig {
             quiet_homing: false,
             homing_fails: None,
             travel: [400.0, 300.0],
+            soft_limits: false,
         }
     }
 }
@@ -92,7 +95,17 @@ pub enum Spindle {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Block {
-    Move { target: [f64; 3], steps: u32 },
+    Move {
+        target: [f64; 3],
+        steps: u32,
+    },
+    /// A `$J=` jog: the head moves from `from` to `target` in `total` steps, `left` to go.
+    Jog {
+        from: [f64; 3],
+        target: [f64; 3],
+        total: u32,
+        left: u32,
+    },
     Spindle(Spindle, f64),
     Air(bool),
 }
@@ -141,6 +154,8 @@ pub struct GrblSim {
     pub silent_on_hold: bool,
     /// The safety door is open: the state reads `Door:0`.
     pub door: bool,
+    /// Ignores the jog cancel `0x85` (a controller that does not stop its jog).
+    pub no_jog_cancel: bool,
     /// Steps since the start.
     pub clock: u64,
     /// The clock at the last status report.
@@ -202,6 +217,7 @@ impl GrblSim {
             garbage: false,
             silent_on_hold: false,
             door: false,
+            no_jog_cancel: false,
             clock: 0,
             last_report: None,
         }
@@ -244,7 +260,7 @@ impl GrblSim {
                 self.silent = true;
                 continue;
             }
-            if matches!(b, b'?' | b'!' | b'~' | 0x18 | 0x9E) && self.partial_line() {
+            if matches!(b, b'?' | b'!' | b'~' | 0x18 | 0x85 | 0x9E) && self.partial_line() {
                 self.faults
                     .push(format!("real-time byte {b:#04x} inside a line"));
             }
@@ -256,6 +272,8 @@ impl GrblSim {
                 b'!' => self.feed_hold(),
                 b'~' => self.cycle_start(),
                 0x18 => self.reset(),
+                0x85 if self.no_jog_cancel => {}
+                0x85 => self.jog_cancel(),
                 0x9E => {
                     if self.hold.is_some_and(|h| h.complete) {
                         self.spindle_stop = !self.spindle_stop;
@@ -294,7 +312,7 @@ impl GrblSim {
     pub fn reset(&mut self) {
         let raised = if self.homing.is_some() {
             Some(6)
-        } else if self.moving() {
+        } else if self.moving() && !self.jogging() {
             Some(3)
         } else {
             None
@@ -349,6 +367,12 @@ impl GrblSim {
         if self.homing.is_some() {
             self.homing = Some(1);
         }
+    }
+
+    /// The head's machine position, for the tests.
+    #[must_use]
+    pub fn rx_pos_for_tests(&self) -> [f64; 2] {
+        [self.pos[0], self.pos[1]]
     }
 
     /// Whether a homing cycle runs.
@@ -432,6 +456,22 @@ impl GrblSim {
                     }
                     break;
                 }
+                Block::Jog {
+                    from,
+                    target,
+                    total,
+                    left,
+                } => {
+                    *left = left.saturating_sub(1);
+                    let done = f64::from(*total - *left) / f64::from(*total);
+                    for axis in 0..3 {
+                        self.pos[axis] = from[axis] + (target[axis] - from[axis]) * done;
+                    }
+                    if *left == 0 {
+                        self.planner.pop_front();
+                    }
+                    break;
+                }
                 Block::Spindle(s, p) => {
                     (self.spindle, self.power) = (*s, *p);
                     self.planner.pop_front();
@@ -467,6 +507,19 @@ impl GrblSim {
         // A varying, line-count-driven delay before the next line is taken (G6).
         self.parse_wait = n % 3;
         self.execute(n, &line);
+    }
+
+    /// Whether a jog is the motion GRBL runs now: its state word is `Jog`.
+    pub(crate) fn jogging(&self) -> bool {
+        matches!(self.planner.front(), Some(Block::Jog { .. }))
+    }
+
+    /// `0x85`: ends a running jog and flushes the planner; GRBL ignores it outside a jog.
+    fn jog_cancel(&mut self) {
+        if self.jogging() {
+            self.planner.clear();
+            self.planned = self.pos;
+        }
     }
 
     pub(crate) fn push_block(&mut self, block: Block) {
