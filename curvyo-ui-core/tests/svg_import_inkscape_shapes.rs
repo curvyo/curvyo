@@ -689,11 +689,11 @@ fn ac125_inkscape_shapes_fixture() {
         kinds("inkscape_shapes.svg"),
         // The tester's real Inkscape 1.4.4 save (`inkscape_shapes_src/`): five arcs, the arc
         // tool's whole ellipse (an `<ellipse>`) and a 359.99° arc, three arcs, the rx ≠ ry
-        // rectangle, four polygons, a star, the rounded, randomized and twisted stars, two
+        // rectangle, four polygons, a star, the rounded star (live since `0145`), the randomized and twisted stars as paths, two
         // stars, the spiral, then the skew, stretch and rotate groups and the 3D box.
         [
             "arc", "arc", "arc", "arc", "arc", "ellipse", "ellipse", "arc", "arc", "arc", "arc",
-            "path", "polygon", "polygon", "polygon", "polygon", "star", "path", "path", "path",
+            "path", "polygon", "polygon", "polygon", "polygon", "star", "star", "path", "path",
             "star", "star", "path", "group", "group", "group", "group"
         ]
     );

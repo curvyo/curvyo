@@ -556,7 +556,8 @@
                     "radius": 15.0
                   },
                   "inner_ratio": 0.4,
-                  "point_count": 5
+                  "point_count": 5,
+                  "rounded": 0.0
                 }
               },
               "style": {
@@ -612,7 +613,8 @@
                     },
                     "radius": 15.0
                   },
-                  "point_count": 6
+                  "point_count": 6,
+                  "rounded": 0.0
                 }
               },
               "style": {

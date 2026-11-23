@@ -297,8 +297,8 @@ fn ac28_inkscape_star_data_is_read() {
     let all = leaves(&d.nodes);
     assert_eq!(all.len(), 1, "the first has no segment and is skipped");
     assert!(
-        matches!(all[0].1.kind, LeafKind::Path { .. }),
-        "rounded stars are paths"
+        matches!(&all[0].1.kind, LeafKind::Star { star, .. } if star.rounded == 0.2),
+        "a rounded star keeps its number (`0145`); the importer decides by the drawn d"
     );
     let d = mm(
         r#"<path sodipodi:type="star" sodipodi:sides="6" sodipodi:cx="5" sodipodi:cy="5" sodipodi:r1="10" sodipodi:r2="8.66" sodipodi:arg1="0" inkscape:flatsided="true" d="M 15,5 L 0 0"/>"#,

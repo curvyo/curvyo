@@ -36,7 +36,8 @@
                     "radius": 31.801573
                   },
                   "inner_ratio": 0.5109137840445818,
-                  "point_count": 15
+                  "point_count": 15,
+                  "rounded": 0.0
                 }
               },
               "style": {
@@ -93,7 +94,8 @@
                     "radius": 43.9463220738516
                   },
                   "inner_ratio": 0.5109137705162312,
-                  "point_count": 12
+                  "point_count": 12,
+                  "rounded": 0.0
                 }
               },
               "style": {

@@ -264,6 +264,11 @@ fn star_vertices(
 pub fn effective_curve(shape: &Shape) -> Option<Curve> {
     match *shape {
         Shape::Ellipse { arc: Some(_), .. } => Some(Curve::ELLIPSE_DEFAULT),
+        // Rounded wins over Curve while it is not 0 (`specs/0145-shape-spiro-handles/adrs.md`
+        // decision 3): the sides are straight, Rounded draws the corners.
+        Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. } if !rounded.is_zero() => {
+            Some(Curve(0.0))
+        }
         Shape::Ellipse { curve, .. } | Shape::Polygon { curve, .. } | Shape::Star { curve, .. } => {
             let (low, high) = (curve_limit(shape)?, curve_max(shape)?);
             Some(Curve(curve.get().clamp(low.get(), high.get())))
@@ -586,6 +591,7 @@ mod tests {
             frame: frame(r, 0.0),
             point_count: PointCount::new(n).unwrap(),
             curve: Curve::clamped(k),
+            rounded: crate::Rounded::ZERO,
         }
     }
 
@@ -595,6 +601,7 @@ mod tests {
             point_count: PointCount::new(n).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),
             curve: Curve::clamped(k),
+            rounded: crate::Rounded::ZERO,
         }
     }
 
@@ -928,6 +935,7 @@ mod tests {
                     frame,
                     point_count,
                     curve,
+                    rounded: crate::Rounded::ZERO,
                 },
                 Shape::Star {
                     frame,
@@ -939,6 +947,7 @@ mod tests {
                     point_count,
                     inner_ratio,
                     curve,
+                    rounded: crate::Rounded::ZERO,
                 },
                 other => other,
             }

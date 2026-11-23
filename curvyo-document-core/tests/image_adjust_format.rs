@@ -949,7 +949,7 @@ fn by_name(d: &Document, name: &str) -> NodeId {
 /// A `document.json` saved by this build as the format-51 golden stores it.
 fn as_format_51(json: &[u8]) -> String {
     String::from_utf8(json.to_vec()).unwrap().replacen(
-        "\"format_version\": 55,",
+        "\"format_version\": 56,",
         "\"format_version\": 51,",
         1,
     )
@@ -957,7 +957,7 @@ fn as_format_51(json: &[u8]) -> String {
 
 #[test]
 fn the_format_is_52() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 55);
+    assert_eq!(CURRENT_FORMAT_VERSION, 56);
 }
 
 #[test]
@@ -1107,8 +1107,8 @@ fn a_file_of_the_next_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 56,
-            supported: 55
+            found: 57,
+            supported: 56
         })
     ));
 }

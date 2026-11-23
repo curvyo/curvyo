@@ -15,10 +15,12 @@ use loro::{LoroMap, LoroValue};
 use crate::ellipse_arc::{ArcKind, EllipseArc};
 use crate::path_codec;
 use crate::ring_curve::Curve;
+use crate::ring_rounded::Rounded;
 use crate::units::Angle;
 
 pub(crate) const KEY_ELLIPSE_ARC: &str = "ellipse_arc";
 pub(crate) const KEY_CURVE: &str = "curve";
+pub(crate) const KEY_ROUNDED: &str = "rounded";
 
 /// What a stored register holds: nothing, a valid value, or something a file must be
 /// refused for.
@@ -68,6 +70,41 @@ fn stored_curve(meta: &LoroMap) -> Stored<Curve> {
     }
 }
 
+fn stored_rounded(meta: &LoroMap) -> Stored<Rounded> {
+    let Some(value) = meta.get(KEY_ROUNDED) else {
+        return Stored::Absent;
+    };
+    match path_codec::as_f64(&value.get_deep_value()).and_then(Rounded::new) {
+        Some(rounded) => Stored::Valid(rounded),
+        None => Stored::Damaged,
+    }
+}
+
+/// The shape's stored Rounded value, 0 when absent.
+pub(crate) fn read_rounded(meta: &LoroMap) -> Rounded {
+    match stored_rounded(meta) {
+        Stored::Valid(rounded) => rounded,
+        Stored::Absent | Stored::Damaged => Rounded::ZERO,
+    }
+}
+
+/// Writes `rounded` unless the node already reads it; 0 deletes the register
+/// (`specs/0145-shape-spiro-handles/adrs.md` decision 4). Returns whether it wrote.
+pub(crate) fn write_rounded_if_changed(meta: &LoroMap, rounded: Rounded) -> bool {
+    if rounded.is_zero() {
+        return delete_if_present(meta, KEY_ROUNDED);
+    }
+    if let Stored::Valid(old) = stored_rounded(meta)
+        && old == rounded
+    {
+        return false;
+    }
+    // invariant: inserting a number under a known key on an attached map cannot fail.
+    #[allow(clippy::unwrap_used)]
+    meta.insert(KEY_ROUNDED, rounded.get()).unwrap();
+    true
+}
+
 /// The ellipse's arc, `None` for the whole ellipse (absent, or unreadable on a document
 /// that was validated on open).
 pub(crate) fn read_arc(meta: &LoroMap) -> Option<EllipseArc> {
@@ -103,7 +140,10 @@ pub(crate) fn ellipse_arc_and_curve_are_valid(meta: &LoroMap) -> bool {
 /// Whether a polygon's or star's curve register opens (criterion 50); a value below the
 /// shape's limit is valid.
 pub(crate) fn polygon_curve_is_valid(meta: &LoroMap) -> bool {
+    // A finite Rounded of any size opens (it is limited on use); both registers non-zero is
+    // a valid merge result, Rounded wins (adrs.md decision 3).
     !matches!(stored_curve(meta), Stored::Damaged)
+        && !matches!(stored_rounded(meta), Stored::Damaged)
 }
 
 fn delete_if_present(meta: &LoroMap, key: &str) -> bool {
@@ -177,8 +217,9 @@ pub(crate) fn write_arc_and_curve(meta: &LoroMap, shape: &crate::primitive_model
             write_arc_if_changed(meta, arc);
             write_curve_if_changed(meta, curve, Curve::ELLIPSE_DEFAULT);
         }
-        Shape::Polygon { curve, .. } | Shape::Star { curve, .. } => {
+        Shape::Polygon { curve, rounded, .. } | Shape::Star { curve, rounded, .. } => {
             write_curve_if_changed(meta, curve, Curve::POLYGON_DEFAULT);
+            write_rounded_if_changed(meta, rounded);
         }
         Shape::Rect { .. } => {}
     }

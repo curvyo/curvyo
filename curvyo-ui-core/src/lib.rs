@@ -184,6 +184,7 @@ mod shape_arc_edit;
 mod shape_arc_text;
 mod shape_knobs;
 mod shape_placement;
+mod shape_rounded_edit;
 mod shape_tool_common;
 pub mod share_text;
 pub mod sharing_text;
@@ -528,7 +529,7 @@ pub use select_bar::{
     BarPreview, BarValue, ObjectKind, SelectBarState, ids_of_kind, only_dimensions,
     select_bar_state,
 };
-pub use select_bar_arc::{CurveBarState, EllipseBarState, GreyReason};
+pub use select_bar_arc::{CurveBarState, EllipseBarState, GreyReason, RoundedBarState};
 pub use select_tool::{
     Axis, EntryKey, GestureKind, GestureShape, KeyEntryRefusal, LiveEdit, LiveGesture,
     MoveEntryMode, MoveResolution, PressTarget, SelectDoubleClickOutcome, SelectPointerDownOutcome,
@@ -539,11 +540,18 @@ pub use selection::NodeSelection;
 pub use shape_arc_edit::{
     ARC_SEAM, ArcEnd, arc_angle_from_pointer, arc_capable, curve_capable, curve_from_pointer,
 };
-pub use shape_arc_text::{arc_announcement, arc_readout, curve_announcement, curve_readout};
+pub use shape_arc_text::{
+    arc_announcement, arc_readout, curve_announcement, curve_readout, rounded_announcement,
+    rounded_readout,
+};
 pub use shape_placement::{
     CANCELLED_SENTENCE, Placed, PlacementError, PlacementField, PlacementKind, PlacementNoun,
     ShapePlacement, field_label, field_name, field_suffix, message as placement_message,
     placed_sentence,
+};
+pub use shape_rounded_edit::{
+    rounded_capable, rounded_from_drag, rounded_handle_position, rounded_snap_window,
+    rounded_unit_mm, with_rounded,
 };
 pub use shape_tool_common::{CreateOutcome, CreatePreview};
 pub use skew_entry::SkewEntry;

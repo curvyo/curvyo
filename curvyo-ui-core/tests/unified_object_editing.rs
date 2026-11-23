@@ -192,8 +192,8 @@ fn ac1_a_star_shows_one_inner_radius_handle_and_a_polygon_none() {
     let star = Rig::star(40.0, 5, 0.5);
     let handles = star.handles();
     // Since `specs/0021-ellipse-arcs-and-shaping/` (criterion 40) a star and a polygon
-    // also have a curve handle.
-    assert_eq!(count_params(&handles), 2);
+    // also have a curve handle, since `specs/0145-shape-spiro-handles/` a Rounded handle.
+    assert_eq!(count_params(&handles), 3);
     assert!(
         handles
             .iter()
@@ -208,7 +208,8 @@ fn ac1_a_star_shows_one_inner_radius_handle_and_a_polygon_none() {
         },
         PointCount::new(6).unwrap(),
     );
-    assert_eq!(count_params(&Rig::selected(document, id).handles()), 1);
+    // A polygon: its Curve and its Rounded handle (`0145` criterion 1).
+    assert_eq!(count_params(&Rig::selected(document, id).handles()), 2);
 }
 
 /// Criterion 7: the tiers 24, 48, 72 on the shorter side, and the order in

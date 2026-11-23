@@ -20,6 +20,7 @@ use crate::primitive_model::{
     EllipseFrame, PointCount, RectBounds, Shape, StarFrame, shape_center,
 };
 use crate::ring_curve::{CONVERSION_PIECE_RAD, Curve, Ring, effective_curve, ring_outline};
+use crate::ring_rounded::rounded_outline;
 use crate::units::{Angle, Point, Vec2};
 
 /// The standard cubic-Bézier approximation of a quarter circle:
@@ -365,6 +366,12 @@ fn outline_with_pieces(shape: &Shape, piece: f64) -> PrimitiveOutline {
         }
         Shape::Ellipse { frame, curve, .. } if curve == Curve::ELLIPSE_DEFAULT => {
             PrimitiveOutline::closed(ellipse_outline(frame))
+        }
+        Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. } if !rounded.is_zero() => {
+            // invariant: a polygon or star has a ring.
+            #[allow(clippy::unwrap_used)]
+            let ring = Ring::of(shape, true).unwrap();
+            PrimitiveOutline::closed(rounded_outline(&ring, rounded.effective()))
         }
         Shape::Polygon {
             frame, point_count, ..

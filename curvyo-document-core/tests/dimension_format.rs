@@ -168,6 +168,7 @@ fn every_other_slot_form(document: &Document, rect: NodeId, circle: NodeId) {
             },
             point_count: curvyo_document_core::PointCount::new(4).unwrap(),
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     );

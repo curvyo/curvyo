@@ -246,6 +246,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0021-ellipse-arcs-and-shaping` criterion 59.
     ("set_ellipse_arc", "Change arc"),
     ("set_curve", "Change curve"),
+    ("set_rounded", "Change rounding"),
     ("set_curve_kind", "Change curve type"),
     ("set_spiro_transform", "Transform Spiro path"),
     ("set_width_point", "Change width point"),

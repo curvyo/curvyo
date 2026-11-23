@@ -64,6 +64,9 @@ pub enum EntryKind {
     ArcAngle,
     /// One field: a shape's curve in percent (criteria 24 and 42).
     Curve,
+    /// One field: a polygon's or star's Rounded value (`specs/0145-shape-spiro-handles/`
+    /// criterion 3).
+    Rounded,
 }
 
 /// What a field edits.

@@ -312,8 +312,9 @@ fn number_list(text: &str) -> Vec<f64> {
         .collect()
 }
 
-/// Inkscape's star data of `node`, when complete and not rounded or randomized
-/// (criterion 28); the caller still compares it with the drawn path.
+/// Inkscape's star data of `node`, when complete and not randomized (criterion 28; a finite
+/// `inkscape:rounded` is kept, `specs/0145-shape-spiro-handles` criterion 18); the caller still
+/// compares it with the drawn path.
 fn star_data(node: Node<'_, '_>) -> Option<StarData> {
     if node.attribute((SODIPODI_NS, "type"))? != "star" {
         return None;
@@ -327,9 +328,13 @@ fn star_data(node: Node<'_, '_>) -> Option<StarData> {
         node.attribute((INKSCAPE_NS, name))
             .is_none_or(|_| number(INKSCAPE_NS, name) == Some(0.0))
     };
-    if !zero_or_absent("rounded") || !zero_or_absent("randomized") {
+    if !zero_or_absent("randomized") {
         return None;
     }
+    let rounded = match node.attribute((INKSCAPE_NS, "rounded")) {
+        None => 0.0,
+        Some(_) => number(INKSCAPE_NS, "rounded")?,
+    };
     let sides = number(SODIPODI_NS, "sides")?;
     if sides.fract() != 0.0 || !(3.0..=1024.0).contains(&sides) {
         return None;
@@ -345,5 +350,6 @@ fn star_data(node: Node<'_, '_>) -> Option<StarData> {
         arg1: number(SODIPODI_NS, "arg1")?,
         arg2: tool_number(node, SODIPODI_NS, "arg2").ok()?,
         flat: node.attribute((INKSCAPE_NS, "flatsided")).map(str::trim) == Some("true"),
+        rounded,
     })
 }

@@ -81,6 +81,10 @@ pub struct TransformDecorationInput {
     /// radius handle (`docs/design-system.md`, "Parameter handle guide"):
     /// corner first, handle second.
     pub param_guides: Vec<(Point, Point)>,
+    /// Short solid ticks across a parameter guide, each `(from, to)` in document space: the end of
+    /// the normal range of the Rounded handle (`specs/0145-shape-spiro-handles/ux-notes.md`
+    /// section 4), `--accent` on a white casing.
+    pub param_ticks: Vec<(Point, Point)>,
     /// `window.devicePixelRatio`: the skew guide snaps to whole device pixels
     /// with it, as the selection box does. Not a positive finite number (and
     /// the default 0) reads as 1.
@@ -330,6 +334,16 @@ pub fn build_transform_handles(view: ViewTransform, input: &TransformDecorationI
                 screen_px_to_mm(view, theme::GUIDE_GAP_PX),
             ),
         ));
+    }
+    let tick_width = screen_px_to_mm(view, theme::TRANSFORM_RESIZE_HANDLE_OUTLINE_PX);
+    for &(from, to) in &input.param_ticks {
+        list.extend(glyphs::thick_line(
+            from,
+            to,
+            tick_width + 2.0 * screen_px_to_mm(view, 1.0),
+            theme::SELECTION_CASING,
+        ));
+        list.extend(glyphs::thick_line(from, to, tick_width, theme::ACCENT));
     }
     // Parameter handles sit above every other handle (`docs/design-system.md`).
     for handle in input

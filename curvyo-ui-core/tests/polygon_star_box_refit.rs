@@ -62,6 +62,7 @@ fn polygon(
             frame: frame(center, radius, frame_angle),
             point_count: PointCount::new(n).unwrap(),
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         rotation,
     )
@@ -81,6 +82,7 @@ fn star(
             point_count: PointCount::new(n).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         rotation,
     )

@@ -952,16 +952,19 @@ fn primitive_docs(k: f64) -> Vec<(&'static str, Document, Point)> {
         40.0 + 100.0 / k - 100.0 / k * std::f64::consts::FRAC_1_SQRT_2,
         30.0 + 70.0 / k + 70.0 / k * std::f64::consts::FRAC_1_SQRT_2,
     );
-    let mid = |d: &Document| {
+    // Rewritten for `0145` criterion 1: the star's first edge now lies 10 px from the Rounded
+    // knob (15 px inside vertex 0), so a second double-click there opens its entry instead of
+    // asking for the hint. The star's spot is the middle of the edge opposite vertex 0.
+    let mid = |d: &Document, edge: usize| {
         let id = d.object_ids()[0];
         let o = d.primitive(id).unwrap();
         let pts = outline_of_rotated(&o.shape, o.rotation);
         pt(
-            f64::midpoint(pts[0].point.x, pts[1].point.x),
-            f64::midpoint(pts[0].point.y, pts[1].point.y),
+            f64::midpoint(pts[edge].point.x, pts[edge + 1].point.x),
+            f64::midpoint(pts[edge].point.y, pts[edge + 1].point.y),
         )
     };
-    let (po, so) = (mid(&p), mid(&st));
+    let (po, so) = (mid(&p, 0), mid(&st, 8));
     vec![
         ("rectangle", r, rect_pt),
         ("ellipse", e, ell_pt),

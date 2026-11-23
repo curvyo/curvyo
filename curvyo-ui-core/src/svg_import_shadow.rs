@@ -5,7 +5,7 @@
 
 use curvyo_document_core::{
     Angle, CornerRadii, Curve, DashPattern, EllipseFrame, InnerRatio, Length, MarkerCount,
-    MarkerPlace, Markers, Point, PointCount, RectBounds, Shape, StarFrame, Style,
+    MarkerPlace, Markers, Point, PointCount, RectBounds, Rounded, Shape, StarFrame, Style,
 };
 use curvyo_svg_core::{LeafKind, MarkerShape, ShadowKind, ShadowMarkers, SvgLeaf};
 use kurbo::{Affine, BezPath};
@@ -175,23 +175,9 @@ pub(crate) fn shadow_primitive(leaf: &SvgLeaf, placement: Affine) -> Option<(Sha
             },
             rotation,
         ),
-        (ShadowKind::Polygon, &[cx, cy, radius, sides, angle, rotation, k]) => (
-            Shape::Polygon {
-                frame: star_frame(center(cx, cy), radius, angle),
-                point_count: count(sides)?,
-                curve: curve(k)?,
-            },
-            rotation,
-        ),
-        (ShadowKind::Star, &[cx, cy, radius, points, angle, rotation, k, ratio]) => (
-            Shape::Star {
-                frame: star_frame(center(cx, cy), radius, angle),
-                point_count: count(points)?,
-                inner_ratio: InnerRatio::new(ratio).ok()?,
-                curve: curve(k)?,
-            },
-            rotation,
-        ),
+        (ShadowKind::Polygon | ShadowKind::Star, numbers) => {
+            ring_by_numbers(kind, numbers, &center, &curve)?
+        }
         _ => return None,
     };
     let finite = frame.iter().all(|v| v.is_finite() && v.abs() <= 1e7);
@@ -263,6 +249,48 @@ fn arc_by_frame(
     };
     let rotation = Angle::from_radians(rotation);
     draws(&shape, rotation, drawn).then_some((shape, rotation))
+}
+
+/// A polygon or star by its shadow numbers: `cx cy radius count angle rotation curve [ratio]` with
+/// `Rounded` appended since `specs/0145-shape-spiro-handles` (the forms without it read as 0), and
+/// the rotation.
+fn ring_by_numbers(
+    kind: ShadowKind,
+    numbers: &[f64],
+    center: &dyn Fn(f64, f64) -> Point,
+    curve: &dyn Fn(f64) -> Option<Curve>,
+) -> Option<(Shape, f64)> {
+    let polygon = kind == ShadowKind::Polygon;
+    let (head, rest) = numbers.split_first_chunk::<7>()?;
+    let &[cx, cy, radius, count_value, angle, rotation, k] = head;
+    let (ratio, rounded) = match (polygon, rest) {
+        (true, []) => (None, 0.0),
+        (true, &[q]) => (None, q),
+        (false, &[ratio]) => (Some(ratio), 0.0),
+        (false, &[ratio, q]) => (Some(ratio), q),
+        _ => return None,
+    };
+    let (frame, point_count) = (
+        star_frame(center(cx, cy), radius, angle),
+        count(count_value)?,
+    );
+    let (curve, rounded) = (curve(k)?, Rounded::new(rounded)?);
+    let shape = match ratio {
+        None => Shape::Polygon {
+            frame,
+            point_count,
+            curve,
+            rounded,
+        },
+        Some(ratio) => Shape::Star {
+            frame,
+            point_count,
+            inner_ratio: InnerRatio::new(ratio).ok()?,
+            curve,
+            rounded,
+        },
+    };
+    Some((shape, rotation))
 }
 
 fn star_frame(center: Point, radius: f64, angle: f64) -> StarFrame {

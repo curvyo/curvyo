@@ -150,6 +150,7 @@ pub(super) fn param_readout(
         (shape, ParamHandle::ArcStart) => curvyo_ui_core::arc_readout(&shape, ArcEnd::Start),
         (shape, ParamHandle::ArcEnd) => curvyo_ui_core::arc_readout(&shape, ArcEnd::End),
         (shape, ParamHandle::Curve) => curvyo_ui_core::curve_readout(&shape),
+        (shape, ParamHandle::Rounded) => curvyo_ui_core::rounded_readout(&shape),
         _ => None,
     }
 }

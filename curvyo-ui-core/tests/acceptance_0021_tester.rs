@@ -62,6 +62,7 @@ fn poly(n: u32, r: f64, curve: f64) -> Shape {
         frame: sframe(r),
         point_count: PointCount::new(n).unwrap(),
         curve: Curve::new(curve).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 
@@ -71,6 +72,7 @@ fn star(n: u32, ratio: f64, r: f64, curve: f64) -> Shape {
         point_count: PointCount::new(n).unwrap(),
         inner_ratio: InnerRatio::new(ratio).unwrap(),
         curve: Curve::new(curve).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 
@@ -214,12 +216,13 @@ fn c31_a_curved_ellipse_has_no_arc_knobs_and_an_arc_has_no_curve_knob() {
 
 #[test]
 fn c40_polygon_has_only_the_curve_knob_a_star_adds_its_inner_radius_rect_none_of_ours() {
+    // `0145` adds the Rounded knob to both.
     let k = knobs(&obj(poly(6, 20.0, 0.0), 0.0));
-    assert_eq!(k.len(), 1);
-    assert!(find(&k, ParamHandle::Curve).is_some());
+    assert_eq!(k.len(), 2);
+    assert!(find(&k, ParamHandle::Curve).is_some() && find(&k, ParamHandle::Rounded).is_some());
     let k = knobs(&obj(star(5, 0.4, 20.0, 0.0), 0.0));
     assert!(find(&k, ParamHandle::Curve).is_some() && find(&k, ParamHandle::InnerRadius).is_some());
-    assert_eq!(k.len(), 2);
+    assert_eq!(k.len(), 3);
     let rect = obj(
         Shape::Rect {
             bounds: curvyo_document_core::RectBounds::from_corners(

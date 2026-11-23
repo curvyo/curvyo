@@ -17,6 +17,7 @@ use crate::corner_radii::CornerRadii;
 use crate::ellipse_arc::EllipseArc;
 use crate::path_model::{NodeId, PathSnapshot};
 use crate::ring_curve::Curve;
+use crate::ring_rounded::Rounded;
 use crate::style_model::Style;
 use crate::text_model::TextSnapshot;
 use crate::units::{Angle, Length, Point, Tolerance, Vec2};
@@ -247,6 +248,9 @@ pub enum Shape {
         /// The curve of its sides (`specs/0021-ellipse-arcs-and-shaping/` criterion
         /// 35), stored raw, [`Curve::POLYGON_DEFAULT`] straight.
         curve: Curve,
+        /// The Rounded value of its corners (`specs/0145-shape-spiro-handles/`), stored raw,
+        /// [`Rounded::ZERO`] straight; it wins over `curve` while it is not 0.
+        rounded: Rounded,
     },
     /// Acceptance criteria 10, 12, 13, 14, 15.
     Star {
@@ -258,6 +262,8 @@ pub enum Shape {
         inner_ratio: InnerRatio,
         /// The curve of its sides, as on the polygon.
         curve: Curve,
+        /// The Rounded value of its corners, as on the polygon.
+        rounded: Rounded,
     },
 }
 
@@ -566,6 +572,7 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             frame,
             point_count,
             curve,
+            rounded,
         } => Shape::Polygon {
             frame: StarFrame {
                 center: frame.center.translated(offset),
@@ -573,12 +580,14 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             },
             point_count,
             curve,
+            rounded,
         },
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
             curve,
+            rounded,
         } => Shape::Star {
             frame: StarFrame {
                 center: frame.center.translated(offset),
@@ -587,6 +596,7 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             point_count,
             inner_ratio,
             curve,
+            rounded,
         },
     }
 }
@@ -683,10 +693,19 @@ pub fn shape_frame_bounds(shape: &Shape) -> (Point, Point) {
             // The circumscribed box of the curved outline (criterion 47): it grows where a
             // star's sides bulge past the outer radius.
             let radius = crate::ring_curve::ring_extent(shape).max(frame.radius.as_mm());
-            (
+            let straight = (
                 Point::new(frame.center.x - radius, frame.center.y - radius),
                 Point::new(frame.center.x + radius, frame.center.y + radius),
-            )
+            );
+            // A Rounded outline can leave the circumscribed box (criterion 7): the union of
+            // today's box and the exact box of the cubics, so the box only grows.
+            match crate::ring_rounded::rounded_bounds(shape) {
+                Some((min, max)) => (
+                    Point::new(straight.0.x.min(min.x), straight.0.y.min(min.y)),
+                    Point::new(straight.1.x.max(max.x), straight.1.y.max(max.y)),
+                ),
+                None => straight,
+            }
         }
     }
 }
@@ -866,6 +885,7 @@ mod tests {
                 },
                 point_count: PointCount::new(5).unwrap(),
                 curve: crate::Curve::POLYGON_DEFAULT,
+                rounded: crate::Rounded::ZERO,
             },
             style: Style::default(),
             rotation: Angle::from_radians(rotation.to_radians()),
@@ -1020,6 +1040,7 @@ mod tests {
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: InnerRatio::new(0.5).unwrap(),
             curve: Curve::new(-0.3).unwrap(),
+            rounded: crate::Rounded::ZERO,
         };
         let Shape::Star { curve, .. } = translate_shape(star, Vec2::new(1.0, 1.0)) else {
             panic!("a star");
@@ -1083,6 +1104,7 @@ mod tests {
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: InnerRatio::new(0.5).unwrap(),
             curve: crate::Curve::POLYGON_DEFAULT,
+            rounded: crate::Rounded::ZERO,
         };
         let (min, max) = shape_frame_bounds(&shape);
         assert_eq!(min, Point::new(-10.0, -10.0));

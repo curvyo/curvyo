@@ -246,6 +246,7 @@ impl Session {
             pivot_marker_full: self.select.centre_chip_open(),
             skew_guide: self.skew_guide_now(),
             param_guides: Vec::new(),
+            param_ticks: Vec::new(),
             device_pixel_ratio: self.device_pixel_ratio,
         }
     }

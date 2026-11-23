@@ -660,7 +660,13 @@ impl DocumentVersion {
 /// matrix). A build that stops at 54 would read the marks as nothing it knows and could cut the
 /// sheet in the wrong place, so this build's files are refused there by version; a file of 54
 /// opens unchanged. Goldens: `print_and_cut_v55.curvyo`, `print_and_cut_damaged_v55.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 55;
+///
+/// Version 56 (`specs/0145-shape-spiro-handles` slice 1, `adrs.md` decision 4): a polygon or star
+/// may carry the register `rounded` (a finite number, absent = 0, limited to -10..=10 where it
+/// is evaluated). A build that stops at 55 would draw the shape's corners straight, so this
+/// build's files are refused there by version; a file of 55 opens unchanged. Golden:
+/// `rounded_v56.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 56;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -1251,6 +1257,9 @@ enum ObjectJson {
         /// The curve as a fraction; left out at the default.
         #[serde(skip_serializing_if = "Option::is_none")]
         curve: Option<f64>,
+        /// The Rounded value; left out at 0.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rounded: Option<f64>,
         style: crate::style_model::Style,
         rotation: crate::units::Angle,
     },
@@ -1262,6 +1271,9 @@ enum ObjectJson {
         /// The curve as a fraction; left out at the default.
         #[serde(skip_serializing_if = "Option::is_none")]
         curve: Option<f64>,
+        /// The Rounded value; left out at 0.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rounded: Option<f64>,
         style: crate::style_model::Style,
         rotation: crate::units::Angle,
     },
@@ -1359,11 +1371,13 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                         frame,
                         point_count,
                         curve,
+                        rounded,
                     } => Self::Polygon {
                         id,
                         frame,
                         point_count: point_count.get(),
                         curve: stored_curve(curve, crate::ring_curve::Curve::POLYGON_DEFAULT),
+                        rounded: (!rounded.is_zero()).then_some(rounded.get()),
                         style,
                         rotation,
                     },
@@ -1372,8 +1386,10 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                         point_count,
                         inner_ratio,
                         curve,
+                        rounded,
                     } => Self::Star {
                         curve: stored_curve(curve, crate::ring_curve::Curve::POLYGON_DEFAULT),
+                        rounded: (!rounded.is_zero()).then_some(rounded.get()),
                         id,
                         frame,
                         point_count: point_count.get(),

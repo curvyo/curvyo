@@ -450,6 +450,7 @@ impl Session {
         match param {
             ParamHandle::ArcStart | ParamHandle::ArcEnd => curvyo_ui_core::arc_announcement(&shape),
             ParamHandle::Curve => curvyo_ui_core::curve_announcement(&shape),
+            ParamHandle::Rounded => curvyo_ui_core::rounded_announcement(&shape),
             ParamHandle::CornerRadius(_) | ParamHandle::InnerRadius => None,
         }
     }

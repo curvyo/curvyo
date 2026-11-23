@@ -242,6 +242,8 @@ pub struct StarData {
     pub arg2: Option<f64>,
     /// `inkscape:flatsided`: a polygon.
     pub flat: bool,
+    /// `inkscape:rounded`, 0 for the straight shape (`specs/0145-shape-spiro-handles`).
+    pub rounded: f64,
 }
 
 /// The numbers of Inkscape's arc tool, in user units; each is finite.

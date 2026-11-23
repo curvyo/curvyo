@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 722f2dd5fe2e1d5a14ad4ee764ba4d78a1bb70a27f019e54dd3e25d54d2ba1c9 # shrinks to shorter_px = 72.0, aspect = 1.792280827357719, stored = [0.0, 1.7579365650494851, 0.0, 1.4950073336584062], rotation = 0.0, scale = 0.2, side_rotate = false
+cc 2a317f103efd314478d42b86a15cb231dddec871782206ac81b485678c0e5626 # shrinks to shorter_px = 72.0, points = 9, ratio = 0.5073720004198122, angle = 0.0, rotation = 0.0, scale = 0.2

@@ -46,6 +46,7 @@ const fn handle_bit(handle: EditHandle) -> u32 {
             ParamHandle::ArcStart => 26,
             ParamHandle::ArcEnd => 27,
             ParamHandle::Curve => 28,
+            ParamHandle::Rounded => 29,
         },
     };
     1 << index

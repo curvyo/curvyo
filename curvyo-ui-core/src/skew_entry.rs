@@ -299,6 +299,7 @@ mod tests {
                             handle: EditHandle::Skew(side),
                             modes: ScaleModes::default(),
                             param_gain: 1.0,
+                            rounded_snap: 0.0,
                             unlinked: false,
                             converted: None,
                             signs: crate::transform_math::ExtentSigns::default(),

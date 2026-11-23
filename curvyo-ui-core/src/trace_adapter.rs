@@ -61,6 +61,7 @@ pub(crate) fn shape_of(primitive: &Primitive, rotation: Angle) -> (Shape, DocAng
             frame: star_frame(centre, radius, angle),
             point_count: PointCount::new(points).expect("point count in range"),
             curve: Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Primitive::Star {
             centre,
@@ -73,6 +74,7 @@ pub(crate) fn shape_of(primitive: &Primitive, rotation: Angle) -> (Shape, DocAng
             point_count: PointCount::new(points).expect("point count in range"),
             inner_ratio: InnerRatio::new(inner_ratio).expect("inner ratio in range"),
             curve: Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
     };
     (shape, DocAngle::from_radians(rotation.as_radians()))

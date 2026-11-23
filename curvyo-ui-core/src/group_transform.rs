@@ -338,21 +338,25 @@ pub(crate) fn scale_primitive(
             frame,
             point_count,
             curve,
+            rounded,
         } => Shape::Polygon {
             frame: scaled_star_frame(frame, map_point(frame.center), factor),
             point_count,
             curve,
+            rounded,
         },
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
             curve,
+            rounded,
         } => Shape::Star {
             frame: scaled_star_frame(frame, map_point(frame.center), factor),
             point_count,
             inner_ratio,
             curve,
+            rounded,
         },
     };
     PrimitiveSnapshot {

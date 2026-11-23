@@ -32,6 +32,7 @@ fn polygon(n: u32, k: f64) -> Shape {
         },
         point_count: PointCount::new(n).unwrap(),
         curve: Curve::new(k).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 

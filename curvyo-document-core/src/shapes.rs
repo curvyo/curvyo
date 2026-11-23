@@ -166,6 +166,7 @@ impl Document {
                 frame,
                 point_count,
                 curve: crate::Curve::POLYGON_DEFAULT,
+                rounded: crate::Rounded::ZERO,
             },
             Angle::from_radians(0.0),
         )
@@ -185,6 +186,7 @@ impl Document {
             point_count,
             inner_ratio,
             curve: crate::Curve::POLYGON_DEFAULT,
+            rounded: crate::Rounded::ZERO,
         };
         self.create_primitive(shape, Angle::from_radians(0.0))
     }
@@ -1164,6 +1166,7 @@ mod tests {
                     frame: star_frame(),
                     point_count,
                     curve: crate::Curve::POLYGON_DEFAULT,
+                    rounded: crate::Rounded::ZERO,
                 },
                 "create_polygon",
             ),
@@ -1173,6 +1176,7 @@ mod tests {
                     point_count,
                     inner_ratio: InnerRatio::new(0.5).expect("valid"),
                     curve: crate::Curve::POLYGON_DEFAULT,
+                    rounded: crate::Rounded::ZERO,
                 },
                 "create_star",
             ),

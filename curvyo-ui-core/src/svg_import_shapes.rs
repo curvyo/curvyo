@@ -5,7 +5,7 @@
 
 use curvyo_document_core::{
     AnchorKind, Angle, CornerRadii, Curve, DrawingAnchor, DrawingOutline, EllipseFrame, InnerRatio,
-    Length, Point, PointCount, RectBounds, Shape, StarFrame, Vec2, outline_of,
+    Length, Point, PointCount, RectBounds, Rounded, Shape, StarFrame, Vec2, outline_of,
 };
 use curvyo_svg_core::{LeafKind, StarData, rounded_rect};
 
@@ -212,11 +212,14 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
         radius: Length::from_mm(tip_r * scale),
         angle: Angle::from_radians((v.y - c.y).atan2(v.x - c.x)),
     };
+    // A value beyond the field's range is evaluated limited, so it could not draw the file's `d`.
+    let rounded = Rounded::new(star.rounded).filter(|r| r.get().abs() <= Rounded::RANGE)?;
     let shape = match valley {
         None => Shape::Polygon {
             frame,
             point_count: PointCount::new(star.sides).ok()?,
             curve: Curve::POLYGON_DEFAULT,
+            rounded,
         },
         Some((r2, arg2)) => {
             let step = std::f64::consts::TAU / f64::from(star.sides);
@@ -230,6 +233,7 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
                     frame,
                     point_count: PointCount::new(star.sides.checked_mul(2)?).ok()?,
                     curve: Curve::POLYGON_DEFAULT,
+                    rounded,
                 }
             } else {
                 Shape::Star {
@@ -237,6 +241,7 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
                     point_count: PointCount::new(star.sides).ok()?,
                     inner_ratio: InnerRatio::new(r2.min(star.r1) / tip_r).ok()?,
                     curve: Curve::POLYGON_DEFAULT,
+                    rounded,
                 }
             }
         }

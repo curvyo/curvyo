@@ -8,6 +8,7 @@ use curvyo_document_core::{Point, Shape, Vec2, curve_handle_position, ellipse_po
 use crate::oriented_box::OrientedBox;
 use crate::param_handles::{ParamHandle, star_inner_vertex};
 use crate::shape_arc_edit::{ARC_SEAM, arc_capable, curve_capable};
+use crate::shape_rounded_edit::rounded_handle_position;
 use crate::transform_handle_layout::{
     ALL_EIGHT, EditHandle, HandleSpec, TransformHandleTolerances, transform_handles,
 };
@@ -70,7 +71,7 @@ fn arc_knobs(shape: &Shape, pitch_mm: f64) -> Vec<Knob> {
 }
 
 /// The knobs `shape` has, in its box-local frame.
-fn knobs(shape: &Shape, pitch_mm: f64) -> Vec<Knob> {
+fn knobs(shape: &Shape, pitch_mm: f64, tolerances: &TransformHandleTolerances) -> Vec<Knob> {
     let centre = curvyo_document_core::shape_center(shape);
     let mut knobs = Vec::new();
     if let Shape::Star {
@@ -89,6 +90,16 @@ fn knobs(shape: &Shape, pitch_mm: f64) -> Vec<Knob> {
         });
     }
     knobs.extend(arc_knobs(shape, pitch_mm));
+    // The Rounded knob, after the inner-radius knob and before Curve (`ux-notes.md` section 2):
+    // on the ray from vertex 0 to the centre, so its travel line is that ray.
+    if let Some(at) = rounded_handle_position(shape, tolerances) {
+        knobs.push(Knob {
+            handle: ParamHandle::Rounded,
+            at,
+            travel: Vec2::new(-1.0, 0.0),
+            inward: None,
+        });
+    }
     if curve_capable(shape)
         && let Some(at) = curve_handle_position(shape)
     {
@@ -118,6 +129,7 @@ fn curve_side_middle(shape: &Shape) -> Option<Point> {
             frame,
             point_count,
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Shape::Star {
             frame,
@@ -129,6 +141,7 @@ fn curve_side_middle(shape: &Shape) -> Option<Point> {
             point_count,
             inner_ratio,
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Shape::Rect { .. } => return None,
     };
@@ -173,34 +186,58 @@ fn displaced(shape: &Shape, knobs: &[Knob], glyphs: &[Point], pitch: f64) -> Vec
             placed.push(knob.at);
             continue;
         }
-        let clear = |p: Point| {
+        let clear_of = |p: Point, others: &[Point]| {
             glyphs
                 .iter()
                 .all(|g| g.vector_to(p).length() >= glyph_clearance - 1e-9)
-                && placed
+                && others
                     .iter()
                     .all(|k| k.vector_to(p).length() >= pitch - 1e-9)
         };
+        // A knob that cannot clear every knob placed before it (a dense star near 72 px has no
+        // room for the inner, Rounded and Curve knobs) clears the glyphs and the inner knob
+        // only, as it did before the Rounded knob existed: the Curve knob is never put on a glyph.
+        let fewer: Vec<Point> = placed
+            .iter()
+            .zip(knobs)
+            .filter(|(_, k)| k.handle == ParamHandle::InnerRadius)
+            .map(|(p, _)| *p)
+            .collect();
+        // A displaced knob never lands on the centre, where it would take the press of the move
+        // handle (`0005` F1); the Rounded knob alone may rest there, at q = 1.
+        let near_centre =
+            |p: Point| knob.handle != ParamHandle::Rounded && centre.vector_to(p).length() < pitch;
+        let clear = |p: Point| clear_of(p, &placed) && !near_centre(p);
+        let clear_fewer = |p: Point| clear_of(p, &fewer) && !near_centre(p);
         // Up to two pitches either way: a knob exactly on a glyph needs more than one.
-        let found = (0..=2 * SEARCH_STEPS)
-            .flat_map(|step| {
-                let distance = pitch * f64::from(step) / f64::from(SEARCH_STEPS);
-                [distance, -distance]
-            })
-            .filter(|distance| knob.inward.is_none_or(|sign| distance * sign >= 0.0))
-            .map(|distance| moved(shape, *knob, distance))
-            .find(|p| clear(*p));
+        let search = |clear: &dyn Fn(Point) -> bool| {
+            (0..=2 * SEARCH_STEPS)
+                .flat_map(|step| {
+                    let distance = pitch * f64::from(step) / f64::from(SEARCH_STEPS);
+                    [distance, -distance]
+                })
+                .filter(|distance| knob.inward.is_none_or(|sign| distance * sign >= 0.0))
+                .map(|distance| moved(shape, *knob, distance))
+                .find(|p| clear(*p))
+        };
         let inward = unit(knob.at.vector_to(centre));
-        let at = found
-            .or_else(|| {
-                (1..=2 * SEARCH_STEPS)
-                    .map(|step| {
-                        knob.at.translated(
-                            inward.scaled(pitch * f64::from(step) / f64::from(SEARCH_STEPS)),
-                        )
-                    })
-                    .find(|p| clear(*p))
-            })
+        let toward_centre = |clear: &dyn Fn(Point) -> bool| {
+            (1..=2 * SEARCH_STEPS)
+                .map(|step| {
+                    knob.at.translated(
+                        inward.scaled(pitch * f64::from(step) / f64::from(SEARCH_STEPS)),
+                    )
+                })
+                .find(|p| clear(*p))
+        };
+        let at = search(&clear)
+            .or_else(|| toward_centre(&clear))
+            .or_else(|| search(&clear_fewer))
+            .or_else(|| toward_centre(&clear_fewer))
+            // Last resort on a dense star near 72 px: off the glyphs and the inner knob even if
+            // that is near the centre, where the 4 px gap matters more than the press of the move
+            // handle (the centre glyph yields to a knob within 20 px, `0009`).
+            .or_else(|| search(&|p| clear_of(p, &fewer)))
             .unwrap_or(knob.at);
         placed.push(at);
     }
@@ -216,7 +253,7 @@ pub(crate) fn shape_knobs(
     tolerances: &TransformHandleTolerances,
 ) -> Vec<(ParamHandle, Point)> {
     let pitch = tolerances.param_pitch_mm;
-    let knobs = knobs(shape, pitch);
+    let knobs = knobs(shape, pitch, tolerances);
     let spec = HandleSpec {
         resize_directions: &ALL_EIGHT,
         side_rotate: false,

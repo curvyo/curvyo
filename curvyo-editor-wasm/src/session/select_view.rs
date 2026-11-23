@@ -8,12 +8,13 @@
 
 use std::borrow::Cow;
 
-use curvyo_document_core::{ObjectSnapshot, Vec2};
+use curvyo_document_core::{ObjectSnapshot, Point, Shape, Vec2};
 use curvyo_render_core::{
     SelectDecorationInput, TransformDecorationInput, TransformGlyphKind, TransformHandleGlyph,
 };
 use curvyo_ui_core::{
-    EditHandle, LiveEdit, ParamHandle, SelectTool, corner_local_position, is_drawn_handle,
+    EditHandle, LiveEdit, OrientedBox, ParamHandle, SelectTool, corner_local_position,
+    is_drawn_handle,
 };
 
 use super::Session;
@@ -367,6 +368,8 @@ impl Session {
                 }
             })
             .collect();
+        let param_ticks =
+            self.rounded_guide(object, &box_, highlighted.or(hovered), &mut param_guides);
         let live_pivot = self.select.live_pivot(self.held.shift);
         // Criterion 55: Shift held, nothing running, the pointer on a handle:
         // the marker previews the point that handle would use.
@@ -385,8 +388,59 @@ impl Session {
             pivot_marker_full: centre_chip,
             skew_guide: self.skew_guide_now(),
             param_guides,
+            param_ticks,
             device_pixel_ratio: self.device_pixel_ratio,
         }
+    }
+
+    /// The Rounded handle's guide and ticks while it is hovered or dragged (`ux-notes.md`
+    /// section 4): the guide covers the normal range and reaches the knob, a tick of 10 px
+    /// across it at `q = 0` and `q = 1`, 16 px while the value sits on one. Positions come from
+    /// the straight ring, so they stay put during the drag. Returns the ticks.
+    fn rounded_guide(
+        &self,
+        object: &ObjectSnapshot,
+        box_: &OrientedBox,
+        active: Option<EditHandle>,
+        guides: &mut Vec<(Point, Point)>,
+    ) -> Vec<(Point, Point)> {
+        let ObjectSnapshot::Primitive(primitive) = object else {
+            return Vec::new();
+        };
+        let (Some(EditHandle::Param(ParamHandle::Rounded)), Some(q)) = (
+            active,
+            curvyo_document_core::effective_rounded(&primitive.shape),
+        ) else {
+            return Vec::new();
+        };
+        let (Shape::Polygon { frame, .. } | Shape::Star { frame, .. }) = primitive.shape else {
+            return Vec::new();
+        };
+        let px = 1.0 / self.view().scale();
+        let (inset, radius) = (15.0 * px, frame.radius.as_mm());
+        let unit = radius - inset;
+        let at = |q: f64| {
+            box_.to_document(Point::new(
+                frame.center.x + radius - inset - q * unit,
+                frame.center.y,
+            ))
+        };
+        guides.push((at(q.min(0.0)), at(q.max(1.0))));
+        [0.0, 1.0]
+            .into_iter()
+            .map(|target| {
+                let long = (q - target).abs() < 1e-9;
+                let half = if long { 8.0 } else { 5.0 } * px;
+                let (centre_x, y) = (
+                    frame.center.x + radius - inset - target * unit,
+                    frame.center.y,
+                );
+                (
+                    box_.to_document(Point::new(centre_x, y - half)),
+                    box_.to_document(Point::new(centre_x, y + half)),
+                )
+            })
+            .collect()
     }
 }
 

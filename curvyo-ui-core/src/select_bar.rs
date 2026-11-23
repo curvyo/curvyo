@@ -13,7 +13,10 @@ use curvyo_document_core::{
 
 use crate::object_selection::{ObjectSelection, objects_with_ids};
 use crate::param_edit::{PARAM_EQUAL_EPSILON, ParamValue};
-use crate::select_bar_arc::{CurveBarState, EllipseBarState, curve_bar_state, ellipse_bar_state};
+use crate::select_bar_arc::{
+    CurveBarState, EllipseBarState, RoundedBarState, curve_bar_state, ellipse_bar_state,
+    rounded_bar_state,
+};
 use crate::shape_arc_edit::{arc_capable, curve_capable};
 
 /// The kinds of object a bar control acts on.
@@ -132,6 +135,9 @@ pub struct SelectBarState {
     pub ellipse: Option<EllipseBarState>,
     /// The "Curve" field (criteria 26 and 44), `None` while it is not shown.
     pub curve: Option<CurveBarState>,
+    /// The "Rounded" field (`specs/0145-shape-spiro-handles/` criterion 3), `None` while the
+    /// selection holds no polygon or star.
+    pub rounded: Option<RoundedBarState>,
 }
 
 /// The one value of `values` if they all agree within `eps`, else `Mixed`.
@@ -284,6 +290,7 @@ pub fn select_bar_state(
             && !only_registration_marks(objects, selection),
         ellipse: ellipse_bar_state(objects, selection),
         curve: curve_bar_state(objects, selection, preview),
+        rounded: rounded_bar_state(objects, selection, preview),
     }
 }
 

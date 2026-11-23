@@ -124,9 +124,9 @@ fn c25_the_format_is_44() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 55);
+    assert_eq!(CURRENT_FORMAT_VERSION, 56);
     let (d, _, _) = laser();
-    assert_eq!(format_of(&pack(&d, "t").unwrap()), 55);
+    assert_eq!(format_of(&pack(&d, "t").unwrap()), 56);
 }
 
 #[test]

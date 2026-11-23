@@ -8,7 +8,10 @@ use crate::ellipse_arc::EllipseArc;
 use crate::path_model::NodeId;
 use crate::primitive_model::{EllipseFrame, Shape};
 use crate::ring_curve::Curve;
-use crate::shape_arc_codec::{write_arc_if_changed, write_curve_if_changed};
+use crate::ring_rounded::Rounded;
+use crate::shape_arc_codec::{
+    write_arc_if_changed, write_curve_if_changed, write_rounded_if_changed,
+};
 use crate::shape_codec::SHAPE_ELLIPSE;
 use crate::shapes::ShapeEditError;
 use crate::units::Length;
@@ -142,9 +145,48 @@ impl Document {
         let mut changed = false;
         for (meta, curve, default) in metas {
             changed |= write_curve_if_changed(&meta, curve, default);
+            // Rounded and Curve exclude each other (`specs/0145-shape-spiro-handles/`
+            // criterion 5): a curve on a polygon or star zeroes Rounded in the same commit.
+            if curve != default && default == Curve::POLYGON_DEFAULT {
+                changed |= write_rounded_if_changed(&meta, Rounded::ZERO);
+            }
         }
         if changed {
             self.commit_with_label("set_curve");
+        }
+        Ok(())
+    }
+
+    /// Sets each named polygon's or star's stored Rounded value as **one commit** for the
+    /// whole batch, labelled `set_rounded` ("Change rounding", criteria 3 and 5). The value is
+    /// stored raw (limited to ±10 only where it is evaluated); 0 deletes the register. A value
+    /// other than 0 also sets the shape's Curve to 0 in the same commit.
+    ///
+    /// # Errors
+    /// [`ShapeEditError::NoSuchObject`] or [`ShapeEditError::NotAPrimitive`] if an id is not a
+    /// primitive, [`ShapeEditError::WrongShape`] for a rectangle or an ellipse.
+    pub fn set_rounded(&self, values: &[(NodeId, Rounded)]) -> Result<(), ShapeEditError> {
+        let metas: Vec<_> = values
+            .iter()
+            .map(|&(id, rounded)| {
+                let meta = self.require_primitive(id)?;
+                match self.primitive(id).map(|p| p.shape) {
+                    Some(Shape::Polygon { .. } | Shape::Star { .. }) => Ok((meta, rounded)),
+                    Some(_) => Err(ShapeEditError::WrongShape),
+                    None => Err(ShapeEditError::NotAPrimitive),
+                }
+            })
+            .collect::<Result<_, _>>()?;
+        let mut changed = false;
+        for (meta, rounded) in metas {
+            changed |= write_rounded_if_changed(&meta, rounded);
+            if !rounded.is_zero() {
+                changed |=
+                    write_curve_if_changed(&meta, Curve::POLYGON_DEFAULT, Curve::POLYGON_DEFAULT);
+            }
+        }
+        if changed {
+            self.commit_with_label("set_rounded");
         }
         Ok(())
     }

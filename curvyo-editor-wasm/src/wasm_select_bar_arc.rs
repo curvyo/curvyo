@@ -4,7 +4,9 @@
 //! through to `Session`.
 
 use curvyo_document_core::ArcKind;
-use curvyo_ui_core::{ArcEnd, BarValue, CurveBarState, EllipseBarState, EntryOutcome, GreyReason};
+use curvyo_ui_core::{
+    ArcEnd, BarValue, CurveBarState, EllipseBarState, EntryOutcome, GreyReason, RoundedBarState,
+};
 use wasm_bindgen::prelude::*;
 
 use crate::wasm_api::WasmSession;
@@ -51,6 +53,16 @@ pub struct ArcBarView {
     pub curve_limited: bool,
     /// The stored curve, percent, for the tag's tooltip.
     pub curve_stored: f64,
+    /// The "Rounded" field is shown (the selection holds a polygon or star).
+    pub rounded_shown: bool,
+    /// The effective Rounded value.
+    pub rounded: f64,
+    /// The polygons and stars show different values.
+    pub rounded_mixed: bool,
+    /// The stored value lies beyond -10..=10 (the "limited" tag).
+    pub rounded_limited: bool,
+    /// The stored value, for the tag's tooltip.
+    pub rounded_stored: f64,
 }
 
 fn grey(reason: Option<GreyReason>) -> String {
@@ -72,7 +84,11 @@ fn value(value: Option<BarValue<f64>>) -> (f64, bool) {
 }
 
 impl ArcBarView {
-    fn new(ellipse: Option<&EllipseBarState>, curve: Option<&CurveBarState>) -> Self {
+    fn new(
+        ellipse: Option<&EllipseBarState>,
+        curve: Option<&CurveBarState>,
+        rounded: Option<&RoundedBarState>,
+    ) -> Self {
         let kind = match ellipse.and_then(|e| e.kind) {
             None => "",
             Some(BarValue::Mixed) => "mixed",
@@ -82,6 +98,7 @@ impl ArcBarView {
         let (end, end_mixed) = value(ellipse.and_then(|e| e.end));
         let (curve_value, curve_mixed) = value(curve.and_then(|c| c.value));
         let limited = curve.and_then(|c| c.limited);
+        let (rounded_value, rounded_mixed) = value(rounded.map(|r| r.value));
         Self {
             ellipse_shown: ellipse.is_some(),
             kind: kind.to_string(),
@@ -97,6 +114,11 @@ impl ArcBarView {
             curve_grey: grey(curve.and_then(|c| c.grey)),
             curve_limited: limited.is_some(),
             curve_stored: limited.map_or(0.0, |(stored, _)| stored),
+            rounded_shown: rounded.is_some(),
+            rounded: rounded_value,
+            rounded_mixed,
+            rounded_limited: rounded.is_some_and(|r| r.limited.is_some()),
+            rounded_stored: rounded.and_then(|r| r.limited).unwrap_or(0.0),
         }
     }
 }
@@ -118,7 +140,11 @@ impl WasmSession {
     #[must_use]
     pub fn arc_bar_state(&self) -> ArcBarView {
         let state = self.session.select_bar_state();
-        ArcBarView::new(state.ellipse.as_ref(), state.curve.as_ref())
+        ArcBarView::new(
+            state.ellipse.as_ref(),
+            state.curve.as_ref(),
+            state.rounded.as_ref(),
+        )
     }
 
     /// "Pie", "Arc" or "Chord" (`kind` is `"pie"`, `"arc"` or `"chord"`).
@@ -143,6 +169,17 @@ impl WasmSession {
     /// Enter in "Curve", percent.
     pub fn set_selected_curve(&mut self, text: &str) -> String {
         outcome_code(self.session.set_selected_curve_text(text))
+    }
+
+    /// Enter in "Rounded": a number, limited to -10..=10.
+    pub fn set_selected_rounded(&mut self, text: &str) -> String {
+        outcome_code(self.session.set_selected_rounded_text(text))
+    }
+
+    /// A step of the "Rounded" field, on every tick or key: writes nothing until
+    /// [`WasmSession::commit_selected_curve`].
+    pub fn preview_selected_rounded(&mut self, value: f64) {
+        self.session.preview_selected_rounded(value);
     }
 
     /// A drag of the "Curve" field, on every tick: writes nothing.

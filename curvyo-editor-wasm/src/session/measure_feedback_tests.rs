@@ -101,6 +101,7 @@ fn a_star_edge_and_its_centre_are_picked() {
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: curvyo_document_core::InnerRatio::new(0.5).unwrap(),
             curve: Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     );

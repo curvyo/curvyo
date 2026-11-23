@@ -392,6 +392,7 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
             frame,
             point_count,
             curve,
+            rounded,
         } => vec![
             frame.center.x,
             frame.center.y,
@@ -399,12 +400,14 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
             frame.angle.as_radians(),
             f64::from(point_count.get()),
             curve.get(),
+            rounded.get(),
         ],
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
             curve,
+            rounded,
         } => vec![
             frame.center.x,
             frame.center.y,
@@ -413,6 +416,7 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
             f64::from(point_count.get()),
             inner_ratio.get(),
             curve.get(),
+            rounded.get(),
         ],
     }
 }

@@ -144,7 +144,7 @@ fn c8_the_registers_survive_save_and_reopen_in_order_and_the_format_is_52() {
         },
     );
     let bytes = pack(&d, "0.1.0").unwrap();
-    assert_eq!(manifest_format(&bytes), 55);
+    assert_eq!(manifest_format(&bytes), 56);
     let back = unpack(4, &bytes).unwrap();
     let a = shown(&back, id);
     assert_eq!(a.preset.as_deref(), Some("line_art"));
