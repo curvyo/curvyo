@@ -153,7 +153,7 @@ impl Machine {
             if peer.role == Role::Member {
                 Self::wrong_state(out);
             } else if held_id != Some(job_id) {
-                Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
+                self.not_held(job_id, out);
             } else {
                 self.run_waiting(Some(peer), out);
             }
@@ -165,7 +165,7 @@ impl Machine {
                 self.refresh_list(out);
             }
         } else if held_id != Some(job_id) {
-            Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
+            self.not_held(job_id, out);
         } else if rule == StartRule::LocalPress
             || (rule == StartRule::OwnerConfirms && peer.role == Role::Member)
         {
@@ -176,6 +176,17 @@ impl Machine {
             }
             out.commands.push(ControllerCommand::Start { job_id });
             self.set(State::Running, out);
+        }
+    }
+
+    /// A `Start` for a job that is not the held one: `WrongState` when the list holds it (it may
+    /// not start now), `UnknownJob` when nothing does.
+    fn not_held(&mut self, job_id: Uuid, out: &mut Output) {
+        if self.list.get(job_id).is_some() {
+            Self::wrong_state(out);
+            self.refresh_list(out);
+        } else {
+            Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
         }
     }
 

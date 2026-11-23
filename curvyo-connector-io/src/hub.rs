@@ -364,6 +364,14 @@ impl Hub {
         let _ = self.lock().notices.send(line);
     }
 
+    /// Before a wipe: everything queued for the job store is on disk and nothing is written after
+    /// it, so the deletion is the last word on the directory.
+    pub fn freeze_store(&self) {
+        let mut inner = self.lock();
+        inner.frozen = true;
+        inner.store.flush();
+    }
+
     /// Ends the terminal's notices: the receiver reads what was sent, then its end.
     pub fn close_notices(&self) {
         self.lock().notices = channel().0;
