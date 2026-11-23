@@ -79,26 +79,26 @@ Commits (conventional, scope = crate, at most five): core, `-io` (server and ctl
 
 ## Tasks
 Phase 1: core, `-io`, server, goldens, simulator
-- [ ] 1. Wire: `Jog`, `JogKeep`, `JogStop`, `State::Jogging`, `Status.homed`, `machine_position`,
+- [x] 1. Wire: `Jog`, `JogKeep`, `JogStop`, `State::Jogging`, `Status.homed`, `machine_position`,
         `work_offset`, goldens, old goldens unchanged (15, 16, 18, 19, 21; J1)
-- [ ] 2. `jog.rs`: steps, feeds, `TravelBox`, `clamp` with a table per travel, `$23` and edge (16, 17, 21; J2)
-- [ ] 3. Access table: `Kind::Motion` owner-only, `JogStop` and a member's Home pass (12, 37; J7)
-- [ ] 4. Core rules for both machines: Jog per state, refusals in words, queue of one step, Stop and
+- [x] 2. `jog.rs`: steps, feeds, `TravelBox`, `clamp` with a table per travel, `$23` and edge (16, 17, 21; J2)
+- [x] 3. Access table: `Kind::Motion` owner-only, `JogStop` and a member's Home pass (12, 37; J7)
+- [x] 4. Core rules for both machines: Jog per state, refusals in words, queue of one step, Stop and
         `JogStop` cancel, `JogEnded`, `JogFailed`, Alarm and loss end the jog, a Ready job is kept (8, 10, 12, 19, 20; J3)
-- [ ] 5. Dead-man by `Event::Clock`: 299 ms keeps, 300 ms cancels (18; J4)
-- [ ] 6. Homed since connect and the positions in `Status` (13, 14; J5)
-- [ ] 7. A member's Home waits, an owner or `curvyoctl confirm-start` confirms, Stop discards, a second
+- [x] 5. Dead-man by `Event::Clock`: 299 ms keeps, 300 ms cancels (18; J4)
+- [x] 6. Homed since connect and the positions in `Status` (13, 14; J5)
+- [x] 7. A member's Home waits, an owner or `curvyoctl confirm-start` confirms, Stop discards, a second
         Home is `WrongState`, `admin.log` names Home (12, 37; J7)
-- [ ] 8. GRBL: `M5` before the first motion, `$J=` per sign, feed cap, clamp, hold increments, `0x85`
+- [x] 8. GRBL: `M5` before the first motion, `$J=` per sign, feed cap, clamp, hold increments, `0x85`
         repeated until Idle, the stop of G12 after 2 s, `error:15`, the `Jog` word is no foreign state (9, 10, 16, 17, 18; J6)
-- [ ] 9. Fake controller position moved by jogs in injected time (18, 21; J9)
-- [ ] 10. Hub: clock tick, `Hub::jog`, `jobs.log` line per pad session, session close ends a hold (11, 12, 18; J4, J7)
+- [x] 9. Fake controller position moved by jogs in injected time (18, 21; J9)
+- [x] 10. Hub: clock tick, `Hub::jog`, `jobs.log` line per pad session, session close ends a hold (11, 12, 18; J4, J7)
 Phase 2: app and frontend
-- [ ] 11. App `connector_command` "jog", `connector_jog` hold, keep, release (15, 18, 21; J8)
-- [ ] 12. Frontend: `jog.ts` corner table and press reducer, `JogPad`, causes, "Jogging", "Not homed",
+- [x] 11. App `connector_command` "jog", `connector_jog` hold, keep, release (15, 18, 21; J8)
+- [x] 12. Frontend: `jog.ts` corner table and press reducer, `JogPad`, causes, "Jogging", "Not homed",
         work-offset notice, member without pad, "Confirm home" (15 to 20, 37; W16 to W27)
 Phase 3: docs
-- [ ] 13. ADR amendments, design-system rows, technical debt (21)
+- [x] 13. ADR amendments, design-system rows, technical debt (21)
 
 ## Validation
 - Core: `tests/jog_0118.rs` (J3 table, Clock, clamp, J5, J7 rows, goldens), `access.rs` table.
