@@ -1,0 +1,56 @@
+import { Box, Cog } from "lucide-react";
+import type { ReactNode } from "react";
+
+import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
+import type { GeneratorKindsApi } from "@/hooks/useGenerators";
+
+const GLYPHS: Record<string, ReactNode> = {
+  Box: <Box size={16} strokeWidth={1.5} aria-hidden />,
+  Cog: <Cog size={16} strokeWidth={1.5} aria-hidden />,
+};
+
+/**
+ * The Generators bar (`specs/0141-parametric-generators` UX notes §1): one pill with a radio group
+ * "Generator" of text segments with a 16 px glyph each, one Tab stop, the arrows move and select.
+ * Nothing else: the parameters are in the panel once the object exists.
+ */
+export function GeneratorsBar({
+  api,
+  onReturnFocus,
+}: {
+  api: GeneratorKindsApi;
+  onReturnFocus: () => void;
+}) {
+  if (api.kinds.length === 0) {
+    return null;
+  }
+  const options: ToggleOption<string>[] = api.kinds.map((kind) => ({
+    value: kind.id,
+    label: kind.label,
+    tooltip: "",
+    icon: (
+      <span className="flex items-center gap-1 text-sm">
+        {GLYPHS[kind.icon]}
+        {kind.label}
+      </span>
+    ),
+  }));
+  return (
+    <div
+      data-placement-keeps
+      className="pointer-events-auto flex h-9 min-w-0 items-center rounded-lg px-2"
+      style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
+    >
+      <ToggleGroup
+        label="Generator"
+        options={options}
+        value={api.kind}
+        onChange={api.setKind}
+        itemWidth={84}
+        bar
+        tooltipSide="bottom"
+        onReturnFocus={onReturnFocus}
+      />
+    </div>
+  );
+}

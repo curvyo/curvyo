@@ -4,6 +4,10 @@
 /** The Node bar and the double-click hint on a clone (criterion 26). */
 export const CLONE_NODES_TEXT = "Linked clones have no nodes. Edit the original or unlink the clone.";
 
+/** The Node bar on generated objects (`specs/0141-parametric-generators` UX notes §8). */
+export const GENERATED_NODES_TEXT =
+  "Generated objects have no nodes. Change their parameters or convert them to paths.";
+
 /** A refusal stays 8 s, a status 3 s (criterion 52, "Action notice"). */
 export const CLONE_REFUSAL_MS = 8000;
 export const CLONE_STATUS_MS = 3000;

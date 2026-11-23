@@ -37,7 +37,9 @@ import { PanelStrip } from "@/components/panel/PanelStrip";
 import { GridSection } from "@/components/panel/GridSection";
 import { SnappingSection } from "@/components/panel/SnappingSection";
 import { CloneBlock } from "@/components/panel/CloneBlock";
+import { GeneratorBlock } from "@/components/panel/GeneratorBlock";
 import { StyleSection } from "@/components/panel/StyleSection";
+import { useGeneratorBlock } from "@/hooks/useGenerators";
 import { TraceInfoPage } from "@/components/panel/TraceInfoPage";
 import { ShareTab } from "@/components/panel/ShareTab";
 import type { MembershipApi } from "@/hooks/useMembership";
@@ -184,6 +186,24 @@ export function PropertiesPanel({
    * tab's body has rendered (and the panel has opened). */
   const focusAfterShortcut = useRef(false);
   const panel = useStylePanel(editor);
+  const generators = useGeneratorBlock(editor);
+  // Placing a generated object shows the Style tab, and the panel body if it was hidden, even from
+  // History, Layers or File (`specs/0141` UX notes §2, a stated exception to "they never switch by
+  // themselves").
+  const placedFrom = useRef(editor.tool);
+  const placedPending = useRef(false);
+  const { pressTab } = doc;
+  useEffect(() => {
+    if (placedFrom.current === "generators" && editor.tool === "select") {
+      placedPending.current = true;
+    }
+    placedFrom.current = editor.tool;
+    if (placedPending.current && generators.view) {
+      placedPending.current = false;
+      setOpen(true);
+      pressTab("style");
+    }
+  }, [editor.tool, generators.view, pressTab, setOpen]);
   const background = useBackgroundPanel(editor);
   const textLayout = useTextLayout(editor.getSession, editor.sync, editor.syncRevision);
   const { getSession } = editor;
@@ -590,6 +610,9 @@ export function PropertiesPanel({
                 </div>
               ) : (
                 <>
+                  {/* The Generator block of a selected generated object: first, above the Style
+                      sections (`specs/0141` UX notes §3). */}
+                  <GeneratorBlock api={generators} onReturnFocus={returnFocus} />
                   <PlacedPageBlock text={placedPage} />
                   {/* A placed page has no style of its own: no Stroke, no Fill (`specs/0106`
                       criterion 12). */}

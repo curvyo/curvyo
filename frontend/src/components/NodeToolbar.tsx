@@ -18,7 +18,7 @@ import { ClosePathGroup } from "@/components/ClosePathGroup";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useActionNotice } from "@/hooks/useActionNotice";
 import { CENTRE_LINES_LABEL, focusCentreLinesBar } from "@/lib/centreLinesText";
-import { CLONE_NODES_TEXT } from "@/lib/cloneText";
+import { CLONE_NODES_TEXT, GENERATED_NODES_TEXT } from "@/lib/cloneText";
 import { joinNoticeText, joinReasonLines, splitNoticeText } from "@/lib/nodeText";
 import { noticeMs } from "@/lib/pathText";
 
@@ -204,7 +204,7 @@ export function NodeToolbar({
     }),
     [plain, show],
   );
-  if (state.cloneOnly) {
+  if (state.cloneOnly || state.generatedOnly) {
     // Text only, no controls (`0049-linked-clone` criterion 26).
     return (
       <div
@@ -217,7 +217,7 @@ export function NodeToolbar({
           color: "var(--toolbar-icon)",
         }}
       >
-        {CLONE_NODES_TEXT}
+        {state.generatedOnly ? GENERATED_NODES_TEXT : CLONE_NODES_TEXT}
         {centreLines ? (
           <>
             <div className="mx-2 h-5 w-px bg-border" aria-hidden />

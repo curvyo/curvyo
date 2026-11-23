@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ToolRail } from "@/components/ToolRail";
 import { SketchToolRail } from "@/components/sketch/SketchTools";
 import type { EditorSession } from "@/hooks/useEditorSession";
+import { decodeKinds } from "@/lib/generatedView";
 import type { RailCommands } from "@/hooks/useRailCommands";
 import type { SketchApi } from "@/hooks/useSketch";
 import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
@@ -35,6 +36,9 @@ function vectorRail(ctx: WorkbenchContext) {
       paused={ctx.paused}
       onImport={ctx.onImport}
       testGridAvailable={ctx.editor.getSession()?.test_grid_tool_available() ?? false}
+      generatorsAvailable={
+        decodeKinds(ctx.editor.getSession()?.generator_kinds_json() ?? "[]").length > 0
+      }
     />
   );
 }

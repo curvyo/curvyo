@@ -86,7 +86,8 @@ export type Tool =
   | "text"
   | "trace"
   | "measure"
-  | "test-grid";
+  | "test-grid"
+  | "generators";
 
 /** The polygon/star tool-options bar's mode toggle (acceptance criteria
  * 11 vs. 12). */
@@ -112,6 +113,7 @@ export interface NodeToolbarState {
   /** Split (acceptance criterion 12). */
   canSplit: boolean;
   cloneOnly: boolean;
+  generatedOnly: boolean;
   /** Why Join is disabled (`0053` criterion 19): 0 enabled, 1 count, 2 not end nodes, 3 other. */
   joinBlock: number;
   /** With `joinBlock` 2: how many selected nodes are not an end node. */
@@ -133,6 +135,7 @@ const EMPTY_TOOLBAR_STATE: NodeToolbarState = {
   canJoin: false,
   canSplit: false,
   cloneOnly: false,
+  generatedOnly: false,
   joinBlock: 0,
   joinNotEnd: 0,
   selectedNodes: 0,
@@ -306,6 +309,7 @@ function readToolbarState(raw: {
   can_join: boolean;
   can_split: boolean;
   clone_only: boolean;
+  generated_only: boolean;
   join_block: number;
   join_not_end: number;
   selected_nodes: number;
@@ -324,6 +328,7 @@ function readToolbarState(raw: {
     canJoin: raw.can_join,
     canSplit: raw.can_split,
     cloneOnly: raw.clone_only,
+    generatedOnly: raw.generated_only,
     joinBlock: raw.join_block,
     joinNotEnd: raw.join_not_end,
     selectedNodes: raw.selected_nodes,

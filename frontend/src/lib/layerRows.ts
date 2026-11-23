@@ -31,6 +31,8 @@ export interface LayerRowData {
   /** `aria-level`: 1 at the top level. */
   level: number;
   kind: string;
+  /** The lower-case label of a generated object's generator ("gear", "box"); null otherwise. */
+  generator?: string | null;
   name: string;
   named: boolean;
   /** What the row shows when it differs from the name: a dimension's value without the kind
