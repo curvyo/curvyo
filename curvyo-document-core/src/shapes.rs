@@ -571,6 +571,14 @@ pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnaps
             ObjectSnapshot::Dimension(Box::new(dimension))
         });
     }
+    if crate::generated_codec::is_generated_meta(&meta) {
+        return crate::generated_codec::read_snapshot(id, &meta).map(|generated| {
+            ObjectSnapshot::Path(crate::generated_outline::outline(
+                &generated,
+                crate::style_codec::read_style(&meta),
+            ))
+        });
+    }
     match shape_codec::read_shape_tag(&meta) {
         Some(shape) if shape == "sketch" => crate::sketch_read::read(id, &meta)
             .ok()

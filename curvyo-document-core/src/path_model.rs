@@ -30,6 +30,12 @@ pub struct NodeId {
 }
 
 impl NodeId {
+    /// An id that names no object: for an outline that is only drawn, never written (a ghost).
+    pub const NONE: Self = Self {
+        peer: 0,
+        counter: 0,
+    };
+
     /// Builds a [`NodeId`] from the `(peer, counter)` pair Loro's own
     /// `TreeID` carries — used only by [`crate::paths`]'s conversions to
     /// and from `loro::TreeID`, which never crosses this crate's public

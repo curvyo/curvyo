@@ -638,7 +638,21 @@ impl DocumentVersion {
 /// asset, and the container holds those as `assets/derived/<sha256>.png`. A build that stops at
 /// 52 would burn the picture without its stored result, so this build's files are refused there
 /// by version; a file of 52 opens unchanged. Golden: `image_adjust_ai_v53.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 53;
+///
+/// Version 54 (`specs/0141-parametric-generators`, ADR 0079 §4): a leaf may have `shape =
+/// "generated"` with `generated` (one atomic map `{kind, seed, params, parts}`, the stored
+/// outline in frame-local mm) and `generated_frame` (`[a, b, c, d, e, f]`, rotation, mirror and
+/// translation only). A build that stops at 53 reads the unknown `shape` tag as a primitive
+/// without its registers and would refuse or drop the object, so this build's files are refused
+/// there by version (ADR 0033 §7); a file of 53 opens unchanged. An unknown or disabled kind is
+/// kept and drawn from its stored outline and a save keeps its record (ADR 0079 §5); a new
+/// generator kind needs no bump. Labels `add_generated`, `change_parameter` and
+/// `convert_generated`; steps may carry the fields `gk` (kind) and `gp` (parameter). Damage
+/// refuses the file: `generated` not a map, a `kind` that is not `<id>/<kind>`, a seed outside
+/// `u32`, no part or an empty part, a subpath that is not `2 + 6n` finite numbers within ±1e7, a
+/// frame that is not six finite numbers or holds scale or shear beyond 1e-9. Goldens:
+/// `generated_v54.curvyo`, `generated_unknown_kind_v54.curvyo`, `generated_damaged_v54.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 54;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

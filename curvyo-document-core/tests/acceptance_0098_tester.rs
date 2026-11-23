@@ -912,9 +912,9 @@ fn ac20_save_writes_format_38() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 53);
+    assert_eq!(CURRENT_FORMAT_VERSION, 54);
     let d = Document::new(1);
-    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 53);
+    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 54);
 }
 
 #[test]

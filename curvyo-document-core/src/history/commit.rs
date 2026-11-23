@@ -181,6 +181,14 @@ impl Document {
         }
     }
 
+    /// [`Document::commit_with_label`] with extra header keys: a step's subject fields
+    /// (`specs/0141-parametric-generators`). Inside a batch the batch's commit takes the writes.
+    pub(crate) fn commit_with_label_and(&self, label: &str, extra: &[(&str, String)]) {
+        if self.commit_state.batch_depth.get() == 0 {
+            self.commit_step(label, extra);
+        }
+    }
+
     /// Commits the pending writes as one step with the given extra header keys. Returns the step,
     /// or `None` when nothing was pending (no step is added).
     pub(crate) fn commit_step(&self, label: &str, extra: &[(&str, String)]) -> Option<StepRef> {

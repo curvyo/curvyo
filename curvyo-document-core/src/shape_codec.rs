@@ -144,6 +144,9 @@ pub(crate) enum LeafKind {
     Image,
     /// A dimension object (`shape = "dimension"`, ADR 0027 §1).
     Dimension,
+    /// A generated object (`shape = "generated"`, ADR 0079 §4): reads as a path, writes its own
+    /// registers.
+    Generated,
 }
 
 /// The kind of the leaf `meta` holds.
@@ -155,6 +158,7 @@ pub(crate) fn leaf_kind(meta: &LoroMap) -> LeafKind {
         Some(tag) if tag == crate::text_codec::SHAPE_TEXT => LeafKind::Text,
         Some(tag) if tag == crate::image_codec::SHAPE_IMAGE => LeafKind::Image,
         Some(tag) if tag == crate::dimension_codec::SHAPE_DIMENSION => LeafKind::Dimension,
+        Some(tag) if tag == crate::generated_codec::SHAPE_GENERATED => LeafKind::Generated,
         Some(tag) => LeafKind::Primitive(tag),
     }
 }
