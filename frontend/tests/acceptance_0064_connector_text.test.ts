@@ -83,11 +83,12 @@ test("q15: the buttons apply per state as the UX table says", () => {
   };
   assert.equal(row(null), "1000");
   assert.equal(row({ name: "Idle" }), "1000");
-  assert.equal(row({ name: "Receiving" }), "0000");
-  assert.equal(row({ name: "Ready" }), "0101");
-  assert.equal(row({ name: "AwaitingLocalStart" }), "0001");
-  assert.equal(row({ name: "Running" }), "0011");
-  assert.equal(row({ name: "Paused" }), "0101");
+  // `specs/0132` UX notes section 5: Send job... is on while a job is held, the job goes to the list.
+  assert.equal(row({ name: "Receiving" }), "1000");
+  assert.equal(row({ name: "Ready" }), "1101");
+  assert.equal(row({ name: "AwaitingLocalStart" }), "1001");
+  assert.equal(row({ name: "Running" }), "1011");
+  assert.equal(row({ name: "Paused" }), "1101");
   assert.equal(row({ name: "Done", result: "Stopped" }), "1000");
   assert.equal(row({ name: "Alarm" }), "0000");
   assert.equal(row({ name: "NoController" }), "0000");

@@ -130,6 +130,7 @@ impl Session {
             Some(SendCause::NoLongerPaired) => (Some("no_longer_paired"), None),
             Some(SendCause::KeyChanged) => (Some("key_changed"), None),
             Some(SendCause::Sending) => (Some("sending"), None),
+            Some(SendCause::ListFull) => (Some("list_full"), None),
         };
         Some(SendView {
             enabled: button.enabled,

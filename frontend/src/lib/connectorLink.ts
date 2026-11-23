@@ -16,6 +16,7 @@ import {
   jobIsActive,
   refusalText,
 } from "./connectorText.ts";
+import { type JobListMessage } from "./jobList.ts";
 import { notStartedText } from "./sendText.ts";
 
 /** The one press of a profile's connector controls that waits for its answer; the others of the
@@ -75,6 +76,8 @@ export interface LinkEntry {
   maintenance: boolean;
   keyChanged: { stored: string; presented: string } | null;
   status: StatusMessage | null;
+  /** The connector's job list (`specs/0132`): its last push, `null` before the first. */
+  jobList: JobListMessage | null;
   /** What the connector's controller reported at its last identify (`specs/0127` G19). */
   controller: ControllerInfo | null;
   /** The connection dropped while a job was in flight; the last values stay. */
@@ -113,6 +116,7 @@ export interface LinkEntry {
 type Payload =
   | { profileId: string; kind: "status"; status: StatusMessage }
   | { profileId: string; kind: "controller"; controller: ControllerInfo | null }
+  | { profileId: string; kind: "jobList"; list: JobListMessage }
   | { profileId: string; kind: "sending"; name: string }
   | { profileId: string; kind: "lost" }
   | { profileId: string; kind: "failed"; error: LinkError }
@@ -151,6 +155,7 @@ const EMPTY: LinkEntry = {
   maintenance: false,
   keyChanged: null,
   status: null,
+  jobList: null,
   controller: null,
   lost: false,
   held: null,
@@ -181,6 +186,14 @@ export function discardedName(
   const mine = session?.role === "Member" && last?.requested_by === session.clientName;
   if (!waited || !mine || ownStop || next.state.name !== "Idle") return null;
   return last?.job_name ?? "the job";
+}
+
+/** Whether the name of a send in progress stays: while its job arrives, and while it waits behind
+ * a job that is held (`specs/0132` UX notes section 2), the answer of the send ends it then. */
+export function keepsSendingName(last: StatusMessage | null, next: StatusMessage): boolean {
+  if (next.state.name === "Receiving") return true;
+  const held = ["Ready", "AwaitingLocalStart", "Running", "Paused"].includes(next.state.name);
+  return held && last !== null && last.state.name !== "Receiving";
 }
 
 /** The text of a send that ended without an accepted job (S7, S11). */
@@ -223,11 +236,12 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
         keyChanged: { stored: error.stored, presented: error.presented },
         paired: null,
         status: null,
+        jobList: null,
       });
     } else if (error.kind === "noLongerPaired") {
-      patch(profileId, { link: "no_longer_paired", paired: null, status: null });
+      patch(profileId, { link: "no_longer_paired", paired: null, status: null, jobList: null });
     } else if (error.kind === "notPaired") {
-      patch(profileId, { link: "not_paired", paired: null, status: null });
+      patch(profileId, { link: "not_paired", paired: null, status: null, jobList: null });
     } else if (error.kind === "noCredentialStore") {
       patch(profileId, { noStore: true });
     } else if (error.kind === "memberOnly") {
@@ -256,7 +270,7 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
       held,
       lost: false,
       sendFailure: changed && now.sendFailure?.atState !== status.state.name ? null : now.sendFailure,
-      sendingName: status.state.name === "Receiving" ? now.sendingName : null,
+      sendingName: keepsSendingName(now.status, status) ? now.sendingName : null,
     });
   };
 
@@ -294,6 +308,9 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
         break;
       case "controller":
         patch(profileId, { controller: payload.controller });
+        break;
+      case "jobList":
+        patch(profileId, { jobList: payload.list });
         break;
       case "sending":
         patch(profileId, { sendingName: payload.name, discarded: null });

@@ -120,7 +120,8 @@ export type SendCause =
   | "not_paired"
   | "no_longer_paired"
   | "key_changed"
-  | "sending";
+  | "sending"
+  | "list_full";
 const SEND_CAUSES: readonly SendCause[] = [
   "blocked",
   "browser",
@@ -129,6 +130,7 @@ const SEND_CAUSES: readonly SendCause[] = [
   "no_longer_paired",
   "key_changed",
   "sending",
+  "list_full",
 ];
 
 /** The Send to machine button, present only for a profile that names a connector (S1). */

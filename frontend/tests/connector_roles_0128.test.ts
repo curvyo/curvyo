@@ -59,7 +59,7 @@ test("a26 an owner's Start slot confirms, a member's stays off, Stop works for b
   assert.equal(confirmKind(waiting(null), owner), null);
   const state = { name: "AwaitingLocalStart" } as const;
   assert.deepEqual(jobButtons(state, false, "Confirm start"), {
-    send: false,
+    send: true,
     start: true,
     startName: "Confirm start",
     pause: false,

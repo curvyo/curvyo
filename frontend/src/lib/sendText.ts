@@ -47,5 +47,7 @@ export function sendCauseText(send: SendButton): string | null {
       return "This connector's key changed";
     case "sending":
       return "Sending";
+    case "list_full":
+      return "List full";
   }
 }

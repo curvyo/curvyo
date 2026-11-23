@@ -17,7 +17,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use curvyo_connector_core::{
-    JobKind, MAX_CHUNK_BYTES, Message, Progress, RejectReason, Resolution, SendWatch, State,
+    JobKind, MAX_CHUNK_BYTES, Message, Progress, Resolution, SendWatch, State,
 };
 use curvyo_connector_io::client::{CONNECT_TIMEOUT, ClientError, Connection, connect, open_paired};
 use curvyo_connector_io::hub::{ControllerChoice, FakeSettings};
@@ -541,10 +541,11 @@ fn s6_s9_s17_the_connector_holds_exactly_the_exported_job_then_start_and_stop() 
     let progress = job.unwrap();
     let exported_lines = String::from_utf8(exported.bytes).unwrap().lines().count();
     assert!(progress.lines > 0 && (progress.lines as usize) <= exported_lines);
-    // Busy while held: a refusal commits nothing and frees Send (S8, S11).
+    // Held: the connector lists the second job (`0132`), which is accepted and counts as
+    // lasered (S8, S10, S11); Send stays free.
     assert_eq!(
         press(&mut s, &mut open),
-        Some(SendEnd::Resolved(Resolution::Rejected(RejectReason::Busy)))
+        Some(SendEnd::Resolved(Resolution::Accepted))
     );
     assert_eq!(s.undo_len(), steps + 1);
     assert_eq!(view(&s)["send"]["enabled"], true);

@@ -263,6 +263,7 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   connector_forget: () => notInTheBrowser("connector_forget"),
   connector_send_job: () => notInTheBrowser("connector_send_job"),
   connector_command: () => notInTheBrowser("connector_command"),
+  connector_list_command: () => notInTheBrowser("connector_list_command"),
   connector_watch: () => notInTheBrowser("connector_watch"),
   connector_unwatch: () => undefined,
   connector_send_page_job: () => notInTheBrowser("connector_send_page_job"),

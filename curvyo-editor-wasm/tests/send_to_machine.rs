@@ -12,7 +12,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use curvyo_connector_core::{
-    JobKind, JobResult, MAX_CHUNK_BYTES, Message, RejectReason, Resolution, SendWatch, State,
+    JobKind, JobResult, MAX_CHUNK_BYTES, Message, Resolution, SendWatch, State,
 };
 use curvyo_connector_io::Uuid;
 use curvyo_connector_io::client::{CONNECT_TIMEOUT, ClientError, Connection, connect, open_paired};
@@ -277,14 +277,15 @@ fn s17_the_whole_path_from_pairing_to_a_second_send() {
         "{lines} of {text_lines} lines"
     );
 
-    // S12: a second send is refused while the job is held; nothing changes.
+    // S12 (amended by `0132`): a second send while the job is held is listed behind it.
     let held = job_id_of(&ready);
-    let busy = press(&mut s, &mut normal(&rig)).unwrap();
+    let listed = press(&mut s, &mut normal(&rig)).unwrap();
+    assert_eq!(listed, SendEnd::Resolved(Resolution::Accepted));
     assert_eq!(
-        busy,
-        SendEnd::Resolved(Resolution::Rejected(RejectReason::Busy))
+        s.undo_len(),
+        steps + 1,
+        "S12: an unchanged page adds no step"
     );
-    assert_eq!(s.undo_len(), steps + 1, "S11: a refusal commits nothing");
     assert_eq!(
         view(&s)["send"]["enabled"],
         true,
@@ -363,18 +364,14 @@ fn s7_a_page_named_with_an_umlaut_sends_and_the_connector_logs_the_name() {
 }
 
 #[test]
-fn s16_a_refused_send_leaves_the_project_bytes_unchanged() {
+fn s16_a_listed_send_commits_and_the_format_stays() {
     let rig = rig();
     let mut s = page(&rig.address());
     let first = press(&mut s, &mut normal(&rig)).unwrap();
     assert_eq!(first, SendEnd::Resolved(Resolution::Accepted));
-    let before = s.pack("test").unwrap();
-    let refused = press(&mut s, &mut normal(&rig)).unwrap();
-    assert_eq!(
-        refused,
-        SendEnd::Resolved(Resolution::Rejected(RejectReason::Busy))
-    );
-    assert_eq!(s.pack("test").unwrap(), before, "nothing was written");
+    // `0132`: a second send while the job is held is listed, accepted and commits as lasered.
+    let second = press(&mut s, &mut normal(&rig)).unwrap();
+    assert_eq!(second, SendEnd::Resolved(Resolution::Accepted));
     // Superseded by 0135 slice 1 (2026-11-19): format 51 is `0135`'s, not this story's.
     assert_eq!(
         curvyo_document_core::CURRENT_FORMAT_VERSION,

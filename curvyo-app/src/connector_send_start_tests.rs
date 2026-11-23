@@ -158,7 +158,7 @@ fn ss9_a_press_that_did_not_ask_only_sends() {
 }
 
 #[test]
-fn ss2_a_held_job_is_refused_and_nothing_starts() {
+fn ss2_a_held_job_is_listed_behind_and_nothing_starts() {
     let rig = Rig::new(false);
     let first = pending();
     let first_id = watched_job(&first.watch).unwrap();
@@ -168,9 +168,7 @@ fn ss2_a_held_job_is_refused_and_nothing_starts() {
         answer,
         PageSendAnswer::Resolved {
             job_id: answer_id(&answer),
-            resolution: ResolutionView::Rejected {
-                reason: "Busy".to_owned()
-            },
+            resolution: ResolutionView::Accepted,
             start: None,
         }
     );

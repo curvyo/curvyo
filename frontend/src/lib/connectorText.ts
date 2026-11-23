@@ -199,6 +199,8 @@ const REFUSALS: Record<string, string> = {
   NoController: "No controller",
   LaserModeOff: "Laser mode is off ($32=0)",
   LaserModeUnknown: "Laser mode unknown ($32 not read)",
+  // The list holds 20 jobs or 256 MiB (`specs/0132` UX notes section 5).
+  ListFull: "List full",
 };
 
 /** The words of a refused job; the alarm explains a `Busy` (Q19). */
@@ -258,21 +260,24 @@ export function jobButtons(
     case "Idle":
     case "Done":
       return { ...none, send: true };
+    case "Receiving":
+      // Another app's send arrives; this app's goes to the job list (`specs/0132`).
+      return { ...none, send: true };
     case "Ready":
-      return { ...none, start: true, stop: true };
+      return { ...none, send: true, start: true, stop: true };
     case "AwaitingLocalStart":
       // An owner confirms a member's request in the Start slot, not armed (`0128` V14, V15).
-      if (confirm !== null) return { ...none, start: true, startName: confirm, stop: true };
-      return { ...none, stop: true };
+      if (confirm !== null) return { ...none, send: true, start: true, startName: confirm, stop: true };
+      return { ...none, send: true, stop: true };
     case "Homing":
       // Stop ends a homing too and never asks (`specs/0118` criterion 5).
       return { ...none, stop: true };
     case "Running":
       // A pending pause is cancelled by Resume; Pause shows it as waiting (`specs/0133` H3, H6).
-      if (pausePending) return { ...none, start: true, startName: "Resume", stop: true };
-      return { ...none, pause: true, stop: true };
+      if (pausePending) return { ...none, send: true, start: true, startName: "Resume", stop: true };
+      return { ...none, send: true, pause: true, stop: true };
     case "Paused":
-      return { ...none, start: true, startName: "Resume", stop: true };
+      return { ...none, send: true, start: true, startName: "Resume", stop: true };
     default:
       return none;
   }

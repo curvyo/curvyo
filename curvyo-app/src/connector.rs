@@ -93,7 +93,30 @@ fn job_state(status: &Message) -> JobState {
 
 /// The id of the job a `Ready` status carries, or of a start a member requested (an owner's
 /// Confirm start, `specs/0128` A26): what `Start` needs, from any connection.
-fn ready_job_id(status: &Message) -> Option<Uuid> {
+fn ready_job_id(status: &Message, list: Option<&Message>) -> Option<Uuid> {
+    ready_job_of_status(status).or_else(|| first_waiting_id(status, list))
+}
+
+/// The first waiting job that is not interrupted, when the connector holds no job that is not
+/// over: what Start takes then (`specs/0132` criterion 4).
+fn first_waiting_id(status: &Message, list: Option<&Message>) -> Option<Uuid> {
+    let free = matches!(
+        status,
+        Message::Status {
+            state: JobState::Idle | JobState::Done { .. },
+            ..
+        }
+    );
+    match list {
+        Some(Message::JobList { waiting, .. }) if free => waiting
+            .iter()
+            .find(|e| e.interrupted_at.is_none())
+            .map(|e| e.job_id),
+        _ => None,
+    }
+}
+
+fn ready_job_of_status(status: &Message) -> Option<Uuid> {
     match status {
         Message::Status {
             state: JobState::Ready,
@@ -377,10 +400,10 @@ pub(crate) fn connector_send_job(
 }
 
 /// The message a job button sends; `None` for an unknown command or a Start with no Ready job.
-fn command_message(command: &str, status: &Message) -> Option<Message> {
+fn command_message(command: &str, status: &Message, list: Option<&Message>) -> Option<Message> {
     Some(match command {
         "start" => Message::Start {
-            job_id: ready_job_id(status)?,
+            job_id: ready_job_id(status, list)?,
         },
         "pause" => Message::Pause,
         "resume" => Message::Resume,
@@ -418,12 +441,88 @@ pub(crate) fn connector_command(
         Ok(opened) => opened,
         Err(e) => return CommandAnswer::Failed { error: e.into() },
     };
-    let Some(message) = command_message(&command, &status) else {
+    let Some(message) = command_message(&command, &status, connection.job_list.as_ref()) else {
         return CommandAnswer::WrongState;
     };
     match connection.command(&message, job_state(&status)) {
         Ok(_) => CommandAnswer::Done,
         Err(e) => CommandAnswer::from_error(e),
+    }
+}
+
+/// A press in the job list (`specs/0132`): move, remove or run next automatically.
+#[derive(Debug, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum ListCall {
+    Move { job_id: Uuid, from: u32, to: u32 },
+    Remove { job_id: Uuid },
+    RunNext { job_id: Uuid, on: bool },
+}
+
+impl ListCall {
+    fn message(&self) -> Message {
+        match *self {
+            Self::Move { job_id, from, to } => Message::MoveJob { job_id, from, to },
+            Self::Remove { job_id } => Message::RemoveJob { job_id },
+            Self::RunNext { job_id, on } => Message::SetRunNext { job_id, on },
+        }
+    }
+}
+
+/// How a press in the list ended.
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum ListAnswer {
+    /// The connector took it; the list arrives on the watcher.
+    Done,
+    /// The job is not where the app saw it, or it is gone: the list is read again.
+    Stale,
+    /// Only an owner may.
+    OwnerRequired,
+    Failed {
+        error: LinkError,
+    },
+}
+
+/// Moves, removes or flags a job of the list over a fresh connection.
+#[tauri::command(async)]
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn connector_list_command(
+    app: AppHandle,
+    open: State<'_, OpenStore>,
+    profile_id: String,
+    address: String,
+    call: ListCall,
+) -> ListAnswer {
+    let record = match load_record(&app, &open, &profile_id) {
+        Ok(record) => record,
+        Err(error) => return ListAnswer::Failed { error },
+    };
+    let (mut connection, status) = match open_paired_on(
+        &address,
+        DEFAULT_PORT,
+        record.spki,
+        &record.token,
+        CONNECT_TIMEOUT,
+    ) {
+        Ok(opened) => opened,
+        Err(e) => return ListAnswer::Failed { error: e.into() },
+    };
+    match connection.command(&call.message(), job_state(&status)) {
+        Ok(_) => ListAnswer::Done,
+        Err(ClientError::Protocol(code)) if code == "WrongState" || code == "UnknownJob" => {
+            ListAnswer::Stale
+        }
+        Err(ClientError::Protocol(code)) if code == "OwnerRequired" => ListAnswer::OwnerRequired,
+        Err(e) => ListAnswer::Failed { error: e.into() },
     }
 }
 
@@ -445,6 +544,10 @@ enum WatchView {
     /// The controller changed (`specs/0127`: identified after a reconnect, lost).
     Controller {
         controller: Option<ControllerInfo>,
+    },
+    /// The connector's job list: the first one after connecting, then every change.
+    JobList {
+        list: Message,
     },
     Sending {
         name: String,
@@ -515,6 +618,11 @@ pub(crate) fn connector_watch(
                         };
                         emit(&app, &profile_id, view);
                         report_resolution(&app, &state.pending, &profile_id, &status);
+                        return;
+                    }
+                    WatchEvent::JobList(list) => {
+                        emit(&app, &profile_id, WatchView::JobList { list: list.clone() });
+                        report_resolution(&app, &state.pending, &profile_id, &list);
                         return;
                     }
                     WatchEvent::Controller(controller) => WatchView::Controller { controller },
@@ -665,17 +773,23 @@ mod tests {
     #[test]
     fn start_takes_the_job_id_from_a_ready_status_only() {
         let id = Uuid::nil();
-        assert_eq!(ready_job_id(&status(JobState::Ready, Some(id))), Some(id));
-        assert_eq!(ready_job_id(&status(JobState::Idle, None)), None);
-        assert_eq!(ready_job_id(&status(JobState::Running, Some(id))), None);
+        assert_eq!(
+            ready_job_id(&status(JobState::Ready, Some(id)), None),
+            Some(id)
+        );
+        assert_eq!(ready_job_id(&status(JobState::Idle, None), None), None);
+        assert_eq!(
+            ready_job_id(&status(JobState::Running, Some(id)), None),
+            None
+        );
         // `specs/0128` A26: an owner's Confirm start takes the id of the start a member requested;
         // the foreground wait for Enter carries no requester and is not confirmed from the app.
         let mut waiting = status(JobState::AwaitingLocalStart, Some(id));
-        assert_eq!(ready_job_id(&waiting), None);
+        assert_eq!(ready_job_id(&waiting, None), None);
         if let Message::Status { requested_by, .. } = &mut waiting {
             *requested_by = Some("Phone".into());
         }
-        assert_eq!(ready_job_id(&waiting), Some(id));
+        assert_eq!(ready_job_id(&waiting, None), Some(id));
     }
 
     #[test]
@@ -687,21 +801,21 @@ mod tests {
             JobState::Running,
         ] {
             assert_eq!(
-                command_message("home", &status(state, None)),
+                command_message("home", &status(state, None), None),
                 Some(Message::Home)
             );
         }
         let id = Uuid::nil();
         assert_eq!(
-            command_message("start", &status(JobState::Ready, Some(id))),
+            command_message("start", &status(JobState::Ready, Some(id)), None),
             Some(Message::Start { job_id: id })
         );
         assert_eq!(
-            command_message("start", &status(JobState::Idle, None)),
+            command_message("start", &status(JobState::Idle, None), None),
             None
         );
         assert_eq!(
-            command_message("reboot", &status(JobState::Idle, None)),
+            command_message("reboot", &status(JobState::Idle, None), None),
             None
         );
     }

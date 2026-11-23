@@ -71,14 +71,14 @@ test("H6: Resume and Stop are enabled while pending and when paused", () => {
   assert.equal(pausePending(homing), false);
   assert.equal(pausePending(status({ name: "Paused" }, { pause_pending: true })), false, "Running only");
   assert.deepEqual(jobButtons(pending.state, pausePending(pending)), {
-    send: false,
+    send: true,
     start: true,
     startName: "Resume",
     pause: false,
     stop: true,
   });
   assert.deepEqual(jobButtons(paused.state, pausePending(paused)), {
-    send: false,
+    send: true,
     start: true,
     startName: "Resume",
     pause: false,

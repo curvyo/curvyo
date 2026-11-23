@@ -414,12 +414,8 @@ mod tests {
         else {
             panic!("{answer:?}");
         };
-        assert_eq!(
-            resolution,
-            ResolutionView::Rejected {
-                reason: "Busy".to_owned()
-            }
-        );
+        // `specs/0132`: it is listed behind the held job, and never started (SS2).
+        assert_eq!(resolution, ResolutionView::Accepted);
         assert_eq!(start, None, "a held job is never started (SS2)");
     }
 

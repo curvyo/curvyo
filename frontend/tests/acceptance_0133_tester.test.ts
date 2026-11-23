@@ -91,12 +91,12 @@ test("H3 / H5: Pause stays busy while pending, not enabled, no time limit, secon
   assert.equal(SETTLES.pause.done(st({ name: "Running" }, { pending: true })), true);
 });
 
-test("H6: while pending Resume and Stop are enabled, Send and Pause are not (Resume is named Resume)", () => {
+test("H6: while pending Resume and Stop are enabled, Pause is not (Resume is named Resume); Send goes to the list (`0132`)", () => {
   const j = jobButtons({ name: "Running" }, true);
   assert.equal(j.start, true);
   assert.equal(j.startName, "Resume");
   assert.equal(j.stop, true);
-  assert.equal(j.send, false);
+  assert.equal(j.send, true);
   assert.equal(j.pause, false);
   // even while a command's press waits, the pending phase keeps Stop enabled
 });
