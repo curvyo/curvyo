@@ -37,6 +37,9 @@ export interface EntryFieldProps {
   messages: Readonly<Record<string, string>>;
   /** After Enter or Escape: the keyboard goes back to the canvas. */
   onReturnFocus: () => void;
+  /** After a committed Enter, in place of `onReturnFocus`: the form moves on to its next field
+   * (`specs/0121` UX notes P14). */
+  onEnter?: () => void;
   /** Marks the field as the panel's first focus target when it is the first
    * control. */
   firstFocus?: boolean;
@@ -92,6 +95,7 @@ export function EntryField({
   onSubmit,
   messages,
   onReturnFocus,
+  onEnter,
   firstFocus = false,
   commitOnBlur = false,
   inputMode = "text",
@@ -228,7 +232,8 @@ export function EntryField({
             event.preventDefault();
             if (submit(event.currentTarget)) {
               event.currentTarget.blur();
-              onReturnFocus();
+              if (onEnter) onEnter();
+              else onReturnFocus();
             }
           } else if (event.key === "Tab") {
             // Tab commits and moves on; a refused value keeps focus.

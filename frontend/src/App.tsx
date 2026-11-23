@@ -56,6 +56,7 @@ import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { useFixtures } from "@/hooks/useFixtures";
 import { useMachineRecords } from "@/hooks/useMachineRecords";
+import { usePrintAndCut } from "@/hooks/usePrintAndCut";
 import { useFixtureJobs } from "@/hooks/useFixtureJobs";
 import { useOutput } from "@/hooks/useOutput";
 import { useMaterials } from "@/hooks/useMaterials";
@@ -200,6 +201,8 @@ function Editor() {
   const selectedLock = selectedLockBar(fixtures.view);
   // The fixture jobs of the active laser page (`specs/0103-fixture-jobs`).
   const fixtureJobs = useFixtureJobs(editor);
+  // Registration marks and the Print and cut group (`specs/0121-print-and-cut`).
+  const printAndCut = usePrintAndCut(editor);
   // The Output tab, the Toolpath view toggle and Export job file (`specs/0029`).
   const output = useOutput(
     editor,
@@ -550,6 +553,7 @@ function Editor() {
           operations={operations}
           fixtures={fixtures}
           fixtureJobs={fixtureJobs}
+          printAndCut={printAndCut}
           operationSettings={operationSettings}
           operationTools={operationTools}
           materials={materials}
