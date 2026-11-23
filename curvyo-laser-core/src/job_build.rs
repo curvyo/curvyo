@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use crate::job_input::{BlockInput, JobInput, LeafGeometry, PointUm, um_of_mm};
 use crate::job_moves::{Block, Frame, Job, build_moves, running_z_um};
-use crate::job_numbers::{BlockNumbers, NumbersContext, NumbersRead, block_numbers};
+use crate::job_numbers::{
+    BlockNumbers, NumbersContext, NumbersRead, block_numbers, frame_stand_in,
+};
 use crate::job_plan::{Plan, PlanCache};
 use crate::material_record::MaterialRead;
 use crate::output_settings::Start;
@@ -25,9 +27,48 @@ pub struct Built {
     pub plans: Vec<Option<Arc<Plan>>>,
 }
 
+impl Built {
+    /// Whether a block with items has no numbers for want of power or speed (4 a): its geometry
+    /// is missing from [`Built::job`] and only [`build_frame_job`] holds it.
+    #[must_use]
+    pub fn unpriced(&self) -> bool {
+        self.numbers
+            .iter()
+            .zip(&self.runs)
+            .any(|(read, &run)| run && read.blocks())
+    }
+}
+
 /// The job of `input` with the library `materials`, plans reused from `cache`.
 #[must_use]
 pub fn build_job(input: &JobInput, materials: &[MaterialRead], cache: &mut PlanCache) -> Built {
+    build_with(input, materials, cache, |_, read| read.numbers().copied())
+}
+
+/// The job a frame of `input` traces (`specs/0118` Frage 335 B): [`build_job`]'s, and a block
+/// with items and no power or speed runs its geometry at stand-in numbers, since a frame never
+/// burns. Export and Send never read it.
+#[must_use]
+pub fn build_frame_job(
+    input: &JobInput,
+    materials: &[MaterialRead],
+    cache: &mut PlanCache,
+) -> Built {
+    let max_feed = input.machine.values.max_feed;
+    build_with(input, materials, cache, |block, read| {
+        read.numbers()
+            .copied()
+            .or_else(|| frame_stand_in(block, read, max_feed))
+    })
+}
+
+/// The job of `input` whose blocks run with the numbers `numbers` gives for their read.
+fn build_with(
+    input: &JobInput,
+    materials: &[MaterialRead],
+    cache: &mut PlanCache,
+    numbers: impl Fn(&BlockInput, &NumbersRead) -> Option<BlockNumbers>,
+) -> Built {
     let values = &input.machine.values;
     let frame = frame_of(input);
     let context = numbers_context(input, materials);
@@ -36,14 +77,14 @@ pub fn build_job(input: &JobInput, materials: &[MaterialRead], cache: &mut PlanC
     for block in &input.blocks {
         let read = block_numbers(block, context);
         let run = block.has_items() && !matches!(read, NumbersRead::Damaged);
-        let (job_block, plan) = match (run, read.numbers()) {
+        let (job_block, plan) = match (run, numbers(block, &read)) {
             (true, Some(numbers)) => {
-                let plan = cache.plan(block, numbers, entry);
+                let plan = cache.plan(block, &numbers, entry);
                 entry = plan.exit;
                 built
                     .job
                     .blocks
-                    .push(job_block_of(block, numbers, values.motorised_z));
+                    .push(job_block_of(block, &numbers, values.motorised_z));
                 (Some(built.job.blocks.len() - 1), Some(plan))
             }
             _ => (None, None),

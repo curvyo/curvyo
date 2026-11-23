@@ -170,7 +170,7 @@ impl GrblController {
     /// The travel box of the controller, when `$130` and `$131` are known: `[-travel, 0]`, or
     /// `[0, travel]` on an axis `$23` homes towards its positive end and that sat at 0 after
     /// homing (a build that forces the origin).
-    fn travel_box(&self) -> Option<TravelBox> {
+    pub(super) fn travel_box(&self) -> Option<TravelBox> {
         let travel = self.settings.travel()?;
         let mask = self.settings.homing_dir_mask();
         let positive = [0, 1].map(|i| {

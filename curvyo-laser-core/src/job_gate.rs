@@ -199,12 +199,7 @@ fn page_issues(input: &JobInput, built: &Built, issues: &mut Vec<Issue>) {
     }
     // Only a running block's own block stands in for "nothing runs"; an operation without
     // items runs nothing, whatever its numbers (criterion 4 d).
-    let running_block = built
-        .numbers
-        .iter()
-        .zip(&built.runs)
-        .any(|(read, &run)| run && read.blocks());
-    if !built.job.burns() && !running_block {
+    if !built.job.burns() && !built.unpriced() {
         issues.push(issue(Cause::NothingRuns, 1, Targets::None));
     }
     let outside = outside_bed(input, built);
@@ -415,6 +410,13 @@ fn bed_offset(built: &Built) -> PointUm {
     );
     let origin = frame.origin();
     PointUm::new(origin.x - corner.x, origin.y - corner.y)
+}
+
+/// Whether burn geometry of `built` lies outside the bed (4 b): the gate's measure, also for the
+/// job a frame traces.
+#[must_use]
+pub fn outside_the_bed(input: &JobInput, built: &Built) -> bool {
+    !outside_bed(input, built).is_empty()
 }
 
 /// The leaves with a burn point outside the bed, in move order, each once; then the raster

@@ -41,6 +41,32 @@ impl FakeHead {
         });
     }
 
+    /// Queues straight moves along X, then Y, to each of `points` at `feed`, behind the ones
+    /// running (a frame).
+    pub fn trace(&mut self, points: &[[f64; 2]], feed: f64, at: Duration) {
+        self.start(at);
+        let mut from = self.moves.iter().fold(self.pos, |mut p, m| {
+            if m.remaining.is_finite() {
+                p[m.axis.index()] += m.sign * m.remaining;
+            }
+            p
+        });
+        for to in points {
+            for (axis, i) in [(JogAxis::X, 0), (JogAxis::Y, 1)] {
+                let delta = to[i] - from[i];
+                if delta.abs() > 1e-9 {
+                    let direction = if delta > 0.0 {
+                        JogDirection::Plus
+                    } else {
+                        JogDirection::Minus
+                    };
+                    self.step((axis, direction), delta.abs(), feed, at);
+                }
+            }
+            from = *to;
+        }
+    }
+
     /// A move that goes on until [`FakeHead::cancel`].
     pub fn hold(&mut self, (axis, direction): (JogAxis, JogDirection), feed: f64, at: Duration) {
         self.moves.clear();
@@ -89,6 +115,12 @@ impl FakeHead {
                 offset: Some([Millimetres(0.0); 3]),
             },
         ]
+    }
+
+    /// Where the head stands, machine X and Y.
+    #[must_use]
+    pub fn position(&self) -> [f64; 2] {
+        self.pos
     }
 
     /// Whether a move is under way.

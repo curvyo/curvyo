@@ -30,7 +30,8 @@ fn announce(rig: &mut Rig, text: &str) {
 
 #[test]
 fn chunks_assemble_to_the_original_and_the_job_is_ready() {
-    for kind in [JobKind::Job, JobKind::Frame] {
+    // A frame assembles in its own slot (`frame_0118.rs`), not as the held job.
+    for kind in [JobKind::Job] {
         let mut rig = Rig::plugged();
         rig.app(submit(JOB_TEXT, kind));
         let mut last = None;

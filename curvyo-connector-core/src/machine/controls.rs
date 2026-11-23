@@ -55,6 +55,11 @@ impl Machine {
             }
             (Message::Stop, State::Jogging) => self.cancel_jog(true, out),
             (Message::Stop, State::Homing) => self.stop_homing(out),
+            (Message::Stop, State::Framing) => self.stop_frame(out),
+            (Message::Stop, State::AwaitingLocalStart) if self.waiting == Waiting::Frame => {
+                // Stop from anyone discards a waiting frame; the held job stays.
+                self.end_frame(None, out);
+            }
             (Message::Stop, State::AwaitingLocalStart) if self.waiting == Waiting::Home => {
                 // Stop from anyone discards a waiting Home.
                 self.requester = None;
@@ -73,21 +78,7 @@ impl Machine {
 
     pub(super) fn on_controller(&mut self, event: Event, out: &mut Output) {
         if self.state == State::NoController {
-            match event {
-                Event::ControllerConnected => {
-                    self.homed = false;
-                    self.set(State::Idle, out);
-                }
-                Event::LaserModeOff(off) => self.laser_off = off,
-                Event::LaserModeUnknown(unknown) => self.laser_unknown = unknown,
-                Event::NoControllerDetail { detail }
-                    if !self.sticky && self.detail.as_deref() != Some(detail.as_str()) =>
-                {
-                    self.detail = Some(detail);
-                    out.messages.push(self.status());
-                }
-                _ => {}
-            }
+            self.on_no_controller(event, out);
             return;
         }
         match event {
@@ -152,6 +143,8 @@ impl Machine {
                 self.homed = false;
                 if self.state == State::Jogging {
                     self.on_jogging(Event::ControllerReset, out);
+                } else if self.state == State::Framing {
+                    self.on_framing(Event::ControllerReset, out);
                 } else {
                     out.messages.push(self.status());
                 }
@@ -161,7 +154,38 @@ impl Machine {
             {
                 self.on_jogging(event, out);
             }
+            event @ (Event::JobFinished { .. }
+            | Event::JobFailed { .. }
+            | Event::JobFailedWith { .. }
+            | Event::Stopped
+            | Event::Progress { .. }
+            | Event::Held
+            | Event::Resumed
+            | Event::PauseDeferred)
+                if self.state == State::Framing =>
+            {
+                self.on_framing(event, out);
+            }
             other => self.on_job_event(other, out),
+        }
+    }
+
+    /// The events of a connector without a controller: only its coming and its words matter.
+    fn on_no_controller(&mut self, event: Event, out: &mut Output) {
+        match event {
+            Event::ControllerConnected => {
+                self.homed = false;
+                self.set(State::Idle, out);
+            }
+            Event::LaserModeOff(off) => self.laser_off = off,
+            Event::LaserModeUnknown(unknown) => self.laser_unknown = unknown,
+            Event::NoControllerDetail { detail }
+                if !self.sticky && self.detail.as_deref() != Some(detail.as_str()) =>
+            {
+                self.detail = Some(detail);
+                out.messages.push(self.status());
+            }
+            _ => {}
         }
     }
 
@@ -184,7 +208,8 @@ impl Machine {
             | State::Ready
             | State::AwaitingLocalStart
             | State::Homing
-            | State::Jogging => Some("Lost the controller".to_owned()),
+            | State::Jogging
+            | State::Framing => Some("Lost the controller".to_owned()),
             _ => None,
         };
         let detail = text.map(str::to_owned).or(loss);

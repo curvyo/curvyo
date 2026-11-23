@@ -56,12 +56,14 @@ pub enum Confirms {
     Resume,
     /// A homing cycle (`specs/0118` 37).
     Home,
+    /// A member's frame (`specs/0118` 2b).
+    Frame,
 }
 
 /// A start, resume or home that waited and ran.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Confirmation {
-    /// The job; `None` for a Home.
+    /// The job; the frame for a Frame; `None` for a Home.
     pub job_id: Option<Uuid>,
     /// Who asked for it.
     pub requested_by: String,
@@ -105,7 +107,8 @@ impl Machine {
     /// The held job as the owner rule's `Status` names it (configured mode only).
     pub(super) fn shown_job(&self) -> Option<&super::Held> {
         // A waiting Home starts no job, so it names none (`specs/0118` M5).
-        let waits_home = self.state == State::AwaitingLocalStart && self.waiting == Waiting::Home;
+        let waits_home = self.state == State::AwaitingLocalStart
+            && matches!(self.waiting, Waiting::Home | Waiting::Frame);
         let shown = self.options.start_rule == StartRule::OwnerConfirms
             && !waits_home
             && matches!(
@@ -116,6 +119,7 @@ impl Machine {
                     | State::Paused
                     | State::Homing
                     | State::Jogging
+                    | State::Framing
                     | State::Done { .. }
             );
         self.held.as_ref().filter(|_| shown)
@@ -171,10 +175,15 @@ impl Machine {
         let owner_wait = rule == StartRule::OwnerConfirms
             && self.state == State::AwaitingLocalStart
             && self.waiting != Waiting::Home;
+        let waited_id = if self.waiting == Waiting::Frame {
+            self.frame_id()
+        } else {
+            held_id
+        };
         if owner_wait {
             if peer.role == Role::Member {
                 Self::wrong_state(out);
-            } else if held_id != Some(job_id) {
+            } else if waited_id != Some(job_id) {
                 self.not_held(job_id, out);
             } else {
                 self.run_waiting(Some(peer), out);
@@ -223,6 +232,16 @@ impl Machine {
         let requested_by = self.requester.take().unwrap_or_default();
         let resume = self.waiting == Waiting::Resume;
         let confirmed_by = owner.map(|p| p.name.clone());
+        if self.waiting == Waiting::Frame {
+            out.confirmed = Some(Confirmation {
+                job_id: self.frame_id(),
+                requested_by,
+                confirmed_by,
+                what: Confirms::Frame,
+            });
+            self.run_frame(out);
+            return;
+        }
         if self.waiting == Waiting::Home {
             out.confirmed = Some(Confirmation {
                 job_id: None,

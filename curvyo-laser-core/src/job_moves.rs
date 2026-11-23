@@ -133,6 +133,13 @@ impl Frame {
         )
     }
 
+    /// The page point of machine coordinates `m`: the inverse of [`Frame::machine_point`], which
+    /// mirrors each axis it flips and so is its own inverse.
+    #[must_use]
+    pub const fn page_point(&self, m: PointUm) -> PointUm {
+        self.machine_point(m)
+    }
+
     /// Whether `p` lies on the bed within `tolerance` µm.
     #[must_use]
     pub const fn holds(&self, p: PointUm, tolerance: i64) -> bool {

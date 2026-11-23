@@ -40,6 +40,7 @@ fn status(
         homed: false,
         machine_position: None,
         work_offset: None,
+        frame_id: None,
     }
 }
 
@@ -201,6 +202,7 @@ fn all() -> Vec<(&'static str, Message)> {
                 homed: true,
                 machine_position: Some([-112.5, -130.0, 0.0].map(Millimetres)),
                 work_offset: Some([100.0, 100.0, 0.0].map(Millimetres)),
+                frame_id: None,
             },
         ),
         (
@@ -218,6 +220,7 @@ fn all() -> Vec<(&'static str, Message)> {
                 homed: false,
                 machine_position: None,
                 work_offset: None,
+                frame_id: None,
             },
         ),
         (

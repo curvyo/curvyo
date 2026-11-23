@@ -27,7 +27,11 @@ impl Machine {
             State::AwaitingLocalStart if self.waiting == Waiting::Home => {
                 Some("A home waits.".to_owned())
             }
+            State::AwaitingLocalStart if self.waiting == Waiting::Frame => {
+                Some("A frame waits.".to_owned())
+            }
             State::AwaitingLocalStart => Some("A start waits at the machine.".to_owned()),
+            State::Framing => Some("Framing.".to_owned()),
             State::NoController => Some("No controller.".to_owned()),
         };
         if let Some(message) = refusal {

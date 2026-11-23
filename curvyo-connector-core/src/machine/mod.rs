@@ -4,6 +4,7 @@ mod arrival;
 mod confirm;
 mod controls;
 mod event;
+mod frame;
 mod home;
 mod jog;
 mod list;
@@ -19,8 +20,9 @@ use uuid::Uuid;
 use crate::assembly::{Assembly, Job};
 pub(crate) use crate::count::count;
 use crate::job_list::JobList;
-use crate::message::{ErrorCode, Message, Progress, RejectReason, State};
+use crate::message::{ErrorCode, JobKind, Message, Progress, RejectReason, State};
 use crate::millimetres::Millimetres;
+use frame::FrameRun;
 use jog::JogRun;
 use list::Transfer;
 
@@ -55,6 +57,8 @@ enum Waiting {
     Resume,
     /// A homing cycle (`specs/0118` M5).
     Home,
+    /// A member's frame (`specs/0118` 2b, adrs F5); the frame is in its own slot.
+    Frame,
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +81,8 @@ pub struct Machine {
     state: State,
     assembly: Option<Assembly>,
     held: Option<Held>,
+    /// The frame that arrives, waits or runs, beside the held job (`specs/0118` 2b).
+    frame: Option<FrameRun>,
     position: Option<[Millimetres; 3]>,
     alarm: Option<String>,
     /// The sentence that explains the state.
@@ -133,6 +139,7 @@ impl Machine {
             state: State::NoController,
             assembly: None,
             held: None,
+            frame: None,
             position: None,
             alarm: None,
             detail: None,
@@ -206,10 +213,12 @@ impl Machine {
                 | State::AwaitingLocalStart
                 | State::Homing
                 | State::Jogging
+                | State::Framing
                 | State::Done { .. }
         );
-        // A waiting Home starts no job, so it names none.
-        let waits_home = self.state == State::AwaitingLocalStart && self.waiting == Waiting::Home;
+        // A waiting Home or frame starts no job, so it names none.
+        let waits_home = self.state == State::AwaitingLocalStart
+            && matches!(self.waiting, Waiting::Home | Waiting::Frame);
         let job = self
             .held
             .as_ref()
@@ -233,6 +242,7 @@ impl Machine {
             homed: self.homed,
             machine_position: self.mpos,
             work_offset: self.wco,
+            frame_id: self.shown_frame_id(),
         }
     }
 
@@ -277,7 +287,7 @@ impl Machine {
     fn enter(&mut self, state: State, out: &mut Output) {
         if !matches!(
             state,
-            State::Running | State::Paused | State::Homing | State::Jogging
+            State::Running | State::Paused | State::Homing | State::Jogging | State::Framing
         ) {
             self.stop_pending = false;
         }
@@ -307,6 +317,7 @@ impl Machine {
     fn discard(&mut self) {
         self.assembly = None;
         self.held = None;
+        self.frame = None;
         self.requester = None;
     }
 
@@ -315,11 +326,18 @@ impl Machine {
     }
 
     fn on_message(&mut self, message: Message, peer: &Peer, out: &mut Output) {
-        if self.takes_as_request(&message, peer, out) {
+        if self.takes_as_request(&message, peer, out) || self.frame_refuses(&message, out) {
             return;
         }
         match message {
             Message::GetStatus => out.messages.push(self.status()),
+            Message::SubmitJob {
+                job_id,
+                name,
+                kind: JobKind::Frame,
+                bytes,
+                sha256,
+            } => self.submit_frame((job_id, name), (bytes, sha256), peer, out),
             Message::SubmitJob {
                 job_id,
                 name,

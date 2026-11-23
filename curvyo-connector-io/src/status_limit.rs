@@ -64,6 +64,7 @@ mod tests {
             homed: false,
             machine_position: None,
             work_offset: None,
+            frame_id: None,
         }
     }
 

@@ -19,8 +19,12 @@ impl Machine {
     ) {
         let refusal = match self.state {
             State::NoController => Some(RejectReason::NoController),
-            State::Alarm | State::Homing | State::Jogging => Some(RejectReason::Busy),
-            State::AwaitingLocalStart if self.waiting == Waiting::Home => Some(RejectReason::Busy),
+            State::Alarm | State::Homing | State::Jogging | State::Framing => {
+                Some(RejectReason::Busy)
+            }
+            State::AwaitingLocalStart if matches!(self.waiting, Waiting::Home | Waiting::Frame) => {
+                Some(RejectReason::Busy)
+            }
             _ if self.laser_off => Some(RejectReason::LaserModeOff),
             _ if self.laser_unknown => Some(RejectReason::LaserModeUnknown),
             _ => None,
@@ -56,6 +60,9 @@ impl Machine {
     }
 
     pub(super) fn chunk(&mut self, job_id: Uuid, index: u32, text: &str, out: &mut Output) {
+        if self.chunk_frame(job_id, index, text, out) {
+            return;
+        }
         let current = self.assembly.as_ref().is_some_and(|a| a.job_id() == job_id);
         if !current {
             if !self.chunk_waiting(job_id, index, text, out) {

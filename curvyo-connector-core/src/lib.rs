@@ -13,6 +13,7 @@ mod assembly;
 mod codec;
 mod config;
 mod count;
+mod frame_text;
 mod handshake;
 mod job_list;
 mod jog;
@@ -30,6 +31,7 @@ pub use config::{
     DEFAULT_LINES_PER_SECOND, MAX_BAUD, MAX_CLIENT_NAME, MAX_LABEL, check_client_name, check_text,
 };
 pub use count::count;
+pub use frame_text::{FrameMoves, NotAFrame, check as check_frame};
 pub use handshake::{Handshake, Outcome, PROTOCOL_VERSION};
 pub use job_list::{
     Chain, Dropped, End, Entry, Item, JobList, MAX_BYTES, MAX_ENTRIES, Restored, StoredCurrent,
@@ -46,3 +48,5 @@ pub use message::{
 };
 pub use millimetres::Millimetres;
 pub use send_watch::{Resolution, SendWatch};
+/// The id type of jobs and frames, so callers need no `uuid` dependency of their own.
+pub use uuid::Uuid;

@@ -256,6 +256,39 @@ fn fixture_numbers(kind: OperationKind, context: NumbersContext<'_>) -> NumbersR
     }
 }
 
+/// The numbers a frame traces `block` with when its own `read` blocks for want of power or speed
+/// (`specs/0118` Frage 335 B): its kind and options at the lowest power, the machine's maximum feed
+/// and one pass. A frame never burns, so only the geometry they plan counts. `None` for a block
+/// whose numbers read otherwise or whose kind or options are damaged.
+pub(crate) fn frame_stand_in(
+    block: &BlockInput,
+    read: &NumbersRead,
+    max_feed: FeedRate,
+) -> Option<BlockNumbers> {
+    if !read.blocks() {
+        return None;
+    }
+    let kind = block.kind.known()?;
+    let options = match &block.source {
+        BlockSource::Operation { options, .. } => *options.as_ref().ok()?,
+        BlockSource::Fixture { .. } => fixture_options(),
+    };
+    let main = RunNumbers {
+        power: PowerPercent::from_tenths(PowerPercent::MIN_TENTHS)?,
+        speed: max_feed,
+        feed: max_feed,
+        passes: Passes::ONE,
+    };
+    Some(BlockNumbers {
+        kind,
+        main,
+        outline: (kind == OperationKind::EngraveOutline).then_some(main),
+        interval: Interval::default(),
+        picture_interval: Interval::default(),
+        options,
+    })
+}
+
 /// The options of a fixture block (ADR 0064 §3): bidirectional, 0 degrees, no Crosshatch, no
 /// Overscanning, no Z offset.
 fn fixture_options() -> OperationOptions {

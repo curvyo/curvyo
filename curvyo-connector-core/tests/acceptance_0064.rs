@@ -116,6 +116,7 @@ fn all_messages() -> Vec<Message> {
             homed: false,
             machine_position: None,
             work_offset: None,
+            frame_id: None,
         },
         Message::Error {
             code: ErrorCode::Malformed,
@@ -224,6 +225,14 @@ fn in_state(state: State, text: &str) -> FakeController {
         State::Homing => {
             let mut f = idle();
             f.send(Message::Home);
+            f
+        }
+        // `specs/0118` slice 2b: added so the match stays exhaustive; `frame_0118.rs` has its table.
+        State::Framing => {
+            let text = "G21\nG90\nM5\nG1 X1 Y1 F100 S0\n";
+            let mut f = idle();
+            f.send(submit(j1(), JobKind::Frame, text));
+            f.send(chunk(j1(), 0, text));
             f
         }
         // `specs/0118` slice 2a: added so the match stays exhaustive; `jog_0118.rs` has its table.
@@ -406,6 +415,7 @@ fn p3_status_nulls_are_present() {
         homed: false,
         machine_position: None,
         work_offset: None,
+        frame_id: None,
     })
     .unwrap();
     let v: Value = serde_json::from_str(&text).unwrap();
@@ -436,6 +446,7 @@ fn p3_status_with_job_and_position_round_trips() {
         homed: false,
         machine_position: None,
         work_offset: None,
+        frame_id: None,
     };
     let text = encode(&msg).unwrap();
     assert_eq!(decode(&text).unwrap(), msg);
@@ -590,15 +601,17 @@ fn p8_chunks_assemble_and_job_is_accepted() {
     assert_eq!(f.machine.held_job().unwrap().text.as_ref(), text);
 }
 
-// P8: a Frame job is assembled the same way.
+// P8: a Frame job is assembled the same way, in the frame slot beside the held job (`specs/0118`
+// 2b, adrs F4): it runs at once, the state is Framing and no job is held.
 #[test]
 fn p8_frame_job_is_assembled() {
-    let text = "G0 X0 Y0\nG1 X10 Y0\n";
+    let text = "G21\nG90\nM5\nG1 X10 Y0 F100 S0\n";
     let mut f = idle();
     f.send(submit(j1(), JobKind::Frame, text));
     f.send(chunk(j1(), 0, text));
-    assert_eq!(f.state(), State::Ready);
-    assert_eq!(f.machine.held_job().unwrap().kind, JobKind::Frame);
+    assert_eq!(f.state(), State::Framing);
+    assert!(f.machine.held_job().is_none());
+    assert_eq!(f.machine.frame_job().unwrap().kind, JobKind::Frame);
 }
 
 // P8 edge: one byte per chunk assembles to the same text.

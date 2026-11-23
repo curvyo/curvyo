@@ -25,7 +25,7 @@ const LOST: &str = "Lost the controller: no answer to ? for 3 s";
 /// The terminal line of a stop GRBL did not confirm (G12).
 const UNCONFIRMED: &str = "Could not confirm the machine stopped (no GRBL banner within 3 s)";
 /// GRBL states in which no job starts (G4): the door, check mode, sleep.
-const BUSY_WORDS: [&str; 3] = ["Door", "Check", "Sleep"];
+pub(super) const BUSY_WORDS: [&str; 3] = ["Door", "Check", "Sleep"];
 
 /// GRBL 1.1 on one serial port.
 #[derive(Debug)]
@@ -324,22 +324,25 @@ impl GrblController {
                 elapsed_ms: 0,
                 detail: texts::failed_at(refused.line, refused.cause.text()),
             }),
-            Ok(lines) => {
-                self.spindle_off = false;
-                let mut stream = Stream::new(lines, at);
-                stream.fill(self.owed_bytes(), &mut self.out);
-                if stream.all_answered() {
-                    stream.finished_at_report = Some(self.reports);
-                }
-                if stream.answered() > 0 {
-                    self.events.push(Event::Progress {
-                        line: stream.answered(),
-                        elapsed_ms: 0,
-                    });
-                }
-                self.stream = Some(stream);
-            }
+            Ok(lines) => self.begin_stream(lines, at),
         }
+    }
+
+    /// Streams the prepared `lines`: a job's or a frame's.
+    pub(super) fn begin_stream(&mut self, lines: Vec<String>, at: Duration) {
+        self.spindle_off = false;
+        let mut stream = Stream::new(lines, at);
+        stream.fill(self.owed_bytes(), &mut self.out);
+        if stream.all_answered() {
+            stream.finished_at_report = Some(self.reports);
+        }
+        if stream.answered() > 0 {
+            self.events.push(Event::Progress {
+                line: stream.answered(),
+                elapsed_ms: 0,
+            });
+        }
+        self.stream = Some(stream);
     }
 
     /// Starts the stop of G12 for the maker's Stop (`failure` `None`) or a failing job; also for
@@ -396,6 +399,7 @@ impl Controller for GrblController {
             ControllerCommand::Stop => self.begin_stop(None, at),
             ControllerCommand::Unlock => self.unlock(),
             ControllerCommand::Home => self.home(),
+            ControllerCommand::Frame { homed, .. } => self.frame(job, *homed, at),
             ControllerCommand::Jog { .. }
             | ControllerCommand::JogHold { .. }
             | ControllerCommand::JogCancel => self.jog_command(command, at),

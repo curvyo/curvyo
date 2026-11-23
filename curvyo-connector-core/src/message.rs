@@ -8,12 +8,12 @@ use crate::config::ConnectorConfig;
 use crate::jog::{JogAxis, JogDirection, JogStep};
 use crate::millimetres::Millimetres;
 
-/// What a job is: the work itself or its outline at low power.
+/// What a job is: the work itself or its outline traced with the laser off.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JobKind {
     /// The job's G-code.
     Job,
-    /// The frame: the job's outline at low power.
+    /// The frame: the job's outline, the laser off (`specs/0118` 2b).
     Frame,
 }
 
@@ -36,6 +36,8 @@ pub enum RejectReason {
     LaserModeUnknown,
     /// The job list holds 20 jobs or 256 MiB (`specs/0132`).
     ListFull,
+    /// A frame holds a line a frame may not (`specs/0118` 2b, adrs F3): the laser could turn on.
+    NotAFrame,
 }
 
 /// How a job ended.
@@ -67,6 +69,8 @@ pub enum State {
     Homing,
     /// The controller moves the head for a jog (`specs/0118`); a kept `Ready` job is carried along.
     Jogging,
+    /// The controller runs a frame (`specs/0118` 2b); a kept `Ready` job is carried along.
+    Framing,
     /// The controller is running the job.
     Running,
     /// The job is paused.
@@ -463,6 +467,9 @@ pub enum Message {
         /// The controller's work coordinate offset, when the controller reported it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         work_offset: Option<[Millimetres; 3]>,
+        /// The frame that runs or waits for a confirmation (`specs/0118` 2b); left out otherwise.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        frame_id: Option<Uuid>,
     },
     /// A refusal that keeps the connection open, except where stated.
     Error {

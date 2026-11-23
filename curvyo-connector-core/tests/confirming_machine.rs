@@ -55,6 +55,7 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                 homed: false,
                 machine_position: None,
                 work_offset: None,
+                frame_id: None,
             },
         ),
         (
@@ -72,6 +73,7 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                 homed: false,
                 machine_position: None,
                 work_offset: None,
+                frame_id: None,
             },
         ),
         (
@@ -89,6 +91,7 @@ fn g19_g21_the_new_fields_match_their_golden_files_and_old_files_still_decode() 
                 homed: false,
                 machine_position: None,
                 work_offset: None,
+                frame_id: None,
             },
         ),
         (

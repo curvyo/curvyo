@@ -21,6 +21,8 @@ pub fn event_words(event: &str, subject: &str, detail: &str) -> String {
             let job = detail.split(' ').next().unwrap_or_default();
             let what = if detail.ends_with(" resume") {
                 "resume"
+            } else if job == "Frame" {
+                "frame"
             } else {
                 "start"
             };

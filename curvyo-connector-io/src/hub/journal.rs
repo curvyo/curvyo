@@ -54,6 +54,14 @@ impl Hub {
         }
     }
 
+    /// A frame went to the controller: one `jobs.log` line `Frame: <client>` and one terminal
+    /// line, never a result line (`specs/0118` 2b, adrs F6).
+    pub(super) fn log_frame(&self, inner: &Inner, client: &str) {
+        let _ = inner.notices.send(format!("Frame sent by {client}"));
+        let result = LogResult::Frame(client.to_owned());
+        self.append_job_line(inner, "", &result, &LogPeople::default());
+    }
+
     /// The refusal of a submitted job: its log line and, for the settings refusals, its own
     /// terminal line (UX notes section 10).
     pub(super) fn log_rejection(&self, inner: &Inner, job_id: Uuid, reason: RejectReason) {
@@ -126,6 +134,7 @@ impl Hub {
     pub(super) fn log_confirmation(&self, inner: &Inner, confirmation: &Confirmation) {
         let name = match confirmation.what {
             Confirms::Home => "Home".to_owned(),
+            Confirms::Frame => "Frame".to_owned(),
             _ => inner
                 .machine
                 .held_job()
@@ -142,8 +151,9 @@ impl Hub {
             Confirms::Start => "Started",
             Confirms::Resume => "Resumed",
             Confirms::Home => "Homing",
+            Confirms::Frame => "Framing",
         };
-        let line = if confirmation.what == Confirms::Home {
+        let line = if matches!(confirmation.what, Confirms::Home | Confirms::Frame) {
             format!(
                 "{verb}, confirmed by {owner} for {}",
                 confirmation.requested_by
@@ -202,12 +212,20 @@ impl Hub {
         if after != State::AwaitingLocalStart {
             return;
         }
-        // A waiting Home carries no job (`specs/0118` M5).
+        // A waiting Home or frame carries no job (`specs/0118` M5, 2b).
         let job = match status {
+            Message::Status {
+                frame_id: Some(_), ..
+            } => "Frame",
             Message::Status { job: None, .. } => "Home",
             _ => inner.job_name.as_str(),
         };
         let line = match &status {
+            Message::Status {
+                requested_by: Some(member),
+                frame_id: Some(_),
+                ..
+            } => format!("Frame requested by {member}"),
             Message::Status {
                 requested_by: Some(member),
                 job: None,

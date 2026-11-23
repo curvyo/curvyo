@@ -83,6 +83,7 @@ impl FakeController {
                 ControllerCommand::Stop => self.streaming = None,
                 ControllerCommand::Unlock
                 | ControllerCommand::Home
+                | ControllerCommand::Frame { .. }
                 | ControllerCommand::Jog { .. }
                 | ControllerCommand::JogHold { .. }
                 | ControllerCommand::JogCancel => {}
