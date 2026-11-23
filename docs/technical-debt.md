@@ -2736,6 +2736,7 @@ for satin stitch (embroidery family) rather than here.
   fonts (512 MiB) plus derived AI results (512 MiB, ADR 0077 §6) are held in the editor's
   memory in the browser build. **Resolution:** when an out-of-memory is measured, page assets
   from IndexedDB or the container on demand instead of holding the store.
+- **A second wasm instance holds a second Loro replica of the open document, without assets (`0136`, ADR 0079 §4, 2026-11-23).** The recovery worker keeps its own replica of the open document, so in the browser build the operations sit in memory twice; the replica holds no asset bytes. **Resolution:** when an out-of-memory is measured, drop the replica and reseed the worker from the container, as a reseed already does at an idle moment. Trigger: a measured out-of-memory.
 - **Operating the model origin and CDN is a customer operating duty (Frage 280 A, 2026-11-19).**
   A domain, an origin bucket and a CDN in front, plus an upload per model version (ADR 0076),
   must be kept alive for the AI tools to download on demand (models are never bundled); the app

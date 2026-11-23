@@ -1,6 +1,6 @@
 # Autosave and restore: little is lost in a crash, also for a project that was never saved
 
-Status: Draft (decisions of 2026-11-19 applied; not Ready: `adrs.md` and UX notes are missing)
+Status: Done (PR #454; Ready 2026-11-23; decisions of 2026-11-19 and 2026-11-23 applied: Frage 317 A, ADR 0079 accepted (Frage 318); `adrs.md` and UX notes in)
 Priority: Should
 Origin: Customer (2026-11-19, translated): "Autosave and restore: as little as possible should be lost on a crash, also when the project was never saved initially." Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
@@ -22,16 +22,16 @@ Today (`0001`, out of scope there; `R-SYS-010`, `0051`): a project is dirty when
 1. Given a project with changes (saved or never saved), then a recovery copy of the whole project (all pages, the history, the document formats, the same content as Save writes) is written by **one rule** (Frage 266, the product owner's reading of the customer's "after every step, at most every 5 minutes"): a committed step is written at once (at the next idle moment, within 1 s) when the last write is 5 minutes or more ago; steps committed within the 5 minutes after a write are not written one by one, but exactly one trailing write happens when the 5 minutes expire with steps not yet written; given no step since the last write, nothing is written. **Worst-case loss:** the steps committed after the last write, which is less than 5 minutes of work (and only the step in flight, under 1 s, after a quiet period). A test with a fake clock drives the rule; timing tests measure thread CPU time of the write path, not wall time (`CLAUDE.md` §5). **Revisitable at the demo:** the 5 minutes are a constant of the core, not a setting (criterion 13).
 2. Given a recovery copy being written, then the write never blocks the canvas: a drag of 60 fps on a project with 10,000 objects drops no frame because of it, and a crash during the write leaves the previous recovery copy intact (the new copy replaces the old one only when complete).
 3. Given Save or Save as succeeds, then the recovery copy of this project is deleted; given Discard in the unsaved-changes check (`0051`) or a clean Close, then it is deleted too; given New, then no copy exists until the first step is committed.
-4. Given the app starts and finds one or more recovery copies whose project is not open, then the File tab shows a block "Unsaved work from a crash" with one row per copy (the project's name or "Untitled", the time of the last step, the page count), and two icon buttons per row, Restore and Discard; Discard needs the inline second press (design system, inline delete confirm). No dialog, no popup.
+4. Given the app starts and finds one or more recovery copies whose project is not open, then the File tab shows a block "Unsaved work from a crash" with one row per copy (the project's name or "Untitled", the time of the last step, the page count; line 2 reads "3 pages" beside the time in the workspace row format, and "File changed since" (criterion 6) is a third line), and two icon buttons per row, Restore and Discard; Discard needs the inline second press (design system, inline delete confirm). No dialog, no popup.
 5. Given Restore, then the project opens as an unsaved project (dirty, no file path, named "Untitled" or its name followed by " (recovered)" **(Proposal)**), history included, in one step; the row goes. The maker saves it where he wants; the recovery copy goes with that Save (criterion 3).
 6. Given a recovery copy whose project had a saved file that has changed since (newer on disk than the copy's base), then the row says so ("File changed since") and Restore still opens the recovered state as a new unsaved project; it never overwrites the file.
 7. Given a damaged recovery copy (truncated, or a newer format than this app), then it is listed as "Cannot be restored", Discard works, and nothing else is affected; the same named errors as opening a damaged project (`0001` criterion 7).
 8. Given the maker has not changed anything since open or Save, then no recovery copy is written (a clean project is never recoverable).
-9. Given the desktop app, then recovery copies live in the app's data folder, not beside the project, not in a workspace folder and not in a folder that is synced (`R-SYS-004`, `0095`, `0096`); given the browser build, then in the browser's own origin storage. Where they live is shown in the File tab block's help line only when a copy exists (no standing hint, `feedback_no_hint_labels`).
+9. Given the desktop app, then recovery copies live in the app's data folder, not beside the project, not in a workspace folder and not in a folder that is synced (`R-SYS-004`, `0095`, `0096`); given the browser build, then in the browser's own origin storage. Where they live is shown in the File tab block's help line only when a copy exists, as "Kept in <path>" (desktop) or "Kept in this browser" (browser) (no standing hint, `feedback_no_hint_labels`).
 10. Given `R-SYS-007`, then a recovery copy never leaves the machine: it is not sent to the sync server, to a collaboration room or anywhere else; a project in a shared room keeps recovering from its own local copy of the room state, which the sync mechanism already holds, and this slice adds nothing to the network.
 11. Given a project open in two windows or two browser tabs, then each has its own recovery copy (keyed by a per-session project id), and a copy of a project that is open in another window is not offered for restore.
-12. Given the recovery copies of discarded or restored projects, then at most 20 copies and 200 MB exist; the oldest beyond that are deleted at start without a question **(Proposal)**.
-13. Given the whole slice, then there is no preference, no setting and no switch for autosave (always on, `R-SYS-007` satisfied by criterion 10), and no toast after a successful write or restore; only a failed write (disk full, no permission) shows a notice in the File tab and the title area, once, until the next success.
+12. Given the recovery copies of discarded or restored projects, then at most 20 copies and 200 MB exist beyond the newest copy (the newest copy is always kept, whatever its size); the oldest beyond that are deleted at start without a question **(Proposal)**.
+13. Given the whole slice, then there is no preference, no setting and no switch for autosave (always on, `R-SYS-007` satisfied by criterion 10), and no toast after a successful write or restore; only a failed write (disk full, no permission) shows a line in the File tab's project block until the next successful write, and one canvas notice when the failure first happens.
 
 ## Out of scope
 
@@ -48,18 +48,24 @@ Customer, 2026-11-19:
 - **Frage 266 (AUTOSAVE-INTERVAL): A and B combined.** A recovery copy after each step, but at most every 5 minutes. Exactly one rule is specified in criterion 1; it is the product owner's reading of "nach jedem Schritt, max alle 5 Minuten" (**Proposal**, vetoable at the demo): first step after a 5-minute gap written at once, plus one trailing write when the 5 minutes expire with unwritten steps; worst-case loss under 5 minutes.
 - **Frage 267 (AUTOSAVE-OFFER): A.** An inline block in the File tab at the next start (criterion 4).
 
-## Still open before Ready
+Customer, 2026-11-23:
 
-- `adrs.md` (architect: recovery copy format and atomic replace, keying by per-session project id, browser origin storage, the 20 copies / 200 MB limit).
-- UX notes (the File tab block of criterion 4).
+- **Frage 317 (RESTORE-SHOW): A.** When copies wait at start, the panel body is shown and the File tab is active, once; focus stays on the canvas (UX notes, section 13).
+- **Frage 318 (ADR 0079): accepted.** The recovery copy decisions are in `docs/adr/0079-recovery-copies.md` and `adrs.md`.
+
+## Ready checks (done 2026-11-23)
+
+- `adrs.md`: ADR 0079 (recovery copy format and atomic replace, keying by per-session project id, browser origin storage, the 20 copies / 200 MB limit), accepted by the customer (Frage 318); the architect's note applied to criterion 12.
+- UX notes: deltas E1 to E3 (section 12) applied to criteria 4, 9 and 13.
 
 ## UX notes
 
-(ux-engineer, before Ready.) The block of criterion 4 in the File tab; no popup.
+See `ux-notes.md` (ux-engineer, 2026-11-23): the File tab block of criterion 4, Restore, Discard, keyboard, accessibility, the failed-write line; Frage 317 answered A (customer, 2026-11-23).
 
 ## Links
 
 Requirements: R-SYS-010 (extended), R-SYS-013 (new), R-SYS-007, R-SYS-002
+Decisions: ADR 0079 (`docs/adr/0079-recovery-copies.md`)
 Depends on: `0001`, `0051`, `0020` (the history is part of the copy)
 Related: `0095` workspace, `0096` own-devices sync (their copies are not recovery copies)
 PR: none yet
