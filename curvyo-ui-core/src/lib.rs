@@ -85,6 +85,7 @@ mod history_names;
 mod history_notice;
 mod hit_test;
 mod hit_test_object;
+mod image_adjust_ai;
 mod image_adjust_copy;
 mod image_adjust_edit;
 mod image_adjust_points;
@@ -387,6 +388,12 @@ pub use history_notice::{
 };
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
+pub use image_adjust_ai::{
+    CHECKSUM_TEXT, HOST_UNREACHABLE_TEXT, OUT_OF_DATE_TEXT, STORED_RESULTS_WARN_BYTES,
+    WITHDRAWN_TEXT, budget_line, consent_line, downloading_line, megabytes, not_downloaded_line,
+    paused_line, ready_line, remove_result, result_refusal, run_label, running_line, storage_line,
+    store_result, stored_line, upscale_line,
+};
 pub use image_adjust_copy::CopiedAdjustments;
 pub use image_adjust_edit::{
     CURVE_ORDER_TEXT, LEVELS_ORDER_TEXT, PICK_INTERVAL_UM, STRENGTH_RANGE_TEXT, add_step,

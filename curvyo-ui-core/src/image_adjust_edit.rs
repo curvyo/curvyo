@@ -4,7 +4,7 @@
 //! adjustments".
 
 use curvyo_document_core::{AdjustEntry, AdjustmentsWrite, EXPERT_PRESET};
-use curvyo_laser_core::adjust::{Band, DitherSettings, ManualStep, Preset, StepKind};
+use curvyo_laser_core::adjust::{Band, DitherSettings, ManualStep, Preset, ResultRef, StepKind};
 use curvyo_laser_core::settings::ImageEdit;
 
 /// The refusal of a typed Strength out of range (criterion 26, as `0123` criterion 12).
@@ -93,11 +93,13 @@ pub fn add_step_with(entries: &[AdjustEntry], step: ManualStep) -> Vec<AdjustEnt
     next
 }
 
-/// The step of row `index` when it reads, with its on/off state.
-fn manual(entries: &[AdjustEntry], index: usize) -> Option<(ManualStep, bool)> {
-    let step = entries.get(index)?.step()?;
+/// The step of row `index` when it reads, with its on/off state and stored result.
+pub(crate) fn manual(entries: &[AdjustEntry], index: usize) -> Option<(ManualStep, bool)> {
+    let entry = entries.get(index)?;
+    let step = entry.step()?;
     let read = ManualStep::read(&step.kind, |key| step.fields.get(key).copied()).ok()?;
-    Some((read, step.enabled))
+    let result = entry.result().and_then(ResultRef::of);
+    Some((read.with_result(result), step.enabled))
 }
 
 /// The stack with field `key` of row `index` set to `typed` (in the field's shown unit), rounded
@@ -138,8 +140,10 @@ pub fn edit_field(
         StepKind::Curves => CURVE_ORDER_TEXT.to_owned(),
         _ => LEVELS_ORDER_TEXT.to_owned(),
     })?;
+    // An AI step keeps its stored result: its other fields apply to it without the model; a
+    // changed Factor makes it Out of date (criterion 48).
     let mut next = entries.to_vec();
-    next[index] = edited.entry(enabled);
+    next[index] = edited.with_result(step.result()).entry(enabled);
     Ok(Some(next))
 }
 
@@ -199,14 +203,20 @@ pub fn stretch_levels(
 /// row is not of the step shape or already in that state.
 #[must_use]
 pub fn set_enabled(entries: &[AdjustEntry], index: usize, on: bool) -> Option<Vec<AdjustEntry>> {
-    let step = entries.get(index)?.step()?;
+    let entry = entries.get(index)?;
+    let step = entry.step()?;
     if step.enabled == on {
         return None;
     }
-    let mut changed = step.clone();
-    changed.enabled = on;
+    let mut changed = entry.clone();
+    match &mut changed {
+        AdjustEntry::Step(step) | AdjustEntry::Ran(curvyo_document_core::RanStep { step, .. }) => {
+            step.enabled = on;
+        }
+        AdjustEntry::Unreadable(_) => return None,
+    }
     let mut next = entries.to_vec();
-    next[index] = AdjustEntry::Step(changed);
+    next[index] = changed;
     Some(next)
 }
 
@@ -222,11 +232,13 @@ pub fn remove_step(entries: &[AdjustEntry], index: usize) -> Option<Vec<AdjustEn
 }
 
 /// Whether a row of kind `other` is in the same band as a moved row of kind `moved`, so the
-/// move may pass it (criterion 3, `ux-notes.md` §3.7): tone steps among tone steps; the geometry
-/// band runs in its fixed order, so a geometry row passes only rows of its own kind.
+/// move may pass it (criterion 3, `ux-notes.md` §3.7): tone steps among tone steps, masks among
+/// masks; the geometry band runs in its fixed order, so a geometry row passes only rows of its
+/// own kind.
 fn same_band(moved: StepKind, other: StepKind) -> bool {
     match moved.band() {
         Band::Tone => other.band() == Band::Tone,
+        Band::Mask => other.band() == Band::Mask,
         Band::Geometry => other == moved,
     }
 }
@@ -269,9 +281,9 @@ pub fn move_step_to(entries: &[AdjustEntry], from: usize, to: usize) -> Option<V
 
 /// Make editable (criterion 29): Preset Expert and, in one write, the tone steps that ran
 /// (`resolved`, the derived steps at the shown operation's Interval) as ordinary switched-on rows
-/// in place of the manual tone steps that were "Preset in use"; the geometry rows (Crop, Resize)
-/// stay as they were, before them, and the rows this build does not know after them. Strength is
-/// kept.
+/// in place of the manual tone steps that were "Preset in use"; the geometry rows (Crop, Resize,
+/// Upscale, AI denoise) stay as they were, before them, Remove background after them, and the
+/// rows this build does not know last. Strength is kept.
 #[must_use]
 pub fn make_editable(entries: &[AdjustEntry], resolved: &[ManualStep]) -> AdjustmentsWrite {
     let steps = entries
@@ -283,6 +295,12 @@ pub fn make_editable(entries: &[AdjustEntry], resolved: &[ManualStep]) -> Adjust
                 .iter()
                 .filter(|step| step.kind().band() == Band::Tone)
                 .map(|step| step.entry(true)),
+        )
+        .chain(
+            entries
+                .iter()
+                .filter(|entry| known_kind(entry).is_some_and(|k| k.band() == Band::Mask))
+                .cloned(),
         )
         .chain(
             entries

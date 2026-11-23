@@ -291,6 +291,11 @@ pub fn check_text(issue: &Issue, names: &Names) -> CheckText {
             button: names.item(*item).to_owned(),
             after: " could not run.".to_owned(),
         },
+        Cause::StaleResults { item } => CheckText {
+            before: format!("{count} stored AI {} of ", verb(count, "result", "results")),
+            button: names.item(*item).to_owned(),
+            after: verb(count, " is out of date.", " are out of date.").to_owned(),
+        },
     };
     if issue.targets == Targets::None {
         return CheckText::plain(&text.whole());

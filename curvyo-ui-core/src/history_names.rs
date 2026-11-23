@@ -338,6 +338,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("edit_adjustments", "Edit adjustments"),
     ("restore_original", "Restore original"),
     ("paste_adjustments", "Paste adjustments"),
+    ("run_remove_background", "Run Remove background"),
+    ("run_upscale", "Run Upscale"),
+    ("run_ai_denoise", "Run AI denoise"),
     ("follow_original", "Follow original"),
     ("trace_image", "Trace image"),
     // `specs/0114-image-trace-mask` criterion 17, ADR 0061 §6.

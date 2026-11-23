@@ -17,6 +17,13 @@ pub const MAX_PROJECT_ASSET_BYTES: u64 = 512 * 1024 * 1024;
 /// member is a missing asset, so a zip bomb is cut off.
 pub const MAX_ASSET_BYTES: u64 = 100 * 1024 * 1024;
 
+/// The largest stored AI result (ADR 0077 §6, `specs/0135` criterion 66): 64 MiB of PNG bytes.
+pub const MAX_DERIVED_ASSET_BYTES: u64 = 64 * 1024 * 1024;
+
+/// The most bytes of stored AI results one project holds (ADR 0077 §6): 512 MiB, counted apart
+/// from [`MAX_PROJECT_ASSET_BYTES`].
+pub const MAX_DERIVED_PROJECT_BYTES: u64 = 512 * 1024 * 1024;
+
 /// The lowercase hex SHA-256 of an asset's bytes, 64 characters.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
@@ -99,18 +106,80 @@ pub enum AssetError {
         /// The bytes the refused pictures would add.
         adds: u64,
     },
+    /// One stored AI result over [`MAX_DERIVED_ASSET_BYTES`].
+    #[error("one stored result can be at most 64 MB; this one is {bytes} bytes")]
+    ResultTooLarge {
+        /// The result's bytes.
+        bytes: u64,
+    },
+    /// The stored AI results would pass [`MAX_DERIVED_PROJECT_BYTES`].
+    #[error("the stored results of this document can be at most 512 MB; this adds {adds} bytes")]
+    ResultsFull {
+        /// The bytes the refused result would add.
+        adds: u64,
+    },
 }
 
-/// The asset bytes of one document, sorted by hash so a save is deterministic.
+/// The asset bytes of one document, sorted by hash so a save is deterministic: the originals
+/// (pictures, fonts) and the derived class (stored AI results, ADR 0077 §1) apart.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct AssetStore {
     assets: BTreeMap<AssetHash, Arc<[u8]>>,
+    derived: BTreeMap<AssetHash, Arc<[u8]>>,
+    /// The derived assets this session wrote or saw referred to, kept by a save (ADR 0077 §5).
+    session_derived: HashSet<AssetHash>,
 }
 
 impl AssetStore {
-    /// The bytes named `hash`.
+    /// The bytes named `hash`, an original or a derived asset.
     pub(crate) fn get(&self, hash: &AssetHash) -> Option<Arc<[u8]>> {
-        self.assets.get(hash).cloned()
+        self.assets
+            .get(hash)
+            .or_else(|| self.derived.get(hash))
+            .cloned()
+    }
+
+    /// The bytes of the derived assets among `hashes` this store holds.
+    pub(crate) fn derived_bytes_of(&self, hashes: &HashSet<AssetHash>) -> u64 {
+        hashes
+            .iter()
+            .filter_map(|hash| self.derived.get(hash))
+            .map(|bytes| bytes.len() as u64)
+            .sum()
+    }
+
+    /// Adds derived `bytes` under `hash` and marks it as this session's.
+    pub(crate) fn insert_derived(&mut self, hash: AssetHash, bytes: Arc<[u8]>) {
+        self.session_derived.insert(hash.clone());
+        self.derived.entry(hash).or_insert(bytes);
+    }
+
+    /// Marks the derived asset `hash` as this session's.
+    pub(crate) fn mark_derived(&mut self, hash: &AssetHash) {
+        self.session_derived.insert(hash.clone());
+    }
+
+    /// Adds derived `bytes` read from a container (not marked as this session's).
+    pub(crate) fn load_derived(&mut self, hash: AssetHash, bytes: Arc<[u8]>) {
+        self.derived.entry(hash).or_insert(bytes);
+    }
+
+    /// Whether the derived asset `hash` is held.
+    pub(crate) fn has_derived(&self, hash: &AssetHash) -> bool {
+        self.derived.contains_key(hash)
+    }
+
+    /// Keeps the derived assets `referenced` names or this session wrote or saw, and remembers
+    /// `referenced` as seen (ADR 0077 §5).
+    pub(crate) fn prune_derived(&mut self, referenced: &HashSet<AssetHash>) {
+        self.session_derived.extend(referenced.iter().cloned());
+        let keep = &self.session_derived;
+        self.derived.retain(|hash, _| keep.contains(hash));
+    }
+
+    /// Every derived asset in hash order.
+    pub(crate) fn iter_derived(&self) -> impl Iterator<Item = (&AssetHash, &Arc<[u8]>)> {
+        self.derived.iter()
     }
 
     /// The bytes held, in total.

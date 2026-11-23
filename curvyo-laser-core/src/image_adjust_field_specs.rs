@@ -182,6 +182,38 @@ pub(crate) const MIX_GREEN: FieldSpec =
     pct("green_pct", "Green", -200, 200, "Green is -200 to 200 %.");
 pub(crate) const MIX_BLUE: FieldSpec = pct("blue_pct", "Blue", -200, 200, "Blue is -200 to 200 %.");
 
+pub(crate) const UPSCALE_FACTOR: FieldSpec = FieldSpec {
+    key: "factor",
+    label: "Factor",
+    unit: "\u{d7}",
+    step: 1,
+    per_unit: 1,
+    min: 2,
+    max: 4,
+    range_text: "Factor is 2\u{d7} or 4\u{d7}.",
+};
+pub(crate) const AI_DENOISE_STRENGTH: FieldSpec = pct(
+    "strength_pct",
+    "Strength",
+    0,
+    100,
+    "Strength is 0 to 100 %.",
+);
+pub(crate) const MASK_SOFTNESS: FieldSpec = pct(
+    "softness_pct",
+    "Edge softness",
+    0,
+    20,
+    "Edge softness is 0 to 20 %.",
+);
+pub(crate) const MASK_THRESHOLD: FieldSpec = pct(
+    "threshold_pct",
+    "Threshold",
+    0,
+    100,
+    "Threshold is 0 to 100 %.",
+);
+
 const fn curve(key: &'static str, label: &'static str) -> FieldSpec {
     pct(key, label, 0, 100, "Points are 0 to 100 %.")
 }

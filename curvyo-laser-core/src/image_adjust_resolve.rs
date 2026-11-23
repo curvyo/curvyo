@@ -3,7 +3,8 @@
 
 use curvyo_document_core::Point;
 use curvyo_image_core::{
-    Adjusted, Analysis, PixelStep, WorkingImage, crop_rect, resized_size, run_steps,
+    Adjusted, Analysis, PixelStep, StoredPixels, WorkingImage, crop_rect, resized_size,
+    run_steps_with,
 };
 
 use crate::image_adjust_fields::{Band, ManualStep};
@@ -39,6 +40,9 @@ pub struct AdjustRegisters {
     /// How many registers did not read (a damaged register, an unknown preset; ADR 0072 §5);
     /// each counts as one step that could not run.
     pub damaged_registers: usize,
+    /// How many stored AI results are out of date (criterion 48; set by the caller that holds
+    /// the pixels, [`Self::count_stale`]); 0 when not checked.
+    pub stale_results: usize,
 }
 
 impl Default for AdjustRegisters {
@@ -49,6 +53,7 @@ impl Default for AdjustRegisters {
             steps: Vec::new(),
             dither: DitherSettings::DEFAULT,
             damaged_registers: 0,
+            stale_results: 0,
         }
     }
 }
@@ -71,13 +76,15 @@ impl AdjustRegisters {
             .collect();
         steps.sort_by_key(|s| match s.kind().band() {
             Band::Geometry => s.kind() as usize,
-            Band::Tone => usize::MAX,
+            Band::Tone => usize::MAX - 1,
+            Band::Mask => usize::MAX,
         });
         steps
     }
 
-    /// The enabled geometry steps (Crop, Resize) in their fixed order: they run with any preset
-    /// (criterion 30), and the picture analysis reads the picture after them (criterion 39).
+    /// The enabled geometry steps (Crop, Resize, Upscale, AI denoise) in their fixed order: they
+    /// run with any preset (criterion 30), and the picture analysis reads the picture after them
+    /// (criterion 39).
     #[must_use]
     pub fn geometry_steps(&self) -> Vec<ManualStep> {
         let mut steps = self.enabled_in_zone_order();
@@ -103,6 +110,12 @@ impl AdjustRegisters {
             .preset
             .derive(self.strength, &analysis(&steps), interval_um);
         steps.extend(derived);
+        // Remove background always runs, last (criterion 30).
+        steps.extend(
+            self.enabled_in_zone_order()
+                .into_iter()
+                .filter(|s| s.kind().band() == Band::Mask),
+        );
         steps
     }
 
@@ -117,8 +130,9 @@ impl AdjustRegisters {
 /// `steps` (in zone order) in pixel units for an input of `input` pixels, a level of a working
 /// image of `full` pixels, whose visible part is drawn in `frame` (page mm, top-left, top-right,
 /// bottom-right, bottom-left; the cropped part, ADR 0072 §3): Resize's width scales from the
-/// working image to the input; the mm of the tone steps become 1/16 px by the pixel pitch of the
-/// picture after the geometry steps along its longer page axis (ADR 0073 §2).
+/// working image to the input; an Upscale makes the picture its stored result's size; the mm of
+/// the tone steps become 1/16 px by the pixel pitch of the picture after the geometry steps
+/// along its longer page axis (ADR 0073 §2). An AI step without a stored result is left out.
 #[must_use]
 pub fn pixel_steps(
     steps: &[ManualStep],
@@ -143,6 +157,16 @@ pub fn pixel_steps(
                 (w, h) = resized_size(w, h, width_px);
                 out.push(PixelStep::Resize { width_px });
             }
+            ManualStep::Upscale {
+                result: Some(result),
+                ..
+            } => {
+                (w, h) = (result.width_px, result.height_px);
+                out.push(step.pixel_step(1.0));
+            }
+            ManualStep::AiDenoise {
+                result: Some(_), ..
+            } => out.push(step.pixel_step(1.0)),
             _ => {}
         }
     }
@@ -153,18 +177,36 @@ pub fn pixel_steps(
             .filter(|s| s.kind().band() == Band::Tone)
             .map(|s| s.pixel_step(pitch)),
     );
+    out.extend(
+        steps
+            .iter()
+            .filter(|s| s.kind().band() == Band::Mask && s.result().is_some())
+            .map(|s| s.pixel_step(pitch)),
+    );
     out
 }
 
 /// The picture analysis of `image` after the geometry steps `geometry` (criterion 39).
 #[must_use]
 pub fn analysis_after(image: &WorkingImage, geometry: &[ManualStep]) -> Analysis {
+    analysis_after_with(image, geometry, &StoredPixels::default())
+}
+
+/// [`analysis_after`] with the stored results of the AI geometry steps from `results`
+/// (criterion 39: after Upscale and AI denoise).
+#[must_use]
+pub fn analysis_after_with(
+    image: &WorkingImage,
+    geometry: &[ManualStep],
+    results: &StoredPixels,
+) -> Analysis {
     let pixel: Vec<PixelStep> = geometry
         .iter()
         .filter(|s| s.kind().band() == Band::Geometry)
+        .filter(|s| !s.kind().is_ai() || s.result().is_some())
         .map(|s| s.pixel_step(1.0))
         .collect();
-    match run_steps(image, &pixel) {
+    match run_steps_with(image, &pixel, results) {
         Adjusted::Rgba(cut) => Analysis::of(&cut),
         Adjusted::Grey(plane) => Analysis::of_plane(&plane),
         Adjusted::Unchanged => Analysis::of(image),
@@ -186,7 +228,7 @@ pub fn adjust_picture(
     let steps = registers.effective_steps(interval_um, |geometry| analysis_after(image, geometry));
     let size = (image.width, image.height);
     let pixel = pixel_steps(&steps, frame, size, size);
-    let adjusted = run_steps(image, &pixel);
+    let adjusted = run_steps_with(image, &pixel, &StoredPixels::default());
     (steps, adjusted)
 }
 

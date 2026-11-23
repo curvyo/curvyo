@@ -69,6 +69,22 @@ impl Document {
         self.write_adjustments_as(target, write, PASTE_ADJUSTMENTS_COMMIT_LABEL)
     }
 
+    /// A Run of an AI step (criteria 24, 48): [`Self::edit_image_adjustments`] writing the stack
+    /// with the step's new `result` in one commit labelled `label`, one of the three
+    /// `RUN_*_COMMIT_LABEL`s ("Run Remove background", "Run Upscale", "Run AI denoise"). The
+    /// derived asset is stored beforehand ([`Self::insert_derived_asset`]).
+    ///
+    /// # Errors
+    /// As [`Self::edit_image_adjustments`].
+    pub fn run_image_ai_step(
+        &self,
+        target: NodeId,
+        write: &AdjustmentsWrite,
+        label: &str,
+    ) -> Result<bool, AdjustError> {
+        self.write_adjustments_as(target, write, label)
+    }
+
     fn write_adjustments_as(
         &self,
         target: NodeId,

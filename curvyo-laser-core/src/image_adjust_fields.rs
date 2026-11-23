@@ -3,13 +3,16 @@
 
 use curvyo_image_core::{PixelStep, SubPx};
 
+use crate::image_adjust_ai::ResultRef;
+
 pub use crate::image_adjust_field_specs::FieldSpec;
 use crate::image_adjust_field_specs::{CROP_HEIGHT, CROP_WIDTH, CURVES_FIELDS, LEVELS_WHITE};
 pub use crate::image_adjust_kinds::{
     Band, CHANNEL_PRESETS, LUMINANCE_MIX, MAX_CURVE_POINTS, StepKind,
 };
 
-/// One step of a picture's stack with its stored fields (ADR 0072 §1, ADR 0073 §2).
+/// One step of a picture's stack with its stored fields (ADR 0072 §1, ADR 0073 §2) and, for an
+/// AI step, its stored result (ADR 0077 §2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ManualStep {
     /// Crop.
@@ -74,6 +77,29 @@ pub enum ManualStep {
         /// Threshold, 0 to 50 %.
         threshold_pct: u8,
     },
+    /// Upscale (criterion 47).
+    Upscale {
+        /// 2 or 4.
+        factor: u8,
+        /// The stored result, `None` until Run.
+        result: Option<ResultRef>,
+    },
+    /// AI denoise.
+    AiDenoise {
+        /// Strength, 0 to 100 %: the share of the model output.
+        strength_pct: u8,
+        /// The stored result, `None` until Run.
+        result: Option<ResultRef>,
+    },
+    /// Remove background.
+    RemoveBackground {
+        /// Edge softness, 0 to 20 %.
+        softness_pct: u8,
+        /// Threshold, 0 to 100 %.
+        threshold_pct: u8,
+        /// The stored mask, `None` until Run.
+        result: Option<ResultRef>,
+    },
 }
 
 /// Why a stored step does not run (ADR 0072 §5).
@@ -129,6 +155,9 @@ impl ManualStep {
             Self::LocalContrast { .. } => StepKind::LocalContrast,
             Self::Contours { .. } => StepKind::Contours,
             Self::Sharpen { .. } => StepKind::Sharpen,
+            Self::Upscale { .. } => StepKind::Upscale,
+            Self::AiDenoise { .. } => StepKind::AiDenoise,
+            Self::RemoveBackground { .. } => StepKind::RemoveBackground,
         }
     }
 
@@ -165,6 +194,13 @@ impl ManualStep {
                 amount_pct,
                 threshold_pct,
             } => vec![radius_um.into(), amount_pct.into(), threshold_pct.into()],
+            Self::Upscale { factor, .. } => vec![factor.into()],
+            Self::AiDenoise { strength_pct, .. } => vec![strength_pct.into()],
+            Self::RemoveBackground {
+                softness_pct,
+                threshold_pct,
+                ..
+            } => vec![softness_pct.into(), threshold_pct.into()],
         };
         self.kind()
             .fields()
@@ -244,6 +280,24 @@ impl ManualStep {
                 amount_pct: to_u16(b),
                 threshold_pct: to_u8(c),
             },
+            StepKind::Upscale => {
+                if a != 2 && a != 4 {
+                    return Err(StepDamage::OutOfRange("factor"));
+                }
+                Self::Upscale {
+                    factor: to_u8(a),
+                    result: None,
+                }
+            }
+            StepKind::AiDenoise => Self::AiDenoise {
+                strength_pct: to_u8(a),
+                result: None,
+            },
+            StepKind::RemoveBackground => Self::RemoveBackground {
+                softness_pct: to_u8(a),
+                threshold_pct: to_u8(b),
+                result: None,
+            },
             StepKind::Curves => unreachable!("read above"),
         })
     }
@@ -251,7 +305,8 @@ impl ManualStep {
     /// The step in pixel units for an input whose pixel is `pitch_mm` of the page: radii and
     /// widths `round(16 · µm / (1000 · pitch))` in 1/16 px (ADR 0073 §2), Contours' sigma half
     /// the line width. Resize's width is in the pixels of the full working image; the caller
-    /// scales it for a reduced level.
+    /// scales it for a reduced level. An AI step names its stored result (a step without one
+    /// names no held result and changes nothing; the caller leaves it out).
     #[must_use]
     pub fn pixel_step(&self, pitch_mm: f64) -> PixelStep {
         let sub = |um: u32| sub_px(f64::from(um), pitch_mm);
@@ -298,6 +353,25 @@ impl ManualStep {
                 radius: sub(radius_um),
                 amount_pct,
                 threshold_pct,
+            },
+            Self::Upscale { result, .. } => PixelStep::Upscale {
+                result: result.map_or([0; 32], |r| r.asset),
+            },
+            Self::AiDenoise {
+                strength_pct,
+                result,
+            } => PixelStep::AiDenoise {
+                result: result.map_or([0; 32], |r| r.asset),
+                strength_pct,
+            },
+            Self::RemoveBackground {
+                softness_pct,
+                threshold_pct,
+                result,
+            } => PixelStep::Mask {
+                result: result.map_or([0; 32], |r| r.asset),
+                threshold_pct,
+                softness_pct,
             },
         }
     }

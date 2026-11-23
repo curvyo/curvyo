@@ -1,4 +1,5 @@
 use super::*;
+use crate::adjust_blur::SubPx;
 
 fn image() -> WorkingImage {
     let pixels = (0..64_u8)

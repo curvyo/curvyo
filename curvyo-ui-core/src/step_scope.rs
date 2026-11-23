@@ -338,6 +338,10 @@ pub const EDIT_STEPS: &[&str] = &[
     "restore_original",
     "paste_adjustments",
     "follow_original",
+    // Slice 3: a Run stores the AI step's result on the picture.
+    "run_remove_background",
+    "run_upscale",
+    "run_ai_denoise",
     "trace_image",
     // `specs/0114-image-trace-mask`: the Trace tool's mask commands, as Create paths.
     "draw_trace_rectangle",

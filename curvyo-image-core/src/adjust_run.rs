@@ -1,164 +1,13 @@
 //! Runs a list of pixel steps on a working image (ADR 0073 §3, §7, §9), at once or a band of rows
 //! at a time between the host's ticks (`specs/0135` criterion 13): the adjusted image.
 
-use crate::adjust_blur::SubPx;
-use crate::adjust_clahe::ClaheRun;
-use crate::adjust_denoise::DenoiseRun;
-use crate::adjust_detail::DetailRun;
-use crate::adjust_geometry::{crop_plane, resize_plane};
 use crate::adjust_plane::{GreyPlane, luminance, over_white};
-use crate::adjust_tone::{TableRun, channel_mix_grey};
+use crate::adjust_result::{
+    StoredPixels, denoised, mapped_mask, masked, opaque_over_white, replaced,
+};
+use crate::adjust_step::{PixelStep, StepRun};
+use crate::adjust_tone::channel_mix_grey;
 use crate::working::WorkingImage;
-
-/// One adjustment step in pixel units, as it runs (ADR 0073 §1): radii in 1/16 pixel of the
-/// step's input, greys and percentages as stored.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PixelStep {
-    /// Keeps the pixel rectangle of left, top, width and height in percent
-    /// ([`crate::crop_rect`]).
-    Crop {
-        /// Left, top, width and height, whole percent.
-        pct: [u8; 4],
-    },
-    /// Reduces the picture to this width in pixels, the height following
-    /// ([`crate::resized_size`]).
-    Resize {
-        /// The width in pixels.
-        width_px: u32,
-    },
-    /// How colour becomes grey: red, green and blue weights in whole percent (-200 to 200).
-    ChannelMix {
-        /// Red, green and blue.
-        weights: [i16; 3],
-    },
-    /// The bilateral filter: Strength and Detail kept in percent.
-    Denoise {
-        /// Strength, 0 to 100 %.
-        strength_pct: u8,
-        /// Detail kept, 0 to 100 %.
-        detail_pct: u8,
-    },
-    /// Black point, White point in percent of the grey range, Gamma in hundredths.
-    Levels {
-        /// Black point, 0 to 98 %.
-        black_pct: u8,
-        /// White point, 2 to 100 %.
-        white_pct: u8,
-        /// Gamma in hundredths, 10 to 400.
-        gamma_centi: u16,
-    },
-    /// The monotone curve through the first `count` of `points` (Input %, Output %).
-    Curves {
-        /// The points, Input strictly increasing; the ones past `count` unused.
-        points: [(u8, u8); 8],
-        /// How many points are used.
-        count: u8,
-    },
-    /// CLAHE with tiles of 2 x `radius`.
-    LocalContrast {
-        /// The radius.
-        radius: SubPx,
-        /// Amount, 0 to 200 %.
-        amount_pct: u16,
-    },
-    /// The dark lines of a difference of blurs at `sigma` (half the line width) and 1.6 x that.
-    Contours {
-        /// Half the line width.
-        sigma: SubPx,
-        /// Sensitivity, 0 to 100 %.
-        sensitivity_pct: u8,
-    },
-    /// The unsharp mask.
-    Sharpen {
-        /// The blur's sigma.
-        radius: SubPx,
-        /// Amount, 0 to 500 %.
-        amount_pct: u16,
-        /// Threshold, 0 to 50 %.
-        threshold_pct: u8,
-    },
-}
-
-impl PixelStep {
-    /// Whether the step runs on each colour channel while the picture is still in colour.
-    const fn per_channel(self) -> bool {
-        matches!(
-            self,
-            Self::Denoise { .. } | Self::Crop { .. } | Self::Resize { .. }
-        )
-    }
-
-    /// The step's run on `plane`, nothing worked yet.
-    fn start(self, plane: &GreyPlane) -> StepRun {
-        match self {
-            Self::Crop { pct } => StepRun::Geometry(Geometry::Crop(pct)),
-            Self::Resize { width_px } => StepRun::Geometry(Geometry::Resize(width_px)),
-            // The grey conversion is the step; on a grey plane it changes nothing (criterion 6).
-            Self::ChannelMix { .. } => StepRun::Table(TableRun::curves(&[])),
-            Self::Curves { points, count } => {
-                StepRun::Table(TableRun::curves(&points[..usize::from(count.min(8))]))
-            }
-            Self::Denoise {
-                strength_pct,
-                detail_pct,
-            } => StepRun::Denoise(Box::new(DenoiseRun::new(plane, strength_pct, detail_pct))),
-            Self::Levels {
-                black_pct,
-                white_pct,
-                gamma_centi,
-            } => StepRun::Table(TableRun::levels(black_pct, white_pct, gamma_centi)),
-            Self::LocalContrast { radius, amount_pct } => {
-                StepRun::Clahe(ClaheRun::new(plane, radius, amount_pct))
-            }
-            Self::Contours {
-                sigma,
-                sensitivity_pct,
-            } => StepRun::Detail(DetailRun::contours(plane, sigma, sensitivity_pct)),
-            Self::Sharpen {
-                radius,
-                amount_pct,
-                threshold_pct,
-            } => StepRun::Detail(DetailRun::sharpen(plane, radius, amount_pct, threshold_pct)),
-        }
-    }
-}
-
-/// One step being worked on one plane.
-#[derive(Debug, Clone)]
-enum StepRun {
-    Geometry(Geometry),
-    Denoise(Box<DenoiseRun>),
-    Table(TableRun),
-    Clahe(ClaheRun),
-    Detail(DetailRun),
-}
-
-impl StepRun {
-    fn work(&mut self, plane: &mut GreyPlane, work: &mut u64) -> bool {
-        match self {
-            Self::Geometry(step) => {
-                *work = work.saturating_sub(plane.pixels());
-                *plane = match *step {
-                    Geometry::Crop(pct) => crop_plane(plane, pct),
-                    Geometry::Resize(width_px) => resize_plane(plane, width_px),
-                };
-                true
-            }
-            Self::Denoise(run) => run.work(plane, work),
-            Self::Table(run) => run.work(plane, work),
-            Self::Clahe(run) => run.work(plane, work),
-            Self::Detail(run) => run.work(plane, work),
-        }
-    }
-}
-
-/// A geometry step, worked on a plane at once (a crop is a copy, a resize one pass of each
-/// axis).
-#[derive(Debug, Clone, Copy)]
-enum Geometry {
-    Crop([u8; 4]),
-    Resize(u32),
-}
 
 /// The adjusted image of a working image (ADR 0073 §7).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -179,6 +28,39 @@ pub enum Adjusted {
 #[must_use]
 pub fn run_steps(image: &WorkingImage, steps: &[PixelStep]) -> Adjusted {
     AdjustRun::new(image, steps).finish()
+}
+
+/// [`run_steps`] reading the stored results of the AI steps from `results`; a step whose result
+/// is not held changes nothing.
+#[must_use]
+pub fn run_steps_with(
+    image: &WorkingImage,
+    steps: &[PixelStep],
+    results: &StoredPixels,
+) -> Adjusted {
+    AdjustRun::with_results(image, steps, u64::MAX, results).finish()
+}
+
+/// The picture an AI step reads (ADR 0077 §2): `image` after the steps before it (`upstream`,
+/// the geometry band) as opaque RGBA composited over white, at full resolution.
+#[must_use]
+pub fn step_input(
+    image: &WorkingImage,
+    upstream: &[PixelStep],
+    results: &StoredPixels,
+) -> WorkingImage {
+    match run_steps_with(image, upstream, results) {
+        Adjusted::Unchanged => opaque_over_white(image),
+        Adjusted::Rgba(rgba) => rgba,
+        Adjusted::Grey(plane) => WorkingImage {
+            width: plane.width,
+            height: plane.height,
+            pixels: plane.grey.iter().flat_map(|&g| [g, g, g, 255]).collect(),
+            original_size: image.original_size,
+            truncated: image.truncated,
+            animated: image.animated,
+        },
+    }
 }
 
 /// The work units of one pixel turned from three channels to grey.
@@ -210,6 +92,8 @@ pub struct AdjustRun {
     meta: ((u32, u32), bool, bool),
     /// The first step that did not fit the memory budget, and every one after it, not run.
     not_run: Option<usize>,
+    /// The stored results the AI steps read.
+    results: StoredPixels,
 }
 
 /// The bytes a run holds while step `index` of `steps` is worked on a picture of `pixels`
@@ -250,6 +134,24 @@ impl AdjustRun {
     /// steps before it made.
     #[must_use]
     pub fn within(image: &WorkingImage, steps: &[PixelStep], budget: u64) -> Self {
+        Self::with_results(image, steps, budget, &StoredPixels::default())
+    }
+
+    /// [`Self::within`] reading the AI steps' stored results from `results` (only the ones
+    /// `steps` name are kept).
+    #[must_use]
+    pub fn with_results(
+        image: &WorkingImage,
+        steps: &[PixelStep],
+        budget: u64,
+        results: &StoredPixels,
+    ) -> Self {
+        let mut kept = StoredPixels::default();
+        for hash in steps.iter().filter_map(|s| s.result()) {
+            if let Some(pixels) = results.get(&hash) {
+                kept.insert(hash, std::sync::Arc::clone(pixels));
+            }
+        }
         let pixels = u64::from(image.width.max(1)) * u64::from(image.height.max(1));
         let fits = (0..steps.len()).find(|&i| step_bytes(pixels, steps, i) > budget);
         let steps = &steps[..fits.unwrap_or(steps.len())];
@@ -270,6 +172,7 @@ impl AdjustRun {
             running: None,
             meta: (image.original_size, image.truncated, image.animated),
             not_run: fits,
+            results: kept,
         }
     }
 
@@ -300,6 +203,15 @@ impl AdjustRun {
                 });
             }
             let step = self.steps[self.next];
+            if step.result().is_some() {
+                work = work.saturating_sub(self.apply_result(step));
+                self.channel = 0;
+                self.next += 1;
+                if work == 0 {
+                    break;
+                }
+                continue;
+            }
             let plane = match &mut self.planes {
                 Planes::Unchanged => return true,
                 Planes::Channels(channels) => &mut channels[self.channel],
@@ -325,6 +237,49 @@ impl AdjustRun {
             }
         }
         self.done()
+    }
+
+    /// Applies the stored result of `step` to every plane at once (ADR 0077 §3); the work done.
+    /// A result that is not held changes nothing.
+    fn apply_result(&mut self, step: PixelStep) -> u64 {
+        let Some(hash) = step.result() else {
+            return 0;
+        };
+        let Some(stored) = self.results.get(&hash).cloned() else {
+            return 0;
+        };
+        let planes: Vec<&mut GreyPlane> = match &mut self.planes {
+            Planes::Unchanged => return 0,
+            Planes::Channels(channels) => channels.iter_mut().collect(),
+            Planes::Grey(grey) => vec![grey],
+        };
+        let channels = planes.len();
+        let size = (planes[0].width, planes[0].height);
+        let pixels = planes[0].pixels() * channels as u64;
+        match step {
+            PixelStep::Upscale { .. } => {
+                for (plane, new) in planes.into_iter().zip(replaced(&stored, channels)) {
+                    *plane = new;
+                }
+            }
+            PixelStep::AiDenoise { strength_pct, .. } => {
+                for (c, plane) in planes.into_iter().enumerate() {
+                    denoised(plane, &stored, (channels == 3).then_some(c), strength_pct);
+                }
+            }
+            PixelStep::Mask {
+                threshold_pct,
+                softness_pct,
+                ..
+            } => {
+                let mask = mapped_mask(&stored, size, threshold_pct, softness_pct);
+                for plane in planes {
+                    masked(plane, &mask);
+                }
+            }
+            _ => {}
+        }
+        pixels
     }
 
     /// The adjusted image, the steps not run yet run now.

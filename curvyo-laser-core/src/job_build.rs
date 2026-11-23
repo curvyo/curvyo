@@ -55,15 +55,24 @@ pub fn build_job(input: &JobInput, materials: &[MaterialRead], cache: &mut PlanC
     }
     add_moves(&mut built, frame, input.start);
     let ids: Vec<_> = input.blocks.iter().map(|b| b.id).collect();
-    let assets: Vec<_> = input
+    // The pictures and the stored AI results they read (ADR 0077 §3).
+    let assets: Vec<curvyo_document_core::AssetHash> = input
         .blocks
         .iter()
         .flat_map(|b| &b.leaves)
-        .filter_map(|leaf| match &leaf.geometry {
-            LeafGeometry::Image { asset, .. } => Some(asset),
-            LeafGeometry::Outlines(_) | LeafGeometry::Gradient { .. } => None,
+        .flat_map(|leaf| match &leaf.geometry {
+            LeafGeometry::Image { asset, adjust, .. } => std::iter::once(asset.clone())
+                .chain(
+                    adjust
+                        .stored_results()
+                        .iter()
+                        .map(crate::adjust::ResultRef::asset_hash),
+                )
+                .collect(),
+            LeafGeometry::Outlines(_) | LeafGeometry::Gradient { .. } => Vec::new(),
         })
         .collect();
+    let assets: Vec<&curvyo_document_core::AssetHash> = assets.iter().collect();
     let items: Vec<_> = input
         .blocks
         .iter()

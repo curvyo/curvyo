@@ -48,6 +48,7 @@ mod container_ended;
 mod container_share;
 mod corner_radii;
 mod corner_radii_codec;
+mod derived_assets;
 mod devices_list;
 mod display_unit;
 mod document;
@@ -288,7 +289,8 @@ mod units;
 
 pub use affine::{Affine, MATRIX_ENTRY_LIMIT, SINGULAR_DETERMINANT};
 pub use assets::{
-    AssetError, AssetHash, MAX_ASSET_BYTES, MAX_PROJECT_ASSET_BYTES, asset_extension,
+    AssetError, AssetHash, MAX_ASSET_BYTES, MAX_DERIVED_ASSET_BYTES, MAX_DERIVED_PROJECT_BYTES,
+    MAX_PROJECT_ASSET_BYTES, asset_extension,
 };
 pub use clone_hold::CloneHold;
 pub use clone_model::{CloneChain, CloneSnapshot, MAX_CLONE_DEPTH};
@@ -360,7 +362,9 @@ pub use image_adjust_model::{
     AdjustDamage, AdjustEntry, AdjustError, AdjustOwner, AdjustStep, AdjustmentsWrite,
     DEFAULT_IMAGE_STRENGTH, EDIT_ADJUSTMENTS_COMMIT_LABEL, EXPERT_PRESET,
     FOLLOW_ORIGINAL_COMMIT_LABEL, ImageAdjustments, MAX_IMAGE_STRENGTH,
-    PASTE_ADJUSTMENTS_COMMIT_LABEL, RESTORE_ORIGINAL_COMMIT_LABEL, ShownAdjustments, StoredDither,
+    PASTE_ADJUSTMENTS_COMMIT_LABEL, RESTORE_ORIGINAL_COMMIT_LABEL, RUN_AI_DENOISE_COMMIT_LABEL,
+    RUN_REMOVE_BACKGROUND_COMMIT_LABEL, RUN_UPSCALE_COMMIT_LABEL, RanStep, ShownAdjustments,
+    StepResult, StoredDither,
 };
 pub use image_crop::{CROP_KIND, UnitRect, visible_rect};
 pub use image_model::{

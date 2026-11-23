@@ -473,6 +473,10 @@ fn kind_key(s: &ManualStep) -> &'static str {
         ManualStep::Resize { .. } => "resize",
         ManualStep::ChannelMix { .. } => "channel_mix",
         ManualStep::Curves { .. } => "curves",
+        // Slice 3 kinds; no preset derives them.
+        ManualStep::Upscale { .. } => "upscale",
+        ManualStep::AiDenoise { .. } => "ai_denoise",
+        ManualStep::RemoveBackground { .. } => "remove_background",
     }
 }
 
@@ -488,7 +492,11 @@ fn c3_derived_steps_are_in_pipeline_order() {
         ManualStep::Crop { .. }
         | ManualStep::Resize { .. }
         | ManualStep::ChannelMix { .. }
-        | ManualStep::Curves { .. } => 5,
+        | ManualStep::Curves { .. }
+        // Slice 3 kinds; no preset derives them.
+        | ManualStep::Upscale { .. }
+        | ManualStep::AiDenoise { .. }
+        | ManualStep::RemoveBackground { .. } => 5,
     };
     for preset in PRESETS {
         for (_, a) in analyses() {
