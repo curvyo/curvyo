@@ -1,4 +1,5 @@
 import {
+  Blocks,
   Circle as CircleIcon,
   MousePointer2,
   MousePointer as SelectIcon,
@@ -53,6 +54,9 @@ interface ToolRailProps {
   /** The Test grid tool is offered: a laser page (`specs/0112` criterion 1). Off it, the button
    * stays in the card, dimmed. */
   testGridAvailable?: boolean;
+  /** At least one generator kind is on (`specs/0141` UX notes §1); with none, the Generators
+   * button is not drawn. */
+  generatorsAvailable?: boolean;
 }
 
 /** The muted last tooltip line of the creation tools (`specs/0052-click-to-create-shapes/`
@@ -183,6 +187,7 @@ export function ToolRail({
   paused = false,
   onImport,
   testGridAvailable = false,
+  generatorsAvailable = false,
 }: ToolRailProps) {
   // The one state that changes a letter: the Select tool with a selection.
   const letterActsOnSelection = tool === "select" && selectionCount > 0;
@@ -314,6 +319,20 @@ export function ToolRail({
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
+            {/* The Generators tool (`specs/0141-parametric-generators` criterion 1, UX notes §1):
+                the next button of the More tools card, no letter, no chord; not drawn while no
+                generator kind is on. */}
+            {generatorsAvailable ? (
+              <ToolButton
+                tool="generators"
+                active={tool === "generators"}
+                label="Generators"
+                name="Generators"
+                icon={<Blocks size={20} />}
+                onSelect={onSelect}
+                onReturnFocus={onReturnFocus}
+              />
+            ) : null}
           </div>
           <ImportCard primary={MAC ? "Cmd" : "Ctrl"} onImport={onImport} />
         </div>

@@ -20,7 +20,9 @@ import { SelectToolbar } from "@/components/SelectToolbar";
 import { CropBar } from "@/components/CropBar";
 import { CropOverlay } from "@/components/CropOverlay";
 import { WidthEditToggle } from "@/components/WidthEditToggle";
+import { GeneratorsBar } from "@/components/GeneratorsBar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
+import { useGeneratorKinds } from "@/hooks/useGenerators";
 import { TextBar } from "@/components/TextBar";
 import { TestGridBar } from "@/components/TestGridBar";
 import { TraceBar } from "@/components/TraceBar";
@@ -209,6 +211,8 @@ function Editor() {
   const materials = useMaterials(editor);
   // The Test grid tool and its bar (`specs/0112`); the bar also edits one selected grid.
   const testGrid = useTestGridTool(editor, editor.tool === "test-grid", editor.containerRef);
+  // The Generators tool's bar (`specs/0141-parametric-generators`).
+  const generatorKinds = useGeneratorKinds(editor);
   const gridBar = testGrid.view !== null && (editor.tool === "test-grid" || (editor.tool === "select" && testGrid.view.group !== null));
   // The workspace outlives the File tab: its scan and open document stay while other tabs show.
   const workspace = useWorkspace(editor, project);
@@ -244,6 +248,9 @@ function Editor() {
             editor.tool === "select" ? "flex-wrap items-start gap-y-2" : ""
           }`}
         >
+          {editor.tool === "generators" ? (
+            <GeneratorsBar api={generatorKinds} onReturnFocus={() => editor.containerRef.current?.focus()} />
+          ) : null}
           {editor.tool === "select" && editor.recognise.open ? (
             <RecogniseBar recognise={editor.recognise} onReturnFocus={() => editor.containerRef.current?.focus()} />
           ) : null}

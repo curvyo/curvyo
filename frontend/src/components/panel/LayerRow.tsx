@@ -1,9 +1,11 @@
 import type { FixtureKind } from "@/lib/fixturesView";
 import { FixtureGlyph } from "@/components/workbench/FixtureGlyphs";
 import {
+  Box,
   ChevronDown,
   ChevronRight,
   Circle,
+  Cog,
   Eye,
   EyeOff,
   Frame,
@@ -70,6 +72,10 @@ const KIND_GLYPHS: Record<string, Glyph> = {
   // A fixture under the Fixtures row (`specs/0102` criterion 12).
   fixture: Grid3x3,
 };
+
+/** The glyph of a generated object by its generator's lower-case label (`specs/0141` UX notes
+ * §3); an unavailable generator keeps the compound glyph. */
+const GENERATOR_GLYPHS: Record<string, Glyph> = { gear: Cog, box: Box };
 
 /** The kind word of a fixture row as a glyph kind; anything unlisted is the unknown glyph. */
 function fixtureKindOf(word: string): FixtureKind {
@@ -228,7 +234,7 @@ export function LayerRow({
       inputRef.current?.select();
     }
   }, [renaming]);
-  const Kind = KIND_GLYPHS[row.kind];
+  const Kind = row.generator ? GENERATOR_GLYPHS[row.generator] : KIND_GLYPHS[row.kind];
   const selected = row.mark === "selected";
   const active = row.mark === "active";
   const entered = row.mark === "entered";

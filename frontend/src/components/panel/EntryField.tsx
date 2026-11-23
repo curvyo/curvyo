@@ -52,7 +52,10 @@ export interface EntryFieldProps {
   inputRef?: React.Ref<HTMLInputElement>;
   /** Up and Down step the typed text (Shift: by 10) and commit on key-up
    * (`specs/0028` ux-notes 12): returns the new text, `null` for none. */
-  stepText?: (text: string, key: string, shift: boolean) => string | null;
+  stepText?: (text: string, key: string, shift: boolean, ctrl: boolean) => string | null;
+  /** A number field with a range (`specs/0141` UX notes §13): the input is a spin button that
+   * reports its value and bounds to a screen reader. */
+  range?: { now: number; min: number; max: number };
   /** A 12 px muted word inside the left edge ("Scan angle", `specs/0111` ux-notes 6.3); the
    * accessible name stays `label`. */
   prefix?: string;
@@ -96,6 +99,7 @@ export function EntryField({
   stepText,
   prefix,
   compact = false,
+  range,
 }: EntryFieldProps) {
   const messageId = useId();
   const display = mixed ? "" : shown;
@@ -163,6 +167,10 @@ export function EntryField({
         autoComplete="off"
         spellCheck={false}
         aria-label={label}
+        role={range ? "spinbutton" : undefined}
+        aria-valuenow={range?.now}
+        aria-valuemin={range?.min}
+        aria-valuemax={range?.max}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={invalid ? messageId : undefined}
         placeholder={mixed ? "Mixed" : placeholder}
@@ -209,7 +217,7 @@ export function EntryField({
           }
         }}
         onKeyDown={(event) => {
-          const stepper = stepText?.(text, event.key, event.shiftKey);
+          const stepper = stepText?.(text, event.key, event.shiftKey, event.ctrlKey || event.metaKey);
           if (stepper !== undefined && stepper !== null) {
             event.preventDefault();
             stepped.current = true;
