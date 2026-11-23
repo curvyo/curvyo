@@ -3,7 +3,8 @@
 //! complete while they apply, greyed with a reason where they would do nothing.
 
 use curvyo_document_core::{
-    ArcKind, Curve, NodeId, ObjectSnapshot, PrimitiveSnapshot, Shape, effective_curve,
+    ArcKind, Curve, NodeId, ObjectSnapshot, PrimitiveSnapshot, Rounded, Shape, effective_curve,
+    effective_rounded,
 };
 
 use crate::object_selection::{ObjectSelection, objects_with_ids};
@@ -50,6 +51,16 @@ pub struct CurveBarState {
     pub limited: Option<(f64, f64)>,
     /// Why the field is greyed, `None` when it applies.
     pub grey: Option<GreyReason>,
+}
+
+/// The "Rounded" field: shown while the selection holds a polygon or star, acting on those
+/// only (`specs/0145-shape-spiro-handles/` criterion 3).
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoundedBarState {
+    /// The effective value of the polygons and stars it acts on.
+    pub value: BarValue<f64>,
+    /// For a uniform value: the stored value, when it lies beyond -10..=10 (the "limited" tag).
+    pub limited: Option<f64>,
 }
 
 fn shapes<'a>(objects: &'a [ObjectSnapshot], ids: &'a [NodeId]) -> Vec<&'a Shape> {
@@ -183,6 +194,38 @@ pub fn curve_bar_state(
         limited,
         grey: None,
     })
+}
+
+/// The "Rounded" field's state, `None` while the selection holds no polygon or star. A pending
+/// bar edit `preview` shows as committed.
+#[must_use]
+pub fn rounded_bar_state(
+    objects: &[ObjectSnapshot],
+    selection: &ObjectSelection,
+    preview: Option<&BarPreview>,
+) -> Option<RoundedBarState> {
+    let acted = ids_of_kind(objects, selection, ObjectKind::PolygonOrStar);
+    let acted_shapes = shapes(objects, &acted);
+    let effective: Vec<f64> = acted_shapes
+        .iter()
+        .filter_map(|shape| effective_rounded(shape))
+        .collect();
+    let mut value = uniform(&effective, same_degrees)?;
+    if let (Some(preview), BarValue::Uniform(_)) = (preview, value)
+        && let ParamValue::Rounded(shown) = preview.value
+    {
+        value = BarValue::Uniform(shown.clamp(-Rounded::RANGE, Rounded::RANGE));
+    }
+    let limited = match value {
+        BarValue::Uniform(_) => acted_shapes.iter().find_map(|shape| match shape {
+            Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. } => {
+                (rounded.get().abs() > Rounded::RANGE).then_some(rounded.get())
+            }
+            _ => None,
+        }),
+        BarValue::Mixed => None,
+    };
+    Some(RoundedBarState { value, limited })
 }
 
 #[cfg(test)]

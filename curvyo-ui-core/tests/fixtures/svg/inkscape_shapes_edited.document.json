@@ -402,7 +402,8 @@
                     "radius": 12.0
                   },
                   "inner_ratio": 0.4166666666666667,
-                  "point_count": 5
+                  "point_count": 5,
+                  "rounded": 0.0
                 }
               },
               "style": {

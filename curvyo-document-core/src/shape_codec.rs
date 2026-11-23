@@ -49,8 +49,8 @@ use crate::primitive_model::{
 };
 use crate::ring_curve::Curve;
 use crate::shape_arc_codec::{
-    KEY_CURVE, KEY_ELLIPSE_ARC, ellipse_arc_and_curve_are_valid, polygon_curve_is_valid, read_arc,
-    read_curve,
+    KEY_CURVE, KEY_ELLIPSE_ARC, KEY_ROUNDED, ellipse_arc_and_curve_are_valid,
+    polygon_curve_is_valid, read_arc, read_curve, read_rounded,
 };
 use crate::units::{Angle, Length, Point};
 
@@ -84,6 +84,7 @@ pub(crate) const ALL_PRIMITIVE_KEYS: &[&str] = &[
     KEY_INNER_RATIO,
     KEY_ELLIPSE_ARC,
     KEY_CURVE,
+    KEY_ROUNDED,
 ];
 
 /// This node's `shape` tag, or `None` if absent (a path) or mistyped —
@@ -350,12 +351,14 @@ pub(crate) fn read_shape(meta: &LoroMap, shape_tag: &str) -> Option<Shape> {
             frame: read_star_frame(meta)?,
             point_count: read_point_count(meta)?,
             curve: read_curve(meta, Curve::POLYGON_DEFAULT),
+            rounded: read_rounded(meta),
         }),
         SHAPE_STAR => Some(Shape::Star {
             frame: read_star_frame(meta)?,
             point_count: read_point_count(meta)?,
             inner_ratio: read_inner_ratio(meta)?,
             curve: read_curve(meta, Curve::POLYGON_DEFAULT),
+            rounded: read_rounded(meta),
         }),
         _ => None,
     }

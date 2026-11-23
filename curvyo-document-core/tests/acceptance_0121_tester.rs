@@ -382,8 +382,9 @@ fn c19_measures_survive_save_and_reopen_and_saves_are_format_55() {
     let fit = Affine::translation(Vec2::new(25.0, 3.0));
     s.d.apply_print_and_cut(s.placement, fit).unwrap();
     let bytes = pack(&s.d, "0.1.0").unwrap();
-    assert_eq!(CURRENT_FORMAT_VERSION, 55);
-    assert_eq!(manifest_version(&bytes), 55);
+    // Format 56 since `specs/0145-shape-spiro-handles`.
+    const { assert!(CURRENT_FORMAT_VERSION >= 55) };
+    assert_eq!(manifest_version(&bytes), u64::from(CURRENT_FORMAT_VERSION));
     let back = unpack(3, &bytes).unwrap();
     let m = measures(&back, s.placement);
     assert_eq!(m, measures(&s.d, s.placement));
@@ -421,9 +422,18 @@ fn c19_the_goldens_are_format_55_and_open() {
         assert_eq!(manifest_version(&bytes), 55, "{name}");
         let d = unpack(2, &bytes).unwrap();
         assert!(!d.marks_objects_on(&d.pages()[0]).is_empty(), "{name}");
+        // Saved again under the build's own version (a later bump changes only that number).
+        let saved =
+            String::from_utf8(members(&pack(&d, "0.1.0").unwrap())["document.json"].clone())
+                .unwrap()
+                .replacen(
+                    &format!("\"format_version\": {CURRENT_FORMAT_VERSION},"),
+                    "\"format_version\": 55,",
+                    1,
+                );
         assert_eq!(
-            members(&pack(&d, "0.1.0").unwrap())["document.json"],
-            members(&bytes)["document.json"],
+            saved.as_bytes(),
+            members(&bytes)["document.json"].as_slice(),
             "{name} saves back unchanged"
         );
     }

@@ -179,6 +179,9 @@ pub fn with_curve(shape: &Shape, fraction: f64) -> Option<Shape> {
             frame,
             point_count,
             curve: limited,
+            // A curve and Rounded exclude each other (`specs/0145-shape-spiro-handles`
+            // criterion 5): a curve other than 0 clears Rounded.
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Shape::Star {
             frame,
@@ -190,6 +193,7 @@ pub fn with_curve(shape: &Shape, fraction: f64) -> Option<Shape> {
             point_count,
             inner_ratio,
             curve: limited,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Shape::Rect { .. } => return None,
     })
@@ -300,6 +304,7 @@ mod tests {
             },
             point_count: PointCount::new(3).unwrap(),
             curve: Curve::new(curve).unwrap(),
+            rounded: curvyo_document_core::Rounded::ZERO,
         }
     }
 

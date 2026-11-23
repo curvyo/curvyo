@@ -398,6 +398,7 @@ fn c40_c41_polygon_and_star_curve_handle_drag() {
                 frame: sframe(30.0),
                 point_count: PointCount::new(6).unwrap(),
                 curve: Curve::POLYGON_DEFAULT,
+                rounded: curvyo_document_core::Rounded::ZERO,
             },
         ),
         (
@@ -407,6 +408,7 @@ fn c40_c41_polygon_and_star_curve_handle_drag() {
                 point_count: PointCount::new(5).unwrap(),
                 inner_ratio: InnerRatio::new(0.45).unwrap(),
                 curve: Curve::POLYGON_DEFAULT,
+                rounded: curvyo_document_core::Rounded::ZERO,
             },
         ),
     ] {
@@ -535,6 +537,7 @@ fn c26_c38_c44_the_curve_field_limits_per_shape_and_mixed_selections() {
         frame: sframe(30.0),
         point_count: PointCount::new(3).unwrap(),
         curve: Curve::POLYGON_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     let hex = Shape::Polygon {
         frame: StarFrame {
@@ -543,6 +546,7 @@ fn c26_c38_c44_the_curve_field_limits_per_shape_and_mixed_selections() {
         },
         point_count: PointCount::new(6).unwrap(),
         curve: Curve::POLYGON_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     let mut s = open(&[(tri, 0.0), (hex, 0.0)]);
     assert_eq!(
@@ -707,6 +711,7 @@ fn c24_c42_double_click_on_the_curve_knob_limits_and_names_the_field() {
         frame: sframe(30.0),
         point_count: PointCount::new(3).unwrap(),
         curve: Curve::POLYGON_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     let mut s = open(&[(tri, 0.0)]);
     let o = outline_of_rotated(&tri, ang(0.0));
@@ -1096,6 +1101,7 @@ fn c55_linked_clone_of_every_arc_kind_and_of_a_curved_shape_converts_without_not
             frame: sframe(30.0),
             point_count: PointCount::new(5).unwrap(),
             curve: Curve::new(0.5).unwrap(),
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
     ];
     for shape in shapes {
@@ -1390,6 +1396,7 @@ fn c60_boolean_union_of_a_pie_and_a_curved_hexagon_uses_the_drawn_outline() {
         },
         point_count: PointCount::new(6).unwrap(),
         curve: Curve::new(-0.6).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     let mut s = open(&[(pie, 0.0), (hex, 0.0)]);
     click(&mut s, at_angle(30.0, 30.0, 135.0, 1.0));
@@ -1425,6 +1432,7 @@ fn c62c_a_curve_drag_frame_on_a_1024_gon_takes_at_most_4_ms() {
         frame: sframe(60.0),
         point_count: PointCount::new(1024).unwrap(),
         curve: Curve::new(0.3).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     let mut s = open(&[(big, 0.0)]);
     let o = outline_of_rotated(&big, ang(0.0));

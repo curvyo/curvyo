@@ -409,6 +409,15 @@ fn ac02_selection_decoration_of_a_hexagon_is_the_box_decoration_of_a_turned_squa
             f64::midpoint(o[o.len() - 1].y, o[0].y),
         );
         let k = k_of(&poly);
+        // `0145`: and the Rounded knob, 15 px inside vertex 0 on the ray to the centre (it may be
+        // displaced along that ray by up to 28 px).
+        let rounded_spot = {
+            let (v, len) = (o[0], (o[0].x - c.x).hypot(o[0].y - c.y));
+            pt(
+                v.x + (c.x - v.x) / len * 15.0 / k,
+                v.y + (c.y - v.y) / len * 15.0 / k,
+            )
+        };
         let at = |v: &String| {
             let xy: Vec<f64> = v
                 .split('|')
@@ -417,7 +426,9 @@ fn ac02_selection_decoration_of_a_hexagon_is_the_box_decoration_of_a_turned_squa
                 .split(',')
                 .map(|x| x.parse().unwrap())
                 .collect();
-            (xy[0] - spot.x).hypot(xy[1] - spot.y) * k
+            ((xy[0] - spot.x).hypot(xy[1] - spot.y))
+                .min((xy[0] - rounded_spot.x).hypot(xy[1] - rounded_spot.y))
+                * k
         };
         let extra: Vec<_> = dp.difference(&dr).collect();
         let missing: Vec<_> = extra.iter().filter(|v| at(v) > 20.0).take(5).collect();
@@ -671,6 +682,14 @@ fn ac05_live_box_equals_the_box_of_the_shape_committed_at_that_angle_at_every_fr
                 let (a, b) = (o[o.len() - 1], o[0]);
                 pt(f64::midpoint(a.x, b.x), f64::midpoint(a.y, b.y))
             };
+            let rounded_spot = {
+                let o = prim_of(&at, 0).shape_outline();
+                let (v, len) = (o[0], (o[0].x - c.x).hypot(o[0].y - c.y));
+                pt(
+                    v.x + (c.x - v.x) / len * 15.0 / k,
+                    v.y + (c.y - v.y) / len * 15.0 / k,
+                )
+            };
             let missing: Vec<String> = missing
                 .into_iter()
                 .filter(|v| {
@@ -689,6 +708,7 @@ fn ac05_live_box_equals_the_box_of_the_shape_committed_at_that_angle_at_every_fr
                     d(c) > 16.0
                         && d(hh) > 24.0
                         && d(curve_spot) > 20.0
+                        && d(rounded_spot) > 20.0
                         && (mode == PolyStarMode::Polygon || d(knob) > 14.0)
                 })
                 .collect();

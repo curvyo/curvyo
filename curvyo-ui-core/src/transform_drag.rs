@@ -20,6 +20,7 @@ use crate::param_edit::{
 };
 use crate::param_handles::ParamHandle;
 use crate::shape_arc_edit::{ArcEnd, arc_angle_from_pointer, curve_from_pointer};
+use crate::shape_rounded_edit::rounded_from_drag;
 use crate::skew_math::{skew_angle, skew_factor, skew_frame};
 use crate::transform_commit::{commit_gesture, sane_or};
 use crate::transform_handle_layout::{EditHandle, Side};
@@ -218,6 +219,10 @@ pub(crate) struct TransformDrag {
     /// during the drag cannot change the mapping between frames and release
     /// equals preview. `1` for every other handle.
     pub(crate) param_gain: f64,
+    /// For a Rounded drag: the snap window in `q` frozen at the press (the larger of 0.015 and
+    /// 3 px over the unit), `0` for every other handle. [`TransformDrag::param_gain`] is then the
+    /// unit `U` in millimetres.
+    pub(crate) rounded_snap: f64,
     /// Whether a corner radius drag changes one corner only, decided at the
     /// press from the "Link corners" switch and Shift
     /// ([`CornerLinking::is_unlinked_with`]) and frozen for the whole drag.
@@ -252,8 +257,16 @@ pub(crate) fn arc_or_curve_value(
         ParamHandle::Curve => {
             curve_from_pointer(&primitive.shape, local, ctrl).map(ParamValue::Curve)
         }
-        ParamHandle::CornerRadius(_) | ParamHandle::InnerRadius => None,
+        ParamHandle::CornerRadius(_) | ParamHandle::InnerRadius | ParamHandle::Rounded => None,
     }
+}
+
+/// The Rounded value the shape of `start` is drawn with, `None` for another object.
+fn start_rounded(start: &ObjectSnapshot) -> Option<f64> {
+    let ObjectSnapshot::Primitive(primitive) = start else {
+        return None;
+    };
+    curvyo_document_core::effective_rounded(&primitive.shape)
 }
 
 /// What the live readout of a corner radius drag needs beyond the resolved
@@ -349,6 +362,25 @@ impl TransformDrag {
                     || start.clone(),
                     |value| sane_or(start, apply_param(start, value)),
                 )
+            }
+            EditHandle::Param(ParamHandle::Rounded) => {
+                // Relative to the press: the displacement along the ray over the unit, so a
+                // knob drawn displaced at rest does not jump the value (ux-notes section 3).
+                let local_delta = local_delta_of(start_box, down_at, current);
+                let (Some(press), true) = (
+                    start_rounded(start),
+                    local_delta.x.is_finite() && self.param_gain > 0.0,
+                ) else {
+                    return start.clone();
+                };
+                let value = rounded_from_drag(
+                    press,
+                    local_delta.x,
+                    self.param_gain,
+                    self.rounded_snap,
+                    ctrl,
+                );
+                sane_or(start, apply_param(start, ParamValue::Rounded(value)))
             }
             EditHandle::Param(handle) => {
                 let local_delta = local_delta_of(start_box, down_at, current);

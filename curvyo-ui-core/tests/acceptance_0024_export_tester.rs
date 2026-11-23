@@ -178,12 +178,14 @@ fn star_shape(
             frame,
             point_count: PointCount::new(points).unwrap(),
             curve,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Some(ratio) => Shape::Star {
             frame,
             point_count: PointCount::new(points).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),
             curve,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
     }
 }
@@ -1713,6 +1715,7 @@ fn items(d: &Document) -> Vec<Item> {
                         frame,
                         point_count,
                         curve,
+                        rounded: _,
                     } => {
                         exact.push_str(&format!(" polygon {point_count:?} curve={}", curve.get()));
                         nums.extend([
@@ -1727,6 +1730,7 @@ fn items(d: &Document) -> Vec<Item> {
                         point_count,
                         inner_ratio,
                         curve,
+                        rounded: _,
                     } => {
                         exact.push_str(&format!(
                             " star {point_count:?} ratio={} curve={}",
@@ -1858,6 +1862,7 @@ fn translated(nodes: &[DrawingNode], v: Vec2) -> Vec<DrawingNode> {
                         frame,
                         point_count,
                         curve,
+                        rounded: _,
                     } => Shape::Polygon {
                         frame: StarFrame {
                             center: mv(frame.center),
@@ -1865,12 +1870,14 @@ fn translated(nodes: &[DrawingNode], v: Vec2) -> Vec<DrawingNode> {
                         },
                         point_count,
                         curve,
+                        rounded: curvyo_document_core::Rounded::ZERO,
                     },
                     Shape::Star {
                         frame,
                         point_count,
                         inner_ratio,
                         curve,
+                        rounded: _,
                     } => Shape::Star {
                         frame: StarFrame {
                             center: mv(frame.center),
@@ -1879,6 +1886,7 @@ fn translated(nodes: &[DrawingNode], v: Vec2) -> Vec<DrawingNode> {
                         point_count,
                         inner_ratio,
                         curve,
+                        rounded: curvyo_document_core::Rounded::ZERO,
                     },
                 };
                 DrawingNode::Primitive {

@@ -491,7 +491,21 @@ impl SelectTool {
             EditHandle::Param(ParamHandle::CornerRadius(_)) => {
                 radius_gain(box_.width().min(box_.height()), tolerances)
             }
+            // The Rounded drag's unit in millimetres (`ux-notes.md` section 2).
+            EditHandle::Param(ParamHandle::Rounded) => match object {
+                ObjectSnapshot::Primitive(primitive) => {
+                    crate::shape_rounded_edit::rounded_unit_mm(&primitive.shape, tolerances)
+                        .unwrap_or(0.0)
+                }
+                _ => 0.0,
+            },
             _ => 1.0,
+        };
+        let rounded_snap = match (handle, param_gain) {
+            (EditHandle::Param(ParamHandle::Rounded), unit) if unit > 0.0 => {
+                crate::shape_rounded_edit::rounded_snap_window(unit, tolerances)
+            }
+            _ => 0.0,
         };
         TransformDrag {
             origin,
@@ -500,6 +514,7 @@ impl SelectTool {
             handle,
             modes: self.modes,
             param_gain,
+            rounded_snap,
             unlinked: matches!(handle, EditHandle::Param(ParamHandle::CornerRadius(_)))
                 && self.corner_linking.is_unlinked_with(origin.shift_at_press),
             // A resize of a polygon or star and a skew of any primitive end as a path

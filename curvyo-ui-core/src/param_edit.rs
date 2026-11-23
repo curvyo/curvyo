@@ -14,6 +14,7 @@ use curvyo_document_core::{
 
 use crate::param_handles::{Corner, ParamHandle};
 use crate::shape_arc_edit::{ArcEnd, made_whole, with_arc_angle, with_arc_kind, with_curve};
+use crate::shape_rounded_edit::with_rounded;
 
 /// A value within this (millimetres, or a ratio) of the current one is "equal":
 /// nothing is written (criteria 9, 12, 18).
@@ -48,6 +49,9 @@ pub enum ParamValue {
     /// The curve of an ellipse, polygon or star as a fraction, limited per shape when
     /// applied (criteria 23, 24, 26, 42 and 44).
     Curve(f64),
+    /// The Rounded value of a polygon or star, limited to -10..=10 when applied
+    /// (`specs/0145-shape-spiro-handles/` criteria 2, 3 and 5).
+    Rounded(f64),
 }
 
 /// The largest corner radius a rectangle allows: half its shorter side.
@@ -247,10 +251,70 @@ fn arc_or_curve_shape(shape: &Shape, value: ParamValue) -> Option<Shape> {
         ParamValue::ArcKind(kind) => with_arc_kind(shape, kind),
         ParamValue::WholeEllipse => made_whole(shape),
         ParamValue::Curve(fraction) => with_curve(shape, fraction),
+        ParamValue::Rounded(value) => with_rounded(shape, value),
         ParamValue::Radius(_)
         | ParamValue::CornerRadius(..)
         | ParamValue::Ratio(_)
         | ParamValue::PointCount(_) => None,
+    }
+}
+
+/// `shape` with a star's ratio or a polygon's or star's point count `value` applied; `None`
+/// when nothing changes or `value` is of another kind.
+fn ring_value_shape(shape: &Shape, value: ParamValue) -> Option<Shape> {
+    match (*shape, value) {
+        (
+            Shape::Star {
+                frame,
+                point_count,
+                inner_ratio,
+                curve,
+                rounded,
+            },
+            ParamValue::Ratio(ratio),
+        ) => {
+            let limited = clamped_ratio(ratio.get());
+            ((limited.get() - inner_ratio.get()).abs() > PARAM_EQUAL_EPSILON).then_some(
+                Shape::Star {
+                    frame,
+                    point_count,
+                    inner_ratio: limited,
+                    curve,
+                    rounded,
+                },
+            )
+        }
+        (
+            Shape::Polygon {
+                frame,
+                point_count,
+                curve,
+                rounded,
+            },
+            ParamValue::PointCount(count),
+        ) => (count != point_count).then_some(Shape::Polygon {
+            frame,
+            point_count: count,
+            curve,
+            rounded,
+        }),
+        (
+            Shape::Star {
+                frame,
+                point_count,
+                inner_ratio,
+                curve,
+                rounded,
+            },
+            ParamValue::PointCount(count),
+        ) => (count != point_count).then_some(Shape::Star {
+            frame,
+            point_count: count,
+            inner_ratio,
+            curve,
+            rounded,
+        }),
+        _ => None,
     }
 }
 
@@ -287,64 +351,10 @@ fn apply_to_primitive(start: &PrimitiveSnapshot, value: ParamValue) -> Primitive
                 corner_radii,
             }
         }
-        (
-            Shape::Star {
-                frame,
-                point_count,
-                inner_ratio,
-                curve,
-            },
-            ParamValue::Ratio(ratio),
-        ) => {
-            let limited = clamped_ratio(ratio.get());
-            if (limited.get() - inner_ratio.get()).abs() <= PARAM_EQUAL_EPSILON {
-                return start.clone();
-            }
-            Shape::Star {
-                frame,
-                point_count,
-                inner_ratio: limited,
-                curve,
-            }
-        }
-        (
-            Shape::Polygon {
-                frame,
-                point_count,
-                curve,
-            },
-            ParamValue::PointCount(count),
-        ) => {
-            if count == point_count {
-                return start.clone();
-            }
-            Shape::Polygon {
-                frame,
-                point_count: count,
-                curve,
-            }
-        }
-        (
-            Shape::Star {
-                frame,
-                point_count,
-                inner_ratio,
-                curve,
-            },
-            ParamValue::PointCount(count),
-        ) => {
-            if count == point_count {
-                return start.clone();
-            }
-            Shape::Star {
-                frame,
-                point_count: count,
-                inner_ratio,
-                curve,
-            }
-        }
         (shape, value) => {
-            let Some(shape) = arc_or_curve_shape(&shape, value) else {
+            let Some(shape) =
+                ring_value_shape(&shape, value).or_else(|| arc_or_curve_shape(&shape, value))
+            else {
                 return start.clone();
             };
             shape
@@ -379,6 +389,9 @@ pub(crate) fn commit_param(document: &Document, handle: ParamHandle, result: &Ob
         ) => {
             let _ = document.set_curves(&[(primitive.id, curve)]);
         }
+        (ParamHandle::Rounded, Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. }) => {
+            let _ = document.set_rounded(&[(primitive.id, rounded)]);
+        }
         _ => {}
     }
 }
@@ -393,6 +406,7 @@ fn commit_arc_or_curve_batch(
 ) -> Result<(), ShapeEditError> {
     let mut arcs = Vec::new();
     let mut curves = Vec::new();
+    let mut roundeds = Vec::new();
     for &id in ids {
         let old = document.object(id).ok_or(ShapeEditError::NoSuchObject)?;
         let ObjectSnapshot::Primitive(new) = apply_param(&old, value) else {
@@ -410,6 +424,12 @@ fn commit_arc_or_curve_batch(
             ) => {
                 curves.push((id, curve));
             }
+            (
+                ParamValue::Rounded(_),
+                Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. },
+            ) => {
+                roundeds.push((id, rounded));
+            }
             (_, Shape::Ellipse { arc, .. }) => arcs.push((id, arc)),
             _ => {}
         }
@@ -419,6 +439,9 @@ fn commit_arc_or_curve_batch(
     }
     if !curves.is_empty() {
         document.set_curves(&curves)?;
+    }
+    if !roundeds.is_empty() {
+        document.set_rounded(&roundeds)?;
     }
     Ok(())
 }
@@ -448,7 +471,8 @@ pub fn commit_param_batch(
         ParamValue::ArcAngle(..)
         | ParamValue::ArcKind(_)
         | ParamValue::WholeEllipse
-        | ParamValue::Curve(_) => commit_arc_or_curve_batch(document, ids, value),
+        | ParamValue::Curve(_)
+        | ParamValue::Rounded(_) => commit_arc_or_curve_batch(document, ids, value),
     }
 }
 

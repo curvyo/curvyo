@@ -47,6 +47,7 @@ fn hexagon() -> ObjectSnapshot {
             },
             point_count: PointCount::new(6).unwrap(),
             curve: Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
     )
 }
@@ -63,6 +64,7 @@ fn star() -> ObjectSnapshot {
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: InnerRatio::new(0.5).unwrap(),
             curve: Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
     )
 }

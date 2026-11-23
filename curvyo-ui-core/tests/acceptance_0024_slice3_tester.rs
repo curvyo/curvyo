@@ -565,6 +565,7 @@ fn primitive_segs(shape: &Shape, rot: f64) -> Vec<Seg> {
             frame,
             point_count,
             curve,
+            rounded: _,
         } => {
             assert_eq!(curve, Curve::POLYGON_DEFAULT, "criterion 116: Curve 0%");
             let n = point_count.get();
@@ -587,6 +588,7 @@ fn primitive_segs(shape: &Shape, rot: f64) -> Vec<Seg> {
             point_count,
             inner_ratio,
             curve,
+            rounded,
         } => {
             assert_eq!(
                 curve,
@@ -603,7 +605,26 @@ fn primitive_segs(shape: &Shape, rot: f64) -> Vec<Seg> {
                 pts.push(around(c, r, base));
                 pts.push(around(c, r * inner_ratio.get(), base + PI / f64::from(n)));
             }
-            ring(pts)
+            if rounded.get() == 0.0 {
+                return ring(pts);
+            }
+            // `0145`: every vertex is a smooth node whose handles lie along the tangent
+            // perpendicular to its radius, `q` times the side length long (Inkscape's rule).
+            let side = dist(pts[0], pts[1]);
+            let handle = |v: P, sign: f64| {
+                let (dx, dy) = (v.x - c.x, v.y - c.y);
+                let len = dx.hypot(dy);
+                p(
+                    v.x - sign * rounded.get() * side * dy / len,
+                    v.y + sign * rounded.get() * side * dx / len,
+                )
+            };
+            (0..pts.len())
+                .map(|i| {
+                    let (v, w) = (pts[i], pts[(i + 1) % pts.len()]);
+                    Seg::Cubic(v, handle(v, 1.0), handle(w, -1.0), w)
+                })
+                .collect()
         }
         Shape::Rect { .. } => panic!("no rectangle is compared here"),
     }
@@ -918,7 +939,7 @@ fn c111_c125_real_save_draws_its_d_and_inkscapes_object_to_path() {
         "p6:polygon",
         "p6_rot:polygon",
         "s5:star",
-        "s_round:path",
+        "s_round:star",
         "s_rand:path",
         "s_twist:path",
         "s_rot:star",
@@ -1324,12 +1345,15 @@ fn c117_arg2_beyond_1e6_rad_is_a_path() {
 #[test]
 fn c118_rounded_and_randomized_are_paths_of_d() {
     let src = saved();
-    for id in ["s_round", "s_rand"] {
-        let node = real_as_is(id);
-        assert!(is_path(&node), "{id}");
-        assert_follows_d(&node, &attr(&element(&src, id), "d").unwrap());
-    }
-    let p6 = real("p6", |e| with_attr(&e, "inkscape:rounded", "0.0001"));
+    // `0145` (Frage 310 A): the real rounded star is a live star whose outline is its d; the
+    // randomized one stays a path of d.
+    let rounded = real_as_is("s_round");
+    assert_eq!(kind(&rounded), "star");
+    let node = real_as_is("s_rand");
+    assert!(is_path(&node), "s_rand");
+    assert_follows_d(&node, &attr(&element(&src, "s_rand"), "d").unwrap());
+    // A rounded value that does not draw the file's d stays a path of d.
+    let p6 = real("p6", |e| with_attr(&e, "inkscape:rounded", "0.5"));
     assert!(is_path(&p6), "{}", kind(&p6));
     let s5 = real("s5", |e| with_attr(&e, "inkscape:randomized", "0.0001"));
     assert!(is_path(&s5), "{}", kind(&s5));

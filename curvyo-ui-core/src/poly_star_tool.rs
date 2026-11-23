@@ -46,12 +46,14 @@ impl PolyStarSettings {
                 frame,
                 point_count: self.point_count,
                 curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+                rounded: curvyo_document_core::Rounded::ZERO,
             },
             PolyStarMode::Star => Shape::Star {
                 frame,
                 point_count: self.point_count,
                 inner_ratio: self.ratio,
                 curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+                rounded: curvyo_document_core::Rounded::ZERO,
             },
         }
     }

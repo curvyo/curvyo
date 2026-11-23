@@ -171,7 +171,11 @@ impl Writer<'_> {
             "inkscape:flatsided",
             if star.flat { "true" } else { "false" },
         );
-        self.attr("inkscape:rounded", "0");
+        if star.rounded == 0.0 {
+            self.attr("inkscape:rounded", "0");
+        } else {
+            self.attr_exact("inkscape:rounded", star.rounded);
+        }
         self.attr("inkscape:randomized", "0");
     }
 

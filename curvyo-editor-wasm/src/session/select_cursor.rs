@@ -204,6 +204,7 @@ impl Session {
             EditHandle::Param(ParamHandle::ArcStart) => "param-arc-start",
             EditHandle::Param(ParamHandle::ArcEnd) => "param-arc-end",
             EditHandle::Param(ParamHandle::Curve) => "param-curve",
+            EditHandle::Param(ParamHandle::Rounded) => "param-rounded",
         }
         .to_string()
     }

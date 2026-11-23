@@ -6,7 +6,7 @@
 use curvyo_document_core::{Angle, ArcKind};
 use curvyo_ui_core::{
     ArcEnd, EntryOutcome, InvalidReason, ParamValue, arc_announcement, curve_announcement,
-    parse_entry_number,
+    parse_entry_number, rounded_announcement,
 };
 
 use super::{Session, Tool};
@@ -38,6 +38,7 @@ impl Session {
             let shape = self.document.primitive(*id)?.shape;
             match value {
                 ParamValue::Curve(_) => curve_announcement(&shape),
+                ParamValue::Rounded(_) => rounded_announcement(&shape),
                 _ => arc_announcement(&shape),
             }
         })
@@ -80,6 +81,30 @@ impl Session {
         self.commit_arc_or_curve(ParamValue::Curve(percent / 100.0))
     }
 
+    /// Enter in "Rounded" (`specs/0145-shape-spiro-handles/` criterion 3): a number, limited to
+    /// -10..=10 and written as the limited value; text that is not a number keeps the field
+    /// open, marked invalid.
+    pub fn set_selected_rounded_text(&mut self, text: &str) -> EntryOutcome {
+        let Some(value) = parse_entry_number(text, false) else {
+            return EntryOutcome::Invalid {
+                field: 0,
+                reason: InvalidReason::NotANumber,
+            };
+        };
+        self.commit_arc_or_curve(ParamValue::Rounded(value))
+    }
+
+    /// A step of the "Rounded" field, on every tick or key: nothing is written; committed once
+    /// by [`Session::commit_selected_curve`] on release or key-up.
+    pub fn preview_selected_rounded(&mut self, value: f64) {
+        if !value.is_finite() {
+            return;
+        }
+        let objects = self.objects();
+        self.select
+            .preview_bar_value(&objects, &self.selection, ParamValue::Rounded(value));
+    }
+
     /// A drag of the "Curve" field, on every tick: nothing is written; the shapes show in
     /// blue over their old outline. Released by [`Session::commit_selected_ratio`] (the
     /// one pending bar edit) or dropped by [`Session::cancel_selected_ratio`].
@@ -115,7 +140,9 @@ impl Session {
         let pending = self.select.bar_preview().map(|preview| preview.value);
         let before = self.document.version();
         self.commit_selected_ratio();
-        if let Some(value @ (ParamValue::Curve(_) | ParamValue::ArcAngle(..))) = pending
+        if let Some(
+            value @ (ParamValue::Curve(_) | ParamValue::ArcAngle(..) | ParamValue::Rounded(_)),
+        ) = pending
             && self.document.version() != before
         {
             self.transform_announcement = self.bar_announcement(value);

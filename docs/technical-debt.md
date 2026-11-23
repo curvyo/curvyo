@@ -2896,3 +2896,38 @@ lives in the session's undo stack and a reopened file shows the label's fallback
 **Resolution:** (1) a shared-value read over several objects in `instance.rs`; (2) the knob overlay and an
 entry chip in the session; (3) the history row reads the step's fields in `curvyo-document-core`.
 Trigger: the first customer report, or `0099`'s instance arm.
+
+## Rounded: the Inkscape goldens are mostly hand-computed (`0145` slice 1, 2026-11-23)
+
+The formula of `ring_rounded.rs` matches the one real Inkscape 1.4.4 save in the repo (the
+`s_round` star of `curvyo-ui-core/tests/fixtures/svg/inkscape_shapes.svg`, q = 0.3, 5 points, Ratio
+0.4: the handle lengths and tangents agree to 1e-5). The other values (q -1, -0.3, 1, 3 and the
+hexagon) are hand-computed from `adrs.md` decision 1 (`rounded_0145.rs` in `curvyo-ui-core`,
+marked provisional). **Resolution:** the customer exports them from Inkscape 1.4
+(`adrs.md` decision 7); the issue is ISSUE-NEEDED.
+
+## Rounded: what the first build leaves out (`0145` slice 1, 2026-11-23)
+
+The minor ticks under Ctrl, the "Drag ghost" rendering of the looped shape during the drag
+(the preview is the existing live outline), the double-click entry chip on the knob being checked
+in a browser, and the centre handle yielding while the knob is merely hovered. **Resolution:** a
+look at the demo decides which of them the customer wants.
+
+## Rounded: criterion 12 is not met, and the 4 px rule of criterion 1 fails on dense stars (`0145` slice 1, 2026-11-23)
+
+- **Criterion 12 (2 ms per pointer event, flatten included) is not met for the 1024-point star at
+  q = 10.** Measured in the test profile (`curvyo-editor-wasm/tests/rounded_0145.rs`): the outline
+  0.1 ms, a pointer event of the drag under 2 ms, flattening at the display tolerance of 0.25 px
+  about 4 ms (55 000 segments), and the whole frame (`frame_draw_list`) of a drag about 54 ms. The
+  5-point star at q = -10 is within the budget (frame 1.6 ms). The test bounds the flatten at
+  10 ms and the frame at 500 ms and says so. **Resolution:** the architect and the customer decide
+  (clip the outline to the view before flattening, or lower the point count the budget applies to).
+- **Criterion 1 (a knob never within 4 px of another glyph at rest) fails for some stars.** The
+  Rounded knob against the other glyphs, measured: 7 points at ratio 0.3 and 96 px (gap -6 px), 8
+  points at ratio 0.7 (-0.2 px), 12 points at ratio 0.3 (-7 px); in the property test of
+  `param_handles.rs` the Rounded knob is left out of the star case and `the_rounded_knob_keeps_four_pixels_on_regular_shapes`
+  covers only 5 and 6 points at ratio 0.38 to 0.5 from 104 px (6 points at ratio 0.4 and 96 to 103 px: gap -5 px, the Curve knob 5 px from the Rounded knob). The Curve knob, placed after the
+  Rounded knob, falls back to clearing the glyphs and the inner knob only when it cannot clear all
+  of them, so it may sit within 4 px of the Rounded knob. Below 96 px and for dense stars (ratio
+  below 0.2, many points) the same happens. **Resolution:** a look at the demo; the knobs could
+  take a second ring of positions or the Curve knob could yield to Rounded.

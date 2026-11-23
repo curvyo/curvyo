@@ -147,6 +147,7 @@ fn kitchen_sink() -> SvgExport {
         arg1: -std::f64::consts::FRAC_PI_2,
         arg2: Some(-std::f64::consts::FRAC_PI_2 + std::f64::consts::PI / 5.0),
         flat: false,
+        rounded: 0.0,
     };
     let arc = ArcData {
         center: Point::new(50.0, 50.0),

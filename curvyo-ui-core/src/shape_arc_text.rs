@@ -2,7 +2,7 @@
 //! 6, 25, 43 and 65): the pointer readout of a drag and the polite announcement after a
 //! release or a bar commit.
 
-use curvyo_document_core::{ArcKind, Shape, effective_curve};
+use curvyo_document_core::{ArcKind, Rounded, Shape, effective_curve, effective_rounded};
 
 use crate::param_entry::shown_arc_angles;
 use crate::shape_arc_edit::{ArcEnd, arc_capable};
@@ -26,6 +26,29 @@ pub fn arc_readout(shape: &Shape, end: ArcEnd) -> Option<String> {
 #[must_use]
 pub fn curve_readout(shape: &Shape) -> Option<String> {
     Some(format!("curve {:.1} %", effective_curve(shape)?.percent()))
+}
+
+/// The readout of a Rounded-handle drag: "rounded 0.35", two decimals and a real minus sign,
+/// "max" or "min" appended at a limit (`ux-notes.md` section 5).
+#[must_use]
+pub fn rounded_readout(shape: &Shape) -> Option<String> {
+    let q = effective_rounded(shape)?;
+    let text = format!("{q:.2}").replace('-', "\u{2212}");
+    let limit = if q >= Rounded::RANGE {
+        " max"
+    } else if q <= -Rounded::RANGE {
+        " min"
+    } else {
+        ""
+    };
+    Some(format!("rounded {text}{limit}"))
+}
+
+/// The announcement of `shape`'s Rounded value after an edit: "Rounded −1.25".
+#[must_use]
+pub fn rounded_announcement(shape: &Shape) -> Option<String> {
+    let text = format!("{:.2}", effective_rounded(shape)?);
+    Some(format!("Rounded {}", text.replace('-', "\u{2212}")))
 }
 
 const fn kind_word(kind: ArcKind) -> &'static str {

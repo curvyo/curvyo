@@ -363,6 +363,7 @@ mod tests {
             },
             point_count: curvyo_document_core::PointCount::new(6).unwrap(),
             curve: Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         }
     }
 

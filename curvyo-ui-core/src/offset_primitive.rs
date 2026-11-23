@@ -60,6 +60,7 @@ pub(crate) fn offset_primitive(
                     frame,
                     point_count,
                     curve: Curve::POLYGON_DEFAULT,
+                    rounded: curvyo_document_core::Rounded::ZERO,
                 }),
                 Scaled::Vanishes => PrimitiveOffset::Vanishes,
                 Scaled::Path => PrimitiveOffset::Path,
@@ -78,6 +79,7 @@ pub(crate) fn offset_primitive(
                     point_count,
                     inner_ratio,
                     curve: Curve::POLYGON_DEFAULT,
+                    rounded: curvyo_document_core::Rounded::ZERO,
                 }),
                 Scaled::Vanishes => PrimitiveOffset::Vanishes,
                 Scaled::Path => PrimitiveOffset::Path,
@@ -134,6 +136,7 @@ fn has_default_sides(shape: &Shape) -> bool {
         Shape::Ellipse { arc, curve, .. } => arc.is_none() && *curve == Curve::ELLIPSE_DEFAULT,
         Shape::Polygon { .. } | Shape::Star { .. } => {
             curvyo_document_core::effective_curve(shape).is_some_and(|k| k.get() == 0.0)
+                && curvyo_document_core::effective_rounded(shape).is_some_and(|q| q == 0.0)
         }
     }
 }
@@ -399,6 +402,7 @@ mod tests {
             },
             point_count: PointCount::new(6).unwrap(),
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         };
         let PrimitiveOffset::Stays(Shape::Polygon { frame, .. }) =
             off(&hexagon, 2.0, OffsetJoin::Miter)
@@ -436,6 +440,7 @@ mod tests {
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         };
         // A plump star: tips of about 108°, inside the limit.
         let PrimitiveOffset::Stays(Shape::Star {

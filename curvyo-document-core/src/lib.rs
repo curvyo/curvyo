@@ -272,6 +272,7 @@ mod primitive_model;
 mod primitive_outline;
 mod replace;
 mod ring_curve;
+mod ring_rounded;
 mod segment_bend;
 mod shape_arc;
 mod shape_arc_codec;
@@ -462,6 +463,7 @@ pub use ring_curve::{
     Curve, curve_from_position, curve_handle_position, curve_limit, curve_max, effective_curve,
     ring_bounds, ring_extent,
 };
+pub use ring_rounded::{Rounded, effective_rounded, rounded_bounds};
 pub use shapes::ShapeEditError;
 pub use smooth_handles::smooth_corner_handles;
 pub use snapping::{DocumentSnapping, GridSnapPoint};

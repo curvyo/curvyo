@@ -377,7 +377,8 @@ impl GroupEntry {
             EntryKind::CornerRadius
             | EntryKind::InnerRatio
             | EntryKind::ArcAngle
-            | EntryKind::Curve => Ok(None),
+            | EntryKind::Curve
+            | EntryKind::Rounded => Ok(None),
         }
     }
 

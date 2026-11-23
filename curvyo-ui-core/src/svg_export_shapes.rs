@@ -215,18 +215,20 @@ fn arc_kind(
 /// 140).
 #[allow(clippy::many_single_char_names)] // the centre and count of the specification
 fn ring_kind(shape: &Shape, rotation: Angle, t: Affine) -> (ExportKind, Shadow) {
-    let (frame, point_count, curve, ratio) = match *shape {
+    let (frame, point_count, curve, rounded, ratio) = match *shape {
         Shape::Polygon {
             frame,
             point_count,
             curve,
-        } => (frame, point_count, curve, None),
+            rounded,
+        } => (frame, point_count, curve, rounded, None),
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
             curve,
-        } => (frame, point_count, curve, Some(inner_ratio.get())),
+            rounded,
+        } => (frame, point_count, curve, rounded, Some(inner_ratio.get())),
         Shape::Rect { .. } | Shape::Ellipse { .. } => {
             return primitive_kind(shape, rotation, t);
         }
@@ -236,14 +238,18 @@ fn ring_kind(shape: &Shape, rotation: Angle, t: Affine) -> (ExportKind, Shadow) 
     let angle = frame.angle.as_radians();
     let n = point_count.get();
     let turn = rotation.as_radians();
+    // The shadow numbers: the form without Rounded (7 and 8 numbers) still reads as Rounded 0,
+    // the form written now appends it (`specs/0145-shape-spiro-handles` `adrs.md` decision 6).
     let mut numbers = vec![c.x, c.y, radius, f64::from(n), angle, turn, curve.get()];
     numbers.extend(ratio);
+    numbers.push(rounded.get());
     let id = if ratio.is_some() {
         PathId::Star
     } else {
         PathId::Polygon
     };
-    if curve.get() != 0.0 {
+    // Rounded wins over Curve while it is not 0 (decision 3): such a shape is Inkscape's star.
+    if curve.get() != 0.0 && rounded.is_zero() {
         let shadow = Shadow {
             kind: Some(if ratio.is_some() {
                 ShadowKind::Star
@@ -264,6 +270,7 @@ fn ring_kind(shape: &Shape, rotation: Angle, t: Affine) -> (ExportKind, Shadow) 
         arg1,
         arg2: Some(arg1 + std::f64::consts::PI / f64::from(n)),
         flat: ratio.is_none(),
+        rounded: rounded.effective(),
     };
     let (path, node_types) = outline_data(&drawing_outline_of_rotated(shape, rotation), t);
     (

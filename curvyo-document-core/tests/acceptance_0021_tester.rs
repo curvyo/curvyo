@@ -66,6 +66,7 @@ fn polygon(n: u32, r: f64, curve: f64) -> Shape {
         frame: sframe(r),
         point_count: PointCount::new(n).unwrap(),
         curve: Curve::new(curve).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 
@@ -75,6 +76,7 @@ fn star(n: u32, ratio: f64, r: f64, curve: f64) -> Shape {
         point_count: PointCount::new(n).unwrap(),
         inner_ratio: InnerRatio::new(ratio).unwrap(),
         curve: Curve::new(curve).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 

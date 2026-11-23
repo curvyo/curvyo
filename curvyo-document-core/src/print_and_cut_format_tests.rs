@@ -180,9 +180,22 @@ fn format_of(bytes: &[u8]) -> serde_json::Value {
     manifest["format_version"].clone()
 }
 
+/// The `document.json` of a save, under the golden's own version: a later bump changes only that
+/// number.
+fn saved_as_golden(d: &Document) -> String {
+    String::from_utf8(members(&pack(d, "0.1.0").unwrap())["document.json"].clone())
+        .unwrap()
+        .replacen(
+            &format!("\"format_version\": {CURRENT_FORMAT_VERSION},"),
+            "\"format_version\": 55,",
+            1,
+        )
+}
+
 #[test]
 fn the_golden_is_format_55_and_reads_back_marks_measures_and_placement() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 55);
+    // `0145` (rounded polygons and stars) is 56 on top.
+    const { assert!(CURRENT_FORMAT_VERSION >= 55) };
     let bytes = golden();
     assert_eq!(format_of(&bytes), 55);
     let d = unpack(2, &bytes).unwrap();
@@ -207,8 +220,8 @@ fn the_golden_is_format_55_and_reads_back_marks_measures_and_placement() {
     assert_eq!(tolerance_um, 400);
     assert_eq!(reset, Some(Affine::translation(Vec2::new(20.0, 0.0))));
     assert_eq!(
-        members(&pack(&d, "0.1.0").unwrap())["document.json"],
-        members(&bytes)["document.json"],
+        saved_as_golden(&d).as_bytes(),
+        members(&bytes)["document.json"].as_slice(),
         "saves back unchanged"
     );
 }
@@ -242,9 +255,10 @@ fn the_damaged_golden_opens_reads_what_it_can_and_saves_back_unchanged() {
         PrintAndCutRegister::Unreadable,
         "not an integer"
     );
+    let saved = saved_as_golden(&d);
     assert_eq!(
-        members(&pack(&d, "0.1.0").unwrap())["document.json"],
-        members(&bytes)["document.json"],
+        saved.as_bytes(),
+        members(&bytes)["document.json"].as_slice(),
         "never repaired"
     );
 }
@@ -254,7 +268,7 @@ fn a_build_of_format_54_refuses_the_golden() {
     let bytes = golden();
     let mut files = members(&bytes);
     let mut json: serde_json::Value = serde_json::from_slice(&files["manifest.json"]).unwrap();
-    json["format_version"] = serde_json::json!(56);
+    json["format_version"] = serde_json::json!(CURRENT_FORMAT_VERSION + 1);
     files.insert("manifest.json".into(), serde_json::to_vec(&json).unwrap());
     let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let options =
@@ -267,8 +281,8 @@ fn a_build_of_format_54_refuses_the_golden() {
     assert!(matches!(
         unpack(3, &newer),
         Err(OpenError::FormatTooNew {
-            found: 56,
-            supported: 55
+            found: 57,
+            supported: 56
         })
     ));
 }

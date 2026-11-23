@@ -7,7 +7,7 @@
 
 use curvyo_document_core::{
     Angle, Document, Length, ObjectSnapshot, PrimitiveSnapshot, Shape, effective_corner_radii,
-    effective_curve, wrapped_angle,
+    effective_curve, effective_rounded, wrapped_angle,
 };
 
 use crate::oriented_box::OrientedBox;
@@ -17,6 +17,7 @@ use crate::param_edit::{
 };
 use crate::param_handles::{Corner, ParamHandle};
 use crate::shape_arc_edit::{ARC_SEAM, ArcEnd, arc_capable, curve_capable};
+use crate::shape_rounded_edit::rounded_capable;
 use crate::transform_commit::MAX_COORDINATE_MM;
 use crate::transform_commit::still_current;
 use crate::transform_entry::{
@@ -126,6 +127,9 @@ impl ParamEntry {
                 "Curve",
                 format!("{:.1}", effective_curve(shape)?.percent()),
             ),
+            (ParamHandle::Rounded, _) if rounded_capable(shape) => {
+                EntryField::for_param("", "Rounded", format!("{:.2}", effective_rounded(shape)?))
+            }
             _ => return None,
         };
         Some(Self {
@@ -147,7 +151,8 @@ impl ParamEntry {
             ParamHandle::InnerRadius
             | ParamHandle::ArcStart
             | ParamHandle::ArcEnd
-            | ParamHandle::Curve => None,
+            | ParamHandle::Curve
+            | ParamHandle::Rounded => None,
         }
     }
 
@@ -185,6 +190,7 @@ impl ParamEntry {
             ParamHandle::InnerRadius => EntryKind::InnerRatio,
             ParamHandle::ArcStart | ParamHandle::ArcEnd => EntryKind::ArcAngle,
             ParamHandle::Curve => EntryKind::Curve,
+            ParamHandle::Rounded => EntryKind::Rounded,
         }
     }
 
@@ -249,6 +255,8 @@ impl ParamEntry {
             ParamHandle::ArcEnd => ParamValue::ArcAngle(ArcEnd::End, degrees(value)),
             // Limited to the shape's range by `apply_param` (criteria 24 and 42).
             ParamHandle::Curve => ParamValue::Curve(value / 100.0),
+            // Limited to -10..=10 by `apply_param`, no error for a value out of range (criterion 3).
+            ParamHandle::Rounded => ParamValue::Rounded(value),
         };
         let result = apply_param(&self.start, typed);
         Ok((result != self.start).then_some(result))

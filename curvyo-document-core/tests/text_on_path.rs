@@ -221,6 +221,7 @@ fn the_start_of_each_carrier_kind_is_pinned() {
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: curvyo_document_core::InnerRatio::new(0.5).unwrap(),
             curve: Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     );
@@ -542,6 +543,7 @@ fn golden_document() -> (Document, Vec<NodeId>) {
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: curvyo_document_core::InnerRatio::new(0.5).unwrap(),
             curve: Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     );
