@@ -67,6 +67,15 @@ A second computer becomes an owner with `curvyoctl login 192.168.1.20 --code <co
 from `curvyoctl pair --name <any name> --owner` on the first one; the second computer is listed as
 `curvyoctl@<its host name>`.
 
+## The job list
+
+While a job runs or waits for its start, the connector takes further jobs into a list of at most
+20 jobs and 256 MiB together; owners reorder it and press Start, members add and remove their own
+jobs. The list is kept in `<state dir>/jobs/` and comes back after a restart: a job that ran shows
+"Interrupted at line <n>" and is never restarted by itself. A job is on disk a moment after the
+connector answered that it holds it, so a crash in that moment loses it. The waiting texts also
+stay in RAM (about 320 MiB at most); a Pi needs 512 MB.
+
 ## Reset
 
 `curvyoctl reset --confirm workshop-laser` stops a running job, deletes the state and ends the
