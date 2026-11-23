@@ -157,7 +157,8 @@ fn shapes_of<'a>(
             | ObjectSnapshot::Sketch(_)
             | ObjectSnapshot::Text(_)
             | ObjectSnapshot::Image(_)
-            | ObjectSnapshot::Dimension(_) => None,
+            | ObjectSnapshot::Dimension(_)
+            | ObjectSnapshot::RegistrationMark(_) => None,
         })
 }
 
@@ -279,7 +280,8 @@ pub fn select_bar_state(
         object_to_path: !ids_of_kind(objects, selection, ObjectKind::Primitive).is_empty()
             || !ids_of_kind(objects, selection, ObjectKind::Text).is_empty(),
         scale_switches_shown: !only_clones(objects, selection)
-            && !only_dimensions(objects, selection),
+            && !only_dimensions(objects, selection)
+            && !only_registration_marks(objects, selection),
         ellipse: ellipse_bar_state(objects, selection),
         curve: curve_bar_state(objects, selection, preview),
     }
@@ -304,6 +306,16 @@ pub fn only_dimensions(objects: &[ObjectSnapshot], selection: &ObjectSelection) 
         && held
             .iter()
             .all(|object| matches!(object, ObjectSnapshot::Dimension(_)))
+}
+
+/// Whether the selection holds at least one object and every one is a registration mark: it only
+/// moves, so no scale switch applies (`specs/0121` UX notes §3.2).
+fn only_registration_marks(objects: &[ObjectSnapshot], selection: &ObjectSelection) -> bool {
+    let held = objects_with_ids(objects, selection.ids());
+    !held.is_empty()
+        && held
+            .iter()
+            .all(|object| matches!(object, ObjectSnapshot::RegistrationMark(_)))
 }
 
 #[cfg(test)]

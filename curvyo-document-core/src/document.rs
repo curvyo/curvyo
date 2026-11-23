@@ -652,7 +652,15 @@ impl DocumentVersion {
 /// `u32`, no part or an empty part, a subpath that is not `2 + 6n` finite numbers within ±1e7, a
 /// frame that is not six finite numbers or holds scale or shear beyond 1e-9. Goldens:
 /// `generated_v54.curvyo`, `generated_unknown_kind_v54.curvyo`, `generated_damaged_v54.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 54;
+///
+/// Version 55 (`specs/0121-print-and-cut` slice 1, ADR 0081 §1, §4, §9): a leaf may be a
+/// registration mark (`shape = "registration_mark"`, `mark_number`, `mark_centre`,
+/// `mark_diameter`, `mark_line`) inside a group tagged `registration_marks`, and a placement may
+/// hold the register `x.curvyo.laser.print_and_cut` (measured marks in µm, tolerance, Reset
+/// matrix). A build that stops at 54 would read the marks as nothing it knows and could cut the
+/// sheet in the wrong place, so this build's files are refused there by version; a file of 54
+/// opens unchanged. Goldens: `print_and_cut_v55.curvyo`, `print_and_cut_damaged_v55.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 55;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -1150,6 +1158,14 @@ enum ObjectJson {
         place: crate::dimension_model::DimensionPlace,
         kept: crate::dimension_model::Measured,
     },
+    /// A registration mark (`specs/0121-print-and-cut`, ADR 0081 §1): number, centre, size.
+    RegistrationMark {
+        id: crate::path_model::NodeId,
+        number: u8,
+        centre: crate::units::Point,
+        diameter: crate::units::Length,
+        line: crate::units::Length,
+    },
     /// A linked clone (`specs/0049-linked-clone` criterion 40): the original it follows and its
     /// matrix `[a, b, c, d, e, f]`, no outline. Listed whether or not its chain resolves. The
     /// override flags are listed only when set, and `style` only with `own_style`; its own
@@ -1266,6 +1282,13 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 graph: sketch.graph,
                 placement: sketch.placement,
                 style: sketch.style,
+            },
+            ObjectSnapshot::RegistrationMark(mark) => Self::RegistrationMark {
+                id: mark.id,
+                number: mark.number,
+                centre: mark.centre,
+                diameter: mark.diameter,
+                line: mark.line,
             },
             ObjectSnapshot::Dimension(dimension) => Self::Dimension {
                 id: dimension.id,

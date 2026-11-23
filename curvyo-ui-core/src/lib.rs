@@ -200,6 +200,7 @@ mod style_scope;
 mod svg_export;
 mod svg_export_gradient;
 mod svg_export_leaf;
+mod svg_export_marks;
 mod svg_export_notices;
 mod svg_export_parts;
 mod svg_export_pattern;

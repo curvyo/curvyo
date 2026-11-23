@@ -472,6 +472,9 @@ pub(crate) fn kind_of(doc: &LoroDoc, id: TreeID) -> ObjectShape {
         Some(crate::text_codec::SHAPE_TEXT) => ObjectShape::Text,
         Some(crate::image_codec::SHAPE_IMAGE) => ObjectShape::Image,
         Some(crate::dimension_codec::SHAPE_DIMENSION) => ObjectShape::Dimension,
+        Some(crate::registration_mark_codec::SHAPE_REGISTRATION_MARK) => {
+            ObjectShape::RegistrationMark
+        }
         Some(crate::shape_codec::SHAPE_RECT) => ObjectShape::Rectangle,
         Some(crate::shape_codec::SHAPE_ELLIPSE) => ObjectShape::Ellipse,
         Some(crate::shape_codec::SHAPE_POLYGON) => ObjectShape::Polygon,

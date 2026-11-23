@@ -28,6 +28,9 @@ fn width(d: &Document, id: NodeId, mm: f64) -> StepRef {
 
 fn stroke(d: &Document, id: NodeId) -> f64 {
     match d.object(id).unwrap() {
+        curvyo_document_core::ObjectSnapshot::RegistrationMark(_) => {
+            unreachable!("no registration mark here")
+        }
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Dimension(_) => {

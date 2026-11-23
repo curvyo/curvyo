@@ -93,6 +93,7 @@ fn all_primitives(doc: &Document) -> Vec<NodeId> {
 
 fn style_of(doc: &Document, id: NodeId) -> Style {
     match doc.object(id).expect("object exists") {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -483,6 +484,7 @@ fn object_to_path_gives_a_path_without_markers() {
     doc.convert_to_paths(&conversions).unwrap();
     for id in prims {
         match doc.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -557,6 +559,7 @@ fn splitting_an_open_path_keeps_the_settings_on_both_halves() {
     // Each half is an open path with the split node at the end / the start.
     for id in [a, b] {
         match doc.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -636,6 +639,7 @@ fn closing_a_path_onto_itself_keeps_its_settings() {
         .join_endpoints(p, AnchorId::new(1, 3), p, AnchorId::new(1, 1))
         .unwrap();
     match doc.object(id).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

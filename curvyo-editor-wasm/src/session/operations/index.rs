@@ -94,7 +94,9 @@ impl Session {
 fn output_capable(object: &ObjectSnapshot, read: &DocumentRead) -> bool {
     !matches!(
         object,
-        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Dimension(_)
+        ObjectSnapshot::Sketch(_)
+            | ObjectSnapshot::Dimension(_)
+            | ObjectSnapshot::RegistrationMark(_)
     ) && !read.guides.contains(&object.id())
 }
 

@@ -123,7 +123,8 @@ fn stroked_outlines(object: &ObjectSnapshot) -> (Vec<(Vec<OutlineTriple>, bool)>
         ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_)
-        | ObjectSnapshot::Dimension(_) => (Vec::new(), false),
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => (Vec::new(), false),
     }
 }
 

@@ -93,6 +93,7 @@ pub fn object_bounds(object: &ObjectSnapshot) -> (Point, Point) {
         ObjectSnapshot::Text(text) => crate::text_box::line_box_bounds(text),
         ObjectSnapshot::Image(image) => crate::image_frame::frame_bounds(image),
         ObjectSnapshot::Dimension(dimension) => dimension_bounds(dimension),
+        ObjectSnapshot::RegistrationMark(mark) => curvyo_document_core::mark_lines(mark).bounds(),
         ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
@@ -147,6 +148,7 @@ pub fn try_object_outline_bounds(object: &ObjectSnapshot) -> Option<(Point, Poin
         }
         ObjectSnapshot::Image(image) => crate::image_frame::frame_bounds(image),
         ObjectSnapshot::Dimension(dimension) => dimension_bounds(dimension),
+        ObjectSnapshot::RegistrationMark(mark) => curvyo_document_core::mark_lines(mark).bounds(),
         ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)

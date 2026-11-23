@@ -137,6 +137,9 @@ pub fn map_leaf(leaf: &ObjectSnapshot, map: Affine) -> ObjectSnapshot {
         }
         ObjectSnapshot::Sketch(sketch) => ObjectSnapshot::Path(sketch.resolved.mapped(map)),
         ObjectSnapshot::Clone(clone) => ObjectSnapshot::Clone(clone.mapped_by(map)),
+        ObjectSnapshot::RegistrationMark(mark) => {
+            ObjectSnapshot::RegistrationMark(mark.mapped_by(map))
+        }
         ObjectSnapshot::Dimension(dimension) => {
             ObjectSnapshot::Dimension(Box::new(dimension.mapped_by(map)))
         }
@@ -420,6 +423,11 @@ fn group_list(
         };
         match object {
             ObjectSnapshot::Dimension(_) => {}
+            ObjectSnapshot::RegistrationMark(mark) => {
+                if !own_guide {
+                    list.push(ObjectSnapshot::RegistrationMark(mark.clone()));
+                }
+            }
             ObjectSnapshot::Clone(clone) if clone.is_picture() => {
                 let own = leaf_opacity(clone.chain.style_source);
                 for leaf in clone.chain.picture.iter().flat_map(|p| p.iter()) {

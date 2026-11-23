@@ -181,7 +181,8 @@ impl Session {
             tolerances.param_min_side_mm = f64::INFINITY;
         }
         // A whole test grid keeps its box and centre move only (`specs/0028` ux-notes 6.5).
-        tolerances.move_only = self.whole_test_grid_selected();
+        // A marks object and its marks only move (`specs/0121` UX notes P6).
+        tolerances.move_only = self.whole_test_grid_selected() || self.marks_selected();
         // Generated objects resize proportionally from their corners (`0141` criterion 5).
         tolerances.corners_only = self.selection_all_generated();
         // A shape handle under a drawn gradient handle yields (`specs/0124` criterion 6).

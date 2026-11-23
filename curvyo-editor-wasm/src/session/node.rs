@@ -70,7 +70,8 @@ impl Session {
                 | ObjectSnapshot::Clone(_)
                 | ObjectSnapshot::Text(_)
                 | ObjectSnapshot::Image(_)
-                | ObjectSnapshot::Dimension(_) => None,
+                | ObjectSnapshot::Dimension(_)
+                | ObjectSnapshot::RegistrationMark(_) => None,
             })
             .collect();
         if self.tool == Tool::Node {

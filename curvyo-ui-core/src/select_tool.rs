@@ -1660,6 +1660,9 @@ mod tests {
                 let after = document.object(id).expect("exists");
                 assert_ne!(after, before, "{direction:?}: the resize happened");
                 let width = |o: &ObjectSnapshot| match o {
+                    ObjectSnapshot::RegistrationMark(_) => {
+                        unreachable!("no registration mark here")
+                    }
                     ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                     ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                     ObjectSnapshot::Text(_) => unreachable!("no text in this test"),

@@ -458,9 +458,9 @@ fn hit_outcome(object: &ObjectSnapshot) -> SelectDoubleClickOutcome {
         ObjectSnapshot::Clone(_) => SelectDoubleClickOutcome::Clone,
         // An image has no nodes; nothing opens (`specs/0058-bitmap-import` criterion 36).
         // Nothing is driven by a dimension: a double-click does nothing (`0070` UX notes §7).
-        ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_) => {
-            SelectDoubleClickOutcome::NoNodes
-        }
+        ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => SelectDoubleClickOutcome::NoNodes,
     }
 }
 

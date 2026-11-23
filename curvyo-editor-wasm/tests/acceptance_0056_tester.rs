@@ -142,6 +142,7 @@ fn path_pts(o: &ObjectSnapshot) -> Vec<Point> {
 }
 fn outline_pts(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -165,6 +166,7 @@ fn outline_pts(o: &ObjectSnapshot) -> Vec<Point> {
 }
 fn rotation_of(o: &ObjectSnapshot) -> f64 {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -343,6 +345,7 @@ fn radius_t(r: CornerRadii) -> [f64; 4] {
 }
 fn id_of(o: &ObjectSnapshot) -> String {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -725,6 +728,7 @@ fn tbb_centre_extreme(o: &ObjectSnapshot) -> Point {
 }
 fn tbb(o: &ObjectSnapshot) -> (Point, Point) {
     let anchors = match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -1596,6 +1600,7 @@ fn mixed_scene() -> Document {
 fn nums(o: &ObjectSnapshot) -> Vec<f64> {
     let mut v = vec![rotation_of(o)];
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -1664,6 +1669,7 @@ fn ac28_flip_properties_on_mixed_selection() {
     let mut ptsb = Vec::new();
     for o in &before {
         let (l, h) = match o {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -1854,6 +1860,7 @@ fn ac26_file_round_trip_no_negative_lengths() {
     let now = objects(&s);
     for o in &now {
         match o {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

@@ -919,6 +919,7 @@ fn ac8_stroke_stays_positive_for_every_object_kind_when_collapsed() {
         let id = only_id(&s);
         let d = document_of(&s);
         let stroke = match d.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -2068,6 +2069,7 @@ fn ac24_scaled_and_rotated_objects_round_trip_exactly() {
             let id = only_id(&s);
             let d = document_of(&s);
             match d.object(id).unwrap() {
+                ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -2861,6 +2863,7 @@ fn assert_all_finite_and_reopenable(session: &Session) {
     let doc = document_of(&reopened);
     for id in doc.object_ids() {
         match doc.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

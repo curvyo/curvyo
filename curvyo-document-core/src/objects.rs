@@ -88,6 +88,9 @@ pub enum ObjectEditError {
     /// [`Document::group_objects`] was given fewer than two different objects.
     #[error("a group needs two or more objects")]
     NotEnoughObjects,
+    /// A delete would leave a marks object with fewer than two marks (`specs/0121` criterion 3).
+    #[error("Registration marks need at least 2 marks.")]
+    MarksBelowTwo,
     /// [`Document::group_objects`] was given objects that do not share one parent.
     #[error("the objects do not share one parent")]
     NotSiblings,
@@ -336,7 +339,8 @@ impl Document {
                 ObjectSnapshot::Primitive(_)
                 | ObjectSnapshot::Text(_)
                 | ObjectSnapshot::Image(_)
-                | ObjectSnapshot::Dimension(_) => None,
+                | ObjectSnapshot::Dimension(_)
+                | ObjectSnapshot::RegistrationMark(_) => None,
             })
             .collect();
         self.clone_limits_hold(&links, &changed)
@@ -744,6 +748,9 @@ impl Document {
             .copied()
             .filter(|&id| !crate::group_tree::has_ancestor_in(&tree, id, &tree_ids))
             .collect();
+        if crate::registration_mark_commands::delete_leaves_marks_below_two(&tree, &doomed) {
+            return Err(ObjectEditError::MarksBelowTwo);
+        }
         for id in self.object_ids() {
             let node = tree_id_of(id);
             if doomed.contains(&node) || crate::group_tree::has_ancestor_in(&tree, node, &doomed) {
@@ -970,6 +977,9 @@ pub(crate) fn translate_meta(meta: &loro::LoroMap, offset: Vec2) {
         }
         shape_codec::LeafKind::Generated => {
             crate::generated_codec::translate_generated_meta(meta, offset);
+        }
+        shape_codec::LeafKind::RegistrationMark => {
+            crate::registration_mark_codec::translate_mark_meta(meta, offset);
         }
     }
 }

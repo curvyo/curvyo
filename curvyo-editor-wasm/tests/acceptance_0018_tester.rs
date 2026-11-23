@@ -81,6 +81,7 @@ fn styles(s: &Session) -> Vec<Style> {
         .into_iter()
         .filter_map(|id| d.object(id))
         .map(|o| match o {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -363,6 +364,7 @@ fn a_mixed_selection_of_paths_and_primitives_edits_the_paths_in_one_commit() {
     let d = doc_of(&s);
     for (id, style) in d.object_ids().into_iter().zip(st) {
         match d.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -774,6 +776,7 @@ fn a_resize_moves_the_markers_with_the_geometry_without_stretching_them() {
     s.pointer_up(pt(200.0, 100.0), false, false);
     let d = doc_of(&s);
     let end_x = match d.object(d.object_ids()[0]).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

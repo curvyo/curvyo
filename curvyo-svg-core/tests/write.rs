@@ -177,6 +177,7 @@ fn kitchen_sink() -> SvgExport {
             locked: true,
             opacity: 0.3,
             key: Some(7),
+            data: Vec::new(),
         },
         leaf: Box::new(ExportLeaf {
             kind: ExportKind::Path {
@@ -482,4 +483,22 @@ fn ac57_without_the_format_the_profile_is_ignored() {
     leaves(&read.nodes, &mut all);
     assert!(all.iter().all(|l| l.shadow == Shadow::default()));
     assert!(read.nodes.iter().all(|n| !n.state().guides_layer));
+}
+
+/// `specs/0121-print-and-cut` (architect review): a `data-*` value is escaped like a name.
+#[test]
+fn a_data_attribute_value_is_escaped() {
+    let drawing = a4(vec![ExportNode::Group {
+        state: ExportState {
+            data: vec![("data-curvyo-mark", "1\" onload=\"x&<".to_owned())],
+            ..ExportState::default()
+        },
+        layer: false,
+        children: Vec::new(),
+    }]);
+    let text = write_svg(&drawing);
+    assert!(
+        text.contains("data-curvyo-mark=\"1&quot; onload=&quot;x&amp;&lt;\""),
+        "{text}"
+    );
 }

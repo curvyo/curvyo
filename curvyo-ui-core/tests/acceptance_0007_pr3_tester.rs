@@ -65,6 +65,9 @@ fn hex_rgb(text: &str) -> Result<Color, StyleEntryError> {
 
 fn style_of(document: &Document, id: NodeId) -> curvyo_document_core::Style {
     match document.object(id).unwrap() {
+        curvyo_document_core::ObjectSnapshot::RegistrationMark(_) => {
+            unreachable!("no registration mark here")
+        }
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Dimension(_) => {
@@ -632,6 +635,9 @@ fn a_gesture_on_one_object_is_not_applied_to_another() {
     let mut objs = objects(&document);
     editor.apply_to(&mut objs);
     let opacity = |o: &curvyo_document_core::ObjectSnapshot| match o {
+        curvyo_document_core::ObjectSnapshot::RegistrationMark(_) => {
+            unreachable!("no registration mark here")
+        }
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Dimension(_) => {
@@ -745,6 +751,9 @@ fn a_width_preview_of_zero_is_drawn_as_no_stroke_and_only_the_commit_stores_it()
     let mut objs = objects(&document);
     editor.apply_to(&mut objs);
     match &objs[0] {
+        curvyo_document_core::ObjectSnapshot::RegistrationMark(_) => {
+            unreachable!("no registration mark here")
+        }
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Dimension(_) => {

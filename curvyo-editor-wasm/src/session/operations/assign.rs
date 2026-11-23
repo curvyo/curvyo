@@ -132,11 +132,13 @@ impl Session {
             } else if read.guides.contains(&id) {
                 selection.guides += 1;
                 selection.skipped += 1;
-            } else if read
-                .leaves
-                .iter()
-                .any(|o| o.id() == id && matches!(o, ObjectSnapshot::Dimension(_)))
-            {
+            } else if read.leaves.iter().any(|o| {
+                o.id() == id
+                    && matches!(
+                        o,
+                        ObjectSnapshot::Dimension(_) | ObjectSnapshot::RegistrationMark(_)
+                    )
+            }) {
                 selection.skipped += 1;
             } else {
                 if unit.is_group {
@@ -280,6 +282,7 @@ impl Session {
                     ObjectSnapshot::Image(_) if self.is_placement(id) => return None,
                     ObjectSnapshot::Image(_) => ObjectShape::Image,
                     ObjectSnapshot::Dimension(_) => ObjectShape::Dimension,
+                    ObjectSnapshot::RegistrationMark(_) => ObjectShape::RegistrationMark,
                     ObjectSnapshot::Primitive(primitive) => match primitive.shape {
                         Shape::Rect { .. } => ObjectShape::Rectangle,
                         Shape::Ellipse { .. } => ObjectShape::Ellipse,

@@ -145,6 +145,7 @@ mod tests {
         let mut results: Vec<ObjectSnapshot> = [o, b]
             .iter()
             .map(|&id| match snapshot(&document, id) {
+                ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
@@ -197,6 +198,7 @@ mod tests {
         let mut results: Vec<ObjectSnapshot> = [o, c]
             .iter()
             .map(|&id| match snapshot(&document, id) {
+                ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),

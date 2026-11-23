@@ -69,6 +69,8 @@ pub enum ObjectShape {
     Image,
     /// A dimension (`specs/0070-measure-and-dimension`).
     Dimension,
+    /// A registration mark (`specs/0121-print-and-cut`).
+    RegistrationMark,
 }
 
 /// The outcome for one object.

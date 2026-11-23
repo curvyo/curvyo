@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="210mm" height="297mm" viewBox="0 0 210 297" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1" inkscape:label="Registration marks">
+    <g id="g2" data-curvyo-kind="registration-mark" data-curvyo-mark="1">
+      <circle id="circle1" cx="10" cy="10" r="3" fill="none" stroke="#000000" stroke-width="0.25"/>
+      <path id="compound1" d="M 6 10 L 14 10 M 10 6 L 10 14 M 13.86 4.1 L 14.49 3.5 L 14.49 6.5" sodipodi:nodetypes="ccccccc" fill="none" stroke="#000000" stroke-width="0.25"/>
+    </g>
+    <g id="g3" data-curvyo-kind="registration-mark" data-curvyo-mark="2">
+      <circle id="circle2" cx="200" cy="10" r="3" fill="none" stroke="#000000" stroke-width="0.25"/>
+      <path id="compound2" d="M 196 10 L 204 10 M 200 6 L 200 14 M 203.5 4.25 L 203.95 3.5 L 204.85 3.5 L 205.3 4.25 L 205.3 4.85 L 203.5 6.5 L 205.3 6.5" sodipodi:nodetypes="ccccccccccc" fill="none" stroke="#000000" stroke-width="0.25"/>
+    </g>
+    <g id="g4" data-curvyo-kind="registration-mark" data-curvyo-mark="3">
+      <circle id="circle3" cx="200" cy="287" r="3" fill="none" stroke="#000000" stroke-width="0.25"/>
+      <path id="compound3" d="M 196 287 L 204 287 M 200 283 L 200 291 M 203.5 280.5 L 205.3 280.5 L 204.22 281.76 L 204.85 281.76 L 205.3 282.6 L 204.85 283.5 L 203.5 283.5" sodipodi:nodetypes="ccccccccccc" fill="none" stroke="#000000" stroke-width="0.25"/>
+    </g>
+    <g id="g5" data-curvyo-kind="registration-mark" data-curvyo-mark="4">
+      <circle id="circle4" cx="10" cy="287" r="3" fill="none" stroke="#000000" stroke-width="0.25"/>
+      <path id="compound4" d="M 6 287 L 14 287 M 10 283 L 10 291 M 14.85 283.5 L 14.85 280.5 L 13.5 282.6 L 15.3 282.6" sodipodi:nodetypes="cccccccc" fill="none" stroke="#000000" stroke-width="0.25"/>
+    </g>
+  </g>
+</svg>

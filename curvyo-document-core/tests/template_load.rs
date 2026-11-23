@@ -137,6 +137,7 @@ fn load(target: &Document, source: &Document, from: u64) -> Vec<NodeId> {
 /// The geometry of an object without ids: points, closed flags, shapes.
 fn geometry(object: &ObjectSnapshot) -> String {
     match object {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

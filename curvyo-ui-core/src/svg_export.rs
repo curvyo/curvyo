@@ -540,6 +540,7 @@ pub(crate) fn state_of(node: &NodeRead) -> ExportState {
         locked: node.registers.locked,
         opacity: node.registers.opacity.get(),
         key: None,
+        data: Vec::new(),
     }
 }
 
@@ -600,6 +601,7 @@ pub(crate) fn shape_leaf(
         ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_)
-        | ObjectSnapshot::Dimension(_) => None,
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => None,
     }
 }

@@ -49,6 +49,7 @@ pub fn build_history_preview_greyed(
                 ObjectSnapshot::Clone(clone) => ghost_style(&mut clone.resolved.style),
                 ObjectSnapshot::Image(image) => image.shown_opacity = ghost(image.shown_opacity),
                 ObjectSnapshot::Dimension(_) => {}
+                ObjectSnapshot::RegistrationMark(mark) => ghost_style(&mut mark.style),
                 ObjectSnapshot::Text(text) => {
                     ghost_style(&mut text.style);
                     if let Some(outline) = &mut text.outline {

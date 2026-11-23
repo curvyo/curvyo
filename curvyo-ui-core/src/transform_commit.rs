@@ -177,7 +177,8 @@ pub(crate) fn commit_resize(
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_)
-        | ObjectSnapshot::Dimension(_) => {
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => {
             let _ = commit_group(
                 document,
                 std::slice::from_ref(result),
@@ -330,6 +331,7 @@ fn numbers_of(object: &ObjectSnapshot) -> (Vec<f64>, f64) {
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Text(_) => (Vec::new(), 0.0),
         ObjectSnapshot::Image(image) => (image.placement.to_array().to_vec(), 0.0),
+        ObjectSnapshot::RegistrationMark(mark) => (vec![mark.centre.x, mark.centre.y], 0.0),
         ObjectSnapshot::Dimension(dimension) => (
             dimension
                 .kept

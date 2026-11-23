@@ -52,9 +52,12 @@ impl Session {
             };
             let to_plane = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
             for (id, map, members) in self.placements_of(manufacturing) {
+                // A mark of a placed sheet is drawn as a faint cross by the overlay, never as
+                // artwork on a laser page (`specs/0121` UX notes P22).
                 let objects: Vec<ObjectSnapshot> = members
                     .iter()
                     .map(|&index| read.drawn[index].clone())
+                    .filter(|object| !matches!(object, ObjectSnapshot::RegistrationMark(_)))
                     .collect();
                 // The members of this placed page in their looks (`0101` criteria 11, 14, 15, 18).
                 let objects = match looks
@@ -191,6 +194,7 @@ impl Session {
     /// marker (view only, never artwork).
     pub(in crate::session) fn output_pages_overlay(&self) -> DrawList {
         let mut list = self.placed_frame_marks();
+        list.extend(self.print_and_cut_overlay());
         let manufacturings = self.document.manufacturings();
         if manufacturings.is_empty() {
             return list;

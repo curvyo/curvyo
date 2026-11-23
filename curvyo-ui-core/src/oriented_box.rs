@@ -139,7 +139,7 @@ pub fn oriented_bounds(object: &ObjectSnapshot) -> OrientedBox {
         ObjectSnapshot::Text(text) => crate::text_box::line_box_oriented(text),
         ObjectSnapshot::Sketch(sketch) => path_oriented_bounds(&sketch.resolved),
         ObjectSnapshot::Image(image) => crate::image_frame::frame_oriented(image),
-        ObjectSnapshot::Dimension(_) => {
+        ObjectSnapshot::Dimension(_) | ObjectSnapshot::RegistrationMark(_) => {
             let (min, max) = crate::object_bounds::object_bounds(object);
             OrientedBox {
                 min,

@@ -665,6 +665,7 @@ fn ac17_converting_a_rect_replaces_its_parameters_with_only_path_anchors() {
         "no primitive parameters remain"
     );
     match document.object(id).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -731,6 +732,7 @@ fn ac22_each_selected_primitive_converts_independently_in_one_call() {
 
     for id in [rect_id, ellipse_id] {
         match document.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

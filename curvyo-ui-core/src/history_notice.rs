@@ -63,6 +63,7 @@ pub fn objects_summary(shapes: &[ObjectShape]) -> Option<String> {
             ObjectShape::Text => ("text", "texts"),
             ObjectShape::Image => ("image", "images"),
             ObjectShape::Dimension => ("dimension", "dimensions"),
+            ObjectShape::RegistrationMark => ("registration mark", "registration marks"),
         };
         Some(format!("{count} {}", if count == 1 { one } else { many }))
     } else {

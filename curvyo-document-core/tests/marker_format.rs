@@ -61,6 +61,7 @@ fn rect(document: &Document) -> NodeId {
 
 fn markers_of(document: &Document, id: NodeId) -> Markers {
     match document.object(id).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

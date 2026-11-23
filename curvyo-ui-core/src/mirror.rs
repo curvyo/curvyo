@@ -119,6 +119,14 @@ pub(crate) fn mirrored(object: &ObjectSnapshot, mirror: Mirror) -> ObjectSnapsho
             });
             ObjectSnapshot::Dimension(Box::new(dimension.mapped_by(g)))
         }
+        // A mark's centre is mirrored; the mark itself stays upright (ADR 0081 §1).
+        ObjectSnapshot::RegistrationMark(mark) => {
+            let (fx, fy) = mirror.factors();
+            let g = crate::clone_gesture::affine_of(mark.id, &|path: &PathSnapshot| {
+                path.scaled_along(mirror.pivot, fx, fy, mirror.axes)
+            });
+            ObjectSnapshot::RegistrationMark(mark.mapped_by(g))
+        }
         ObjectSnapshot::Image(image) => {
             let (fx, fy) = mirror.factors();
             let g = crate::clone_gesture::affine_of(image.id, &|path: &PathSnapshot| {
@@ -414,6 +422,7 @@ mod tests {
 
     fn samples(object: &ObjectSnapshot) -> Vec<Point> {
         match object {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),

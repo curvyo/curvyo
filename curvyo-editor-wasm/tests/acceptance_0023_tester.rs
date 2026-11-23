@@ -918,6 +918,7 @@ fn ac13_ctrl_drag_copies_the_group_with_new_ids_for_everything() {
     // The copy sits 100 mm to the right.
     let copy_leaves = d2.leaves_of(copy);
     let moved = copy_leaves.iter().any(|id| match d2.object(*id).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

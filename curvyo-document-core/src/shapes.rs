@@ -241,7 +241,8 @@ impl Document {
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Text(_)
             | ObjectSnapshot::Image(_)
-            | ObjectSnapshot::Dimension(_) => None,
+            | ObjectSnapshot::Dimension(_)
+            | ObjectSnapshot::RegistrationMark(_) => None,
         }
     }
 
@@ -578,6 +579,10 @@ pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnaps
                 crate::style_codec::read_style(&meta),
             ))
         });
+    }
+    if crate::registration_mark_codec::is_registration_mark_meta(&meta) {
+        return crate::registration_mark_codec::read_mark_snapshot(id, &meta)
+            .map(ObjectSnapshot::RegistrationMark);
     }
     match shape_codec::read_shape_tag(&meta) {
         Some(shape) if shape == "sketch" => crate::sketch_read::read(id, &meta)

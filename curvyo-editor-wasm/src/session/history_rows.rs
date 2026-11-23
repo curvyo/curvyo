@@ -30,6 +30,7 @@ fn shape_word(shape: ObjectShape) -> &'static str {
         ObjectShape::Text => "text",
         ObjectShape::Image => "image",
         ObjectShape::Dimension => "dimension",
+        ObjectShape::RegistrationMark => "registration-mark",
     }
 }
 
@@ -106,6 +107,7 @@ fn shape_name(shape: ObjectShape) -> &'static str {
         ObjectShape::Text => "Text",
         ObjectShape::Image => "Image",
         ObjectShape::Dimension => "Dimension",
+        ObjectShape::RegistrationMark => "Registration mark",
     }
 }
 

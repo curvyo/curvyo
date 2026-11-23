@@ -83,6 +83,7 @@ fn prims_of(s: &Session) -> Vec<PrimitiveSnapshot> {
     d.object_ids()
         .into_iter()
         .filter_map(|id| match d.object(id).unwrap() {
+            ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
             ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

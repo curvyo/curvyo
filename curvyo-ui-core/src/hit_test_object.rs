@@ -103,6 +103,12 @@ fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) ->
         | ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Dimension(_) => true,
+        // A registration mark is hit on its drawn lines (ADR 0081 §1).
+        ObjectSnapshot::RegistrationMark(mark) => certainly_farther_than(
+            &ObjectSnapshot::Path(curvyo_document_core::mark_path(mark)),
+            point,
+            margin,
+        ),
         ObjectSnapshot::Primitive(primitive) => {
             let (min, max) = shape_frame_bounds(&primitive.shape);
             let centre = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
@@ -208,6 +214,12 @@ pub(crate) fn distance_to_object_with_artwork(
         | ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Dimension(_) => None,
+        ObjectSnapshot::RegistrationMark(mark) => distance_to_object_with_artwork(
+            &ObjectSnapshot::Path(curvyo_document_core::mark_path(mark)),
+            point,
+            tolerance,
+            artwork,
+        ),
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
             nearest_distance_on_run(outline.len(), outline.closed, point, tolerance, |i| {
@@ -245,6 +257,9 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
         }
         ObjectSnapshot::Image(image) => crate::image_frame::frame_outline(image),
         ObjectSnapshot::Dimension(_) => Vec::new(),
+        ObjectSnapshot::RegistrationMark(mark) => {
+            outlines_of(&ObjectSnapshot::Path(curvyo_document_core::mark_path(mark)))
+        }
         // Marquee and lasso take a text by its line box (criterion 25).
         ObjectSnapshot::Text(text) => vec![(
             crate::text_box::line_box_corners(text)
@@ -668,6 +683,29 @@ mod tests {
         let objects = vec![document.object(path).expect("exists")];
         let hit = hit_test_object(&objects, Point::new(10.0, 0.3), Tolerance::from_mm(1.0));
         assert_eq!(hit, Some(path));
+    }
+
+    /// `specs/0121`: a registration mark is hit on its circle and cross, not far beside it.
+    #[test]
+    fn hits_a_registration_mark_on_its_lines() {
+        let document = Document::new(1);
+        document
+            .insert_registration_marks([Point::new(50.0, 50.0); 4])
+            .expect("inserted");
+        let objects: Vec<ObjectSnapshot> = document
+            .read_objects()
+            .objects
+            .iter()
+            .filter(|o| matches!(o, ObjectSnapshot::RegistrationMark(_)))
+            .cloned()
+            .collect();
+        let tolerance = Tolerance::from_mm(0.5);
+        assert!(hit_test_object(&objects, Point::new(53.0, 50.2), tolerance).is_some());
+        assert!(hit_test_object(&objects, Point::new(50.0, 53.9), tolerance).is_some());
+        assert_eq!(
+            hit_test_object(&objects, Point::new(40.0, 40.0), tolerance),
+            None
+        );
     }
 
     #[test]

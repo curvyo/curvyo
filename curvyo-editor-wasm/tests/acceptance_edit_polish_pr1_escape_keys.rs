@@ -61,6 +61,7 @@ fn objects_of(s: &Session) -> Vec<ObjectSnapshot> {
 
 fn path_points(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -600,6 +601,7 @@ fn ac42_skew_and_parameter_handle_drags_are_cancelled_too() {
         let p0 = {
             let o = &objects_of(&s)[0];
             match o {
+                ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),

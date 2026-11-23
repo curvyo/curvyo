@@ -84,6 +84,20 @@ mod generated_commands;
 #[cfg(test)]
 mod generated_damage_tests;
 mod generated_outline;
+mod print_and_cut_codec;
+mod print_and_cut_commands;
+pub use print_and_cut_codec::{
+    APPLY_PRINT_AND_CUT_COMMIT_LABEL, PRINT_AND_CUT_DEFAULT_TOLERANCE_UM,
+    PRINT_AND_CUT_MAX_MEASURE_UM, PRINT_AND_CUT_MAX_TOLERANCE_UM,
+    PRINT_AND_CUT_MEASURE_COMMIT_LABEL, PRINT_AND_CUT_MIN_TOLERANCE_UM,
+    PRINT_AND_CUT_TOLERANCE_COMMIT_LABEL, PrintAndCutMeasures, PrintAndCutRegister,
+    RESET_PRINT_AND_CUT_COMMIT_LABEL,
+};
+mod registration_mark_codec;
+mod registration_mark_commands;
+pub use registration_mark_commands::{MarksObject, registration_mark_corners};
+mod registration_mark_lines;
+mod registration_mark_model;
 pub use dimension_commands::{ConvertedPath, DimensionConversion};
 pub use dimension_model::{
     CONVERT_DIMENSION_COMMIT_LABEL, CREATE_DIMENSION_COMMIT_LABEL, CurveSlot, DimensionKind,
@@ -95,6 +109,8 @@ pub use dimension_read::{
     CIRCLE_TOLERANCE, angle_rays, arc_circle, cubic_at, measure, resolve as resolve_dimension,
     resolve_dimensions_in, resolve_into as resolve_dimension_into, segment, shape_point,
 };
+pub use registration_mark_lines::{MarkLines, mark_lines, mark_path};
+pub use registration_mark_model::*;
 mod drawing_above;
 mod drawing_check;
 mod drawing_content;

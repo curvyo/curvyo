@@ -286,7 +286,9 @@ impl Document {
                 let meta = tree
                     .get_meta(tree_id)
                     .map_err(|_| CloneError::NoSuchObject)?;
-                if crate::dimension_codec::is_dimension_meta(&meta) {
+                if crate::dimension_codec::is_dimension_meta(&meta)
+                    || crate::registration_mark_codec::is_registration_mark_meta(&meta)
+                {
                     return Err(CloneError::NotClonable);
                 }
                 if crate::text_codec::is_text_meta(&meta)

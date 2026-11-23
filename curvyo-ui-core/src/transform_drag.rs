@@ -533,6 +533,13 @@ fn resize_by_box(
                     1.0,
                 )
             }
+            // A mark's centre is mapped; its size never scales (ADR 0081 §1).
+            ObjectSnapshot::RegistrationMark(mark) => {
+                let g = crate::clone_gesture::affine_of(mark.id, &|path: &PathSnapshot| {
+                    path.scaled(pivot, resized.sx, resized.sy)
+                });
+                (ObjectSnapshot::RegistrationMark(mark.mapped_by(g)), 1.0)
+            }
             // An image is stretched freely; its frame is mapped, never converted (`0058` 32, 33).
             ObjectSnapshot::Image(image) => {
                 let g = crate::clone_gesture::affine_of(image.id, &|path: &PathSnapshot| {
@@ -642,6 +649,13 @@ pub(crate) fn skewed_unchecked(
             });
             return ObjectSnapshot::Dimension(Box::new(dimension.mapped_by(g)));
         }
+        (ObjectSnapshot::RegistrationMark(mark), _) => {
+            let fixed = frame.fixed_point;
+            let g = crate::clone_gesture::affine_of(mark.id, &|path: &PathSnapshot| {
+                path.sheared(fixed, ku, kv)
+            });
+            return ObjectSnapshot::RegistrationMark(mark.mapped_by(g));
+        }
         // An image is skewed by its frame and never converts (`0058` criterion 32).
         (ObjectSnapshot::Image(image), _) => {
             let fixed = frame.fixed_point;
@@ -688,6 +702,7 @@ pub(crate) fn scale_stroke(object: &mut ObjectSnapshot, factor: f64) {
         ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Image(_)
-        | ObjectSnapshot::Dimension(_) => {}
+        | ObjectSnapshot::Dimension(_)
+        | ObjectSnapshot::RegistrationMark(_) => {}
     }
 }

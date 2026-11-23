@@ -107,6 +107,73 @@ fn cut_line() {
     );
 }
 
+/// `specs/0121-print-and-cut` criterion 17: a 40 mm square on a sheet with marks at its corners,
+/// measured on the bed as placed by a turn of 90 degrees and a move to (150, 60) mm; the fit
+/// places the square, and the job cuts it where the measures say.
+#[test]
+fn print_and_cut_cut_line() {
+    use curvyo_document_core::{Affine, PrintAndCutMeasures, PrintAndCutRegister};
+    use curvyo_laser_core::print_and_cut::{
+        FitState, SheetInput, head_position_um, machine_mm, read_print_and_cut,
+    };
+    let marks = [
+        (1, Point::new(10.0, 10.0)),
+        (2, Point::new(50.0, 10.0)),
+        (3, Point::new(50.0, 50.0)),
+        (4, Point::new(10.0, 50.0)),
+    ];
+    let placed = Affine::new(0.0, 1.0, -1.0, 0.0, 150.0, 60.0);
+    let mut page = cut_line_page();
+    let frame = curvyo_laser_core::job::Frame {
+        corner: page.input.machine.values.origin,
+        width: 400_000,
+        height: 300_000,
+    };
+    let measured = marks
+        .iter()
+        .map(|&(n, c)| {
+            let m = machine_mm(frame, placed.apply_point(c));
+            (n, head_position_um(m.x, m.y))
+        })
+        .collect();
+    let register = PrintAndCutRegister::Measures(PrintAndCutMeasures {
+        marks: measured,
+        ..PrintAndCutMeasures::default()
+    });
+    let reading = read_print_and_cut(&SheetInput {
+        marks: &marks,
+        register: &register,
+        frame,
+        matrix: Affine::new(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+        sheet: (100.0, 100.0),
+        start: Start::default(),
+    });
+    let FitState::Fit(fit) = reading.fit else {
+        panic!("a fit");
+    };
+    assert!(fit.largest_mm < 0.001);
+    let square = rect(10.0, 10.0, 40.0, 40.0);
+    let mapped = curvyo_laser_core::job::LeafOutline {
+        anchors: square
+            .anchors
+            .iter()
+            .map(|&(p, i, o)| (fit.map.apply_point(p), i, o))
+            .collect(),
+        closed: true,
+    };
+    page = Page::new();
+    page.operation(
+        Cut,
+        "Cut 1",
+        own(Cut, 50.0, 600, 1),
+        plain(),
+        vec![leaf(vec![mapped])],
+    );
+    let text = golden("print_and_cut_cut_line.gcode", &page.input, &[]);
+    // The square's first corner (10, 10) lands at page (140, 70): machine (140, 230).
+    assert!(text.contains("X140.000 Y230.000"), "{text}");
+}
+
 /// A page with a Score rectangle, an Engrave square and a Cut rectangle.
 fn shapes(page: &mut Page) {
     page.operation(

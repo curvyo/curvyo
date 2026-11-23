@@ -211,7 +211,12 @@ impl Document {
         if groups.iter().any(|&id| is_layer_node(&tree, id)) {
             return Err(ObjectEditError::IsALayer);
         }
-        if groups.is_empty() || groups.iter().any(|&id| !is_group_node(&tree, id)) {
+        if groups.is_empty()
+            || groups.iter().any(|&id| {
+                !is_group_node(&tree, id)
+                    || crate::registration_mark_codec::is_marks_group(&tree, id)
+            })
+        {
             return Err(ObjectEditError::NotAGroup);
         }
         tree.enable_fractional_index(0);

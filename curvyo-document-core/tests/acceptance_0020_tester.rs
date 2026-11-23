@@ -41,6 +41,7 @@ fn rect(d: &Document, x: f64) -> NodeId {
 
 fn width_mm(d: &Document, id: NodeId) -> f64 {
     match d.object(id).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -53,6 +54,7 @@ fn width_mm(d: &Document, id: NodeId) -> f64 {
 
 fn fill_color(d: &Document, id: NodeId) -> Color {
     match d.object(id).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
@@ -991,6 +993,7 @@ fn c54_eleven_continuation_commits_are_one_step() {
     let step = last_step(&a);
     a.undo_step(step).unwrap();
     match a.object(r).unwrap() {
+        ObjectSnapshot::RegistrationMark(_) => unreachable!("no registration mark here"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
