@@ -166,6 +166,10 @@ mod poly_star_tool;
 pub mod presence;
 mod preview_faces;
 mod preview_sample;
+mod recovery_prune;
+mod recovery_record;
+mod recovery_schedule;
+mod recovery_text;
 mod rectangle_tool;
 mod reference_point;
 mod resize_direction;
@@ -709,3 +713,15 @@ pub use sketch_marquee::{sketch_marquee, sketch_marquee_placed};
 
 mod sketch_lasso;
 pub use sketch_lasso::sketch_lasso;
+
+pub use recovery_prune::{MAX_BYTES as RECOVERY_MAX_BYTES, MAX_COPIES as RECOVERY_MAX_COPIES};
+pub use recovery_prune::{PruneCandidate, prune_plan};
+pub use recovery_record::{
+    RECOVERY_FORMAT, RecordError, RecoveryBase, RecoveryRecord, decode_record, encode_record,
+};
+pub use recovery_schedule::{Due, INTERVAL_MS, RecoverySchedule};
+pub use recovery_text::{
+    BLOCK_HEADING as RECOVERY_BLOCK_HEADING, FILE_CHANGED_LINE, LocalTime, Unrestorable,
+    WriteFailure, discard_armed_label, discard_label, failure_sentence, help_line, pages_text,
+    recovered_name, restore_label, row_label, row_line_two, row_name, row_subject, time_text,
+};

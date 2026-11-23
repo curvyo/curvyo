@@ -159,6 +159,9 @@ mod project;
 mod recognise;
 #[cfg(test)]
 mod recognise_tests;
+mod recovery;
+#[cfg(test)]
+mod recovery_tests;
 mod reference_view;
 mod refusal;
 mod ruler;
@@ -473,6 +476,8 @@ pub struct Session {
     saved: DocumentVersion,
     /// The version that went into the bytes of a save whose write has not been reported yet.
     packed: Option<DocumentVersion>,
+    /// What the recovery copy has been handed (`recovery.rs`).
+    recovery: recovery::Handoff,
     minter: AnchorIdMinter,
     pen: PenTool,
     node: NodeTool,
@@ -724,6 +729,7 @@ impl Session {
         Self {
             saved: document.version(),
             packed: None,
+            recovery: recovery::Handoff::default(),
             document,
             peer,
             sync: None,
@@ -852,6 +858,7 @@ impl Session {
         let mut session = Self {
             saved: document.version(),
             packed: None,
+            recovery: recovery::Handoff::default(),
             document,
             peer,
             sync: None,

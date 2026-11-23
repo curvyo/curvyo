@@ -28,6 +28,7 @@ mod font_checks_glue;
 mod font_file_glue;
 mod font_library_glue;
 mod font_preview_glue;
+mod recovery_writer;
 // The frame generation of `WasmSession`, plain Rust so its unit tests run on the host.
 #[cfg(any(target_arch = "wasm32", test))]
 mod frame_gate;
@@ -141,6 +142,8 @@ mod wasm_properties_panel;
 #[cfg(target_arch = "wasm32")]
 mod wasm_recognise;
 #[cfg(target_arch = "wasm32")]
+mod wasm_recovery;
+#[cfg(target_arch = "wasm32")]
 mod wasm_render;
 #[cfg(target_arch = "wasm32")]
 mod wasm_ruler;
@@ -200,6 +203,7 @@ pub use font_library_glue::FontLibraryGlue;
 pub use font_preview_glue::PreviewFacesGlue;
 pub use ocr_pool_glue::{crops_wire, read_crops, read_crops_wire};
 pub use pairing_glue::{PairPhase, PairingGlue};
+pub use recovery_writer::{PackedCopy, RecoveryWriter, RecoveryWriterError};
 pub use session::SvgExportResult;
 pub use session::TraceRegionTool;
 pub use session::{

@@ -45,9 +45,9 @@ const ZIP_EMPTY_ARCHIVE: &[u8] = b"PK\x05\x06";
 // accident to refactor away.
 #[allow(clippy::struct_field_names)]
 #[derive(Debug, Serialize, Deserialize)]
-struct Manifest {
-    format_version: u32,
-    loro_snapshot_version: u32,
+pub(crate) struct Manifest {
+    pub(crate) format_version: u32,
+    pub(crate) loro_snapshot_version: u32,
     app_version: String,
 }
 
@@ -62,7 +62,7 @@ struct Manifest {
 /// Returns [`SaveError`] if the document cannot be exported or the zip
 /// container cannot be assembled.
 pub fn pack(document: &Document, app_version: &str) -> Result<Vec<u8>, SaveError> {
-    pack_members(document, app_version, true)
+    pack_members(document, app_version, Members::Save)
 }
 
 /// Packs a [`Document`] as a relay snapshot: like [`pack`], without the share record
@@ -72,13 +72,34 @@ pub fn pack(document: &Document, app_version: &str) -> Result<Vec<u8>, SaveError
 /// # Errors
 /// As [`pack`].
 pub fn pack_snapshot(document: &Document, app_version: &str) -> Result<Vec<u8>, SaveError> {
-    pack_members(document, app_version, false)
+    pack_members(document, app_version, Members::Snapshot)
+}
+
+/// Packs a [`Document`] as a recovery copy (`specs/0136-autosave-and-restore`, ADR 0079 §4):
+/// like [`pack_snapshot`] without the asset members. The assets are written once each beside
+/// the copy; [`crate::assemble_recovery_copy`] puts them back into a normal container.
+///
+/// # Errors
+/// As [`pack`].
+pub fn pack_recovery(document: &Document, app_version: &str) -> Result<Vec<u8>, SaveError> {
+    pack_members(document, app_version, Members::Recovery)
+}
+
+/// Which members a pack writes.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Members {
+    /// Everything: a saved file.
+    Save,
+    /// A relay snapshot: no share record.
+    Snapshot,
+    /// A recovery copy: no share record and no assets.
+    Recovery,
 }
 
 fn pack_members(
     document: &Document,
     app_version: &str,
-    with_share: bool,
+    members: Members,
 ) -> Result<Vec<u8>, SaveError> {
     let loro_bytes = document.export_loro_snapshot()?;
     let json_bytes = document.export_json()?;
@@ -94,13 +115,19 @@ fn pack_members(
     write_member(&mut writer, MANIFEST_MEMBER, &manifest_bytes, options)?;
     write_member(&mut writer, LORO_SNAPSHOT_MEMBER, &loro_bytes, options)?;
     write_member(&mut writer, DOCUMENT_JSON_MEMBER, &json_bytes, options)?;
-    let record = document.share.borrow().clone().filter(|_| with_share);
+    let record = document
+        .share
+        .borrow()
+        .clone()
+        .filter(|_| members == Members::Save);
     if let Some(record) = record {
         let (name, bytes) = crate::container_share::share_member(&record)?;
         write_member(&mut writer, name, &bytes, options)?;
     }
-    document.prune_derived_assets();
-    crate::container_assets::write_assets(&mut writer, &document.assets.borrow())?;
+    if members != Members::Recovery {
+        document.prune_derived_assets();
+        crate::container_assets::write_assets(&mut writer, &document.assets.borrow())?;
+    }
     let cursor = writer.finish().map_err(|_| SaveError::Container)?;
     Ok(cursor.into_inner())
 }
