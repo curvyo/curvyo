@@ -1,6 +1,6 @@
 # Parametric generators: laser boxes with finger joints and gears, as live objects with typed parameters
 
-Status: Draft (a sketch; decisions of 2026-11-19 applied; not Ready: `adrs.md` (the extension contract's second extension, the shared instance mechanism with `0099`) and UX notes are missing)
+Status: Ready (2026-11-23; Fragen 277, 278, 308 and 309 answered; `adrs.md`, ADR 0079 (Accepted) and `ux-notes.md` exist)
 Priority: Could
 Origin: Customer (2026-11-19, translated): generators for laser boxes (finger joints etc.) and gears (module, tooth count, diameter, solid, spokes, cut-outs, centre bore, keyway ...). Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
@@ -19,13 +19,13 @@ As a maker I want to type "box 120 x 80 x 60 mm, 3 mm plywood, finger joints" or
 
 ## Acceptance criteria (as far as clear)
 
-1. Given the Generators entry in the toolbox card of the create tools (Proposal: `More tools`), then Box and Gear are offered; pressing one places a generated object at the pointer with its defaults, selected, with its parameters in the Properties panel (not a dialog), one undo step "Add gear".
-2. Given a **gear**, then its parameters are: Module (mm), Teeth (integer, 6 to 200), Pressure angle (degrees, default 20), Pitch diameter (shown, derived from module and teeth; typing it changes the module), Centre bore (diameter, 0 = none), Keyway (width and depth, off), Spokes (count 0 to 12, rim width, hub diameter), Cut-outs between spokes as rounded windows, and Solid (no spokes). The outline is an involute tooth profile within 0.01 mm of the exact involute, closed; the output is one compound path with holes (`0035`).
-3. Given a **box**, then its parameters are: Inner width, Depth, Height (mm), Material thickness (mm), Joint (finger, or none), Finger width (mm, default 2 times the thickness **(Proposal)**), Kerf compensation (mm, default 0; `0028` left kerf out, so it is only a number here), Lid (none, flat, with fingers), Layout (six flat plates side by side, with a gap). The plates are separate closed outlines in one group; the fingers of two plates that meet fit with the joint clearance (mm, default 0): a test mates two plates at the given thickness and asserts the engaged edges lie on one line within the kerf value.
-4. Given any generated object, then changing a parameter regenerates its paths within 100 ms of thread CPU time for a gear of 200 teeth and a box with 100 fingers per edge; invalid values (negative thickness, teeth below 6) are clamped with a short notice (permit over refuse), never an error dialog.
-5. Given a generated object, then it moves, rotates, scales and is aligned like any object; scaling changes its size parameters, not a hidden transform **(Proposal)**, so the numbers stay true; operations of `0101` assign to it like to any item.
+1. Given the Generators tool in the More tools card (with Offset, Measure and Grid; Frage 309 A), then Box and Gear are offered as segments of the tool's bar; pressing one places a generated object at the pointer with its defaults, selected, with its parameters in the Properties panel (not a dialog), one undo step "Add gear".
+2. Given a **gear**, then its parameters are: Module (mm), Teeth (integer, 6 to 200), Pressure angle (degrees, default 20), Pitch diameter (shown, derived from module and teeth; typing it changes the module), Centre bore (diameter, 0 = none), Keyway (width and depth, off), a Web choice, Solid or Spokes (Spokes: count 2 to 12, rim width, hub diameter; the windows between the spokes are always rounded, no field). The outline is an involute tooth profile within 0.01 mm of the exact involute, closed; the output is one compound path with holes (`0035`).
+3. Given a **box**, then its parameters are: Inner width, Depth, Height (mm), Material thickness (mm), Joint (finger, or none), Finger width (mm, default 2 times the thickness **(Proposal)**), Kerf compensation (mm, default 0; `0028` left kerf out, so it is only a number here), Lid (none, flat, with fingers), Layout (the plates flat side by side, with a Gap field; five plates without a lid). The live box is **one object** (one leaf with one closed outline per plate, not enterable); Convert to paths (criterion 6) gives the **group** of plates; the fingers of two plates that meet fit with the joint clearance (mm, default 0): a test mates two plates at the given thickness and asserts the engaged edges lie on one line within the kerf value.
+4. Given any generated object, then changing a parameter regenerates its paths within 100 ms of thread CPU time for a gear of 200 teeth and a box with 100 fingers per edge; invalid values (negative thickness, teeth below 6) and dependent values (bore below the root circle, hub inside the rim, keyway inside the hub) are clamped to the nearest valid value with a short status notice that names the field and the limit (permit over refuse), never an error dialog.
+5. Given a generated object, then it moves, rotates and is aligned like any object; it resizes **proportionally only** (corner handles, no skew), and a resize changes its size parameters, not a hidden transform, so the numbers stay true: gear Module, Pitch diameter, Bore, Keyway width and depth, Rim width, Hub diameter; box Inner width, depth and height; Teeth, Pressure angle, Spokes, Thickness, Kerf, Finger width, Clearance and Gap stay, so a box after a resize is near, not exactly, the dragged size; operations of `0101` assign to it like to any item.
 6. Given Convert to paths, then the object becomes ordinary paths in one undo step and its parameters are gone.
-7. Given save and reopen, then the generator kind and its parameters survive and the paths are recomputed; a file with a generator kind this build does not know opens with the last paths as plain paths and a notice **(Proposal)**; `format_version` change by the architect.
+7. Given save and reopen (Frage 308 A), then the generator kind, its parameters and its outline survive and the file **opens exactly as stored**; a test asserts that regenerating from the stored numbers gives the same outline, and the outline is rebuilt on the next parameter change. A file with a generator kind this build does not know (or disabled) opens with the stored outline drawn, cut, moved, rotated, copied, deleted and converted to paths, but not resized or changed by number; it is **not** converted on open, a save keeps its record unchanged, and one status notice tells the maker once; `format_version`: next free at merge (ADR 0079).
 8. Given the first build, then at least the box and the gear of criteria 2 and 3 exist; other generators (hinges, living hinges, spirals, hole patterns, honeycomb) are later entries through the same contract.
 
 ## Out of scope
@@ -41,18 +41,21 @@ Customer, 2026-11-19:
 - **Frage 277 (GEN-HOME): A.** Built-in extensions through the `0065` contract (the second real extension); the shell stays free of generator code.
 - **Frage 278 (GEN-OBJECT): A.** A live parametric object (kept parameters, Convert to paths) sharing one instance mechanism with sketch instances (`0099` revision, criteria 23 to 31).
 
+- **Frage 308 (GEN-STORED): A.** (2026-11-23) A file opens exactly as stored (kept outline, no regeneration on open); ADR 0079 is Accepted by this answer.
+- **Frage 309 (GEN-RAIL):** (2026-11-23) The Generators tool goes into the More tools card with Offset, Measure and Grid, simply there for now. The rails must later be reworked to scroll so they fit the screen size; on a small screen everything could be one rail, below each other (`docs/technical-debt.md`).
+
 ## Still open before Ready
 
-- `adrs.md` (architect: the shared instance mechanism, the generator contract, `format_version`).
-- UX notes (parameters in the Properties panel, the Generators entry).
+Nothing. `adrs.md`, ADR 0079 (Accepted 2026-11-23) and `ux-notes.md` exist; the architect's spec issues of `adrs.md` and the UX flags are resolved above. Slice and PR are the implementer's `plan.md`; `format_version` takes the next free number at merge.
 
 ## UX notes
 
-(ux-engineer, before Ready.)
+See `specs/0141-parametric-generators/ux-notes.md` (the Generators tool and bar in the More tools card, placing at the pointer, the Generator block of the Style tab drawn from the schema, Pitch diameter, clamping with a status notice, instance handles shared with the `0099` revision, Convert to paths, the unknown-kind notice on open, and the questions for the lead).
 
 ## Links
 
 Requirements: R-EDIT-055 (new), R-EXT-004, R-EXT-005
 Depends on: `0065` (contract), `0099` revision (the instance mechanism, if Frage 278 A)
 Related: `0066`, `0071`, `0035`, `0101`
+ADRs: `docs/adr/0079-generated-objects-extension-trait-and-parametric-instances.md` (Accepted)
 PR: none yet

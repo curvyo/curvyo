@@ -7,6 +7,8 @@
 
 Note 2026-11-09: §1 to §4 amended by [ADR 0045](0045-clones-of-groups-texts-images-and-movable-placed-pages.md) (proposed, `needs-customer`, spec `0100`): `own_placement` works for every root, a group counts as transformed when its whole subtree is mapped by one T; `own_style` only for outline roots (path, compound path, primitive, sketch), residue on clones of groups, texts and images.
 
+Note 2026-11-23: §1 to §5 amended by [ADR 0079](0079-generated-objects-extension-trait-and-parametric-instances.md) §6, §9 (accepted 2026-11-23, specs `0099` revision, `0141`): a further override on clones whose root is a sketch, `instance_params` (one atomic map of own parameter values; the nearest own value on the chain wins), with the sketch's `exposed_params`; lands with `0099`'s revision.
+
 Note 2026-11-20: §1 to §5 amended by [ADR 0072](0072-image-adjustments-on-the-image-object.md) §2 (spec `0135`): a third override, `own_adjustments`, on clones whose root is an image; the adjustment source is the nearest own on the chain, as the style source; the first adjustment edit copies the source's Preset, Strength and stack (Own copies them in full).
 
 ## Context
