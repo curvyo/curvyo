@@ -1,6 +1,6 @@
 # AI tile pool: the image models on a pool of separate wasm workers
 
-Status: Ready (ADR 0078 is accepted by the lead as a Proposal, Frage 307 default A; the customer may veto at the demo)
+Status: Done (PR #447, 2026-11-23, merged together with `0135` slice 3; ADR 0078 accepted with it, Frage 307 A)
 Priority: Must (it gates slice 3 of `0135`)
 Origin: Customer. Frage 286 B (2026-11-21): "build wasm threads first, then ship slice 3 of 0135." Reason: in Chromium on a 1 Mpx picture Upscale (realesr-animevideov3) and AI denoise (ffdnet-color) take 74 s each against the target of 30 s (`0135` criterion 50); Remove background takes 2.1 s. `rten` runs single-threaded in wasm today. The architect's ADR 0078 reaches the same goal without shared memory (Frage 307 A, the default), so the story was renamed from `wasm-threads` to `ai-tile-pool`.
 

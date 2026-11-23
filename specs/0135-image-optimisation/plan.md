@@ -1,6 +1,6 @@
 # Plan for image optimisation, slice 1: Presets and Strength (0135)
 
-**Status:** Slice 1 Done (PR #435, 2026-11-20); Slice 2 Done (PR #441, 2026-11-21), see "Slice 2".
+**Status:** Slice 1 Done (PR #435, 2026-11-20); Slice 2 Done (PR #441, 2026-11-21), see "Slice 2"; Slice 3 Done (PR #447, 2026-11-23, merged with `0143`), see "Slice 3".
 
 Slice 1 = criteria 1, 2, 4, 5 (Denoise, Levels, Local contrast, Contours, Sharpen), 8, 9, 11 to 13,
 15 to 46, 51 to 62 (spec "Acceptance criteria" intro). Not in this build: slice 2 (Crop, Resize,
@@ -508,8 +508,8 @@ release.
 Slice 3 = criteria 47 to 50 and 63 to 66, plus the parts of 3, 17, 18, 23, 24, 54, 55, 58 and 59
 for the AI steps. Branch `story/image-ai-tools`. Design: ADR 0075 (runtime, crate, models), ADR
 0076 (download on demand, pinned manifest, device cache, the one network use), ADR 0077 (derived
-PNG assets, result record, limits, pruning). The three ADRs stay `needs-customer`: the customer
-accepts them with this PR. Customer answers: Fragen 273 C, 274 B, 275 A, 280 A, 281 A; Frage 282
+PNG assets, result record, limits, pruning). The three ADRs were `needs-customer`; the customer
+accepted them with PR #447 (2026-11-23). Customer answers: Fragen 273 C, 274 B, 275 A, 280 A, 281 A; Frage 282
 default A (Cloudflare R2; an operating runbook only, the app knows the URL alone).
 
 **Format:** `CURRENT_FORMAT_VERSION` 53: the stack gains the kinds `upscale`, `ai_denoise`,

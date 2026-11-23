@@ -98,4 +98,8 @@ each pinned URL and compare its SHA-256 (ADR 0076 §12).
 - access logs off or kept at most 30 days;
 - a takedown deletes the file and purges the cache; the next release drops it from `MODELS`.
 
+Verified 2026-11-23 at `models.curvyo.org`: the pinned bytes come back (SHA-256 and sizes match), `Range`
+answers 206 with `Content-Range`, CORS is `*` with `Range` allowed and the headers exposed, and the
+customer set `Cache-Control: public, max-age=31536000, immutable` on the `.onnx` and `LICENSE.txt` files.
+
 The app's only change for another provider is none: it knows the URL alone (`MODEL_HOST`).
