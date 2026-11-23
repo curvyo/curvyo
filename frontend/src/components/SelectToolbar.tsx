@@ -754,7 +754,7 @@ export function SelectToolbar({
     groups.push(<EllipseKindGroup key="ellipse" arc={arcBar} onReturnFocus={onReturnFocus} />);
     groups.push(<ArcFieldGroup key="arc-fields" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
-  if (arcBar.state.curveShown && !arcBar.state.ellipseShown && edits) {
+  if ((arcBar.state.curveShown || arcBar.state.roundedShown) && !arcBar.state.ellipseShown && edits) {
     groups.push(<CurveGroup key="curve" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
   // The Text controls' row 1 in place, in the Text bar's order (`specs/0084-text-bar-second-row`

@@ -462,6 +462,7 @@ export interface TransformEntryState {
     | "skew"
     | "arc-angle"
     | "curve"
+    | "rounded"
     // A laser fixture's one-field chip (a leg, the thickness, a diameter) and its S chip of
     // several fields (`specs/0102-laser-fixtures` adrs.md §6a.4).
     | "fixture-length"
