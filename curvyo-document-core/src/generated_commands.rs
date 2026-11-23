@@ -1,4 +1,4 @@
-//! The commands of a generated object (ADR 0079 §4, §6): create, change the record and frame in
+//! The commands of a generated object (ADR 0080 §4, §6): create, change the record and frame in
 //! one commit, convert to paths. The generator itself lives in an extension crate the document
 //! cannot call; the caller passes in what it generated.
 
@@ -34,7 +34,7 @@ pub enum GeneratedError {
     /// The object is not a generated object.
     #[error("the object is not a generated object")]
     NotGenerated,
-    /// The record or frame breaks a rule of the stored shape (ADR 0079 §4).
+    /// The record or frame breaks a rule of the stored shape (ADR 0080 §4).
     #[error("the generated record or frame is not valid")]
     Invalid,
     /// A converted outline takes an anchor id another path holds, or one id twice.
@@ -102,7 +102,7 @@ impl Document {
     }
 
     /// [`Document::create_generated`] with the seed set from the new node's id (ADR 0029 §5,
-    /// ADR 0079 §2): the id's peer and counter folded into a `u32`, so a copy keeps it and two
+    /// ADR 0080 §2): the id's peer and counter folded into a `u32`, so a copy keeps it and two
     /// objects differ.
     ///
     /// # Errors

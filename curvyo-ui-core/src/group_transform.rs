@@ -523,7 +523,7 @@ pub(crate) fn commit_group(
         );
     }
     // A resize of a generated object writes its parameters through the generator, in the same
-    // step as the rest (`specs/0141-parametric-generators`, ADR 0079 §6).
+    // step as the rest (`specs/0141-parametric-generators`, ADR 0080 §6).
     let (resized, results): (Vec<ObjectSnapshot>, Vec<ObjectSnapshot>) = results
         .into_iter()
         .partition(|result| crate::instance::is_resize(document, result));

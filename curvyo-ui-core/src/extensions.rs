@@ -1,4 +1,4 @@
-//! The registration module of the compiled-in extensions (ADR 0034 §3, §6, ADR 0079 §1): the
+//! The registration module of the compiled-in extensions (ADR 0034 §3, §6, ADR 0080 §1): the
 //! list of [`Extension`] values, the dispatch by extension id and the per-user list of disabled
 //! extensions (`extensions.toml`).
 //!
@@ -60,7 +60,7 @@ pub struct ExtensionSettings {
 
 thread_local! {
     /// The settings the session that is writing right now runs with, for the commit paths that
-    /// have no settings of their own (a resize of a generated object, ADR 0079 §5).
+    /// have no settings of their own (a resize of a generated object, ADR 0080 §5).
     static ACTIVE: std::cell::RefCell<ExtensionSettings> =
         std::cell::RefCell::new(ExtensionSettings::default());
 }

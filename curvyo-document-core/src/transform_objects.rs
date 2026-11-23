@@ -51,7 +51,7 @@ enum Planned<'a> {
         result: &'a ObjectSnapshot,
     },
     /// A generated object: only its frame is written, and only for a move, turn or flip
-    /// (ADR 0079 §4; a resize goes through the generator and is not a transform).
+    /// (ADR 0080 §4; a resize goes through the generator and is not a transform).
     Generated {
         meta: loro::LoroMap,
         frame: crate::affine::Affine,

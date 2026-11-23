@@ -1,5 +1,5 @@
 //! The cost of a parameter edit of a generated object (`specs/0141-parametric-generators`
-//! criterion 4, ADR 0079 §8): the session's edit (the generator, the one commit and the frame's
+//! criterion 4, ADR 0080 §8): the session's edit (the generator, the one commit and the frame's
 //! canvas view) of a gear of 200 teeth with spokes, windows, bore and keyway, and of a box with
 //! about 100 fingers per edge and a finger lid, at most 100 ms of thread CPU time. Asserted in
 //! release builds, printed in debug builds, as the other budget tests do:

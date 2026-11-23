@@ -5,7 +5,7 @@ use curvyo_document_core::Point;
 use curvyo_extension_core::{ClosedPath, Cubic};
 
 /// The largest sweep of one cubic arc: a 45 degree arc deviates from its circle by about 4e-6 of
-/// the radius, well under the 0.01 mm of ADR 0079's tolerance for the radii this crate allows.
+/// the radius, well under the 0.01 mm of ADR 0080's tolerance for the radii this crate allows.
 const MAX_ARC_SWEEP: f64 = std::f64::consts::FRAC_PI_4;
 
 /// `centre + radius * (cos angle, sin angle)`.

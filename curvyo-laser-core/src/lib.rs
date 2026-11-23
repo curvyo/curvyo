@@ -309,7 +309,7 @@ pub use record_envelope::{is_record_id as is_profile_id, new_record_id as new_pr
 
 use curvyo_extension_core::{Extension, Manifest, NoticeContext};
 
-/// The laser workbench as a compiled-in extension (ADR 0079 §1): `manifest` and `notice` only.
+/// The laser workbench as a compiled-in extension (ADR 0080 §1): `manifest` and `notice` only.
 #[derive(Debug, Clone, Copy)]
 pub struct Laser;
 

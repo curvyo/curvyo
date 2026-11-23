@@ -1,10 +1,10 @@
-//! The generated-object arm of the shared parametric-instance mechanism (ADR 0079 §6): the schema
+//! The generated-object arm of the shared parametric-instance mechanism (ADR 0080 §6): the schema
 //! view, a parameter edit, a proportional resize and Convert to paths of a generated object. The
 //! sketch instances of `0099` add their arm to the same functions.
 //!
 //! Nothing here writes more than one commit per call, and nothing is written for a kind the
 //! registry does not know or the maker switched off: that object is shown from its stored outline
-//! and refuses a change by number or a resize (ADR 0079 §5).
+//! and refuses a change by number or a resize (ADR 0080 §5).
 
 use curvyo_document_core::{
     Affine, CHANGE_PARAMETER_COMMIT_LABEL, Document, GeneratedRecord, GeneratedSnapshot,
@@ -279,7 +279,7 @@ pub struct ResizePlan {
 }
 
 /// Works out the resize of the generated object `result.id()` to the outline of `result` (a
-/// proportional resize of the Select tool, ADR 0079 §6): the generator scales its size parameters
+/// proportional resize of the Select tool, ADR 0080 §6): the generator scales its size parameters
 /// by the factor the outline grew by, and the frame follows the map. Writes nothing.
 ///
 /// # Errors

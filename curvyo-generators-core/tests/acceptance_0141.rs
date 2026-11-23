@@ -1,5 +1,5 @@
 //! Acceptance tests of `specs/0141-parametric-generators`, criteria 2 to 5 and 7 to 8, through the
-//! public generator contract (ADR 0079 §1 to §3). Black-box: outlines and stored values only.
+//! public generator contract (ADR 0080 §1 to §3). Black-box: outlines and stored values only.
 //! Criteria 1 and 6 and the document, sketch and UI layers are covered outside this crate.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]

@@ -92,7 +92,7 @@ pub struct ChoiceOption {
     pub label: &'static str,
 }
 
-/// The kind of a parameter. Only the kinds a story uses exist (ADR 0034 §4, ADR 0079 §2).
+/// The kind of a parameter. Only the kinds a story uses exist (ADR 0034 §4, ADR 0080 §2).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ParamKind {
@@ -152,7 +152,7 @@ pub enum ParamValue {
 
 impl ParamValue {
     /// The stored encoding: a one-key map naming the unit, `{"mm": n}`, `{"deg": n}`,
-    /// `{"count": n}`, `{"on": b}` or `{"choice": "id"}` (ADR 0079 §2).
+    /// `{"count": n}`, `{"on": b}` or `{"choice": "id"}` (ADR 0080 §2).
     #[must_use]
     pub fn to_stored(&self) -> Value {
         let (key, value) = match self {

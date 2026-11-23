@@ -639,13 +639,13 @@ impl DocumentVersion {
 /// 52 would burn the picture without its stored result, so this build's files are refused there
 /// by version; a file of 52 opens unchanged. Golden: `image_adjust_ai_v53.curvyo`.
 ///
-/// Version 54 (`specs/0141-parametric-generators`, ADR 0079 §4): a leaf may have `shape =
+/// Version 54 (`specs/0141-parametric-generators`, ADR 0080 §4): a leaf may have `shape =
 /// "generated"` with `generated` (one atomic map `{kind, seed, params, parts}`, the stored
 /// outline in frame-local mm) and `generated_frame` (`[a, b, c, d, e, f]`, rotation, mirror and
 /// translation only). A build that stops at 53 reads the unknown `shape` tag as a primitive
 /// without its registers and would refuse or drop the object, so this build's files are refused
 /// there by version (ADR 0033 §7); a file of 53 opens unchanged. An unknown or disabled kind is
-/// kept and drawn from its stored outline and a save keeps its record (ADR 0079 §5); a new
+/// kept and drawn from its stored outline and a save keeps its record (ADR 0080 §5); a new
 /// generator kind needs no bump. Labels `add_generated`, `change_parameter` and
 /// `convert_generated`; steps may carry the fields `gk` (kind) and `gp` (parameter). Damage
 /// refuses the file: `generated` not a map, a `kind` that is not `<id>/<kind>`, a seed outside

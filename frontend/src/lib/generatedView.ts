@@ -1,4 +1,4 @@
-// The Generator block's data (`specs/0141-parametric-generators` ADR 0079 §2, UX notes §3 to §6):
+// The Generator block's data (`specs/0141-parametric-generators` ADR 0080 §2, UX notes §3 to §6):
 // the decoder of the session's JSON and the small text rules of its fields. Pure functions, so the
 // tests load it without a bundler. The rules (clamps, derived values, notices) are Rust's.
 

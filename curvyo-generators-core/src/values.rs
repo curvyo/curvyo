@@ -1,6 +1,6 @@
 //! The parameter values of one generation: read from the stored map, clamped by the schema first
 //! and by the generator's dependent bounds second, with every change reported (permit over
-//! refuse, ADR 0079 §2).
+//! refuse, ADR 0080 §2).
 
 use curvyo_document_core::Length;
 use curvyo_extension_core::{Bound, Clamp, Param, ParamKind, ParamValue, StoredParams};

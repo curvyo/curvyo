@@ -157,7 +157,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("create_rect", "Draw rectangle"),
     ("create_ellipse", "Draw ellipse"),
     ("create_polygon", "Draw polygon"),
-    // `specs/0141-parametric-generators` (ADR 0079 §7): the fallback names; the steps also carry
+    // `specs/0141-parametric-generators` (ADR 0080 §7): the fallback names; the steps also carry
     // their kind (`gk`) and parameter (`gp`) as fields for a kind-specific row text.
     ("add_generated", "Add generated object"),
     ("change_parameter", "Change parameter"),

@@ -5,7 +5,7 @@ use curvyo_extension_core::{ClosedPath, Cubic};
 
 use crate::outline::{Builder, polar};
 
-/// The deviation a fitted flank may have from the exact involute (ADR 0079, feature decision 5).
+/// The deviation a fitted flank may have from the exact involute (ADR 0080, feature decision 5).
 pub(crate) const FIT_TOLERANCE_MM: f64 = 0.004;
 
 /// The involute function `tan x - x`.

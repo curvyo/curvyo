@@ -49,7 +49,7 @@ impl Manifest {
 pub enum Contribution {
     /// A manufacturing workbench: its tabs, toolbox cards and fixture kinds.
     Workbench(WorkbenchContribution),
-    /// A parametric generator: parameters in, closed outlines out (ADR 0079 §2).
+    /// A parametric generator: parameters in, closed outlines out (ADR 0080 §2).
     Generator(GeneratorKind),
 }
 

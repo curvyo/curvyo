@@ -1,4 +1,4 @@
-//! The stored shape of a generated object (ADR 0079 §4, `specs/0141-parametric-generators`): the
+//! The stored shape of a generated object (ADR 0080 §4, `specs/0141-parametric-generators`): the
 //! leaf `shape = "generated"` with its two registers, read, written and validated here.
 //!
 //! ```text
@@ -79,7 +79,7 @@ pub struct GeneratedSnapshot {
 
 impl GeneratedSnapshot {
     /// Every part as its subpaths with the frame applied, closed, with synthesised anchor ids
-    /// that were never written: what "Convert to paths" replaces ids on (ADR 0079 §6).
+    /// that were never written: what "Convert to paths" replaces ids on (ADR 0080 §6).
     #[must_use]
     pub fn outlines(&self) -> Vec<Vec<SubpathSnapshot>> {
         let mut ordinal = 0;

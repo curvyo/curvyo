@@ -1,5 +1,5 @@
 //! The damaged golden of format 54 (`generated_damaged_v54.curvyo`): a generated leaf whose
-//! `generated` register breaks a stored-shape rule is refused at open as damaged (ADR 0079 §4).
+//! `generated` register breaks a stored-shape rule is refused at open as damaged (ADR 0080 §4).
 //! `CURVYO_WRITE_FIXTURES=1` rewrites the golden.
 
 use std::path::PathBuf;

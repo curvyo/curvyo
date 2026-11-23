@@ -1,7 +1,7 @@
 # Plan for Parametric generators
 
 Implementer, 2026-11-23, branch `story/extensions-sdk` (from `main` + the 0141 docs commits). Built under
-`adrs.md`, ADR 0079 (Accepted), ADR 0034 and `ux-notes.md`. Own choices are marked **(Proposal)**.
+`adrs.md`, ADR 0080 (Accepted), ADR 0034 and `ux-notes.md`. Own choices are marked **(Proposal)**.
 
 ## Affected crates/modules
 
@@ -9,7 +9,7 @@ Implementer, 2026-11-23, branch `story/extensions-sdk` (from `main` + the 0141 d
   `Generated`, `Part`, `ClosedPath`, `Cubic`, `Handle`, `Clamp`, `Seed`), `param.rs` (kinds `Count`, `Angle`,
   `Switch`, `Choice`, `step`/`decimals` on lengths, `shown_when`), `manifest.rs` (`Contribution::Generator`),
   `CHANGELOG.md`.
-- **`curvyo-generators-core`** (new crate, ADR 0079 §3; `libm` only besides the workspace edges): `manifest.rs`,
+- **`curvyo-generators-core`** (new crate, ADR 0080 §3; `libm` only besides the workspace edges): `manifest.rs`,
   `gear/` (involute flank, spokes and windows, bore and keyway), `boxes/` (finger edges, kerf, clearance,
   layout), `lib.rs` (`GENERATORS`, `impl Extension`). In CI's wasm32 list.
 - **`curvyo-laser-core`:** `impl Extension for Laser` (`manifest`, `notice`); the free functions stay.
@@ -47,7 +47,7 @@ Implementer, 2026-11-23, branch `story/extensions-sdk` (from `main` + the 0141 d
 - [x] 7. Editor session and wasm bindings: Generators tool, place at the pointer, Style-tab block data, edit
   field with live preview and one commit, resize writes parameters, unknown-kind notice, refused resize of an
   unknown kind (AC 1, 4, 5, 6, 7).
-- [x] 8. CPU-time test per ADR 0079 §8: parameter edit of a 200-tooth gear with spokes, windows, bore and keyway
+- [x] 8. CPU-time test per ADR 0080 §8: parameter edit of a 200-tooth gear with spokes, windows, bore and keyway
   and of a box with 100 fingers per edge and finger lid at most 100 ms thread CPU (AC 4).
 - [x] 9. Frontend: tool button in More tools, bar with Box / Gear, schema-drawn block, Convert to paths,
   unknown-kind notice (AC 1, 2, 3, 6, 7).

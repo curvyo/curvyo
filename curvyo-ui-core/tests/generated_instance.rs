@@ -1,5 +1,5 @@
 //! The generated-object arm of the instance mechanism (`specs/0141-parametric-generators`,
-//! criteria 1 to 7, ADR 0079 §6): place, change by number with clamps and their notices, a
+//! criteria 1 to 7, ADR 0080 §6): place, change by number with clamps and their notices, a
 //! resize that writes parameters, Convert to paths, an unknown kind, the stored outline equal to
 //! a regeneration from the stored numbers.
 
