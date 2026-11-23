@@ -144,6 +144,14 @@ pub enum ControllerCommand {
     Unlock,
     /// Run the controller's homing cycle.
     Home,
+    /// Trace the frame of `frame_job()` with the laser off; `homed` lets the controller check it
+    /// against the travel.
+    Frame {
+        /// The frame.
+        job_id: Uuid,
+        /// The controller has been homed since it was identified.
+        homed: bool,
+    },
     /// Move the head one step with the laser off; `homed` lets the controller clamp it.
     Jog {
         /// The machine axis.

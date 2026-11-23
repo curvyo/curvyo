@@ -415,6 +415,10 @@ impl Hub {
 
             let before = inner.machine.state();
             let people = inner.machine.people().cloned();
+            let sender = match &event {
+                Event::Message(_, peer) => Some(peer.name.clone()),
+                _ => None,
+            };
             let output = inner.machine.handle(event);
             for command in &output.commands {
                 if matches!(command, ControllerCommand::Start { .. }) {
@@ -424,7 +428,19 @@ impl Hub {
                         .map(|j| j.name.clone())
                         .unwrap_or_default();
                 }
-                let job = inner.machine.held_job();
+                let is_frame = matches!(command, ControllerCommand::Frame { .. });
+                if is_frame {
+                    let client = (output.confirmed.as_ref())
+                        .map(|c| c.requested_by.clone())
+                        .or_else(|| sender.clone())
+                        .unwrap_or_default();
+                    self.log_frame(inner, &client);
+                }
+                let job = if is_frame {
+                    inner.machine.frame_job()
+                } else {
+                    inner.machine.held_job()
+                };
                 if let Some(controller) = inner.controller.as_mut() {
                     // Its bytes go out with the next turn of the serial thread.
                     queue.extend(controller.command(command, job, at));

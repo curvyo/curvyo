@@ -33,6 +33,7 @@ mod job_build;
 mod job_effects;
 mod job_fingerprint;
 mod job_flatten;
+mod job_frame;
 mod job_gate;
 mod job_gate_cause;
 mod job_gate_raster;
@@ -55,6 +56,7 @@ mod job_raster_tone;
 mod job_raster_work;
 mod job_timeline;
 mod job_write;
+mod job_write_frame;
 mod job_write_grbl;
 mod library_merge;
 mod machine_profile;
@@ -159,10 +161,11 @@ pub mod print_and_cut {
 /// move list one page runs, its order, time and gate, the output registers of ADR 0065 §1 and the
 /// one entry point to every output format.
 pub mod job {
-    pub use crate::job_build::{Built, build_job, prepare_job};
+    pub use crate::job_build::{Built, build_frame_job, build_job, prepare_job};
     pub use crate::job_effects::{ExportEffects, export_effects};
+    pub use crate::job_frame::{FrameShape, outline as frame_outline};
     pub use crate::job_gate::{
-        BED_TOLERANCE_UM, Gate, GateFacts, Issue, MachineFacts, Targets, gate,
+        BED_TOLERANCE_UM, Gate, GateFacts, Issue, MachineFacts, Targets, gate, outside_the_bed,
     };
     pub use crate::job_gate_cause::{Cause, Severity};
     pub use crate::job_gate_rows::{NumbersLine, RunFacts, numbers_lines};
@@ -191,7 +194,8 @@ pub mod job {
     pub use crate::job_timeline::{
         Head, Timeline, duration_text, estimate_text, length_text, lengths_text, readout_text,
     };
-    pub use crate::job_write::{extension, file_type, name, write};
+    pub use crate::job_write::{extension, file_type, name, write, write_frame};
+    pub use crate::job_write_frame::FRAME_FEED;
     pub use crate::job_write_grbl::{coordinate, s_value};
     pub use crate::output_settings::{
         FIXTURE_MATERIAL_FIELD, OutputSettings, START_FIELD, Start, read_output_settings,

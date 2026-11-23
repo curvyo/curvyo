@@ -1,7 +1,9 @@
 //! The one entry point to every output format (ADR 0064 §12): `write(format, &job)` and the
 //! format facts the UI needs, one `match` each over [`OutputFormat`].
 
+use crate::job_frame::FrameShape;
 use crate::job_moves::Job;
+use crate::job_write_frame::write_frame_grbl;
 use crate::job_write_grbl::write_grbl;
 use crate::machine_profile::OutputFormat;
 
@@ -10,6 +12,15 @@ use crate::machine_profile::OutputFormat;
 pub fn write(format: OutputFormat, job: &Job) -> Vec<u8> {
     match format {
         OutputFormat::Grbl => write_grbl(job),
+    }
+}
+
+/// The bytes of the frame of `job` in `format` (`specs/0118` 2b), laser off; `None` when no move
+/// burns.
+#[must_use]
+pub fn write_frame(format: OutputFormat, job: &Job, shape: FrameShape) -> Option<Vec<u8>> {
+    match format {
+        OutputFormat::Grbl => write_frame_grbl(job, shape),
     }
 }
 

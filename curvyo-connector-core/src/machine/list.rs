@@ -97,10 +97,6 @@ impl Machine {
         sender: &str,
         out: &mut Output,
     ) {
-        if kind == JobKind::Frame {
-            Self::reject(out, job_id, RejectReason::Busy);
-            return;
-        }
         let in_flight_bytes = self.transfers.iter().map(|t| t.assembly.bytes()).sum();
         if !self.list.fits(self.transfers.len(), in_flight_bytes, bytes) {
             Self::reject(out, job_id, RejectReason::ListFull);
@@ -186,6 +182,7 @@ impl Machine {
     /// A client's transfer ended before it was complete: only its own assembly is dropped.
     pub(super) fn abandon(&mut self, job_id: Uuid, out: &mut Output) {
         self.transfers.retain(|t| t.assembly.job_id() != job_id);
+        self.abandon_frame(job_id);
         let receiving = self.state == State::Receiving
             && self.assembly.as_ref().is_some_and(|a| a.job_id() == job_id);
         if receiving {
@@ -453,6 +450,7 @@ impl Machine {
             .as_ref()
             .is_some_and(|h| h.job.job_id == job_id && !over)
             || self.assembly.as_ref().is_some_and(|a| a.job_id() == job_id)
+            || self.frame_id() == Some(job_id)
             || self.transfers.iter().any(|t| t.assembly.job_id() == job_id)
             || self.list.get(job_id).is_some()
     }

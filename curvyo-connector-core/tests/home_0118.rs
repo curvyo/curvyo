@@ -99,6 +99,7 @@ fn m1_home_and_homing_match_their_golden_files() {
                 homed: false,
                 machine_position: None,
                 work_offset: None,
+                frame_id: None,
             },
         ),
         (
@@ -116,6 +117,7 @@ fn m1_home_and_homing_match_their_golden_files() {
                 homed: false,
                 machine_position: None,
                 work_offset: None,
+                frame_id: None,
             },
         ),
     ];

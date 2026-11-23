@@ -11,7 +11,7 @@
 use curvyo_connector_core::Peer;
 use std::time::Duration;
 
-use curvyo_connector_core::{Event, JobKind, Machine, Message, Options, State};
+use curvyo_connector_core::{ControllerCommand, Event, JobKind, Machine, Message, Options, State};
 use curvyo_connector_io::controller::Controller;
 use curvyo_connector_io::grbl::{GrblController, Timing};
 use sha2::{Digest, Sha256};
@@ -142,9 +142,12 @@ impl Bench {
         let out = self.machine.handle(event);
         self.record(out.messages);
         for command in out.commands {
-            let events = self
-                .ctrl
-                .command(&command, self.machine.held_job(), self.at);
+            let job = if matches!(command, ControllerCommand::Frame { .. }) {
+                self.machine.frame_job()
+            } else {
+                self.machine.held_job()
+            };
+            let events = self.ctrl.command(&command, job, self.at);
             for e in events {
                 self.apply(e);
             }
@@ -179,6 +182,25 @@ impl Bench {
             rest = tail;
         }
         assert_eq!(self.state(), State::Ready);
+        id
+    }
+
+    /// Sends `text` as a frame (one chunk); the id it went under.
+    pub fn frame(&mut self, text: &str) -> Uuid {
+        self.job += 1;
+        let id = job_id(0x1000 + self.job);
+        self.app(Message::SubmitJob {
+            job_id: id,
+            name: "frame".into(),
+            kind: JobKind::Frame,
+            bytes: text.len() as u64,
+            sha256: sha256_hex(text),
+        });
+        self.app(Message::JobChunk {
+            job_id: id,
+            index: 0,
+            text: text.to_owned(),
+        });
         id
     }
 

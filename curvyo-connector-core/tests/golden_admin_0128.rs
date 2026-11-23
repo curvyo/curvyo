@@ -186,6 +186,7 @@ fn all() -> Vec<(&'static str, Message)> {
                 homed: false,
                 machine_position: None,
                 work_offset: None,
+                frame_id: None,
             },
         ),
     ]

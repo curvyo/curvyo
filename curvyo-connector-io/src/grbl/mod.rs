@@ -3,6 +3,7 @@
 
 pub mod controller;
 pub mod flow;
+mod frame;
 mod hold;
 pub mod home;
 mod homing;

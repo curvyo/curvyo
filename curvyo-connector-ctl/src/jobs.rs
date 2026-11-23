@@ -2,13 +2,16 @@
 //! `unlock` and `jobs`, in the owner app's words.
 
 use curvyo_connector_core::{
-    ConnectorMode, ControllerInfo, JobResult, LogName, Message, Progress, State,
+    ConnectorMode, ControllerInfo, JobResult, LogName, Message, Progress, State, Uuid,
 };
 
 use crate::connect::{self, Owner, client_error};
 use crate::context::Context;
 use crate::error::CtlError;
 use crate::texts::{columns, duration, labelled, log_time, number};
+
+/// What a waiting frame is called where a job's name would stand.
+const FRAME_NAME: &str = "Frame";
 
 /// The parts of a `Status` the commands read.
 struct Seen<'a> {
@@ -18,6 +21,8 @@ struct Seen<'a> {
     requested_by: Option<&'a str>,
     job_name: &'a str,
     sent_by: Option<&'a str>,
+    /// The frame that runs or waits (`specs/0118` 2b).
+    frame_id: Option<Uuid>,
 }
 
 fn seen(status: &Message) -> Option<Seen<'_>> {
@@ -29,6 +34,7 @@ fn seen(status: &Message) -> Option<Seen<'_>> {
             requested_by,
             job_name,
             sent_by,
+            frame_id,
             ..
         } => Some(Seen {
             state: *state,
@@ -37,6 +43,7 @@ fn seen(status: &Message) -> Option<Seen<'_>> {
             requested_by: requested_by.as_deref(),
             job_name: job_name.as_deref().unwrap_or("the job"),
             sent_by: sent_by.as_deref(),
+            frame_id: *frame_id,
         }),
         _ => None,
     }
@@ -56,12 +63,14 @@ fn state_words(s: &Seen<'_>) -> String {
             Some(member) if line > 0 => {
                 format!("Resume requested by {member} at line {}", number(line))
             }
+            Some(member) if s.frame_id.is_some() => format!("Frame requested by {member}"),
             Some(member) if s.job.is_none() => format!("Home requested by {member}"),
             Some(member) => format!("Start requested by {member}"),
             None => "Waiting for the start at the machine".to_owned(),
         },
         State::Homing => "Homing".to_owned(),
         State::Jogging => "Jogging".to_owned(),
+        State::Framing => "Framing".to_owned(),
         State::Running => format!(
             "Running, line {} / {}, {}",
             number(line),
@@ -163,6 +172,11 @@ pub fn confirm_start(ctx: &mut Context, positionals: &[String]) -> Result<String
     let (waiting, requester) = {
         let s = status_of(&owner)?;
         match (s.state, s.requested_by, s.job) {
+            // A member's frame waits without a job and names its own id (`specs/0118` 2b).
+            (State::AwaitingLocalStart, Some(member), _) if s.frame_id.is_some() => {
+                let frame = s.frame_id.unwrap_or_default();
+                (Some((frame, 0, FRAME_NAME.to_owned())), member.to_owned())
+            }
             (State::AwaitingLocalStart, Some(member), Some(progress)) => (
                 Some((progress.job_id, progress.line, s.job_name.to_owned())),
                 member.to_owned(),
@@ -195,7 +209,9 @@ pub fn confirm_start(ctx: &mut Context, positionals: &[String]) -> Result<String
         &Message::Start { job_id },
         State::AwaitingLocalStart,
     )?;
-    Ok(if line > 0 {
+    Ok(if job_name == FRAME_NAME {
+        format!("Framing, requested by {requester}\n")
+    } else if line > 0 {
         format!(
             "Resumed {job_name} at line {}, requested by {requester}\n",
             number(line)
@@ -211,13 +227,14 @@ pub fn confirm_start(ctx: &mut Context, positionals: &[String]) -> Result<String
 /// The failure in words.
 pub fn stop(ctx: &mut Context, name: Option<&str>) -> Result<String, CtlError> {
     let mut owner = connect::owner(ctx, name)?;
-    let (state, line, job_name, s_job_none) = {
+    let (state, line, job_name, s_job_none, is_frame) = {
         let s = status_of(&owner)?;
         (
             s.state,
             s.job.map_or(0, |j| j.line),
             s.job_name.to_owned(),
             s.job.is_none(),
+            s.frame_id.is_some(),
         )
     };
     let text = match state {
@@ -225,11 +242,13 @@ pub fn stop(ctx: &mut Context, name: Option<&str>) -> Result<String, CtlError> {
         State::AwaitingLocalStart if line > 0 => {
             format!("Stopped {job_name} at line {}\n", number(line))
         }
+        State::AwaitingLocalStart if is_frame => "Discarded Frame\n".to_owned(),
         State::AwaitingLocalStart if s_job_none => "Discarded Home\n".to_owned(),
         State::Receiving | State::Ready | State::AwaitingLocalStart | State::Homing => {
             format!("Discarded {job_name}\n")
         }
         State::Jogging => "Stopped the jog\n".to_owned(),
+        State::Framing => "Stopped the frame\n".to_owned(),
         _ => return Ok("No job\n".to_owned()),
     };
     command(&mut owner, &Message::Stop, state)?;

@@ -4,13 +4,18 @@
 
 use std::time::Duration;
 
-use curvyo_connector_core::{ControllerCommand, ControllerInfo, Event, Job};
+use curvyo_connector_core::{
+    ControllerCommand, ControllerInfo, Event, Job, Millimetres, check_frame,
+};
 
 use crate::controller::{Advance, Controller};
 use crate::fake_jog::FakeHead;
 
 /// How long the fake controller's homing cycle takes (`specs/0118` M6).
 pub const FAKE_HOMING: Duration = Duration::from_secs(2);
+
+/// The feed the fake traces a frame at, in mm/min (the frame text's own, `specs/0118` 25).
+const FRAME_FEED: f64 = 3_000.0;
 
 /// The text of the alarm the fake controller raises.
 #[must_use]
@@ -26,6 +31,8 @@ struct Run {
     last: Duration,
     paused: bool,
     reported: u32,
+    /// A frame: it moves the head and never raises the fake alarm.
+    frame: bool,
 }
 
 /// The fake controller.
@@ -84,6 +91,7 @@ impl FakeController {
                     last: at,
                     paused: false,
                     reported: 0,
+                    frame: false,
                 });
             }
             ControllerCommand::Pause => {
@@ -101,8 +109,10 @@ impl FakeController {
             ControllerCommand::Stop => {
                 self.run = None;
                 self.homing_until = None;
+                self.head.cancel(at);
             }
-            ControllerCommand::Unlock => {}
+            // A frame needs its text for the moves: `take_frame`.
+            ControllerCommand::Unlock | ControllerCommand::Frame { .. } => {}
             ControllerCommand::Home => self.homing_until = Some(at + FAKE_HOMING),
             ControllerCommand::Jog {
                 axis,
@@ -118,6 +128,30 @@ impl FakeController {
                 ..
             } => self.head.hold((*axis, *direction), feed.0, at),
             ControllerCommand::JogCancel => self.head.cancel(at),
+        }
+    }
+
+    /// A frame: the lines run at the pace of a job and the head traces their moves in the
+    /// fake's own coordinates (machine origin at its homed corner, work offset 0).
+    pub fn take_frame(&mut self, job: &Job, at: Duration) {
+        let lines = u32::try_from(job.text.lines().count()).unwrap_or(u32::MAX);
+        self.run = Some(Run {
+            total: lines,
+            ran_ms: 0,
+            last: at,
+            paused: false,
+            reported: 0,
+            frame: true,
+        });
+        if let Ok(moves) = check_frame(&job.text) {
+            let head = self.head.position();
+            let zero = [Millimetres(0.0); 2];
+            let points: Vec<[f64; 2]> = moves
+                .points([Millimetres(head[0]), Millimetres(head[1])], zero)
+                .iter()
+                .map(|p| [p[0].0, p[1].0])
+                .collect();
+            self.head.trace(&points, FRAME_FEED, at);
         }
     }
 
@@ -139,7 +173,7 @@ impl FakeController {
         let mut line = u32::try_from(done.min(u64::from(run.total))).unwrap_or(run.total);
         let alarm = self
             .alarm_at_line
-            .filter(|n| *n >= 1 && *n <= run.total && line >= *n);
+            .filter(|n| !run.frame && *n >= 1 && *n <= run.total && line >= *n);
         if let Some(n) = alarm {
             line = n;
         }
@@ -178,6 +212,10 @@ impl Controller for FakeController {
         job: Option<&Job>,
         at: Duration,
     ) -> Vec<Event> {
+        if let (ControllerCommand::Frame { .. }, Some(job)) = (command, job) {
+            self.take_frame(job, at);
+            return Vec::new();
+        }
         let lines = job.map_or(0, |j| j.text.lines().count());
         self.take(command, u32::try_from(lines).unwrap_or(u32::MAX), at);
         Vec::new()
