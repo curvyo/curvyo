@@ -57,6 +57,7 @@ fn drawn_edit_handles(
         handles.retain(|(handle, _)| *handle == EditHandle::Move);
     }
     handles.retain(|(handle, _)| !tolerances.yielded.contains(*handle));
+    handles.retain(|(handle, _)| !tolerances.drops_for_corners_only(*handle));
     handles
 }
 
@@ -276,5 +277,35 @@ mod tests {
         let rotate = entry_anchor(&box_, EditHandle::Rotate(ResizeDirection::Ne), &tolerances)
             .expect("anchor");
         assert!(rotate.x > 2.0 && rotate.y < 0.0);
+    }
+
+    /// `specs/0141` criterion 5: a corners-only selection has the four corner resize handles,
+    /// the rotate handles and the centre, and no edge resize and no skew handle.
+    #[test]
+    fn a_corners_only_selection_has_no_edge_and_no_skew_handle() {
+        let document = Document::new(1);
+        let id = document.create_rect(RectBounds {
+            origin: Point::new(0.0, 0.0),
+            width: Length::from_mm(100.0),
+            height: Length::from_mm(60.0),
+        });
+        let object = document.object(id).expect("exists");
+        let box_ = oriented_bounds(&object);
+        let mut tolerances = TransformHandleTolerances::at_scale(3.78);
+        let all = drawn_edit_handles(&object, &box_, &tolerances, false);
+        assert!(all.iter().any(|(h, _)| matches!(h, EditHandle::Skew(_))));
+        tolerances.corners_only = true;
+        let kept = drawn_edit_handles(&object, &box_, &tolerances, false);
+        let count = |f: fn(&EditHandle) -> bool| kept.iter().filter(|(h, _)| f(h)).count();
+        assert_eq!(count(|h| matches!(h, EditHandle::Skew(_))), 0);
+        assert_eq!(
+            count(|h| matches!(h, EditHandle::Resize(d) if !crate::is_corner(*d))),
+            0
+        );
+        assert_eq!(
+            count(|h| matches!(h, EditHandle::Resize(d) if crate::is_corner(*d))),
+            4
+        );
+        assert_eq!(count(|h| matches!(h, EditHandle::Rotate(_))), 4);
     }
 }

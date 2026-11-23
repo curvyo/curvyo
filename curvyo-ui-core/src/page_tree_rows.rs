@@ -126,6 +126,7 @@ fn plain_row(id: NodeId, kind: RowKind, name: &str, depth: usize, shown: bool) -
         via: None,
         read_only: false,
         page_tree: true,
+        generator: None,
         fixture: None,
     }
 }

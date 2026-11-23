@@ -294,6 +294,7 @@ impl Session {
         let paths = self.node_paths();
         let mut state = self.node.toolbar_state(&self.document, &paths);
         state.clone_only = self.node_selection_is_clones();
+        state.generated_only = self.selection_all_generated();
         state
     }
 

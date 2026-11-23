@@ -132,7 +132,9 @@ impl GroupEntry {
             ResizeDirection::N | ResizeDirection::S => vec![height],
             _ => vec![width, height],
         };
-        let linked = fields.len() == 2 && fields.iter().all(|(_, f)| f.editable) && ctrl;
+        let linked = fields.len() == 2
+            && fields.iter().all(|(_, f)| f.editable)
+            && (ctrl || modes.proportional);
         let mut entry = Self::new(
             EntryKind::Size,
             members,

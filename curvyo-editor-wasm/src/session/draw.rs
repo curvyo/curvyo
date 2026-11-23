@@ -211,6 +211,10 @@ impl Session {
         if self.style.is_active() {
             self.style.apply_to(artwork_objects.to_mut());
         }
+        // A generated object being stepped is drawn as the generator would rebuild it (`0141`).
+        if self.generated_preview_in_place() {
+            self.apply_generated_preview(artwork_objects.to_mut());
+        }
         if let Some(preview) = self.width_preview_artwork(&artwork_objects) {
             artwork_objects = Cow::Owned(preview);
         }
@@ -290,6 +294,7 @@ impl Session {
         list.extend(self.width_handle_overlay());
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
         list.extend(self.bend_preview_list(view, &objects));
+        list.extend(self.generators_preview_overlay(view));
         // The Node tool draws the nodes and handles of its editing set only (customer 2026-10-26).
         let control_paths: Vec<_> = paths.iter().map(super::node::control_view).collect();
         let decorated = if self.centre_lines_hides_marks() {
@@ -349,6 +354,8 @@ impl Session {
         list.extend(self.trace_mask_draw_list(view));
         // The Test grid tool's outline of the grid a press would place (`specs/0112` UX 3).
         list.extend(self.test_grid_draw_list(view));
+        list.extend(self.generators_draw_list(view));
+        list.extend(self.generator_knobs_draw_list());
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
         // the blue preview, whose white casing would otherwise cover it where the two coincide
         // (an unrotated object), and below the selection box and the handles.

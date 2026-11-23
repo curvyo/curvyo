@@ -73,10 +73,20 @@ impl Session {
         let Some(id) = self.history_object() else {
             return Vec::new();
         };
-        self.document
-            .object_history_page(id, start, count)
-            .iter()
-            .map(object_row_json)
+        let rows = self.document.object_history_page(id, start, count);
+        rows.iter()
+            .map(|row| {
+                let mut value = object_row_json(row);
+                // A step named by its command (a generator's "Gear: Teeth") reads the same here
+                // as in the Document scope.
+                if matches!(row.class, ObjectRowClass::Step)
+                    && row.version.is_none()
+                    && let Some(name) = self.history.stack.custom_name(row.step)
+                {
+                    value["name"] = Value::String(name.to_owned());
+                }
+                value
+            })
             .collect()
     }
 }

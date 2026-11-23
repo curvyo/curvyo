@@ -182,6 +182,7 @@ pub fn group_handles(
     if tolerances.move_only {
         handles.retain(|(handle, _)| *handle == EditHandle::Move);
     }
+    handles.retain(|(handle, _)| !tolerances.drops_for_corners_only(*handle));
     handles
 }
 

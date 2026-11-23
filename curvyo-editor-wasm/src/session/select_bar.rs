@@ -30,6 +30,18 @@ impl Session {
         if state.object_to_path && self.selection_holds_image() {
             state.object_to_path = false;
         }
+        // A generated object converts too (`specs/0141` UX notes §11).
+        if !state.object_to_path
+            && self.selected_group_leaves().is_empty()
+            && !self.selection_holds_image()
+            && self
+                .selection
+                .ids()
+                .iter()
+                .any(|id| self.document.is_generated(*id))
+        {
+            state.object_to_path = true;
+        }
         state
     }
 

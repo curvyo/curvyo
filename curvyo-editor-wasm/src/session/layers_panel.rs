@@ -169,7 +169,10 @@ impl Session {
         } else {
             LayerRows::build(&key.nodes, &key.expansion, facts)
         };
-        let rows = Arc::new(rows.with_dimension_unit(&key.nodes, key.unit));
+        let rows = rows
+            .with_dimension_unit(&key.nodes, key.unit)
+            .with_generated(|id| self.generated_row_label(id));
+        let rows = Arc::new(rows);
         *self.panel.rows.borrow_mut() = Some((key, Arc::clone(&rows)));
         rows
     }
@@ -524,6 +527,8 @@ fn row_json(row: &LayerRow, index: usize) -> Value {
         "id": row.id,
         "level": row.depth + 1,
         "kind": row.kind.code(),
+        // The generator of a generated object, lower case: the host's glyph key ("gear", "box").
+        "generator": row.generator.as_ref().map(|label| label.to_lowercase()),
         "name": row.name,
         "named": row.named,
         "text": row.text,

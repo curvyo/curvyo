@@ -43,7 +43,7 @@ impl Session {
     /// Whether the extension of `process` is compiled in and switched on.
     #[must_use]
     pub fn process_enabled(&self, process: &str) -> bool {
-        curvyo_ui_core::manifest(process).is_some()
+        curvyo_ui_core::manifest(process).is_some_and(|manifest| manifest.workbench().is_some())
             && self.manufacturing.extensions.is_enabled(process)
     }
 

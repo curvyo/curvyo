@@ -45,6 +45,7 @@ impl Session {
             | Tool::Text
             | Tool::Trace
             | Tool::TestGrid
+            | Tool::Generators
             | Tool::Measure => {}
         }
     }
@@ -114,6 +115,7 @@ impl Session {
             | Tool::Text
             | Tool::Trace
             | Tool::TestGrid
+            | Tool::Generators
             | Tool::Measure => {}
         }
     }
@@ -150,6 +152,7 @@ impl Session {
             | Tool::Text
             | Tool::Trace
             | Tool::TestGrid
+            | Tool::Generators
             | Tool::Measure => CreateOutcome::NoOp,
         };
         self.end_snapping_drag();
@@ -173,6 +176,7 @@ impl Session {
             | Tool::Text
             | Tool::Trace
             | Tool::TestGrid
+            | Tool::Generators
             | Tool::Measure => false,
         };
         if had_drag {
@@ -235,6 +239,7 @@ impl Session {
             | Tool::Text
             | Tool::Trace
             | Tool::TestGrid
+            | Tool::Generators
             | Tool::Measure => None,
         }
     }

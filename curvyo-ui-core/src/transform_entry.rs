@@ -279,7 +279,8 @@ impl TransformEntry {
             ResizeDirection::N | ResizeDirection::S => vec![height],
             _ => vec![width, height],
         };
-        let linked = ctrl && fields.len() == 2 && fields.iter().all(|f| f.editable);
+        let linked =
+            (ctrl || modes.proportional) && fields.len() == 2 && fields.iter().all(|f| f.editable);
         Self {
             kind: EntryKind::Size,
             start: object.clone(),

@@ -249,7 +249,14 @@ fn ac11b_switched_off_the_laser_kind_goes_and_the_page_stays_with_its_data() {
             .all(|k| k["id"] != LASER),
         "Laser leaves the Kind switch"
     );
-    assert!(w["manifests"].as_array().unwrap().is_empty());
+    // The generators extension (`0141`) stays on: only the laser's manifest leaves.
+    assert!(
+        w["manifests"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|manifest| manifest["id"] != LASER)
+    );
     assert_eq!(w["page"]["word"], "Laser (off)");
     assert!(s.add_page_of_kind(LASER, None).is_none());
 

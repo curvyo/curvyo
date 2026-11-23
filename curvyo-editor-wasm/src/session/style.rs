@@ -34,6 +34,7 @@ impl Session {
             | Tool::Text
             | Tool::Trace
             | Tool::TestGrid
+            | Tool::Generators
             | Tool::Measure => StyleTool::Other,
         }
     }

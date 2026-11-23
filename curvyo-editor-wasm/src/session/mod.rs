@@ -128,6 +128,7 @@ pub use library_sync::LibraryEdit;
 pub use materials::{MaterialWrite, MaterialsView};
 pub use output::{ExportedJob, OutputGroupView, PlayView, SendView, SentJobFile, send_notice};
 pub use test_grid::TestGridView;
+mod generators;
 mod gradient;
 mod page_drag;
 mod page_tree_panel;
@@ -456,6 +457,9 @@ pub enum Tool {
     /// The Trace tool (`specs/0025-raster-trace` criteria 1 to 3): key `I` or the Select bar's
     /// Trace button; a press selects, the preview and Create paths act on the selected images.
     Trace,
+    /// The Generators tool (`specs/0141-parametric-generators` criterion 1): a click places the
+    /// chosen generator's object at the pointer.
+    Generators,
     /// The Measure tool (`specs/0070-measure-and-dimension` criteria 1 to 6): key `M`, measures
     /// on the canvas and with Shift leaves a dimension.
     Measure,
@@ -717,6 +721,8 @@ pub struct Session {
     library: library_sync::LibrarySyncState,
     /// The Test grid tool (`test_grid/`, `specs/0112`).
     test_grid: test_grid::TestGridTool,
+    /// The Generators tool (`generators.rs`, `specs/0141`).
+    generators: generators::GeneratorsState,
 }
 
 impl Session {
@@ -843,6 +849,7 @@ impl Session {
             library_journal: library_journal::Journal::default(),
             library: library_sync::LibrarySyncState::default(),
             test_grid: test_grid::TestGridTool::default(),
+            generators: generators::GeneratorsState::default(),
         }
     }
 
@@ -964,9 +971,11 @@ impl Session {
             library_journal: library_journal::Journal::default(),
             library: library_sync::LibrarySyncState::default(),
             test_grid: test_grid::TestGridTool::default(),
+            generators: generators::GeneratorsState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
+        session.arm_generated_notice();
         // The first page's kind decides the tools (`specs/0098` criterion 8).
         session.sync_workbench();
         session.refresh_document_fonts();
@@ -1081,6 +1090,9 @@ impl Session {
         self.edit_targets()
             .iter()
             .filter_map(|object| match object {
+                // A generated object has no nodes: its parameters are its handles
+                // (`specs/0141` UX notes §8).
+                ObjectSnapshot::Path(path) if self.document.is_generated(path.id) => None,
                 ObjectSnapshot::Path(path) => Some(
                     controls
                         .get(&path.id)
@@ -1238,6 +1250,7 @@ impl Session {
             Tool::Text => self.text_pointer_down(point, shift),
             Tool::Trace => self.trace_pointer_down(point, shift),
             Tool::TestGrid => self.test_grid_pointer_down(point),
+            Tool::Generators => {}
         }
     }
 
@@ -1336,6 +1349,7 @@ impl Session {
                 self.trace_mask_drag_move(point);
             }
             Tool::TestGrid => self.test_grid_hover(Some(point)),
+            Tool::Generators => self.generators_hover(Some(point)),
         }
     }
 
@@ -1454,6 +1468,7 @@ impl Session {
                     this.trace_mask_release(point, shift, constrain);
                 }
                 Tool::TestGrid => {}
+                Tool::Generators => this.generators_pointer_up(point),
             }
         });
     }
@@ -1539,7 +1554,8 @@ impl Session {
                 | Tool::Ellipse
                 | Tool::PolygonStar
                 | Tool::Measure
-                | Tool::TestGrid => {}
+                | Tool::TestGrid
+                | Tool::Generators => {}
             }
             DoubleClickHint::None
         })

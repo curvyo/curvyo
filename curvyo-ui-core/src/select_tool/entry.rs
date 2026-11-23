@@ -172,6 +172,15 @@ impl SelectTool {
         }
     }
 
+    /// Whether the open entry is a size entry, from a handle or from the key S.
+    #[must_use]
+    pub fn size_entry_open(&self) -> bool {
+        matches!(
+            self.entry.as_ref().map(OpenEntry::handle),
+            Some(EditHandle::Resize(_))
+        )
+    }
+
     /// Closes the numeric entry without writing (criterion 20): idempotent.
     pub fn cancel_entry(&mut self) {
         self.entry = None;
