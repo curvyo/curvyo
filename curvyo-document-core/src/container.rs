@@ -99,6 +99,7 @@ fn pack_members(
         let (name, bytes) = crate::container_share::share_member(&record)?;
         write_member(&mut writer, name, &bytes, options)?;
     }
+    document.prune_derived_assets();
     crate::container_assets::write_assets(&mut writer, &document.assets.borrow())?;
     let cursor = writer.finish().map_err(|_| SaveError::Container)?;
     Ok(cursor.into_inner())
@@ -166,6 +167,9 @@ pub fn unpack(peer_id: u64, bytes: &[u8]) -> Result<Document, OpenError> {
     let loro_bytes = read_member(&mut archive, LORO_SNAPSHOT_MEMBER)?;
     let document = Document::from_loro_snapshot(peer_id, &loro_bytes)?;
     *document.assets.borrow_mut() = crate::container_assets::read_assets(&mut archive);
+    // ADR 0077 §5: the results the opened tree refers to are this session's, so a save after
+    // their removal keeps them for undo.
+    document.mark_referenced_derived_assets();
     document.set_workspace_share(share);
     document.legacy_share.set(legacy);
     document.migrate_page_kinds(manifest.format_version);

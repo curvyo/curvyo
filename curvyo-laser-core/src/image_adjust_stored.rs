@@ -1,8 +1,9 @@
 //! A picture's adjustment registers translated between the document's stored shape and the typed
 //! steps (ADR 0072 §1, §5; `specs/0135` criteria 8, 23).
 
-use curvyo_document_core::{AdjustEntry, AdjustStep, ImageAdjustments};
+use curvyo_document_core::{AdjustEntry, AdjustStep, ImageAdjustments, RanStep};
 
+use crate::image_adjust_ai::ResultRef;
 use crate::image_adjust_fields::ManualStep;
 use crate::image_adjust_resolve::{AdjustRegisters, StoredStep};
 use crate::image_dither::DitherSettings;
@@ -27,12 +28,21 @@ impl AdjustRegisters {
         let steps = stored
             .steps
             .iter()
-            .map(|entry| match entry {
-                AdjustEntry::Step(step) => StoredStep {
+            .map(|entry| match entry.step() {
+                Some(step) => StoredStep {
                     enabled: step.enabled,
-                    step: ManualStep::read(&step.kind, |key| step.fields.get(key).copied()).ok(),
+                    step: ManualStep::read(&step.kind, |key| step.fields.get(key).copied())
+                        .ok()
+                        .map(|read| {
+                            let result = entry.result().and_then(ResultRef::of);
+                            if read.kind().is_ai() {
+                                read.with_result(result)
+                            } else {
+                                read
+                            }
+                        }),
                 },
-                AdjustEntry::Unreadable(_) => StoredStep {
+                None => StoredStep {
                     enabled: false,
                     step: None,
                 },
@@ -46,15 +56,16 @@ impl AdjustRegisters {
             steps,
             dither,
             damaged_registers: damaged,
+            stale_results: 0,
         }
     }
 }
 
 impl ManualStep {
-    /// The step in the document's stored shape, switched on or off.
+    /// The step in the document's stored shape, switched on or off, with its stored result.
     #[must_use]
     pub fn entry(&self, enabled: bool) -> AdjustEntry {
-        AdjustEntry::Step(AdjustStep {
+        let step = AdjustStep {
             kind: self.kind().key().to_owned(),
             enabled,
             fields: self
@@ -62,7 +73,14 @@ impl ManualStep {
                 .into_iter()
                 .map(|(key, value)| (key.to_owned(), value))
                 .collect(),
-        })
+        };
+        match self.result() {
+            Some(result) => AdjustEntry::Ran(RanStep {
+                step,
+                result: result.record(),
+            }),
+            None => AdjustEntry::Step(step),
+        }
     }
 }
 

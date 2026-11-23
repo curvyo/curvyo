@@ -19,6 +19,7 @@ mod fixture_slot;
 mod fixture_snap;
 mod fixture_stored;
 mod grid_layout;
+mod image_adjust_ai;
 mod image_adjust_cache;
 mod image_adjust_field_specs;
 mod image_adjust_fields;
@@ -102,6 +103,7 @@ mod test_recipe_layout;
 /// 0073): the stored steps, the presets with their Strength, and the adjusted image at an
 /// Interval.
 pub mod adjust {
+    pub use crate::image_adjust_ai::{AiInput, ModelTag, ResultRef};
     pub use crate::image_adjust_cache::{
         ADJUST_WORK, ADJUSTED_BYTES, AdjustKey, AdjustedPicture, LOOK_BYTES, PyramidCache,
         RUN_BYTES, Resolved, reduced_level,

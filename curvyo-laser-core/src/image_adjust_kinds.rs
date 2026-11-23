@@ -2,21 +2,24 @@
 //! 5): keys, names, bands, field lists and defaults.
 
 use crate::image_adjust_field_specs::{
-    CONTOURS_SENSITIVITY, CONTOURS_WIDTH, CROP_HEIGHT, CROP_LEFT, CROP_TOP, CROP_WIDTH,
-    CURVES_FIELDS, DENOISE_DETAIL, DENOISE_STRENGTH, FieldSpec, LEVELS_BLACK, LEVELS_GAMMA,
-    LEVELS_WHITE, LOCAL_AMOUNT, LOCAL_RADIUS, MIX_BLUE, MIX_GREEN, MIX_RED, RESIZE_WIDTH,
-    SHARPEN_AMOUNT, SHARPEN_RADIUS, SHARPEN_THRESHOLD,
+    AI_DENOISE_STRENGTH, CONTOURS_SENSITIVITY, CONTOURS_WIDTH, CROP_HEIGHT, CROP_LEFT, CROP_TOP,
+    CROP_WIDTH, CURVES_FIELDS, DENOISE_DETAIL, DENOISE_STRENGTH, FieldSpec, LEVELS_BLACK,
+    LEVELS_GAMMA, LEVELS_WHITE, LOCAL_AMOUNT, LOCAL_RADIUS, MASK_SOFTNESS, MASK_THRESHOLD,
+    MIX_BLUE, MIX_GREEN, MIX_RED, RESIZE_WIDTH, SHARPEN_AMOUNT, SHARPEN_RADIUS, SHARPEN_THRESHOLD,
+    UPSCALE_FACTOR,
 };
 use crate::image_adjust_fields::ManualStep;
 
 /// The band of a step (ADR 0073 §3, `ux-notes.md` §3.7): the geometry steps run first in their
-/// fixed order, the tone and detail steps in the maker's order.
+/// fixed order, the tone and detail steps in the maker's order, the mask last.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Band {
-    /// Crop, Resize (and in slice 3 Upscale, AI denoise).
+    /// Crop, Resize, Upscale, AI denoise.
     Geometry,
     /// Channel mix to Sharpen.
     Tone,
+    /// Remove background.
+    Mask,
 }
 
 /// The kind of a stored step, in pipeline order (ADR 0073 §3).
@@ -26,6 +29,10 @@ pub enum StepKind {
     Crop,
     /// Fewer pixels, the ratio kept.
     Resize,
+    /// More pixels by a model (the stored result).
+    Upscale,
+    /// A model's denoise (the stored result) blended in.
+    AiDenoise,
     /// How colour becomes grey.
     ChannelMix,
     /// The bilateral filter.
@@ -40,6 +47,8 @@ pub enum StepKind {
     Contours,
     /// The unsharp mask.
     Sharpen,
+    /// A model's subject mask (the stored result), applied last.
+    RemoveBackground,
 }
 
 /// The largest number of Curves points.
@@ -47,9 +56,11 @@ pub const MAX_CURVE_POINTS: usize = 8;
 
 impl StepKind {
     /// Every kind in pipeline order.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 12] = [
         Self::Crop,
         Self::Resize,
+        Self::Upscale,
+        Self::AiDenoise,
         Self::ChannelMix,
         Self::Denoise,
         Self::Levels,
@@ -57,6 +68,7 @@ impl StepKind {
         Self::LocalContrast,
         Self::Contours,
         Self::Sharpen,
+        Self::RemoveBackground,
     ];
 
     /// The stored kind.
@@ -65,6 +77,8 @@ impl StepKind {
         match self {
             Self::Crop => "crop",
             Self::Resize => "resize",
+            Self::Upscale => "upscale",
+            Self::AiDenoise => "ai_denoise",
             Self::ChannelMix => "channel_mix",
             Self::Denoise => "denoise",
             Self::Levels => "levels",
@@ -72,6 +86,7 @@ impl StepKind {
             Self::LocalContrast => "local_contrast",
             Self::Contours => "contours",
             Self::Sharpen => "sharpen",
+            Self::RemoveBackground => "remove_background",
         }
     }
 
@@ -87,6 +102,8 @@ impl StepKind {
         match self {
             Self::Crop => "Crop",
             Self::Resize => "Resize",
+            Self::Upscale => "Upscale",
+            Self::AiDenoise => "AI denoise",
             Self::ChannelMix => "Channel mix",
             Self::Denoise => "Denoise",
             Self::Levels => "Levels",
@@ -94,6 +111,7 @@ impl StepKind {
             Self::LocalContrast => "Local contrast",
             Self::Contours => "Contours",
             Self::Sharpen => "Sharpen",
+            Self::RemoveBackground => "Remove background",
         }
     }
 
@@ -101,7 +119,8 @@ impl StepKind {
     #[must_use]
     pub const fn band(self) -> Band {
         match self {
-            Self::Crop | Self::Resize => Band::Geometry,
+            Self::Crop | Self::Resize | Self::Upscale | Self::AiDenoise => Band::Geometry,
+            Self::RemoveBackground => Band::Mask,
             _ => Band::Tone,
         }
     }
@@ -113,6 +132,8 @@ impl StepKind {
         match self {
             Self::Crop => &[CROP_LEFT, CROP_TOP, CROP_WIDTH, CROP_HEIGHT],
             Self::Resize => &[RESIZE_WIDTH],
+            Self::Upscale => &[UPSCALE_FACTOR],
+            Self::AiDenoise => &[AI_DENOISE_STRENGTH],
             Self::ChannelMix => &[MIX_RED, MIX_GREEN, MIX_BLUE],
             Self::Denoise => &[DENOISE_STRENGTH, DENOISE_DETAIL],
             Self::Levels => &[LEVELS_BLACK, LEVELS_WHITE, LEVELS_GAMMA],
@@ -120,6 +141,7 @@ impl StepKind {
             Self::LocalContrast => &[LOCAL_RADIUS, LOCAL_AMOUNT],
             Self::Contours => &[CONTOURS_WIDTH, CONTOURS_SENSITIVITY],
             Self::Sharpen => &[SHARPEN_RADIUS, SHARPEN_AMOUNT, SHARPEN_THRESHOLD],
+            Self::RemoveBackground => &[MASK_SOFTNESS, MASK_THRESHOLD],
         }
     }
 
@@ -161,6 +183,20 @@ impl StepKind {
                 radius_um: u32::try_from(um(SHARPEN_RADIUS, interval_um)).unwrap_or(u32::MAX),
                 amount_pct: 100,
                 threshold_pct: 0,
+            },
+            // Criterion 47's defaults; no result until Run.
+            Self::Upscale => ManualStep::Upscale {
+                factor: 2,
+                result: None,
+            },
+            Self::AiDenoise => ManualStep::AiDenoise {
+                strength_pct: 50,
+                result: None,
+            },
+            Self::RemoveBackground => ManualStep::RemoveBackground {
+                softness_pct: 5,
+                threshold_pct: 50,
+                result: None,
             },
         }
     }

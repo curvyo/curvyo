@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+use crate::assets::AssetHash;
+
 /// The label of every edit of a picture's adjustments: a preset pick, Strength, a step added,
 /// edited, switched, moved or removed, Make editable; its history name is "Edit adjustments"
 /// (ADR 0072 §7).
@@ -16,6 +18,12 @@ pub const PASTE_ADJUSTMENTS_COMMIT_LABEL: &str = "paste_adjustments";
 pub const RESTORE_ORIGINAL_COMMIT_LABEL: &str = "restore_original";
 /// The label of Original's on a clone's Adjustments override row (criterion 9); "Follow original".
 pub const FOLLOW_ORIGINAL_COMMIT_LABEL: &str = "follow_original";
+/// The label of a Run of Remove background (`specs/0135` criterion 24); "Run Remove background".
+pub const RUN_REMOVE_BACKGROUND_COMMIT_LABEL: &str = "run_remove_background";
+/// The label of a Run of Upscale; "Run Upscale".
+pub const RUN_UPSCALE_COMMIT_LABEL: &str = "run_upscale";
+/// The label of a Run of AI denoise; "Run AI denoise".
+pub const RUN_AI_DENOISE_COMMIT_LABEL: &str = "run_ai_denoise";
 
 /// The stored preset of a picture that has none: no preset, everything by hand.
 pub const EXPERT_PRESET: &str = "expert";
@@ -48,12 +56,43 @@ pub struct StoredDither {
     pub fields: BTreeMap<String, i64>,
 }
 
+/// The stored result of an AI step (ADR 0077 §2): the derived asset holding the raw model output,
+/// the model that made it, and what it was made from.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+pub struct StepResult {
+    /// The derived asset (`assets/derived/<hash>.png`).
+    pub asset: AssetHash,
+    /// The model's name, e.g. `u2netp`.
+    pub model: String,
+    /// The model's version.
+    pub model_version: String,
+    /// The SHA-256 of the step's input and model fields, in the asset hash's form.
+    pub input_hash: AssetHash,
+    /// The stored picture's width in pixels.
+    pub width_px: u32,
+    /// The stored picture's height in pixels.
+    pub height_px: u32,
+}
+
+/// An AI step with its stored result (ADR 0077 §2), stored as the step's map with a `result`
+/// key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RanStep {
+    /// The step.
+    #[serde(flatten)]
+    pub step: AdjustStep,
+    /// Its stored result.
+    pub result: StepResult,
+}
+
 /// One entry of the stack as stored.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum AdjustEntry {
     /// An entry of the step shape.
     Step(AdjustStep),
+    /// An entry of the step shape with a stored AI result.
+    Ran(RanStep),
     /// An entry that is not of the step shape (not a map, a kind that is no text, a flag that is
     /// no bool, a field that is no integer, a key this build does not know): kept as stored and
     /// written back unchanged, never run (ADR 0072 §5). A value that has no plain form is `null`.
@@ -65,8 +104,17 @@ impl AdjustEntry {
     #[must_use]
     pub const fn step(&self) -> Option<&AdjustStep> {
         match self {
-            Self::Step(step) => Some(step),
+            Self::Step(step) | Self::Ran(RanStep { step, .. }) => Some(step),
             Self::Unreadable(_) => None,
+        }
+    }
+
+    /// The stored AI result, `None` for a step without one.
+    #[must_use]
+    pub const fn result(&self) -> Option<&StepResult> {
+        match self {
+            Self::Ran(ran) => Some(&ran.result),
+            _ => None,
         }
     }
 }

@@ -338,3 +338,78 @@ fn crop_and_curve_edits_are_refused_past_their_rules() {
     );
     assert!(edit_field(&curve, 0, "out_0", 10.0).unwrap().is_some());
 }
+
+fn with_result(entry: AdjustEntry) -> AdjustEntry {
+    let AdjustEntry::Step(step) = entry else {
+        panic!("a step");
+    };
+    AdjustEntry::Ran(curvyo_document_core::RanStep {
+        step,
+        result: curvyo_document_core::StepResult {
+            asset: curvyo_document_core::AssetHash::of(b"png"),
+            model: "u2netp".into(),
+            model_version: "1".into(),
+            input_hash: curvyo_document_core::AssetHash::of(b"in"),
+            width_px: 320,
+            height_px: 320,
+        },
+    })
+}
+
+/// Criteria 3, 47 (slice 3): the AI steps are added at their pipeline place: Upscale and AI
+/// denoise after Crop and Resize, Remove background last; the mask moves only among masks.
+#[test]
+fn ai_steps_take_their_pipeline_place_and_band() {
+    let mut entries = add_step(&[], StepKind::Levels, 100);
+    for kind in [
+        StepKind::RemoveBackground,
+        StepKind::AiDenoise,
+        StepKind::Crop,
+        StepKind::Upscale,
+    ] {
+        entries = add_step(&entries, kind, 100);
+    }
+    assert_eq!(
+        kinds(&entries),
+        [
+            "crop",
+            "upscale",
+            "ai_denoise",
+            "levels",
+            "remove_background"
+        ]
+    );
+    assert_eq!(move_step(&entries, 4, true), None, "the mask stays last");
+    assert_eq!(
+        move_step(&entries, 1, false),
+        None,
+        "the geometry band is fixed"
+    );
+}
+
+/// Criterion 48: editing Edge softness, switching the step and Make editable keep the stored
+/// result (its fields apply without the model).
+#[test]
+fn edits_keep_the_stored_result() {
+    let entries = vec![
+        with_result(StepKind::Upscale.default_step(100).entry(true)),
+        with_result(StepKind::RemoveBackground.default_step(100).entry(true)),
+    ];
+    let edited = edit_field(&entries, 1, "softness_pct", 12.0)
+        .unwrap()
+        .unwrap();
+    assert_eq!(edited[1].result(), entries[1].result());
+    assert_eq!(edited[1].step().unwrap().fields["softness_pct"], 12);
+    assert_eq!(
+        edit_field(&entries, 1, "softness_pct", 21.0),
+        Err("Edge softness is 0 to 20 %.".to_owned())
+    );
+    let off = set_enabled(&entries, 0, false).unwrap();
+    assert_eq!(off[0].result(), entries[0].result());
+    assert!(!off[0].step().unwrap().enabled);
+    let write = make_editable(&entries, &[StepKind::Levels.default_step(100)]);
+    let steps = write.steps.unwrap();
+    assert_eq!(kinds(&steps), ["upscale", "levels", "remove_background"]);
+    assert_eq!(steps[0].result(), entries[0].result());
+    assert_eq!(steps[2].result(), entries[1].result());
+}

@@ -207,6 +207,8 @@ pub(crate) fn prepare_raster(
 pub(crate) fn raster_leaf<'a>(leaf: &'a LeafInput, raster: &mut Vec<RasterLeaf<'a>>) {
     let (outlines, raster_kind) = match &leaf.geometry {
         LeafGeometry::Outlines(_) | LeafGeometry::Image { pixels: None, .. } => return,
+        // ADR 0077 §4: an AI step without its stored result does not burn the picture.
+        LeafGeometry::Image { adjust, .. } if adjust.missing_results() > 0 => return,
         LeafGeometry::Image {
             frame,
             asset,

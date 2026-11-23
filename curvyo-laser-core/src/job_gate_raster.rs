@@ -123,6 +123,8 @@ struct Lists {
     unreadable: Once,
     /// Pictures with steps that cannot run, each once with its count (`specs/0135` criterion 23).
     broken: Vec<(NodeId, usize)>,
+    /// Pictures with out-of-date stored AI results, each once with its count (criterion 48).
+    stale: Vec<(NodeId, usize)>,
 }
 
 impl Lists {
@@ -140,7 +142,12 @@ impl Lists {
         if broken > 0 && !self.broken.iter().any(|(node, _)| *node == leaf.node) {
             self.broken.push((leaf.node, broken));
         }
-        let Some(pixels) = pixels else {
+        let stale = adjust.stale_results;
+        if stale > 0 && !self.stale.iter().any(|(node, _)| *node == leaf.node) {
+            self.stale.push((leaf.node, stale));
+        }
+        // ADR 0077 §4: an AI step without its stored result does not burn the picture.
+        let Some(pixels) = pixels.as_ref().filter(|_| adjust.missing_results() == 0) else {
             self.unreadable.add(leaf.node);
             return;
         };
@@ -196,6 +203,13 @@ impl Lists {
         for (item, count) in self.broken {
             issues.push(issue(
                 Cause::BrokenAdjustments { item },
+                count,
+                Targets::Items(vec![item]),
+            ));
+        }
+        for (item, count) in self.stale {
+            issues.push(issue(
+                Cause::StaleResults { item },
                 count,
                 Targets::Items(vec![item]),
             ));

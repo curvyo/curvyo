@@ -14,6 +14,8 @@ image.workspace = true
 # `pow` and `exp` for the 256-entry Levels and range tables (ADR 0073 §1, §4): the same bits on
 # every target.
 libm.workspace = true
+# The input hash of an AI step's stored result (ADR 0077 §2); the workspace pin, already locked.
+sha2.workspace = true
 thiserror.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

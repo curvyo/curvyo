@@ -1,7 +1,8 @@
 //! The bitmap decoder boundary of the image import (`specs/0058-bitmap-import`, ADR 0017 §4):
 //! hostile bytes in, a checked header or a deterministic working image out; and the PNG of a
 //! working image for the clipboard (`specs/0087-image-clipboard-and-drop`); and the integer pixel
-//! steps of the image adjustments with the picture analysis (`specs/0135`, ADR 0073).
+//! steps of the image adjustments with the picture analysis (`specs/0135`, ADR 0073), and the
+//! integer application of the AI steps' stored results (ADR 0077 §3).
 //!
 //! Pure and wasm-compatible (`CLAUDE.md` §6): no filesystem, clock or threads; callers pass the
 //! bytes in. A panic aborts a wasm module, so every size is checked before a buffer exists:
@@ -17,8 +18,11 @@ mod adjust_clahe;
 mod adjust_denoise;
 mod adjust_detail;
 mod adjust_geometry;
+mod adjust_hash;
 mod adjust_plane;
+mod adjust_result;
 mod adjust_run;
+mod adjust_step;
 mod adjust_tone;
 mod container;
 mod decode;
@@ -36,12 +40,17 @@ mod working;
 pub use adjust_analysis::{ANALYSIS_PIXELS, Analysis, Histogram, noise_tenths};
 pub use adjust_blur::{SubPx, box_widths, gauss_blur};
 pub use adjust_geometry::{crop_plane, crop_rect, resize_plane, resized_size};
+pub use adjust_hash::input_hash;
 pub use adjust_plane::GreyPlane;
-pub use adjust_run::{AdjustRun, Adjusted, PixelStep, peak_bytes, run_steps, step_bytes};
+pub use adjust_result::{StoredPixels, blend, mask_map, mask_resized, opaque_over_white};
+pub use adjust_run::{
+    AdjustRun, Adjusted, peak_bytes, run_steps, run_steps_with, step_bytes, step_input,
+};
+pub use adjust_step::PixelStep;
 pub use adjust_tone::{channel_mix_grey, curves_table, levels_table};
 pub use decode::decode_working;
 pub use density::PixelDensity;
-pub use encode::encode_png;
+pub use encode::{encode_grey_png, encode_png};
 pub use error::ImageError;
 pub use format::ImageFormat;
 pub use limits::{

@@ -631,7 +631,14 @@ impl DocumentVersion {
 /// an Image test grid with the Picture source are image nodes tagged `grid_cell`. A build that
 /// stops at 51 would engrave the uncropped picture, so this build's files are refused there by
 /// version; a file of 51 opens unchanged. Golden: `image_adjust_crop_v52.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 52;
+///
+/// Version 53 (`specs/0135-image-optimisation` slice 3, ADR 0077 §1, §2, §9): the stack may hold
+/// the AI kinds `upscale` (`factor`), `ai_denoise` (`strength_pct`) and `remove_background`
+/// (`softness_pct`, `threshold_pct`), each with an optional `result` record naming a derived
+/// asset, and the container holds those as `assets/derived/<sha256>.png`. A build that stops at
+/// 52 would burn the picture without its stored result, so this build's files are refused there
+/// by version; a file of 52 opens unchanged. Golden: `image_adjust_ai_v53.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 53;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

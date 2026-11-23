@@ -124,7 +124,7 @@ fn the_settings_golden_reads_back_every_register_link_override_and_grid() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 52);
+    assert_eq!(CURRENT_FORMAT_VERSION, 53);
     let d = open_unchanged(&bytes);
     let ops = operations(&d);
     assert_eq!(ops.len(), 5, "four operations and the grid row");
@@ -230,8 +230,8 @@ fn a_file_of_a_newer_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 53,
-            supported: 52
+            found: 54,
+            supported: 53
         })
     ));
 }

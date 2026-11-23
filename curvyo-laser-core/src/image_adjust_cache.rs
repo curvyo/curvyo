@@ -12,10 +12,12 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use curvyo_document_core::{AssetHash, Length, Point};
-use curvyo_image_core::{AdjustRun, Adjusted, Analysis, PixelStep, WorkingImage, peak_bytes};
+use curvyo_image_core::{
+    AdjustRun, Adjusted, Analysis, PixelStep, StoredPixels, WorkingImage, peak_bytes,
+};
 
 use crate::image_adjust_fields::ManualStep;
-use crate::image_adjust_resolve::{AdjustRegisters, analysis_after, pixel_steps};
+use crate::image_adjust_resolve::{AdjustRegisters, StoredStep, analysis_after_with, pixel_steps};
 use crate::image_preset::Preset;
 use crate::job_raster_sample::GreyPyramid;
 
@@ -106,6 +108,12 @@ struct Entries {
     bytes: usize,
     /// The bytes a run may hold; [`RUN_BYTES`] unless set.
     run_bytes: Option<u64>,
+    /// The decoded stored results of the AI steps (ADR 0077 §3), by their derived asset.
+    results: StoredPixels,
+    /// The hashes of [`Self::results`], for [`PyramidCache::retain`].
+    result_assets: HashSet<AssetHash>,
+    /// The out-of-date AI rows of a stack, by asset and steps (criterion 48).
+    stale: HashMap<(AssetHash, Vec<StoredStep>), Vec<usize>>,
 }
 
 impl Entries {
@@ -200,6 +208,61 @@ impl PyramidCache {
         self.entries().run_bytes = Some(bytes);
     }
 
+    /// Holds the decoded stored result `asset` for the runs that read it (the caller decodes the
+    /// derived asset once; ADR 0077 §3).
+    pub fn hold_result(&self, asset: &AssetHash, pixels: Arc<WorkingImage>) {
+        let mut entries = self.entries();
+        entries.results.insert(asset.to_bytes(), pixels);
+        entries.result_assets.insert(asset.clone());
+    }
+
+    /// Whether the stored result `asset` is held.
+    #[must_use]
+    pub fn holds_result(&self, asset: &AssetHash) -> bool {
+        self.entries().result_assets.contains(asset)
+    }
+
+    /// The stored results held, for a run outside the cache (an AI step's input).
+    #[must_use]
+    pub fn results(&self) -> StoredPixels {
+        self.entries().results.clone()
+    }
+
+    /// How many stored results of `registers` on `asset` (working image `image`) are out of
+    /// date (criterion 48), computed once per stack and kept.
+    #[must_use]
+    pub fn stale_results(
+        &self,
+        asset: &AssetHash,
+        image: &WorkingImage,
+        registers: &AdjustRegisters,
+    ) -> usize {
+        self.stale_rows(asset, image, registers).len()
+    }
+
+    /// The stack indices of the out-of-date stored results ([`Self::stale_results`]); empty
+    /// until every stored result is held.
+    #[must_use]
+    pub fn stale_rows(
+        &self,
+        asset: &AssetHash,
+        image: &WorkingImage,
+        registers: &AdjustRegisters,
+    ) -> Vec<usize> {
+        let stored = registers.stored_results();
+        if stored.is_empty() || !stored.iter().all(|r| self.holds_result(&r.asset_hash())) {
+            return Vec::new();
+        }
+        let key = (asset.clone(), registers.steps.clone());
+        if let Some(held) = self.entries().stale.get(&key) {
+            return held.clone();
+        }
+        let results = self.results();
+        let stale = registers.stale_rows(image, &results);
+        self.entries().stale.insert(key, stale.clone());
+        stale
+    }
+
     /// Whether resolving `registers` needs no work: Expert, or the analysis of `asset` is held.
     #[must_use]
     pub fn resolvable(&self, asset: &AssetHash, registers: &AdjustRegisters) -> bool {
@@ -223,7 +286,8 @@ impl PyramidCache {
         if let Some(held) = self.entries().analyses.get(&key) {
             return Arc::clone(held);
         }
-        let analysis = Arc::new(analysis_after(image, geometry));
+        let results = self.results();
+        let analysis = Arc::new(analysis_after_with(image, geometry, &results));
         self.entries().analyses.insert(key, Arc::clone(&analysis));
         analysis
     }
@@ -312,7 +376,8 @@ impl PyramidCache {
             let (mut run, bytes) = started.unwrap_or_else(|| {
                 let input = input();
                 let pixels = u64::from(input.width) * u64::from(input.height);
-                let run = AdjustRun::within(&input, &key.steps, budget);
+                let results = self.results();
+                let run = AdjustRun::with_results(&input, &key.steps, budget, &results);
                 let ran = &key.steps[..run.not_run().unwrap_or(key.steps.len())];
                 let bytes = usize::try_from(peak_bytes(pixels, ran)).unwrap_or(usize::MAX);
                 (run, bytes)
@@ -359,7 +424,8 @@ impl PyramidCache {
         self.picture(&key, image).pyramid
     }
 
-    /// Drops the pictures and analyses of assets not in `assets`.
+    /// Drops the pictures, analyses and stored results of assets not in `assets` (originals and
+    /// derived assets alike).
     pub fn retain(&mut self, assets: &[&AssetHash]) {
         let assets: HashSet<&AssetHash> = assets.iter().copied().collect();
         let mut entries = self.entries();
@@ -372,6 +438,23 @@ impl PyramidCache {
         entries
             .running
             .retain(|(key, _, _)| assets.contains(&key.asset));
+        entries.stale.retain(|(asset, _), _| assets.contains(asset));
+        let dropped: Vec<AssetHash> = entries
+            .result_assets
+            .iter()
+            .filter(|hash| !assets.contains(hash))
+            .cloned()
+            .collect();
+        if !dropped.is_empty() {
+            let mut kept = StoredPixels::default();
+            for hash in entries.result_assets.iter().filter(|h| assets.contains(h)) {
+                if let Some(pixels) = entries.results.get(&hash.to_bytes()) {
+                    kept.insert(hash.to_bytes(), Arc::clone(pixels));
+                }
+            }
+            entries.results = kept;
+            entries.result_assets.retain(|hash| assets.contains(hash));
+        }
         entries.bytes = entries.pictures.values().map(|held| held.bytes).sum();
     }
 

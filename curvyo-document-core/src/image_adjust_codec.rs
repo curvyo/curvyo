@@ -5,8 +5,11 @@
 //! meta map of an image (and of a clone with `own_adjustments`), besides its own registers:
 //!   image_preset      : "<text>"        absent = "expert"; known values are the extension's
 //!   image_strength    : i64 0..=100     absent = 50
-//!   image_adjustments : [ { kind: "<text>", enabled: bool, fields: { <key>: i64, ... } }, ... ]
-//!                       ONE plain list value, written whole; absent or empty = no stack
+//!   image_adjustments : [ { kind: "<text>", enabled: bool, fields: { <key>: i64, ... },
+//!                           result?: { asset, model, model_version, input_hash: "<64 hex>",
+//!                                      width_px, height_px: i64 } }, ... ]
+//!                       ONE plain list value, written whole; absent or empty = no stack; the
+//!                       `result` of an AI step names its derived asset (ADR 0077 §2)
 //!   image_dither      : { mode: "<text>", <key>: i64, ... }
 //!                       ONE plain map, written whole; absent = Floyd-Steinberg with the `0123`
 //!                       defaults; the mode names, keys and ranges are the extension's
@@ -19,9 +22,10 @@ use std::collections::BTreeMap;
 
 use loro::{LoroMap, LoroValue, ValueOrContainer};
 
+use crate::assets::AssetHash;
 use crate::image_adjust_model::{
     AdjustDamage, AdjustEntry, AdjustStep, AdjustmentsWrite, ImageAdjustments, MAX_IMAGE_STRENGTH,
-    StoredDither,
+    RanStep, StepResult, StoredDither,
 };
 use crate::manufacturing_codec::{json_of, loro_of};
 
@@ -41,6 +45,22 @@ const DITHER_MODE: &str = "mode";
 const ENTRY_KIND: &str = "kind";
 const ENTRY_ENABLED: &str = "enabled";
 const ENTRY_FIELDS: &str = "fields";
+const ENTRY_RESULT: &str = "result";
+
+const RESULT_ASSET: &str = "asset";
+const RESULT_MODEL: &str = "model";
+const RESULT_VERSION: &str = "model_version";
+const RESULT_INPUT: &str = "input_hash";
+const RESULT_WIDTH: &str = "width_px";
+const RESULT_HEIGHT: &str = "height_px";
+const RESULT_KEYS: [&str; 6] = [
+    RESULT_ASSET,
+    RESULT_MODEL,
+    RESULT_VERSION,
+    RESULT_INPUT,
+    RESULT_WIDTH,
+    RESULT_HEIGHT,
+];
 
 /// One register as stored.
 enum Stored {
@@ -67,7 +87,7 @@ fn read_step(value: &LoroValue) -> Option<AdjustStep> {
     };
     if map
         .keys()
-        .any(|key| ![ENTRY_KIND, ENTRY_ENABLED, ENTRY_FIELDS].contains(&key.as_str()))
+        .any(|key| ![ENTRY_KIND, ENTRY_ENABLED, ENTRY_FIELDS, ENTRY_RESULT].contains(&key.as_str()))
     {
         return None;
     }
@@ -92,6 +112,51 @@ fn read_step(value: &LoroValue) -> Option<AdjustStep> {
         enabled: *enabled,
         fields,
     })
+}
+
+/// The stored result of an entry, `None` when it is not a map of the six keys with two hashes,
+/// two texts and two sizes from 1 to `u32::MAX`.
+fn read_result(value: &LoroValue) -> Option<StepResult> {
+    let LoroValue::Map(map) = value else {
+        return None;
+    };
+    if map.len() != RESULT_KEYS.len() || map.keys().any(|k| !RESULT_KEYS.contains(&k.as_str())) {
+        return None;
+    }
+    let text = |key: &str| match map.get(key) {
+        Some(LoroValue::String(text)) => Some(text.to_string()),
+        _ => None,
+    };
+    let size = |key: &str| match map.get(key) {
+        Some(LoroValue::I64(n)) => u32::try_from(*n).ok().filter(|n| *n > 0),
+        _ => None,
+    };
+    Some(StepResult {
+        asset: AssetHash::parse(&text(RESULT_ASSET)?)?,
+        model: text(RESULT_MODEL)?,
+        model_version: text(RESULT_VERSION)?,
+        input_hash: AssetHash::parse(&text(RESULT_INPUT)?)?,
+        width_px: size(RESULT_WIDTH)?,
+        height_px: size(RESULT_HEIGHT)?,
+    })
+}
+
+fn result_value(result: &StepResult) -> LoroValue {
+    let map: std::collections::HashMap<String, LoroValue> = [
+        (RESULT_ASSET, LoroValue::from(result.asset.as_str())),
+        (RESULT_MODEL, LoroValue::from(result.model.as_str())),
+        (
+            RESULT_VERSION,
+            LoroValue::from(result.model_version.as_str()),
+        ),
+        (RESULT_INPUT, LoroValue::from(result.input_hash.as_str())),
+        (RESULT_WIDTH, LoroValue::I64(i64::from(result.width_px))),
+        (RESULT_HEIGHT, LoroValue::I64(i64::from(result.height_px))),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_owned(), v))
+    .collect();
+    LoroValue::from(map)
 }
 
 /// The plain form of an unreadable entry; `null` for a value that has none (bytes, a NaN).
@@ -133,11 +198,27 @@ fn dither_value(dither: &StoredDither) -> LoroValue {
     LoroValue::from(map)
 }
 
+/// One stored entry: a step, a step with its stored result, or (not of the step shape, or a
+/// `result` that does not read) unreadable.
 fn read_entry(value: &LoroValue) -> AdjustEntry {
-    read_step(value).map_or_else(
-        || AdjustEntry::Unreadable(unreadable_json(value)),
-        AdjustEntry::Step,
-    )
+    let unreadable = || AdjustEntry::Unreadable(unreadable_json(value));
+    let Some(step) = read_step(value) else {
+        return unreadable();
+    };
+    let LoroValue::Map(map) = value else {
+        return unreadable();
+    };
+    match map.get(ENTRY_RESULT) {
+        None => AdjustEntry::Step(step),
+        Some(stored) => read_result(stored).map_or_else(unreadable, |result| {
+            AdjustEntry::Ran(RanStep { step, result })
+        }),
+    }
+}
+
+/// Whether a stored entry is unreadable (kept as stored by a write).
+fn is_unreadable(value: &LoroValue) -> bool {
+    matches!(read_entry(value), AdjustEntry::Unreadable(_))
 }
 
 /// The adjustment registers stored in `meta`, each damaged one read as its default and named in
@@ -178,19 +259,22 @@ pub(crate) fn read_adjustments(meta: &LoroMap) -> ImageAdjustments {
 /// One entry as its stored value.
 fn entry_value(entry: &AdjustEntry) -> LoroValue {
     match entry {
-        AdjustEntry::Step(step) => {
+        AdjustEntry::Step(step) | AdjustEntry::Ran(RanStep { step, .. }) => {
             let fields: std::collections::HashMap<String, LoroValue> = step
                 .fields
                 .iter()
                 .map(|(key, value)| (key.clone(), LoroValue::I64(*value)))
                 .collect();
-            let map: std::collections::HashMap<String, LoroValue> = [
+            let mut map: std::collections::HashMap<String, LoroValue> = [
                 (ENTRY_KIND.to_owned(), LoroValue::from(step.kind.as_str())),
                 (ENTRY_ENABLED.to_owned(), LoroValue::Bool(step.enabled)),
                 (ENTRY_FIELDS.to_owned(), LoroValue::from(fields)),
             ]
             .into_iter()
             .collect();
+            if let Some(result) = entry.result() {
+                map.insert(ENTRY_RESULT.to_owned(), result_value(result));
+            }
             LoroValue::from(map)
         }
         AdjustEntry::Unreadable(value) => loro_of(value),
@@ -217,7 +301,7 @@ pub(crate) fn write_adjustments(meta: &LoroMap, write: &AdjustmentsWrite) {
         let mut kept: Vec<Option<LoroValue>> = match stored(meta, KEY_ADJUSTMENTS) {
             Stored::Plain(LoroValue::List(list)) => list
                 .iter()
-                .filter(|value| read_step(value).is_none())
+                .filter(|value| is_unreadable(value))
                 .cloned()
                 .map(Some)
                 .collect(),
@@ -234,7 +318,7 @@ pub(crate) fn write_adjustments(meta: &LoroMap, write: &AdjustmentsWrite) {
                     })
                     .and_then(Option::take)
                     .unwrap_or_else(|| entry_value(entry)),
-                AdjustEntry::Step(_) => entry_value(entry),
+                AdjustEntry::Step(_) | AdjustEntry::Ran(_) => entry_value(entry),
             })
             .collect();
         insert(meta, KEY_ADJUSTMENTS, LoroValue::from(list));
@@ -242,6 +326,19 @@ pub(crate) fn write_adjustments(meta: &LoroMap, write: &AdjustmentsWrite) {
     if let Some(dither) = &write.dither {
         insert(meta, KEY_DITHER, dither_value(dither));
     }
+}
+
+/// The derived assets the stack stored in `meta` names (ADR 0077 §5), in stack order.
+pub(crate) fn derived_assets(meta: &LoroMap) -> Vec<AssetHash> {
+    let Stored::Plain(LoroValue::List(list)) = stored(meta, KEY_ADJUSTMENTS) else {
+        return Vec::new();
+    };
+    list.iter()
+        .filter_map(|value| match read_entry(value) {
+            AdjustEntry::Ran(ran) => Some(ran.result.asset),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Removes the Dither register from `meta`, uncommitted (Restore original, amendment A3).

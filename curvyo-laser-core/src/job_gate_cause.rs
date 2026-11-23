@@ -138,6 +138,12 @@ pub enum Cause {
         /// The picture.
         item: NodeId,
     },
+    /// `specs/0135` criterion 48: stored AI results of a picture whose input changed; they still
+    /// burn. The count is the results'.
+    StaleResults {
+        /// The picture.
+        item: NodeId,
+    },
 }
 
 impl Cause {
@@ -172,6 +178,7 @@ impl Cause {
             Self::LowestPowerAbovePower { .. } => 24,
             Self::DamagedSettings => 25,
             Self::BrokenAdjustments { .. } => 26,
+            Self::StaleResults { .. } => 27,
         }
     }
 

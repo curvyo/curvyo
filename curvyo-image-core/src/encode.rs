@@ -1,9 +1,10 @@
-//! The PNG of a working image for the clipboard (`specs/0087-image-clipboard-and-drop` criteria 11
-//! and 12, `adrs.md` decision 2): the stored pixels as RGBA8, fast compression, no metadata chunk.
+//! The PNG bytes of a picture (the clipboard, `specs/0087-image-clipboard-and-drop` criteria 11
+//! and 12; the stored AI results, ADR 0077 §1): fast compression, no metadata chunk.
 
 use image::ImageEncoder;
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 
+use crate::adjust_plane::GreyPlane;
 use crate::error::ImageError;
 use crate::limits::{MAX_WORKING_PIXELS, MAX_WORKING_SIDE};
 use crate::working::WorkingImage;
@@ -39,6 +40,31 @@ pub fn encode_png(image: &WorkingImage) -> Result<Vec<u8>, ImageError> {
             height,
             image::ExtendedColorType::Rgba8,
         )
+        .map_err(|_| ImageError::Damaged)?;
+    Ok(out)
+}
+
+/// The 8-bit grey PNG of `plane` (a stored mask, ADR 0077 §1), with the rules of [`encode_png`].
+///
+/// # Errors
+/// As [`encode_png`].
+pub fn encode_grey_png(plane: &GreyPlane) -> Result<Vec<u8>, ImageError> {
+    let (width, height) = (plane.width, plane.height);
+    if width > MAX_WORKING_SIDE
+        || height > MAX_WORKING_SIDE
+        || u64::from(width) * u64::from(height) > MAX_WORKING_PIXELS
+    {
+        return Err(ImageError::TooManyPixels { width, height });
+    }
+    if width == 0 || height == 0 || plane.grey.len() as u64 != u64::from(width) * u64::from(height)
+    {
+        return Err(ImageError::Damaged);
+    }
+    let mut out = Vec::new();
+    out.try_reserve(plane.grey.len() / 4)
+        .map_err(|_| ImageError::OutOfMemory)?;
+    PngEncoder::new_with_quality(&mut out, CompressionType::Fast, FilterType::Adaptive)
+        .write_image(&plane.grey, width, height, image::ExtendedColorType::L8)
         .map_err(|_| ImageError::Damaged)?;
     Ok(out)
 }

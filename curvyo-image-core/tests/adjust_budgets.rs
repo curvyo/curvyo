@@ -231,3 +231,31 @@ fn a_stepped_photo_stack_keeps_every_tick_short() {
     println!("stepped photo stack: {ticks} ticks, worst {worst:?}, total {total:?}");
     assert!(worst < Duration::from_millis(50), "worst tick {worst:?}");
 }
+
+/// Criterion 55: reading a stored AI result and blending it, at most 60 ms on 4 Mpx (the decode
+/// of the stored PNG included; ADR 0077 §3).
+#[test]
+#[ignore = "budget benchmark, run in release"]
+fn a_stored_ai_result_reads_and_blends_within_60_ms() {
+    use std::sync::Arc;
+    let image = picture();
+    let png = curvyo_image_core::encode_png(&image).unwrap();
+    let hash = [1_u8; 32];
+    timed(
+        "stored AI denoise read and blend",
+        Duration::from_millis(60),
+        || {
+            let mut results = curvyo_image_core::StoredPixels::default();
+            let decoded = curvyo_image_core::decode_working(&png).unwrap();
+            results.insert(hash, Arc::new(decoded));
+            curvyo_image_core::run_steps_with(
+                &image,
+                &[PixelStep::AiDenoise {
+                    result: hash,
+                    strength_pct: 50,
+                }],
+                &results,
+            )
+        },
+    );
+}
