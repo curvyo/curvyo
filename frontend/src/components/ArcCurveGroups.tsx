@@ -21,6 +21,10 @@ const LIMITED_FIELD_PX = 148;
 const START_LABEL_PX = 36;
 const END_LABEL_PX = 30;
 const CURVE_LABEL_PX = 40;
+/** Rounded: the label and "-10.00" (`specs/0145-shape-spiro-handles/ux-notes.md` section 7). */
+const ROUNDED_FIELD_PX = 104;
+const ROUNDED_LIMITED_FIELD_PX = 153;
+const ROUNDED_LABEL_PX = 56;
 
 const TOOLTIP_STYLE = {
   background: "var(--toolbar-bg)",
@@ -31,6 +35,11 @@ const TOOLTIP_STYLE = {
 /** One decimal, a real minus never needed: the session parses both. */
 function formatOne(value: number): string {
   return (Math.round(value * 10) / 10).toFixed(1);
+}
+
+/** Two decimals, as the Rounded field shows its factor. */
+function formatTwo(value: number): string {
+  return (Math.round(value * 100) / 100).toFixed(2);
 }
 
 /** The tooltip of a bar control: the name in semibold, one muted line, and the reason on a
@@ -115,6 +124,10 @@ interface BarNumberFieldProps {
   limited: string | null;
   /** Enter: `"committed"`, `"unchanged"` or `"invalid:number"`. */
   onEnter: (text: string) => string;
+  /** Decimals shown (default 1), and the arrow-key step and its Shift step (default 1 and 10). */
+  decimals?: number;
+  step?: number;
+  shiftStep?: number;
   /** An arrow-key step: previewed, committed once on key-up; absent when the field has none. */
   onStepPreview?: (value: number) => void;
   onStepCommit?: () => void;
@@ -141,15 +154,19 @@ function BarNumberField({
   tooltipName,
   tooltipLine,
   limited,
+  decimals = 1,
+  step: baseStep = 1,
+  shiftStep = 10,
   onEnter,
   onStepPreview,
   onStepCommit,
   onStepCancel,
   onReturnFocus,
 }: BarNumberFieldProps) {
+  const format = decimals === 2 ? formatTwo : formatOne;
   const id = useId();
   const disabled = grey !== "";
-  const shown = mixed || disabled ? "" : formatOne(value);
+  const shown = mixed || disabled ? "" : format(value);
   const [text, setText] = useState(shown);
   const [invalid, setInvalid] = useState(false);
   const editing = useRef(false);
@@ -195,10 +212,10 @@ function BarNumberField({
       leave(event.currentTarget);
     } else if ((event.key === "ArrowUp" || event.key === "ArrowDown") && onStepPreview && !mixed) {
       event.preventDefault();
-      const step = (event.shiftKey ? 10 : 1) * (event.key === "ArrowUp" ? 1 : -1);
+      const step = (event.shiftKey ? shiftStep : baseStep) * (event.key === "ArrowUp" ? 1 : -1);
       const next = (stepping.current ?? value) + step;
       stepping.current = next;
-      setText(formatOne(next));
+      setText(format(next));
       onStepPreview(next);
     }
   };
@@ -425,6 +442,7 @@ function ArcFieldRow({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocus: ()
       />
       {/* Curve sits beside Start and End, so the group stays two rows (UX review 3). */}
       {state.curveShown && <CurveField arc={arc} onReturnFocus={onReturnFocus} />}
+      {state.roundedShown && <RoundedField arc={arc} onReturnFocus={onReturnFocus} />}
     </div>
   );
 }
@@ -494,13 +512,47 @@ function CurveField({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocus: () 
   );
 }
 
+/** The "Rounded" field (`specs/0145-shape-spiro-handles/` criterion 3): a factor from -10 to 10
+ * with two decimals and no suffix, "Mixed", the "limited" tag. The arrow keys step it by 0.05
+ * (Shift 0.25) live and commit once on key-up. It sits right after Curve, where Curve is shown. */
+function RoundedField({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocus: () => void }) {
+  const { state } = arc;
+  const limited = state.roundedLimited
+    ? `Stored ${formatTwo(state.roundedStored)}, limited to ${formatTwo(state.rounded)}.`
+    : null;
+  return (
+    <BarNumberField
+      label="Rounded"
+      labelPx={ROUNDED_LABEL_PX}
+      accessibleName="Rounded"
+      suffix=""
+      widthPx={limited ? ROUNDED_LIMITED_FIELD_PX : ROUNDED_FIELD_PX}
+      value={state.rounded}
+      mixed={state.roundedMixed}
+      grey=""
+      tooltipName="Rounded"
+      limited={limited}
+      decimals={2}
+      step={0.05}
+      shiftStep={0.25}
+      onEnter={arc.setRounded}
+      onStepPreview={arc.previewRounded}
+      onStepCommit={arc.commitCurve}
+      onStepCancel={arc.cancelCurve}
+      onReturnFocus={onReturnFocus}
+    />
+  );
+}
+
 /** The Curve group for a selection of polygons and stars without an ellipse; with an
- * ellipse the field sits in the ellipse group's second row. */
+ * ellipse the field sits in the ellipse group's second row. Rounded follows Curve, 4 px apart
+ * (`specs/0145-shape-spiro-handles/ux-notes.md` section 7). */
 export function CurveGroup({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocus: () => void }) {
   return (
     <Tooltip.Provider delayDuration={400}>
-      <div className="flex h-9 items-center">
-        <CurveField arc={arc} onReturnFocus={onReturnFocus} />
+      <div className="flex h-9 items-center gap-1">
+        {arc.state.curveShown && <CurveField arc={arc} onReturnFocus={onReturnFocus} />}
+        {arc.state.roundedShown && <RoundedField arc={arc} onReturnFocus={onReturnFocus} />}
       </div>
     </Tooltip.Provider>
   );

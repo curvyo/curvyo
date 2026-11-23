@@ -23,6 +23,14 @@ export interface ArcBarState {
   curveLimited: boolean;
   /** The stored percent, for the "limited" tag's tooltip. */
   curveStored: number;
+  /** The Rounded field (`specs/0145-shape-spiro-handles/` criterion 3): a polygon or star is
+   * selected. */
+  roundedShown: boolean;
+  rounded: number;
+  roundedMixed: boolean;
+  roundedLimited: boolean;
+  /** The stored value beyond -10..=10, for the "limited" tag's tooltip. */
+  roundedStored: number;
 }
 
 export const EMPTY_ARC_BAR_STATE: ArcBarState = {
@@ -40,6 +48,11 @@ export const EMPTY_ARC_BAR_STATE: ArcBarState = {
   curveGrey: "",
   curveLimited: false,
   curveStored: 0,
+  roundedShown: false,
+  rounded: 0,
+  roundedMixed: false,
+  roundedLimited: false,
+  roundedStored: 0,
 };
 
 export interface ArcBarApi {
@@ -50,6 +63,10 @@ export interface ArcBarApi {
   setAngle: (end: boolean, text: string) => string;
   /** Enter in "Curve": as [`setAngle`]. */
   setCurve: (text: string) => string;
+  /** Enter in "Rounded": as [`setAngle`]. */
+  setRounded: (text: string) => string;
+  /** An arrow-key step of "Rounded": previewed, committed by `commitCurve`. */
+  previewRounded: (value: number) => void;
   previewCurve: (percent: number) => void;
   /** An arrow-key step of "Start" (`end` false) or "End": previewed, committed by
    * `commitCurve`. */
@@ -75,6 +92,11 @@ function read(session: WasmSession): ArcBarState {
     curveGrey: view.curve_grey,
     curveLimited: view.curve_limited,
     curveStored: view.curve_stored,
+    roundedShown: view.rounded_shown,
+    rounded: view.rounded,
+    roundedMixed: view.rounded_mixed,
+    roundedLimited: view.rounded_limited,
+    roundedStored: view.rounded_stored,
   };
   view.free();
   return state;
@@ -142,6 +164,17 @@ export function useArcBar(
     (text: string) => run((session) => session.set_selected_curve(text), "unchanged"),
     [run],
   );
+  const setRounded = useCallback(
+    (text: string) => run((session) => session.set_selected_rounded(text), "unchanged"),
+    [run],
+  );
+  const previewRounded = useCallback(
+    (value: number) => {
+      getSession()?.preview_selected_rounded(value);
+      onChange();
+    },
+    [getSession, onChange],
+  );
   const previewCurve = useCallback(
     (percent: number) => {
       getSession()?.preview_selected_curve(percent);
@@ -170,6 +203,8 @@ export function useArcBar(
     makeWhole,
     setAngle,
     setCurve,
+    setRounded,
+    previewRounded,
     previewCurve,
     previewAngle,
     commitCurve,

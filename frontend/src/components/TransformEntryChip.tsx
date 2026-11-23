@@ -202,6 +202,7 @@ export function TransformEntryChip({
   const isCurve = entry.kind === "curve";
   const visibleLabel = (field: { label: string; name: string }) =>
     entry.kind === "skew" ? field.name.replace("Skew angle ", "Skew ") : field.label;
+  const isRounded = entry.kind === "rounded";
   const isRatio = entry.kind === "inner-ratio";
   const isSize = entry.kind === "size";
   // A negative size mirrors: the chip says how, under the fields (`0056` UX notes).
@@ -209,7 +210,7 @@ export function TransformEntryChip({
   const isSkew = entry.kind === "skew";
   // The skew chip names its axis inside the field ("Skew x"), so it differs
   // from the angle chip even where the handle itself is hidden.
-  const fieldWidth = isSkew ? 120 : isAngle ? 80 : isRatio || isCurve ? 96 : 100;
+  const fieldWidth = isSkew ? 120 : isAngle ? 80 : isRatio || isCurve || isRounded ? 96 : 100;
   const groupName =
     entry.kind === "angle"
       ? entry.selection
@@ -223,7 +224,9 @@ export function TransformEntryChip({
           ? (entry.fields[0]?.name ?? "Arc")
           : isCurve
             ? "Curve"
-            : isRatio
+            : isRounded
+              ? "Rounded"
+              : isRatio
           ? "Inner ratio"
           : entry.kind === "fixture-length" || entry.kind === "fixture-size"
             ? (entry.fields[0]?.name.replace(" (mm)", "") ?? "Size")
