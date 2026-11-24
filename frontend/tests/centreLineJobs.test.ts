@@ -36,6 +36,11 @@ function handWorker() {
 }
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
+// The worker is made and answers its start on timers of their own; on a busy machine one tick may
+// end before them.
+const settle = async (done: () => boolean) => {
+  for (let i = 0; i < 200 && !done(); i++) await tick();
+};
 const options = (overlap: number): CentreOptionsWire => [overlap, 6, 0.75, 0, 0.3, 1];
 const module = () => Promise.resolve({} as WebAssembly.Module);
 
@@ -63,7 +68,7 @@ test("a drag sends one job at a time, overwrites the pending one and drops stale
   runner.request(options(0.2), new Float64Array([1, 0]));
   runner.request(options(0.1));
   runner.request(options(0.0));
-  await tick();
+  await settle(() => (hand.made[0]?.got.length ?? 0) >= 3);
   assert.deepEqual(kinds(hand.made[0].got), ["init", "centre-subjects:1", "centre-finish:1"]);
   assert.equal(runner.busy, true);
   hand.reply(0, { id: 1, kind: "centre-preview", wire: new Float64Array(0), ms: 1 });
