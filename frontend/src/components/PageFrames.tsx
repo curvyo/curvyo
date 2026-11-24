@@ -4,6 +4,7 @@ import type { WasmSession } from "@/lib/editorSession";
 import { OPERATIONS_VIEW_NAME, TOOLPATH_VIEW_NAME, operationsToggle, readPages, toolpathToggle } from "@/lib/pages";
 import { PlayBar } from "@/components/PlayBar";
 import { RingLabels } from "@/components/RingLabels";
+import { UserOriginMarks } from "@/components/UserOriginMarks";
 import { Tooltip } from "@/components/ui/tooltip";
 import { KindChip } from "@/components/KindChip";
 import { pagesTick, perfPagesCommitted, perfPagesTick, perfRender, perfStart } from "@/lib/perfProbe";
@@ -114,6 +115,7 @@ export function PageFrames({
           )}
         </div>
       ))}
+      <UserOriginMarks getSession={getSession} />
       {route ? (
         <>
           <RingLabels getSession={getSession} />

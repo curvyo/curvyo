@@ -1,6 +1,7 @@
 import { Crosshair, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { EntryField } from "@/components/panel/EntryField";
 import { OutputChecks } from "@/components/panel/OutputChecks";
 import { OutputPick } from "@/components/panel/OutputPick";
 import { SendToMachine } from "@/components/panel/SendToMachine";
@@ -11,6 +12,7 @@ import { sendLinkOf } from "@/lib/connectorLink";
 import type { OperationId } from "@/lib/operationsView";
 import { EXPORT_NAME, START_DAMAGED, machineLineParts } from "@/lib/outputText";
 import type { Check, StartValue } from "@/lib/outputView";
+import { parseMeasure } from "@/lib/printAndCutView";
 import { sendCauseText } from "@/lib/sendText";
 import { isTauri } from "@/platform/host";
 
@@ -95,6 +97,9 @@ export function OutputGroup({
         onReturnFocus={onReturnFocus}
         dataName="data-start-pick"
       />
+      {view.start.userOrigin === null ? null : (
+        <UserOriginRow point={view.start.userOrigin} api={api} onReturnFocus={onReturnFocus} />
+      )}
       {view.checks.length > 0 ? (
         <>
           <Divider />
@@ -176,6 +181,62 @@ export function OutputGroup({
         </span>
       )}
     </section>
+  );
+}
+
+const ORIGIN_MESSAGES = { range: "Enter a number from -10000 to 10000" } as const;
+
+/** Up and Down step 0.01 mm, Shift 0.1 mm (`specs/0118` W43, the `0121` Mark row rules). */
+function stepOrigin(text: string, key: string, shift: boolean): string | null {
+  const value = parseMeasure(text);
+  if (typeof value !== "number" || (key !== "ArrowUp" && key !== "ArrowDown")) return null;
+  const step = (shift ? 0.1 : 0.01) * (key === "ArrowUp" ? 1 : -1);
+  return (Math.round((value + step) * 100) / 100).toFixed(2);
+}
+
+/** The User origin row under the Start pick while User origin is picked (`specs/0118` W43): the
+ * stored point in bed mm, each commit one step. */
+function UserOriginRow({
+  point,
+  api,
+  onReturnFocus,
+}: {
+  point: { x: number; y: number };
+  api: OutputApi;
+  onReturnFocus: () => void;
+}) {
+  const submit = (axis: "x" | "y", text: string): string => {
+    const value = parseMeasure(text);
+    if (value === undefined || value === null) return "invalid:range";
+    const next = axis === "x" ? { ...point, x: value } : { ...point, y: value };
+    return api.typeUserOrigin(next.x, next.y) ? "committed" : "unchanged";
+  };
+  return (
+    <div role="group" aria-label="User origin" data-user-origin className="-mt-1 flex gap-2">
+      {(["x", "y"] as const).map((axis) => (
+        <div key={axis} className="relative">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-2 z-10 -translate-y-1/2 text-xs text-[var(--panel-muted-fg)]"
+          >
+            {axis.toUpperCase()}
+          </span>
+          <EntryField
+            label={`User origin ${axis.toUpperCase()}`}
+            shown={point[axis].toFixed(2)}
+            mixed={false}
+            suffix="mm"
+            width={118}
+            inputMode="decimal"
+            align="right"
+            onSubmit={(text) => submit(axis, text)}
+            stepText={(text, key, shift) => stepOrigin(text, key, shift)}
+            messages={ORIGIN_MESSAGES}
+            onReturnFocus={onReturnFocus}
+          />
+        </div>
+      ))}
+    </div>
   );
 }
 

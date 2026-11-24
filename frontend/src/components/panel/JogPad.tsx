@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, LocateFixed } from "lucide-react";
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
@@ -21,7 +21,8 @@ import {
   press,
   requestOf,
 } from "@/lib/jog";
-import { jogCause } from "@/lib/machineControls";
+import { jogCause, setOriginCause } from "@/lib/machineControls";
+import { userOriginWords } from "@/lib/outputView";
 
 const GLYPHS: Record<Arrow, ReactNode> = {
   up: <ChevronUp {...GLYPH} />,
@@ -48,6 +49,8 @@ interface Props {
   corner: Corner;
   step: JogStep;
   onStep: (step: JogStep) => void;
+  /** Set origin here: stores the work position `(x, y)` mm on the page; whether it changed. */
+  onSetOrigin: (x: number, y: number) => boolean;
 }
 
 /** One arrow press at a time: which arrow, its reducer state, and what started it. */
@@ -69,7 +72,7 @@ interface Active {
  * 300 ms is one step, a press held past it moves the head until the release, kept alive every
  * 100 ms from here; the connector stops a hold whose keep-alive is late.
  */
-export function JogPad({ id, model, corner, step, onStep }: Props) {
+export function JogPad({ id, model, corner, step, onStep, onSetOrigin }: Props) {
   const [pressed, setPressed] = useState<Arrow | null>(null);
   const [rover, setRover] = useState<Arrow>("up");
   const active = useRef<Active | null>(null);
@@ -261,8 +264,70 @@ export function JogPad({ id, model, corner, step, onStep }: Props) {
             </div>
           );
         })}
+        <SetOriginHere id={id} model={model} onSetOrigin={onSetOrigin} />
       </div>
       <StepPick step={step} onStep={onStep} homed={model.entry.status?.homed === true} />
+    </div>
+  );
+}
+
+/**
+ * Set origin here in the cross's centre cell (`specs/0118` W39 to W41, W51): its own Tab stop after
+ * the arrows, outside their roving. A press stores the head's work position as the page's user
+ * origin and sends nothing to the controller; the point is said once.
+ */
+function SetOriginHere({ id, model, onSetOrigin }: Pick<Props, "id" | "model" | "onSetOrigin">) {
+  // `n` toggles a trailing no-break space, so the same point stored again is said again.
+  const [said, setSaid] = useState({ text: "", n: 0 });
+  const cause = setOriginCause(model.entry);
+  const causeId = `${id}-origin-cause`;
+  const press = () => {
+    const position = model.entry.status?.position;
+    if (cause !== null || position === null || position === undefined) return;
+    const [x, y] = position;
+    if (onSetOrigin(x, y)) setSaid((was) => ({ text: userOriginWords(x, y), n: was.n + 1 }));
+  };
+  return (
+    <div className="col-start-2 row-start-2">
+      <Tooltip
+        side="top"
+        content={
+          cause === null ? (
+            "Set origin here"
+          ) : (
+            <>
+              <div>Set origin here</div>
+              <div className="text-muted-foreground">{cause}</div>
+            </>
+          )
+        }
+      >
+        <button
+          type="button"
+          data-set-origin
+          aria-label="Set origin here"
+          aria-disabled={cause !== null}
+          aria-describedby={cause === null ? undefined : causeId}
+          className={`${ICON_BUTTON} ${OFF}`}
+          onClick={press}
+          onKeyDown={(event) => {
+            // One press on key down; a held key repeats nothing.
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            if (!event.repeat) press();
+          }}
+        >
+          <LocateFixed {...GLYPH} />
+        </button>
+      </Tooltip>
+      {cause === null ? null : (
+        <span id={causeId} className="sr-only">
+          {cause}
+        </span>
+      )}
+      <span role="status" aria-atomic="true" className="sr-only">
+        {said.n % 2 === 1 ? `${said.text}\u00a0` : said.text}
+      </span>
     </div>
   );
 }

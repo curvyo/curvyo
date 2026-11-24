@@ -16,6 +16,9 @@ export interface FramePage {
   /** The head ring at the controller's position (work coordinates, or the offset when relative). */
   head: (x: number, y: number) => void;
   clearHead: () => void;
+  /** Set origin here (`specs/0118` 29): stores the work position `(x, y)` mm as the page's user
+   * origin, one step; whether it changed. */
+  setOrigin: (x: number, y: number) => boolean;
 }
 
 /** The shape pick of each laser page this run: session state, never saved (W30). */
@@ -52,8 +55,16 @@ export function useFramePage(
   const clearHead = useCallback(() => {
     if (getSession()?.clear_frame_head()) sync();
   }, [getSession, sync]);
+  const setOrigin = useCallback(
+    (x: number, y: number) => {
+      const changed = getSession()?.set_user_origin(x, y) ?? false;
+      if (changed) sync();
+      return changed;
+    },
+    [getSession, sync],
+  );
   return useMemo(
-    () => ({ view, relative, shape, setShape, bytes, head, clearHead }),
-    [view, relative, shape, setShape, bytes, head, clearHead],
+    () => ({ view, relative, shape, setShape, bytes, head, clearHead, setOrigin }),
+    [view, relative, shape, setShape, bytes, head, clearHead, setOrigin],
   );
 }
