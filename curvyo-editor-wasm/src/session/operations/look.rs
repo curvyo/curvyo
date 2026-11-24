@@ -339,14 +339,25 @@ impl Session {
         Some((out, overlay))
     }
 
-    /// What the Toolpath view keeps of the artwork (`without_looked_items`) and its dot pictures.
+    /// What the Toolpath view keeps of the artwork (`without_looked_items`) and its dot pictures;
+    /// while the job burns elsewhere (User origin), the items stay at their own place at 35 %
+    /// (`specs/0118` W48).
     fn toolpath_artwork(
         &self,
         objects: &[ObjectSnapshot],
         table: &LookTable,
     ) -> Vec<ObjectSnapshot> {
-        let mut kept = without_looked_items(objects, table);
-        if let Some(job) = self.laser_job() {
+        let job = self.laser_job();
+        let mut kept = if job
+            .as_ref()
+            .is_some_and(|job| crate::session::output::shifted(&job.built.job))
+        {
+            let looked = looked_ids(table);
+            dim_outside(objects, &|id| !looked.contains(&id))
+        } else {
+            without_looked_items(objects, table)
+        };
+        if let Some(job) = job {
             kept.extend(self.toolpath_raster_objects(&job));
         }
         kept
@@ -371,12 +382,22 @@ impl Session {
         view: ViewTransform,
     ) -> Vec<ObjectSnapshot> {
         if self.toolpath_view_on() {
-            // The Toolpath view draws the job instead (`specs/0029` criterion 8).
-            return members
-                .iter()
-                .filter(|object| !table.inner.contains_key(&(object.id(), placement)))
-                .cloned()
-                .collect();
+            // The Toolpath view draws the job instead (`specs/0029` criterion 8); while it burns
+            // elsewhere the members stay at their place at 35 % (`specs/0118` W48).
+            let looked =
+                |object: &ObjectSnapshot| table.inner.contains_key(&(object.id(), placement));
+            if self
+                .laser_job()
+                .is_some_and(|job| crate::session::output::shifted(&job.built.job))
+            {
+                let ids: HashSet<NodeId> = members
+                    .iter()
+                    .filter(|o| looked(o))
+                    .map(ObjectSnapshot::id)
+                    .collect();
+                return dim_outside(members, &|id| !ids.contains(&id));
+            }
+            return members.iter().filter(|o| !looked(o)).cloned().collect();
         }
         let operations_view = self.operations_view_on();
         let mut out = Vec::with_capacity(members.len());
@@ -413,11 +434,21 @@ impl Dimming {
 /// (`specs/0029` criterion 8), a clone of a group by its members' keys; hit tests still use the
 /// items.
 fn without_looked_items(objects: &[ObjectSnapshot], table: &LookTable) -> Vec<ObjectSnapshot> {
-    let clones: HashSet<NodeId> = table.clone_members.keys().map(|(c, _)| *c).collect();
+    let looked = looked_ids(table);
     objects
         .iter()
-        .filter(|object| !table.own.contains_key(&object.id()) && !clones.contains(&object.id()))
+        .filter(|object| !looked.contains(&object.id()))
         .cloned()
+        .collect()
+}
+
+/// The objects the table looks by: its own leaves and the clones of groups with looked members.
+fn looked_ids(table: &LookTable) -> HashSet<NodeId> {
+    table
+        .own
+        .keys()
+        .copied()
+        .chain(table.clone_members.keys().map(|(c, _)| *c))
         .collect()
 }
 

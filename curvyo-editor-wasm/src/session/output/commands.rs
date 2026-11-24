@@ -40,10 +40,11 @@ impl Session {
         })
     }
 
-    /// Start (criterion 38): `start` is one of the three stored spellings (`machine_origin`,
-    /// `head_position`, `home_then_origin`); one step "Start: `<option>`". A pick writes whenever
-    /// the stored value differs, a damaged one included. Whether it changed; `false` for another
-    /// spelling or off a laser page.
+    /// Start (criterion 38): `start` is one of the stored spellings (`machine_origin`,
+    /// `head_position`, `home_then_origin`, `user_origin` once a point is stored); one step
+    /// "Start: `<option>`". A pick writes whenever the stored value differs, a damaged one
+    /// included. Whether it changed; `false` for another spelling, User origin without a point
+    /// or off a laser page.
     pub fn set_start(&mut self, start: &str) -> bool {
         let Some(manufacturing) = self.output_page() else {
             return false;

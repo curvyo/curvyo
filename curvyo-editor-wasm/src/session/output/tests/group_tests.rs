@@ -141,7 +141,10 @@ fn criterion_38_start_is_one_pick_with_one_step_per_value() {
             "Home, then machine origin"
         ]
     );
-    // Every value of the core's closed list, so a fourth value cannot miss its step here.
+    // Every value of the core's closed list, so a fourth value cannot miss its step here; User
+    // origin needs a stored point first (`specs/0118` O2).
+    assert!(s.set_user_origin(5.0, 6.0));
+    assert!(s.set_start("machine_origin"));
     for start in curvyo_laser_core::job::Start::ALL.into_iter().rev() {
         let value = start.as_str();
         assert!(s.set_start(value), "{value}");

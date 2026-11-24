@@ -283,7 +283,8 @@ impl Session {
             .document
             .manufacturing(job.manufacturing)
             .and_then(|m| m.page)
-            .map_or(Point::new(0.0, 0.0), |page| page.origin);
+            .map_or(Point::new(0.0, 0.0), |page| page.origin)
+            .translated(shift_mm(&job.built.job));
         let (look, runs) = look_of(&job.built.job, origin);
         let look = Arc::new(look);
         *cache.look.borrow_mut() = Some((job.generation, Arc::clone(&look), runs.clone()));
@@ -366,11 +367,26 @@ impl Session {
     }
 }
 
-/// The page corner of `job`'s laser page as a vector.
+/// Where the look of `job` is drawn: the page corner of its laser page, moved by the job's shift
+/// to where it burns (`specs/0118` W48).
 fn look_origin(session: &Session, job: &PageJob) -> Vec2 {
+    let shift = shift_mm(&job.built.job);
     session
         .document
         .manufacturing(job.manufacturing)
         .and_then(|m| m.page)
-        .map_or(Vec2::ZERO, |page| Vec2::new(page.origin.x, page.origin.y))
+        .map_or(shift, |page| {
+            Vec2::new(page.origin.x + shift.x, page.origin.y + shift.y)
+        })
+}
+
+/// The job's shift in mm (`specs/0118` O7): zero but for User origin.
+pub(super) fn shift_mm(job: &Job) -> Vec2 {
+    let shift = job.shift.to_mm();
+    Vec2::new(shift.x, shift.y)
+}
+
+/// Whether the job burns away from where its items are drawn (0.01 mm or more, W48).
+pub(in crate::session) fn shifted(job: &Job) -> bool {
+    job.shift.x.abs() >= 10 || job.shift.y.abs() >= 10
 }
