@@ -399,6 +399,7 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
             point_count,
             curve,
             rounded,
+            randomized,
         } => vec![
             frame.center.x,
             frame.center.y,
@@ -407,6 +408,8 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
             f64::from(point_count.get()),
             curve.get(),
             rounded.get(),
+            // The seed is a 32-bit number, not a length: it is not bounded as a coordinate.
+            randomized.effective(),
         ],
         Shape::Star {
             frame,
@@ -414,6 +417,7 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
             inner_ratio,
             curve,
             rounded,
+            randomized,
         } => vec![
             frame.center.x,
             frame.center.y,
@@ -423,6 +427,8 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
             inner_ratio.get(),
             curve.get(),
             rounded.get(),
+            // The seed is a 32-bit number, not a length: it is not bounded as a coordinate.
+            randomized.effective(),
         ],
     }
 }

@@ -64,6 +64,7 @@ fn sframe(r: f64) -> StarFrame {
 
 fn polygon(n: u32, r: f64, curve: f64) -> Shape {
     Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: sframe(r),
         point_count: PointCount::new(n).unwrap(),
         curve: Curve::new(curve).unwrap(),
@@ -73,6 +74,7 @@ fn polygon(n: u32, r: f64, curve: f64) -> Shape {
 
 fn star(n: u32, ratio: f64, r: f64, curve: f64) -> Shape {
     Shape::Star {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: sframe(r),
         point_count: PointCount::new(n).unwrap(),
         inner_ratio: InnerRatio::new(ratio).unwrap(),

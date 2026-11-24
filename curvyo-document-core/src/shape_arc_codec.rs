@@ -15,12 +15,16 @@ use loro::{LoroMap, LoroValue};
 use crate::ellipse_arc::{ArcKind, EllipseArc};
 use crate::path_codec;
 use crate::ring_curve::Curve;
+use crate::ring_random::Randomized;
 use crate::ring_rounded::Rounded;
+use crate::seed::Seed;
 use crate::units::Angle;
 
 pub(crate) const KEY_ELLIPSE_ARC: &str = "ellipse_arc";
 pub(crate) const KEY_CURVE: &str = "curve";
 pub(crate) const KEY_ROUNDED: &str = "rounded";
+pub(crate) const KEY_RANDOMIZED: &str = "randomized";
+pub(crate) const KEY_SEED: &str = "seed";
 
 /// What a stored register holds: nothing, a valid value, or something a file must be
 /// refused for.
@@ -105,6 +109,72 @@ pub(crate) fn write_rounded_if_changed(meta: &LoroMap, rounded: Rounded) -> bool
     true
 }
 
+fn stored_randomized(meta: &LoroMap) -> Stored<f64> {
+    let Some(value) = meta.get(KEY_RANDOMIZED) else {
+        return Stored::Absent;
+    };
+    match path_codec::as_f64(&value.get_deep_value()).filter(|v| v.is_finite()) {
+        Some(amount) => Stored::Valid(amount),
+        None => Stored::Damaged,
+    }
+}
+
+fn stored_seed(meta: &LoroMap) -> Stored<Seed> {
+    let Some(value) = meta.get(KEY_SEED) else {
+        return Stored::Absent;
+    };
+    match value.get_deep_value() {
+        LoroValue::I64(n) => u32::try_from(n)
+            .ok()
+            .map_or(Stored::Damaged, |n| Stored::Valid(Seed::new(n))),
+        _ => Stored::Damaged,
+    }
+}
+
+/// The shape's stored Randomized value and seed, 0 and seed 0 when absent (a merge can leave a
+/// value without a seed, a file can too: the seed 0 draws then).
+pub(crate) fn read_randomized(meta: &LoroMap) -> Randomized {
+    let seed = match stored_seed(meta) {
+        Stored::Valid(seed) => seed,
+        Stored::Absent | Stored::Damaged => Seed::new(0),
+    };
+    match stored_randomized(meta) {
+        Stored::Valid(amount) => Randomized::new(amount, seed).unwrap_or(Randomized::ZERO),
+        Stored::Absent | Stored::Damaged => Randomized::ZERO.with_seed(seed),
+    }
+}
+
+/// Writes the amount of `random` unless the node already reads it; 0 deletes the register
+/// (`specs/0145-shape-spiro-handles/adrs.md` decisions 4 and 8). Returns whether it wrote.
+#[allow(clippy::float_cmp)] // an exact stored value is an exact question
+pub(crate) fn write_randomized_if_changed(meta: &LoroMap, amount: f64) -> bool {
+    if amount == 0.0 {
+        return delete_if_present(meta, KEY_RANDOMIZED);
+    }
+    if let Stored::Valid(old) = stored_randomized(meta)
+        && old == amount
+    {
+        return false;
+    }
+    // invariant: inserting a number under a known key on an attached map cannot fail.
+    #[allow(clippy::unwrap_used)]
+    meta.insert(KEY_RANDOMIZED, amount).unwrap();
+    true
+}
+
+/// Writes `seed` unless the node already reads it. Returns whether it wrote.
+pub(crate) fn write_seed_if_changed(meta: &LoroMap, seed: Seed) -> bool {
+    if let Stored::Valid(old) = stored_seed(meta)
+        && old == seed
+    {
+        return false;
+    }
+    // invariant: inserting a number under a known key on an attached map cannot fail.
+    #[allow(clippy::unwrap_used)]
+    meta.insert(KEY_SEED, i64::from(seed.get())).unwrap();
+    true
+}
+
 /// The ellipse's arc, `None` for the whole ellipse (absent, or unreadable on a document
 /// that was validated on open).
 pub(crate) fn read_arc(meta: &LoroMap) -> Option<EllipseArc> {
@@ -148,6 +218,8 @@ pub(crate) fn polygon_curve_is_valid(meta: &LoroMap) -> bool {
     // a valid merge result, Rounded wins (adrs.md decision 3).
     !matches!(stored_curve(meta), Stored::Damaged)
         && !matches!(stored_rounded(meta), Stored::Damaged)
+        && !matches!(stored_randomized(meta), Stored::Damaged)
+        && !matches!(stored_seed(meta), Stored::Damaged)
 }
 
 fn delete_if_present(meta: &LoroMap, key: &str) -> bool {
@@ -227,9 +299,24 @@ pub(crate) fn write_arc_and_curve(meta: &LoroMap, shape: &crate::primitive_model
             write_curve_if_changed(meta, curve, Curve::ELLIPSE_DEFAULT);
             write_rounded_if_changed(meta, rounded);
         }
-        Shape::Polygon { curve, rounded, .. } | Shape::Star { curve, rounded, .. } => {
+        Shape::Polygon {
+            curve,
+            rounded,
+            randomized,
+            ..
+        }
+        | Shape::Star {
+            curve,
+            rounded,
+            randomized,
+            ..
+        } => {
             write_curve_if_changed(meta, curve, Curve::POLYGON_DEFAULT);
             write_rounded_if_changed(meta, rounded);
+            if !randomized.is_zero() {
+                write_randomized_if_changed(meta, randomized.amount());
+                write_seed_if_changed(meta, randomized.seed());
+            }
         }
         Shape::Rect { .. } => {}
     }

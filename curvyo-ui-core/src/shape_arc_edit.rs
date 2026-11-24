@@ -182,8 +182,12 @@ pub fn with_curve(shape: &Shape, fraction: f64) -> Option<Shape> {
             rounded: curvyo_document_core::Rounded::ZERO,
         },
         Shape::Polygon {
-            frame, point_count, ..
+            frame,
+            point_count,
+            randomized,
+            ..
         } => Shape::Polygon {
+            randomized,
             frame,
             point_count,
             curve: limited,
@@ -195,8 +199,10 @@ pub fn with_curve(shape: &Shape, fraction: f64) -> Option<Shape> {
             frame,
             point_count,
             inner_ratio,
+            randomized,
             ..
         } => Shape::Star {
+            randomized,
             frame,
             point_count,
             inner_ratio,
@@ -306,6 +312,7 @@ mod tests {
 
     fn triangle(curve: f64) -> Shape {
         Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(0.0, 0.0),
                 radius: Length::from_mm(20.0),

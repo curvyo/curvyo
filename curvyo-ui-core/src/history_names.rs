@@ -256,6 +256,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("set_ellipse_arc", "Change arc"),
     ("set_curve", "Change curve"),
     ("set_rounded", "Change rounding"),
+    // `specs/0145-shape-spiro-handles` slice 3 criteria 21 and 22.
+    ("set_randomized", "Change randomizing"),
+    ("reroll_seed", "New seed"),
     ("set_curve_kind", "Change curve type"),
     ("set_spiro_transform", "Transform Spiro path"),
     ("set_width_point", "Change width point"),

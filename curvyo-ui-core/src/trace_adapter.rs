@@ -59,6 +59,7 @@ pub(crate) fn shape_of(primitive: &Primitive, rotation: Angle) -> (Shape, DocAng
             angle,
             points,
         } => Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: star_frame(centre, radius, angle),
             point_count: PointCount::new(points).expect("point count in range"),
             curve: Curve::POLYGON_DEFAULT,
@@ -71,6 +72,7 @@ pub(crate) fn shape_of(primitive: &Primitive, rotation: Angle) -> (Shape, DocAng
             points,
             inner_ratio,
         } => Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: star_frame(centre, radius, angle),
             point_count: PointCount::new(points).expect("point count in range"),
             inner_ratio: InnerRatio::new(inner_ratio).expect("inner ratio in range"),

@@ -14,8 +14,8 @@ use curvyo_document_core::{
 use crate::object_selection::{ObjectSelection, objects_with_ids};
 use crate::param_edit::{PARAM_EQUAL_EPSILON, ParamValue};
 use crate::select_bar_arc::{
-    CurveBarState, EllipseBarState, RoundedBarState, curve_bar_state, ellipse_bar_state,
-    rounded_bar_state,
+    CurveBarState, EllipseBarState, RandomizedBarState, RoundedBarState, curve_bar_state,
+    ellipse_bar_state, randomized_bar_state, rounded_bar_state,
 };
 use crate::shape_arc_edit::{arc_capable, curve_capable};
 
@@ -28,6 +28,8 @@ pub enum ObjectKind {
     PolygonOrStar,
     /// A polygon, a star or an ellipse without an arc: "Rounded" (`0145` criteria 3, 14, 19).
     Rounded,
+    /// A polygon or a star: "Randomized" and "Re-roll seed" (`0145` slice 3, criterion 21).
+    Randomized,
     /// A star: "Ratio".
     Star,
     /// A rectangle, ellipse, polygon or star: "Object to path".
@@ -54,6 +56,7 @@ impl ObjectKind {
             Self::Rectangle => matches!(shape, Shape::Rect { .. }),
             Self::PolygonOrStar => matches!(shape, Shape::Polygon { .. } | Shape::Star { .. }),
             Self::Rounded => crate::shape_rounded_edit::rounded_capable(shape),
+            Self::Randomized => crate::shape_random_edit::randomized_capable(shape),
             Self::Star => matches!(shape, Shape::Star { .. }),
             Self::Primitive => true,
             Self::ArcEllipse => arc_capable(shape).is_some(),
@@ -141,6 +144,9 @@ pub struct SelectBarState {
     /// The "Rounded" field (`specs/0145-shape-spiro-handles/` criterion 3), `None` while the
     /// selection holds no polygon or star.
     pub rounded: Option<RoundedBarState>,
+    /// The "Randomized" field and "Re-roll seed" button (`0145` slice 3, criteria 21 and 22),
+    /// `None` while the selection holds no polygon or star.
+    pub randomized: Option<RandomizedBarState>,
 }
 
 /// The one value of `values` if they all agree within `eps`, else `Mixed`.
@@ -294,6 +300,7 @@ pub fn select_bar_state(
         ellipse: ellipse_bar_state(objects, selection),
         curve: curve_bar_state(objects, selection, preview),
         rounded: rounded_bar_state(objects, selection, preview),
+        randomized: randomized_bar_state(objects, selection, preview),
     }
 }
 

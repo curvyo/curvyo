@@ -2941,6 +2941,18 @@ look at the demo decides which of them the customer wants.
   below 0.2, many points) the same happens. **Resolution:** a look at the demo; the knobs could
   take a second ring of positions or the Curve knob could yield to Rounded.
 
+## Randomized: criterion 30's flatten is not met at r = 10, q = 10 (`0145` slice 3, 2026-11-24)
+
+The outline of a 1024-point star at `r = 10`, `q = 10` is recomputed in about 0.4 ms (test profile,
+`curvyo-editor-wasm/tests/randomized_0145.rs`), within the 2 ms of criterion 30, and a 5-point star
+at `r = -10`, `q = -10` flattens in 0.04 ms. Flattening the 1024-point star for the display at
+0.25 px gives about 165 000 segments in about 8 ms: handles scaled by `1 + r*d4` (up to 6 times the
+Rounded handle) make three times the segments of slice 1's 55 000, so the 2 ms for outline plus
+flatten is not met, as for criterion 12 of slice 1 (same row above). In the release profile: outline 0.11 ms, flatten 4.4 ms, a drag event 6 µs, the frame 38 ms, so outline plus flatten
+is about 4.5 ms against 2 ms. The test bounds the flatten at
+10 ms, asserted in the release profile only. **Resolution:** the same decision as for criterion 12
+(clip to the view before flattening, or lower the point count the budget applies to).
+
 ## The fake controller's frame ends by its line pace, not by its head (`0118` slice 2b, F6, 2026-11-23)
 
 The fake controller finishes a frame when its lines have run at the set rate, while its head traces

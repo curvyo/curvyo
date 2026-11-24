@@ -567,7 +567,7 @@ fn primitive_segs(shape: &Shape, rot: f64) -> Vec<Seg> {
             frame,
             point_count,
             curve,
-            rounded: _,
+            ..
         } => {
             assert_eq!(curve, Curve::POLYGON_DEFAULT, "criterion 116: Curve 0%");
             let n = point_count.get();
@@ -591,6 +591,7 @@ fn primitive_segs(shape: &Shape, rot: f64) -> Vec<Seg> {
             inner_ratio,
             curve,
             rounded,
+            ..
         } => {
             assert_eq!(
                 curve,

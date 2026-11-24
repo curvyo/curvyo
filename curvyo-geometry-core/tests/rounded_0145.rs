@@ -14,6 +14,7 @@ const JOB_TOLERANCE_MM: f64 = 0.0095;
 fn a_1024_gon_flattened_for_a_job_stays_within_the_tolerance_of_its_outline() {
     for q in [-10.0, -1.0, 2.5, 10.0] {
         let shape = Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(100.0, 100.0),
                 radius: Length::from_mm(60.0),

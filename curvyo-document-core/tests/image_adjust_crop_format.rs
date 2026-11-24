@@ -164,7 +164,7 @@ fn close(a: Point, b: Point) -> bool {
 
 #[test]
 fn the_golden_is_format_52_and_reads_back_every_slice_2_kind() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 59);
+    assert_eq!(CURRENT_FORMAT_VERSION, 60);
     let bytes = read_or_write();
     let manifest: Value = serde_json::from_slice(&members(&bytes)["manifest.json"]).unwrap();
     assert_eq!(manifest["format_version"], 52);
@@ -197,7 +197,7 @@ fn the_golden_saves_back_unchanged() {
     // Saved by a build of format 53 (slice 3): the same content under its own version.
     let as_52 = |json: &[u8]| {
         String::from_utf8(json.to_vec()).unwrap().replacen(
-            "\"format_version\": 59,",
+            "\"format_version\": 60,",
             "\"format_version\": 52,",
             1,
         )

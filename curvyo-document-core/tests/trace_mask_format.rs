@@ -304,7 +304,7 @@ fn c22_the_golden_reads_back_every_part_region_and_setting() {
     );
     let json: Value = serde_json::from_slice(&d.export_json().unwrap()).unwrap();
     // Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(json["format_version"], json!(59));
+    assert_eq!(json["format_version"], json!(60));
     let listed = find_named(&json["objects"], "M1").unwrap();
     assert_eq!(
         listed["trace_mask"]["parts"][0]["regions"][0]["points"],
@@ -376,11 +376,11 @@ fn c22_a_file_of_format_47_is_refused() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 59);
+    assert_eq!(CURRENT_FORMAT_VERSION, 60);
     let bytes = pack(&golden_document(), "0.1.0").unwrap();
     let mut files = members(&bytes);
     let mut manifest: Value = serde_json::from_slice(&files["manifest.json"]).unwrap();
-    assert_eq!(manifest["format_version"], json!(59));
+    assert_eq!(manifest["format_version"], json!(60));
     manifest["format_version"] = json!(CURRENT_FORMAT_VERSION + 1);
     files.insert(
         "manifest.json".to_owned(),
@@ -389,8 +389,8 @@ fn c22_a_file_of_format_47_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 60,
-            supported: 59
+            found: 61,
+            supported: 60
         })
     ));
 }

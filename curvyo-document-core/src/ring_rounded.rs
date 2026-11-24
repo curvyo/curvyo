@@ -142,11 +142,15 @@ pub(crate) fn anchors_bounds(anchors: &[OutlineAnchor]) -> Option<(Point, Point)
     Some((min, max))
 }
 
-/// The exact box of `shape`'s rounded outline as drawn (`Ring::of(shape, true)`: the frame's
+/// The exact box of `shape`'s rounded or randomized outline as drawn (`Ring::of(shape, true)`: the frame's
 /// angle included, the object's `rotation` excluded), `None` for a shape without a Rounded
 /// value or with Rounded 0 (criterion 7, decision 5).
 #[must_use]
 pub fn rounded_bounds(shape: &Shape) -> Option<(Point, Point)> {
+    // A randomized polygon or star draws moved vertices (`0145` slice 3, criterion 28).
+    if let Some(bounds) = crate::ring_random::randomized_bounds(shape) {
+        return Some(bounds);
+    }
     let q = effective_rounded(shape).filter(|q| *q != 0.0)?;
     let ring = Ring::of(shape, true)?;
     anchors_bounds(&rounded_outline(&ring, q))
@@ -168,6 +172,7 @@ mod tests {
 
     fn polygon(n: u32, q: f64, angle: f64) -> Shape {
         Shape::Polygon {
+            randomized: crate::Randomized::ZERO,
             frame: frame(angle),
             point_count: PointCount::new(n).unwrap(),
             curve: crate::Curve::POLYGON_DEFAULT,
@@ -177,6 +182,7 @@ mod tests {
 
     fn star(n: u32, ratio: f64, q: f64) -> Shape {
         Shape::Star {
+            randomized: crate::Randomized::ZERO,
             frame: frame(0.0),
             point_count: PointCount::new(n).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),

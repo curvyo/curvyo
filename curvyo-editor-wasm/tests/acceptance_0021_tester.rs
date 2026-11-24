@@ -396,6 +396,7 @@ fn c40_c41_polygon_and_star_curve_handle_drag() {
         (
             "hexagon",
             Shape::Polygon {
+                randomized: curvyo_document_core::Randomized::ZERO,
                 frame: sframe(30.0),
                 point_count: PointCount::new(6).unwrap(),
                 curve: Curve::POLYGON_DEFAULT,
@@ -405,6 +406,7 @@ fn c40_c41_polygon_and_star_curve_handle_drag() {
         (
             "star",
             Shape::Star {
+                randomized: curvyo_document_core::Randomized::ZERO,
                 frame: sframe(30.0),
                 point_count: PointCount::new(5).unwrap(),
                 inner_ratio: InnerRatio::new(0.45).unwrap(),
@@ -535,12 +537,14 @@ fn c3_equal_angles_typed_make_the_ellipse_whole_in_one_commit() {
 #[test]
 fn c26_c38_c44_the_curve_field_limits_per_shape_and_mixed_selections() {
     let tri = Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: sframe(30.0),
         point_count: PointCount::new(3).unwrap(),
         curve: Curve::POLYGON_DEFAULT,
         rounded: curvyo_document_core::Rounded::ZERO,
     };
     let hex = Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: StarFrame {
             center: pt(200.0, 80.0),
             ..sframe(30.0)
@@ -709,6 +713,7 @@ fn c8_c24_double_click_on_a_knob_opens_its_field_and_enter_writes_one_commit() {
 #[test]
 fn c24_c42_double_click_on_the_curve_knob_limits_and_names_the_field() {
     let tri = Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: sframe(30.0),
         point_count: PointCount::new(3).unwrap(),
         curve: Curve::POLYGON_DEFAULT,
@@ -1102,6 +1107,7 @@ fn c55_linked_clone_of_every_arc_kind_and_of_a_curved_shape_converts_without_not
         ell(30.0, 30.0, Some(arc(0.0, 270.0, ArcKind::Chord)), 1.0),
         ell(30.0, 30.0, None, -0.4),
         Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: sframe(30.0),
             point_count: PointCount::new(5).unwrap(),
             curve: Curve::new(0.5).unwrap(),
@@ -1394,6 +1400,7 @@ fn path_area(p: &curvyo_document_core::PathSnapshot) -> f64 {
 fn c60_boolean_union_of_a_pie_and_a_curved_hexagon_uses_the_drawn_outline() {
     let pie = ell(30.0, 30.0, Some(arc(0.0, 270.0, ArcKind::Pie)), 1.0);
     let hex = Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: StarFrame {
             center: pt(130.0, 80.0),
             ..sframe(25.0)
@@ -1433,6 +1440,7 @@ fn c60_boolean_union_of_a_pie_and_a_curved_hexagon_uses_the_drawn_outline() {
 #[ignore = "benchmark: run in release"]
 fn c62c_a_curve_drag_frame_on_a_1024_gon_takes_at_most_4_ms() {
     let big = Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: sframe(60.0),
         point_count: PointCount::new(1024).unwrap(),
         curve: Curve::new(0.3).unwrap(),

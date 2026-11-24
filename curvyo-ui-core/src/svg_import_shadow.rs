@@ -5,7 +5,8 @@
 
 use curvyo_document_core::{
     Angle, CornerRadii, Curve, DashPattern, EllipseFrame, InnerRatio, Length, MarkerCount,
-    MarkerPlace, Markers, Point, PointCount, RectBounds, Rounded, Shape, StarFrame, Style,
+    MarkerPlace, Markers, Point, PointCount, Randomized, RectBounds, Rounded, Seed, Shape,
+    StarFrame, Style,
 };
 use curvyo_svg_core::{LeafKind, MarkerShape, ShadowKind, ShadowMarkers, SvgLeaf};
 use kurbo::{Affine, BezPath};
@@ -188,7 +189,7 @@ pub(crate) fn shadow_primitive(leaf: &SvgLeaf, placement: Affine) -> Option<(Sha
         }
         _ => return None,
     };
-    let finite = frame.iter().all(|v| v.is_finite() && v.abs() <= 1e7);
+    let finite = numbers_are_sane(kind, frame);
     let rotation = Angle::from_radians(rotation);
     let agrees = match &leaf.kind {
         // A `<rect>` draws true circular corners, the model's outline cubic ones: its numbers are
@@ -199,6 +200,22 @@ pub(crate) fn shadow_primitive(leaf: &SvgLeaf, placement: Affine) -> Option<(Sha
         _ => draws(&shape, rotation, &drawn),
     };
     (finite && agrees).then_some((shape, rotation))
+}
+
+/// Whether every shadow number is finite and every length or angle within 1e7. The seed that ends
+/// a randomized polygon's (10 numbers) or star's (11) shadow is a 32-bit number, not a length:
+/// `ring_by_numbers` checked it, the bound is for the others.
+fn numbers_are_sane(kind: ShadowKind, frame: &[f64]) -> bool {
+    let seeded = matches!(
+        (kind, frame.len()),
+        (ShadowKind::Polygon, 10) | (ShadowKind::Star, 11)
+    );
+    let measured = if seeded {
+        &frame[..frame.len() - 1]
+    } else {
+        frame
+    };
+    frame.iter().all(|v| v.is_finite()) && measured.iter().all(|v| v.abs() <= 1e7)
 }
 
 /// Whether the rectangle `shape` turned by `rotation` is the `<rect>` `rect` under `m` within
@@ -261,8 +278,8 @@ fn arc_by_frame(
 }
 
 /// A polygon or star by its shadow numbers: `cx cy radius count angle rotation curve [ratio]` with
-/// `Rounded` appended since `specs/0145-shape-spiro-handles` (the forms without it read as 0), and
-/// the rotation.
+/// `Rounded` appended since `specs/0145-shape-spiro-handles` and, for a randomized shape only,
+/// `Randomized` and its seed (the forms without them read as 0), and the rotation.
 fn ring_by_numbers(
     kind: ShadowKind,
     numbers: &[f64],
@@ -272,12 +289,19 @@ fn ring_by_numbers(
     let polygon = kind == ShadowKind::Polygon;
     let (head, rest) = numbers.split_first_chunk::<7>()?;
     let &[cx, cy, radius, count_value, angle, rotation, k] = head;
-    let (ratio, rounded) = match (polygon, rest) {
-        (true, []) => (None, 0.0),
-        (true, &[q]) => (None, q),
-        (false, &[ratio]) => (Some(ratio), 0.0),
-        (false, &[ratio, q]) => (Some(ratio), q),
+    // After Curve (and the ratio of a star): Rounded, then Randomized and its seed (slice 3).
+    let (ratio, rounded, random) = match (polygon, rest) {
+        (true, []) => (None, 0.0, None),
+        (true, &[q]) => (None, q, None),
+        (true, &[q, r, seed]) => (None, q, Some((r, seed))),
+        (false, &[ratio]) => (Some(ratio), 0.0, None),
+        (false, &[ratio, q]) => (Some(ratio), q, None),
+        (false, &[ratio, q, r, seed]) => (Some(ratio), q, Some((r, seed))),
         _ => return None,
+    };
+    let randomized = match random {
+        None => Randomized::ZERO,
+        Some((r, seed)) => Randomized::new(r, Seed::new(whole_u32(seed)?))?,
     };
     let (frame, point_count) = (
         star_frame(center(cx, cy), radius, angle),
@@ -286,12 +310,14 @@ fn ring_by_numbers(
     let (curve, rounded) = (curve(k)?, Rounded::new(rounded)?);
     let shape = match ratio {
         None => Shape::Polygon {
+            randomized,
             frame,
             point_count,
             curve,
             rounded,
         },
         Some(ratio) => Shape::Star {
+            randomized,
             frame,
             point_count,
             inner_ratio: InnerRatio::new(ratio).ok()?,
@@ -308,6 +334,15 @@ fn star_frame(center: Point, radius: f64, angle: f64) -> StarFrame {
         radius: Length::from_mm(radius),
         angle: Angle::from_radians(angle),
     }
+}
+
+/// A seed written as a number: a whole number of 32 bits.
+fn whole_u32(value: f64) -> Option<u32> {
+    if value.fract() != 0.0 || !(0.0..=f64::from(u32::MAX)).contains(&value) {
+        return None;
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // checked just above
+    Some(value as u32)
 }
 
 /// A point count written as a number.

@@ -40,6 +40,7 @@ fn hexagon() -> ObjectSnapshot {
     primitive(
         node(2),
         Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(100.0, 100.0),
                 radius: Length::from_mm(20.0),
@@ -56,6 +57,7 @@ fn star() -> ObjectSnapshot {
     primitive(
         node(3),
         Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(100.0, 100.0),
                 radius: Length::from_mm(20.0),

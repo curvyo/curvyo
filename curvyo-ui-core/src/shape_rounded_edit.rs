@@ -147,8 +147,10 @@ pub fn with_rounded(shape: &Shape, value: f64) -> Option<Shape> {
             frame,
             point_count,
             curve: old,
+            randomized,
             ..
         } => Shape::Polygon {
+            randomized,
             frame,
             point_count,
             curve: curve(old),
@@ -159,8 +161,10 @@ pub fn with_rounded(shape: &Shape, value: f64) -> Option<Shape> {
             point_count,
             inner_ratio,
             curve: old,
+            randomized,
             ..
         } => Shape::Star {
+            randomized,
             frame,
             point_count,
             inner_ratio,
@@ -189,6 +193,7 @@ mod tests {
 
     fn hexagon(q: f64, curve: f64) -> Shape {
         Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(10.0, 20.0),
                 radius: Length::from_mm(40.0),

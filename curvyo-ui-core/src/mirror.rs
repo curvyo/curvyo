@@ -218,8 +218,10 @@ fn mirrored_primitive(primitive: &PrimitiveSnapshot, mirror: Mirror) -> Primitiv
             point_count,
             curve,
             rounded,
+            randomized,
         } => (
             Shape::Polygon {
+                randomized,
                 frame: mirrored_star_frame(frame, rotation, mirror),
                 point_count,
                 curve,
@@ -233,8 +235,10 @@ fn mirrored_primitive(primitive: &PrimitiveSnapshot, mirror: Mirror) -> Primitiv
             inner_ratio,
             curve,
             rounded,
+            randomized,
         } => (
             Shape::Star {
+                randomized,
                 frame: mirrored_star_frame(frame, rotation, mirror),
                 point_count,
                 inner_ratio,

@@ -347,7 +347,9 @@ pub(crate) fn scale_primitive(
             point_count,
             curve,
             rounded,
+            randomized,
         } => Shape::Polygon {
+            randomized,
             frame: scaled_star_frame(frame, map_point(frame.center), factor),
             point_count,
             curve,
@@ -359,7 +361,9 @@ pub(crate) fn scale_primitive(
             inner_ratio,
             curve,
             rounded,
+            randomized,
         } => Shape::Star {
+            randomized,
             frame: scaled_star_frame(frame, map_point(frame.center), factor),
             point_count,
             inner_ratio,

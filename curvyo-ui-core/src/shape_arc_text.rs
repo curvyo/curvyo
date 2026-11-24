@@ -51,6 +51,16 @@ pub fn rounded_announcement(shape: &Shape) -> Option<String> {
     Some(format!("Rounded {}", text.replace('-', "\u{2212}")))
 }
 
+/// The announcement of `shape`'s Randomized value after an edit: "Randomized 0.30".
+#[must_use]
+pub fn randomized_announcement(shape: &Shape) -> Option<String> {
+    let (Shape::Polygon { randomized, .. } | Shape::Star { randomized, .. }) = shape else {
+        return None;
+    };
+    let text = format!("{:.2}", randomized.effective());
+    Some(format!("Randomized {}", text.replace('-', "\u{2212}")))
+}
+
 const fn kind_word(kind: ArcKind) -> &'static str {
     match kind {
         ArcKind::Pie => "pie",

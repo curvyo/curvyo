@@ -59,6 +59,7 @@ fn polygon(
 ) -> ObjectSnapshot {
     primitive(
         Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: frame(center, radius, frame_angle),
             point_count: PointCount::new(n).unwrap(),
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
@@ -78,6 +79,7 @@ fn star(
 ) -> ObjectSnapshot {
     primitive(
         Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: frame(center, radius, frame_angle),
             point_count: PointCount::new(n).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),

@@ -127,6 +127,7 @@ fn curve_side_middle(shape: &Shape) -> Option<Point> {
         Shape::Polygon {
             frame, point_count, ..
         } => Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame,
             point_count,
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
@@ -138,6 +139,7 @@ fn curve_side_middle(shape: &Shape) -> Option<Point> {
             inner_ratio,
             ..
         } => Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame,
             point_count,
             inner_ratio,

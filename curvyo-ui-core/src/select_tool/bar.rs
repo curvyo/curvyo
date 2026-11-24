@@ -26,6 +26,7 @@ const fn kind_of(value: ParamValue) -> ObjectKind {
         ParamValue::Ratio(_) => ObjectKind::Star,
         ParamValue::PointCount(_) => ObjectKind::PolygonOrStar,
         ParamValue::Rounded(_) => ObjectKind::Rounded,
+        ParamValue::Randomized(_) => ObjectKind::Randomized,
         ParamValue::ArcAngle(..) | ParamValue::ArcKind(_) | ParamValue::WholeEllipse => {
             ObjectKind::ArcEllipse
         }

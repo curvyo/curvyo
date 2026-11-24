@@ -279,6 +279,8 @@ pub const EDIT_STEPS: &[&str] = &[
     "set_ellipse_arc",
     "set_curve",
     "set_rounded",
+    "set_randomized",
+    "reroll_seed",
     "set_curve_kind",
     "set_width_point",
     "remove_width_point",

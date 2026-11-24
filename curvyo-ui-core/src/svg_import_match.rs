@@ -367,6 +367,7 @@ mod tests {
 
     fn hexagon() -> Shape {
         Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: curvyo_document_core::StarFrame {
                 center: DocPoint::new(0.0, 0.0),
                 radius: Length::from_mm(10.0),

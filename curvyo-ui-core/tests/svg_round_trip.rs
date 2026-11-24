@@ -203,12 +203,14 @@ fn everything() -> Vec<DrawingNode> {
         )
     };
     let polygon = |curve: f64| Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: star_frame(50.0, 200.0, 15.0, 10.0),
         point_count: PointCount::new(6).unwrap(),
         curve: Curve::new(curve).unwrap(),
         rounded: curvyo_document_core::Rounded::ZERO,
     };
     let star = |deg: f64, curve: f64| Shape::Star {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: star_frame(100.0, 200.0, 20.0, deg),
         point_count: PointCount::new(5).unwrap(),
         inner_ratio: InnerRatio::new(0.4).unwrap(),
@@ -218,12 +220,14 @@ fn everything() -> Vec<DrawingNode> {
     // `specs/0145-shape-spiro-handles/` criterion 18: Rounded shapes leave as Inkscape's star
     // with `inkscape:rounded` and come back as live shapes with the same value.
     let rounded_polygon = |q: f64| Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: star_frame(50.0, 240.0, 15.0, 10.0),
         point_count: PointCount::new(6).unwrap(),
         curve: Curve::POLYGON_DEFAULT,
         rounded: curvyo_document_core::Rounded::new(q).unwrap(),
     };
     let rounded_star = |q: f64| Shape::Star {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: star_frame(100.0, 240.0, 20.0, -30.0),
         point_count: PointCount::new(5).unwrap(),
         inner_ratio: InnerRatio::new(0.5).unwrap(),
@@ -523,6 +527,7 @@ fn items(document: &Document) -> Vec<Item> {
                             point_count,
                             curve,
                             rounded,
+                            ..
                         } => {
                             exact.push_str(&format!(
                                 " polygon {} {} {}",
@@ -543,6 +548,7 @@ fn items(document: &Document) -> Vec<Item> {
                             inner_ratio,
                             curve,
                             rounded,
+                            ..
                         } => {
                             exact.push_str(&format!(
                                 " star {} {} {} {}",
@@ -772,12 +778,14 @@ fn arb_primitive() -> impl Strategy<Value = DrawingNode> {
                     rounded: curvyo_document_core::Rounded::ZERO,
                 },
                 2 => Shape::Polygon {
+                    randomized: curvyo_document_core::Randomized::ZERO,
                     frame: star_frame(c.0, c.1, r, angle),
                     point_count: PointCount::new(n).unwrap(),
                     curve: Curve::POLYGON_DEFAULT,
                     rounded: curvyo_document_core::Rounded::ZERO,
                 },
                 3 => Shape::Star {
+                    randomized: curvyo_document_core::Randomized::ZERO,
                     frame: star_frame(c.0, c.1, r, angle),
                     point_count: PointCount::new(n).unwrap(),
                     inner_ratio: InnerRatio::new(ratio).unwrap(),

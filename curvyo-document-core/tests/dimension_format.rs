@@ -162,6 +162,7 @@ fn every_other_slot_form(document: &Document, rect: NodeId, circle: NodeId) {
     let add = |kind, slots| document.add_dimension(kind, slots, place()).unwrap();
     let square = document.create_primitive(
         Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: curvyo_document_core::StarFrame {
                 center: Point::new(160.0, 40.0),
                 radius: Length::from_mm(20.0),
