@@ -268,6 +268,7 @@ mod tests {
             Cause::OutsideBed {
                 width_um: 1,
                 height_um: 1,
+                over_um: None,
             },
             Cause::MachineDamaged,
             Cause::StartDamaged,

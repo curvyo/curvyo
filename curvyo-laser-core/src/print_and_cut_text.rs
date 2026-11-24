@@ -93,6 +93,7 @@ pub fn warning_text(warning: &Warning) -> String {
         Warning::HeadPosition => {
             "Start is Head position: the cut will not follow the sheet".to_owned()
         }
+        Warning::UserOrigin => "Start is User origin: the cut will not follow the sheet".to_owned(),
     }
 }
 

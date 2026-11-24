@@ -36,10 +36,31 @@ fn the_button_is_placed_by_the_cause_not_found_in_the_sentence() {
     let bed = Cause::OutsideBed {
         width_um: 400_000,
         height_um: 300_000,
+        over_um: None,
     };
     let text = line(bed, 3, Targets::Items(vec![id(5), id(6), id(7)]));
     assert_eq!(text.button, "3 items");
     assert_eq!(text.whole(), "3 items lie outside the 400 × 300 mm bed.");
+    // `specs/0118` W50: with User origin the line names the distance.
+    for (um, words) in [
+        (12_000, "by 12 mm."),
+        (11_001, "by 12 mm."),
+        (1_000, "by 1 mm."),
+        (950, "by 1 mm."),
+        (350, "by 0.4 mm."),
+        (11, "by 0.1 mm."),
+    ] {
+        let bed = Cause::OutsideBed {
+            width_um: 400_000,
+            height_um: 300_000,
+            over_um: Some(um),
+        };
+        let text = line(bed, 3, Targets::Items(vec![id(5), id(6), id(7)]));
+        assert_eq!(
+            text.whole(),
+            format!("3 items lie outside the 400 × 300 mm bed {words}")
+        );
+    }
     let text = line(Cause::StartDamaged, 1, Targets::StartPick);
     assert_eq!(
         (text.button.as_str(), text.whole().as_str()),
@@ -155,7 +176,8 @@ fn the_start_options_read_as_the_ux_notes() {
         [
             "Machine origin",
             "Head position",
-            "Home, then machine origin"
+            "Home, then machine origin",
+            "User origin"
         ]
     );
 }

@@ -36,8 +36,8 @@ fn burn_points(job: &Job) -> Vec<PointUm> {
     let mut points = Vec::new();
     for m in &job.moves {
         if matches!(m.kind, MoveKind::Burn { .. } | MoveKind::Sweep { .. }) {
-            points.push(job.frame.machine_point(head));
-            points.push(job.frame.machine_point(m.to));
+            points.push(job.machine_point(head));
+            points.push(job.machine_point(m.to));
         }
         head = m.to;
     }

@@ -94,6 +94,7 @@ fn page(blocks: Vec<BlockInput>) -> JobInput {
         },
         start: Start::default(),
         start_damaged: false,
+        user_origin: None,
         fixture_material: None,
         blocks,
     }

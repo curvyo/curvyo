@@ -56,7 +56,7 @@ impl<'a> Writer<'a> {
             job,
             text: String::with_capacity(64 * job.moves.len() + 4096),
             relative: job.start.relative(),
-            at: job.frame.machine_point(job.home),
+            at: job.machine_point(job.home),
             z: 0,
             feed: None,
             s: 0,
@@ -138,7 +138,7 @@ impl<'a> Writer<'a> {
     /// One `G0` or `G1` line to page point `to`, with `F` and `S` where they change; written
     /// straight into the text (no line is built twice: a raster file has millions of them).
     fn motion(&mut self, code: &str, to: PointUm, feed: Option<u32>, s: Option<u32>) {
-        let machine = self.job.frame.machine_point(to);
+        let machine = self.job.machine_point(to);
         let shown = if self.relative {
             PointUm::new(machine.x - self.at.x, machine.y - self.at.y)
         } else {
