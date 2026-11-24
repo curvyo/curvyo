@@ -310,7 +310,7 @@ fn criteria_15_16_an_old_file_opens_unchanged_and_only_a_changing_save_fills_it(
 
 #[test]
 fn criterion_15_each_page_reads_its_own_copy_pair() {
-    let bytes = fixture("operation_defaults_v57.curvyo");
+    let bytes = fixture("operation_defaults_v59.curvyo");
     let mut s = Session::open(4, &bytes).unwrap();
     let d = unpack(9, &bytes).unwrap();
     let pages: Vec<_> = d.manufacturings();
