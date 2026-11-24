@@ -48,6 +48,9 @@ pub struct NewOperation<'a> {
     pub kind: &'a str,
     /// The name.
     pub name: &'a str,
+    /// Its `op_settings` as plain values, written in the same step (`specs/0150` criteria 4, 20;
+    /// the laser extension makes them); `None` writes none.
+    pub settings: Option<&'a serde_json::Map<String, serde_json::Value>>,
 }
 
 /// The two switches of an operation row.
@@ -165,8 +168,9 @@ impl Document {
             .collect())
     }
 
-    /// Adds an operation at `index` of the list (or last) with Show and Output on and the
-    /// `members` assigned, in one history step: "add operation" with no member, else "assign".
+    /// Adds an operation at `index` of the list (or last) with Show and Output on, the
+    /// `members` assigned and its settings, in one history step: "add operation" with no member,
+    /// else "assign".
     ///
     /// # Errors
     /// [`OperationError::NoSuchManufacturing`]; [`OperationError::NoSuchTarget`] when a member
@@ -202,6 +206,13 @@ impl Document {
             meta.insert(KEY_SHAPE, SHAPE_OPERATION).unwrap();
             meta.insert(KEY_OP_KIND, new.kind).unwrap();
             meta.insert(KEY_NAME, new.name).unwrap();
+            if let Some(settings) = new.settings {
+                crate::manufacturing_codec::write_plain_map(
+                    &meta,
+                    crate::operation_codec::KEY_OP_SETTINGS,
+                    settings,
+                );
+            }
             for member in members {
                 meta.insert(&member_key(&tree_path(member)), true).unwrap();
                 self.member_keys_may_exist.set(true);

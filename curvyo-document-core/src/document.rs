@@ -680,7 +680,20 @@ impl DocumentVersion {
 /// A build that stops at 57 would drop the record silently on Object to path and never show it,
 /// so this build's files are refused there by version; a file of 57 opens unchanged. Goldens:
 /// `came_from_v58.curvyo`, `came_from_damaged_v58.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 58;
+///
+/// Version 59 (`specs/0150-operation-always-has-numbers`, `adrs.md` decisions 1, 3, 4, 7): the
+/// machine profile copy `mfg_profile` may hold `default_power_pct` (1 to 100, one decimal) and
+/// `default_speed_mm_min` (a whole 1 to 100,000), each read on its own, absent or unreadable as
+/// 10 % and 1,000 mm/min, the speed limited to the copy's max feed; an operation without
+/// `op_settings` no longer means No settings: the laser extension reads it as own numbers from
+/// its copy's pair, and writes them into the register when the operation is created, when a step
+/// changes the copy's pair (before the change, in that step) and in the reserved commit of a save
+/// that changes the project. Labels `edit_default_power` ("Edit default power") and
+/// `edit_default_speed` ("Edit default speed"). A build that stops at 58 would drop the two copy
+/// keys on its next Machine block edit and block such an operation as "No settings", so this
+/// build's files are refused there by version (ADR 0033 §7); a file of 58 opens unchanged and is
+/// not rewritten on read. Golden: `operation_defaults_v59.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 59;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

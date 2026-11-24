@@ -44,6 +44,10 @@ pub const EDIT_ORIGIN_CORNER_COMMIT_LABEL: &str = "edit_origin_corner";
 pub const EDIT_MAX_FEED_COMMIT_LABEL: &str = "edit_max_feed";
 /// The label of an edit of the copy's max power.
 pub const EDIT_MAX_POWER_COMMIT_LABEL: &str = "edit_max_power";
+/// The label of an edit of the copy's Default power (`specs/0150` criterion 1).
+pub const EDIT_DEFAULT_POWER_COMMIT_LABEL: &str = "edit_default_power";
+/// The label of an edit of the copy's Default speed (`specs/0150` criterion 1).
+pub const EDIT_DEFAULT_SPEED_COMMIT_LABEL: &str = "edit_default_speed";
 /// The label of an edit of the copy's laser mode.
 pub const EDIT_LASER_MODE_COMMIT_LABEL: &str = "edit_laser_mode";
 /// The label of the copy's motorised Z axis switched on (`specs/0111` criterion 22).
@@ -75,6 +79,10 @@ pub enum ProfileChange {
     EditMaxFeed,
     /// The max power field.
     EditMaxPower,
+    /// The Default power field (`specs/0150` criterion 1).
+    EditDefaultPower,
+    /// The Default speed field (`specs/0150` criterion 1).
+    EditDefaultSpeed,
     /// The laser mode switch.
     EditLaserMode,
     /// The Motorised Z axis switch, to `on` (ADR 0056 §7).
@@ -103,6 +111,8 @@ impl ProfileChange {
             Self::EditOrigin => EDIT_ORIGIN_CORNER_COMMIT_LABEL,
             Self::EditMaxFeed => EDIT_MAX_FEED_COMMIT_LABEL,
             Self::EditMaxPower => EDIT_MAX_POWER_COMMIT_LABEL,
+            Self::EditDefaultPower => EDIT_DEFAULT_POWER_COMMIT_LABEL,
+            Self::EditDefaultSpeed => EDIT_DEFAULT_SPEED_COMMIT_LABEL,
             Self::EditLaserMode => EDIT_LASER_MODE_COMMIT_LABEL,
             Self::MotorisedZ { on: true } => MOTORISED_Z_ON_COMMIT_LABEL,
             Self::MotorisedZ { on: false } => MOTORISED_Z_OFF_COMMIT_LABEL,
@@ -506,7 +516,7 @@ impl Document {
         change: ProfileChange,
         contents: &crate::PageContents,
     ) -> Result<bool, ManufacturingError> {
-        self.write_profile(id, profile, work_area, anchor, change, None, contents)
+        self.write_profile(id, profile, work_area, anchor, change, None, &[], contents)
     }
 
     /// As [`Document::set_manufacturing_profile`], and in the same step the page's sets are
@@ -530,10 +540,45 @@ impl Document {
         sets: ProfileSets<'_>,
         contents: &crate::PageContents,
     ) -> Result<bool, ManufacturingError> {
-        self.write_profile(id, profile, work_area, anchor, change, Some(sets), contents)
+        self.write_profile(
+            id,
+            profile,
+            work_area,
+            anchor,
+            change,
+            Some(sets),
+            &[],
+            contents,
+        )
     }
 
-    #[allow(clippy::too_many_arguments)] // a pick carries the copy, page, corner, change, sets and owned contents
+    /// As [`Document::set_manufacturing_profile_and_sets`] (with `sets`) or
+    /// [`Document::set_manufacturing_profile`] (without), and in the same step the `fills` are
+    /// written before the new copy: the numbers the operations of this manufacturing without
+    /// `op_settings` read under the copy before the change (`specs/0150` adrs.md decision 4 b),
+    /// so an undo returns copy and registers together and no visible number changes.
+    ///
+    /// # Errors
+    /// As [`Document::set_manufacturing_profile`]; [`ManufacturingError::NotFound`] when a fill
+    /// names no live operation or a test grid row. Nothing is written then.
+    #[allow(clippy::too_many_arguments)] // the copy, page, corner, change, sets, fills and owned contents
+    pub fn set_manufacturing_profile_filled(
+        &self,
+        id: NodeId,
+        profile: &FixtureParams,
+        work_area: DocumentSize,
+        anchor: PageCorner,
+        change: ProfileChange,
+        sets: Option<ProfileSets<'_>>,
+        fills: &[crate::SettingsWrite],
+        contents: &crate::PageContents,
+    ) -> Result<bool, ManufacturingError> {
+        self.write_profile(
+            id, profile, work_area, anchor, change, sets, fills, contents,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)] // a pick carries the copy, page, corner, change, sets, fills and owned contents
     fn write_profile(
         &self,
         id: NodeId,
@@ -542,6 +587,7 @@ impl Document {
         anchor: PageCorner,
         change: ProfileChange,
         sets: Option<ProfileSets<'_>>,
+        fills: &[crate::SettingsWrite],
         contents: &crate::PageContents,
     ) -> Result<bool, ManufacturingError> {
         let manufacturing = self.manufacturing(id).ok_or(ManufacturingError::NotFound)?;
@@ -602,7 +648,13 @@ impl Document {
         };
         self.check_layout(&layout, contents)
             .map_err(|_| ManufacturingError::OutOfRange)?;
+        let fill_metas = fills
+            .iter()
+            .map(|fill| self.writable_operation_meta(fill.operation))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| ManufacturingError::NotFound)?;
         self.batch(change.label(), |doc| {
+            Self::write_settings(&fill_metas, fills);
             doc.write_layout(&pages, &layout, contents)
                 .map_err(|_| ManufacturingError::OutOfRange)?;
             if !same_profile {
