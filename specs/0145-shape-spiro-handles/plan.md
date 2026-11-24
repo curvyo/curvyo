@@ -4,7 +4,7 @@
 
 Built to `adrs.md` decision 8 and `ux-notes.md` section 13. Polygon and star only (the ellipse has no
 Randomized). Slices 1 and 2's `Rounded`, `rounded_outline`, `set_rounded`, `shape_arc_codec`,
-select bar and shadow code are extended, not duplicated. `format_version` 58 (renumbered at
+select bar and shadow code are extended, not duplicated. `format_version` 60 (renumbered at
 rebase if `main` moved; it lives in `CURRENT_FORMAT_VERSION` and the golden fixture only).
 
 ### Affected crates/modules
@@ -14,7 +14,7 @@ rebase if `main` moved; it lives in `CURRENT_FORMAT_VERSION` and the golden fixt
   the draws, the moved ring and the randomized outline and bounds); `primitive_model.rs` (field
   `randomized` on `Shape::Polygon`/`Star`), `primitive_outline.rs` (an arm ahead of Rounded),
   `shape_arc_codec.rs` (registers `randomized` and `seed`), `shape_arc.rs` (`set_randomized`,
-  `reroll_seeds`), `shapes.rs` (Object to path), `document.rs` (format 58).
+  `reroll_seeds`), `shapes.rs` (Object to path), `document.rs` (format 60).
 - `curvyo-svg-core`: nothing (a randomized Inkscape star stays a path, `star_data` already refuses it).
 - `curvyo-ui-core`: `svg_export_shapes.rs` / `svg_import_shadow.rs` (a randomized shape exports as a
   path with the shadow, `r` and seed appended), `svg_import_match.rs`, `offset_primitive.rs`,
@@ -30,20 +30,20 @@ M0 refactor (own commit): `PatternSeed` becomes `Seed` in `seed.rs` with `splitm
 change; the pattern tests are the net.
 
 M1 document-core (tests first):
-- [ ] 1. Draws: `splitmix64(seed ^ splitmix64(4i + k))`, top 53 bits to `[-0.5, 0.5)`; golden of the
+- [x] 1. Draws: `splitmix64(seed ^ splitmix64(4i + k))`, top 53 bits to `[-0.5, 0.5)`; golden of the
   first 3 draws of seed 1 and the ring of a 5-point star at `r = 1`, seed 1 (fulfils AC 23)
-- [ ] 2. Shift `r * 2 R_max * (d1, d2)`, bounded by `|r| R_max` per axis, linear in `r`; a different seed
+- [x] 2. Shift `r * 2 R_max * (d1, d2)`, bounded by `|r| R_max` per axis, linear in `r`; a different seed
   gives a different ring (fulfils AC 24, 23)
-- [ ] 3. `r = 0` is today's outline, bounds and export for every polygon and star, whatever the seed
+- [x] 3. `r = 0` is today's outline, bounds and export for every polygon and star, whatever the seed
   (fulfils AC 25)
-- [ ] 4. Rounded through the moved vertices, handles from the unshifted ring turned by `r*pi*d3` and
+- [x] 4. Rounded through the moved vertices, handles from the unshifted ring turned by `r*pi*d3` and
   scaled by `1 + r*d4`; Curve arcs between moved vertices; every moved vertex on the outline (fulfils
   AC 27)
-- [ ] 5. Bounds: today's box united with the exact box of the randomized outline; 4096 sampled points
+- [x] 5. Bounds: today's box united with the exact box of the randomized outline; 4096 sampled points
   inside; stays a live primitive; Object to path keeps the moved ring, strips the keys (fulfils AC 28, 29)
-- [ ] 6. Registers `randomized` (deleted at 0, non-finite is Damaged, limited on use) and `seed`;
-  `format_version` 58 plus a generated golden project; older files open unchanged (fulfils AC 26)
-- [ ] 7. `set_randomized` (one commit "Change randomizing", fresh seed when `r` first leaves 0 with no
+- [x] 6. Registers `randomized` (deleted at 0, non-finite is Damaged, limited on use) and `seed`;
+  `format_version` 60 plus a generated golden project; older files open unchanged (fulfils AC 26)
+- [x] 7. `set_randomized` (one commit "Change randomizing", fresh seed when `r` first leaves 0 with no
   seed) and `reroll_seeds` (one commit "New seed", only shapes with `r != 0`); undo restores (fulfils AC 21, 22, 26)
 
 M2 svg and ui-core: export as path with the shadow (never `inkscape:randomized`), the shadow appends
@@ -60,10 +60,15 @@ test in `curvyo-editor-wasm/tests/cpu_time/` (`cpu_time_of`, min of 5, asserts o
 M4 frontend: the Randomized group after Rounded, Re-roll seed (`Dices`), steps 0.01 / 0.1; design-system
 rows (fulfils AC 21, 22).
 
-Built as commits: plan, seed refactor, Rust, frontend. Proposals: a stored seed stays when `r` returns to 0
+Built as four commits (plan, seed refactor, Rust, frontend). Proposals and deviations: a stored seed stays when `r` returns to 0
 (the register `randomized` is deleted, `seed` kept, so `0 -> 1 -> 0 -> 1` reproduces); Re-roll on several
 shapes touches only those with `r != 0`; the shifts are taken in the ring's axes with the frame angle
-included (the literal reading of criterion 24).
+included (the literal reading of criterion 24); the seed 0 means "no seed yet" (a fresh one is
+drawn when the value first leaves 0); a Mirror keeps `r` and the seed, so a mirrored randomized shape
+is another draw of the same family (an exact mirror image would need a path), a stretch converts to a
+path as for every polygon and star; the commit labels are the spec's ("Change randomizing", "New
+seed"), not ux-notes section 13's "Change randomization"; criterion 30's flatten at `r = 10`,
+`q = 10` is not met (`docs/technical-debt.md`).
 
 
 ## Slice 2: ellipse only (Frage 326 at default B; criteria 14, 15, 16, 19)

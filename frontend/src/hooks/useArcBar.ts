@@ -33,6 +33,16 @@ export interface ArcBarState {
   roundedLimited: boolean;
   /** The stored value beyond -10..=10, for the "limited" tag's tooltip. */
   roundedStored: number;
+  /** The Randomized group (`specs/0145-shape-spiro-handles/` slice 3, criteria 21 and 22): a
+   * polygon or star is selected. */
+  randomizedShown: boolean;
+  randomized: number;
+  randomizedMixed: boolean;
+  randomizedLimited: boolean;
+  /** The stored value beyond -10..=10, for the "limited" tag's tooltip. */
+  randomizedStored: number;
+  /** "Re-roll seed" would change something (a selected shape has a value other than 0). */
+  rerollEnabled: boolean;
 }
 
 export const EMPTY_ARC_BAR_STATE: ArcBarState = {
@@ -56,6 +66,12 @@ export const EMPTY_ARC_BAR_STATE: ArcBarState = {
   roundedGrey: "",
   roundedLimited: false,
   roundedStored: 0,
+  randomizedShown: false,
+  randomized: 0,
+  randomizedMixed: false,
+  randomizedLimited: false,
+  randomizedStored: 0,
+  rerollEnabled: false,
 };
 
 export interface ArcBarApi {
@@ -70,6 +86,12 @@ export interface ArcBarApi {
   setRounded: (text: string) => string;
   /** An arrow-key step of "Rounded": previewed, committed by `commitCurve`. */
   previewRounded: (value: number) => void;
+  /** Enter in "Randomized": as [`setAngle`]. */
+  setRandomized: (text: string) => string;
+  /** An arrow-key step of "Randomized": previewed, committed by `commitCurve`. */
+  previewRandomized: (value: number) => void;
+  /** "Re-roll seed": a new seed for every selected polygon or star that has a value. */
+  rerollSeed: () => void;
   previewCurve: (percent: number) => void;
   /** An arrow-key step of "Start" (`end` false) or "End": previewed, committed by
    * `commitCurve`. */
@@ -101,6 +123,12 @@ function read(session: WasmSession): ArcBarState {
     roundedGrey: view.rounded_grey,
     roundedLimited: view.rounded_limited,
     roundedStored: view.rounded_stored,
+    randomizedShown: view.randomized_shown,
+    randomized: view.randomized,
+    randomizedMixed: view.randomized_mixed,
+    randomizedLimited: view.randomized_limited,
+    randomizedStored: view.randomized_stored,
+    rerollEnabled: view.reroll_enabled,
   };
   view.free();
   return state;
@@ -172,6 +200,20 @@ export function useArcBar(
     (text: string) => run((session) => session.set_selected_rounded(text), "unchanged"),
     [run],
   );
+  const setRandomized = useCallback(
+    (text: string) => run((session) => session.set_selected_randomized(text), "unchanged"),
+    [run],
+  );
+  const previewRandomized = useCallback(
+    (value: number) => {
+      getSession()?.preview_selected_randomized(value);
+      onChange();
+    },
+    [getSession, onChange],
+  );
+  const rerollSeed = useCallback(() => {
+    run((session) => session.reroll_selected_seed(), "unchanged");
+  }, [run]);
   const previewRounded = useCallback(
     (value: number) => {
       getSession()?.preview_selected_rounded(value);
@@ -209,6 +251,9 @@ export function useArcBar(
     setCurve,
     setRounded,
     previewRounded,
+    setRandomized,
+    previewRandomized,
+    rerollSeed,
     previewCurve,
     previewAngle,
     commitCurve,
