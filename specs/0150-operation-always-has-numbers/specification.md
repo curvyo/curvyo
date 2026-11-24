@@ -1,6 +1,6 @@
 # Operation always has numbers: every laser operation has a power and a speed, from the material or from the machine profile
 
-Status: Ready (2026-11-24; Fragen 337 to 340 applied by default A; `adrs.md` and `ux-notes.md` W1 to W12 done)
+Status: Done (PR #468); was Ready (2026-11-24; Fragen 337 to 340 applied by default A; `adrs.md` and `ux-notes.md` W1 to W12 done)
 Priority: Must
 Origin: Customer (2026-11-24, Frage 336 OP-NO-EMPTY-VALUES **A**, translated: every laser operation always has power and speed; when none is set they come from the chosen material if there is one, else from default values in the machine profile; old files get these values when opened). Companion decision Frage 335 MC-FRAME-NO-POWER **B**: a Cut without power or speed frames anyway; that is built in PR #460 for `0118` and is **not** part of this story. Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 
@@ -35,7 +35,7 @@ As a maker who adds an operation I want it to have a power and a speed from the 
 
 ### A new operation
 
-4. Given a laser page and no material for the new operation, when the maker presses a kind button (`0101` criterion 2), then the operation has numbers at once: power and speed of the profile's default numbers, passes 1 (Engrave + Outline: the outline set equal to `main`, as `StoredSettings::own` does), its source state is **own** (`0028` criterion 26 c), and its row shows "<power> %, <speed> mm/min, 1 x" and no "No settings". One undo step "Add operation" (as `0101`; the numbers are part of that step, there is no second step).
+4. Given a laser page and no material for the new operation, when the maker presses a kind button (`0101` criterion 2), then the operation has numbers at once: power and speed of the profile's default numbers, passes 1 (Engrave + Outline: the outline set equal to `main`, as `StoredSettings::own` does), its source state is **own** (`0028` criterion 26 c), and its row shows "<power> %, <speed> mm/min, 1 x" and no "No settings". One undo step "Add operation", or "Assign to <operation>" when objects are selected (as `0101` and `0111`; **(Proposal)**, lead 2026-11-24; the numbers are part of that step, there is no second step).
 5. Given a new operation whose kind has an interval (Engrave, Engrave + Outline, Image), then the interval, the options of `0111` and the Image settings keep their defaults (`0111` criterion 20, `0123`); this story adds nothing to `op_options`.
 6. Given the Image kind, then it takes power and speed from the same default numbers (`0123`'s Image settings, e.g. lowest power, are not touched).
 7. Given an operation that is created already linked to a material (a route another story may add; today the pick comes after creation), then its numbers are the material's, as `0028` criterion 25 says; the profile defaults fill only a field the material's set does not give.
@@ -60,7 +60,7 @@ As a maker who adds an operation I want it to have a power and a speed from the 
 
 ### Undo and history
 
-20. Given a new operation (criterion 4), then the numbers come into being with the operation: there is no step "add operation, then add numbers", so Ctrl+Z after "Add operation" removes the whole operation and Ctrl+Z after an "Edit settings" returns to the previous numbers, never to an empty state.
+20. Given a new operation (criterion 4), then the numbers come into being with the operation: there is no step "add operation, then add numbers", so Ctrl+Z after "Add operation" (or "Assign to <operation>") removes the whole operation and Ctrl+Z after an "Edit settings" returns to the previous numbers, never to an empty state.
 21. Given a history that already holds steps from before this story (the History list of `0043`), when a project saved earlier is opened, then no step is added by the fill of criterion 15; restoring an old step from the History list shows the operation with the numbers of that step, or, when that step's operation had no numbers, with the derived defaults of criterion 15.
 22. Given an edit of the Default power or Default speed in the Machine block, then it is one undo step on the manufacturing's copy and changes no operation (criterion 8); Ctrl+Z puts the previous default back.
 
