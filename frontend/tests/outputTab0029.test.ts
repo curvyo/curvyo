@@ -9,6 +9,7 @@ import {
   checkPrefix,
   machineLineParts,
   numbersParts,
+  numbersTitle,
   parseExportNotice,
   readoutParts,
 } from "../src/lib/outputText.ts";
@@ -169,4 +170,12 @@ test("U1: below the bar's 360 px floor the slider gives way to the readout", () 
   assert.equal(sliderMinWidth(640), 120);
   // A 760 px window leaves the bar about 300 px: the slider shrinks to 48 px.
   assert.equal(sliderMinWidth(300), 48);
+});
+
+test("the word typed comes once when the core text already carries it", () => {
+  assert.deepEqual(numbersParts("35 % typed, 6,000 mm/min", ["power"]), [
+    { text: "35 %", typed: true },
+    { text: "6,000 mm/min", typed: false },
+  ]);
+  assert.equal(numbersTitle("35 % typed, 6,000 mm/min", ["power"]), "35 % typed, 6,000 mm/min");
 });

@@ -75,13 +75,15 @@ export interface NumberPart {
   typed: boolean;
 }
 
+/** The word the core text already puts after a typed number; the view draws it once, in ink. */
+const TYPED_WORD = " typed";
 const TYPED_ORDER = ["power", "speed", "passes"] as const;
 
 /** A numbers line ("90 %, 6,000 mm/min, 1 ×, 0.25 mm") as its numbers; the first three are power,
  * speed and passes, and a typed one is followed by "typed" in ink (UX notes 6.1). */
 export function numbersParts(text: string, typed: readonly string[]): NumberPart[] {
   return text.split(", ").map((part, index) => ({
-    text: part,
+    text: part.endsWith(TYPED_WORD) ? part.slice(0, -TYPED_WORD.length) : part,
     typed: index < TYPED_ORDER.length && typed.includes(TYPED_ORDER[index]),
   }));
 }
