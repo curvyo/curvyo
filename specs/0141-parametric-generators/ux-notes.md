@@ -14,6 +14,9 @@ hint labels (2026-10-16), no notice after a success (2026-10-31), hidden not dis
 label here names a control or a state. No new colour token. Choices marked **(Proposal)** are vetoable
 at the demo.
 
+**Revision 2 (2026-11-24).** Section 15 supersedes the lines it names in sections 3 to 13; read it
+first.
+
 **Shared with `0099`.** The `0099` revision (criteria 23 to 31) has no UX notes yet. Sections 4 (schema
 fields) and 9 (instance handles) are written as the one look of a parametric instance: a sketch clone's
 exposed parameter list and its handles use them unchanged; section 9 names the only differences.
@@ -295,3 +298,153 @@ different Teeth a typed value gives each gear its own module.
 5. **Spec lines outside UX notes:** Status and "Still open before Ready" are updated (Ready).
 6. **To go into `docs/design-system.md` when Done:** the Generators tool and bar, the Generator block, the
    schema element table, the clamp notice texts, the instance handle row.
+
+## 15. Revision 2 (2026-11-24, criteria 2, 3, 5, 6, 9, 10)
+
+ux-engineer, 2026-11-24, after the customer's try. Customer decisions of 2026-11-24 (spec "Decisions"):
+every number of the Generator block is a slider like Opacity and Width, Convert to paths leaves the block,
+the Joint choice goes, the gear's resize changes Teeth. Everything not named a customer decision below is
+**(Proposal)**.
+
+### 15.1 Which component
+
+"Like Opacity and Width" is the panel's **Value field** (`ValueField`, `useValueDrag`, `SliderTip`; rows
+"Value field" and "Slider" of `docs/design-system.md`): the filled-bar field, not the Strength
+track-and-thumb slider. It already does what criterion 9 asks: drag inside the field, click to set,
+double-click, Enter, F2 or a digit to type, overshoot past the track up to the typed maximum, reset slot,
+Mixed, `SliderTip`. No new component.
+
+- **Reverses section 4.** Section 4 chose the Params field because the Value field "needs a per-parameter
+  drag scale the schema would have to carry". Revision 2 makes the schema carry it (15.3); the Params field
+  is no longer used for a generator: section 4's Component column ("Params field") and its "Field keys"
+  paragraph are replaced by 15.2.
+- **The panel rule.** "Plain fields, not sliders, in the panel" (`0123`) allows "the bar number field or
+  the Value field", so the Value field in the block does not break it, and the customer asked for it here.
+  It is not a second Strength-style slider.
+- **Size.** 244 x 28px, label inside the left edge (the schema label), value and unit right, reset slot
+  24px always reserved, rows 8px apart, 16px between groups (section 3 unchanged otherwise). The longest
+  label, "Kerf compensation", leaves about 70px for "0.125 mm": it fits.
+
+### 15.2 Rules for every schema number
+
+- **Track and typed range.** The bar spans the **track** (15.3); a drag past the right end continues the
+  curve up to the schema maximum (the overshoot rule, `dragLimit`), a click stays on the track, typing
+  reaches the schema minimum and maximum. `aria-valuemin`/`aria-valuemax` are the track's ends (the "Value
+  field" semantics row), `aria-valuenow` at most the track end; this supersedes section 4's "aria-valuemax"
+  as the schema maximum. Where a track starts above the schema minimum (Pitch diameter, `0147`'s Corner
+  radius), a value below it draws an empty bar and a drag past the left end continues down to the schema
+  minimum (`dragMin`, the `0079` spacing precedent); a click stays on the track.
+- **Mapping.** Two curves only: **linear**, `p = (v - a) / (b - a)`; **log**, Width's curve between the
+  track ends `a` and `b`: `v = a + (b - a)(100^p - 1) / 99`, inverse `p = ln(1 + 99 (v - a) / (b - a)) /
+  ln 100`. Log where the useful values crowd at the low end (a 6 mm bore and a 60 mm bore both matter).
+- **Grid.** The drag and the arrows round to the parameter's step; Shift ten times, Ctrl a tenth (the
+  shown decimals cover the Ctrl step: a field whose Ctrl step is finer than its decimals shows one more); an
+  integer (Teeth, Spokes) steps 1, Shift 10, Ctrl does nothing. Home / End: the track's ends. One commit
+  per drag, click or key run; preview per tick (section 7 unchanged).
+- **Reset.** The slot shows when the value differs from the schema default; it and Ctrl+Backspace write
+  the default (step "Gear: Reset Bore"). A derived field (Pitch diameter) reserves the slot but never
+  shows the icon: resetting it would write a module nobody chose.
+- **Names.** Accessible name and tooltip first line "<Kind> <label in lower case>": "Gear teeth: 24",
+  "Box inner width: 100 mm", "Flex box corner radius: 15 mm"; second line the panel's gesture help
+  (`HELP_VALUE_FIELD`). `aria-valuetext` "24 teeth" for Teeth, "5 spokes", otherwise number and unit in
+  words (section 4).
+- **Clamp.** Typing beyond a bound: as section 6. A **drag or click into a dependent bound** (Bore at the
+  root circle) stops the bar there while the pointer goes on; on release the notice of section 6 shows
+  once under the field, because the field alone does not say why it stopped. A drag that stays inside the
+  bounds shows nothing. Rounding is never a clamp.
+- **Mixed.** As the Value field: "Mixed", no bar, absolute drag; a value writes all selected objects of
+  the kind.
+
+### 15.3 Tracks per parameter
+
+Typed range = the schema's min and max (unchanged from `curvyo-generators-core`); "to N" = overshoot up
+to that maximum.
+
+**Gear**
+
+| Field | Track | Curve | Step (Shift, Ctrl) | Note |
+|---|---|---|---|---|
+| Module | 0.1 to 10 mm, to 25 | log | 0.05 (0.5, 0.005) | step was 0.1; 0.05 reaches the standard 0.25, 0.75, 1.25 |
+| Teeth | 6 to 100, to 200 | linear | 1 (10, -) | about 2.6px per tooth; integer |
+| Pitch diameter | 5 to 500 mm, to 5000 | log | 1 (10, 0.1) | derived: a drag or typed value writes Module, Teeth kept (section 5 unchanged); no reset icon |
+| Pressure angle | 10 to 30° | linear | 0.5 (5, 0.1) | reaches 14.5°; one decimal; no overshoot |
+| Bore | 0 to 100 mm, to 1000 | log | 0.5 (5, 0.05) | 0 at the left end is "none"; root circle by clamp |
+| Keyway width | 0.5 to 20 mm, to 100 | log | 0.1 (1, 0.01) | |
+| Keyway depth | 0.2 to 10 mm, to 50 | log | 0.1 (1, 0.01) | |
+| Spokes | 2 to 12 | linear | 1 (10, -) | the whole range; about 24px per spoke |
+| Rim width | 0.5 to 50 mm, to 200 | log | 0.5 (5, 0.05) | |
+| Hub diameter | 1 to 200 mm, to 1000 | log | 0.5 (5, 0.05) | rim and bore by clamp |
+
+**Box**
+
+| Field | Track | Curve | Step (Shift, Ctrl) | Note |
+|---|---|---|---|---|
+| Inner width, Inner depth, Inner height | 10 to 500 mm, to 2000 | log | 1 (10, 0.1) | |
+| Thickness | 0.1 to 12 mm, to 50 | linear | 0.1 (1, 0.01) | plywood and acrylic sit evenly between 1 and 12 |
+| Kerf compensation | 0 to 0.5 mm, to 2 | linear | 0.01 (0.1, 0.001) | |
+| Finger width | 0.5 to 50 mm, to 200 | log | 0.5 (5, 0.05) | edge length by clamp |
+| Clearance | 0 to 0.5 mm, to 2 | linear | 0.01 (0.1, 0.001) | |
+| Gap | 0 to 50 mm, to 100 | linear | 1 (10, 0.1) | |
+
+**For the architect (ADR 0080 §2).** `ParamKind` has min, max, step and decimals, no track and no curve.
+Recommendation: the **schema carries them** (`track: (a, b)` within min..max and `curve: Linear | Log` on
+Length, Count and Angle), because no shell rule can know from 0 to 1000 that a bore's useful range is 0 to
+100; an extension of `0065` states its own. A schema number without a track gets a linear track over its
+whole range. `0147` adds an "automatic" marker (its UX notes, section 3). ADR 0080 §2 is amended, not
+replaced.
+
+### 15.4 Joint gone (criterion 10)
+
+- Box group **Joints**: Finger width, Clearance; always shown (section 3's "only while Joint is Fingers"
+  and section 5's Joint row are gone). The group keeps its heading.
+- An old file with `joint: none` opens as stored (outline kept, ADR 0080); its first parameter change
+  regenerates it with fingers. No notice (the spec reads it as finger).
+
+### 15.5 Convert to paths leaves the block (criterion 6)
+
+- The block ends with its last group; no button, no 16px gap after it. Section 3's layout line, section 11's
+  "Panel" item and the Convert stop in section 13's tab order are gone.
+- **Object to path** in the Select bar converts a generated object (section 11 "Select bar" and "Result"
+  unchanged: one step, the result selected, focus to the canvas). Step names of section 7 ("Convert gear
+  to paths", "Convert box to paths", "Convert to paths") are now Object to path's for these objects.
+
+### 15.6 Gear resize writes Teeth (criterion 5)
+
+Supersedes section 8's gear line ("Module, Bore, Keyway, Rim width and Hub diameter by the factor").
+
+- A corner drag writes **Teeth** in whole numbers, 6 to 200; Module, Pressure angle, Bore, Keyway, Rim
+  width, Hub diameter and Spokes keep their values (customer decision). The outer diameter `m (z + 2)`
+  steps by one module per tooth.
+- **Preview.** The blue live preview (section 7) and the dashed selection box show the whole-tooth gear
+  nearest the pointer's size, not the pointer's exact size, so the box jumps tooth by tooth while the
+  pointer moves freely; the transform handles sit on the previewed gear.
+- **Readout.** The pointer chip reads "30 teeth · ⌀ 64 mm" (the count, then the outer diameter, so it
+  still says the size), in place of "W × H mm"; at a bound "6 teeth min" / "200 teeth max" (the "max"
+  rule of the corner radius readout). Ctrl (proportional) is implied. The opposite corner stays fixed,
+  so the gear's centre moves by half a module per tooth; Shift resizes from the centre, as for any object
+  ("Shift: from the center").
+- **Knock-on.** Fewer teeth can shrink the root circle under the bore: the bore is clamped in the same
+  step (section 6) and the sentence goes to the canvas notice slot on release ("Bore set to 20 mm, the
+  most this gear allows."), since no field was edited.
+- **Size chip** (`S`, a double-click on a corner handle): W and H as for any object; a typed size sets
+  the nearest whole Teeth for that outer diameter, the chip shows the result after the commit. No notice
+  (rounding).
+- **The Pitch diameter knob of section 9 is dropped.** The corner handle at the box corner lies on the
+  same 45° diagonal and now does the same (Teeth); two knobs on one line with one effect would be noise.
+  Bore, Hub diameter and Rim width keep their knobs. If the product owner keeps it, it writes Teeth too,
+  with the readout above.
+- The box resize is unchanged (section 8: inner sizes by the factor).
+
+### 15.7 App-wide (Proposal, needs the customer)
+
+Every schema-drawn number with a track renders as the Value field wherever it appears: the Params blocks
+of schema-rendered workbench tabs and the parameters of `0065` extensions; numbers without a range stay
+typed fields. This goes past the customer's decision (Generator block) and touches "Plain fields, not
+sliders, in the panel" for other blocks, so it is a Frage for the lead (default: the Generator block
+only).
+
+### 15.8 To go into `docs/design-system.md` when Done
+
+In addition to section 14 item 6: the Value field row lists the schema-drawn fields with the two curves
+and the track/overshoot rule; "Plain fields, not sliders, in the panel" names the Generator block's Value
+fields; the gear resize readout "30 teeth · ⌀ 64 mm" in the "Live transform readout" row.

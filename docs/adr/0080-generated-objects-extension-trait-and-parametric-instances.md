@@ -198,6 +198,13 @@ one. Box and Gear are that second one. Three facts shape the design:
 > extension settings from a thread-local set by the session (`ui-core/src/extensions.rs`), a
 > stopgap until `commit_group` takes `&ExtensionSettings` (`docs/technical-debt.md`).
 
+> **Note 2026-11-24 (ADR 0082, ADR 0083).** §2 gains `automatic` on Length and Count and
+> `Generated.automatic` (ADR 0082 §7), and `ParamKind::Path`, `ParamValue::Path` and
+> `GeneratorKind.source` (ADR 0083 §2). §3: `curvyo-generators-core` gains the edge to
+> `curvyo-geometry-core` (ADR 0083). §2 and §4: `Part.key` and the record's `part_keys`, and §6:
+> Convert to paths rewrites per-part membership keys (ADR 0082 §10, `needs-customer`, the next
+> `format_version`).
+
 ## Consequences
 
 - Every committed parameter edit stores the whole outline: about 1,200 cubics, some 60 KB, for a

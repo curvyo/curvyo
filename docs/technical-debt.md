@@ -2940,3 +2940,10 @@ before the head arrived. The GRBL controller ends a frame only after the planner
 
 **Resolution:** accepted; the fake serves tests and demos without a machine, and the simulator tests
 cover the real order.
+## Generator geometry uses bare `f64` millimetres (observed in `0147`, 2026-11-24)
+`curvyo-generators-core` keeps the public edges typed (`Length`, `Point` in `SlitPattern`, `Band`,
+`Window`, `Footprint::rounded_rect`), but the internal geometry (`Slot`, `Footprint` spans, `Hollow`,
+`Sizes`, the layout pieces, `Contour` pieces) calculates in plain `f64` millimetres and radians, as the
+gear and box code before it (CLAUDE.md §5: units are newtypes). **Resolution:** a `Mm` newtype (and an
+`Angle`) used by `contour.rs`, `footprint.rs` and `wall*.rs` together, once a second path-based generator
+(`0149`) shares them. Trigger: the first unit mix-up, or `0149`'s slice 1.
