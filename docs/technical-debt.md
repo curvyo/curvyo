@@ -9,6 +9,15 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 (each names its slice). An entry is removed when its resolution lands, or stays with the note that
 it is accepted for good.
 
+## Document library: the browser's member reads on the page's thread (`0137`, 2026-11-24)
+
+In the browser build the Library reads the members of a changed stored entry (and unpacks a file
+without `library.json`) on the page's thread, not in a Web Worker as ADR 0084 decision 10 proposes.
+A first scan of many changed documents can hold the page for that time.
+
+**Resolution:** move `WasmLibraryIndex::put` into a worker with the wasm module, as the recovery
+worker of ADR 0079 does.
+
 ## Foreground mode and `--require-local-start` stay as a legacy (`0128` A28, Frage 247 A, 2026-11-20)
 
 The run flags of slices 2 and 4 (`--fake-controller`, `--serial`, `--require-local-start`,

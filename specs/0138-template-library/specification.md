@@ -1,6 +1,6 @@
 # Template library over the network: browse and load templates from sources on the net that I added
 
-Status: Draft (a sketch with research; decisions of 2026-11-19 applied; not Ready: `adrs.md` (asset-connector slice, credentials, catalogue format) and UX notes are missing)
+Status: Ready (2026-11-24; research and decisions of 2026-11-19 applied; `adrs.md` and `ux-notes.md` exist; ADR 0085 is Proposed, `needs-customer`, accepted with the slice PR; depends on `0137`, which is built first; Fragen 334 A and 340 B answered 2026-11-24)
 Priority: Could
 Origin: Customer (2026-11-19, translated): a template library like the document library, but loadable over the network; (first wish: "we must also build offering templates over the network", moved out of scope on 2026-11-19, see Out of scope); maybe connect svgrepo.com, fontrepo.com, 1001fonts etc. legally: "check licences, terms and APIs". Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
@@ -35,15 +35,16 @@ What could not be verified: the full ToS of svgrepo.com, the "general font usage
 
 ## Acceptance criteria (as far as clear)
 
-1. Given the library surface of `0137`, then it has a section "Online" listing the sources the maker has added; with none added it lists nothing and sends nothing (R-SYS-007). A source is added by its address on purpose, never by default: any **Iconify-compatible API** or any **Git catalogue** (criterion 6) the maker knows. The Curvyo catalogue (criterion 7) appears as a ready entry with an Add button, not as an added source **(Proposal)**.
-2. Given a source, then it is one connector of `R-ASSET-004`: a read-only catalogue (names, tags, thumbnails, licence per item, size) fetched only when the maker opens that source's list or presses Refresh, over TLS, with no project data and no identifier of the maker in the request (Frage 273 A). Nothing is fetched in the background.
-3. Given a template, then its row shows its name, author, licence (name and link) and size before loading; Load copies it into the open document as a plain copy with Came from info (`0137` criteria 4 to 6) where the Came from record carries the address and licence instead of a document name; one undo step.
-4. Given a licence that needs credit (CC BY and similar), then the credit text is kept in the Came from record and listed with the document's export (a "Credits" list in the File tab, **Proposal**); the app never removes it.
-5. Given no network, then the "Online" sources show "Offline" and nothing else is affected; local libraries, drawing and saving work (R-SYS-002, R-COLLAB-005); templates already loaded stay in the document.
+1. Given the library surface of `0137`, then it has a section "Online" listing the sources the maker has added; with none added it lists nothing and sends nothing (R-SYS-007). A source is added by its address on purpose, never by default (adding sends one request to check the address, and the form says so; F6, **Proposal**): any **Iconify-compatible API** or any **Git catalogue** (criterion 6) the maker knows. The Curvyo catalogue (criterion 7), read from GitHub raw files of `curvyo/templates` (Frage 334 A), appears as a ready entry with an Add button, not as an added source **(Proposal)**.
+2. Given a source, then it is one connector of `R-ASSET-004`: a read-only catalogue (names, tags, thumbnails, licence per item, size) fetched only when the maker opens that source's list or presses Refresh, over TLS, with no project data and no identifier of the maker in the request (Frage 273 A). Nothing is fetched in the background. Fetched lists and downloaded templates live for the session only; nothing is written but the sources list (`online-sources.toml`), there is no offline cache (F2, **Proposal**, ADR 0085). No credential field exists in this slice (F1; no source needs one).
+3. Given a template, then its row shows its name, author, licence (name and link) and size before loading; Load copies every page of the template into the open document as new pages, a plain copy with Came from info (`0137` criteria 4 to 6) where the Came from record carries the address and licence instead of a document name; one undo step "Load template" (F3, **Proposal**); a template also expands to its pages like a local document. An Iconify icon is imported as a path through the SVG reader (`0024`, ADR 0018), 24 mm wide, at the drop point or centred, one undo step "Import icon" (F5, **Proposal**).
+4. Given a licence that needs credit (CC BY and similar), then the credit text is kept in the Came from record of the loaded objects and the document's "Credits" list (in the File tab) is **derived from the objects that carry it** (F4, **Proposal**, ADR 0085): while an object with a credit is in the document its credit is listed, and the app never removes a credit from an object; deleting the object removes its credit from the list. No separate credit list is stored (that would need its own format).
+5. Given no network, then an "Online" source whose own request failed to connect shows "Offline" and nothing else is affected (the state is per source, after a connection failure of that source's request; there is no app-wide online state; F7, **Proposal**, ADR 0085, which replaces the UX note F7 wording); local libraries, drawing and saving work (R-SYS-002, R-COLLAB-005); templates already loaded stay in the document.
 6. Given a **Git catalogue**, then it is a plain repository of folders, each holding a `.curvyo` file, a thumbnail and a `template.toml` (name, author, tags, licence), plus an index file that lists every template with its hash. Anyone may host one; Curvyo reads it and writes nothing to it.
-7. Given the first slice, then it ships two kinds of source (Frage 271 B): **a Curvyo catalogue** (a Git repository of our own with permissively licensed templates, the format of criterion 6) and **Iconify** (the connector of `R-ASSET-004`, any Iconify-compatible API address); the three sites of the research (svgrepo.com, fontrepo.com, 1001fonts.com) stay unconnected.
-8. Given a downloaded template, then it is a `.curvyo` file opened with the same reader as any file (damaged or newer-version files are refused as in `0001` criterion 7); its hash is checked against the catalogue's index; nothing executes (no scripts, no extension code from a template).
-9. Given a template with fonts, then fonts that are not embeddable or whose licence is unknown are not fetched; the text falls back as in `0107` and the row says "Font not included".
+7. Given the first slice, then it ships two kinds of source (Frage 271 B): **a Curvyo catalogue** (the Git repository `curvyo/templates` with permissively licensed templates, the format of criterion 6, read from its GitHub raw files, Frage 334 A) and **Iconify** (the connector of `R-ASSET-004`, any Iconify-compatible API address); the three sites of the research (svgrepo.com, fontrepo.com, 1001fonts.com) stay unconnected.
+8. Given a downloaded template, then it is a `.curvyo` file opened with the same reader as any file (damaged or newer-version files are refused as in `0001` criterion 7); its SHA-256 is checked against the catalogue's index before it is read (a changed template on a moving branch fails with "does not match its catalogue entry"; Refresh fixes it); nothing executes (no scripts, no extension code from a template).
+9. Given a template with fonts, then fonts that are not embeddable or whose licence is unknown are not fetched; the text falls back as in `0107` and the row says "Font not included" as its third line (F8, **Proposal**).
+10. Given a search in the library (Frage 340 B, answered 2026-11-24), then typing filters live only what was already fetched and sends nothing; **Enter** in the search field also sends the typed words to every **Iconify source the maker added** (only those; never to a Git catalogue or the Curvyo catalogue), once per Enter, over TLS, with no project data and no identifier of the maker; results join the icon grid of that source. It is a maker action like opening a list (Frage 273 A): nothing is sent while typing, in the background or on a source the maker has not added; the form of an Iconify source says that Enter sends the words to it.
 
 ## Out of scope
 
@@ -61,10 +62,19 @@ Customer, 2026-11-19:
 - **Frage 272 (TPL-OFFER): A, or an Iconify-compatible API, but Curvyo offers nothing itself for now.** Offering is out of scope (Out of scope); sources are any Iconify-compatible API or Git catalogue the maker adds. The licence display and `R-SYS-007` rules stay (criteria 1 to 4).
 - **Frage 273 (TPL-FETCH): A.** Only when the maker opens a source's list or presses Refresh (criterion 2).
 
-## Still open before Ready
+Customer, answered 2026-11-24:
 
-- `adrs.md` (architect: the asset-connector slice and credentials, the catalogue index and hash format; fontsource is not part of this slice).
-- UX notes (the "Online" section, the licence line, the offline state; shared surface with `0137`).
+- **Frage 334 (TPL-HOST): A, answered 2026-11-24.** The ready Curvyo catalogue is read from GitHub raw files of the `curvyo/templates` repository (criteria 1 and 7); no `templates.curvyo.org` host. GitHub sees those requests.
+- **Frage 340 (TPL-SEARCH): B, answered 2026-11-24.** Enter in the library search also sends the words to the Iconify sources the maker added, only on Enter (criterion 10); consistent with Frage 273 A.
+
+## Open, with defaults (customer may veto at the demo)
+
+- **ADR 0085** (network, new crate `curvyo-library-core`, new dependency `ureq` 3) is Proposed, `needs-customer`; accepted with the slice PR.
+- The public Iconify API states no terms; the source line says so (**Proposal**). fontsource is not part of this slice.
+
+## Spec deltas of 2026-11-24
+
+UX notes F1 to F8 and ADR 0085's notes are taken into the criteria above as **(Proposal)**; none changes a decision of 2026-11-19 (Fragen 271 to 273). F6 (one request on Add) stays inside Frage 273 A: the maker's own action, to a source the maker named. No `format_version` change of its own: the online keys are added to the format-58 record of `0137`.
 
 ## Later
 
@@ -72,11 +82,12 @@ Customer, 2026-11-19:
 
 ## UX notes
 
-(ux-engineer, before Ready.) Same surface as `0137`; the licence line and the offline state.
+See `ux-notes.md` (ux-engineer, 2026-11-24), on top of `../0137-document-library/ux-notes.md`: the "Online" section of the Library tab, the Curvyo catalogue ready entry, Add source, fetch on expand and Refresh, Git template rows with the licence line, Iconify sets and icon grid, Load, offline state, Came from and the Credits block; proposals Q1 to Q18, spec deltas F1 to F8 (accepted above), Frage 340 (TPL-SEARCH, answered B). Draft: `docs/design-drafts/2026-11-library/03-online-section.html`.
 
 ## Links
 
 Requirements: R-ASSET-007, R-ASSET-008 (offering, now Later); R-ASSET-004, R-SYS-007, R-FONT-008
+ADRs: `adrs.md`, ADR 0085
 Depends on: `0137`; the asset-connector slice (architect's ADR, credentials)
 Related: `0075`, `0107`, `0096`, `0105`, `0116`
 PR: none yet
