@@ -108,6 +108,36 @@ export function jogCause(entry: LinkEntry, own: boolean): string | null {
   return word !== null ? `Controller state: ${word}` : null;
 }
 
+/** Why Set origin here is greyed, the first cause that applies (`specs/0118` W40); `null` when a
+ * press stores the head's position. It only reads the last status, so the motion rules of
+ * criterion 8 do not apply: a waiting member command, Ready, Paused and Receiving are no causes. */
+export function setOriginCause(entry: LinkEntry): string | null {
+  const status = entry.status;
+  if (entry.lost) return "Connection lost";
+  if (status === null || status === undefined) {
+    if (entry.reading || entry.readError === null) return "Testing";
+    return errorLine(entry.readError).text;
+  }
+  if (status.state.name === "NoController") return status.detail ?? "No controller";
+  if (status.position === null) return "No position from the machine";
+  const word = controllerWord(status);
+  switch (status.state.name) {
+    case "Running":
+    case "Homing":
+    case "Jogging":
+    case "Framing":
+      return "Machine is moving";
+    case "Alarm":
+      return "Alarm";
+    default:
+      break;
+  }
+  if (word === "Jog") return "Machine is moving";
+  if (word !== null) return `Controller state: ${word}`;
+  if (status.homed !== true) return "Not homed";
+  return null;
+}
+
 /** "Work offset on the controller: X <x>, Y <y>" when the controller carries an offset beyond
  * 0.001 mm (`specs/0118` 14); Curvyo writes no `G10`, `G92` or `G54`. */
 export function workOffsetNotice(status: StatusMessage | null): string | null {

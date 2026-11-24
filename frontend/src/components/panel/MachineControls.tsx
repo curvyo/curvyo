@@ -161,7 +161,14 @@ function ControlsBody({ model, corner, frame }: { model: MachineControlsModel; c
       />
       <JobList model={model} />
       {padOpen ? (
-        <JogPad id={padId} model={model} corner={corner} step={view.step} onStep={(step) => setView({ ...view, step })} />
+        <JogPad
+          id={padId}
+          model={model}
+          corner={corner}
+          step={view.step}
+          onStep={(step) => setView({ ...view, step })}
+          onSetOrigin={frame.setOrigin}
+        />
       ) : null}
       <p role="status" className="sr-only">
         {polite}

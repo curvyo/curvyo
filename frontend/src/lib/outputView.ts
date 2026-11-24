@@ -8,8 +8,8 @@
 import { asId, type OperationId } from "./operationsView.ts";
 
 /** The three Start values, as the session stores them (`set_start`). */
-export type StartValue = "machine_origin" | "head_position" | "home_then_origin";
-const START_VALUES: readonly StartValue[] = ["machine_origin", "head_position", "home_then_origin"];
+export type StartValue = "machine_origin" | "head_position" | "home_then_origin" | "user_origin";
+const START_VALUES: readonly StartValue[] = ["machine_origin", "head_position", "home_then_origin", "user_origin"];
 
 /** One option of the Start pick. */
 export interface StartOption {
@@ -25,6 +25,8 @@ export interface StartView {
    * pick rewrites it. */
   damaged: boolean;
   options: StartOption[];
+  /** The User origin row while User origin is picked, in bed mm (`specs/0118` W43); else `null`. */
+  userOrigin: { x: number; y: number } | null;
 }
 
 /** One material of the fixture jobs' pick. */
@@ -222,7 +224,10 @@ function asStart(value: unknown): StartView | null {
     return word === undefined ? null : { value: word, label: item.label };
   });
   if (current === undefined || options === null) return null;
-  return { value: current, damaged: value.damaged, options };
+  const origin = value.user_origin;
+  const userOrigin =
+    isObject(origin) && typeof origin.x === "number" && typeof origin.y === "number" ? { x: origin.x, y: origin.y } : null;
+  return { value: current, damaged: value.damaged, options, userOrigin };
 }
 
 function asOption(value: unknown): FixtureOption | null {
@@ -447,4 +452,39 @@ export function decodePlayViewText(text: string): PlayView | null {
   } catch {
     return null;
   }
+}
+
+/** The user origin's marks in canvas CSS px (`specs/0118` W46, W47): the cross and the dashed
+ * burn box `[x, y, width, height]`, each `null` while not shown. */
+export interface UserOriginMarks {
+  cross: [number, number] | null;
+  box: [number, number, number, number] | null;
+}
+
+const NO_MARKS: UserOriginMarks = { cross: null, box: null };
+
+function numbers(value: unknown, length: number): number[] | null {
+  return Array.isArray(value) && value.length === length && value.every((n) => typeof n === "number") ? value : null;
+}
+
+/** `user_origin_marks_json()` decoded; unreadable text is no marks. */
+export function decodeUserOriginMarks(text: string): UserOriginMarks {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return NO_MARKS;
+  }
+  if (!isObject(value)) return NO_MARKS;
+  const cross = numbers(value.cross, 2);
+  const box = numbers(value.box, 4);
+  return {
+    cross: cross === null ? null : [cross[0], cross[1]],
+    box: box === null ? null : [box[0], box[1], box[2], box[3]],
+  };
+}
+
+/** The screen reader's words for a stored point (`specs/0118` W41). */
+export function userOriginWords(x: number, y: number): string {
+  return `User origin X ${x.toFixed(2)} mm, Y ${y.toFixed(2)} mm`;
 }

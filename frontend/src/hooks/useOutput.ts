@@ -25,6 +25,9 @@ export interface OutputApi {
   setFixtureMaterial: (id: string) => boolean;
   /** The Start pick: one step "Start: <option>". */
   setStart: (value: StartValue) => boolean;
+  /** The typed User origin pair (`specs/0118` W43): one step; whether it changed. */
+  setUserOrigin: (x: number, y: number) => boolean;
+  typeUserOrigin: (x: number, y: number) => boolean;
   /** A check's count: selects these items on the canvas. */
   selectItems: (ids: OperationId[]) => boolean;
   /** The total's "M items": selects the running items (`specs/0101` criterion 17). */
@@ -64,6 +67,8 @@ export function useOutput(
   );
   const setFixtureMaterial = useCallback((id: string) => run((s) => s.set_fixture_material(id)), [run]);
   const setStart = useCallback((value: StartValue) => run((s) => s.set_start(value)), [run]);
+  const setUserOrigin = useCallback((x: number, y: number) => run((s) => s.set_user_origin(x, y)), [run]);
+  const typeUserOrigin = useCallback((x: number, y: number) => run((s) => s.type_user_origin(x, y)), [run]);
   const selectItems = useCallback(
     (ids: OperationId[]) => run((s) => s.select_output_items(JSON.stringify(ids.map(operationIdText)))),
     [run],
@@ -73,5 +78,5 @@ export function useOutput(
   const exportJob = useJobExport(editor, projectFile, onError);
   const send = useSendJob(editor);
   const session = useMemo(() => ({ get: getSession, sync }), [getSession, sync]);
-  return { view, setFixtureMaterial, setStart, selectItems, selectRunning, toggleRoute, exportJob, send, session };
+  return { view, setFixtureMaterial, setStart, setUserOrigin, typeUserOrigin, selectItems, selectRunning, toggleRoute, exportJob, send, session };
 }
