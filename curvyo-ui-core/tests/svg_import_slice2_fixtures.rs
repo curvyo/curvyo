@@ -2,6 +2,8 @@
 //! the hostile text inputs of criterion 98.
 #![allow(clippy::unwrap_used, clippy::float_cmp)]
 
+mod budget_factor;
+
 mod svg_fonts;
 
 use std::fmt::Write;
@@ -168,7 +170,7 @@ fn mm(body: &str) -> Vec<u8> {
 
 /// The calling thread's CPU time (Linux `schedstat`; wall time since the first call elsewhere), so
 /// that a loaded machine does not fail a bound (`CLAUDE.md` §5).
-fn thread_cpu() -> Duration {
+fn thread_cpu_unscaled() -> Duration {
     std::fs::read_to_string("/proc/thread-self/schedstat")
         .ok()
         .and_then(|s| s.split_whitespace().next()?.parse::<u64>().ok())
@@ -179,6 +181,10 @@ fn thread_cpu() -> Duration {
             },
             Duration::from_nanos,
         )
+}
+
+fn thread_cpu() -> Duration {
+    budget_factor::scaled(thread_cpu_unscaled())
 }
 
 /// Criterion 98's hostile inputs: a 2,000,000-character text, 100,000 one-character texts and

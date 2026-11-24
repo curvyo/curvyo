@@ -62,7 +62,7 @@ fn cpu_time_of(work: impl FnOnce()) -> Duration {
         };
         let start = now();
         work();
-        now().saturating_sub(start)
+        crate::session::sync_tests::cpu_time::budget_factor::scaled(now().saturating_sub(start))
     }
     #[cfg(not(unix))]
     {

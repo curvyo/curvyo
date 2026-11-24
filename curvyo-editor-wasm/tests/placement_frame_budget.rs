@@ -7,6 +7,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_precision_loss)]
 
+mod budget_factor;
+
 use std::time::{Duration, Instant};
 
 use curvyo_document_core::{Point, PointCount};
@@ -32,12 +34,17 @@ fn star_session() -> Session {
 /// processes is not in it, so a busy CI runner does not inflate a frame (as for
 /// `node_marquee_interactivity`).
 #[cfg(unix)]
-fn thread_time() -> Duration {
+fn thread_time_unscaled() -> Duration {
     let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
     Duration::new(
         u64::try_from(now.tv_sec).unwrap(),
         u32::try_from(now.tv_nsec).unwrap(),
     )
+}
+
+#[cfg(unix)]
+fn thread_time() -> Duration {
+    budget_factor::scaled(thread_time_unscaled())
 }
 
 /// The CPU time of one `draw_list` call (wall time where no thread clock is available).

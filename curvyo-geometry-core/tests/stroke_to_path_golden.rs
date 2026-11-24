@@ -20,6 +20,8 @@
     missing_docs
 )]
 
+mod budget_factor;
+
 mod common;
 
 use std::fmt::Write as _;
@@ -206,12 +208,17 @@ fn node_lines(result: &OffsetOutlines) -> Vec<String> {
 /// The CPU time the calling thread has used so far: wall time would count every moment another
 /// process holds the core, and a busy machine would fail the budget.
 #[cfg(unix)]
-fn thread_time() -> std::time::Duration {
+fn thread_time_unscaled() -> std::time::Duration {
     let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
     std::time::Duration::new(
         u64::try_from(now.tv_sec).unwrap(),
         u32::try_from(now.tv_nsec).unwrap(),
     )
+}
+
+#[cfg(unix)]
+fn thread_time() -> std::time::Duration {
+    budget_factor::scaled(thread_time_unscaled())
 }
 
 /// Runs `case` and checks `budget_ms` of thread CPU time in a native release build (wall time off

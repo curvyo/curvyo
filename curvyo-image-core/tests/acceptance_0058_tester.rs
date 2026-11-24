@@ -10,6 +10,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
+mod budget_factor;
+
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -39,7 +41,7 @@ fn reset_peak() -> bool {
 }
 
 /// The calling thread's CPU time (Linux `schedstat`; wall time elsewhere).
-fn thread_cpu() -> Duration {
+fn thread_cpu_unscaled() -> Duration {
     std::fs::read_to_string("/proc/thread-self/schedstat")
         .ok()
         .and_then(|text| text.split_whitespace().next()?.parse::<u64>().ok())
@@ -50,6 +52,10 @@ fn thread_cpu() -> Duration {
             },
             Duration::from_nanos,
         )
+}
+
+fn thread_cpu() -> Duration {
+    budget_factor::scaled(thread_cpu_unscaled())
 }
 
 struct Measured<T> {

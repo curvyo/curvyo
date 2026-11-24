@@ -22,6 +22,8 @@
     clippy::type_complexity
 )]
 
+mod budget_factor;
+
 use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
@@ -1288,7 +1290,7 @@ fn twenty_thousand_anchors_in_four_outlines_round_trip_exactly() {
 
 /// The CPU time the calling thread has used so far: time the thread spends preempted by other
 /// processes (a parallel test run) is not in it. Wall time off Unix.
-fn thread_time() -> std::time::Duration {
+fn thread_time_unscaled() -> std::time::Duration {
     #[cfg(unix)]
     {
         let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
@@ -1302,6 +1304,10 @@ fn thread_time() -> std::time::Duration {
         static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
         START.get_or_init(std::time::Instant::now).elapsed()
     }
+}
+
+fn thread_time() -> std::time::Duration {
+    budget_factor::scaled(thread_time_unscaled())
 }
 
 /// Rotating (and resizing) a compound path writes every anchor; the cost per

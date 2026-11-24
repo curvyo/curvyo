@@ -2,6 +2,9 @@
 //! `T(w)/2` of the centre line, its width within `T(w)/2` of the drawn width, and the skeleton of
 //! a 20-shape drawing stays within its CPU budget.
 
+#[path = "../../tests/budget_factor/mod.rs"]
+mod budget_factor;
+
 use curvyo_document_core::{
     DashPattern, Length, LineCap, LineJoin, Markers, Point as DocPoint, Tolerance, Vec2 as DocVec,
 };
@@ -397,7 +400,7 @@ fn two_holes_touching_at_a_vertex_triangulate() {
 }
 
 /// The CPU time this thread has used.
-fn thread_time() -> std::time::Duration {
+fn thread_time_unscaled() -> std::time::Duration {
     #[cfg(unix)]
     {
         let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
@@ -412,6 +415,10 @@ fn thread_time() -> std::time::Duration {
         static START: OnceLock<std::time::Instant> = OnceLock::new();
         START.get_or_init(std::time::Instant::now).elapsed()
     }
+}
+
+fn thread_time() -> std::time::Duration {
+    budget_factor::scaled(thread_time_unscaled())
 }
 
 /// Twenty strokes laid out like a line-art whale: body arcs, S curves, tapers, rings, a T.

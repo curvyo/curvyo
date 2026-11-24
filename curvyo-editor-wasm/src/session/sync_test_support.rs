@@ -206,13 +206,13 @@ pub(super) fn thread_cpu(work: impl FnOnce()) -> std::time::Duration {
         };
         let start = read();
         work();
-        read().saturating_sub(start)
+        super::sync_tests::cpu_time::budget_factor::scaled(read().saturating_sub(start))
     }
     #[cfg(not(unix))]
     {
         let start = std::time::Instant::now();
         work();
-        start.elapsed()
+        super::sync_tests::cpu_time::budget_factor::scaled(start.elapsed())
     }
 }
 

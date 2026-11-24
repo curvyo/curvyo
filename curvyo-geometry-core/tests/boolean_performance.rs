@@ -18,6 +18,8 @@
     missing_docs
 )]
 
+mod budget_factor;
+
 mod common;
 
 use std::time::{Duration, Instant};
@@ -26,7 +28,9 @@ use common::{Operand, run, wavy};
 use curvyo_document_core::Length;
 use curvyo_geometry_core::{BooleanOp, OffsetJoin, Outline, offset};
 
-fn measure(nodes: usize, budget: Duration) {
+fn measure(nodes: usize, spec_budget: Duration) {
+    // The CI factor (Frage 368): the spec budget times `CURVYO_BUDGET_FACTOR`, 1.0 locally.
+    let budget = spec_budget.mul_f64(budget_factor::budget_factor());
     let radius = nodes as f64 / std::f64::consts::TAU;
     let operands: [Operand; 2] = [
         vec![wavy(nodes, 0.0, 0.0)],
@@ -48,7 +52,7 @@ fn measure(nodes: usize, budget: Duration) {
         if !cfg!(debug_assertions) {
             assert!(
                 elapsed < budget,
-                "{name} took {elapsed:?}, budget {budget:?}"
+                "{name} took {elapsed:?}, budget {spec_budget:?} (effective {budget:?})"
             );
         }
     }
@@ -74,7 +78,8 @@ fn an_offset_of_two_hundred_curved_nodes() {
     let operand = wavy(200, 0.0, 0.0);
     for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
         for d in [2.0, -1.0, 5.0] {
-            let budget = Duration::from_millis(50);
+            let spec_budget = Duration::from_millis(50);
+            let budget = spec_budget.mul_f64(budget_factor::budget_factor());
             let started = Instant::now();
             let result = offset(
                 &[Outline::new(&operand, true)],
@@ -90,7 +95,10 @@ fn an_offset_of_two_hundred_curved_nodes() {
                 result.fallback_outlines()
             );
             if !cfg!(debug_assertions) {
-                assert!(elapsed < budget, "{join:?} {d} took {elapsed:?}");
+                assert!(
+                    elapsed < budget,
+                    "{join:?} {d} took {elapsed:?}, budget {spec_budget:?} (effective {budget:?})"
+                );
             }
         }
     }

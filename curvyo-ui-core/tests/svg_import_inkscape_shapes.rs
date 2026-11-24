@@ -3,6 +3,8 @@
 //! boxes as named paths.
 #![allow(clippy::unwrap_used, clippy::float_cmp)]
 
+mod budget_factor;
+
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 use std::fmt::Write as _;
 
@@ -755,7 +757,7 @@ fn ac126_budget_1000_shapes_under_half_a_second() {
 }
 
 /// The calling thread's CPU time (Linux `schedstat`; wall time since the first call elsewhere).
-fn thread_cpu() -> std::time::Duration {
+fn thread_cpu_unscaled() -> std::time::Duration {
     std::fs::read_to_string("/proc/thread-self/schedstat")
         .ok()
         .and_then(|s| s.split_whitespace().next()?.parse::<u64>().ok())
@@ -766,4 +768,8 @@ fn thread_cpu() -> std::time::Duration {
             },
             std::time::Duration::from_nanos,
         )
+}
+
+fn thread_cpu() -> std::time::Duration {
+    budget_factor::scaled(thread_cpu_unscaled())
 }

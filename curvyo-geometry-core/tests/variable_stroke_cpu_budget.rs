@@ -7,6 +7,8 @@
 
 #![allow(clippy::unwrap_used)]
 
+mod budget_factor;
+
 use std::time::Duration;
 
 use curvyo_document_core::{
@@ -28,7 +30,7 @@ const fn budget(release_ms: u64) -> Duration {
 }
 
 /// The CPU time the calling thread has used so far (wall time off Unix).
-fn thread_time() -> Duration {
+fn thread_time_unscaled() -> Duration {
     #[cfg(unix)]
     {
         let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
@@ -43,6 +45,10 @@ fn thread_time() -> Duration {
         static START: OnceLock<std::time::Instant> = OnceLock::new();
         START.get_or_init(std::time::Instant::now).elapsed()
     }
+}
+
+fn thread_time() -> Duration {
+    budget_factor::scaled(thread_time_unscaled())
 }
 
 fn eight_points() -> WidthProfile {

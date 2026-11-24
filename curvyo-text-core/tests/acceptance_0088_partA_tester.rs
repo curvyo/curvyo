@@ -23,6 +23,8 @@
     missing_docs
 )]
 
+mod budget_factor;
+
 mod common;
 
 use std::collections::HashMap;
@@ -825,7 +827,7 @@ fn add(into: &mut Totals, t: &Totals) {
 // ---------------------------------------------------------------------------------------------
 // CPU numbers against adrs.md decision 8 (thread CPU time, release)
 
-fn cpu_now() -> Duration {
+fn cpu_now_unscaled() -> Duration {
     #[cfg(unix)]
     {
         let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
@@ -840,6 +842,10 @@ fn cpu_now() -> Duration {
         static START: OnceLock<std::time::Instant> = OnceLock::new();
         START.get_or_init(std::time::Instant::now).elapsed()
     }
+}
+
+fn cpu_now() -> Duration {
+    budget_factor::scaled(cpu_now_unscaled())
 }
 
 fn cpu<T>(f: impl FnOnce() -> T) -> (T, Duration) {

@@ -319,6 +319,13 @@ jobs:
                         # {crate} x {debug, release}, archive artifacts
 ```
 
+**Budget tests on a shared runner.** A budget test measures thread CPU time (never wall time)
+and asserts the spec value. The shared CI runner is slower than a development machine, so the
+release budget job sets one factor, `CURVYO_BUDGET_FACTOR` (for example `"1.6"`, Curvyo Frage 368),
+which every budget helper reads once (default 1.0, finite, at least 1.0, otherwise a panic) to scale
+the spec budget; locally the variable stays unset and the spec value applies unchanged. A budget
+that fails on the runner is never raised in its own test; the one factor is the only CI headroom.
+
 **`audit.yml`** — `rustsec/audit-check` (advisories) + `cargo-deny`
 (license compliance) per crate, matrixed the same way. Each crate gets its
 own `deny.toml` with an explicit license allow-list — a new dependency
