@@ -1,4 +1,5 @@
 import {
+  LibraryBig,
   CaseSensitive,
   Variable,
   Shapes,
@@ -48,6 +49,7 @@ const GLYPHS: Record<string, Glyph> = {
   fixtures: HolderGlyph,
   history: History,
   fonts: CaseSensitive,
+  library: LibraryBig,
   snapping: Magnet,
   grid: Grid3x3,
   sketches: Shapes,

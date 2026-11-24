@@ -79,6 +79,13 @@ export interface WorkspaceApi {
   close: (refocus: () => void) => void;
   setExpanded: (path: readonly string[], expanded: boolean) => void;
   openRow: (row: WorkspaceRowData, refocus: () => void) => void;
+  /** Opens the workspace document at `path` behind the unsaved-changes check (Open source,
+   * `specs/0137` criterion 7). */
+  openAt: (path: readonly string[], refocus: () => void) => void;
+  /** Browser: opens the document `path` of the stored workspace `id` (that workspace becomes the
+   * open one) behind the unsaved-changes check (Open source, `specs/0137` criterion 7); resolves
+   * false when the workspace or document is gone. */
+  openStored: (id: string, path: readonly string[]) => Promise<boolean>;
   startNaming: (naming: WorkspaceNaming) => void;
   /** Commits the name field; the refusal shown in the field, or empty once done. */
   commitName: (text: string) => Promise<string>;
@@ -487,6 +494,48 @@ export function useWorkspace(editor: EditorSession, project: ProjectApi): Worksp
     [alert, openDocument, thumbnails],
   );
 
+  const openAt = useCallback(
+    (path: readonly string[], refocus: () => void) => {
+      if (samePath(path, openPathRef.current)) {
+        return;
+      }
+      projectRef.current.replaceThen("switch", () => openDocument([...path]), refocus);
+    },
+    [openDocument],
+  );
+
+  const openStored = useCallback(
+    (id: string, path: readonly string[]) =>
+      new Promise<boolean>((resolve) => {
+        projectRef.current.replaceThen(
+          "switch",
+          async () => {
+            const rows = await invoke<RecentWorkspaceData[]>("recent_workspaces").catch(() => []);
+            const index = rows.findIndex((row) => row.path === id);
+            const answer: WorkspaceAnswer =
+              index < 0
+                ? { kind: "refused", code: "not-found" }
+                : await invoke<WorkspaceAnswer>("open_recent_workspace", { index }).catch(
+                    (): WorkspaceAnswer => ({ kind: "refused", code: "not-found" }),
+                  );
+            if (answer.kind !== "opened") {
+              resolve(false);
+              return;
+            }
+            if (workspaceRef.current) {
+              endWorkspaceLink(editorRef.current.getSession());
+              await projectRef.current.resetToEmpty();
+            }
+            adopt(answer);
+            await openDocument([...path]);
+            resolve(true);
+          },
+          () => resolve(true),
+        );
+      }),
+    [adopt, openDocument],
+  );
+
   /** A file moved from `from` to `to`: the open document, the expanded folders and the cut mark
    * follow it. */
   const followMove = useCallback(
@@ -752,6 +801,8 @@ export function useWorkspace(editor: EditorSession, project: ProjectApi): Worksp
     close,
     setExpanded,
     openRow,
+    openAt,
+    openStored,
     startNaming: (next: WorkspaceNaming) => {
       showSlot(null);
       setNaming(next);

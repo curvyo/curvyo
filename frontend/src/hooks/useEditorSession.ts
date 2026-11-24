@@ -28,6 +28,7 @@ import {
 } from "@/lib/frameState";
 import { perfBeforeAttach, perfDrawn, perfEnabled, perfInput, perfRender, perfSpan, perfStart, renderTick, startPerfScenarios } from "@/lib/perfProbe";
 import { renderPageThumbnail } from "@/lib/pageThumbnail";
+import { withPagePictures as joinPagePictures } from "@/lib/pagePictures";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
@@ -987,6 +988,9 @@ export interface EditorSession {
   /** The PNG of the active page for the container's `thumbnail.png` (`specs/0095-workspace`
    * criterion 6), or `null` when it cannot be drawn. */
   renderThumbnail: () => Promise<Uint8Array | null>;
+  /** The packed `bytes` with the page pictures of `specs/0137` criterion 2 joined in (and
+   * `thumbnail`, for the browser's save). */
+  withPagePictures: (bytes: Uint8Array, thumbnail: Uint8Array | null) => Promise<Uint8Array>;
   /** The bytes of the last `packProject` are written: the project is clean unless it changed
    * since (`specs/0051-sidebar-and-no-menu/` criterion 22). */
   markSaved: () => void;
@@ -1872,6 +1876,10 @@ export function useEditorSession(
   }, []);
 
   const renderThumbnail = useCallback(() => renderPageThumbnail(() => sessionRef.current), []);
+  const withPagePictures = useCallback(
+    (bytes: Uint8Array, thumbnail: Uint8Array | null) => joinPagePictures(bytes, () => sessionRef.current, thumbnail),
+    [],
+  );
 
   const toggleGuide = useCallback(() => {
     sessionRef.current?.toggle_guide();
@@ -3341,6 +3349,7 @@ export function useEditorSession(
     importFinish,
     packProject,
     renderThumbnail,
+    withPagePictures,
     markSaved,
   };
 }

@@ -716,7 +716,8 @@ fn c2_tab_order_is_file_document_style_history_and_labels_and_tooltips() {
         names(&s),
         [
             // A drawing page has no Sketches tab (`0098` criterion 8).
-            "file", "document", "style", "layers", "history", "fonts", "snapping", "grid", "share"
+            "file", "document", "style", "layers", "history", "fonts", "library", "snapping",
+            "grid", "share"
         ]
     );
     let labels: Vec<_> = view.tabs.iter().map(|t| t.label).collect();
@@ -729,6 +730,7 @@ fn c2_tab_order_is_file_document_style_history_and_labels_and_tooltips() {
             "Layers",
             "History",
             "Fonts",
+            "Library",
             "Snapping",
             "Grid & Rulers",
             "Share"

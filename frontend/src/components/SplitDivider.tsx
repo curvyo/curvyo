@@ -23,6 +23,8 @@ interface SplitDividerProps {
   onCommit: (share: number) => void;
   /** Double-click: back to the default width, the kept share forgotten. */
   onReset: () => void;
+  /** The separator's accessible name: the pane it sizes ("Font preview width"). */
+  label?: string;
 }
 
 export function SplitDivider({
@@ -34,6 +36,7 @@ export function SplitDivider({
   onDragEnd,
   onCommit,
   onReset,
+  label = "Font preview width",
 }: SplitDividerProps) {
   const start = useRef<{ x: number; width: number; moved: boolean } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -84,7 +87,7 @@ export function SplitDivider({
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Font preview width"
+      aria-label={label}
       aria-valuemin={percent(oneColumnPane(size))}
       aria-valuemax={percent(areaWidth - DRAWING_MIN_PX)}
       aria-valuenow={percent(width)}

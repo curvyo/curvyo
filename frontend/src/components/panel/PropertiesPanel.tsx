@@ -24,6 +24,9 @@ import type { SketchApi } from "@/hooks/useSketch";
 import { SketchesPanel } from "@/components/sketch/SketchesPanel";
 import { panelHandlesEscape } from "@/lib/panelEscape";
 import { FontsTab } from "@/components/panel/FontsTab";
+import { LibraryTab } from "@/components/panel/LibraryTab";
+import { CameFromBlock } from "@/components/panel/CameFromBlock";
+import { LibraryOpenSource } from "@/components/LibraryPreview";
 import { useTextLayout } from "@/hooks/useTextLayout";
 import { focusCurrentFont, fontsSubject } from "@/lib/textText";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -167,6 +170,8 @@ export function PropertiesPanel({
   const { open, setOpen } = panelOpen;
   /** The "Fixture jobs" check: each press expands that section and focuses its pick (`specs/0029` P15). */
   const [fixturePickRequest, setFixturePickRequest] = useState(0);
+  // The Library tab's document count for the header's subject line (`specs/0137` UX notes 3).
+  const [librarySubject, setLibrarySubject] = useState("");
   // The Share tab mark clears once its body was shown for 1 s, never by hovering (0097 2.1).
   const shareShown = open && doc.view.content === "share";
   const { unread, markRead } = membership;
@@ -357,6 +362,8 @@ export function PropertiesPanel({
           (generators.view?.label ?? panel.view.subject)
         : doc.view.content === "fonts"
           ? fontsSubject(editor.text.fonts)
+          : doc.view.content === "library"
+          ? librarySubject
           : doc.view.content === "share"
             ? collab.view.subject
             : doc.view.content === "fixtures"
@@ -388,6 +395,12 @@ export function PropertiesPanel({
   };
   return (
     <div className="flex h-full shrink-0 flex-col">
+    <LibraryOpenSource
+      getSession={getSession}
+      sync={editor.sync}
+      showNotice={editor.showHistoryNotice}
+      revision={editor.syncRevision}
+    />
     <Tabs
       value={activeTab}
       onValueChange={activate}
@@ -514,7 +527,8 @@ export function PropertiesPanel({
           className={
             doc.view.content === "history" ||
             doc.view.content === "layers" ||
-            doc.view.content === "fonts"
+            doc.view.content === "fonts" ||
+            doc.view.content === "library"
               ? // The tabs with an inner scroll area, the list: the header, the buttons
                 // and the footer stay in view (`0020` criterion 43, `0050` criterion 3).
                 // Operations is not one: its column scrolls as a whole, so the Fixture jobs
@@ -529,7 +543,8 @@ export function PropertiesPanel({
             className={
               doc.view.content === "history" ||
               doc.view.content === "layers" ||
-              doc.view.content === "fonts"
+              doc.view.content === "fonts" ||
+              doc.view.content === "library"
                 ? "flex min-h-0 flex-1 flex-col outline-none"
                 : "outline-none"
             }
@@ -587,6 +602,7 @@ export function PropertiesPanel({
             ) : doc.view.content === "grid" ? (
               <GridSection grid={grid} disabled={snapping.view.hasDrag} onReturnFocus={returnFocus}/>
             ) : doc.view.content === "document" ? (
+              <>
               <DocumentSection
                 registrationMarks={
                   printAndCut.marksOffered ? (
@@ -623,6 +639,16 @@ export function PropertiesPanel({
                 }
                 onReturnFocus={returnFocus}
               />
+              <CameFromBlock
+                getSession={getSession}
+                pageId={doc.view.pages.find((p) => p.active)?.id}
+                revision={editor.syncRevision}
+                openInWorkspace={(path) => workspace.openAt(path, returnFocus)}
+                openStored={workspace.openStored}
+                openPath={workspace.openPath}
+                showNotice={editor.showHistoryNotice}
+              />
+              </>
             ) : doc.view.content === "style" ? (
               outOfContext !== "" ? (
                 // A move-only selection: the one muted line, every section hidden (`specs/0106`
@@ -658,6 +684,14 @@ export function PropertiesPanel({
                       onReturnFocus={returnFocus}
                     />
                   ) : null}
+                  <CameFromBlock
+                    getSession={getSession}
+                    revision={editor.syncRevision}
+                    openInWorkspace={(path) => workspace.openAt(path, returnFocus)}
+                    openStored={workspace.openStored}
+                    openPath={workspace.openPath}
+                    showNotice={editor.showHistoryNotice}
+                  />
                 </>
               )
             ) : doc.view.content === "operations" ? (
@@ -743,6 +777,15 @@ export function PropertiesPanel({
                 textsUsingFamily={editor.text.textsUsingFamily}
                 sync={devicesForTabs.library}
                 layout={textLayout}
+              />
+            ) : doc.view.content === "library" ? (
+              <LibraryTab
+                getSession={getSession}
+                sync={editor.sync}
+                canvasRef={editor.canvasRef}
+                showNotice={editor.showHistoryNotice}
+                onSubject={setLibrarySubject}
+                onReturnFocus={returnFocus}
               />
             ) : doc.view.content === "history" ? (
               <HistoryTab

@@ -4,6 +4,8 @@ import type { SketchRow } from "@/lib/sketchPages";
 export interface PageRow {
   id: string;
   name: string;
+  /** "From Box job › Lid" for an imported page (`specs/0137` criterion 7). */
+  cameFrom?: string | null;
   size: string;
   active: boolean;
   frameOnly: boolean;

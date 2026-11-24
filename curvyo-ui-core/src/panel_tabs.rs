@@ -20,6 +20,9 @@ pub enum PanelTab {
     /// The fonts (`specs/0074-text-objects` criterion 15): always present, never dimmed, never
     /// active by itself.
     Fonts,
+    /// The document library (`specs/0137-document-library` criterion 1): after Fonts, in both
+    /// builds (Frage 341 C); never active by itself.
+    Library,
     /// Document snapping settings, retained across selection changes.
     Snapping,
     /// The active page's grid (`specs/0090-grid` criterion 2), retained across selection changes.
@@ -56,6 +59,7 @@ impl PanelTab {
             Self::Layers => "layers",
             Self::History => "history",
             Self::Fonts => "fonts",
+            Self::Library => "library",
             Self::Snapping => "snapping",
             Self::Grid => "grid",
             Self::Sketches => "sketches",
@@ -74,6 +78,7 @@ impl PanelTab {
         TABS.iter()
             .copied()
             .chain([
+                Self::Library,
                 Self::Workbench,
                 Self::Operations,
                 Self::Materials,
@@ -104,6 +109,7 @@ impl PanelTab {
             Self::Layers => "Layers",
             Self::History => "History",
             Self::Fonts => "Fonts",
+            Self::Library => "Library",
             Self::Snapping => "Snapping",
             // The panel and its rail entry also carry the rulers' origin corner (criterion 18).
             Self::Grid => "Grid & Rulers",
@@ -128,6 +134,7 @@ impl PanelTab {
             // The browser build has no key (Chrome reserves Ctrl+Shift+T): the host drops the
             // part in brackets there (UX notes §4).
             (Self::Fonts, _) => "Fonts (Shift+Ctrl+T)",
+            (Self::Library, _) => "Library",
             (Self::Snapping, _) => "Snapping",
             (Self::Grid, _) => "Grid & Rulers",
             (Self::Sketches, _) => "Sketches",

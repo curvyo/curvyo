@@ -98,6 +98,9 @@ mod layers_panel_tests;
 #[cfg(test)]
 mod layers_tests;
 mod layers_toolbar;
+mod library_import;
+mod library_preview;
+pub use library_preview::PreviewView;
 mod library_journal;
 mod library_sync;
 mod manufacturing;
@@ -551,6 +554,9 @@ pub struct Session {
     /// The objects of the History row, or the targets of Select original, the pointer or focus
     /// rests on (`history.rs`, `clone_view.rs`): they show the hover box.
     history_hover: Vec<NodeId>,
+    /// The page's clock, Unix ms and the local offset in minutes, for the change times of the
+    /// Came from lines (`specs/0137` criterion 7); view state, set by the page.
+    clock: std::cell::Cell<(i64, i32)>,
     /// The live pointer position in document space, tracked regardless
     /// of the active tool — the pen tool's rubber-band preview
     /// (`specification.md`'s UX notes) needs it even though it keeps no
@@ -789,6 +795,7 @@ impl Session {
             hovered: None,
             hovered_object: None,
             history_hover: Vec::new(),
+            clock: std::cell::Cell::new((0, 0)),
             pointer_position: None,
             node_hover_on_nothing: false,
             node_announcement: None,
@@ -912,6 +919,7 @@ impl Session {
             hovered: None,
             hovered_object: None,
             history_hover: Vec::new(),
+            clock: std::cell::Cell::new((0, 0)),
             pointer_position: None,
             node_hover_on_nothing: false,
             node_announcement: None,

@@ -104,13 +104,14 @@ fn doc_of(s: &Session) -> Document {
 }
 
 fn assert_consistent(v: &PanelView, ctx: &str) {
-    assert_eq!(v.tabs.len(), 9, "{ctx}");
+    assert_eq!(v.tabs.len(), 10, "{ctx}");
     assert_eq!(v.tabs.iter().filter(|t| t.selected).count(), 1, "{ctx}");
     assert_eq!(
         v.tabs.iter().map(|t| t.name).collect::<Vec<_>>(),
         [
             // A drawing page has no Sketches tab (`0098` criterion 8).
-            "file", "document", "style", "layers", "history", "fonts", "snapping", "grid", "share"
+            "file", "document", "style", "layers", "history", "fonts", "library", "snapping",
+            "grid", "share"
         ],
         "{ctx}"
     );
@@ -410,7 +411,7 @@ fn c10_an_unfinished_pen_path_keeps_the_document_and_strip() {
     assert!(s.pen_in_progress().is_some(), "an unfinished path");
     let v = s.panel_view();
     assert_eq!(v.content, PanelContent::Document);
-    assert_eq!(v.tabs.len(), 9, "the strip stays");
+    assert_eq!(v.tabs.len(), 10, "the strip stays");
     assert_eq!(active(&v), "document");
     // A press on a tab sets the active tab.
     assert!(

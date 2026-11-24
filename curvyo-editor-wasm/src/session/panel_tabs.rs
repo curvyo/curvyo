@@ -105,6 +105,16 @@ impl Session {
             .into_iter()
             .filter(|tab| tab_of_kind(tab.name, sketch))
             .collect();
+        // The Library tab comes right after Fonts (`specs/0137` UX notes P2).
+        if let Some(at) = tabs
+            .iter()
+            .position(|tab| tab.name == PanelTab::Fonts.name())
+        {
+            tabs.insert(
+                at + 1,
+                PanelTab::Library.entry_labelled("Library", active == PanelTab::Library),
+            );
+        }
         if self.operations_available() {
             // The Operations tab comes right after Document (`specs/0101` criterion 1).
             let at = tabs
@@ -283,6 +293,7 @@ impl PanelTabsRecord {
             PanelContent::Layers => "layers",
             PanelContent::History => "history",
             PanelContent::Fonts => "fonts",
+            PanelContent::Library => "library",
             PanelContent::Snapping => "snapping",
             PanelContent::Grid => "grid",
             PanelContent::Sketches => "sketches",

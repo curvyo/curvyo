@@ -131,8 +131,9 @@ fn library(profiles: &[MachineProfile]) -> String {
     Value::from(entries).to_string()
 }
 
-const VECTOR_TABS: [&str; 9] = [
-    "file", "document", "style", "layers", "history", "fonts", "snapping", "grid", "share",
+const VECTOR_TABS: [&str; 10] = [
+    "file", "document", "style", "layers", "history", "fonts", "library", "snapping", "grid",
+    "share",
 ];
 
 // ---- criteria 1 to 4: Add page ---------------------------------------------------------------

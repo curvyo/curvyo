@@ -34,8 +34,20 @@ impl Session {
     /// area and the document's visible artwork, without guides, grid, selection or any tool's marks.
     #[must_use]
     pub fn thumbnail_frame(&self, width: f64, height: f64) -> (DrawList, ViewTransform) {
-        let page = self.active_page();
-        let view = thumbnail_view(&page, width, height);
+        self.page_frame(&self.active_page(), width, height)
+    }
+
+    /// [`Session::thumbnail_frame`] of `page`: the page pictures of a save and the library's
+    /// preview pane (`specs/0137` criteria 2, 5).
+    #[must_use]
+    pub fn page_frame(&self, page: &Page, width: f64, height: f64) -> (DrawList, ViewTransform) {
+        self.page_frame_in(page, thumbnail_view(page, width, height))
+    }
+
+    /// [`Session::page_frame`] under the given `view` (the preview pane's zoom and pan).
+    #[must_use]
+    pub fn page_frame_in(&self, page: &Page, view: ViewTransform) -> (DrawList, ViewTransform) {
+        let page = page.clone();
         let read = self.document_read();
         let objects: Vec<ObjectSnapshot> = read
             .drawn

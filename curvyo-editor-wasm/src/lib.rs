@@ -114,6 +114,8 @@ mod wasm_keys;
 #[cfg(target_arch = "wasm32")]
 mod wasm_layers;
 #[cfg(target_arch = "wasm32")]
+mod wasm_library;
+#[cfg(target_arch = "wasm32")]
 mod wasm_library_fonts;
 #[cfg(target_arch = "wasm32")]
 mod wasm_membership;
@@ -208,6 +210,7 @@ pub use font_preview_glue::PreviewFacesGlue;
 pub use ocr_pool_glue::{crops_wire, read_crops, read_crops_wire};
 pub use pairing_glue::{PairPhase, PairingGlue};
 pub use recovery_writer::{PackedCopy, RecoveryWriter, RecoveryWriterError};
+pub use session::PreviewView;
 pub use session::SvgExportResult;
 pub use session::TraceRegionTool;
 pub use session::{

@@ -313,7 +313,7 @@ export function PagesBlock({
                 <button
                   type="button"
                   data-page-name={index}
-                  title={page.name}
+                  title={page.cameFrom ? `${page.name}\n${page.cameFrom}` : page.name}
                   aria-label={
                     page.sketch
                       ? sketchPageReading(page.name, page.sketch.state)

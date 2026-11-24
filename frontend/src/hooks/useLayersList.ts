@@ -43,6 +43,7 @@ export function useLayersList(
     if (!session) {
       return EMPTY;
     }
+    session.set_came_from_clock(Date.now(), -new Date().getTimezoneOffset());
     const window = parseLayersView(session.layers_view(first, count));
     const focused = extra === null ? null : parseLayersView(session.layers_view(extra, 1));
     return withExtraRow(window, focused);

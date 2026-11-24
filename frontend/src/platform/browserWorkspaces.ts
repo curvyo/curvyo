@@ -414,3 +414,52 @@ export function forgetOpenDocument(): void {
 export async function workspaceNames(): Promise<string[]> {
   return (await workspaces()).map((w) => w.name);
 }
+
+/** The key of the library index in the store (ADR 0084 decision 10): a cache, the library's only
+ * write in the browser. */
+const LIBRARY_INDEX_KEY = "l|index";
+
+/** The browser's library sources (`specs/0137` criterion 1, Frage 341 C): every stored
+ * workspace, the open one first, by id. */
+export async function librarySources(): Promise<{ key: string; name: string; open: boolean }[]> {
+  const all = await workspaces();
+  const open = all.filter((w) => w.id === openId);
+  const others = all.filter((w) => w.id !== openId);
+  return [...open, ...others].map((w) => ({ key: w.id, name: w.name, open: w.id === openId }));
+}
+
+/** The documents of the stored workspace `id`: path, byte length and `modified` (ms). Read-only. */
+export async function libraryEntries(id: string): Promise<{ path: string[]; size: number; modified: number }[]> {
+  return (await scan(id))
+    .filter((entry) => entry.kind === "document")
+    .map((entry) => ({ path: entry.path, size: entry.size, modified: entry.modified * 1000 }));
+}
+
+/** The whole stored container of a library document, read-only. */
+export async function libraryEntryBytes(id: string, path: readonly string[]): Promise<Uint8Array> {
+  return new Uint8Array(await readDocument(id, path));
+}
+
+/** The cached index text, empty when none. */
+export async function libraryIndexText(): Promise<string> {
+  return (await get<string>(LIBRARY_INDEX_KEY)) ?? "";
+}
+
+/** Keeps the index text; a full store only loses the cache. */
+export async function writeLibraryIndexText(text: string): Promise<void> {
+  // Not `put`: a full store must not raise the storage-full alert for a cache, which holds no
+  // work and is rebuilt next time (ADR 0084 decision 10).
+  try {
+    const tx = (await db()).transaction(FILES, "readwrite");
+    const done = committed(tx);
+    tx.objectStore(FILES).put(text, LIBRARY_INDEX_KEY);
+    await done;
+  } catch {
+    // A cache that cannot be kept is rebuilt next time.
+  }
+}
+
+/** The open workspace document of this tab, `[workspace id, path]`, or null. */
+export function openLibraryPlace(): [string, string[]] | null {
+  return openId && openDocument ? [openId, openDocument] : null;
+}

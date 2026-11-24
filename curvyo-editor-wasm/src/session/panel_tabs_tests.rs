@@ -65,7 +65,8 @@ fn the_dimmed_style_tab_does_nothing() {
     assert_eq!(
         record.tab_names,
         [
-            "file", "document", "style", "layers", "history", "fonts", "snapping", "grid", "share"
+            "file", "document", "style", "layers", "history", "fonts", "library", "snapping",
+            "grid", "share"
         ]
     );
     assert_eq!(record.tab_enabled[at(&record, "style")], 0);
