@@ -160,7 +160,6 @@ fn raster_text(cause: &Cause, count: usize, names: &Names) -> CheckText {
 fn operation_numbers_text(cause: &Cause, names: &Names) -> CheckText {
     let op = |id: &NodeId| names.operation(*id).to_owned();
     match cause {
-        Cause::NoSettings { op: id } => CheckText::led(op(id), " has no power and speed."),
         Cause::MaterialNotFound { op: id, material } => CheckText::led(
             op(id),
             format!(": {material} is not found, using stored numbers."),
@@ -263,8 +262,7 @@ pub fn check_text(issue: &Issue, names: &Names) -> CheckText {
         Cause::GenericLaser => {
             CheckText::plain("The machine is Generic laser; its limits may not match yours.")
         }
-        Cause::NoSettings { .. }
-        | Cause::MaterialNotFound { .. }
+        Cause::MaterialNotFound { .. }
         | Cause::NoSetForLaser { .. }
         | Cause::TypedOverride { .. }
         | Cause::OverFeed { .. }

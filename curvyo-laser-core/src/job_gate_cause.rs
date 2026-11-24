@@ -20,11 +20,6 @@ pub enum Severity {
 /// the display order of criteria 4 and 5: blocks first, then warns, damaged settings (33) last.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Cause {
-    /// 4 a: an operation that runs has no settings.
-    NoSettings {
-        /// The operation.
-        op: NodeId,
-    },
     /// 4 a: running fixture jobs and no (loaded) material pick.
     FixtureNoMaterial,
     /// 4 a: the fixture material has no set of a kind for this laser.
@@ -147,11 +142,11 @@ pub enum Cause {
 }
 
 impl Cause {
-    /// The display rank: the variant's place in the declaration.
+    /// The display rank: the variant's place in the declaration, counted from 1 (rank 0 was the
+    /// removed check "has no power and speed", `specs/0150` criterion 23; the others keep theirs).
     #[must_use]
     pub const fn rank(&self) -> u8 {
         match self {
-            Self::NoSettings { .. } => 0,
             Self::FixtureNoMaterial => 1,
             Self::FixtureNoSet { .. } => 2,
             Self::OutsideBed { .. } => 3,

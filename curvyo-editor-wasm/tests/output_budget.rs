@@ -78,6 +78,7 @@ fn page_file() -> (Vec<u8>, String) {
                 &NewOperation {
                     kind: "cut",
                     name: &name,
+                    settings: None,
                 },
                 k,
                 &members,

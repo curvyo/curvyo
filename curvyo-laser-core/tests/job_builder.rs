@@ -443,10 +443,12 @@ fn a_live_material_with_a_typed_power_warns_and_shows_typed() {
 #[test]
 fn blocks_disable_export_and_come_first() {
     let mut page = Page::new();
+    // Since `specs/0150` criterion 23 an operation without `op_settings` runs the copy's pair:
+    // it no longer blocks, and the bed check is the first block.
     page.operation(
         Cut,
         "Cut 2",
-        curvyo_laser_core::settings::SettingsRead::None,
+        absent(Cut),
         plain(),
         vec![leaf(vec![rect(10.0, 10.0, 10.0, 10.0)])],
     );
@@ -469,26 +471,29 @@ fn blocks_disable_export_and_come_first() {
     assert_eq!(
         texts(&page, &g),
         [
-            "Cut 2 has no power and speed.",
             "2 items lie outside the 400 × 300 mm bed.",
             "The machine is Generic laser; its limits may not match yours.",
             "3 items are not assigned.",
         ]
     );
     assert!(!g.export_allowed());
-    assert_eq!(
+    assert!(matches!(
         g.first_block().unwrap().cause,
-        Cause::NoSettings {
-            op: page.input.blocks[0].id
-        }
-    );
-    assert_eq!(
-        g.issues[0].targets,
-        Targets::Operations(vec![page.input.blocks[0].id])
-    );
-    assert!(matches!(&g.issues[1].targets, Targets::Items(items) if items.len() == 2));
-    // Superseded by 0029 rework (2026-11-17): the run carries no text; No settings has no time.
-    assert!(g.runs[0].no_settings && g.runs[0].time_s.is_none());
+        Cause::OutsideBed { .. }
+    ));
+    assert!(matches!(&g.issues[0].targets, Targets::Items(items) if items.len() == 2));
+    assert!(!g.runs[0].no_settings && g.runs[0].time_s.is_some());
+}
+
+/// What an operation without `op_settings` reads (`specs/0150` criterion 15).
+fn absent(
+    kind: curvyo_laser_core::operations::OperationKind,
+) -> curvyo_laser_core::settings::SettingsRead {
+    curvyo_laser_core::settings::read_settings(
+        None,
+        kind,
+        curvyo_laser_core::DefaultNumbers::BUILT_IN,
+    )
 }
 
 #[test]
@@ -505,13 +510,7 @@ fn nothing_runs_and_a_damaged_machine_block() {
 #[test]
 fn operations_without_items_run_nothing_whatever_their_settings() {
     let mut page = Page::new();
-    page.operation(
-        Cut,
-        "Cut 1",
-        curvyo_laser_core::settings::SettingsRead::None,
-        plain(),
-        vec![],
-    );
+    page.operation(Cut, "Cut 1", absent(Cut), plain(), vec![]);
     page.operation(Cut, "Cut 2", own(Cut, 90.0, 300, 1), plain(), vec![]);
     assert_eq!(causes(&page, &[]), [Cause::NothingRuns]);
     let built = build_job(&page.input, &[], &mut PlanCache::default());
@@ -572,7 +571,11 @@ fn unknown_and_damaged_operations_run_nothing_and_warn_once() {
     page.operation(
         Cut,
         "Cut 2",
-        curvyo_laser_core::settings::read_settings(Some(&json!(7)), Cut),
+        curvyo_laser_core::settings::read_settings(
+            Some(&json!(7)),
+            Cut,
+            curvyo_laser_core::DefaultNumbers::BUILT_IN,
+        ),
         plain(),
         vec![leaf(vec![rect(50.0, 10.0, 10.0, 10.0)])],
     );

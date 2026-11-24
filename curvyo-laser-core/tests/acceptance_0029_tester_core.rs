@@ -119,7 +119,7 @@ fn leaf(n: u64, outlines: Vec<LeafOutline>) -> LeafInput {
 
 fn own(kind: OperationKind, power: f64, speed: u64, passes: u64) -> BlockSource {
     let v = json!({"main": {"power_pct": power, "speed_mm_min": speed, "passes": passes}});
-    let settings = read_settings(Some(&v), kind);
+    let settings = read_settings(Some(&v), kind, curvyo_laser_core::DefaultNumbers::BUILT_IN);
     assert!(
         matches!(
             settings,
@@ -612,7 +612,11 @@ fn c33_unknown_kind_and_damaged_settings_run_nothing() {
     unknown.kind = KindRead::Unknown;
     let damaged = BlockInput {
         source: BlockSource::Operation {
-            settings: read_settings(Some(&json!("not a map")), OperationKind::Cut),
+            settings: read_settings(
+                Some(&json!("not a map")),
+                OperationKind::Cut,
+                curvyo_laser_core::DefaultNumbers::BUILT_IN,
+            ),
             options: Ok(OperationOptions::default()),
             margin: Length::from_mm(0.0),
             grid: None,

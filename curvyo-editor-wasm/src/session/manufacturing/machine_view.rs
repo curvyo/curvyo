@@ -60,6 +60,9 @@ impl Session {
                 "origin": copy.values.origin.name(),
                 "max_feed": copy.values.max_feed.get(),
                 "max_power": copy.values.max_power.get(),
+                // `specs/0150` criterion 1.
+                "default_power": copy.values.defaults.power.percent(),
+                "default_speed": copy.values.defaults.speed.get(),
                 "laser_mode": copy.values.laser_mode,
                 "motorised_z": copy.values.motorised_z,
                 // `specs/0029` criteria 25 and 39 (UX notes §8): the switch and the read-only line.

@@ -30,6 +30,7 @@ impl Session {
                     &NewOperation {
                         kind: kind.as_str(),
                         name: &name,
+                        settings: None,
                     },
                     index,
                     &[],

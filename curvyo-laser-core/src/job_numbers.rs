@@ -111,8 +111,6 @@ pub enum NumbersRead {
         /// Where they come from.
         source: NumbersSource,
     },
-    /// An operation with no settings: blocks (4 a).
-    NoSettings,
     /// A fixture block with no material pick, or a pick not loaded here: blocks (4 a).
     FixtureNoMaterial,
     /// A fixture block whose material has no set of its kind for this laser: blocks (4 a).
@@ -139,10 +137,7 @@ impl NumbersRead {
     /// Whether the block blocks Export (4 a).
     #[must_use]
     pub const fn blocks(&self) -> bool {
-        matches!(
-            self,
-            Self::NoSettings | Self::FixtureNoMaterial | Self::FixtureNoSet { .. }
-        )
+        matches!(self, Self::FixtureNoMaterial | Self::FixtureNoSet { .. })
     }
 }
 
@@ -186,7 +181,6 @@ fn operation_numbers(
     max_feed: FeedRate,
 ) -> NumbersRead {
     let source = match state {
-        SettingsState::NoSettings => return NumbersRead::NoSettings,
         SettingsState::Damaged(_) => return NumbersRead::Damaged,
         SettingsState::Own(_) => NumbersSource::Own,
         SettingsState::Live {
@@ -207,7 +201,7 @@ fn operation_numbers(
         },
     };
     let Some(run) = state.run() else {
-        return NumbersRead::NoSettings;
+        return NumbersRead::Damaged;
     };
     NumbersRead::Runs {
         numbers: BlockNumbers {
@@ -256,10 +250,12 @@ fn fixture_numbers(kind: OperationKind, context: NumbersContext<'_>) -> NumbersR
     }
 }
 
-/// The numbers a frame traces `block` with when its own `read` blocks for want of power or speed
-/// (`specs/0118` Frage 335 B): its kind and options at the lowest power, the machine's maximum feed
-/// and one pass. A frame never burns, so only the geometry they plan counts. `None` for a block
-/// whose numbers read otherwise or whose kind or options are damaged.
+/// The numbers a frame traces the fixture block `block` with when its own `read` blocks for want
+/// of a material pick or set (`specs/0118` Frage 335 B; an operation always has numbers since
+/// `specs/0150`, Frage 339 A): its kind and the fixture options at the lowest power, the
+/// machine's maximum feed and one pass. A frame never burns, so only the geometry they plan
+/// counts. `None` for an operation block, a block whose numbers read otherwise or whose kind is
+/// unknown.
 pub(crate) fn frame_stand_in(
     block: &BlockInput,
     read: &NumbersRead,
@@ -269,10 +265,10 @@ pub(crate) fn frame_stand_in(
         return None;
     }
     let kind = block.kind.known()?;
-    let options = match &block.source {
-        BlockSource::Operation { options, .. } => *options.as_ref().ok()?,
-        BlockSource::Fixture { .. } => fixture_options(),
+    let BlockSource::Fixture { .. } = &block.source else {
+        return None;
     };
+    let options = fixture_options();
     let main = RunNumbers {
         power: PowerPercent::from_tenths(PowerPercent::MIN_TENTHS)?,
         speed: max_feed,

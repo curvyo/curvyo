@@ -128,9 +128,6 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
       )}
       {noPick ? null : picker}
       {skip}
-      {settings.state === "no_settings" ? (
-        <p className="text-xs text-[var(--panel-muted-fg)]">No settings</p>
-      ) : null}
       {settings.state === "damaged" ? (
         <p className="flex items-start gap-1 text-xs text-[var(--toolbar-icon)]">
           <TriangleAlert size={16} aria-hidden className="shrink-0" />

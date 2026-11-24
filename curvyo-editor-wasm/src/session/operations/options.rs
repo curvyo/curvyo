@@ -6,8 +6,8 @@
 use curvyo_document_core::{NodeId, ProfileChange, SettingsStep, SettingsWrite};
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    Dither, ImageEdit, ImageField, Interval, OptionEdit, Overscan, ScanAngle, SettingsRead,
-    ZOffset, edit_interval, read_options,
+    Dither, ImageEdit, ImageField, Interval, OptionEdit, Overscan, ScanAngle, ZOffset,
+    edit_interval, read_options,
 };
 
 use super::super::Session;
@@ -164,15 +164,12 @@ impl Session {
     }
 
     /// A typed Interval (criterion 19): written to `main.interval_mm` of the operation, never as
-    /// an override, one step "Edit settings"; with No settings it waits in the draft and is
-    /// written with power and speed.
+    /// an override, one step "Edit settings"; an operation without `op_settings` stores its derived
+    /// numbers with it (`specs/0150` criterion 5).
     fn edit_interval(&mut self, id: NodeId, interval: Interval) -> bool {
         let Some(target) = self.settings_target(id) else {
             return false;
         };
-        if target.read == SettingsRead::None {
-            return target.kind.has_interval() && self.type_interval_into_draft(id, interval);
-        }
         let Some(next) = edit_interval(&target.read, target.kind, interval) else {
             return false;
         };

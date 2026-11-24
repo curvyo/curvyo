@@ -213,7 +213,16 @@ impl B<'_> {
         let index = self.d.operations(self.m).unwrap().len();
         let keys: Vec<Vec<NodeId>> = members.iter().map(|&n| vec![n]).collect();
         self.d
-            .add_operation(self.m, &NewOperation { kind, name }, index, &keys)
+            .add_operation(
+                self.m,
+                &NewOperation {
+                    kind,
+                    name,
+                    settings: None,
+                },
+                index,
+                &keys,
+            )
             .unwrap()
     }
     /// A black-to-white (left to right, Angle 0) gradient fill on `id`.
@@ -2261,7 +2270,7 @@ fn c41_the_format_50_golden_opens_engraves_and_round_trips() {
     let bytes = golden_project("raster_engraving_v50.curvyo");
     let d = unpack(9, &bytes).unwrap();
     // Superseded by 0135 slice 1 (2026-11-19): format 51 (ADR 0072 §8).
-    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 58);
+    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 59);
     let page = d
         .pages()
         .into_iter()

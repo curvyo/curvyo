@@ -77,6 +77,7 @@ fn page(pixels: &Arc<WorkingImage>, dither: Dither) -> JobInput {
             &json!({"main": {"power_pct": 50, "speed_mm_min": 6000, "passes": 1, "interval_mm": 0.1}}),
         ),
         kind,
+        curvyo_laser_core::DefaultNumbers::BUILT_IN,
     );
     let options = OperationOptions {
         image: ImageSettings {

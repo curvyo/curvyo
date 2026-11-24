@@ -151,6 +151,7 @@ fn setup_with(
                 &NewOperation {
                     kind: "image",
                     name: &name,
+                    settings: None,
                 },
                 index,
                 &[vec![image]],

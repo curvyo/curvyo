@@ -53,18 +53,23 @@ fn criterion_7_nothing_runs_blocks_export_and_has_no_total() {
 }
 
 #[test]
-fn criterion_4_a_an_operation_without_numbers_blocks_with_its_name_as_the_button() {
+fn criterion_4_a_a_new_operation_has_numbers_and_never_blocks() {
+    // Superseded by `specs/0150` criterion 23: "has no power and speed" is gone.
     let (mut s, square) = laser_with_square();
     s.selection.set(&[square]);
     s.press_operation_kind("cut", true).unwrap();
     let v = view(&s);
-    let block = &v["checks"][0];
-    assert_eq!(block["severity"], "block");
-    assert_eq!(block["text"], "Cut 1 has no power and speed.");
-    assert_eq!(block["button"], "Cut 1");
-    assert_eq!(block["after"], " has no power and speed.");
-    assert_eq!(block["target"]["kind"], "operations");
-    assert_eq!(v["export"]["enabled"], false);
+    assert!(
+        v["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c["severity"] != "block"),
+        "{v}"
+    );
+    assert_eq!(v["export"]["enabled"], true);
+    let row = &rows(&s)["rows"][0];
+    assert_ne!(row["run"]["time"], "–", "a running row always has a time");
 }
 
 #[test]

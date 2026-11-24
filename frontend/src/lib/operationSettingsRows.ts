@@ -33,7 +33,7 @@ export function numberText(value: number | null): string {
 }
 
 /** The value of `field` in `numbers`. */
-export function fieldOf(numbers: FieldNumbers, field: SettingsField): number | null {
+export function fieldOf(numbers: FieldNumbers, field: SettingsField): number {
   switch (field) {
     case "power":
       return numbers.powerPct;
@@ -47,11 +47,7 @@ export function fieldOf(numbers: FieldNumbers, field: SettingsField): number | n
 /** The material's number beside a typed field: "Material 60" (the unit is in the field). */
 export function materialLine(set: SetView, field: SettingsField): string | null {
   if (!set.typed.includes(field) || set.material === null) return null;
-  const value = fieldOf(
-    { powerPct: set.material.powerPct, speedMmMin: set.material.speedMmMin, passes: set.material.passes },
-    field,
-  );
-  return value === null ? null : `Material ${value}`;
+  return `Material ${fieldOf(set.material, field)}`;
 }
 
 /** The field's description for assistive technology: "Material 60 %". */
@@ -78,7 +74,7 @@ export interface StateLine {
   text: string;
 }
 
-/** The lines of states (b), (c) and "Differs", then the speed warning; "No settings" has its own plain line. */
+/** The lines of states (b), (c) and "Differs", then the speed warning. */
 export function stateLines(settings: OperationSettings): StateLine[] {
   const lines: StateLine[] = [];
   if (settings.reason !== null) lines.push({ glyph: "not-found", text: settings.reason });
@@ -91,12 +87,9 @@ export function stateLines(settings: OperationSettings): StateLine[] {
 export function blockSummary(settings: OperationSettings): string {
   const main = settings.sets.find((set) => set.role === "main");
   if (settings.state === "damaged") return "Damaged settings";
-  if (!main || settings.state === "no_settings") return "No settings";
-  const parts: string[] = [];
+  if (!main) return "Damaged settings";
   const { powerPct, speedMmMin, passes } = main.run;
-  if (powerPct !== null) parts.push(`Power ${powerPct} %`);
-  if (speedMmMin !== null) parts.push(`speed ${speedMmMin} mm/min`);
-  if (passes !== null) parts.push(`${passes} ${passes === 1 ? "pass" : "passes"}`);
+  const parts = [`Power ${powerPct} %`, `speed ${speedMmMin} mm/min`, `${passes} ${passes === 1 ? "pass" : "passes"}`];
   if (settings.material !== null) parts.push(`from ${settings.material.name}`);
   if (settings.differs !== null) parts.push("differs");
   return parts.join(", ");

@@ -42,7 +42,11 @@ fn the_golden_reads_every_option_interval_and_motorised_z_axis() {
     assert_eq!(engrave.overscan.percent(), 10);
     assert_eq!(engrave.z_offset.mm(), -1.5);
     let interval = |at: usize| {
-        let read = read_settings(ops[at].settings.as_ref(), kind(&ops[at]));
+        let read = read_settings(
+            ops[at].settings.as_ref(),
+            kind(&ops[at]),
+            curvyo_laser_core::DefaultNumbers::BUILT_IN,
+        );
         resolve(&read, kind(&ops[at]), &[], "generic-laser")
             .run()
             .unwrap()
@@ -105,9 +109,15 @@ fn every_damaged_option_and_interval_reads_as_damaged_settings() {
         .collect();
     let settings: Vec<Option<SettingsDamage>> = ops
         .iter()
-        .map(|op| match read_settings(op.settings.as_ref(), kind(op)) {
-            SettingsRead::Damaged(damage) => Some(damage),
-            _ => None,
+        .map(|op| {
+            match read_settings(
+                op.settings.as_ref(),
+                kind(op),
+                curvyo_laser_core::DefaultNumbers::BUILT_IN,
+            ) {
+                SettingsRead::Damaged(damage) => Some(damage),
+                SettingsRead::Stored(_) => None,
+            }
         })
         .collect();
     assert_eq!(

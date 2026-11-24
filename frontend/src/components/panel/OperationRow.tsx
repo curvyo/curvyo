@@ -266,11 +266,10 @@ function Line2({ row, digit }: { row: Row; digit: number | null }) {
   );
 }
 
-/** Line 3, and line 4 "Outline …" of Engrave + Outline: the effective numbers, on every row; "No
- * settings" with none; nothing for an Unknown row or damaged settings. */
+/** Line 3, and line 4 "Outline …" of Engrave + Outline: the effective numbers, on every row;
+ * nothing for an Unknown row or damaged settings (`specs/0150` criterion 27). */
 function NumbersLines({ row }: { row: Row }) {
-  if (row.numbers === null || row.kind === "unknown") return null;
-  if (row.numbers.length === 0) return <span className="block h-[14px] truncate">No settings</span>;
+  if (row.numbers === null || row.numbers.length === 0 || row.kind === "unknown") return null;
   return (
     <>
       <NumbersText line={row.numbers[0]} />

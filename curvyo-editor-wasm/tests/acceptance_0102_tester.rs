@@ -893,8 +893,8 @@ fn ac28_save_as_profile_stores_the_set_and_writes_format_2() {
     let record: Value = serde_json::from_str(texts.last().expect("a record was written")).unwrap();
     // Record format 3 since `0103` (ADR 0052 §7), 4 since `0111` (ADR 0056 §7), 5 with the
     // named sets since `0113` (ADR 0060 §1).
-    // Record format 6 since `0029` (ADR 0065 §3).
-    assert_eq!(record["format_version"], 6, "any write is format 6");
+    // Record format 6 since `0029` (ADR 0065 §3), 7 since `0150`.
+    assert_eq!(record["format_version"], 7, "any write is format 7");
     let set = &record["fixture_sets"][0]["fixtures"];
     assert_eq!(set.as_array().unwrap().len(), 2);
     assert_eq!(record["id"], id);

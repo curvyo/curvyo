@@ -114,14 +114,14 @@
             "material": null,
             "role": "main",
             "run": {
-              "passes": null,
-              "power_pct": null,
-              "speed_mm_min": null
+              "passes": 1,
+              "power_pct": 10.0,
+              "speed_mm_min": 1000
             },
             "typed": []
           }
         ],
-        "state": "no_settings",
+        "state": "own",
         "z_offset_shown": false
       },
       "source": null

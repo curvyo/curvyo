@@ -102,6 +102,7 @@ fn session() -> (Session, NodeId, NodeId) {
             &NewOperation {
                 kind: "image",
                 name: "Image 1",
+                settings: None,
             },
             0,
             &[vec![image]],
@@ -113,6 +114,7 @@ fn session() -> (Session, NodeId, NodeId) {
             &NewOperation {
                 kind: "cut",
                 name: "Cut 1",
+                settings: None,
             },
             1,
             &squares,
@@ -332,6 +334,7 @@ fn thousand_images() -> (Session, NodeId) {
             &NewOperation {
                 kind: "image",
                 name: "Image 1",
+                settings: None,
             },
             0,
             &items,

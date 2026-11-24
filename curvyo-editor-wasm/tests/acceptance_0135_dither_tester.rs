@@ -123,6 +123,7 @@ fn image_op(d: &Document, m: NodeId, name: &str, members: &[NodeId]) -> NodeId {
         &NewOperation {
             kind: "image",
             name,
+            settings: None,
         },
         index,
         &groups,

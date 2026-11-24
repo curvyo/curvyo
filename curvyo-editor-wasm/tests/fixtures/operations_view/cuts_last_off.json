@@ -20,7 +20,7 @@
   "pick": [],
   "rows": [
     {
-      "accessible_name": "Cut 1, run 1, –",
+      "accessible_name": "Cut 1, run 1, 5 s",
       "group_in_part": null,
       "id": {
         "counter": 35,
@@ -30,11 +30,16 @@
       "kind": "cut",
       "margin_mm": 0.0,
       "name": "Cut 1",
-      "numbers": [],
+      "numbers": [
+        {
+          "text": "10 %, 1,000 mm/min, 1 ×",
+          "typed": []
+        }
+      ],
       "output": true,
       "run": {
         "digit": 1,
-        "time": "–"
+        "time": "5 s"
       },
       "section": "cutting",
       "settings": {
@@ -56,14 +61,14 @@
             "material": null,
             "role": "main",
             "run": {
-              "passes": null,
-              "power_pct": null,
-              "speed_mm_min": null
+              "passes": 1,
+              "power_pct": 10.0,
+              "speed_mm_min": 1000
             },
             "typed": []
           }
         ],
-        "state": "no_settings",
+        "state": "own",
         "z_offset_shown": false
       },
       "show": true,
@@ -72,7 +77,7 @@
       "unfolded": false
     },
     {
-      "accessible_name": "Score 1, run 2, –",
+      "accessible_name": "Score 1, run 2, 3 s",
       "group_in_part": null,
       "id": {
         "counter": 40,
@@ -82,11 +87,16 @@
       "kind": "score",
       "margin_mm": 0.0,
       "name": "Score 1",
-      "numbers": [],
+      "numbers": [
+        {
+          "text": "10 %, 1,000 mm/min, 1 ×",
+          "typed": []
+        }
+      ],
       "output": true,
       "run": {
         "digit": 2,
-        "time": "–"
+        "time": "3 s"
       },
       "section": "marking",
       "settings": {
@@ -108,14 +118,14 @@
             "material": null,
             "role": "main",
             "run": {
-              "passes": null,
-              "power_pct": null,
-              "speed_mm_min": null
+              "passes": 1,
+              "power_pct": 10.0,
+              "speed_mm_min": 1000
             },
             "typed": []
           }
         ],
-        "state": "no_settings",
+        "state": "own",
         "z_offset_shown": false
       },
       "show": true,

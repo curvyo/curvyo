@@ -1,10 +1,10 @@
 //! The stored `op_settings` of an operation as plain values (ADR 0054 §1, `specs/0028` criteria
-//! 24 to 28, ADR 0056 §5): its numbers, its material link and its typed overrides, read with their
-//! damage.
+//! 24 to 28, ADR 0056 §5; `specs/0150` criterion 15): its numbers, its material link and its
+//! typed overrides, read with their damage.
 
 use serde_json::{Map, Value, json};
 
-use crate::machine_profile::FeedRate;
+use crate::machine_profile::{DefaultNumbers, FeedRate};
 use crate::material::{Interval, MAX_MATERIAL_NAME_CHARS, Passes, PowerPercent, SetKind, Settings};
 use crate::operation_kind::OperationKind;
 
@@ -171,11 +171,9 @@ pub enum SettingsDamage {
     BadInterval,
 }
 
-/// The stored value as read.
+/// The stored value as read; an absent value reads as own numbers (`specs/0150` criterion 15).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SettingsRead {
-    /// No `op_settings`: "No settings".
-    None,
     /// A damaged value: "Damaged settings".
     Damaged(SettingsDamage),
     /// A readable value.
@@ -337,11 +335,17 @@ fn read_link(value: &Value) -> Option<MaterialLink> {
 
 /// Reads a stored `op_settings` of an operation of kind `kind` (ADR 0054 §1). `value` is the
 /// register's plain values, `None` when it is absent (a register that is no plain value is handed
-/// in as `null` and reads as not a map).
+/// in as `null` and reads as not a map). An absent register reads as own numbers from `defaults`,
+/// the pair of the operation's own profile copy: passes 1, the outline equal to `main`, the
+/// kind's default interval, no link (`specs/0150` criterion 15, Frage 338 A). Nothing is written.
 #[must_use]
-pub fn read_settings(value: Option<&Value>, kind: OperationKind) -> SettingsRead {
+pub fn read_settings(
+    value: Option<&Value>,
+    kind: OperationKind,
+    defaults: DefaultNumbers,
+) -> SettingsRead {
     let Some(value) = value else {
-        return SettingsRead::None;
+        return SettingsRead::Stored(StoredSettings::own(kind, defaults.settings(), None));
     };
     match read_stored(value, kind) {
         Ok(stored) => SettingsRead::Stored(stored),

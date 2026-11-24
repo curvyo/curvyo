@@ -53,8 +53,17 @@ fn scene(grouped: bool) -> (Session, Page, Vec<NodeId>, Vec<NodeId>, Option<Node
         .map(|i| {
             let kind = KINDS[i % 5];
             let name = format!("{kind} {}", i + 1);
-            d.add_operation(m, &NewOperation { kind, name: &name }, i, &[])
-                .unwrap()
+            d.add_operation(
+                m,
+                &NewOperation {
+                    kind,
+                    name: &name,
+                    settings: None,
+                },
+                i,
+                &[],
+            )
+            .unwrap()
         })
         .collect();
     let mut s = Session::open(7, &pack(&d, "0111-budget").unwrap()).unwrap();

@@ -301,7 +301,7 @@ mod tests {
         let (name, text) = record(4, "newer");
         entries.push((
             name,
-            text.replace("\"format_version\": 6", "\"format_version\": 7"),
+            text.replace("\"format_version\": 7", "\"format_version\": 8"),
         ));
         entries.push(("notes.txt".to_owned(), "{".to_owned()));
         let library = MachineProfiles::load(&entries);
@@ -324,7 +324,7 @@ mod tests {
     #[test]
     fn older_records_are_counted_left_as_they_are_and_their_ids_skipped() {
         let (first, text) = record(1, "K40");
-        let older = text.replace("\"format_version\": 6", "\"format_version\": 4");
+        let older = text.replace("\"format_version\": 7", "\"format_version\": 4");
         let one = MachineProfiles::load(&[(first.clone(), older.clone())]);
         assert_eq!(
             one.load_notices(),
@@ -342,7 +342,7 @@ mod tests {
             (first, older),
             (
                 second,
-                text.replace("\"format_version\": 6", "\"format_version\": 2"),
+                text.replace("\"format_version\": 7", "\"format_version\": 2"),
             ),
         ]);
         assert_eq!(

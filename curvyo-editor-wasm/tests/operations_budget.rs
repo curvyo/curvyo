@@ -63,6 +63,7 @@ fn page_file(items: usize, operations: usize) -> (Vec<u8>, String) {
             &NewOperation {
                 kind: "cut",
                 name: &format!("Cut {}", k + 1),
+                settings: None,
             },
             index,
             &members,
@@ -211,6 +212,7 @@ fn engraved_file(items: usize) -> (Vec<u8>, String) {
         &NewOperation {
             kind: "engrave_outline",
             name: "Engrave + Outline 1",
+            settings: None,
         },
         0,
         &members,

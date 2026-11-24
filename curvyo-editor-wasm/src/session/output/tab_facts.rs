@@ -39,7 +39,7 @@ pub(in crate::session) struct TabFacts {
 pub struct RowRunView {
     /// The ring's digit: the row's digit (P26).
     pub digit: u32,
-    /// The run's time ("3 min 21 s"; "–" with No settings).
+    /// The run's time ("3 min 21 s"; an operation always has one since `specs/0150`).
     pub time: String,
 }
 
@@ -142,7 +142,7 @@ impl Session {
 
     /// The effective numbers of operation `op` as its row's line 3 shows them, running or not
     /// (criterion 3), on a page without a job: the same functions the job runs. `None` for an Unknown kind or damaged
-    /// settings (no line 3); empty for "No settings".
+    /// settings (no line 3).
     pub(in crate::session) fn row_numbers(
         &self,
         op: &OperationSnapshot,

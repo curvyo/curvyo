@@ -93,7 +93,8 @@ fn criterion_21_and_22_z_offset_needs_the_motorised_z_axis_and_is_kept_without_i
 }
 
 #[test]
-fn criterion_19_an_interval_typed_with_no_settings_is_a_draft_written_with_the_numbers() {
+fn criterion_19_an_interval_typed_without_settings_stores_it_with_the_derived_numbers() {
+    // `specs/0150` criterion 5: no draft any more; the derived numbers are written with it.
     let mut f = fixture(false);
     let engrave = empty_op(&mut f.s, "engrave", "Engrave 1");
     let steps = f.s.undo_len();
@@ -101,35 +102,23 @@ fn criterion_19_an_interval_typed_with_no_settings_is_a_draft_written_with_the_n
         f.s.edit_operation_option(engrave, "interval", 0.004),
         Err("Interval is 0.01 to 2.00 mm.".to_owned())
     );
+    let view = row(&f.s, "Engrave 1").settings.unwrap();
+    assert_eq!(view.state, SettingsStateView::Own);
+    assert_eq!(view.interval_mm, Some(0.1), "the kind's default interval");
     assert_eq!(
         f.s.edit_operation_option(engrave, "interval", 0.25),
-        Ok(false),
-        "kept in the draft, nothing written"
+        Ok(true)
     );
-    assert_eq!(f.s.undo_len(), steps);
-    assert!(op_named(&f.s, "Engrave 1").settings.is_none());
-    let view = row(&f.s, "Engrave 1").settings.unwrap();
-    assert_eq!(view.state, SettingsStateView::NoSettings);
-    assert_eq!(view.interval_mm, Some(0.25), "the draft shows");
-    f.s.edit_operation_setting(engrave, "main", "power", 40.0)
-        .unwrap();
-    assert_eq!(f.s.undo_len(), steps);
-    assert!(
-        f.s.edit_operation_setting(engrave, "main", "speed", 3000.0)
-            .unwrap()
-    );
-    assert_eq!(f.s.undo_len(), steps + 1, "one step with the numbers");
+    assert_eq!(f.s.undo_len(), steps + 1, "one step");
     assert_eq!(undo_label(&mut f.s), "Edit settings");
     let stored = op_named(&f.s, "Engrave 1").settings.unwrap();
     assert_eq!(stored["main"]["interval_mm"], 0.25, "{stored:?}");
-    assert_eq!(
-        row(&f.s, "Engrave 1").settings.unwrap().interval_mm,
-        Some(0.25)
-    );
+    assert_eq!(stored["main"]["power_pct"], 10.0, "the derived numbers");
+    assert_eq!(stored["main"]["speed_mm_min"], 1000);
 }
 
 #[test]
-fn criterion_19_a_material_pick_with_no_settings_writes_the_draft_interval() {
+fn criterion_19_a_material_pick_keeps_the_interval_typed_before() {
     const BIRCH: &str = "22222222-2222-4222-8222-222222222222";
     // Record format 2 (`specs/0112`): one laser with its Engrave set.
     let record = serde_json::json!({
@@ -145,16 +134,18 @@ fn criterion_19_a_material_pick_with_no_settings_writes_the_draft_interval() {
     let engrave = empty_op(&mut f.s, "engrave", "Engrave 1");
     assert_eq!(
         f.s.edit_operation_option(engrave, "interval", 0.4),
-        Ok(false)
+        Ok(true)
     );
     assert!(f.s.use_material_on(&[engrave], BIRCH));
     let stored = op_named(&f.s, "Engrave 1").settings.unwrap();
     assert_eq!(stored["main"]["interval_mm"], 0.4, "{stored:?}");
     f.s.undo();
+    let view = row(&f.s, "Engrave 1").settings.unwrap();
+    assert_eq!(view.state, SettingsStateView::Own);
     assert_eq!(
-        row(&f.s, "Engrave 1").settings.unwrap().interval_mm,
-        Some(0.1),
-        "the draft went with the pick"
+        view.interval_mm,
+        Some(0.4),
+        "the own numbers of the step before"
     );
 }
 
@@ -174,7 +165,7 @@ fn criterion_19_the_interval_is_typed_into_main_and_checked() {
     assert_eq!(
         row(&f.s, "Engrave 1").settings.unwrap().interval_mm,
         Some(0.1),
-        "No settings shows the default interval"
+        "an operation without op_settings shows the default interval"
     );
     f.s.edit_operation_setting(engrave, "main", "power", 40.0)
         .unwrap();

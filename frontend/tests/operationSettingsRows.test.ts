@@ -84,7 +84,8 @@ test("the head, the block summary and the reset status read as the notes say", (
   assert.equal(blockHead(["a", "b", "c"]), "3 operations");
   const [differs] = rows("settings_live");
   assert.equal(blockSummary(differs.settings), "Power 37.5 %, speed 6000 mm/min, 1 pass, from Birch plywood, differs");
-  assert.equal(blockSummary(rows("settings_live")[1].settings), "No settings");
+  // `specs/0150` criterion 27: the summary always reads numbers.
+  assert.equal(blockSummary(rows("settings_live")[1].settings), "Power 10 %, speed 1000 mm/min, 1 pass");
   assert.equal(blockSummary(rows("settings_own_none_damaged")[1].settings), "Damaged settings");
   assert.equal(resetStatus("Birch 3 mm"), "Numbers reset to Birch 3 mm.");
 });

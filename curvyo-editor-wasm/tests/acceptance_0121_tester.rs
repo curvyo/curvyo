@@ -83,6 +83,7 @@ fn fixture(with_marks: bool) -> Fx {
             &NewOperation {
                 kind: "cut",
                 name: "Cut 1",
+                settings: None,
             },
             0,
             &keys,
@@ -93,6 +94,7 @@ fn fixture(with_marks: bool) -> Fx {
                 &NewOperation {
                     kind: "cut",
                     name: "Cut 1",
+                    settings: None,
                 },
                 0,
                 &[vec![placement]],

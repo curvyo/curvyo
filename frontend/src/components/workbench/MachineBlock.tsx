@@ -270,6 +270,23 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
           notice={noticeAt("power")}
           onCommit={(value) => show(api.setMaxPower(value), "power")}
         />
+        {/* The numbers a new operation takes without a material (`specs/0150` criterion 1, W1, W2). */}
+        <NumberField
+          label="Default power"
+          unit="%"
+          accessibleName="Default power (percent)"
+          value={copy.default_power}
+          notice={noticeAt("default_power")}
+          onCommit={(value) => show(api.setDefaultPower(value), "default_power")}
+        />
+        <NumberField
+          label="Default speed"
+          unit="mm/min"
+          accessibleName="Default speed (mm/min)"
+          value={copy.default_speed}
+          notice={noticeAt("default_speed")}
+          onCommit={(value) => show(api.setDefaultSpeed(value), "default_speed")}
+        />
         <div className={SWITCH_ROW}>
           <ToolbarSwitch
             label="Laser mode"

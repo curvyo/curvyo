@@ -3,13 +3,13 @@
 //! material, Own numbers, Edit settings and Reset to material, each one step.
 
 use curvyo_document_core::{NodeId, OperationSnapshot, SettingsStep, SettingsWrite};
-use curvyo_laser_core::FeedRate;
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    Field, Interval, Passes, PowerPercent, Role, SetOverride, Settings, SettingsDamage,
-    SettingsRead, SettingsState, StoredSettings, TypedNumber, edit_number, read_options,
-    read_settings, reset_to_material, resolve, use_material, use_own_numbers,
+    Field, Passes, PowerPercent, Role, SettingsDamage, SettingsRead, SettingsState, StoredSettings,
+    TypedNumber, edit_number, read_options, read_settings, reset_to_material, resolve,
+    use_material, use_own_numbers,
 };
+use curvyo_laser_core::{DefaultNumbers, FeedRate};
 
 use super::super::Session;
 use super::super::library_journal::short_name;
@@ -71,15 +71,6 @@ pub(in crate::session) fn field_of(name: &str) -> Option<Field> {
     }
 }
 
-/// What is typed into an operation with No settings before power and speed are both there
-/// (`specs/0028` UX notes §8.3): the numbers, and the Interval of a hatching kind (`specs/0111`
-/// criterion 19), written together with them.
-#[derive(Debug, Clone, Copy, Default)]
-pub(in crate::session) struct SettingsDraft {
-    set: SetOverride,
-    interval: Option<Interval>,
-}
-
 /// An operation of the active laser page with what its settings read.
 pub(in crate::session) struct SettingsTarget {
     pub(in crate::session) id: NodeId,
@@ -89,17 +80,19 @@ pub(in crate::session) struct SettingsTarget {
     pub(in crate::session) state: SettingsState,
 }
 
-/// What operation `op` of kind `kind` reads for its numbers: damaged `op_options` make the whole
-/// operation read as Damaged settings, so nothing runs and no material command writes it (ADR 0056
-/// §6; the kind of damage is not shown).
+/// What operation `op` of kind `kind` reads for its numbers, an absent register as own numbers
+/// from `defaults`, its copy's pair (`specs/0150` criterion 15): damaged `op_options` make the
+/// whole operation read as Damaged settings, so nothing runs and no material command writes it
+/// (ADR 0056 §6; the kind of damage is not shown).
 pub(in crate::session) fn operation_read(
     op: &OperationSnapshot,
     kind: OperationKind,
+    defaults: DefaultNumbers,
 ) -> SettingsRead {
     if read_options(op.options.as_ref(), kind).is_err() {
         return SettingsRead::Damaged(SettingsDamage::NotAMap);
     }
-    read_settings(op.settings.as_ref(), kind)
+    read_settings(op.settings.as_ref(), kind, defaults)
 }
 
 fn plain(stored: &StoredSettings) -> Option<serde_json::Map<String, serde_json::Value>> {
@@ -119,7 +112,7 @@ impl Session {
             return None;
         }
         let kind = OperationKind::parse(op.kind.as_deref()?)?;
-        let read = operation_read(op, kind);
+        let read = operation_read(op, kind, self.active_defaults());
         let profile = self.active_profile_id().unwrap_or_default();
         let state = resolve(&read, kind, self.materials.library().reads(), &profile);
         Some(SettingsTarget {
@@ -128,6 +121,14 @@ impl Session {
             kind,
             read,
             state,
+        })
+    }
+
+    /// The default pair of the active laser page's copy (`specs/0150` criterion 1), the built-in
+    /// pair outside one.
+    pub(in crate::session) fn active_defaults(&self) -> DefaultNumbers {
+        self.active_copy().map_or(DefaultNumbers::BUILT_IN, |copy| {
+            copy.read.copy.values.defaults
         })
     }
 
@@ -150,10 +151,7 @@ impl Session {
         let mut skipped: Vec<(String, &'static str)> = Vec::new();
         for target in ids.iter().filter_map(|&id| self.settings_target(id)) {
             match use_material(&found, &profile, target.kind, &target.read) {
-                Ok(mut stored) => {
-                    if target.read == SettingsRead::None {
-                        stored.interval = self.draft_interval(target.id).or(stored.interval);
-                    }
+                Ok(stored) => {
                     writes.push(SettingsWrite {
                         operation: target.id,
                         value: plain(&stored),
@@ -163,13 +161,6 @@ impl Session {
             }
         }
         self.operations.notice = skip_notice(&skipped, &found.name);
-        if writes.iter().any(|write| {
-            self.operations
-                .settings_draft
-                .is_some_and(|(op, _)| op == write.operation)
-        }) {
-            self.operations.settings_draft = None;
-        }
         self.write_settings_step(SettingsStep::UseMaterial, &writes)
     }
 
@@ -195,8 +186,8 @@ impl Session {
     /// Types `value` into the `field` of the `role` set (`main`, `outline`) of operation `id`
     /// (criterion 24, Frage 188 B), one step "Edit settings". Own numbers change; a linked
     /// operation keeps its link and stores the typed number, or drops it when it equals the
-    /// material's. With No settings the numbers are kept until power and speed are both typed
-    /// (passes 1 when empty). `Ok(false)` when nothing is written.
+    /// material's. An operation without `op_settings` starts from its derived numbers
+    /// (`specs/0150` criterion 14). `Ok(false)` when nothing is written.
     ///
     /// # Errors
     /// The chip text of UX notes §8.3.
@@ -218,9 +209,6 @@ impl Session {
         let Some(target) = self.settings_target(id) else {
             return Ok(false);
         };
-        if target.read == SettingsRead::None {
-            return Ok(self.type_into_draft(&target, role, number));
-        }
         let Some(next) = edit_number(&target.read, &target.state, target.kind, role, number) else {
             return Ok(false);
         };
@@ -229,42 +217,6 @@ impl Session {
             value: plain(&next),
         };
         Ok(self.write_settings_step(SettingsStep::EditSettings, &[write]))
-    }
-
-    /// A number typed into an operation with No settings: kept in the draft until power and
-    /// speed are both there, then written as own numbers (UX notes §8.3).
-    fn type_into_draft(
-        &mut self,
-        target: &SettingsTarget,
-        role: Role,
-        number: TypedNumber,
-    ) -> bool {
-        if role != Role::Main {
-            return false;
-        }
-        let mut draft = self.draft_of(target.id);
-        match number {
-            TypedNumber::Power(power) => draft.set.power = Some(power),
-            TypedNumber::Speed(speed) => draft.set.speed = Some(speed),
-            TypedNumber::Passes(passes) => draft.set.passes = Some(passes),
-        }
-        let (Some(power), Some(speed)) = (draft.set.power, draft.set.speed) else {
-            self.operations.settings_draft = Some((target.id, draft));
-            return false;
-        };
-        self.operations.settings_draft = None;
-        let main = Settings {
-            power,
-            speed,
-            passes: draft.set.passes.unwrap_or(Passes::ONE),
-        };
-        let mut stored = StoredSettings::own(target.kind, main, None);
-        stored.interval = draft.interval;
-        let write = SettingsWrite {
-            operation: target.id,
-            value: plain(&stored),
-        };
-        self.write_settings_step(SettingsStep::EditSettings, &[write])
     }
 
     /// Reset to material (criterion 24): the typed numbers of operation `id` go, one step.
@@ -282,41 +234,6 @@ impl Session {
             value: plain(&next),
         };
         self.write_settings_step(SettingsStep::ResetToMaterial, &[write])
-    }
-
-    /// The numbers typed into an operation with No settings, while power or speed is missing.
-    pub(in crate::session) fn settings_draft(&self, id: NodeId) -> Option<SetOverride> {
-        self.operations
-            .settings_draft
-            .and_then(|(op, draft)| (op == id).then_some(draft.set))
-    }
-
-    /// The Interval typed into an operation with No settings, until its numbers are written.
-    pub(in crate::session) fn draft_interval(&self, id: NodeId) -> Option<Interval> {
-        self.operations
-            .settings_draft
-            .and_then(|(op, draft)| (op == id).then_some(draft.interval)?)
-    }
-
-    /// The draft of operation `id`, empty when another operation's draft is kept.
-    fn draft_of(&self, id: NodeId) -> SettingsDraft {
-        match self.operations.settings_draft {
-            Some((op, draft)) if op == id => draft,
-            _ => SettingsDraft::default(),
-        }
-    }
-
-    /// Keeps `interval` typed into operation `id` with No settings until power and speed are
-    /// typed (criterion 19): nothing is written, so the result is always `false`.
-    pub(in crate::session) fn type_interval_into_draft(
-        &mut self,
-        id: NodeId,
-        interval: Interval,
-    ) -> bool {
-        let mut draft = self.draft_of(id);
-        draft.interval = Some(interval);
-        self.operations.settings_draft = Some((id, draft));
-        false
     }
 
     fn write_settings_step(&mut self, step: SettingsStep, writes: &[SettingsWrite]) -> bool {

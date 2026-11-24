@@ -55,8 +55,11 @@ fn the_golden_reads_every_image_setting() {
         engrave.options.as_ref().unwrap(),
         "written back as stored"
     );
-    let SettingsRead::Stored(stored) = read_settings(engrave.settings.as_ref(), kind(engrave))
-    else {
+    let SettingsRead::Stored(stored) = read_settings(
+        engrave.settings.as_ref(),
+        kind(engrave),
+        curvyo_laser_core::DefaultNumbers::BUILT_IN,
+    ) else {
         panic!("stored settings")
     };
     assert_eq!(stored.material.as_ref().unwrap().name, "Slate tile");

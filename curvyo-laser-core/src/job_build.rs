@@ -28,8 +28,8 @@ pub struct Built {
 }
 
 impl Built {
-    /// Whether a block with items has no numbers for want of power or speed (4 a): its geometry
-    /// is missing from [`Built::job`] and only [`build_frame_job`] holds it.
+    /// Whether a fixture block with items has no numbers for want of a material pick or set
+    /// (4 a): its geometry is missing from [`Built::job`] and only [`build_frame_job`] holds it.
     #[must_use]
     pub fn unpriced(&self) -> bool {
         self.numbers
@@ -45,9 +45,10 @@ pub fn build_job(input: &JobInput, materials: &[MaterialRead], cache: &mut PlanC
     build_with(input, materials, cache, |_, read| read.numbers().copied())
 }
 
-/// The job a frame of `input` traces (`specs/0118` Frage 335 B): [`build_job`]'s, and a block
-/// with items and no power or speed runs its geometry at stand-in numbers, since a frame never
-/// burns. Export and Send never read it.
+/// The job a frame of `input` traces (`specs/0118` Frage 335 B): [`build_job`]'s, and a fixture
+/// block with items and no material numbers runs its geometry at stand-in numbers, since a frame
+/// never burns. Export and Send never read it. An operation-only job equals [`build_job`]'s
+/// (`specs/0150` criterion 25).
 #[must_use]
 pub fn build_frame_job(
     input: &JobInput,

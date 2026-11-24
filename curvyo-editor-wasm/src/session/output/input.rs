@@ -14,7 +14,7 @@ use curvyo_laser_core::job::{
 use curvyo_laser_core::operations::{
     KindRead, Leaf, LeafStatus, OperationKind, OperationList, leaf_status,
 };
-use curvyo_laser_core::settings::{OperationOptions, SettingsRead, read_options, read_settings};
+use curvyo_laser_core::settings::{OperationOptions, read_options, read_settings};
 
 use super::super::Session;
 use super::super::fixtures::FixtureRun;
@@ -243,15 +243,23 @@ impl Session {
         self.output.pixels.retain(&assets);
     }
 
-    /// Operation `op`'s block with no leaves yet: its kind, settings, options and grid, ringed with
-    /// the digit 0 (the caller sets the row's digit).
+    /// Operation `op`'s block with no leaves yet: its kind, settings (an absent register read
+    /// from the active copy's pair, `specs/0150` criterion 15), options and grid, ringed with the
+    /// digit 0 (the caller sets the row's digit). An unknown kind's placeholder settings are
+    /// never read: its block is damaged.
     fn empty_block(&self, op: &OperationSnapshot) -> BlockInput {
         let kind = KindRead::of(op.kind.as_deref());
-        let (settings, options) = kind.known().map_or(
-            (SettingsRead::None, Ok(OperationOptions::default())),
+        let defaults = self.active_defaults();
+        let (settings, options) = kind.known().map_or_else(
+            || {
+                (
+                    read_settings(None, OperationKind::Cut, defaults),
+                    Ok(OperationOptions::default()),
+                )
+            },
             |known| {
                 (
-                    read_settings(op.settings.as_ref(), known),
+                    read_settings(op.settings.as_ref(), known, defaults),
                     read_options(op.options.as_ref(), known),
                 )
             },

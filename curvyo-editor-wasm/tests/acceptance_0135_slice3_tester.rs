@@ -122,6 +122,7 @@ fn setup_with(w: u32, h: u32) -> Fx {
             &NewOperation {
                 kind: "image",
                 name: "Image 1",
+                settings: None,
             },
             0,
             &[vec![ids[0]]],

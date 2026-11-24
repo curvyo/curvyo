@@ -31,7 +31,8 @@ function valueOf(numbers: SettingsNumberFieldsProps["numbers"], field: SettingsF
 /**
  * The Power, Speed and Passes fields of one set (`specs/0028` `ux-notes.md` 8.3): Power and Speed
  * in a row (118 px each, 4 px apart), Passes under them. A field with a material number beside it
- * shows "Material 60" under itself. Enter or leaving commits; the session answers with the chip.
+ * shows "Material 60" under itself. Enter or leaving commits; the session answers with the chip;
+ * a cleared field takes back its number.
  */
 export function SettingsNumberFields(props: SettingsNumberFieldsProps) {
   const { numbers, nameOf, lineOf, descriptionOf, onCommit, onReturnFocus, firstFocus, beside, fieldWidth = 118 } = props;
@@ -51,7 +52,8 @@ export function SettingsNumberFields(props: SettingsNumberFieldsProps) {
           gutter={field === "speed" ? 52 : undefined}
           commitOnBlur
           inputMode="decimal"
-          onSubmit={(text) => outcomeOf(onCommit(field, typedNumber(text)))}
+          // A cleared field reverts silently: the numbers are never empty (`specs/0150` UX notes 3).
+          onSubmit={(text) => (text.trim() === "" ? "unchanged" : outcomeOf(onCommit(field, typedNumber(text))))}
           messages={CHIP_IS_MESSAGE}
           stepText={stepText}
           onReturnFocus={onReturnFocus}

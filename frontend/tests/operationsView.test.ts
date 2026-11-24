@@ -246,7 +246,7 @@ test("every settings state of the Rust fixtures decodes", () => {
       states.add(settings.state);
     }
   }
-  assert.deepEqual([...states].sort(), ["damaged", "live", "no_settings", "own", "stored"]);
+  assert.deepEqual([...states].sort(), ["damaged", "live", "own", "stored"]);
 });
 
 test("a live pointing row keeps its typed field, the material's number and the Differs text", () => {
@@ -262,12 +262,15 @@ test("a live pointing row keeps its typed field, the material's number and the D
   assert.deepEqual(settings.disabled, [{ id: "11111111-1111-4111-8111-111111111111", reason: "No Engrave set" }]);
 });
 
-test("a stored row keeps the reason; a No settings row has empty numbers", () => {
+test("a stored row keeps the reason; a row without op_settings has the default numbers", () => {
   const stored = decodeSettings(settingsRows("settings_stored")[0].settings);
   assert.equal(stored?.reason, "Material has no Score set, using stored numbers");
-  const none = decodeSettings(settingsRows("settings_live")[1].settings);
-  assert.equal(none?.state, "no_settings");
-  assert.deepEqual(none?.sets[0].run, { powerPct: null, speedMmMin: null, passes: null });
+  const derived = decodeSettings(settingsRows("settings_live")[1].settings);
+  assert.equal(derived?.state, "own");
+  assert.deepEqual(derived?.sets[0].run, { powerPct: 10, speedMmMin: 1000, passes: 1 });
+  const broken = structuredClone(settingsRows("settings_live")[1].settings) as { sets: { run: { power_pct: unknown } }[] };
+  broken.sets[0].run.power_pct = null;
+  assert.equal(decodeSettings(broken), undefined, "a field is never empty (specs/0150 criterion 27)");
 });
 
 test("the pick lists the materials with their kinds in order", () => {

@@ -94,6 +94,7 @@ fn session() -> (Session, NodeId) {
             &NewOperation {
                 kind: "image",
                 name: "Image 1",
+                settings: None,
             },
             0,
             &[vec![image]],

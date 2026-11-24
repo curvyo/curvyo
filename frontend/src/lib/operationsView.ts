@@ -32,7 +32,7 @@ export type OperationSection = "marking" | "cutting";
 /** A row's tick over the selection: none, some (mixed) or all of it. */
 export type TickState = "none" | "some" | "all";
 
-/** A row that runs: its ring (the row's digit) and its time ("3 min 21 s"; "–" with No settings). */
+/** A row that runs: its ring (the row's digit) and its time ("3 min 21 s"). */
 export interface RowRun {
   digit: number;
   time: string;
@@ -61,7 +61,7 @@ export interface OperationRow {
   /** The run ring and time of a row that runs (`specs/0029` UX 6.1); `null` for a row that does not. */
   run: RowRun | null;
   /** Line 3 (and line 4 of Engrave + Outline): the effective numbers; `null` for Unknown or damaged
-   * settings, empty for No settings. */
+   * settings. */
   numbers: NumbersLine[] | null;
   /** "Cut 1, run 3, 3 min 21 s" (the session's wording). */
   accessibleName: string;

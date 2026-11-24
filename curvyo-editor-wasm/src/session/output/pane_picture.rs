@@ -109,8 +109,7 @@ impl Session {
             max_feed: input.machine.values.max_feed,
         };
         let read = block_numbers(&raster, context);
-        let mut numbers =
-            preview_numbers(&raster, &read).filter(|n| n.kind == OperationKind::Image)?;
+        let mut numbers = preview_numbers(&read).filter(|n| n.kind == OperationKind::Image)?;
         let k = capped_step(1, numbers.interval, raster_area_mm2(&raster), PANE_DOTS);
         let hundredths = i64::from(numbers.interval.hundredths()) * k;
         numbers.interval =

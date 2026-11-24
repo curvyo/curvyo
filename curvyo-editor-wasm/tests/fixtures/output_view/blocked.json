@@ -2,24 +2,6 @@
   "output": {
     "checks": [
       {
-        "after": " has no power and speed.",
-        "before": "",
-        "button": "Cut 1",
-        "count": 1,
-        "severity": "block",
-        "target": {
-          "focus": null,
-          "ids": [
-            {
-              "counter": 35,
-              "peer": "1"
-            }
-          ],
-          "kind": "operations"
-        },
-        "text": "Cut 1 has no power and speed."
-      },
-      {
         "after": " lies outside the 400 × 300 mm bed.",
         "before": "",
         "button": "1 item",
@@ -53,7 +35,7 @@
       "enabled": false,
       "extension": "gcode",
       "file_type": "GRBL G-code",
-      "tooltip": "Cut 1 has no power and speed."
+      "tooltip": "1 item lies outside the 400 × 300 mm bed."
     },
     "frame": {
       "cause": "Outside the work area",
@@ -81,30 +63,35 @@
     "toolpath_view": false,
     "total": {
       "fixtures": null,
-      "lengths": "Burn 80 mm · travel 949 mm",
+      "lengths": "Burn 160 mm · travel 1.12 m",
       "runs": {
         "after": ".",
         "before": "Runs 2 operations, ",
         "button": "2 items",
         "text": "Runs 2 operations, 2 items."
       },
-      "time": "About 17 s"
+      "time": "About 24 s"
     }
   },
   "play": null,
   "ring_labels": [],
   "rows": [
     {
-      "accessible_name": "Cut 1, run 1, –",
+      "accessible_name": "Cut 1, run 1, 8 s",
       "name": "Cut 1",
-      "numbers": [],
+      "numbers": [
+        {
+          "text": "10 %, 1,000 mm/min, 1 ×",
+          "typed": []
+        }
+      ],
       "run": {
         "digit": 1,
-        "time": "–"
+        "time": "8 s"
       }
     },
     {
-      "accessible_name": "Cut 2, run 2, 13 s",
+      "accessible_name": "Cut 2, run 2, 12 s",
       "name": "Cut 2",
       "numbers": [
         {
@@ -114,7 +101,7 @@
       ],
       "run": {
         "digit": 2,
-        "time": "13 s"
+        "time": "12 s"
       }
     }
   ]

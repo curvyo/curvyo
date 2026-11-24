@@ -119,7 +119,11 @@ pub(super) fn empty_op(s: &mut Session, kind: &'static str, name: &'static str) 
         this.document
             .add_operation(
                 manufacturing,
-                &curvyo_document_core::NewOperation { kind, name },
+                &curvyo_document_core::NewOperation {
+                    kind,
+                    name,
+                    settings: None,
+                },
                 index,
                 &[],
             )

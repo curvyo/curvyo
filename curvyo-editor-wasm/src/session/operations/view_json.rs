@@ -276,10 +276,16 @@ impl Session {
                     settings: settings_view(self, op, &pick, &page),
                     source: source_view(self, op, &mut sources),
                     run,
-                    numbers: facts.filter(|_| !stale).map_or_else(
-                        || self.row_numbers(op),
-                        |f| f.numbers.get(&op.id).cloned().flatten(),
-                    ),
+                    // A legacy test grid row (`op_grid`) is never read for numbers, so it has
+                    // no line 3 (`specs/0150` adrs.md decision 3).
+                    numbers: if op.grid {
+                        None
+                    } else {
+                        facts.filter(|_| !stale).map_or_else(
+                            || self.row_numbers(op),
+                            |f| f.numbers.get(&op.id).cloned().flatten(),
+                        )
+                    },
                     accessible_name,
                 }
             })
