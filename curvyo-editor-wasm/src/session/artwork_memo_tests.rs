@@ -262,6 +262,14 @@ proptest! {
                 prop_assert_eq!(&frame, &fresh_frame(&session));
             }
         }
+        // Whether a small pan keeps the same objects depends on where the jump left them
+        // against the cull's edge, so the pans alone may never repeat a frame. Frames of a
+        // view that stays put always do: the kept list is drawn there, and it equals a fresh build.
+        for _ in 0..3 {
+            pan(&mut session, 0.0, 0.0);
+            let frame = session.frame_draw_list();
+            prop_assert_eq!(&frame, &fresh_frame(&session));
+        }
         prop_assert!(hits(&session) > start, "no frame drew the kept list");
     }
 }
