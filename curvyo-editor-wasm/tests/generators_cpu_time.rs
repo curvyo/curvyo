@@ -80,3 +80,30 @@ fn a_box_with_a_hundred_fingers_per_edge_and_a_finger_lid_edits_within_the_budge
     });
     check("box, 100 fingers per edge, finger lid", took);
 }
+
+#[test]
+fn a_rounded_box_of_400_slots_edits_within_the_budget() {
+    let mut s = session();
+    s.set_generator_kind("curvyo.generators/rounded-box");
+    assert!(s.place_generated(500.0, 300.0));
+    for (key, value) in [
+        ("inner_width", "400"),
+        ("inner_depth", "300"),
+        ("inner_height", "100"),
+        ("wall_slits", "\"all\""),
+        ("slit_spacing", "4"),
+    ] {
+        set(&mut s, key, value);
+    }
+    // 1,400 mm of wall at 4 mm columns: about 350 slots; the corner arcs add more.
+    let (_, took) = cpu_time_of(|| {
+        set(&mut s, "corner_radius", "30");
+        // The panel read generates again for the values the generator used (`instance::view`).
+        let panel = s.generated_panel_json();
+        assert!(panel.contains("slit_width"));
+        s.draw_list()
+    });
+    check("rounded box, about 400 slots, edit and panel read", took);
+    let panel = s.generated_panel_json();
+    assert!(panel.contains("\"known\":true"), "{panel}");
+}

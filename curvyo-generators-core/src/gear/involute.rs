@@ -24,6 +24,7 @@ pub(crate) struct Teeth {
 /// The circles and angles the outline is built from.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Profile {
+    #[cfg(test)]
     pub(crate) pitch_radius: f64,
     pub(crate) base_radius: f64,
     pub(crate) root_radius: f64,
@@ -46,6 +47,7 @@ impl Profile {
         let addendum = pitch_radius + teeth.module;
         let offset = std::f64::consts::PI / (2.0 * count) + inv(teeth.pressure);
         let mut profile = Self {
+            #[cfg(test)]
             pitch_radius,
             base_radius,
             root_radius,

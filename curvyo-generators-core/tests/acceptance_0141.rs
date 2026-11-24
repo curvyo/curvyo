@@ -586,8 +586,10 @@ fn criterion_4_a_box_of_100_fingers_per_edge_generates_closed_outlines() {
 
 // ---------- criterion 5: resize changes size parameters only ----------
 
+// Superseded by 0141 revision 2 (customer-decided 2026-11-24): a gear resize writes Teeth in whole
+// numbers, 6 to 200, and keeps Module, Bore, Keyway, Rim width, Hub diameter and Spokes.
 #[test]
-fn criterion_5_proportional_resize_of_a_gear_scales_its_size_parameters_only() {
+fn criterion_5_proportional_resize_of_a_gear_writes_teeth_and_keeps_the_rest() {
     let stored = params(&[
         ("module", mm(2.0)),
         ("teeth", count(24)),
@@ -600,50 +602,30 @@ fn criterion_5_proportional_resize_of_a_gear_scales_its_size_parameters_only() {
         ("rim_width", mm(4.0)),
         ("hub_diameter", mm(16.0)),
     ]);
+    // The outer diameter m (z + 2) = 52 doubles to 104, so z = 50.
     let generated = generate(GEAR, &stored, Some(Edit::Scale(ScaleFactor(2.0))));
-    assert_close(length(&generated, "module"), 4.0, 1e-9, "module doubles");
-    assert_close(
-        length(&generated, "pitch_diameter"),
-        96.0,
-        1e-9,
-        "pitch diameter doubles",
-    );
-    assert_close(length(&generated, "bore"), 12.0, 1e-9, "bore doubles");
-    assert_close(
-        length(&generated, "keyway_width"),
-        4.0,
-        1e-9,
-        "keyway width doubles",
-    );
-    assert_close(
-        length(&generated, "keyway_depth"),
-        2.0,
-        1e-9,
-        "keyway depth doubles",
-    );
-    assert_close(
-        length(&generated, "rim_width"),
-        8.0,
-        1e-9,
-        "rim width doubles",
-    );
-    assert_close(
-        length(&generated, "hub_diameter"),
-        32.0,
-        1e-9,
-        "hub diameter doubles",
-    );
-    assert_eq!(count_of(&generated, "teeth"), 24, "teeth stay");
+    assert_eq!(count_of(&generated, "teeth"), 50, "teeth follow the factor");
+    for (key, value) in [
+        ("module", 2.0),
+        ("bore", 6.0),
+        ("keyway_width", 2.0),
+        ("keyway_depth", 1.0),
+        ("rim_width", 4.0),
+        ("hub_diameter", 16.0),
+    ] {
+        assert_close(length(&generated, key), value, 1e-9, key);
+    }
+    assert_close(length(&generated, "pitch_diameter"), 100.0, 1e-9, "pitch");
     assert_eq!(count_of(&generated, "spokes"), 5, "spokes stay");
+    let tiny = generate(GEAR, &stored, Some(Edit::Scale(ScaleFactor(0.01))));
+    assert_eq!(count_of(&tiny, "teeth"), 6, "clamped to the minimum");
+    let huge = generate(GEAR, &stored, Some(Edit::Scale(ScaleFactor(100.0))));
+    assert_eq!(count_of(&huge, "teeth"), 200, "clamped to the maximum");
     let angle = generated
         .params
         .get("pressure_angle")
         .and_then(ParamValue::from_stored);
-    assert_eq!(
-        angle.and_then(|value| value.degrees()),
-        Some(20.0),
-        "pressure angle stays"
-    );
+    assert_eq!(angle.and_then(|value| value.degrees()), Some(20.0));
 }
 
 #[test]

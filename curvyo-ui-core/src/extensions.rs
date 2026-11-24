@@ -142,7 +142,7 @@ mod tests {
                 kinds += 1;
             }
         }
-        assert_eq!(kinds, 2);
+        assert_eq!(kinds, 3, "box, gear, rounded box");
         let request = GenerateRequest {
             kind: "gear",
             params: &StoredParams::new(),

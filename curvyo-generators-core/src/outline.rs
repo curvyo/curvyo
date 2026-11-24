@@ -120,6 +120,7 @@ pub(crate) fn reversed(path: &ClosedPath) -> ClosedPath {
 }
 
 /// The polygon through `points` as a closed outline of line segments.
+#[cfg(test)]
 pub(crate) fn polygon(points: &[Point]) -> ClosedPath {
     let mut builder = Builder::new(points[0]);
     for point in &points[1..] {

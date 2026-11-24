@@ -206,10 +206,11 @@ fn a_resize_scales_the_lengths_and_keeps_the_counts() {
         .length()
         .unwrap()
         .as_mm();
-    assert!((module - 4.0).abs() < 1e-9 && (bore - 12.0).abs() < 1e-9);
+    // 0141 revision 2: a gear resize writes Teeth (m (z + 2) = 52 doubles to 104) and keeps the lengths.
+    assert!((module - 2.0).abs() < 1e-9 && (bore - 6.0).abs() < 1e-9);
     assert_eq!(
         ParamValue::from_stored(&scaled.params["teeth"]),
-        Some(ParamValue::Count(24))
+        Some(ParamValue::Count(50))
     );
     let boxed = generate(BOX, &stored, Some(Edit::Scale(ScaleFactor(0.5))));
     let width = ParamValue::from_stored(&boxed.params["inner_width"])
@@ -353,4 +354,32 @@ fn generation_is_deterministic() {
     let a = dump(&generate(GEAR, &StoredParams::new(), None));
     let b = dump(&generate(GEAR, &StoredParams::new(), None));
     assert_eq!(a, b);
+}
+
+#[test]
+fn every_number_has_a_slider_track_inside_its_bounds() {
+    use curvyo_extension_core::{Contribution, ParamKind};
+    for contribution in curvyo_generators_core::manifest().contributions {
+        let Contribution::Generator(kind) = contribution else {
+            continue;
+        };
+        for param in kind.groups.iter().flat_map(|group| &group.params) {
+            let (min, max) = match param.kind {
+                ParamKind::Length { min, max, .. } => (min.as_mm(), max.as_mm()),
+                ParamKind::Count { min, max, .. } => (f64::from(min), f64::from(max)),
+                ParamKind::Angle { min, max, .. } => (min.0, max.0),
+                _ => continue,
+            };
+            let track = param
+                .track
+                .unwrap_or_else(|| panic!("{} has no track", param.key));
+            assert!(
+                min <= track.from && track.from < track.to && track.to <= max,
+                "{}: track {}..{} outside {min}..{max}",
+                param.key,
+                track.from,
+                track.to
+            );
+        }
+    }
 }

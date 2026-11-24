@@ -36,7 +36,7 @@ pub struct Seed(pub u32);
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ScaleFactor(pub f64);
 
-/// What the maker did to a generated object.
+/// What happened to a generated object: what the maker did to it, or a request for a draft.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Edit<'a> {
     /// The value of this parameter was typed or dragged: it wins over a value derived from it
@@ -44,6 +44,9 @@ pub enum Edit<'a> {
     Param(&'a str),
     /// The object was resized proportionally; the generator decides which lengths scale.
     Scale(ScaleFactor),
+    /// Only the outer outlines are wanted, for a ghost under the pointer: a generator may leave
+    /// out fine detail (the slits of a bending wall). The result is never stored.
+    Draft,
 }
 
 /// A request to generate: pure and deterministic, no I/O, clock or randomness source.
@@ -112,6 +115,9 @@ pub enum Bound {
     Dependent,
     /// A bound that depends on other parameters, the value was raised to it ("the least").
     DependentMinimum,
+    /// The same, because of a choice that sets its own minimum ("the least the Wave pattern
+    /// allows"): the name of that choice.
+    DependentMinimumFor(&'static str),
 }
 
 /// A parameter the generator moved to the nearest valid value (permit over refuse); the shell
@@ -137,4 +143,12 @@ pub struct Generated {
     pub handles: Vec<Handle>,
     /// What was clamped.
     pub clamps: Vec<Clamp>,
+    /// The values the generator used for parameters stored as 0 (automatic, ADR 0082 §7); the
+    /// block shows them muted. Never written to the record.
+    pub automatic: Vec<(&'static str, ParamValue)>,
+    /// A word for a value that sits at a limit that is a shape ("full round"), by parameter.
+    pub states: Vec<(&'static str, &'static str)>,
+    /// The largest value a bound that depends on other parameters allows right now, by
+    /// parameter: the block's slider ends there (aria-valuemax), not at the schema's.
+    pub limits: Vec<(&'static str, ParamValue)>,
 }

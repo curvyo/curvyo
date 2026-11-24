@@ -17,6 +17,8 @@ use curvyo_ui_core::{
     is_drawn_handle,
 };
 
+use curvyo_ui_core::instance;
+
 use super::Session;
 use super::Tool;
 use super::group_view::merged_corners;
@@ -38,7 +40,7 @@ impl Session {
             return None;
         }
         let cursor = self.pointer_position?;
-        self.select.live_edit_snapped(
+        let mut live = self.select.live_edit_snapped(
             objects,
             &self.selection,
             cursor,
@@ -51,7 +53,16 @@ impl Session {
                     super::DropMode::Copy | super::DropMode::Clone | super::DropMode::Nothing
                 ),
             self.snap_result().map_or(Vec2::ZERO, |r| r.offset),
-        )
+        )?;
+        // A gear's resize shows the whole-tooth gear nearest the pointer (`0141` UX notes §15.6).
+        for object in &mut live.objects {
+            if let Some(view) =
+                instance::resize_view(&self.document, &self.manufacturing.extensions, object)
+            {
+                *object = view.preview;
+            }
+        }
+        Some(live)
     }
 
     /// The document's objects with `live` substituted, for the decorations (the

@@ -9,15 +9,24 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod boxes;
+mod contour;
+mod fingers;
+mod footprint;
 mod gear;
 mod manifest;
 mod outline;
+mod rounded_box;
 mod schema;
+mod slit_bend;
+mod tab_layout;
 mod values;
+mod wall;
+mod wall_plates;
+mod wave_slot;
 
 use curvyo_extension_core::{Extension, GenerateRequest, Generated, Manifest};
 
-pub use manifest::{BOX, GEAR, PROCESS_ID, manifest};
+pub use manifest::{BOX, GEAR, PROCESS_ID, ROUNDED_BOX, manifest};
 
 /// The generators as a compiled-in extension.
 #[derive(Debug, Clone, Copy)]
@@ -35,6 +44,7 @@ impl Extension for Generators {
         match request.kind {
             GEAR => Some(gear::generate(request)),
             BOX => Some(boxes::generate(request)),
+            ROUNDED_BOX => Some(rounded_box::generate(request)),
             _ => None,
         }
     }

@@ -8,7 +8,8 @@
 use curvyo_document_core::Point;
 use curvyo_extension_core::ClosedPath;
 
-use crate::outline::polygon;
+use crate::contour::Contour;
+use crate::fingers::is_notched;
 
 /// How a corner square of side `thickness` is treated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,7 +68,7 @@ impl Plate {
         let step = (fingers.to - fingers.from) / f64::from(fingers.segments);
         let widen = self.clearance / 4.0;
         for index in 0..fingers.segments {
-            let notched = (index % 2 == 0) != fingers.even_solid;
+            let notched = is_notched(index, fingers.even_solid);
             let a = fingers.from + step * f64::from(index);
             let b = if index + 1 == fingers.segments {
                 fingers.to
@@ -108,7 +109,7 @@ impl Plate {
 
     /// The closed outline, clockwise on screen, with the top-left corner of the rectangle at the
     /// origin, before the kerf offset.
-    fn polygon(&self) -> Vec<Point> {
+    pub(crate) fn polygon(&self) -> Vec<Point> {
         let (w, h) = (self.width, self.height);
         let size = self.corners.map(|corner| self.corner_size(corner));
         let corner_at = [
@@ -159,10 +160,14 @@ impl Plate {
         simplify(points)
     }
 
-    /// The outline with every edge moved outward by half the kerf (all corners are right angles).
+    /// The outline with every edge moved outward by half the kerf (`contour.rs`, ADR 0082 §2).
     pub(crate) fn outline(&self, kerf: f64) -> ClosedPath {
         let points = self.polygon();
-        polygon(&offset(&points, kerf / 2.0))
+        let mut contour = Contour::new();
+        for (index, from) in points.iter().enumerate() {
+            contour.line_to(*from, points[(index + 1) % points.len()]);
+        }
+        contour.offset(kerf / 2.0).to_path()
     }
 
     /// The along-edge coordinates where the outline steps in or out along the edge `edge`, for
@@ -226,37 +231,4 @@ fn simplify(points: Vec<Point>) -> Vec<Point> {
         .map(|i| unique[i])
         .collect();
     keep
-}
-
-/// The polygon with every edge moved outward by `distance`: each vertex moves along the sum of
-/// the outward normals of its two edges (right angles only).
-fn offset(points: &[Point], distance: f64) -> Vec<Point> {
-    if distance == 0.0 || points.len() < 3 {
-        return points.to_vec();
-    }
-    let n = points.len();
-    let area: f64 = (0..n)
-        .map(|i| {
-            let (a, b) = (points[i], points[(i + 1) % n]);
-            a.x * b.y - b.x * a.y
-        })
-        .sum();
-    // Y grows downward on screen; `area > 0` is clockwise there, so the outward normal of an edge
-    // with direction (dx, dy) is (dy, -dx); the other way round for a negative area.
-    let sign = if area > 0.0 { 1.0 } else { -1.0 };
-    let normal = |a: Point, b: Point| {
-        let (dx, dy) = (b.x - a.x, b.y - a.y);
-        let length = libm::hypot(dx, dy);
-        (sign * dy / length, -sign * dx / length)
-    };
-    (0..n)
-        .map(|i| {
-            let (a, b, c) = (points[(i + n - 1) % n], points[i], points[(i + 1) % n]);
-            let (n1, n2) = (normal(a, b), normal(b, c));
-            Point::new(
-                b.x + (n1.0 + n2.0) * distance,
-                b.y + (n1.1 + n2.1) * distance,
-            )
-        })
-        .collect()
 }

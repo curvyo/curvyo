@@ -143,6 +143,16 @@ impl<'a> Values<'a> {
         }
     }
 
+    /// As `limit_mm` for a lower bound that a choice sets: the notice names `subject`.
+    pub(crate) fn limit_min_for(&mut self, key: &'static str, min: f64, subject: &'static str) {
+        let before = self.mm(key);
+        self.limit_mm(key, min, f64::MAX);
+        if self.mm(key) > before + 1e-12 {
+            let value = ParamValue::Length(Length::from_mm(self.mm(key)));
+            self.set_clamp(key, value, Bound::DependentMinimumFor(subject));
+        }
+    }
+
     /// The clamp bounds the schema gives the length `key`.
     pub(crate) fn schema_range(&self, key: &str) -> (f64, f64) {
         match self.param(key).map(|param| param.kind) {

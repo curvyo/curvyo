@@ -30,6 +30,31 @@ pub struct Param {
     pub default: ParamValue,
     /// The row is drawn only while this holds (UX notes of `0141` §3); `None` = always.
     pub shown_when: Option<ShownWhen>,
+    /// The span of the slider track a number is drawn on (UX notes of `0141` §15.3); `None` = the
+    /// whole range, linear.
+    pub track: Option<Track>,
+}
+
+/// How a slider maps its position to a value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Curve {
+    /// `v = from + (to - from) p`.
+    Linear,
+    /// Width's curve: `v = from + (to - from) (100^p - 1) / 99`.
+    Log,
+}
+
+/// The track of a number's slider: positions 0 to 1 are the values `from` to `to`, a drag past
+/// either end goes on up to the parameter's own bounds (the overshoot rule).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct Track {
+    /// The value at the left end.
+    pub from: f64,
+    /// The value at the right end.
+    pub to: f64,
+    /// The mapping between the ends.
+    pub curve: Curve,
 }
 
 /// When a parameter row is drawn: a condition on another parameter's stored value (hidden, not
@@ -41,6 +66,12 @@ pub enum ShownWhen {
     On {
         /// The switch's key.
         key: &'static str,
+    },
+    /// Every one of the switches `keys` is on (a row that needs two switches, as Ring thickness
+    /// needs Lid and Lid seat).
+    AllOn {
+        /// The switches' keys.
+        keys: &'static [&'static str],
     },
     /// The choice `key` is `choice`.
     Is {
@@ -69,6 +100,9 @@ impl ShownWhen {
         };
         match self {
             Self::On { key } => matches!(value(key), Some(ParamValue::Switch(true))),
+            Self::AllOn { keys } => keys
+                .iter()
+                .all(|key| matches!(value(key), Some(ParamValue::Switch(true)))),
             Self::Is { key, choice } => {
                 matches!(value(key), Some(ParamValue::Choice(current)) if current == choice)
             }
@@ -106,6 +140,9 @@ pub enum ParamKind {
         step: f64,
         /// The decimals shown, trailing zeros trimmed.
         decimals: u8,
+        /// A stored 0 means automatic: the generator derives the value and reports the one it
+        /// used (`Generated::automatic`); the schema minimum applies to every other value.
+        automatic: bool,
     },
     /// A whole number within `min..=max`.
     Count {
@@ -113,6 +150,8 @@ pub enum ParamKind {
         min: u32,
         /// The largest value.
         max: u32,
+        /// A stored 0 means automatic, as for a length.
+        automatic: bool,
     },
     /// An angle in degrees within `min..=max`.
     Angle {
@@ -253,6 +292,12 @@ impl Param {
     #[must_use]
     pub fn accept(&self, value: ParamValue) -> Option<ParamValue> {
         match (self.kind, value) {
+            (
+                ParamKind::Length {
+                    automatic: true, ..
+                },
+                ParamValue::Length(length),
+            ) if length.as_mm() == 0.0 => Some(ParamValue::Length(length)),
             (ParamKind::Length { min, max, .. }, ParamValue::Length(length))
                 if length.as_mm().is_finite() =>
             {
@@ -265,7 +310,13 @@ impl Param {
             {
                 Some(ParamValue::Angle(Degrees(degrees.0.clamp(min.0, max.0))))
             }
-            (ParamKind::Count { min, max }, ParamValue::Count(count)) => {
+            (
+                ParamKind::Count {
+                    automatic: true, ..
+                },
+                ParamValue::Count(0),
+            ) => Some(ParamValue::Count(0)),
+            (ParamKind::Count { min, max, .. }, ParamValue::Count(count)) => {
                 Some(ParamValue::Count(count.clamp(min, max)))
             }
             (ParamKind::Switch, switch @ ParamValue::Switch(_)) => Some(switch),
@@ -302,10 +353,93 @@ mod tests {
                 max: Length::from_mm(1000.0),
                 step: 1.0,
                 decimals: 2,
+                automatic: false,
             },
             default: ParamValue::Length(Length::from_mm(10.0)),
             shown_when: None,
+            track: None,
         }
+    }
+
+    #[test]
+    fn a_row_shown_when_all_its_switches_are_on() {
+        let switches = [
+            Param {
+                key: "a",
+                label: "A",
+                tooltip: "A",
+                kind: ParamKind::Switch,
+                default: ParamValue::Switch(true),
+                shown_when: None,
+                track: None,
+            },
+            Param {
+                key: "b",
+                label: "B",
+                tooltip: "B",
+                kind: ParamKind::Switch,
+                default: ParamValue::Switch(true),
+                shown_when: None,
+                track: None,
+            },
+        ];
+        let both = ShownWhen::AllOn { keys: &["a", "b"] };
+        let mut stored = StoredParams::new();
+        assert!(both.holds(&switches, &stored), "defaults are on");
+        stored.insert("a".into(), ParamValue::Switch(false).to_stored());
+        assert!(!both.holds(&switches, &stored));
+    }
+
+    #[test]
+    fn an_automatic_zero_passes_accept_and_any_other_value_keeps_the_minimum() {
+        let mut param = spacing();
+        param.kind = ParamKind::Length {
+            min: Length::from_mm(0.5),
+            max: Length::from_mm(1000.0),
+            step: 1.0,
+            decimals: 2,
+            automatic: true,
+        };
+        let zero = ParamValue::Length(Length::from_mm(0.0));
+        assert_eq!(param.accept(zero.clone()), Some(zero.clone()));
+        assert_eq!(
+            param.accept(ParamValue::Length(Length::from_mm(0.1))),
+            Some(ParamValue::Length(Length::from_mm(0.5))),
+            "a typed value below the minimum is clamped"
+        );
+        let mut stored = StoredParams::new();
+        stored.insert("spacing".into(), zero.to_stored());
+        assert_eq!(param.read(&stored), zero, "a stored 0 reads as automatic");
+        let count = ParamKind::Count {
+            min: 1,
+            max: 10,
+            automatic: true,
+        };
+        param.kind = count;
+        assert_eq!(
+            param.accept(ParamValue::Count(0)),
+            Some(ParamValue::Count(0))
+        );
+        assert_eq!(
+            param.accept(ParamValue::Count(99)),
+            Some(ParamValue::Count(10))
+        );
+    }
+
+    #[test]
+    fn a_track_is_part_of_the_serialised_row() {
+        let mut param = spacing();
+        param.track = Some(Track {
+            from: 1.0,
+            to: 100.0,
+            curve: Curve::Log,
+        });
+        let json = serde_json::to_value(&param).unwrap();
+        assert_eq!(
+            json["track"],
+            serde_json::json!({"from": 1.0, "to": 100.0, "curve": "log"})
+        );
+        assert!(serde_json::to_value(spacing()).unwrap()["track"].is_null());
     }
 
     #[test]
@@ -350,9 +484,14 @@ mod tests {
             key: "teeth",
             label: "Teeth",
             tooltip: "Teeth",
-            kind: ParamKind::Count { min: 6, max: 200 },
+            kind: ParamKind::Count {
+                min: 6,
+                max: 200,
+                automatic: false,
+            },
             default: ParamValue::Count(24),
             shown_when: None,
+            track: None,
         };
         assert_eq!(
             count.accept(ParamValue::Count(3)),
@@ -384,6 +523,7 @@ mod tests {
             },
             default: ParamValue::Choice("solid".into()),
             shown_when: None,
+            track: None,
         };
         assert_eq!(choice.accept(ParamValue::Choice("lattice".into())), None);
         assert!(

@@ -25,4 +25,6 @@ pub use manifest::{
     ToolboxCommand, WorkbenchContribution,
 };
 pub use notice::NoticeContext;
-pub use param::{ChoiceOption, Degrees, Param, ParamKind, ParamValue, ShownWhen, StoredParams};
+pub use param::{
+    ChoiceOption, Curve, Degrees, Param, ParamKind, ParamValue, ShownWhen, StoredParams, Track,
+};

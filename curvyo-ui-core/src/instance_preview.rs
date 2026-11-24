@@ -43,6 +43,25 @@ mod tests {
     use crate::instance::{find_kind, new_record};
 
     #[test]
+    fn the_ghost_of_a_rounded_box_has_no_slits() {
+        let found = find_kind(
+            &ExtensionSettings::default(),
+            "curvyo.generators/rounded-box",
+        )
+        .expect("rounded box");
+        let ghost = crate::instance::new_ghost_record(&found).expect("ghost");
+        let (real, _) = new_record(&found).expect("defaults");
+        let ghost = ghost_path(&ghost, Point::new(0.0, 0.0)).expect("outline");
+        let real = ghost_path(&real, Point::new(0.0, 0.0)).expect("outline");
+        assert_eq!(ghost.extra_subpaths.len(), real.extra_subpaths.len());
+        assert!(
+            ghost.anchors.len() <= 4 + 1,
+            "the strip is a plain rectangle"
+        );
+        assert!(real.anchors.len() > 100, "the real strip carries its slits");
+    }
+
+    #[test]
     fn the_ghost_of_a_box_is_its_plates_around_the_pointer() {
         let found = find_kind(&ExtensionSettings::default(), "curvyo.generators/box").expect("box");
         let (record, _) = new_record(&found).expect("defaults");

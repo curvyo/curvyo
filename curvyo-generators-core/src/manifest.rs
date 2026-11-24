@@ -2,7 +2,7 @@
 
 use curvyo_extension_core::{Contribution, GeneratorKind, Manifest};
 
-use crate::{boxes, gear};
+use crate::{boxes, gear, rounded_box};
 
 /// The extension id; generated objects store `<id>/<kind>`.
 pub const PROCESS_ID: &str = "curvyo.generators";
@@ -10,8 +10,10 @@ pub const PROCESS_ID: &str = "curvyo.generators";
 pub const GEAR: &str = "gear";
 /// The kind id of the box.
 pub const BOX: &str = "box";
+/// The kind id of the rounded box.
+pub const ROUNDED_BOX: &str = "rounded-box";
 
-/// The generators' manifest, kinds in the registry order (by name: Box, Gear; `0065` criterion 3).
+/// The generators' manifest, kinds in the registry order (by name: Box, Gear, Rounded box; `0065` criterion 3).
 #[must_use]
 pub fn manifest() -> Manifest {
     Manifest {
@@ -31,6 +33,12 @@ pub fn manifest() -> Manifest {
                 label: "Gear",
                 icon: "Cog",
                 groups: gear::groups(),
+            }),
+            Contribution::Generator(GeneratorKind {
+                id: ROUNDED_BOX,
+                label: "Rounded box",
+                icon: "SquareRoundCorner",
+                groups: rounded_box::groups(),
             }),
         ],
     }

@@ -173,9 +173,10 @@ fn a_resize_writes_parameters_not_a_hidden_transform() {
     let result = ObjectSnapshot::Path(path.mapped(Affine::new(2.0, 0.0, 0.0, 2.0, -50.0, -40.0)));
     instance::resize(&document, &settings, &result, "transform_resize").unwrap();
     let after = document.generated(id).unwrap();
-    assert_eq!(value(&after.record, "module"), mm(4.0));
-    assert_eq!(value(&after.record, "teeth"), ParamValue::Count(24));
-    assert_eq!(value(&after.record, "bore"), mm(12.0));
+    // 0141 revision 2: a gear resize writes Teeth (m (z + 2) = 52 doubles to 104), nothing else.
+    assert_eq!(value(&after.record, "module"), mm(2.0));
+    assert_eq!(value(&after.record, "teeth"), ParamValue::Count(50));
+    assert_eq!(value(&after.record, "bore"), mm(6.0));
     // The object's centre followed the map: (50, 40) about the origin of the scale.
     assert!((after.frame.e - 50.0).abs() < 1e-9 && (after.frame.f - 40.0).abs() < 1e-9);
     assert!(
@@ -318,4 +319,174 @@ fn a_converted_box_keeps_the_operation_assigned_to_it() {
         5,
         "the five plates sit under it"
     );
+}
+
+const ROUNDED: &str = "curvyo.generators/rounded-box";
+
+#[test]
+fn a_rounded_box_block_shows_the_values_the_generator_used_for_automatic_rows() {
+    let (document, id, settings) = placed(ROUNDED);
+    let view = instance::view(&settings, &document.generated(id).unwrap());
+    let row = |key: &str| view.rows.iter().find(|row| row.param.key == key).unwrap();
+    // Stored 0 is automatic: the row keeps 0 and carries what the generator used.
+    assert_eq!(row("slit_width").value, mm(0.0));
+    assert_eq!(row("slit_width").used, Some(mm(0.3)));
+    assert_eq!(
+        row("lid_thickness").used,
+        Some(mm(3.0)),
+        "follows the wall thickness"
+    );
+    assert_eq!(row("thickness").used, None, "a plain row has none");
+    // Typing a value makes it the maker's own: nothing is reported for it.
+    instance::change_value(&document, &settings, id, "slit_width", &mm(0.5)).unwrap();
+    let view = instance::view(&settings, &document.generated(id).unwrap());
+    let own = view
+        .rows
+        .iter()
+        .find(|row| row.param.key == "slit_width")
+        .unwrap();
+    assert_eq!(own.value, mm(0.5));
+    assert_eq!(own.used, None);
+    // The box places, resizes with the radius kept and converts to its five plates.
+    assert_eq!(document.generated(id).unwrap().record.parts.len(), 5);
+}
+
+#[test]
+fn ring_thickness_and_the_hollow_rows_need_the_lid_and_its_seat() {
+    let (document, id, settings) = placed(ROUNDED);
+    let labels = |document: &Document| -> Vec<String> {
+        instance::view(&settings, &document.generated(id).unwrap())
+            .rows
+            .iter()
+            .map(|row| row.param.label.to_owned())
+            .collect()
+    };
+    for shown in [
+        "Ring thickness",
+        "Finger hollow",
+        "Hollow width",
+        "Hollow depth",
+    ] {
+        assert!(labels(&document).contains(&shown.to_owned()), "{shown}");
+    }
+    instance::change_value(&document, &settings, id, "lid", &ParamValue::Switch(false)).unwrap();
+    let after = labels(&document);
+    for hidden in [
+        "Ring thickness",
+        "Finger hollow",
+        "Hollow width",
+        "Hollow depth",
+        "Lid seat",
+    ] {
+        assert!(
+            !after.contains(&hidden.to_owned()),
+            "{hidden} stays hidden without a lid"
+        );
+    }
+}
+
+#[test]
+fn the_wave_pattern_names_itself_when_it_raises_the_slit_spacing() {
+    let (document, id, settings) = placed(ROUNDED);
+    let choice = |id: &str| ParamValue::Choice(id.to_owned());
+    instance::change_value(&document, &settings, id, "slit_pattern", &choice("wave")).unwrap();
+    let changed =
+        instance::change_value(&document, &settings, id, "slit_spacing", &mm(1.3)).unwrap();
+    assert_eq!(
+        changed.notices,
+        ["Slit spacing set to 1.48 mm, the least the Wave pattern allows."]
+    );
+    // Without the Wave pattern the plain sentence stays.
+    instance::change_value(
+        &document,
+        &settings,
+        id,
+        "slit_pattern",
+        &choice("straight"),
+    )
+    .unwrap();
+    let changed =
+        instance::change_value(&document, &settings, id, "slit_spacing", &mm(0.6)).unwrap();
+    assert_eq!(
+        changed.notices,
+        ["Slit spacing set to 1.3 mm, the least this rounded box allows."]
+    );
+}
+
+#[test]
+fn a_full_round_corner_radius_reports_its_state_for_the_field() {
+    let (document, id, settings) = placed(ROUNDED);
+    let state = |document: &Document| {
+        instance::view(&settings, &document.generated(id).unwrap())
+            .rows
+            .iter()
+            .find(|row| row.param.key == "corner_radius")
+            .unwrap()
+            .state
+    };
+    assert_eq!(state(&document), None);
+    instance::change_value(&document, &settings, id, "corner_radius", &mm(40.0)).unwrap();
+    assert_eq!(state(&document), Some("full round"));
+}
+
+#[test]
+fn a_gear_resize_previews_whole_teeth_and_reads_teeth_and_outer_diameter() {
+    let (document, id, settings) = placed(GEAR);
+    let ObjectSnapshot::Path(path) = document.object(id).unwrap() else {
+        panic!("path");
+    };
+    let before = path.anchors.len();
+    // The pointer asks for 1.5 times the size: m (z + 2) = 52 becomes 78, so z = 37.
+    let result = ObjectSnapshot::Path(path.mapped(Affine::new(1.5, 0.0, 0.0, 1.5, 0.0, 0.0)));
+    let view = instance::resize_view(&document, &settings, &result).expect("a gear steps by teeth");
+    assert_eq!(view.readout, "37 teeth · ⌀ 78 mm");
+    let ObjectSnapshot::Path(preview) = view.preview else {
+        panic!("a path");
+    };
+    assert_eq!(preview.id, id, "the preview is the object's own");
+    assert!(preview.anchors.len() > before, "more teeth, more anchors");
+    // The bounds of the whole-tooth gear, not the pointer's exact size.
+    let tiny = ObjectSnapshot::Path(path.mapped(Affine::new(0.01, 0.0, 0.0, 0.01, 0.0, 0.0)));
+    assert_eq!(
+        instance::resize_view(&document, &settings, &tiny)
+            .unwrap()
+            .readout,
+        "6 teeth min · ⌀ 16 mm"
+    );
+    let huge = ObjectSnapshot::Path(path.mapped(Affine::new(50.0, 0.0, 0.0, 50.0, 0.0, 0.0)));
+    assert_eq!(
+        instance::resize_view(&document, &settings, &huge)
+            .unwrap()
+            .readout,
+        "200 teeth max · ⌀ 404 mm"
+    );
+    // Other generators keep the plain size readout.
+    let (document, id, settings) = placed(BOX);
+    let ObjectSnapshot::Path(path) = document.object(id).unwrap() else {
+        panic!("path");
+    };
+    let result = ObjectSnapshot::Path(path.mapped(Affine::scale(2.0, 2.0)));
+    assert!(instance::resize_view(&document, &settings, &result).is_none());
+}
+
+#[test]
+fn a_row_reports_the_live_limit_of_its_dependent_bound() {
+    let (document, id, settings) = placed(ROUNDED);
+    instance::change_value(&document, &settings, id, "corner_radius", &mm(40.0)).unwrap();
+    let view = instance::view(&settings, &document.generated(id).unwrap());
+    let limit = |key: &str| {
+        view.rows
+            .iter()
+            .find(|row| row.param.key == key)
+            .unwrap()
+            .limit
+            .clone()
+    };
+    assert_eq!(
+        limit("hollow_width"),
+        Some(mm(40.0)),
+        "the front straight at r 40"
+    );
+    assert_eq!(limit("corner_radius"), Some(mm(40.0)));
+    assert_eq!(limit("thickness"), None);
 }

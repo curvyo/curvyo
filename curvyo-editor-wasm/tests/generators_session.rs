@@ -21,7 +21,7 @@ fn panel(session: &Session) -> Value {
 }
 
 #[test]
-fn the_bar_offers_box_then_gear_and_a_press_places_the_chosen_one_selected() {
+fn the_bar_offers_box_gear_and_rounded_box_and_a_press_places_the_chosen_one_selected() {
     let mut s = session();
     let kinds: Value = serde_json::from_str(&s.generator_kinds_json()).unwrap();
     let ids: Vec<&str> = kinds
@@ -30,7 +30,14 @@ fn the_bar_offers_box_then_gear_and_a_press_places_the_chosen_one_selected() {
         .iter()
         .map(|kind| kind["id"].as_str().unwrap())
         .collect();
-    assert_eq!(ids, ["curvyo.generators/box", "curvyo.generators/gear"]);
+    assert_eq!(
+        ids,
+        [
+            "curvyo.generators/box",
+            "curvyo.generators/gear",
+            "curvyo.generators/rounded-box"
+        ]
+    );
     assert_eq!(
         s.generator_kind(),
         "curvyo.generators/box",
@@ -246,16 +253,25 @@ fn a_corner_drag_of_an_available_generator_resizes_through_its_parameters() {
     let steps = s.history_len();
     drag_corner(&mut s, high);
     assert_eq!(s.history_len(), steps + 1, "one resize step");
-    let module = panel(&s)["rows"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|row| row["param"]["key"] == "module")
-        .unwrap()["value"]
-        .to_string();
+    let rows = panel(&s)["rows"].clone();
+    let value_of = |key: &str| {
+        rows.as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["param"]["key"] == key)
+            .unwrap()["value"]
+            .to_string()
+    };
+    // 0141 revision 2: the drag writes Teeth (more than the default 24) and keeps the module.
     assert!(
-        !module.contains("2.0") && !module.contains(":2}"),
-        "module grew: {module}"
+        !value_of("teeth").contains("24"),
+        "teeth grew: {}",
+        value_of("teeth")
+    );
+    assert!(
+        value_of("module").contains("2.0"),
+        "module stays: {}",
+        value_of("module")
     );
 }
 
@@ -330,11 +346,11 @@ fn the_size_chip_of_a_disabled_generator_does_not_open() {
     assert!(s.take_transform_notice().ends_with("cannot be resized."));
 }
 
-fn module_of(s: &Session) -> f64 {
+fn teeth_of(s: &Session) -> f64 {
     let rows = panel(s)["rows"].as_array().unwrap().clone();
     let row = rows
         .iter()
-        .find(|row| row["param"]["key"] == "module")
+        .find(|row| row["param"]["key"] == "teeth")
         .unwrap();
     let text = row["value"].to_string();
     text.trim_matches(|c: char| !c.is_ascii_digit() && c != '.' && c != '-')
@@ -346,7 +362,7 @@ fn module_of(s: &Session) -> f64 {
 #[test]
 fn a_corner_drag_of_a_generated_object_keeps_its_proportions_whatever_the_pointer_does() {
     let (mut s, low, high) = gear_session();
-    let before = module_of(&s);
+    let before = teeth_of(&s);
     // The pointer only moves along x: a free resize would scale x alone.
     let width = high.x - low.x;
     let to = Point::new(high.x + width / 2.0, high.y);
@@ -354,12 +370,10 @@ fn a_corner_drag_of_a_generated_object_keeps_its_proportions_whatever_the_pointe
     s.pointer_down(high, false);
     s.pointer_hover(to, false, false);
     s.pointer_up(to, false, false);
-    let after = module_of(&s);
-    // Proportional: both axes follow the larger change, the module grows by half.
-    assert!(
-        (after / before - 1.5).abs() < 1e-3,
-        "module {before} -> {after}"
-    );
+    let after = teeth_of(&s);
+    // Proportional: both axes follow the larger change, the outer diameter m (z + 2) grows by half,
+    // so 24 teeth become 1.5 * 26 - 2 = 37 (0141 revision 2).
+    assert!((after - 37.0).abs() < 0.5, "teeth {before} -> {after}");
 }
 
 #[test]
@@ -452,56 +466,64 @@ fn a_stepped_value_is_previewed_without_a_step_and_the_key_up_commits_it() {
     assert!((value_of(&s, "teeth") - 31.0).abs() < 1e-9);
 }
 
-#[test]
-fn the_pitch_diameter_knob_drags_the_module_with_one_named_step() {
+/// A spoked gear in a session and the rim knob's place, from the same gear in a scratch document.
+fn spoked_gear_session() -> (Session, curvyo_ui_core::instance_handles::Knob) {
     let (mut s, _, _) = gear_session();
+    s.set_generated_value("web", "\"spokes\"");
     let document = Document::new(1);
-    // The same gear in a scratch document gives the knob positions.
+    let settings = curvyo_ui_core::ExtensionSettings::default();
     let id = curvyo_ui_core::instance::place(
         &document,
-        &curvyo_ui_core::ExtensionSettings::default(),
+        &settings,
         "curvyo.generators/gear",
         Point::new(100.0, 100.0),
     )
     .unwrap();
-    let knobs = curvyo_ui_core::instance_handles::knobs(
-        &curvyo_ui_core::ExtensionSettings::default(),
-        &document.generated(id).unwrap(),
-    );
-    let pitch = knobs
-        .iter()
-        .find(|knob| knob.key == "pitch_diameter")
+    curvyo_ui_core::instance::change_value(
+        &document,
+        &settings,
+        id,
+        "web",
+        &curvyo_extension_core::ParamValue::Choice("spokes".into()),
+    )
+    .unwrap();
+    let knobs =
+        curvyo_ui_core::instance_handles::knobs(&settings, &document.generated(id).unwrap());
+    // 0141 revision 2 (UX notes 15.6, Proposal): the corner handle writes Teeth, so no pitch knob.
+    assert!(knobs.iter().all(|knob| knob.key != "pitch_diameter"));
+    let rim = knobs
+        .into_iter()
+        .find(|knob| knob.key == "rim_width")
         .unwrap();
+    (s, rim)
+}
+
+#[test]
+fn the_rim_knob_drags_the_rim_width_with_one_named_step() {
+    let (mut s, rim) = spoked_gear_session();
     let steps = s.history_len();
-    s.pointer_hover(pitch.at, false, false);
-    s.pointer_down(pitch.at, false);
+    s.pointer_hover(rim.at, false, false);
+    s.pointer_down(rim.at, false);
     let to = Point::new(
-        pitch.at.x + pitch.direction.x * 5.0,
-        pitch.at.y + pitch.direction.y * 5.0,
+        rim.at.x + rim.direction.x * 2.0,
+        rim.at.y + rim.direction.y * 2.0,
     );
     s.pointer_hover(to, false, false);
     assert_eq!(s.history_len(), steps, "nothing is written during the drag");
     assert!(
-        s.live_readout()
-            .unwrap()
-            .text
-            .starts_with("Pitch diameter 58.0 mm"),
+        s.live_readout().unwrap().text.starts_with("Rim width"),
         "the readout names the value"
-    );
-    assert!(
-        (value_of(&s, "module") - 58.0 / 24.0).abs() < 1e-6,
-        "the block follows"
     );
     s.pointer_up(to, false, false);
     assert_eq!(s.history_len(), steps + 1, "one step");
-    assert_eq!(newest_name(&mut s), "Gear: Pitch diameter");
-    assert!((value_of(&s, "module") - 58.0 / 24.0).abs() < 1e-6);
+    assert_eq!(newest_name(&mut s), "Gear: Rim width");
+    assert!((value_of(&s, "rim_width") - 6.0).abs() < 1e-6);
 }
 
 #[test]
 fn a_knob_of_a_generator_switched_off_after_a_draw_is_neither_drawn_nor_hit() {
-    let (mut s, _, _) = gear_session();
-    let at = Point::new(100.0 + 24.0 * 0.5_f64.sqrt(), 100.0 + 24.0 * 0.5_f64.sqrt());
+    let (mut s, rim) = spoked_gear_session();
+    let at = rim.at;
     // The draw fills the knob memo.
     let with_knobs = s.draw_list().triangle_count();
     s.set_extension_enabled("curvyo.generators", false);
@@ -514,23 +536,23 @@ fn a_knob_of_a_generator_switched_off_after_a_draw_is_neither_drawn_nor_hit() {
     s.pointer_hover(to, false, false);
     assert!(
         s.live_readout()
-            .is_none_or(|readout| !readout.text.starts_with("Pitch diameter")),
+            .is_none_or(|readout| !readout.text.starts_with("Rim width")),
         "no knob drag runs"
     );
 }
 
 #[test]
 fn escape_during_a_knob_drag_writes_nothing() {
-    let (mut s, _, _) = gear_session();
+    let (mut s, rim) = spoked_gear_session();
     let steps = s.history_len();
-    let at = Point::new(100.0 + 24.0 * 0.5_f64.sqrt(), 100.0 + 24.0 * 0.5_f64.sqrt());
+    let at = rim.at;
     s.pointer_hover(at, false, false);
     s.pointer_down(at, false);
-    s.pointer_hover(Point::new(at.x + 6.0, at.y + 6.0), false, false);
+    s.pointer_hover(Point::new(at.x + 2.0, at.y), false, false);
     s.escape();
-    s.pointer_up(Point::new(at.x + 6.0, at.y + 6.0), false, false);
+    s.pointer_up(Point::new(at.x + 2.0, at.y), false, false);
     assert_eq!(s.history_len(), steps);
-    assert!((value_of(&s, "module") - 2.0).abs() < 1e-9);
+    assert!((value_of(&s, "rim_width") - 4.0).abs() < 1e-9);
 }
 
 #[test]
@@ -575,5 +597,63 @@ fn object_to_path_converts_a_generated_object_of_the_selection() {
     assert!(
         !s.convert_selected_generated(),
         "nothing generated is left to convert"
+    );
+}
+
+#[test]
+fn the_corner_radius_knob_reads_r_and_says_full_round_at_the_limit() {
+    let mut s = session();
+    s.set_generator_kind("curvyo.generators/rounded-box");
+    assert!(s.place_generated(300.0, 300.0));
+    let document = Document::new(1);
+    let settings = curvyo_ui_core::ExtensionSettings::default();
+    let id = curvyo_ui_core::instance::place(
+        &document,
+        &settings,
+        "curvyo.generators/rounded-box",
+        Point::new(300.0, 300.0),
+    )
+    .unwrap();
+    let knobs =
+        curvyo_ui_core::instance_handles::knobs(&settings, &document.generated(id).unwrap());
+    let knob = knobs.iter().find(|k| k.key == "corner_radius").unwrap();
+    s.pointer_hover(knob.at, false, false);
+    s.pointer_down(knob.at, false);
+    // A little along the diagonal: still a plain radius.
+    let step = |mm: f64| {
+        Point::new(
+            knob.at.x + knob.direction.x * mm,
+            knob.at.y + knob.direction.y * mm,
+        )
+    };
+    s.pointer_hover(step(2.0), false, false);
+    let text = s.live_readout().unwrap().text;
+    assert!(text.starts_with("r 19."), "{text}");
+    assert!(!text.contains("full round"), "{text}");
+    // Far past half the shorter side (40 mm): full round.
+    s.pointer_hover(step(60.0), false, false);
+    assert_eq!(s.live_readout().unwrap().text, "r 40.0 mm full round");
+    s.pointer_up(step(60.0), false, false);
+    assert_eq!(value_of(&s, "corner_radius"), 40.0);
+}
+
+#[test]
+fn a_gear_corner_drag_reads_teeth_and_steps_whole_teeth_while_it_moves() {
+    let (mut s, _, high) = gear_session();
+    s.pointer_hover(high, false, false);
+    s.pointer_down(high, false);
+    let to = Point::new(high.x + 20.0, high.y + 20.0);
+    s.pointer_hover(to, false, false);
+    let readout = s.live_readout().unwrap().text;
+    assert!(readout.contains(" teeth"), "{readout}");
+    assert!(readout.contains("⌀"), "{readout}");
+    assert!(!readout.contains('×'), "{readout}");
+    // Nothing is written before the release, and the release writes the same teeth.
+    let shown: f64 = readout.split(' ').next().unwrap().parse().unwrap();
+    s.pointer_up(to, false, false);
+    assert_eq!(
+        value_of(&s, "teeth"),
+        shown,
+        "the commit is the previewed gear"
     );
 }
