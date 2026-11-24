@@ -188,6 +188,9 @@ pub const FREE_STEPS: &[&str] = &[
     "place_sketch_clone",
     "convert_sketch_page",
     "delete_sketch_page",
+    // `specs/0137-document-library`: an import adds new objects (and a page) only.
+    "import_page",
+    "import_elements",
     "create_path",
     "create_rect",
     "create_ellipse",

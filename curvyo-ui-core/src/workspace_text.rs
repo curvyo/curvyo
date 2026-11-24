@@ -119,7 +119,7 @@ pub fn change_time_text(modified: u64, now: u64, offset_minutes: i32) -> String 
 
 /// The year, month (1 to 12) and day of the month of `days` since 1970-01-01 (proleptic
 /// Gregorian calendar; Howard Hinnant's `civil_from_days`).
-fn civil_date(days: i64) -> (i64, i64, i64) {
+pub(crate) fn civil_date(days: i64) -> (i64, i64, i64) {
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);

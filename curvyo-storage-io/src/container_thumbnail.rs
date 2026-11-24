@@ -1,16 +1,11 @@
 //! Puts the page's PNG into `.curvyo` container bytes as the `thumbnail.png` member a workspace
 //! row shows (`specs/0095-workspace` criterion 6, ADR 0004 §1).
 //!
-//! The page renders the thumbnail and packs the document; the host joins the two before the
-//! write. Every other member is copied raw, so the document's own bytes are not touched. A build
-//! that does not know the member never reads it: containers are read member by member by name.
+//! The join itself is `curvyo_document_core::with_thumbnail`; every other member is copied raw,
+//! so the document's own bytes are not touched. A build that does not know the member never
+//! reads it: containers are read member by member by name.
 
-use std::io::{Cursor, Write as _};
-
-use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, ZipArchive, ZipWriter};
-
-use crate::workspace_documents::{MAX_THUMBNAIL_BYTES, THUMBNAIL_MEMBER};
+use crate::workspace_documents::MAX_THUMBNAIL_BYTES;
 
 /// The eight bytes every PNG file starts with.
 const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
@@ -40,30 +35,5 @@ pub fn with_thumbnail(container: &[u8], png: &[u8]) -> Result<Vec<u8>, Thumbnail
     if png.len() as u64 > MAX_THUMBNAIL_BYTES {
         return Err(ThumbnailError::TooLarge);
     }
-    let mut archive =
-        ZipArchive::new(Cursor::new(container)).map_err(|_| ThumbnailError::NotAContainer)?;
-    let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
-    for index in 0..archive.len() {
-        let member = archive
-            .by_index_raw(index)
-            .map_err(|_| ThumbnailError::NotAContainer)?;
-        let name = member.name().map_err(|_| ThumbnailError::NotAContainer)?;
-        if name == THUMBNAIL_MEMBER {
-            continue;
-        }
-        writer
-            .raw_copy_file(member)
-            .map_err(|_| ThumbnailError::NotAContainer)?;
-    }
-    // A PNG is compressed already.
-    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
-    writer
-        .start_file(THUMBNAIL_MEMBER, options)
-        .and_then(|()| writer.write_all(png).map_err(Into::into))
-        .map_err(|_| ThumbnailError::NotAContainer)?;
-    let bytes = writer
-        .finish()
-        .map_err(|_| ThumbnailError::NotAContainer)?
-        .into_inner();
-    Ok(bytes)
+    curvyo_document_core::with_thumbnail(container, png).map_err(|_| ThumbnailError::NotAContainer)
 }

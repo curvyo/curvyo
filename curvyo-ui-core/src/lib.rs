@@ -97,7 +97,10 @@ mod image_placement;
 pub mod key_backup_text;
 mod layer_move;
 mod layer_rows;
+pub mod library_index;
+pub mod library_index_text;
 pub mod library_text;
+pub mod library_tree;
 mod page_tree_rows;
 pub use page_tree_rows::{FixtureTreeRow, PageTree, PlacedPageRow};
 mod layer_text;
@@ -432,7 +435,7 @@ pub use image_placement::{ImagePlacement, ImageTarget, STAGGER_MM, natural_size_
 pub use layer_move::{Reorder, move_refusal_text, reorder_plans, unchanged_text};
 pub use layer_rows::{
     Cause, Container, Expansion, FixtureLine, Flags, LayerRow, LayerRows, RowFacts, RowKind,
-    RowMark, dimension_row_name, percent,
+    RowMark, dimension_row_name, percent, shown_names,
 };
 pub use layer_text::{
     DUPLICATE_FAILED_NOTICE, NothingToSelect, OpacityTarget, delete_locked_layer_notice,
