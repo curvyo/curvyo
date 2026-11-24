@@ -6,16 +6,17 @@ use std::fs::{self, File};
 use std::io::{ErrorKind, Read};
 use std::path::Path;
 
+use curvyo_document_core::{ZipMember as Member, read_zip_member};
 use zip::ZipArchive;
 
 use crate::workspace::{WorkspaceError, io_error, resolve};
 
 /// The container member that holds the document's thumbnail (ADR 0004 §1).
-pub(crate) const THUMBNAIL_MEMBER: &str = "thumbnail.png";
+pub(crate) use curvyo_document_core::THUMBNAIL_MEMBER;
 /// The member every `.curvyo` container has.
 const MANIFEST_MEMBER: &str = "manifest.json";
 /// The largest thumbnail a row reads; a larger one is shown as the placeholder **(Proposal)**.
-pub const MAX_THUMBNAIL_BYTES: u64 = 1024 * 1024;
+pub const MAX_THUMBNAIL_BYTES: u64 = curvyo_document_core::MAX_PICTURE_BYTES;
 /// The largest manifest read to check the container.
 const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
 
@@ -66,12 +67,12 @@ pub fn probe_document(root: &Path, path: &[String]) -> Result<DocumentProbe, Wor
     let Ok(mut archive) = ZipArchive::new(file) else {
         return Ok(DocumentProbe::Damaged);
     };
-    match read_member(&mut archive, MANIFEST_MEMBER, MAX_MANIFEST_BYTES) {
+    match read_zip_member(&mut archive, MANIFEST_MEMBER, MAX_MANIFEST_BYTES) {
         Member::Missing => return Ok(DocumentProbe::NotCurvyo),
         Member::Broken => return Ok(DocumentProbe::Damaged),
         Member::TooLarge | Member::Read(_) => {}
     }
-    let thumbnail = match read_member(&mut archive, THUMBNAIL_MEMBER, MAX_THUMBNAIL_BYTES) {
+    let thumbnail = match read_zip_member(&mut archive, THUMBNAIL_MEMBER, MAX_THUMBNAIL_BYTES) {
         Member::Read(bytes) => Some(bytes),
         Member::Broken => return Ok(DocumentProbe::Damaged),
         Member::Missing | Member::TooLarge => None,
@@ -105,33 +106,9 @@ pub fn share_members(root: &Path, path: &[String]) -> Result<ShareMembers, Works
     let Ok(mut archive) = ZipArchive::new(file) else {
         return Ok(ShareMembers::default());
     };
-    let share_json = match read_member(&mut archive, SHARE_MEMBER, MAX_SHARE_BYTES) {
+    let share_json = match read_zip_member(&mut archive, SHARE_MEMBER, MAX_SHARE_BYTES) {
         Member::Read(bytes) => Some(bytes),
         Member::Missing | Member::TooLarge | Member::Broken => None,
     };
     Ok(ShareMembers { share_json })
-}
-
-enum Member {
-    Missing,
-    TooLarge,
-    Broken,
-    Read(Vec<u8>),
-}
-
-fn read_member(archive: &mut ZipArchive<File>, name: &str, limit: u64) -> Member {
-    let mut member = match archive.by_name(name) {
-        Ok(member) => member,
-        Err(zip::result::ZipError::FileNotFound) => return Member::Missing,
-        Err(_) => return Member::Broken,
-    };
-    if member.size() > limit {
-        return Member::TooLarge;
-    }
-    let mut bytes = Vec::new();
-    match member.by_ref().take(limit + 1).read_to_end(&mut bytes) {
-        Ok(_) if bytes.len() as u64 <= limit => Member::Read(bytes),
-        Ok(_) => Member::TooLarge,
-        Err(_) => Member::Broken,
-    }
 }

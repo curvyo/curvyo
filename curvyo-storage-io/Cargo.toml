@@ -41,10 +41,11 @@ trash = "5.2"
 # thumbnail into the container on save (`specs/0095-workspace` criteria 6 and 8): the workspace's
 # own zip crate, already used by `curvyo-document-core`.
 zip.workspace = true
+# The library's member read of a document file without opening it (`specs/0137`, ADR 0084 decision
+# 10): one pure reader in the document crate for the desktop and the browser build.
+curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 
 [dev-dependencies]
-# Only the test that opening an older project writes nothing to its file (`0040` criterion 4).
-curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 tempfile = "3"
 # Thread CPU time of the workspace scan budget (`specs/0095-workspace` criterion 5).
 rustix = { version = "1.1", features = ["time"] }

@@ -338,6 +338,20 @@ fn row_mark(facts: RowFacts<'_>, id: NodeId, kind: RowKind) -> RowMark {
     }
 }
 
+/// The name each node of `document` shows in the Layers list, by id: its own, or
+/// `<Kind> <six-character id>` (the Library's preview announces picks by it, `specs/0137` UX
+/// notes 6.4).
+#[must_use]
+pub fn shown_names(
+    document: &curvyo_document_core::Document,
+) -> std::collections::HashMap<NodeId, String> {
+    document
+        .read_nodes()
+        .iter()
+        .map(|read| (read.id, shown_name(read, RowKind::of(&read.kind)).0))
+        .collect()
+}
+
 /// The name a node shows: its own, or "<Kind> <six-character id>" (criterion 7).
 fn shown_name(read: &NodeRead, kind: RowKind) -> (String, bool) {
     match &read.registers.name {

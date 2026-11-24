@@ -35,6 +35,7 @@ mod import_dialog;
 #[cfg(target_os = "linux")]
 mod import_preview;
 mod job_export;
+mod library;
 mod local_files;
 mod machine_profiles;
 mod materials;
@@ -83,6 +84,14 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         project::set_dirty,
         project::set_shared,
         project::save_project_bytes,
+        library::library_scan,
+        library::library_rows,
+        library::library_page_picture,
+        library::library_read_document,
+        library::library_add_folder,
+        library::library_remove_folder,
+        library::library_find_source,
+        library::library_open_path,
         project::quit_app,
         recovery::recovery_list,
         recovery::recovery_begin,
@@ -204,6 +213,7 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .manage(library::LibraryState::default())
         .manage(workspace_shared::ShareCache::default())
         .manage(device_keys::OpenStore::default())
         .manage(connector::ConnectorState::default())

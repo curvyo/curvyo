@@ -193,6 +193,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("clear_char_rotation", "Clear per-character rotation"),
     ("translate_objects", "Move"),
     ("duplicate_objects", "Duplicate"),
+    // `specs/0137-document-library` criteria 4 and 5.
+    ("import_page", "Import page"),
+    ("import_elements", "Import elements"),
     // `specs/0042-history-branches` criteria 10 and 22; the row adds the version's id.
     ("go_to_version", "Go to version"),
     ("clone_version", "Clone version"),

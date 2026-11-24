@@ -272,8 +272,8 @@ pub(crate) fn set_shared(app: AppHandle, shared: bool) {
 /// already-packed bytes, write them. `save_as` forces the native save
 /// dialog even when a path is already known (acceptance criterion 3);
 /// otherwise an unknown path falls back to the same dialog (first-ever
-/// save). `thumbnail` is the page's PNG of the current page, written into the container as
-/// `thumbnail.png` (`specs/0095-workspace` criterion 6).
+/// save). The page joined `thumbnail.png` and the page pictures into the bytes in one pass
+/// (`specs/0095-workspace` criterion 6, `specs/0137` criterion 2); the host writes them as given.
 #[tauri::command]
 #[allow(clippy::unused_async)] // async keeps the blocking dialog off the main thread
 pub(crate) async fn save_project_bytes(
@@ -281,7 +281,6 @@ pub(crate) async fn save_project_bytes(
     bytes: Vec<u8>,
     save_as: bool,
     suggested_name: Option<String>,
-    thumbnail: Option<Vec<u8>>,
 ) -> SaveOutcome {
     let state = app.state::<AppState>();
     let (known_path, known_name) = {
@@ -296,7 +295,6 @@ pub(crate) async fn save_project_bytes(
         return SaveOutcome::Cancelled;
     };
 
-    let bytes = with_page_thumbnail(bytes, thumbnail.as_deref());
     if curvyo_storage_io::write_atomic(&path, &bytes).is_err() {
         // A failed save that looks successful is the worst failure mode
         // this product can have — report it, don't just return.
@@ -316,14 +314,6 @@ pub(crate) async fn save_project_bytes(
         file_name,
         path: path.to_string_lossy().into_owned(),
     }
-}
-
-/// The container bytes with `thumbnail` as their `thumbnail.png`; a thumbnail that cannot be put
-/// in leaves the bytes as they are, since the row then shows the placeholder.
-fn with_page_thumbnail(bytes: Vec<u8>, thumbnail: Option<&[u8]>) -> Vec<u8> {
-    thumbnail
-        .and_then(|png| curvyo_storage_io::with_thumbnail(&bytes, png).ok())
-        .unwrap_or(bytes)
 }
 
 /// Leaves the application: the page asked, after Discard, a successful Save, or with nothing to
@@ -430,7 +420,7 @@ fn pick_save_path(app: &AppHandle, current_name: Option<&str>) -> Option<PathBuf
 mod tests {
     use std::path::Path;
 
-    use super::{project_title_name, title_name, window_title, with_page_thumbnail};
+    use super::{project_title_name, title_name, window_title};
     use crate::state::AppState;
 
     /// `specs/0095-workspace` criterion 11: a workspace document is titled by the workspace's name
@@ -474,27 +464,6 @@ mod tests {
         );
         state.confirm_opened(root.join("Walls/Lid.curvyo"));
         assert_eq!(project_title_name(&state).as_deref(), Some("Lid.curvyo"));
-    }
-
-    /// `specs/0095-workspace` criterion 6: Save writes the page's thumbnail into the container;
-    /// a thumbnail that is not a PNG leaves the bytes as the page packed them.
-    #[test]
-    fn save_puts_the_thumbnail_into_the_container() {
-        let packed = curvyo_document_core::pack(&curvyo_document_core::Document::new(1), "0.1.0")
-            .expect("pack");
-        let png = b"\x89PNG\r\n\x1a\npage".as_slice();
-        let saved = with_page_thumbnail(packed.clone(), Some(png));
-        let dir = tempfile::tempdir().expect("dir");
-        std::fs::write(dir.path().join("Lid.curvyo"), &saved).expect("write");
-        assert_eq!(
-            curvyo_storage_io::probe_document(dir.path(), &["Lid.curvyo".to_owned()])
-                .expect("probe"),
-            curvyo_storage_io::DocumentProbe::Readable {
-                thumbnail: Some(png.to_vec())
-            }
-        );
-        assert_eq!(with_page_thumbnail(packed.clone(), Some(b"GIF89a")), packed);
-        assert_eq!(with_page_thumbnail(packed.clone(), None), packed);
     }
 
     /// Criterion 30: the title for every combination of file name and dirty state.
