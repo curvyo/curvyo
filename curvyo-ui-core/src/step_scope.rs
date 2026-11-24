@@ -169,6 +169,8 @@ pub const FREE_STEPS: &[&str] = &[
     "edit_origin_corner",
     "edit_max_feed",
     "edit_max_power",
+    "edit_default_power",
+    "edit_default_speed",
     "edit_laser_mode",
     "motorised_z_on",
     "motorised_z_off",

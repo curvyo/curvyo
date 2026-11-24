@@ -129,8 +129,17 @@ fn laser_origin(d: &Document, mfg: NodeId) -> Point {
 }
 
 fn op(d: &Document, mfg: NodeId, kind: &str, name: &str) -> NodeId {
-    d.add_operation(mfg, &NewOperation { kind, name }, 99, &[])
-        .unwrap()
+    d.add_operation(
+        mfg,
+        &NewOperation {
+            kind,
+            name,
+            settings: None,
+        },
+        99,
+        &[],
+    )
+    .unwrap()
 }
 
 fn settings(d: &Document, operation: NodeId, value: Value) {
@@ -360,7 +369,7 @@ fn damaged_bytes() -> Vec<u8> {
 /// `document.json` with the format number of a newer build put back to 50.
 fn as_format_50(json: &[u8]) -> String {
     String::from_utf8(json.to_vec()).unwrap().replacen(
-        "\"format_version\": 58,",
+        "\"format_version\": 59,",
         "\"format_version\": 50,",
         1,
     )
@@ -373,7 +382,7 @@ fn row(d: &Document, at: usize) -> curvyo_document_core::OperationSnapshot {
 #[test]
 fn the_format_is_50() {
     // Superseded by 0135 slice 1 (2026-11-19): format 51.
-    assert_eq!(CURRENT_FORMAT_VERSION, 58);
+    assert_eq!(CURRENT_FORMAT_VERSION, 59);
 }
 
 #[test]
@@ -508,8 +517,8 @@ fn a_file_of_the_next_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 59,
-            supported: 58
+            found: 60,
+            supported: 59
         })
     ));
 }

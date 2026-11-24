@@ -168,6 +168,7 @@ fn c28_the_export_step_switches_fixture_jobs_off_and_refreshes_in_one_undoable_s
             &NewOperation {
                 kind: "cut",
                 name: "Cut 1",
+                settings: None,
             },
             0,
             &[],
@@ -230,6 +231,7 @@ fn c28_an_export_with_nothing_to_change_writes_no_step_and_gone_ids_are_skipped(
             &NewOperation {
                 kind: "cut",
                 name: "Cut 1",
+                settings: None,
             },
             0,
             &[],

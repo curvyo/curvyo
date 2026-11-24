@@ -123,6 +123,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("edit_origin_corner", "Edit origin corner"),
     ("edit_max_feed", "Edit max feed"),
     ("edit_max_power", "Edit max power"),
+    // `specs/0150-operation-always-has-numbers` criteria 1 and 22.
+    ("edit_default_power", "Edit default power"),
+    ("edit_default_speed", "Edit default speed"),
     ("edit_laser_mode", "Edit laser mode"),
     // `specs/0111-laser-operation-tools` criterion 22.
     ("motorised_z_on", "Motorised Z axis on"),

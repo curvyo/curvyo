@@ -137,6 +137,7 @@ fn job_commands_refuse_work_operations_slots_fixtures_and_foreign_parts() {
             &NewOperation {
                 kind: "cut",
                 name: "Cut 1",
+                settings: None,
             },
             0,
             &[],

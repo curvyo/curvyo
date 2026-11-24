@@ -16,8 +16,17 @@ fn laser(d: &Document) -> NodeId {
 }
 
 fn op(d: &Document, m: NodeId, kind: &str) -> NodeId {
-    d.add_operation(m, &NewOperation { kind, name: kind }, 9, &[])
-        .unwrap()
+    d.add_operation(
+        m,
+        &NewOperation {
+            kind,
+            name: kind,
+            settings: None,
+        },
+        9,
+        &[],
+    )
+    .unwrap()
 }
 
 fn map(value: Value) -> Map<String, Value> {

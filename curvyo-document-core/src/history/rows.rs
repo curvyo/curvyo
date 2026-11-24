@@ -188,6 +188,9 @@ const DOCUMENT_LEVEL_LABELS: &[&str] = &[
     "edit_origin_corner",
     "edit_max_feed",
     "edit_max_power",
+    // `specs/0150-operation-always-has-numbers` criteria 1 and 22.
+    "edit_default_power",
+    "edit_default_speed",
     "edit_laser_mode",
     "motorised_z_on",
     "motorised_z_off",

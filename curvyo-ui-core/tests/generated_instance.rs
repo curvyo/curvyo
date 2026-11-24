@@ -292,6 +292,7 @@ fn a_converted_box_keeps_the_operation_assigned_to_it() {
             &NewOperation {
                 kind: "cut",
                 name: "Cut 1",
+                settings: None,
             },
             0,
             &[vec![id]],

@@ -120,7 +120,7 @@ impl MaterialStep {
     }
 }
 
-/// The new `op_settings` of one operation, as plain values; `None` removes it (No settings).
+/// The new `op_settings` of one operation, as plain values; `None` removes it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SettingsWrite {
     /// The operation.

@@ -179,6 +179,7 @@ fn add_cut(d: &Document, m: NodeId, index: usize) -> NodeId {
         &NewOperation {
             kind: "cut",
             name: "Cut 1",
+            settings: None,
         },
         index,
         &[],

@@ -50,7 +50,7 @@ fn c25_the_format_number_is_39_for_this_slice() {
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
     // Format 52 since `specs/0135-image-optimisation` slice 2 (ADR 0072 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 58);
+    assert_eq!(CURRENT_FORMAT_VERSION, 59);
 }
 
 #[test]

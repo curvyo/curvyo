@@ -93,7 +93,11 @@ fn laser(d: &Document) -> (Page, NodeId) {
 }
 
 fn op(kind: &'static str, name: &'static str) -> NewOperation<'static> {
-    NewOperation { kind, name }
+    NewOperation {
+        kind,
+        name,
+        settings: None,
+    }
 }
 
 fn last_step(d: &Document) -> StepRef {

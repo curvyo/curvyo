@@ -196,6 +196,7 @@ mod sweep_flag_tests {
             &NewOperation {
                 kind: "cut",
                 name: "Cut 1",
+                settings: None,
             },
             0,
             &[vec![rect]],
