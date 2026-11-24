@@ -58,6 +58,27 @@ the architect's and vetoable at the demo.
 7. 2026-11-23: **`format_version`:** next free at merge (54 on main today). **For the lead:** one row
    in the `format_version` table of `specs/README.md`.
 
+8. 2026-11-24: **Corner fix (revision 2), diagnosis for the implementer.** Cause:
+   `boxes/mod.rs` `Sizes::horizontal()` gives the bottom and the finger lid `Corner::Owned` with
+   `even_solid: false`, so pieces 0 and n-1 next to each owned corner square are notches. The
+   square touches the plate only at its inner vertex: `box_default.txt` part 0 visits (-252, -40)
+   twice. Kerf only hid this, by turning the vertex into a neck one kerf wide.
+   - **Rule** (ADR 0082 §1): every corner has exactly one owner, and the owner's pieces next to
+     it are solid. The bottom and the lid own the corner cubes; walls are notched there.
+   - **Fix:** `horizontal()` edges `even_solid: true`; the wall's horizontal edges (bottom, and
+     top when capped) `even_solid: false`. Step positions are unchanged.
+   - **Tests:** every plate outline is a simple polygon at kerf 0 and 0.2, for every lid and
+     piece counts 1 to 9; an occupancy test along all 12 edges; re-bless `box_default.txt` and any
+     document-core box golden.
+   - **Spec wording:** "never starts or ends with a gap at a corner" cannot hold for both mating
+     plates. The test is "exactly one owner, no single-point joint".
+9. 2026-11-24: **Joint choice gone** (criterion 10, ADR 0082 §3). This supersedes feature
+   decision 3's `joint`, `finger_width` and `clearance` rows shown only with fingers; they are
+   shown always. The no-joint code paths go. A stored `joint` is dropped on the next parameter
+   edit.
+10. 2026-11-24: **Kerf and clearance semantics** written once (ADR 0082 §2). Kerf default 0
+    stays.
+
 ## Answers to the UX notes §14 item 3
 
 - The schema elements of UX notes §4 are in ADR 0080 §2: integer (`Count`), angle, `step` and
