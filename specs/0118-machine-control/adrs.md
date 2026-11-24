@@ -368,3 +368,146 @@ Frage 334 (MC-FRAME-TRAVEL): What if a frame would leave the travel of a homed m
 - **B** Clamped to the travel edge, as a jog.
 - **C** No check; GRBL's soft or hard limits stop it with an alarm.
 Recommendation **A** (a clamped frame shows a wrong outline). Default if unanswered: **A**.
+
+## Second slice 2c (origin and start-from)
+
+Architect, 2026-11-24, criteria 29 to 33 (Frage 312 A MC-USER-ORIGIN, 283 A, 282 C of `0140`). **No new
+ADR, crate or dependency; no wire change; one `format_version` bump.** Amends ADR 0065 §1, §2 (a fourth
+Start value, one page register) and ADR 0064 §7, §8 (the job's placement); the notes go onto both ADRs
+with the story PR, after #468 (which edits ADR 0064) has merged. All is **(Proposal)** unless quoted.
+
+**O1. Stored on the page (ADR 0065 §1 amended).** One process register on the laser page's
+manufacturing node, beside `.start`: `x.curvyo.laser.user_origin_um` = `[x, y]`, two integers, the
+point in **µm of the job file's coordinates** (O6), each within ±10,000,000 (10 m); absent = no user
+origin. `.start` gains the spelling `"user_origin"`. *Rejected:* two registers `x`/`y` (a sync merge
+of two devices could pair one's X with the other's Y; one list value is atomic in Loro); mm as
+floats (rounding noise and `-0.0`; µm is the job's grid and GRBL's three decimals exactly); page
+coordinates (a changed origin corner or bed size in the profile copy would move the physical point);
+the machine profile (synced to every page, Frage 312 A says page; profile points are `0140`'s). Read in
+`output_settings.rs`: `OutputSettings.user_origin: Option<PointUm>`; a value not of that shape is
+damaged (counts one, never rewritten on read). Start `user_origin` with no readable origin reads as
+`start_damaged` (blocks Export and Send with `StartDamaged`, ADR 0065 §1: never a guessed start).
+Choosing another Start keeps the register (switching back shows it again); nothing deletes it in 2c.
+
+**O2. Writes and steps (`curvyo-document-core/src/laser_output_commands.rs`).** `STARTS` gains
+`("user_origin", "set_start_user_origin")` ("Start: User origin"); `set_start("user_origin")` on a page
+without the register is `OperationError::NoUserOrigin`. New `Document::set_user_origin(manufacturing,
+[i64; 2])` writes the register **and** `start = "user_origin"` in **one** commit `set_user_origin`
+("Set origin"), so one undo takes back both (criterion 29); the typed X, Y pair of the Output group
+calls the same command (the start is already User origin, so only the point changes); out of range is
+`OperationError::BadUserOrigin`. Labels in `history_names.rs`, `step_scope.rs`, `history/rows.rs`.
+The document-core list and `Start::ALL` stay equal by the session test of ADR 0065 §1.
+
+**O3. Format (ADR 0065 §2: "a fourth value is a format change").** `CURRENT_FORMAT_VERSION` goes up by
+one, to **61**: `main` is at 60 (59 is `0150`, #468; 60 is `0145` slice 3, #475). A build at 60 would read `"user_origin"` as a damaged
+Start ("damaged file", the wrong message, as v49's reasoning); by the bump it refuses the file. No
+migration: a file of 60 or lower opens unchanged. Goldens in `curvyo-document-core/tests/fixtures/`:
+`user_origin_v61.curvyo` (page 1 `start` `user_origin` with `[123456, 78900]`, page 2 an origin with
+`machine_origin`, page 3 none) and `user_origin_damaged_v61.curvyo` (`[1.5, 2]`, `[1, 2, 3]`, `"12,3"`,
+and `user_origin` with no register: each reads damaged, counts one, saves back unchanged).
+
+**O4. Start (`output_settings.rs`, ADR 0064 §7 amended).** `Start::UserOrigin`, fourth in `ALL`
+(the pick's order, criterion 30); `relative()` and `homes()` false: absolute `G90`, no `$H` (no "Home,
+then user origin" value; Proposal). The Output group's view lists User origin only while a readable
+origin is stored, or while it is the stored start (then the pick shows it checked, or none when
+damaged). `print_and_cut` gives User origin the warning it gives Head position (the measured marks
+are bed positions; a moved job leaves them), its frame stays the unshifted bed map.
+
+**O5. The shift and the anchor (`curvyo-laser-core`, pure, wasm32).** New `job_anchor.rs` ("the page
+vector that puts a job's anchor on the user origin"): `burn_box(points)` and `anchor(box, corner)` (the
+box corner at the profile's origin corner: bottom-left box corner for a bottom-left machine; in machine
+coordinates always the box's min corner), shared with the gate's `bed_offset` (Head position, one rule)
+and `job_frame`. `Job` gains `shift: PointUm` (page µm, zero for every other start) and
+`Job::machine_point(p) = frame.machine_point(p + shift)`, `Job::page_point(m) = frame.page_point(m) - shift`;
+`Frame` stays the pure bed mirror. `build_with` plans exactly as for Machine origin (entry from the
+machine origin; ADR 0064 §7: "the plan never depends on the start mode", plans and cache are shared),
+then takes the box of every plan path point and sweep end (the set the frame's `burn_points` and the
+gate's box read), `A` its anchor, `U` the stored origin, `shift = frame.page_point(U) - A`. Run-outs
+clamp to the bed at their placed position. So in machine coordinates **every burn line is Machine
+origin's plus `U - A_machine`**. **Travel (lead's point 3):** `home = A`, so `Job::machine_point(home)
+= U`: the file assumes the head stands on the user origin (where Set origin here left it), its first
+line after the preamble is the `G0` to the first burn start, its last the `G0` back to `U`, so a second
+run lands on the same place (as Machine origin starts and ends at the machine origin); the Toolpath
+view draws exactly these travels. Writers (`job_write_grbl.rs` 59, 141; `job_write_frame.rs` 22) and
+`job_frame::burn_points` switch from `job.frame.machine_point` to `job.machine_point`; the wasm
+`head_place` keeps the bed map (W49). No `G10`, `G92`, `G54`.
+*Rejected:* translating the moves and sweeps (clones every raster `Levels` vector); the shift inside
+`Frame` (print and cut and the bed cross need the plain mirror; every bed reader would subtract it).
+
+**O6. Which position "Set origin here" stores (lead's points 1, 2).** The head's position **in the
+job file's coordinates**: GRBL's work position `Status.position` (`WPos`, or `MPos - WCO`), stored
+verbatim, rounded by `head_position_um`, as `0121`'s Take head position (`print_and_cut.rs`). A `G90`
+line `X u` goes to work position `u`, so the anchor burns exactly where the head stood, whatever the
+controller's work offset (G54 etc.); **the shift subtracts nothing** and Curvyo writes no offset. With
+no work offset (the case Curvyo leaves) this is the machine position of criterion 14. If another
+program later changes the offset, the job moves with it, as every Machine origin job does; the W9
+Notice stays the warning. **No sign conversion** (*rejected:* the jog clamp's `$23`/force-origin sign
+rule of J6): that rule maps `MPos` onto the travel box for limits, while GRBL itself maps work
+coordinates for the file; flipping a negative `WPos` would send the head to the mirror point. A machine
+whose work coordinates run negative into the bed cannot run any Curvyo job (criterion 26 writes
+positive coordinates), and the 4 b check then shows the placed job outside the bed, so the mismatch is
+seen, not hidden. The X, Y fields (W43) show the stored numbers. Nothing is sent (Frage 312 A): **no
+wire message, no connector change**; the frontend reads the last `Status` of `connectorLink` and calls
+the wasm `set_user_origin(x_mm, y_mm)`. Enabled and greyed **as UX W40** (a read, like Take head
+position): `homed` (2a J5) and a reported position required; greyed while stale, without position,
+moving (Running, Homing, Jogging, Framing), in Alarm or a busy word; the motion rules of criterion 8 do
+not apply. A member has no jog pad (W52). *Rejected:* a `SetOrigin` message or a position request (the
+pushed `Status` already carries `homed` and both positions); `G10 L20`/`G92` (312 B, C). Frage 341.
+
+**O7. What follows the pick.** The **work-area check** (4 b): `bed_offset` returns `job.shift` for
+User origin, so `outside_bed` measures the placed job and **blocks, as criterion 31 says and as 4 b
+does for Machine origin (lead's point 5: criterion 31 holds for 2c)**; `0140` criterion 12's "warning
+only" is the PO's to align before `0140` is built. `Cause::OutsideBed` gains `over_um: Option<i64>`
+(set only with User origin: the largest overshoot of the placed burn box over the four bed edges), so
+the text reads "… bed by 12 mm." (W50 rounding, in `job_gate_text.rs`); Machine origin's text keeps
+its bytes. The **frame** (2b): `build_frame_job` goes through the same `build_with`, so
+its job carries the same shift; `outline`, `write_frame` (`G90`, back to the first point), the
+"Outside the work area" cause and the connector's travel check F6 follow with no change; the head ring
+stays on the bed map (`frame.page_point`, W49), around the place the job burns. The **Toolpath view** (`toolpath.rs`,
+`raster_view.rs`, `play.rs`): the look stays built in page µm and is drawn translated by `shift` (one
+translation in the draw step; `DrawKey` gains it), the ring with it. The **canvas cross** at the user
+origin (criterion 32): the view JSON gives `frame.page_point(U)` in page mm while User origin is chosen;
+the dashed burn box (W47) is the burn box plus `shift`, in the same view JSON; looks are UX's
+(W46 to W48). The page's coordinates, rulers and drawing never change (criterion 32). 2d's focus point
+maps a canvas point with `Job::machine_point`.
+
+**O8. Relation to `0140` (criterion 33).** The user origin is the page list's first reference point
+(Frage 282 C): `0140` reads entry 1 from `user_origin_um` and keeps further page points in a register
+of its own, so no 2c file is rewritten; "Set origin here" becomes the page list's Store position;
+`0140`'s Absolute / point / Current position map to Machine origin / User origin / Head position;
+its nine-position anchor (Frage 283 A) is a register whose absent value is O5's corner, so a 2c file
+burns the same under `0140`. 2c writes nothing to the profile. `0140` criterion 12 ("permit over
+refuse") conflicts with criterion 31 here; 2c follows 31 (O7).
+
+**O9. Another machine on the page (Frage 345 C; lead's point 4).** The page's profile copy already
+names its record (`mfg_profile` id, ADR 0039); a **replace** is `write_profile` with `ProfileChange::Pick`
+to a different id; `Reset`, `SaveAs` (same machine, new record) and every `Edit*` (origin corner, work
+area, a library update `0116`) are **edits**. In `write_profile`, a Pick to another id on a page whose
+`start` is `"user_origin"` writes `start = "machine_origin"` in the same commit (one undo restores
+both); the point stays. No "taken on" id is stored (§5: the copy's id already tells it). Accepted edge:
+a sync merge of one device's profile pick with another's concurrent Set origin can leave User origin
+picked on the new machine; the bed check still measures it. Test: Pick another profile resets the
+start, Pick the same id and each `Edit*` keep it.
+
+**O10. Crates and tests (no sleeps).** `curvyo-document-core` (O2, O3, O9; set, undo restores start and
+origin, `NoUserOrigin`, the profile-pick rule, goldens); `curvyo-laser-core` (O1 reading table; `anchor` per corner;
+`tests/job_builder.rs`: per corner the User-origin file's burn lines equal Machine origin's plus the
+offset; goldens `tests/fixtures/output/grbl/start_user_origin_{bl,br,tl,tr}.gcode` and
+`grbl_frame/frame_user_origin.gcode`; gate: a user origin that pushes the box past the bed blocks 4 b,
+one inside passes; every old golden keeps its bytes); `curvyo-ui-core` (labels); `curvyo-editor-wasm`
+(the pick lists User origin only when stored, `set_user_origin` rounding and range, the Toolpath
+shift, the cross and dashed box, the `over_um` text); frontend (Set origin causes table in `connectorText.ts`, the pick,
+the typed pair). Untouched: `curvyo-connector-core`, `-io`, `-server`, `-ctl`, `curvyo-app`.
+
+**Spec points for the PO (no question).** 29 "machine position" reads "the head's position in the job
+file's coordinates (GRBL's work position, the machine position without a work offset)" (O6, Frage 341
+A), and its causes are W40's; 30 has no "Home, then user origin"; 31's wording is W50's ("… bed by
+12 mm."), and `0140` criterion 12 is aligned to the block before `0140` is built; 32's ruler wording
+is corrected in `specification.md` ("the rulers do not change", UX point 2); print and cut warns for
+User origin (O4).
+
+Frage 341 (MC-ORIGIN-WPOS): Which head position does "Set origin here" store?
+- **A** The position in the job file's coordinates (GRBL's work position), as Print and cut's Take head position: the job burns where the head stood, also when another program left a work offset on the controller.
+- **B** The machine position: with a work offset on the controller the job burns off by that offset (the Notice of criterion 14 shows it).
+- **C** As B, and Set origin here is greyed while the controller holds a work offset ("Work offset on the controller").
+Recommendation **A** (equal to B without an offset, which Curvyo never writes; right also with one). Default if unanswered: **A**.
