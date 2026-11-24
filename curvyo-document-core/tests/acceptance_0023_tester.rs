@@ -616,6 +616,9 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
             || name.starts_with("raster_engraving_")
             // `0121-print-and-cut` (format 54) is a later build: a marks object is a group.
             || name.starts_with("print_and_cut_")
+            // `0137-document-library` (format 58) is a later build: its goldens hold an imported
+            // group with a name.
+            || name.starts_with("came_from_")
         {
             continue;
         }

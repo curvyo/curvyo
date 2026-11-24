@@ -672,7 +672,15 @@ impl DocumentVersion {
 /// while the ellipse has an arc). A build that stops at 56 would draw the ellipse without its
 /// loops, so this build's files are refused there by version; a file of 56 opens unchanged.
 /// Golden: `rounded_ellipse_v57.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 57;
+///
+/// Version 58 (`specs/0137-document-library`, ADR 0084 §7, §8): a node may carry the meta key
+/// `came_from` and a page the register `page.<id>.came_from`, one plain map each (`document`,
+/// `page`, `page_id`, optional `item`, `at` in Unix milliseconds). The record never changes
+/// drawing or output: a wrong type or a missing field reads as absent and is kept, the file opens.
+/// A build that stops at 57 would drop the record silently on Object to path and never show it,
+/// so this build's files are refused there by version; a file of 57 opens unchanged. Goldens:
+/// `came_from_v58.curvyo`, `came_from_damaged_v58.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 58;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

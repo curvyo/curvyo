@@ -145,7 +145,7 @@ impl Document {
 
     /// A copied leaf of the clone's root under the clone's matrix `m`, its gradient carried
     /// (`specs/0124-gradient-fill` criterion 17); a nested clone takes `matrix` when given.
-    fn unlinked_leaf(
+    pub(crate) fn unlinked_leaf(
         &self,
         object: &ObjectSnapshot,
         m: Affine,

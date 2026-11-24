@@ -27,6 +27,28 @@ pub use curve_kind::{CurveKind, CurveKindError};
 
 mod affine;
 mod assets;
+mod came_from;
+mod copy_roots;
+mod fragment;
+mod fragment_insert;
+mod fragment_placements;
+pub use fragment::{Fragment, FragmentError};
+pub use fragment_insert::{
+    FragmentReport, FragmentTarget, IMPORT_ELEMENTS_COMMIT_LABEL, IMPORT_PAGE_COMMIT_LABEL,
+    ImportError, PageFallback,
+};
+mod library_members;
+pub use library_members::{
+    LibraryMembers, MAX_PAGE_PICTURES, MAX_PICTURE_BYTES, NotAContainer, PAGES_PREFIX,
+    THUMBNAIL_MEMBER, ZipMember, is_storable_png, read_library_members, read_page_picture,
+    read_page_pictures, read_zip_member, with_pictures, with_thumbnail,
+};
+mod library_summary;
+pub use came_from::{CameFrom, UnixMillis};
+pub use library_summary::{
+    LIBRARY_FORMAT, LIBRARY_MEMBER, LibrarySummary, MAX_LIBRARY_BYTES, PageSummary, kind_word,
+    library_summary,
+};
 mod clone_codec;
 mod clone_copy;
 mod clone_cycle;

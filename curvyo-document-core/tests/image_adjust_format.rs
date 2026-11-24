@@ -949,7 +949,7 @@ fn by_name(d: &Document, name: &str) -> NodeId {
 /// A `document.json` saved by this build as the format-51 golden stores it.
 fn as_format_51(json: &[u8]) -> String {
     String::from_utf8(json.to_vec()).unwrap().replacen(
-        "\"format_version\": 57,",
+        "\"format_version\": 58,",
         "\"format_version\": 51,",
         1,
     )
@@ -957,7 +957,7 @@ fn as_format_51(json: &[u8]) -> String {
 
 #[test]
 fn the_format_is_52() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 57);
+    assert_eq!(CURRENT_FORMAT_VERSION, 58);
 }
 
 #[test]
@@ -1025,8 +1025,12 @@ fn the_golden_saves_back_unchanged_and_twice_the_same() {
         as_format_51(&members(&first)["document.json"]),
         as_format_51(&members(&bytes)["document.json"])
     );
+    // ADR 0084 §1: a save since format 58 adds the page list of the library.
     assert_eq!(
-        members(&first).keys().collect::<Vec<_>>(),
+        members(&first)
+            .keys()
+            .filter(|name| *name != "library.json")
+            .collect::<Vec<_>>(),
         members(&bytes).keys().collect::<Vec<_>>(),
         "the picture is stored once, in assets/"
     );
@@ -1107,8 +1111,8 @@ fn a_file_of_the_next_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 58,
-            supported: 57
+            found: 59,
+            supported: 58
         })
     ));
 }

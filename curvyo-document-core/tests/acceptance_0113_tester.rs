@@ -86,13 +86,13 @@ fn format_is_47() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 57);
+    assert_eq!(CURRENT_FORMAT_VERSION, 58);
 }
 
 #[test]
 fn a_format_48_file_is_refused() {
     let bytes = pack(&unpack(1, &golden("fixture_sets_v47.curvyo")).unwrap(), "t").unwrap();
-    assert!(unpack(2, &with_format(&bytes, 58)).is_err());
+    assert!(unpack(2, &with_format(&bytes, 59)).is_err());
 }
 
 #[test]
@@ -160,7 +160,7 @@ fn ac38_golden_v47_round_trips_every_value_and_saves_as_47() {
             f.read_to_string(&mut t).unwrap();
             if t.contains("\"format_version\"") {
                 assert!(
-                    t.contains("\"format_version\": 57") || t.contains("\"format_version\":57")
+                    t.contains("\"format_version\": 58") || t.contains("\"format_version\":58")
                 );
                 seen = true;
             }

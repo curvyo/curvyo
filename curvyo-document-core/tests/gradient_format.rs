@@ -771,8 +771,8 @@ fn a_newer_file_is_refused_by_version() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 58,
-            supported: 57
+            found: 59,
+            supported: 58
         })
     ));
 }

@@ -120,8 +120,16 @@ impl Document {
         label: &str,
     ) -> NodeId {
         let guide = crate::guides::all_guides(tree, doomed);
+        // ADR 0084 §7: the result keeps Came from only when every operand carries an equal one.
+        let came_from =
+            crate::came_from::shared(doomed.iter().filter_map(|&id| tree.get_meta(id).ok()));
         tree.enable_fractional_index(0);
         let new_tree_id = create_path_after(tree, place, style, outlines);
+        if let Some(record) = came_from {
+            // invariant: the node was just created.
+            #[allow(clippy::unwrap_used)]
+            crate::came_from::write_stored(&tree.get_meta(new_tree_id).unwrap(), record);
+        }
         if guide {
             // invariant: the node was just created.
             #[allow(clippy::unwrap_used)]
@@ -221,6 +229,16 @@ impl Document {
                 style.clone()
             };
             let piece = create_path_after(&tree, anchor, &style, outlines);
+            // A conversion with one source keeps its Came from (ADR 0084 §7).
+            if let Some(record) = tree
+                .get_meta(*place)
+                .ok()
+                .and_then(|meta| crate::came_from::stored(&meta))
+            {
+                // invariant: the node was just created.
+                #[allow(clippy::unwrap_used)]
+                crate::came_from::write_stored(&tree.get_meta(piece).unwrap(), record);
+            }
             // A piece of a guide is a guide: its one input was (criterion 34).
             if crate::guides::all_guides(&tree, &[*place]) {
                 // invariant: the node was just created.
