@@ -21,7 +21,7 @@
 use std::fmt::Write as _;
 
 use curvyo_document_core::{
-    Angle, GeneratorKind, Length, PatternFill, PatternGenerator, PatternMode, PatternSeed, Point,
+    Angle, GeneratorKind, Length, PatternFill, PatternGenerator, PatternMode, Point, Seed,
     Tolerance, Vec2,
 };
 use curvyo_geometry_core::{PatternOutline, PatternPiece, pattern_pieces_of};
@@ -172,7 +172,7 @@ fn render() -> String {
                         generator: PatternGenerator::defaults(kind),
                         margin: Length::from_mm(margin),
                         mode,
-                        seed: PatternSeed::new(20_261_102),
+                        seed: Seed::new(20_261_102),
                         whole_pieces: whole,
                     };
                     let suffix = if whole { " whole pieces" } else { "" };

@@ -4,8 +4,7 @@
 //! `PatternCache`, `pattern_convert_plan`); this keeps the session's state and the commits.
 
 use curvyo_document_core::{
-    FillPaint, GeneratorKind, NodeId, ObjectSnapshot, PatternFill, PatternMode, PatternSeed,
-    StyleEdit,
+    FillPaint, GeneratorKind, NodeId, ObjectSnapshot, PatternFill, PatternMode, Seed, StyleEdit,
 };
 use curvyo_ui_core::{
     Grid, PatternError, PatternField, PatternFieldView, PatternState, object_pattern_pieces,
@@ -388,7 +387,7 @@ impl Session {
     /// `"seed"` for anything else; nothing is written.
     pub fn set_pattern_seed_text(&mut self, text: &str) -> Result<bool, &'static str> {
         let seed: u32 = text.trim().parse().map_err(|_| "seed")?;
-        Ok(self.apply_pattern_edit(&StyleEdit::PatternSeed(PatternSeed::new(seed))))
+        Ok(self.apply_pattern_edit(&StyleEdit::PatternSeed(Seed::new(seed))))
     }
 
     fn pattern_field(&self, name: &str) -> Option<(PatternField, GeneratorKind)> {

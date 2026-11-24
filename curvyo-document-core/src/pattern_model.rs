@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::path_model::NodeId;
 use crate::pattern_schema::specs;
+use crate::seed::Seed;
 use crate::units::{Angle, Length};
 
 /// What a fill paints when it is on: a solid colour, a pattern or a gradient (`fill_paint`).
@@ -30,54 +31,6 @@ pub enum PatternMode {
     Lines,
     /// Closed pieces filled with the shape's fill colour (cutting a perforation).
     Shapes,
-}
-
-/// The seed of a seeded generator: stored, so reopening does not reshuffle (criterion 17).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct PatternSeed(u32);
-
-impl PatternSeed {
-    /// A seed with this value.
-    #[must_use]
-    pub const fn new(value: u32) -> Self {
-        Self(value)
-    }
-
-    /// The value.
-    #[must_use]
-    pub const fn get(self) -> u32 {
-        self.0
-    }
-
-    /// The fresh seed of a new pattern on `node`: `SplitMix64` of its peer and counter, so the
-    /// same shape always gets the same fresh seed and no clock or random source is read.
-    #[must_use]
-    pub fn fresh(node: NodeId) -> Self {
-        #[allow(clippy::cast_sign_loss)] // the counter's bits, not its value
-        let counter = u64::from(node.counter as u32);
-        Self::low_bits(splitmix64(node.peer ^ splitmix64(counter)))
-    }
-
-    /// The seed Re-roll gives: `SplitMix64` of this one.
-    #[must_use]
-    pub fn next(self) -> Self {
-        Self::low_bits(splitmix64(u64::from(self.0)))
-    }
-
-    #[allow(clippy::cast_possible_truncation)] // the low 32 bits are the seed
-    const fn low_bits(value: u64) -> Self {
-        Self(value as u32)
-    }
-}
-
-/// One step of `SplitMix64` (Steele, Lea, Flood 2014) on `state`: the mixing function of the
-/// seeds and of the generators' random stream. Its constants are part of the format.
-#[must_use]
-pub const fn splitmix64(state: u64) -> u64 {
-    let mut z = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
-    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    z ^ (z >> 31)
 }
 
 /// A whole number of lines or rings, at least 1.
@@ -408,7 +361,7 @@ pub struct PatternFill {
     /// Lines or Shapes.
     pub mode: PatternMode,
     /// The seed of a seeded generator; kept for the others.
-    pub seed: PatternSeed,
+    pub seed: Seed,
     /// Only pieces the region and margin leave whole are drawn, cut ones are left out
     /// (criterion 29); kept, and without effect, for a generator without whole pieces.
     pub whole_pieces: bool,
@@ -419,7 +372,7 @@ impl PatternFill {
     #[must_use]
     pub fn fresh(node: NodeId) -> Self {
         Self {
-            seed: PatternSeed::fresh(node),
+            seed: Seed::fresh(node),
             ..Self::default()
         }
     }
@@ -433,7 +386,7 @@ impl Default for PatternFill {
             generator: PatternGenerator::defaults(GeneratorKind::Hatch),
             margin: Length::from_mm(0.0),
             mode: PatternMode::Lines,
-            seed: PatternSeed::new(0),
+            seed: Seed::new(0),
             whole_pieces: false,
         }
     }
@@ -502,17 +455,6 @@ mod tests {
     }
 
     #[test]
-    fn a_fresh_seed_is_stable_per_node_and_differs_between_nodes() {
-        let a = NodeId::from_parts(7, 1);
-        let b = NodeId::from_parts(7, 2);
-        assert_eq!(PatternSeed::fresh(a), PatternSeed::fresh(a));
-        assert_ne!(PatternSeed::fresh(a), PatternSeed::fresh(b));
-        let seed = PatternSeed::fresh(a);
-        assert_ne!(seed.next(), seed);
-        assert_eq!(seed.next(), seed.next());
-    }
-
-    #[test]
     fn whole_pieces_apply_to_the_generators_of_shapes_only() {
         let with: Vec<GeneratorKind> = GeneratorKind::ALL
             .into_iter()
@@ -529,11 +471,5 @@ mod tests {
             ]
         );
         assert!(!PatternFill::default().whole_pieces);
-    }
-
-    #[test]
-    fn splitmix_is_the_reference_algorithm() {
-        // The first output of the reference SplitMix64 stream seeded with 0.
-        assert_eq!(splitmix64(0), 0xE220_A839_7B1D_CDAF);
     }
 }

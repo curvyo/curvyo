@@ -14,7 +14,7 @@ use std::io::{Cursor, Read, Write};
 use curvyo_document_core::{
     AnchorId, CURRENT_FORMAT_VERSION, CURRENT_LORO_SNAPSHOT_VERSION, CopySource, Document,
     FillPaint, GeneratorKind, Length, NewAnchor, NodeId, ObjectSnapshot, OpenError, PatternFill,
-    PatternGenerator, PatternMode, PatternParam, PatternSeed, Point, RectBounds, StyleEdit,
+    PatternGenerator, PatternMode, PatternParam, Point, RectBounds, Seed, StyleEdit,
     StyleEditError, Vec2, pack, pattern_params, unpack,
 };
 use loro::{LoroDoc, LoroValue};
@@ -244,7 +244,7 @@ fn save_and_reopen_keep_every_generator_parameter_mode_margin_and_seed() {
             .unwrap();
         d.edit_style(&[id], &StyleEdit::PatternMode(PatternMode::Shapes))
             .unwrap();
-        d.edit_style(&[id], &StyleEdit::PatternSeed(PatternSeed::new(u32::MAX)))
+        d.edit_style(&[id], &StyleEdit::PatternSeed(Seed::new(u32::MAX)))
             .unwrap();
         ids.push(id);
     }

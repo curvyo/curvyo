@@ -8,7 +8,7 @@
 use std::fmt::Write as _;
 
 use curvyo_document_core::{
-    Angle, GeneratorKind, Length, PatternFill, PatternGenerator, PatternMode, PatternSeed, Point,
+    Angle, GeneratorKind, Length, PatternFill, PatternGenerator, PatternMode, Point, Seed,
     Tolerance, Vec2,
 };
 use curvyo_geometry_core::{PatternOutline, pattern_pieces_of};
@@ -84,7 +84,7 @@ fn digest() -> String {
                     generator: PatternGenerator::defaults(kind),
                     margin: Length::from_mm(1.25),
                     mode,
-                    seed: PatternSeed::new(seed),
+                    seed: Seed::new(seed),
                     whole_pieces: false,
                 };
                 let pieces = pattern_pieces_of(

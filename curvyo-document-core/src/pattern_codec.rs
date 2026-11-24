@@ -17,10 +17,9 @@ use std::collections::HashMap;
 use loro::{LoroMap, LoroValue};
 
 use crate::path_codec::as_f64;
-use crate::pattern_model::{
-    FillPaint, GeneratorKind, PatternFill, PatternGenerator, PatternMode, PatternSeed,
-};
+use crate::pattern_model::{FillPaint, GeneratorKind, PatternFill, PatternGenerator, PatternMode};
 use crate::pattern_schema::{ParamKind, specs};
+use crate::seed::Seed;
 use crate::style_codec::read_value;
 use crate::units::Length;
 
@@ -69,7 +68,7 @@ fn pattern_from_value(value: &LoroValue) -> Option<PatternFill> {
         _ => return None,
     };
     let seed = match map.get(FIELD_SEED) {
-        Some(LoroValue::I64(n)) => PatternSeed::new(u32::try_from(*n).ok()?),
+        Some(LoroValue::I64(n)) => Seed::new(u32::try_from(*n).ok()?),
         _ => return None,
     };
     let whole_pieces = match map.get(FIELD_WHOLE_PIECES) {
@@ -234,7 +233,7 @@ mod tests {
                 generator: PatternGenerator::defaults(kind),
                 margin: Length::from_mm(1.5),
                 mode: PatternMode::Shapes,
-                seed: PatternSeed::new(u32::MAX),
+                seed: Seed::new(u32::MAX),
                 whole_pieces: kind.has_whole_pieces(),
             };
             assert!(write_changes(
