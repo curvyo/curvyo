@@ -23,11 +23,13 @@ export interface ArcBarState {
   curveLimited: boolean;
   /** The stored percent, for the "limited" tag's tooltip. */
   curveStored: number;
-  /** The Rounded field (`specs/0145-shape-spiro-handles/` criterion 3): a polygon or star is
-   * selected. */
+  /** The Rounded field (`specs/0145-shape-spiro-handles/` criterion 3): a polygon, star or ellipse
+   * is selected. */
   roundedShown: boolean;
   rounded: number;
   roundedMixed: boolean;
+  /** `"arc"` while every selected ellipse has an arc (criterion 19), else `""`. */
+  roundedGrey: string;
   roundedLimited: boolean;
   /** The stored value beyond -10..=10, for the "limited" tag's tooltip. */
   roundedStored: number;
@@ -51,6 +53,7 @@ export const EMPTY_ARC_BAR_STATE: ArcBarState = {
   roundedShown: false,
   rounded: 0,
   roundedMixed: false,
+  roundedGrey: "",
   roundedLimited: false,
   roundedStored: 0,
 };
@@ -95,6 +98,7 @@ function read(session: WasmSession): ArcBarState {
     roundedShown: view.rounded_shown,
     rounded: view.rounded,
     roundedMixed: view.rounded_mixed,
+    roundedGrey: view.rounded_grey,
     roundedLimited: view.rounded_limited,
     roundedStored: view.rounded_stored,
   };

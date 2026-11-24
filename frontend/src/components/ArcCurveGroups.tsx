@@ -529,7 +529,7 @@ function RoundedField({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocus: (
       widthPx={limited ? ROUNDED_LIMITED_FIELD_PX : ROUNDED_FIELD_PX}
       value={state.rounded}
       mixed={state.roundedMixed}
-      grey=""
+      grey={state.roundedGrey}
       tooltipName="Rounded"
       limited={limited}
       decimals={2}
