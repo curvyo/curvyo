@@ -111,7 +111,12 @@
     {
       "accessible_name": "Score 1",
       "name": "Score 1",
-      "numbers": [],
+      "numbers": [
+        {
+          "text": "10 %, 1,000 mm/min, 1 ×",
+          "typed": []
+        }
+      ],
       "run": null
     },
     {

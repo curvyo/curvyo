@@ -9,9 +9,9 @@ fn set(power: f64, speed: u64, passes: u64) -> Settings {
 }
 
 fn damage(value: &Value, kind: OperationKind) -> Option<SettingsDamage> {
-    match read_settings(Some(value), kind) {
+    match read_settings(Some(value), kind, crate::DefaultNumbers::BUILT_IN) {
         SettingsRead::Damaged(damage) => Some(damage),
-        _ => None,
+        SettingsRead::Stored(_) => None,
     }
 }
 
@@ -24,8 +24,11 @@ fn a_linked_value_with_overrides_reads_back_and_writes_the_same_plain_values() {
                      "modified": 1_762_862_400_000_u64},
         "overrides": {"main": {"power_pct": 65.0}, "outline": {"passes": 2}},
     });
-    let SettingsRead::Stored(stored) = read_settings(Some(&value), OperationKind::EngraveOutline)
-    else {
+    let SettingsRead::Stored(stored) = read_settings(
+        Some(&value),
+        OperationKind::EngraveOutline,
+        crate::DefaultNumbers::BUILT_IN,
+    ) else {
         panic!("reads");
     };
     assert_eq!(stored.main, set(60.0, 3000, 1));
@@ -43,7 +46,35 @@ fn a_linked_value_with_overrides_reads_back_and_writes_the_same_plain_values() {
         value,
         "writes back the same plain values"
     );
-    assert_eq!(read_settings(None, OperationKind::Cut), SettingsRead::None);
+}
+
+#[test]
+fn criterion_15_an_absent_register_reads_own_numbers_from_the_copy_pair() {
+    let pair = crate::DefaultNumbers {
+        power: PowerPercent::from_percent(12.5).unwrap(),
+        speed: FeedRate::new(1500).unwrap(),
+    };
+    for kind in OperationKind::ALL {
+        let SettingsRead::Stored(stored) = read_settings(None, kind, pair) else {
+            panic!("{kind:?} reads");
+        };
+        assert_eq!(stored, StoredSettings::own(kind, set(12.5, 1500, 1), None));
+        assert_eq!(stored.interval, None, "the kind's default interval");
+        assert!(stored.material.is_none() && stored.overrides.is_empty());
+    }
+    let SettingsRead::Stored(outline) = read_settings(None, OperationKind::EngraveOutline, pair)
+    else {
+        panic!("reads");
+    };
+    assert_eq!(
+        outline.outline,
+        Some(outline.main),
+        "the outline equals main"
+    );
+    assert!(matches!(
+        read_settings(Some(&json!(7)), OperationKind::Cut, pair),
+        SettingsRead::Damaged(SettingsDamage::NotAMap)
+    ));
 }
 
 #[test]
@@ -138,7 +169,9 @@ fn an_engrave_interval_reads_back_and_absent_reads_the_default() {
         "overrides": {"main": {"interval_mm": 0.12}},
     });
     for kind in [OperationKind::Engrave, OperationKind::EngraveOutline] {
-        let SettingsRead::Stored(stored) = read_settings(Some(&value), kind) else {
+        let SettingsRead::Stored(stored) =
+            read_settings(Some(&value), kind, crate::DefaultNumbers::BUILT_IN)
+        else {
             panic!("reads for {kind:?}");
         };
         assert_eq!(stored.interval.unwrap().hundredths(), 8);

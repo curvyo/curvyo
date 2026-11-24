@@ -20,6 +20,8 @@ impl PowerPercent {
     pub const MIN_TENTHS: u16 = 10;
     /// The largest power, in tenths of a percent.
     pub const MAX_TENTHS: u16 = 1000;
+    /// 10 %, the built-in Default power (`specs/0150` criterion 1).
+    pub const TEN: Self = Self(100);
 
     /// The power of `tenths` tenths of a percent, `None` outside 1 to 100 %.
     #[must_use]

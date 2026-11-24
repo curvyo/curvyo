@@ -85,7 +85,7 @@ fn gon(cx: f64, cy: f64, r: f64, n: usize) -> LeafOutline {
 
 fn source(kind: OperationKind, v: &Value, options: OperationOptions) -> BlockSource {
     BlockSource::Operation {
-        settings: read_settings(Some(v), kind),
+        settings: read_settings(Some(v), kind, curvyo_laser_core::DefaultNumbers::BUILT_IN),
         options: Ok(options),
         margin: Length::from_mm(0.0),
         grid: None,
@@ -270,6 +270,7 @@ fn big_session() -> (Session, String, Vec<NodeId>) {
                 &NewOperation {
                     kind: "cut",
                     name: &name,
+                    settings: None,
                 },
                 k,
                 &members,

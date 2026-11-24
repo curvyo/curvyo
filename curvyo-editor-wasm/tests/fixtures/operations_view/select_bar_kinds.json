@@ -21,7 +21,7 @@
   "pick": [],
   "rows": [
     {
-      "accessible_name": "Engrave 1, run 1, –",
+      "accessible_name": "Engrave 1, run 1, 1 min 3 s",
       "group_in_part": null,
       "id": {
         "counter": 35,
@@ -31,11 +31,16 @@
       "kind": "engrave",
       "margin_mm": 0.0,
       "name": "Engrave 1",
-      "numbers": [],
+      "numbers": [
+        {
+          "text": "10 %, 1,000 mm/min, 1 ×, 0.1 mm",
+          "typed": []
+        }
+      ],
       "output": true,
       "run": {
         "digit": 1,
-        "time": "–"
+        "time": "1 min 3 s"
       },
       "section": "marking",
       "settings": {
@@ -62,14 +67,14 @@
             "material": null,
             "role": "main",
             "run": {
-              "passes": null,
-              "power_pct": null,
-              "speed_mm_min": null
+              "passes": 1,
+              "power_pct": 10.0,
+              "speed_mm_min": 1000
             },
             "typed": []
           }
         ],
-        "state": "no_settings",
+        "state": "own",
         "z_offset_shown": false
       },
       "show": true,

@@ -1,6 +1,7 @@
-//! The stored numbers beside material links across the open project (ADR 0054 §3; Frage 187
-//! B+C): which operations point to a material, and the values that bring their stored numbers to
-//! the loaded library, at a material edit (no guard) and at a save (with the guard).
+//! The stored numbers of laser operations across the open project (ADR 0054 §3; Frage 187 B+C;
+//! `specs/0150` adrs.md decision 4): which operations point to a material and the values that
+//! bring their stored numbers to the loaded library, at a material edit (no guard) and at a save
+//! (with the guard), and the derived numbers an operation without `op_settings` gets written.
 
 use curvyo_document_core::{NodeId, SettingsWrite};
 use curvyo_laser_core::operations::OperationKind;
@@ -19,6 +20,10 @@ pub(in crate::session) struct LaserOperation {
     pub(in crate::session) read: SettingsRead,
     /// The id of its page's profile copy, empty when the copy names none.
     pub(in crate::session) profile_id: String,
+    /// Its laser page.
+    pub(in crate::session) manufacturing: NodeId,
+    /// Whether it has no `op_settings`, so `read` is derived from its copy's pair.
+    pub(in crate::session) derived: bool,
 }
 
 impl LaserOperation {
@@ -26,7 +31,7 @@ impl LaserOperation {
     pub(in crate::session) fn material_id(&self) -> Option<&str> {
         match &self.read {
             SettingsRead::Stored(stored) => stored.material.as_ref().map(|link| link.id.as_str()),
-            SettingsRead::None | SettingsRead::Damaged(_) => None,
+            SettingsRead::Damaged(_) => None,
         }
     }
 }
@@ -51,6 +56,7 @@ impl Session {
                 manufacturing.profile.as_ref(),
                 manufacturing.legacy_machine_name.as_deref(),
             );
+            let defaults = copy.copy.values.defaults;
             let profile_id = copy.copy.id.unwrap_or_default();
             let Ok(operations) = self.document.operations(manufacturing.id) else {
                 continue;
@@ -65,8 +71,10 @@ impl Session {
                 out.push(LaserOperation {
                     id: op.id,
                     kind,
-                    read: read_settings(op.settings.as_ref(), kind),
+                    read: read_settings(op.settings.as_ref(), kind, defaults),
                     profile_id: profile_id.clone(),
+                    manufacturing: manufacturing.id,
+                    derived: op.settings.is_none(),
                 });
             }
         }
@@ -91,13 +99,35 @@ impl Session {
             .collect()
     }
 
-    /// The save refresh (Frage 187 C): one reserved commit, no step and no History row, before
-    /// the file text is taken; nothing is committed when nothing differs.
+    /// The derived numbers of every operation without `op_settings` (known kind, no grid row) of
+    /// the laser page `only`, or of every laser page (`None`), as the writes that store them: the
+    /// pair of each page's copy as it is now (`specs/0150` adrs.md decision 4 b, c).
+    pub(in crate::session) fn derived_fills(&self, only: Option<NodeId>) -> Vec<SettingsWrite> {
+        self.laser_operations()
+            .into_iter()
+            .filter(|op| op.derived && only.is_none_or(|id| op.manufacturing == id))
+            .filter_map(|op| match op.read {
+                SettingsRead::Stored(stored) => Some(SettingsWrite {
+                    operation: op.id,
+                    value: plain(stored.to_value()),
+                }),
+                SettingsRead::Damaged(_) => None,
+            })
+            .collect()
+    }
+
+    /// The save refresh (Frage 187 C) and, for a save that changes the project, the derived
+    /// numbers of every operation without `op_settings` (`specs/0150` criterion 16): one reserved
+    /// commit, no step and no History row, before the file text is taken; nothing is committed
+    /// when nothing differs, so a save of an unchanged project writes nothing.
     pub(in crate::session) fn refresh_material_numbers_for_save(&mut self) {
-        let refreshed = self.refreshed_settings(None);
-        if refreshed.is_empty() {
+        let mut writes = self.refreshed_settings(None);
+        if self.is_dirty() {
+            writes.extend(self.derived_fills(None));
+        }
+        if writes.is_empty() {
             return;
         }
-        let _ = self.document.refresh_material_numbers(&refreshed);
+        let _ = self.document.refresh_material_numbers(&writes);
     }
 }

@@ -8,13 +8,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use curvyo_document_core::{AssetHash, DocumentVersion, NodeId, Opacity, Point, ViewTransform};
-use curvyo_laser_core::FeedRate;
 use curvyo_laser_core::job::{
     BlockInput, BlockNumbers, BlockSource, LeafGeometry, MoveKind, NumbersContext, NumbersRead,
-    PlanCache, PointUm, RunNumbers, Sweep, block_numbers, read_output_settings,
+    PlanCache, PointUm, Sweep, block_numbers, read_output_settings,
 };
 use curvyo_laser_core::operations::OperationKind;
-use curvyo_laser_core::settings::{Interval, Passes, PowerPercent};
+use curvyo_laser_core::settings::Interval;
 
 use super::super::Session;
 use super::job_cache::PageJob;
@@ -330,7 +329,7 @@ impl Session {
             };
             let read = block_numbers(&raster, context);
             let Some(mut numbers) =
-                preview_numbers(&raster, &read).filter(|n| n.kind == OperationKind::Image)
+                preview_numbers(&read).filter(|n| n.kind == OperationKind::Image)
             else {
                 continue;
             };
@@ -392,37 +391,10 @@ pub(super) fn retain_preview_plans(
     plans.retain(ids, &assets, &leaves);
 }
 
-/// The numbers the preview draws `block`'s dots with: the block's, or for an operation with no
-/// settings the default Interval with its own options, so its items show their dots before
-/// power and speed are set (UX notes 3.1). The power and speed are never drawn.
-pub(super) fn preview_numbers(block: &BlockInput, read: &NumbersRead) -> Option<BlockNumbers> {
-    if let Some(numbers) = read.numbers() {
-        return Some(*numbers);
-    }
-    let (
-        NumbersRead::NoSettings,
-        BlockSource::Operation {
-            options: Ok(options),
-            ..
-        },
-    ) = (read, &block.source)
-    else {
-        return None;
-    };
-    let run = RunNumbers {
-        power: PowerPercent::from_tenths(PowerPercent::MAX_TENTHS)?,
-        speed: FeedRate::DEFAULT,
-        feed: FeedRate::DEFAULT,
-        passes: Passes::ONE,
-    };
-    Some(BlockNumbers {
-        kind: block.kind.known()?,
-        main: run,
-        outline: None,
-        interval: Interval::DEFAULT,
-        picture_interval: Interval::DEFAULT,
-        options: *options,
-    })
+/// The numbers the preview draws a block's dots with: the block's own (an operation always has
+/// numbers since `specs/0150`), `None` for damage.
+pub(super) fn preview_numbers(read: &NumbersRead) -> Option<BlockNumbers> {
+    read.numbers().copied()
 }
 
 /// `block` with only its raster leaves (images with pixels and gradient-filled leaves) and no

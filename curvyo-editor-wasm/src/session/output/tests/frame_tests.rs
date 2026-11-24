@@ -61,7 +61,8 @@ fn criterion_26_the_ring_shows_at_the_reported_position_and_leaves_with_the_fram
     assert!(!s.clear_frame_head());
 }
 
-/// A Cut holding `items` whose power and speed are not set yet, with `power` alone if given.
+/// A Cut holding `items` made by a kind press, so it runs the copy's default numbers
+/// (`specs/0150` criterion 4), with `power` typed if given.
 fn cut_without_numbers(
     s: &mut Session,
     items: &[curvyo_document_core::NodeId],
@@ -77,13 +78,15 @@ fn cut_without_numbers(
 }
 
 #[test]
-fn frage_335_a_cut_without_power_or_speed_frames_its_outline() {
+fn frage_335_a_new_cut_frames_its_outline_and_exports() {
     for power in [None, Some(60.0)] {
         let (mut s, square) = laser_with_square();
         cut_without_numbers(&mut s, &[square], power);
         let (mut priced, priced_square) = laser_with_square();
         cut(&mut priced, &[priced_square]);
-        assert_eq!(view(&s)["export"]["enabled"], false, "Export stays blocked");
+        // Since `specs/0150` criteria 23 and 25 a new Cut has numbers: Export is enabled and the
+        // frame traces the same outline.
+        assert_eq!(view(&s)["export"]["enabled"], true, "{power:?}");
         assert_eq!(view(&s)["frame"]["enabled"], true, "{power:?}");
         assert!(view(&s)["frame"]["cause"].is_null());
         for shape in [FrameShape::Rectangle, FrameShape::RubberBand] {

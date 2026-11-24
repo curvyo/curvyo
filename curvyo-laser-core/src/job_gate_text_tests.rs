@@ -30,10 +30,9 @@ fn blocks_come_before_warns_and_start_damaged_follows_the_machine() {
 
 #[test]
 fn the_button_is_placed_by_the_cause_not_found_in_the_sentence() {
-    let text = line(Cause::NoSettings { op: id(2) }, 1, op(2));
+    let text = line(Cause::ZWithoutAxis { op: id(2) }, 1, op(2));
     assert_eq!(text.before, "");
     assert_eq!(text.button, "Cut 2");
-    assert_eq!(text.after, " has no power and speed.");
     let bed = Cause::OutsideBed {
         width_um: 400_000,
         height_um: 300_000,

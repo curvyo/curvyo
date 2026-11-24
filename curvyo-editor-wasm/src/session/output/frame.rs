@@ -21,8 +21,8 @@ pub struct FrameView {
     pub cause: Option<&'static str>,
 }
 
-/// The job a page's frame traces when it is not the page's own job: a block has no power or
-/// speed, so its geometry runs at stand-in numbers (`specs/0118` Frage 335 B).
+/// The job a page's frame traces when it is not the page's own job: a fixture block has no
+/// material numbers, so its geometry runs at stand-in numbers (`specs/0118` Frage 335 B).
 #[derive(Debug)]
 pub(in crate::session) struct FrameJob {
     job: Job,
@@ -34,10 +34,7 @@ pub(in crate::session) struct FrameJob {
 fn frame_ignores(cause: &Cause) -> bool {
     matches!(
         cause,
-        Cause::NoSettings { .. }
-            | Cause::FixtureNoMaterial
-            | Cause::FixtureNoSet { .. }
-            | Cause::OutsideBed { .. }
+        Cause::FixtureNoMaterial | Cause::FixtureNoSet { .. } | Cause::OutsideBed { .. }
     )
 }
 

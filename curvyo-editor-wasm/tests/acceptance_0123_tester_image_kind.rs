@@ -101,7 +101,16 @@ impl B<'_> {
         let index = self.d.operations(self.m).unwrap().len();
         let keys: Vec<Vec<NodeId>> = members.iter().map(|&n| vec![n]).collect();
         self.d
-            .add_operation(self.m, &NewOperation { kind, name }, index, &keys)
+            .add_operation(
+                self.m,
+                &NewOperation {
+                    kind,
+                    name,
+                    settings: None,
+                },
+                index,
+                &keys,
+            )
             .unwrap()
     }
     /// The drawing page's origin.

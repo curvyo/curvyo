@@ -66,6 +66,20 @@ impl WasmSession {
             .unwrap_or_default()
     }
 
+    /// The Default power field; returns the notice, empty without one.
+    pub fn set_machine_default_power(&mut self, value: f64) -> String {
+        self.session
+            .set_machine_default_power(value)
+            .unwrap_or_default()
+    }
+
+    /// The Default speed field; returns the notice, empty without one.
+    pub fn set_machine_default_speed(&mut self, value: f64) -> String {
+        self.session
+            .set_machine_default_speed(value)
+            .unwrap_or_default()
+    }
+
     /// The Laser mode switch.
     pub fn set_machine_laser_mode(&mut self, on: bool) {
         self.session.set_machine_laser_mode(on);

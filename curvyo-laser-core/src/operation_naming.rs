@@ -20,7 +20,7 @@ pub fn last_of_kind(operations: &[OperationSnapshot], kind: OperationKind) -> Op
             && !op.grid
             && op.grid_part.as_ref().and_then(GridPart::read).is_none()
             && !matches!(
-                read_settings(op.settings.as_ref(), kind),
+                read_settings(op.settings.as_ref(), kind, crate::DefaultNumbers::BUILT_IN),
                 SettingsRead::Damaged(_)
             )
             && read_options(op.options.as_ref(), kind).is_ok()

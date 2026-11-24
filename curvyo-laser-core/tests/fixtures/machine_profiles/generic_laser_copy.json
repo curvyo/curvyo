@@ -1,5 +1,5 @@
 {
-  "format_version": 5,
+  "format_version": 7,
   "id": "0f0e0d0c-0b0a-4908-8706-050403020100",
   "kind": "laser",
   "modified": 1762171200000,
@@ -13,6 +13,10 @@
   "max_power": 1000,
   "laser_mode": true,
   "motorised_z": false,
+  "air_assist": false,
+  "output_format": "grbl",
+  "default_power_pct": 10.0,
+  "default_speed_mm_min": 1000,
   "connection": {
     "connector_address": "",
     "controller_port": "",

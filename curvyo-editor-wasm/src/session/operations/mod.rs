@@ -52,9 +52,6 @@ pub(in crate::session) struct OperationsState {
     tools: tools::OperationTools,
     /// The output page's leaves, for the drawing read they were built from (`index.rs`).
     leaves: index::LeafCache,
-    /// The numbers typed into an operation with No settings while power or speed is missing
-    /// (`specs/0028` UX notes §8.3), with its typed Interval (`specs/0111` criterion 19).
-    settings_draft: Option<(NodeId, settings::SettingsDraft)>,
 }
 
 /// The operations of the active laser page, in stored list order.

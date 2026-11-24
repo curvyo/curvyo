@@ -281,7 +281,7 @@ fn block_issues(
     let op = block.id;
     let operation = || Targets::Operations(vec![op]);
     let NumbersRead::Runs { numbers, source } = read else {
-        if let Some(found) = blocking_issue(block, read) {
+        if let Some(found) = blocking_issue(read) {
             issues.push(found);
         }
         return;
@@ -310,15 +310,10 @@ fn block_issues(
     }
 }
 
-/// The block of a running block that has no numbers (criterion 4 a); `None` for damage, which
-/// is counted once for the page.
-fn blocking_issue(block: &BlockInput, read: &NumbersRead) -> Option<Issue> {
+/// The block of a running fixture block that has no numbers (criterion 4 a); `None` for damage,
+/// which is counted once for the page.
+fn blocking_issue(read: &NumbersRead) -> Option<Issue> {
     match read {
-        NumbersRead::NoSettings => Some(issue(
-            Cause::NoSettings { op: block.id },
-            1,
-            Targets::Operations(vec![block.id]),
-        )),
         NumbersRead::FixtureNoMaterial => {
             Some(issue(Cause::FixtureNoMaterial, 1, Targets::FixturePick))
         }

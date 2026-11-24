@@ -82,8 +82,6 @@ impl StoredReason {
 /// The state of an operation's settings (criterion 26).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SettingsState {
-    /// No settings: nothing runs.
-    NoSettings,
     /// Damaged settings: nothing runs.
     Damaged(SettingsDamage),
     /// Own numbers.
@@ -115,11 +113,11 @@ pub enum SettingsState {
 }
 
 impl SettingsState {
-    /// The numbers that run, `None` for No settings and Damaged settings. `0029` reads this.
+    /// The numbers that run, `None` for Damaged settings. `0029` reads this.
     #[must_use]
     pub const fn run(&self) -> Option<&RunSettings> {
         match self {
-            Self::NoSettings | Self::Damaged(_) => None,
+            Self::Damaged(_) => None,
             Self::Own(run) | Self::Live { run, .. } | Self::Stored { run, .. } => Some(run),
         }
     }
@@ -129,7 +127,7 @@ impl SettingsState {
     pub const fn material(&self) -> Option<&RunSettings> {
         match self {
             Self::Live { material, .. } | Self::Stored { material, .. } => Some(material),
-            Self::NoSettings | Self::Damaged(_) | Self::Own(_) => None,
+            Self::Damaged(_) | Self::Own(_) => None,
         }
     }
 
@@ -218,7 +216,7 @@ fn linked_interval(
 fn kept_interval(read: &SettingsRead) -> Option<Interval> {
     match read {
         SettingsRead::Stored(stored) => stored.interval,
-        SettingsRead::None | SettingsRead::Damaged(_) => None,
+        SettingsRead::Damaged(_) => None,
     }
 }
 
@@ -304,7 +302,6 @@ pub fn resolve(
     profile_id: &str,
 ) -> SettingsState {
     let stored = match read {
-        SettingsRead::None => return SettingsState::NoSettings,
         SettingsRead::Damaged(damage) => return SettingsState::Damaged(*damage),
         SettingsRead::Stored(stored) => stored,
     };

@@ -114,6 +114,7 @@ fn session(side: u32, mm: f64, count: usize, interval: f64) -> (Session, NodeId,
             &NewOperation {
                 kind: "image",
                 name: "Image 1",
+                settings: None,
             },
             0,
             &[vec![ids[0]]],

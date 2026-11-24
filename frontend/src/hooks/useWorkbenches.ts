@@ -48,6 +48,10 @@ export interface MachineView {
     origin: OriginCorner;
     max_feed: number;
     max_power: number;
+    /** Default power in percent, one decimal (`specs/0150` criterion 1). */
+    default_power: number;
+    /** Default speed in mm/min, at most `max_feed`. */
+    default_speed: number;
     laser_mode: boolean;
     /** The machine has a motorised Z axis (`specs/0111` criterion 22). */
     motorised_z: boolean;
@@ -132,6 +136,10 @@ export function useWorkbenches(editor: EditorSession) {
       setOrigin: (corner: OriginCorner) => run((session) => session.set_machine_origin(corner)),
       setMaxFeed: (value: number) => run((session) => session.set_machine_max_feed(value)) ?? "",
       setMaxPower: (value: number) => run((session) => session.set_machine_max_power(value)) ?? "",
+      /** The Default power field (`specs/0150` criterion 1): one undo step; the notice. */
+      setDefaultPower: (value: number) => run((session) => session.set_machine_default_power(value)) ?? "",
+      /** The Default speed field: one undo step; the notice. */
+      setDefaultSpeed: (value: number) => run((session) => session.set_machine_default_speed(value)) ?? "",
       setLaserMode: (on: boolean) => run((session) => session.set_machine_laser_mode(on)),
       /** The Motorised Z axis switch of the page's profile copy: one undo step. */
       setMotorisedZ: (on: boolean) => run((session) => session.set_motorised_z(on)),

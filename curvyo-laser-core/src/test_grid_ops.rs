@@ -220,7 +220,11 @@ mod tests {
         assert_eq!(cell.settings.main.speed.get(), 1950);
         assert_eq!((cell.settings.interval, cell.options), (None, None));
         assert!(matches!(
-            read_settings(Some(&cell.settings.to_value()), OperationKind::Cut),
+            read_settings(
+                Some(&cell.settings.to_value()),
+                OperationKind::Cut,
+                crate::DefaultNumbers::BUILT_IN
+            ),
             SettingsRead::Stored(_)
         ));
     }

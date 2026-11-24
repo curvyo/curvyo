@@ -46,8 +46,17 @@ fn square(d: &Document, o: Point, (x, y): (f64, f64), side: f64) -> NodeId {
 
 fn add(d: &Document, m: NodeId, kind: &str, name: &str, members: &[Vec<NodeId>]) -> NodeId {
     let index = d.operations(m).unwrap().len();
-    d.add_operation(m, &NewOperation { kind, name }, index, members)
-        .unwrap()
+    d.add_operation(
+        m,
+        &NewOperation {
+            kind,
+            name,
+            settings: None,
+        },
+        index,
+        members,
+    )
+    .unwrap()
 }
 
 fn settings(d: &Document, op: NodeId, value: &Value) {
@@ -324,7 +333,11 @@ fn the_blocked_state_names_its_blocks_first_and_disables_export() {
     let json = view_of(&d, &laser, None);
     let checks = json["output"]["checks"].as_array().unwrap();
     assert_eq!(checks[0]["severity"], "block");
-    assert_eq!(checks[0]["text"], "Cut 1 has no power and speed.");
+    // Superseded by `specs/0150` criterion 23: Cut 1 without `op_settings` no longer blocks.
+    assert_eq!(
+        checks[0]["text"],
+        "1 item lies outside the 400 × 300 mm bed."
+    );
     assert_eq!(json["output"]["export"]["enabled"], false);
 }
 

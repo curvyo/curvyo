@@ -47,9 +47,9 @@ test("criterion 4: a blocked group has Export disabled with the first block as i
   assert.equal(group.export.tooltip, first?.text);
   assert.equal(group.export.fileType, "GRBL G-code");
   assert.equal(group.export.extension, "gcode");
-  const op = group.checks.find((c) => c.target.kind === "operations");
-  assert.equal(op?.text, "Cut 1 has no power and speed.");
-  assert.equal(op?.button, "Cut 1");
+  // Superseded by `specs/0150` criterion 23: no "has no power and speed"; the bed blocks.
+  assert.equal(first?.text, "1 item lies outside the 400 × 300 mm bed.");
+  assert.ok(!group.checks.some((c) => c.text.includes("has no power and speed")));
 });
 
 test("criterion 4: an unblocked group has Export enabled and no tooltip", () => {

@@ -101,6 +101,7 @@ fn simple(address: &str) -> (Session, curvyo_document_core::NodeId) {
             &curvyo_document_core::NewOperation {
                 kind: "cut",
                 name: "Cut 1",
+                settings: None,
             },
             0,
             &[vec![rect]],
@@ -168,7 +169,10 @@ fn s2_each_blocking_condition_disables_export_and_send_together_with_the_same_te
 
 #[test]
 fn s2_geometry_outside_the_bed_and_no_settings_block_both() {
-    for case in ["outside", "nosettings"] {
+    // Superseded by `specs/0150` criterion 23: an operation without `op_settings` runs the copy's
+    // default numbers, so only the bed case blocks.
+    {
+        let case = "outside";
         let doc = Document::new(1);
         let laser = doc
             .add_output_page(NewOutputPage {
@@ -191,6 +195,7 @@ fn s2_geometry_outside_the_bed_and_no_settings_block_both() {
                 &curvyo_document_core::NewOperation {
                     kind: "cut",
                     name: "Cut 1",
+                    settings: None,
                 },
                 0,
                 &[vec![rect]],
@@ -441,7 +446,7 @@ fn s10_s12_accepted_send_is_one_step_lasered_stays_and_a_second_send_adds_no_ste
 fn s16_the_format_version_stays_49() {
     // No bump by `0125`; 50 is `specs/0123-raster-engraving` (ADR 0069 §10).
     // Superseded by 0135 slice 1 (2026-11-19): 51 is `specs/0135-image-optimisation` (ADR 0072 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 58);
+    assert_eq!(CURRENT_FORMAT_VERSION, 59);
 }
 
 // ---- S6, S9, S11, S17, S19 against the fake connector --------------------------------------

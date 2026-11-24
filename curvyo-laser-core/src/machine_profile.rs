@@ -1,8 +1,10 @@
 //! The laser machine profile record with its limits and the built-in (ADR 0038 §2, §4, §5;
-//! `specs/0026-machine-profile` criteria 1, 2, 3 and 9).
+//! `specs/0026-machine-profile` criteria 1, 2, 3 and 9; `specs/0150` criteria 1 and 2).
 
 use curvyo_document_core::{DocumentSize, Length, PRESET_MATCH_TOLERANCE};
 use serde::{Deserialize, Serialize};
+
+use crate::material::{Passes, PowerPercent, Settings};
 
 /// The id of the built-in profile; not a UUID, so no record file can carry it.
 pub const GENERIC_LASER_ID: &str = "generic-laser";
@@ -170,6 +172,54 @@ bounded_integer!(
     BaudRate(u32), 1, 4_000_000, 115_200
 );
 
+/// The power and speed an operation takes when no material gives it numbers (`specs/0150`
+/// criterion 1): the profile's Default power and Default speed. The speed never lies above the
+/// profile's max feed; every path that builds values keeps that.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DefaultNumbers {
+    /// Default power, 1 to 100 % with one decimal.
+    pub power: PowerPercent,
+    /// Default speed, a whole 1 to the max feed in mm/min.
+    pub speed: FeedRate,
+}
+
+impl DefaultNumbers {
+    /// The built-in pair, 10 % and 1,000 mm/min (Frage 337 A).
+    pub const BUILT_IN: Self = Self {
+        power: PowerPercent::TEN,
+        speed: FeedRate(1_000),
+    };
+
+    /// The pair with the speed limited to `max_feed`.
+    #[must_use]
+    pub fn limited_to(self, max_feed: FeedRate) -> Self {
+        Self {
+            power: self.power,
+            speed: if self.speed.get() > max_feed.get() {
+                max_feed
+            } else {
+                self.speed
+            },
+        }
+    }
+
+    /// The set an operation takes from the pair: power, speed and one pass.
+    #[must_use]
+    pub const fn settings(self) -> Settings {
+        Settings {
+            power: self.power,
+            speed: self.speed,
+            passes: Passes::ONE,
+        }
+    }
+}
+
+impl Default for DefaultNumbers {
+    fn default() -> Self {
+        Self::BUILT_IN
+    }
+}
+
 /// The values a manufacturing copies from a profile (ADR 0039 §1), the work area aside.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileValues {
@@ -190,6 +240,8 @@ pub struct ProfileValues {
     pub air_assist: bool,
     /// The file format the machine reads (ADR 0065 §3).
     pub output_format: OutputFormat,
+    /// The numbers a new or numberless operation takes (`specs/0150` criterion 1).
+    pub defaults: DefaultNumbers,
 }
 
 impl Default for ProfileValues {
@@ -203,6 +255,7 @@ impl Default for ProfileValues {
             motorised_z: false,
             air_assist: false,
             output_format: OutputFormat::Grbl,
+            defaults: DefaultNumbers::BUILT_IN,
         }
     }
 }
@@ -325,6 +378,76 @@ pub fn clamp_feed(typed: f64) -> Option<Limited<FeedRate>> {
         value: FeedRate::new(limited.value)?,
         notice: limited.notice,
     })
+}
+
+/// A typed max feed set into `values` (`specs/0150` criterion 2): a Default speed above the new
+/// maximum is lowered to it in the same edit. The notice is the max feed's own, else the
+/// lowered speed's; `None` for a number that is not finite.
+#[must_use]
+pub fn edit_max_feed(values: &mut ProfileValues, typed: f64) -> Option<Option<String>> {
+    let limited = clamp_feed(typed)?;
+    values.max_feed = limited.value;
+    let lowered = values.defaults.limited_to(limited.value);
+    let speed_notice = (lowered != values.defaults).then(|| {
+        format!(
+            "Default speed limited to {} mm/min.",
+            grouped(lowered.speed.get().into())
+        )
+    });
+    values.defaults = lowered;
+    Some(limited.notice.or(speed_notice))
+}
+
+/// A typed Default power, rounded to 0.1 % and set into 1 to 100 % (`specs/0150` criterion 1);
+/// `None` for a number that is not finite.
+#[must_use]
+pub fn clamp_default_power(typed: f64) -> Option<Limited<PowerPercent>> {
+    if !typed.is_finite() {
+        return None;
+    }
+    let tenths = (typed * 10.0).round().clamp(
+        f64::from(PowerPercent::MIN_TENTHS),
+        f64::from(PowerPercent::MAX_TENTHS),
+    );
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    // clamped to a whole number within 10 to 1000
+    let value = PowerPercent::from_tenths(tenths as u16)?;
+    let rounded = (typed * 10.0).round();
+    // Exact: both sides are whole numbers of tenths, or the typed number itself.
+    #[allow(clippy::float_cmp)]
+    let notice = if tenths != rounded {
+        Some(format!("Default power limited to {value} %."))
+    } else if rounded != typed * 10.0 {
+        Some(format!("Default power rounded to {value} %."))
+    } else {
+        None
+    };
+    Some(Limited { value, notice })
+}
+
+/// A typed Default speed, rounded and set into 1 to `max_feed` mm/min (`specs/0150` criterion 1);
+/// `None` for a number that is not finite.
+#[must_use]
+pub fn clamp_default_speed(typed: f64, max_feed: FeedRate) -> Option<Limited<FeedRate>> {
+    let limited = limited_integer(
+        "Default speed",
+        " mm/min",
+        typed,
+        FeedRate::MIN.into(),
+        max_feed.get().into(),
+    )?;
+    let value = FeedRate::new(limited.value)?;
+    let notice = limited.notice.map(|notice| {
+        if notice.contains("rounded") {
+            format!(
+                "Default speed rounded to {} mm/min.",
+                grouped(limited.value)
+            )
+        } else {
+            notice
+        }
+    });
+    Some(Limited { value, notice })
 }
 
 /// A typed max power value, rounded and set into its range.
@@ -505,6 +628,85 @@ mod tests {
         assert!(generic.values.laser_mode);
         assert_eq!(generic.connection.baud_rate.get(), 115_200);
         assert_eq!(generic.connection.connector_address, "");
+        assert_eq!(generic.values.defaults.power.percent(), 10.0);
+        assert_eq!(generic.values.defaults.speed.get(), 1_000);
+        let set = generic.values.defaults.settings();
+        assert_eq!(
+            (set.power.tenths(), set.speed.get(), set.passes.get()),
+            (100, 1_000, 1)
+        );
+    }
+
+    #[test]
+    fn criterion_1_the_default_pair_is_limited_with_a_short_notice() {
+        let power = clamp_default_power(120.0).unwrap();
+        assert_eq!(power.value.percent(), 100.0);
+        assert_eq!(
+            power.notice.as_deref(),
+            Some("Default power limited to 100 %.")
+        );
+        let power = clamp_default_power(0.2).unwrap();
+        assert_eq!(power.value.percent(), 1.0);
+        assert_eq!(
+            power.notice.as_deref(),
+            Some("Default power limited to 1 %.")
+        );
+        let power = clamp_default_power(12.34).unwrap();
+        assert_eq!(power.value.tenths(), 123);
+        assert_eq!(
+            power.notice.as_deref(),
+            Some("Default power rounded to 12.3 %.")
+        );
+        assert_eq!(clamp_default_power(12.5).unwrap().notice, None);
+        assert!(clamp_default_power(f64::NAN).is_none());
+        let max = FeedRate::new(6_000).unwrap();
+        let speed = clamp_default_speed(7_000.0, max).unwrap();
+        assert_eq!(speed.value.get(), 6_000);
+        assert_eq!(
+            speed.notice.as_deref(),
+            Some("Default speed limited to 6,000 mm/min.")
+        );
+        assert_eq!(
+            clamp_default_speed(0.0, max).unwrap().notice.as_deref(),
+            Some("Default speed limited to 1 mm/min.")
+        );
+        let speed = clamp_default_speed(1_250.4, max).unwrap();
+        assert_eq!(speed.value.get(), 1_250);
+        assert_eq!(
+            speed.notice.as_deref(),
+            Some("Default speed rounded to 1,250 mm/min.")
+        );
+        assert!(
+            "Default speed limited to 100,000 mm/min.".len() <= 70,
+            "the longest notice fits"
+        );
+    }
+
+    #[test]
+    fn criterion_2_a_lower_max_feed_lowers_the_default_speed_in_the_same_edit() {
+        let mut values = ProfileValues::default();
+        values.defaults.speed = FeedRate::new(5_000).unwrap();
+        let notice = edit_max_feed(&mut values, 4_000.0).unwrap();
+        assert_eq!(values.max_feed.get(), 4_000);
+        assert_eq!(values.defaults.speed.get(), 4_000);
+        assert_eq!(
+            notice.as_deref(),
+            Some("Default speed limited to 4,000 mm/min.")
+        );
+        let notice = edit_max_feed(&mut values, 0.0).unwrap();
+        assert_eq!(values.defaults.speed.get(), 1);
+        assert_eq!(
+            notice.as_deref(),
+            Some("Max feed limited to 1 mm/min."),
+            "the max feed's own notice wins"
+        );
+        let mut values = ProfileValues::default();
+        assert_eq!(edit_max_feed(&mut values, 3_000.0), Some(None));
+        assert_eq!(
+            values.defaults.speed.get(),
+            1_000,
+            "a speed under the limit stays"
+        );
     }
 
     #[test]

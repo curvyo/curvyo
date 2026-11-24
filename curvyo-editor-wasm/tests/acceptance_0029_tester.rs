@@ -108,8 +108,17 @@ fn path(d: &Document, l: &Page, pts: &[(f64, f64)], closed: bool, first: u64) ->
 fn op(d: &Document, m: NodeId, kind: &str, name: &str, members: &[NodeId]) -> NodeId {
     let index = d.operations(m).unwrap().len();
     let keys: Vec<Vec<NodeId>> = members.iter().map(|&n| vec![n]).collect();
-    d.add_operation(m, &NewOperation { kind, name }, index, &keys)
-        .unwrap()
+    d.add_operation(
+        m,
+        &NewOperation {
+            kind,
+            name,
+            settings: None,
+        },
+        index,
+        &keys,
+    )
+    .unwrap()
 }
 
 fn numbers(s: &mut Session, id: NodeId, power: f64, speed: f64, passes: f64) {
@@ -347,7 +356,9 @@ fn c3_a_typed_power_changes_the_gate_line_at_once() {
 // ---- criterion 4: blocks -------------------------------------------------------------------------
 
 #[test]
-fn c4a_no_settings_blocks_with_the_operation_named_and_export_disabled() {
+fn c4a_an_operation_without_settings_runs_the_default_numbers_and_never_blocks() {
+    // Superseded by `specs/0150` criteria 15, 23: the check "has no power and speed" is gone; an
+    // operation without `op_settings` runs the copy's default numbers.
     let (mut fx, ids) = page_with(|d, l, m| {
         let a = rect(d, l, 10.0, 10.0, 20.0, 10.0);
         let b = rect(d, l, 50.0, 10.0, 20.0, 10.0);
@@ -358,18 +369,9 @@ fn c4a_no_settings_blocks_with_the_operation_named_and_export_disabled() {
     });
     numbers(&mut fx.s, ids[0], 50.0, 600.0, 1.0);
     let v = out(&fx.s);
-    assert_eq!(
-        check_texts(&fx.s, "block"),
-        ["Cut 2 has no power and speed."]
-    );
-    assert_eq!(v["export"]["enabled"], false);
-    assert_eq!(v["export"]["tooltip"], "Cut 2 has no power and speed.");
-    assert!(
-        fx.s.export_job("Untitled.curvyo").is_none(),
-        "nothing is written while blocked"
-    );
-    let c = &checks(&fx.s)[0];
-    assert_eq!(c["target"]["kind"], "operations");
+    assert!(check_texts(&fx.s, "block").is_empty());
+    assert_eq!(v["export"]["enabled"], true);
+    assert!(fx.s.export_job("Untitled.curvyo").is_some());
 }
 
 #[test]
@@ -1677,10 +1679,11 @@ fn rework_c2_rows_carry_ring_time_and_numbers_and_rows_that_do_not_run_keep_thei
     assert!(c2["run"].is_null(), "Output off: no run");
     // Line 3 shows on every row, running or not.
     assert_eq!(c2["numbers"][0]["text"], "80 %, 400 mm/min, 1 ×");
-    // Cut 3 runs with No settings: its time is "–" and its line 3 is No settings (empty lines).
+    // Superseded by `specs/0150` criterion 27: Cut 3 without `op_settings` runs the default
+    // numbers, with a time and its line 3.
     let c3 = row(&v, "Cut 3");
-    assert_eq!(c3["run"]["time"], "–");
-    assert_eq!(c3["numbers"].as_array().unwrap().len(), 0);
+    assert_ne!(c3["run"]["time"], "–");
+    assert_eq!(c3["numbers"][0]["text"], "10 %, 1,000 mm/min, 1 ×");
     // Folding a row never drops lines 2 and 3.
     assert_eq!(c1["unfolded"], false);
     // The row's time is the run's own time: the four times sum to about the total.
@@ -1828,16 +1831,14 @@ fn rework_c4_c5_every_check_reads_before_button_after_and_names_its_target() {
     let first_warn = sev.iter().position(|s| *s == "warn").unwrap();
     assert!(sev[..first_warn].iter().all(|s| *s == "block"), "{sev:?}");
     assert!(sev[first_warn..].iter().all(|s| *s == "warn"), "{sev:?}");
-    let no = cs
-        .iter()
-        .position(|c| c["text"] == "Cut 2 has no power and speed.");
+    // Superseded by `specs/0150` criterion 23: Cut 2 without `op_settings` no longer blocks.
+    assert!(
+        !texts.iter().any(|t| t.contains("has no power and speed")),
+        "{texts:?}"
+    );
     let bed = cs
         .iter()
         .position(|c| c["text"] == "1 item lies outside the 400 × 300 mm bed.");
-    assert!(no.unwrap() < bed.unwrap(), "{texts:?}");
-    let no = &cs[no.unwrap()];
-    assert_eq!(no["button"], "Cut 2");
-    assert_eq!(no["target"]["kind"], "operations");
     let bed = &cs[bed.unwrap()];
     assert_eq!(bed["button"], "1 item");
     assert_eq!(bed["target"]["kind"], "items");
@@ -1860,7 +1861,8 @@ fn rework_c4_c5_every_check_reads_before_button_after_and_names_its_target() {
     // Export: disabled with the first block as its tooltip.
     let ex = out(&fx.s)["export"].clone();
     assert_eq!(ex["enabled"], false);
-    assert_eq!(ex["tooltip"], "Cut 2 has no power and speed.");
+    // Superseded by `specs/0150` criterion 23: the bed is the first block now.
+    assert_eq!(ex["tooltip"], "1 item lies outside the 400 × 300 mm bed.");
     assert_eq!(ex["file_type"], "GRBL G-code");
     assert_eq!(ex["extension"], "gcode");
 }

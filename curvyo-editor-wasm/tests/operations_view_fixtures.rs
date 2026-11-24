@@ -61,8 +61,17 @@ fn manufacturing(d: &Document, laser: &str) -> NodeId {
 
 fn add(d: &Document, m: NodeId, kind: &str, name: &str, members: &[Vec<NodeId>]) -> NodeId {
     let index = d.operations(m).unwrap().len();
-    d.add_operation(m, &NewOperation { kind, name }, index, members)
-        .unwrap()
+    d.add_operation(
+        m,
+        &NewOperation {
+            kind,
+            name,
+            settings: None,
+        },
+        index,
+        members,
+    )
+    .unwrap()
 }
 
 fn state_empty() -> Document {

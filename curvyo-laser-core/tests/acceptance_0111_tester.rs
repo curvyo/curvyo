@@ -133,16 +133,22 @@ fn main_with(interval: Value) -> Value {
 
 #[test]
 fn c19_interval_reads_on_engrave_and_defaults_when_absent() {
-    let SettingsRead::Stored(s) =
-        read_settings(Some(&main_with(json!(0.25))), OperationKind::Engrave)
-    else {
+    let SettingsRead::Stored(s) = read_settings(
+        Some(&main_with(json!(0.25))),
+        OperationKind::Engrave,
+        curvyo_laser_core::DefaultNumbers::BUILT_IN,
+    ) else {
         panic!("0.25 reads");
     };
     assert!(s.interval.is_some());
     let plain = json!({"main": {"power_pct": 40.0, "speed_mm_min": 3000, "passes": 1}});
     assert!(
         matches!(
-            read_settings(Some(&plain), OperationKind::Engrave),
+            read_settings(
+                Some(&plain),
+                OperationKind::Engrave,
+                curvyo_laser_core::DefaultNumbers::BUILT_IN
+            ),
             SettingsRead::Stored(_)
         ),
         "absent interval is no damage (format 43)"
@@ -150,7 +156,11 @@ fn c19_interval_reads_on_engrave_and_defaults_when_absent() {
     for edge in [0.01, 2.0] {
         assert!(
             matches!(
-                read_settings(Some(&main_with(json!(edge))), OperationKind::Engrave),
+                read_settings(
+                    Some(&main_with(json!(edge))),
+                    OperationKind::Engrave,
+                    curvyo_laser_core::DefaultNumbers::BUILT_IN
+                ),
                 SettingsRead::Stored(_)
             ),
             "{edge}"
@@ -169,7 +179,11 @@ fn c25_interval_damage_rules() {
     ] {
         assert!(
             matches!(
-                read_settings(Some(&main_with(bad.clone())), OperationKind::Engrave),
+                read_settings(
+                    Some(&main_with(bad.clone())),
+                    OperationKind::Engrave,
+                    curvyo_laser_core::DefaultNumbers::BUILT_IN
+                ),
                 SettingsRead::Damaged(_)
             ),
             "interval {bad}"
@@ -178,7 +192,11 @@ fn c25_interval_damage_rules() {
     for kind in PLAIN {
         assert!(
             matches!(
-                read_settings(Some(&main_with(json!(0.1))), kind),
+                read_settings(
+                    Some(&main_with(json!(0.1))),
+                    kind,
+                    curvyo_laser_core::DefaultNumbers::BUILT_IN
+                ),
                 SettingsRead::Damaged(_)
             ),
             "interval on {kind:?}"
@@ -203,8 +221,17 @@ fn ops(kinds: &[(&str, &str)]) -> (Document, NodeId, Vec<NodeId>) {
         .iter()
         .enumerate()
         .map(|(i, (kind, name))| {
-            d.add_operation(m, &NewOperation { kind, name }, i, &[])
-                .unwrap()
+            d.add_operation(
+                m,
+                &NewOperation {
+                    kind,
+                    name,
+                    settings: None,
+                },
+                i,
+                &[],
+            )
+            .unwrap()
         })
         .collect();
     (d, m, ids)
@@ -275,11 +302,13 @@ fn c22_a_format_4_record_reads_the_capability_and_writes_back_byte_for_byte() {
         read_record(&file_name_of(&text), &text).unwrap_err(),
         RecordError::Older
     );
-    // Superseded by `0029` (ADR 0065 §3): the format 6 record writes back byte for byte.
+    // Superseded by `0029` (ADR 0065 §3) and `0150`: the format 6 record reads, and writes as
+    // record format 7, which reads back equal.
     let text = profile_fixture("format6_air_assist.json");
     let p = read_record(&file_name_of(&text), &text).unwrap();
     assert!(p.values.motorised_z);
-    assert_eq!(write_record(&p), text);
+    let seven = write_record(&p);
+    assert_eq!(read_record(&file_name_of(&seven), &seven).unwrap(), p);
 }
 
 #[test]
@@ -303,8 +332,8 @@ fn c22_an_older_record_reads_off_and_a_write_upgrades_to_4() {
     let mut p = MachineProfile::generic_laser();
     p.id = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f".to_owned();
     let written: Value = serde_json::from_str(&write_record(&p)).unwrap();
-    // Record format 6 since `0029` (ADR 0065 §3).
-    assert_eq!(written["format_version"], 6);
+    // Record format 7 since `0150`.
+    assert_eq!(written["format_version"], 7);
     assert_eq!(written["motorised_z"], false, "always written");
 }
 
@@ -319,8 +348,8 @@ fn c22_the_key_in_a_format_3_record_damages_it_and_format_5_is_newer() {
     );
     let text = profile_fixture("newer_format.json");
     let v: Value = serde_json::from_str(&text).unwrap();
-    // Format 7 is newer since `0029` (ADR 0065 §6).
-    assert_eq!(v["format_version"], 7);
+    // Format 8 is newer since `0150`.
+    assert_eq!(v["format_version"], 8);
     assert_eq!(
         read_record(&file_name_of(&text), &text).unwrap_err(),
         RecordError::Newer

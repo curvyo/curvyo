@@ -10,8 +10,8 @@ use curvyo_laser_core::grids::{GridPart, Recipe};
 use curvyo_laser_core::library::MaterialRead;
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    Field, Interval, OperationOptions, Role, SetKind, SetOverride, Settings, SettingsRead,
-    SettingsState, hatches, main_set, read_options, resolve, scans,
+    Field, Interval, OperationOptions, Role, SetKind, Settings, SettingsRead, SettingsState,
+    hatches, main_set, read_options, resolve, scans,
 };
 use serde::Serialize;
 
@@ -24,8 +24,6 @@ use curvyo_laser_core::job::{LeafGeometry, burns_grey};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SettingsStateView {
-    /// No settings.
-    NoSettings,
     /// Damaged settings.
     Damaged,
     /// Own numbers.
@@ -67,35 +65,23 @@ pub enum RoleView {
     Outline,
 }
 
-/// The numbers a set's fields show; a field is `None` only in the No settings draft.
+/// The numbers a set's fields show: never empty (`specs/0150` criterion 27).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct FieldNumbersView {
     /// Power in percent.
-    pub power_pct: Option<f64>,
+    pub power_pct: f64,
     /// Speed in mm/min.
-    pub speed_mm_min: Option<u64>,
+    pub speed_mm_min: u64,
     /// Passes.
-    pub passes: Option<u8>,
+    pub passes: u8,
 }
 
 impl From<Settings> for FieldNumbersView {
     fn from(set: Settings) -> Self {
         Self {
-            power_pct: Some(set.power.percent()),
-            speed_mm_min: Some(u64::from(set.speed.get())),
-            passes: Some(set.passes.get()),
-        }
-    }
-}
-
-impl From<SetOverride> for FieldNumbersView {
-    fn from(draft: SetOverride) -> Self {
-        Self {
-            power_pct: draft
-                .power
-                .map(curvyo_laser_core::settings::PowerPercent::percent),
-            speed_mm_min: draft.speed.map(|s| u64::from(s.get())),
-            passes: draft.passes.map(curvyo_laser_core::settings::Passes::get),
+            power_pct: set.power.percent(),
+            speed_mm_min: u64::from(set.speed.get()),
+            passes: set.passes.get(),
         }
     }
 }
@@ -145,7 +131,7 @@ pub struct SettingsView {
     /// The pick's materials this operation cannot take.
     pub disabled: Vec<DisabledPickView>,
     /// The Interval in mm of Engrave and Engrave + Outline (`specs/0111` criterion 19): the one
-    /// that runs, or with No settings the draft's (0.10 until typed); `None` otherwise.
+    /// that runs; `None` otherwise.
     pub interval_mm: Option<f64>,
     /// The operation-only settings of the lower part (`specs/0111` criterion 20); `None` for
     /// Damaged settings.
@@ -275,21 +261,14 @@ fn disabled_picks(pick: &[PickView], needs: SetKind) -> Vec<DisabledPickView> {
         .collect()
 }
 
-/// The set blocks of the row: none when damaged, the draft for no settings, else one per role.
+/// The set blocks of the row: none when damaged, else one per role.
 fn set_views(
     state: &SettingsState,
-    draft: Option<SetOverride>,
     kind: OperationKind,
     overridden: &[(Role, Field)],
 ) -> Vec<SetView> {
-    match (state, draft) {
-        (SettingsState::Damaged(_), _) => Vec::new(),
-        (SettingsState::NoSettings, draft) => vec![SetView {
-            role: RoleView::Main,
-            run: draft.unwrap_or_default().into(),
-            material: None,
-            typed: Vec::new(),
-        }],
+    match state {
+        SettingsState::Damaged(_) => Vec::new(),
         _ => roles(kind)
             .iter()
             .filter_map(|&role| {
@@ -327,20 +306,9 @@ fn over_feed_text(state: &SettingsState, max_feed: FeedRate) -> Option<String> {
         })
 }
 
-/// The Interval field of a hatching row: the one that runs, or the draft's with No settings.
-fn interval_view(
-    session: &Session,
-    id: NodeId,
-    state: &SettingsState,
-    kind: OperationKind,
-) -> Option<f64> {
-    let interval = match state {
-        SettingsState::NoSettings => kind
-            .has_interval()
-            .then(|| session.draft_interval(id).unwrap_or(Interval::DEFAULT)),
-        _ => state.run().and_then(|run| run.interval),
-    };
-    interval.map(Interval::mm)
+/// The Interval field of a hatching row: the one that runs.
+fn interval_view(state: &SettingsState) -> Option<f64> {
+    state.run().and_then(|run| run.interval).map(Interval::mm)
 }
 
 /// What every row of one view reads of the page's profile copy, read once per view (`specs/0112`
@@ -350,6 +318,8 @@ pub(super) struct PageFacts {
     pub(super) profile: String,
     /// The machine's maximum feed.
     pub(super) max_feed: FeedRate,
+    /// The copy's default pair, what an operation without `op_settings` reads (`specs/0150`).
+    pub(super) defaults: curvyo_laser_core::DefaultNumbers,
     /// Whether the machine has a motorised Z axis.
     pub(super) motorised_z: bool,
     /// What each Image operation's items need of its group, by operation.
@@ -362,6 +332,7 @@ impl PageFacts {
         Self {
             profile: session.active_profile_id().unwrap_or_default(),
             max_feed: session.active_max_feed(),
+            defaults: session.active_defaults(),
             motorised_z: session.active_motorised_z(),
             raster: session.raster_facts(),
         }
@@ -410,7 +381,7 @@ pub(super) fn settings_view(
         return None;
     }
     let kind = OperationKind::parse(op.kind.as_deref()?)?;
-    let read = super::settings::operation_read(op, kind);
+    let read = super::settings::operation_read(op, kind, page.defaults);
     let options = read_options(op.options.as_ref(), kind).ok();
     let state = resolve(&read, kind, session.materials().reads(), &page.profile);
     let needs = main_set(kind);
@@ -418,10 +389,9 @@ pub(super) fn settings_view(
     let disabled = disabled_picks(pick, needs);
     let link = match &read {
         SettingsRead::Stored(stored) => stored.material.as_ref(),
-        SettingsRead::None | SettingsRead::Damaged(_) => None,
+        SettingsRead::Damaged(_) => None,
     };
     let (state_view, reason, name) = match &state {
-        SettingsState::NoSettings => (SettingsStateView::NoSettings, None, None),
         SettingsState::Damaged(_) => (SettingsStateView::Damaged, None, None),
         SettingsState::Own(_) => (SettingsStateView::Own, None, None),
         SettingsState::Live { name, .. } => (SettingsStateView::Live, None, Some(name.clone())),
@@ -437,7 +407,7 @@ pub(super) fn settings_view(
         }
         _ => Vec::new(),
     };
-    let sets = set_views(&state, session.settings_draft(op.id), kind, &overridden);
+    let sets = set_views(&state, kind, &overridden);
     let over_feed = over_feed_text(&state, page.max_feed);
     Some(SettingsView {
         state: state_view,
@@ -452,7 +422,7 @@ pub(super) fn settings_view(
         reset: !overridden.is_empty(),
         needs: needs_view,
         disabled,
-        interval_mm: interval_view(session, op.id, &state, kind),
+        interval_mm: interval_view(&state),
         options: options.map(|options| {
             let facts = page.raster.get(&op.id).copied().unwrap_or_default();
             options_view(options, kind, facts)

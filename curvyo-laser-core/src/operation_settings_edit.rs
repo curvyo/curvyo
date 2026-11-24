@@ -35,8 +35,7 @@ impl TypedNumber {
 /// kind `kind` whose state is `state` (criterion 24, Frage 188 B): own numbers change that
 /// number; a linked operation keeps its link and stores the number as typed, or drops the typed
 /// number when it equals the material's. `None` when nothing changes, for a role the kind does
-/// not have, and for No settings and Damaged settings (the first commit of No settings is
-/// [`StoredSettings::own`] once power and speed are set).
+/// not have, and for Damaged settings.
 #[must_use]
 pub fn edit_number(
     stored: &SettingsRead,
@@ -72,8 +71,7 @@ pub fn edit_number(
 /// The value Edit settings writes when `interval` is typed into an operation of kind `kind`
 /// (`specs/0111` criterion 19): `main.interval_mm` on the operation, also when it is linked (no
 /// material holds an interval in this slice), and an interval typed over the link before goes.
-/// `None` when nothing changes, for a kind that does not hatch, and for No settings and Damaged
-/// settings.
+/// `None` when nothing changes, for a kind that does not hatch, and for Damaged settings.
 #[must_use]
 pub fn edit_interval(
     stored: &SettingsRead,

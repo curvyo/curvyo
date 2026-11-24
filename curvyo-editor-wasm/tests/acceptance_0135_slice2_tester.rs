@@ -123,6 +123,7 @@ fn setup() -> Fx {
             &NewOperation {
                 kind: "image",
                 name: "Image 1",
+                settings: None,
             },
             0,
             &[vec![image], vec![other]],

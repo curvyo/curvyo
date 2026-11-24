@@ -304,11 +304,11 @@ pub use library_merge::{
     merge_material_record,
 };
 pub use machine_profile::{
-    BaudRate, Connection, FeedRate, GENERIC_LASER_ID, GENERIC_LASER_NAME, Limited,
+    BaudRate, Connection, DefaultNumbers, FeedRate, GENERIC_LASER_ID, GENERIC_LASER_NAME, Limited,
     MAX_CONNECTION_CHARS, MAX_NAME_CHARS, MAX_WORK_MM, MIN_WORK_MM, MachineProfile, OriginCorner,
-    OutputFormat, PowerValue, ProfileValues, clamp_address, clamp_baud, clamp_feed, clamp_name,
-    clamp_port, clamp_power, clamp_work_area, clamp_work_side, grouped, is_valid_work_side,
-    machine_size_offer, save_as_name,
+    OutputFormat, PowerValue, ProfileValues, clamp_address, clamp_baud, clamp_default_power,
+    clamp_default_speed, clamp_feed, clamp_name, clamp_port, clamp_power, clamp_work_area,
+    clamp_work_side, edit_max_feed, grouped, is_valid_work_side, machine_size_offer, save_as_name,
 };
 pub use machine_profile_copy::{
     CopyRead, DAMAGED_NAME_NOTICE, ProfileCopy, align_due, differs, read_copy, sets_differ,

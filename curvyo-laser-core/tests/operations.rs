@@ -41,6 +41,7 @@ fn add(d: &Document, mfg: NodeId, kind: OperationKind, members: &[NodeId]) -> No
     let new = NewOperation {
         kind: kind.as_str(),
         name: kind.label(),
+        settings: None,
     };
     let paths: Vec<Vec<NodeId>> = members.iter().map(|&member| vec![member]).collect();
     d.add_operation(mfg, &new, at, &paths).unwrap()

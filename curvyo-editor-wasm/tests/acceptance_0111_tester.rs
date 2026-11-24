@@ -97,8 +97,17 @@ fn open(d: &Document, l: &Page, dp: Page, dr: NodeId) -> Fx {
 fn add_op(d: &Document, m: NodeId, kind: &str, name: &str, members: &[NodeId]) -> NodeId {
     let index = d.operations(m).unwrap().len();
     let keys: Vec<Vec<NodeId>> = members.iter().map(|&n| vec![n]).collect();
-    d.add_operation(m, &NewOperation { kind, name }, index, &keys)
-        .unwrap()
+    d.add_operation(
+        m,
+        &NewOperation {
+            kind,
+            name,
+            settings: None,
+        },
+        index,
+        &keys,
+    )
+    .unwrap()
 }
 
 fn doc(s: &Session) -> Document {

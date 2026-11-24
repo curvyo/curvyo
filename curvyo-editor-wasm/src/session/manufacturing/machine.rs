@@ -9,9 +9,10 @@ use curvyo_document_core::{
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::{
     Connection, CopyRead, LibraryWrite, MachineProfile, MachineProfiles, OriginCorner, ProfileCopy,
-    clamp_address, clamp_baud, clamp_feed, clamp_name, clamp_port, clamp_power, clamp_work_area,
-    is_profile_id, is_valid_work_side, machine_size_offer, new_profile_id, read_choice, read_copy,
-    save_as_name, write_choice, write_copy,
+    clamp_address, clamp_baud, clamp_default_power, clamp_default_speed, clamp_name, clamp_port,
+    clamp_power, clamp_work_area, edit_max_feed, is_profile_id, is_valid_work_side,
+    machine_size_offer, new_profile_id, read_choice, read_copy, save_as_name, write_choice,
+    write_copy,
 };
 use curvyo_laser_core::{FixtureKind, FixturePart, job_parts};
 
@@ -184,7 +185,9 @@ impl Session {
 
     /// Writes `copy` and the page size `page` as one step labelled `change`; with `sets` the
     /// page's set mirror is replaced by a fresh one of those in the same step, its job fixtures
-    /// kept (ADR 0059 §6 amended 2026-11-16).
+    /// kept (ADR 0059 §6 amended 2026-11-16). When the copy's default pair changes, every
+    /// operation of the page without `op_settings` gets the numbers it reads now written in the
+    /// same step, so no visible number changes (`specs/0150` criteria 8, 22; adrs.md 4 b).
     fn write_active_copy(
         &mut self,
         id: curvyo_document_core::NodeId,
@@ -203,16 +206,22 @@ impl Session {
         let Some(contents) = self.page_contents() else {
             return false;
         };
+        let before = self
+            .document
+            .manufacturing(id)
+            .map(|m| read_copy(m.profile.as_ref(), m.legacy_machine_name.as_deref()));
+        let fills = if before.is_some_and(|read| read.copy.values.defaults != copy.values.defaults)
+        {
+            self.derived_fills(Some(id))
+        } else {
+            Vec::new()
+        };
         let changed = self.recording_unguarded(|this| {
-            match sets {
-                Some(sets) => this.document.set_manufacturing_profile_and_sets(
-                    id, &map, page, anchor, change, sets, &contents,
-                ),
-                None => this
-                    .document
-                    .set_manufacturing_profile(id, &map, page, anchor, change, &contents),
-            }
-            .unwrap_or(false)
+            this.document
+                .set_manufacturing_profile_filled(
+                    id, &map, page, anchor, change, sets, &fills, &contents,
+                )
+                .unwrap_or(false)
         });
         if let Some(output) = self.document.manufacturing(id).and_then(|m| m.page) {
             self.note_moved_pages(&pages, &output.id);
@@ -288,11 +297,30 @@ impl Session {
         self.document.version() != before
     }
 
-    /// The Max feed field, rounded and set into its range.
+    /// The Max feed field, rounded and set into its range; a Default speed above it is lowered to
+    /// it in the same step (`specs/0150` criterion 2).
     pub fn set_machine_max_feed(&mut self, typed: f64) -> Option<String> {
         self.edit_copy(ProfileChange::EditMaxFeed, |copy| {
-            let limited = clamp_feed(typed)?;
-            copy.values.max_feed = limited.value;
+            edit_max_feed(&mut copy.values, typed)
+        })
+    }
+
+    /// The Default power field, rounded to 0.1 % and set into 1 to 100 % (`specs/0150`
+    /// criterion 1).
+    pub fn set_machine_default_power(&mut self, typed: f64) -> Option<String> {
+        self.edit_copy(ProfileChange::EditDefaultPower, |copy| {
+            let limited = clamp_default_power(typed)?;
+            copy.values.defaults.power = limited.value;
+            Some(limited.notice)
+        })
+    }
+
+    /// The Default speed field, rounded and set into 1 to the copy's max feed (`specs/0150`
+    /// criterion 1).
+    pub fn set_machine_default_speed(&mut self, typed: f64) -> Option<String> {
+        self.edit_copy(ProfileChange::EditDefaultSpeed, |copy| {
+            let limited = clamp_default_speed(typed, copy.values.max_feed)?;
+            copy.values.defaults.speed = limited.value;
             Some(limited.notice)
         })
     }

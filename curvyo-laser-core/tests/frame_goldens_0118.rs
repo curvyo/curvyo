@@ -198,16 +198,12 @@ fn a_job_without_a_burn_has_nothing_to_frame() {
 
 #[test]
 fn frage_335_a_cut_without_power_or_speed_frames_its_geometry() {
-    // A Cut whose power and speed are not set yet reads "No settings" (an incomplete set is
-    // damaged, which runs nothing and frames nothing).
-    let page = two_rects_with(
-        OriginCorner::BottomLeft,
-        Start::MachineOrigin,
-        SettingsRead::None,
-    );
+    // A Cut without `op_settings` reads own numbers from the copy's pair (`specs/0150`
+    // criterion 25): the job runs, and its frame is the outline it had as "No settings".
+    let page = two_rects_with(OriginCorner::BottomLeft, Start::MachineOrigin, absent());
     let built = build_job(&page.input, &[], &mut PlanCache::default());
-    assert!(!built.job.burns(), "the job itself still runs nothing");
-    assert!(built.unpriced());
+    assert!(built.job.burns(), "the derived numbers run");
+    assert!(!built.unpriced());
     for (shape, name) in [
         (FrameShape::Rectangle, "frame_rectangle.gcode"),
         (FrameShape::RubberBand, "frame_rubber_band.gcode"),
@@ -222,12 +218,17 @@ fn frage_335_a_cut_without_power_or_speed_frames_its_geometry() {
 
 #[test]
 fn frage_335_head_position_without_numbers_frames_as_with_them() {
-    let page = two_rects_with(
-        OriginCorner::BottomLeft,
-        Start::HeadPosition,
-        SettingsRead::None,
-    );
+    let page = two_rects_with(OriginCorner::BottomLeft, Start::HeadPosition, absent());
     let text = frame_text(&page.input, FrameShape::Rectangle);
     let stored = std::fs::read_to_string(dir().join("frame_head_position.gcode")).unwrap();
     assert_eq!(text, stored);
+}
+
+/// What a Cut without `op_settings` reads (`specs/0150` criterion 15).
+fn absent() -> SettingsRead {
+    curvyo_laser_core::settings::read_settings(
+        None,
+        curvyo_laser_core::operations::OperationKind::Cut,
+        curvyo_laser_core::DefaultNumbers::BUILT_IN,
+    )
 }

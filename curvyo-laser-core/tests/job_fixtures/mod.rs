@@ -258,7 +258,11 @@ pub fn own_engrave(kind: OperationKind, power: f64, speed: u32, interval: f64) -
 }
 
 pub fn settings(kind: OperationKind, value: Value) -> SettingsRead {
-    let read = read_settings(Some(&value), kind);
+    let read = read_settings(
+        Some(&value),
+        kind,
+        curvyo_laser_core::DefaultNumbers::BUILT_IN,
+    );
     assert!(matches!(read, SettingsRead::Stored(_)), "{value}: {read:?}");
     read
 }
@@ -267,7 +271,7 @@ pub fn settings(kind: OperationKind, value: Value) -> SettingsRead {
 pub fn stored(read: &SettingsRead) -> &StoredSettings {
     match read {
         SettingsRead::Stored(stored) => stored,
-        _ => panic!("not stored"),
+        SettingsRead::Damaged(_) => panic!("not stored"),
     }
 }
 

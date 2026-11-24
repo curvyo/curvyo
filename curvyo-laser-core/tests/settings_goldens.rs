@@ -25,11 +25,18 @@ fn operations(d: &Document) -> Vec<OperationSnapshot> {
 
 fn read(op: &OperationSnapshot) -> (OperationKind, SettingsRead) {
     let kind = KindRead::of(op.kind.as_deref()).known().unwrap();
-    (kind, read_settings(op.settings.as_ref(), kind))
+    (
+        kind,
+        read_settings(
+            op.settings.as_ref(),
+            kind,
+            curvyo_laser_core::DefaultNumbers::BUILT_IN,
+        ),
+    )
 }
 
 #[test]
-fn the_settings_golden_resolves_stored_own_and_no_settings_without_the_library() {
+fn the_settings_golden_resolves_stored_and_own_without_the_library() {
     let d = golden("laser_settings_v43.curvyo");
     let ops = operations(&d);
     let state = |at: usize| {
@@ -63,7 +70,19 @@ fn the_settings_golden_resolves_stored_own_and_no_settings_without_the_library()
     assert_eq!(cut.run().unwrap().main.passes.get(), 2);
     assert_eq!(cut.differs_text(), None);
     assert!(matches!(state(2), SettingsState::Own(_)));
-    assert_eq!(state(3), SettingsState::NoSettings);
+    // Read since `specs/0150` criterion 15: own numbers from the built-in pair of a copy that
+    // has none.
+    let SettingsState::Own(run) = state(3) else {
+        panic!("an absent register reads own numbers");
+    };
+    assert_eq!(
+        (
+            run.main.power.to_string(),
+            run.main.speed.get(),
+            run.main.passes.get()
+        ),
+        ("10".to_owned(), 1000, 1)
+    );
 }
 
 #[test]
@@ -74,7 +93,7 @@ fn every_damaged_register_reads_as_damaged_settings_with_its_reason() {
         .iter()
         .map(|op| match read(op).1 {
             SettingsRead::Damaged(damage) => damage,
-            other => panic!("{}: {other:?}", op.name),
+            other @ SettingsRead::Stored(_) => panic!("{}: {other:?}", op.name),
         })
         .collect();
     assert_eq!(

@@ -60,7 +60,11 @@ fn the_golden_grids_read_with_their_parts_settings_and_options() {
         };
         assert!(
             matches!(
-                read_settings(op.settings.as_ref(), kind),
+                read_settings(
+                    op.settings.as_ref(),
+                    kind,
+                    curvyo_laser_core::DefaultNumbers::BUILT_IN
+                ),
                 SettingsRead::Stored(_)
             ),
             "{}",

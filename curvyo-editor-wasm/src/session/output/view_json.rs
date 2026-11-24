@@ -199,7 +199,7 @@ fn stale_total(total: TotalView) -> TotalView {
     }
 }
 
-/// A run's time text: "–" with No settings.
+/// A run's time text: "–" for a fixture run with No settings (an operation always has numbers).
 pub(super) fn time_text(run: &RunFacts) -> String {
     run.time_s.map_or_else(|| "–".to_owned(), duration_text)
 }

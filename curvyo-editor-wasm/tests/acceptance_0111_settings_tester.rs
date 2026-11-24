@@ -92,8 +92,17 @@ fn fx(kinds: &[&str]) -> Fx {
         .enumerate()
         .map(|(i, kind)| {
             let name = format!("{kind} {}", i + 1);
-            d.add_operation(m, &NewOperation { kind, name: &name }, i, &[vec![r]])
-                .unwrap()
+            d.add_operation(
+                m,
+                &NewOperation {
+                    kind,
+                    name: &name,
+                    settings: None,
+                },
+                i,
+                &[vec![r]],
+            )
+            .unwrap()
         })
         .collect();
     let mut s = Session::open(3, &pack(&d, "0111-settings").unwrap()).unwrap();
@@ -194,10 +203,16 @@ fn c17_the_unfolded_row_is_not_saved() {
 // ---- criterion 18: the upper part ------------------------------------------------------------
 
 #[test]
-fn c18_an_operation_without_numbers_reads_no_settings() {
+fn c18_an_operation_without_numbers_reads_own_default_numbers() {
+    // Superseded by `specs/0150` criteria 15, 27: no "No settings"; the copy's default pair.
     let f = fx(&["cut", "engrave"]);
-    assert_eq!(f.settings(f.ops[0])["state"], "no_settings");
-    assert_eq!(f.settings(f.ops[1])["state"], "no_settings");
+    for &op in &f.ops[..2] {
+        let v = f.settings(op);
+        assert_eq!(v["state"], "own");
+        assert_eq!(v["sets"][0]["run"]["power_pct"], 10.0);
+        assert_eq!(v["sets"][0]["run"]["speed_mm_min"], 1000);
+        assert_eq!(v["sets"][0]["run"]["passes"], 1);
+    }
 }
 
 #[test]
@@ -355,8 +370,8 @@ fn c20_c24_each_option_edit_is_one_step_and_writes_op_options_only() {
     assert_eq!(o["bidirectional"], false);
     assert_eq!(o["scan_angle_deg"], 15.0);
     assert_eq!(o["overscan_pct"], 5);
-    // Options also on "No settings".
-    assert_eq!(f.settings(a)["state"], "no_settings");
+    // Options also on an operation without `op_settings` (own default numbers, `0150`).
+    assert_eq!(f.settings(a)["state"], "own");
     assert_eq!(f.settings(a)["options"]["hatch"]["crosshatch"], true);
     let _ = f.s.undo();
     assert_eq!(

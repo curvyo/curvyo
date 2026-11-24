@@ -76,7 +76,11 @@ fn settings(kind: OperationKind, power: f64) -> SettingsRead {
     } else {
         json!({"power_pct": power, "speed_mm_min": 3000, "passes": 1})
     };
-    read_settings(Some(&json!({ "main": main })), kind)
+    read_settings(
+        Some(&json!({ "main": main })),
+        kind,
+        curvyo_laser_core::DefaultNumbers::BUILT_IN,
+    )
 }
 
 fn page(blocks: Vec<BlockInput>) -> JobInput {

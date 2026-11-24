@@ -69,8 +69,8 @@ fn ac24_a_format_2_record_reads_and_any_write_is_format_3_with_empty_jobs() {
     let profile = read_record(&record_file_name(ID), &golden("format5_fixture_sets.json"))
         .expect("format 5 reads");
     let written: Value = serde_json::from_str(&write_record(&profile)).unwrap();
-    // Record format 6 since `0029` (ADR 0065 §3).
-    assert_eq!(written["format_version"], 6);
+    // Record format 7 since `0150`.
+    assert_eq!(written["format_version"], 7);
     for set in written["fixture_sets"].as_array().unwrap() {
         for entry in set["fixtures"].as_array().unwrap() {
             assert!(entry["jobs"].is_array(), "jobs written, possibly empty");

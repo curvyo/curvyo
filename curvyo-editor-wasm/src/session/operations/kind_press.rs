@@ -1,11 +1,13 @@
 //! A press on one of the six kind buttons of the Select bar (`specs/0111-laser-operation-tools`
 //! criteria 1 to 7 and 9; ADR 0056 §3): the selection goes into the last operation of that kind,
-//! or into a new "`<Kind> <N>`" when there is none or Shift is held, in one step.
+//! or into a new "`<Kind> <N>`" when there is none or Shift is held, in one step; a new one has
+//! the copy's default numbers from that step on (`specs/0150` criteria 4, 20).
 
 use curvyo_document_core::{NewOperation, NodeId};
 use curvyo_laser_core::operations::{
     KindRead, OperationKind, OperationList, insert_index, last_of_kind, next_operation_name,
 };
+use curvyo_laser_core::settings::StoredSettings;
 use curvyo_ui_core::Scope;
 use serde::Serialize;
 
@@ -71,9 +73,16 @@ impl Session {
             let name =
                 next_operation_name(kind, active.operations.iter().map(|op| op.name.as_str()));
             let index = insert_index(&active.kinds(), kind.section(), active.cuts_last);
+            let numbers = match StoredSettings::own(kind, self.active_defaults().settings(), None)
+                .to_value()
+            {
+                serde_json::Value::Object(map) => Some(map),
+                _ => None,
+            };
             let new = NewOperation {
                 kind: kind.as_str(),
                 name: &name,
+                settings: numbers.as_ref(),
             };
             let summary = self.targets_summary(&selection.targets);
             let added =

@@ -638,6 +638,7 @@ fn c6_operations_look_keeps_the_centre_line_proxy_for_machine_output() {
         &NewOperation {
             kind: "cut",
             name: "Op 1",
+            settings: None,
         },
         0,
         &[vec![id]],

@@ -13,7 +13,7 @@ export const SET_KINDS = ["cut", "score", "engrave", "image"] as const;
 export type SetKind = (typeof SET_KINDS)[number];
 
 /** The state of an operation's settings (criterion 26). */
-export type SettingsState = "no_settings" | "damaged" | "own" | "live" | "stored";
+export type SettingsState = "damaged" | "own" | "live" | "stored";
 
 /** The numbers field of a set. */
 export type SettingsField = "power" | "speed" | "passes";
@@ -21,11 +21,11 @@ export type SettingsField = "power" | "speed" | "passes";
 /** The two sets of an operation: the kind's own, and the outline of Engrave + Outline. */
 export type SettingsRole = "main" | "outline";
 
-/** The numbers of a set; a field is `null` only in the No settings draft. */
+/** The numbers of a set: never empty (`specs/0150` criterion 27). */
 export interface FieldNumbers {
-  powerPct: number | null;
-  speedMmMin: number | null;
-  passes: number | null;
+  powerPct: number;
+  speedMmMin: number;
+  passes: number;
 }
 
 /** A material's three numbers (never empty). */
@@ -222,12 +222,7 @@ export function asMaterialNumbers(value: unknown): MaterialNumbers | null {
 }
 
 function asFieldNumbers(value: unknown): FieldNumbers | null {
-  if (!isObject(value)) return null;
-  const power = nullable(value.power_pct, finite);
-  const speed = nullable(value.speed_mm_min, whole);
-  const passes = nullable(value.passes, whole);
-  if (power === undefined || speed === undefined || passes === undefined) return null;
-  return { powerPct: power, speedMmMin: speed, passes };
+  return asMaterialNumbers(value);
 }
 
 function asField(value: unknown): SettingsField | null {
@@ -371,7 +366,7 @@ function asOptions(value: unknown): OperationOptions | null | undefined {
   return { hatch, zOffsetMm: value.z_offset_mm, image };
 }
 
-const STATES: readonly unknown[] = ["no_settings", "damaged", "own", "live", "stored"];
+const STATES: readonly unknown[] = ["damaged", "own", "live", "stored"];
 
 /** One row's Settings block; `undefined` when wrong, `null` for a row that has none. */
 export function decodeSettings(value: unknown): OperationSettings | null | undefined {

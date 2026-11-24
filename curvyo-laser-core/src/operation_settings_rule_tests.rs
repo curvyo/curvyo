@@ -85,13 +85,7 @@ fn the_sets_follow_the_kind_and_the_outline_falls_back_to_engrave() {
             (SetKind::Score, set(15.0, 9000, 1)),
         ],
     );
-    let stored = use_material(
-        &both,
-        PROFILE,
-        OperationKind::EngraveOutline,
-        &SettingsRead::None,
-    )
-    .unwrap();
+    let stored = use_material(&both, PROFILE, OperationKind::EngraveOutline, &absent()).unwrap();
     assert_eq!(stored.outline, Some(set(15.0, 9000, 1)));
     let link = stored.material.unwrap();
     assert_eq!(
@@ -104,7 +98,7 @@ fn the_sets_follow_the_kind_and_the_outline_falls_back_to_engrave() {
         &engrave_only,
         PROFILE,
         OperationKind::EngraveOutline,
-        &SettingsRead::None,
+        &absent(),
     )
     .unwrap();
     assert_eq!(stored.outline, Some(set(30.0, 6000, 1)));
@@ -113,12 +107,7 @@ fn the_sets_follow_the_kind_and_the_outline_falls_back_to_engrave() {
         Some(SetKind::Engrave)
     );
     assert_eq!(
-        use_material(
-            &engrave_only,
-            PROFILE,
-            OperationKind::Cut,
-            &SettingsRead::None
-        ),
+        use_material(&engrave_only, PROFILE, OperationKind::Cut, &absent()),
         Err(SetKind::Cut),
         "skipped and named"
     );
@@ -126,7 +115,7 @@ fn the_sets_follow_the_kind_and_the_outline_falls_back_to_engrave() {
         &material("m3", 1, &[(SetKind::Cut, set(60.0, 300, 2))]),
         PROFILE,
         OperationKind::CutOut,
-        &SettingsRead::None,
+        &absent(),
     )
     .unwrap();
     assert_eq!((cut.main, cut.outline), (set(60.0, 300, 2), None));
@@ -259,8 +248,13 @@ fn own_none_and_damaged_states_and_the_feed_check() {
     );
     assert!(!run.over_feed(FeedRate::new(7000).unwrap()));
     assert_eq!(
-        resolve(&SettingsRead::None, OperationKind::Cut, &[], "p"),
-        SettingsState::NoSettings
+        resolve(&absent(), OperationKind::Cut, &[], "p"),
+        SettingsState::Own(RunSettings {
+            main: crate::DefaultNumbers::BUILT_IN.settings(),
+            outline: None,
+            interval: None,
+        }),
+        "an absent register runs the copy's pair (specs/0150 criterion 15)"
     );
     let damaged = SettingsRead::Damaged(SettingsDamage::BadSet);
     assert!(
@@ -369,8 +363,8 @@ fn a_typed_number_changes_own_numbers_or_becomes_an_override_of_a_link() {
     );
     assert_eq!(
         edit_number(
-            &SettingsRead::None,
-            &SettingsState::NoSettings,
+            &SettingsRead::Damaged(SettingsDamage::BadSet),
+            &SettingsState::Damaged(SettingsDamage::BadSet),
             cut,
             Role::Main,
             power(1.0)
@@ -447,7 +441,10 @@ fn material_paths_keep_the_stored_interval_and_a_typed_interval_writes_main() {
         None,
         "a Cut has no interval"
     );
-    assert_eq!(edit_interval(&SettingsRead::None, kind, typed), None);
+    assert_eq!(
+        edit_interval(&SettingsRead::Damaged(SettingsDamage::BadSet), kind, typed),
+        None
+    );
 
     let cut = linked(set(60.0, 300, 1), 5, Overrides::default());
     let cut_state = resolve(&cut, OperationKind::Cut, &[], PROFILE);
@@ -498,7 +495,7 @@ fn a_linked_engrave_without_an_interval_takes_the_one_of_its_laser_set() {
         .unwrap()
         .numbers
         .interval = Some(interval);
-    let stored = use_material(&m, PROFILE, OperationKind::Engrave, &SettingsRead::None).unwrap();
+    let stored = use_material(&m, PROFILE, OperationKind::Engrave, &absent()).unwrap();
     assert_eq!(stored.interval, Some(interval));
     let own = SettingsRead::Stored(StoredSettings {
         interval: Interval::from_mm(0.3),
@@ -510,7 +507,7 @@ fn a_linked_engrave_without_an_interval_takes_the_one_of_its_laser_set() {
         Interval::from_mm(0.3),
         "an own interval stays (0111 c23)"
     );
-    let other = use_material(&m, "other", OperationKind::Engrave, &SettingsRead::None);
+    let other = use_material(&m, "other", OperationKind::Engrave, &absent());
     assert_eq!(
         other,
         Err(SetKind::Engrave),
@@ -537,7 +534,7 @@ fn engrave_and_image(modified: u64, image: bool) -> Material {
 fn an_image_operation_reads_the_image_set_and_never_the_engrave_set() {
     assert_eq!(main_set(OperationKind::Image), SetKind::Image);
     let m = engrave_and_image(7, true);
-    let stored = use_material(&m, PROFILE, OperationKind::Image, &SettingsRead::None).unwrap();
+    let stored = use_material(&m, PROFILE, OperationKind::Image, &absent()).unwrap();
     assert_eq!(stored.main, set(45.0, 9000, 2));
     assert_eq!(
         stored.interval,
@@ -552,7 +549,7 @@ fn an_image_operation_reads_the_image_set_and_never_the_engrave_set() {
         panic!("live")
     };
     assert_eq!(material.main, set(45.0, 9000, 2));
-    let engrave = use_material(&m, PROFILE, OperationKind::Engrave, &SettingsRead::None).unwrap();
+    let engrave = use_material(&m, PROFILE, OperationKind::Engrave, &absent()).unwrap();
     assert_eq!(
         engrave.main,
         set(30.0, 6000, 1),
@@ -560,7 +557,7 @@ fn an_image_operation_reads_the_image_set_and_never_the_engrave_set() {
     );
     let without = engrave_and_image(7, false);
     assert_eq!(
-        use_material(&without, PROFILE, OperationKind::Image, &SettingsRead::None),
+        use_material(&without, PROFILE, OperationKind::Image, &absent()),
         Err(SetKind::Image),
         "no fallback to the Engrave set: Use material skips"
     );
@@ -588,7 +585,7 @@ fn an_image_operation_reads_the_image_set_and_never_the_engrave_set() {
 #[test]
 fn refresh_of_an_image_operation_follows_the_image_set() {
     let old = engrave_and_image(5, true);
-    let stored = use_material(&old, PROFILE, OperationKind::Image, &SettingsRead::None).unwrap();
+    let stored = use_material(&old, PROFILE, OperationKind::Image, &absent()).unwrap();
     let read = SettingsRead::Stored(stored);
     let mut edited = engrave_and_image(9, true);
     edited.lasers[0]
@@ -608,4 +605,13 @@ fn refresh_of_an_image_operation_follows_the_image_set() {
         None,
         "no Image set: the stored numbers stay"
     );
+}
+
+/// What an operation without `op_settings` reads (`specs/0150` criterion 15).
+fn absent() -> SettingsRead {
+    crate::operation_settings::read_settings(
+        None,
+        OperationKind::Cut,
+        crate::DefaultNumbers::BUILT_IN,
+    )
 }

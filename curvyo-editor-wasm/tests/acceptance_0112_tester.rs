@@ -1296,6 +1296,7 @@ fn c21_adding_a_set_for_a_new_laser_adds_the_laser_and_ops_use_the_page_laser() 
             &NewOperation {
                 kind: "cut",
                 name: "Cut 1",
+                settings: None,
             },
             0,
             &[vec![r]],

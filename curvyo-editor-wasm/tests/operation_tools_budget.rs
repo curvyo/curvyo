@@ -55,6 +55,7 @@ fn page_file(grouped: bool, operations: usize) -> (Vec<u8>, String) {
             &NewOperation {
                 kind: "cut",
                 name: &format!("Cut {}", k + 1),
+                settings: None,
             },
             index,
             &[vec![*square]],

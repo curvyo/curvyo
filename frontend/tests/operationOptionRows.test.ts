@@ -43,10 +43,10 @@ test("a Cut shows Z offset alone with the capability, and no lower part without 
   assert.deepEqual(lowerPart("cut_out", { ...settings, zOffsetShown: true })?.fields.length, 1);
 });
 
-test("Interval shows 0.10 for Engrave and Engrave + Outline also with No settings, never for a Cut (AC 19)", () => {
+test("Interval shows 0.10 for Engrave and Engrave + Outline also on default numbers, never for a Cut (AC 19)", () => {
   for (const kind of ["engrave", "engrave_outline"]) {
     const { settings } = settingsOf("five_kinds_cuts_last", kind);
-    assert.equal(settings.state, "no_settings");
+    assert.equal(settings.state, "own");
     assert.equal(settings.intervalMm, 0.1, kind);
   }
   for (const kind of ["score", "cut", "cut_out"]) {

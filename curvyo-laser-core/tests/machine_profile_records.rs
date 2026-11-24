@@ -1,6 +1,7 @@
 //! The machine profile record goldens of `tests/fixtures/machine_profiles/`: record format 6 with
-//! air assist and the output format reads and writes back byte for byte, format 5 with named
-//! fixture sets reads (air assist off, GRBL) and writes as format 6, every damage case is damaged,
+//! air assist and the output format reads and writes as format 7 with the built-in default pair
+//! (`specs/0150`, tested in `operation_defaults_0150.rs`), format 5 with named fixture sets reads
+//! (air assist off, GRBL) and writes as format 7, every damage case is damaged,
 //! a newer record is newer, and every record of formats 1 to 4 is skipped as older
 //! (`specs/0113-fixture-sets-and-pins` criteria 10, 39 to 41; ADR 0060 §1 to §4, §9;
 //! `specs/0029-laser-job-preview-and-output` criteria 25, 32, 39; ADR 0065 §3, §6).
@@ -29,14 +30,21 @@ fn read(name: &str) -> Result<curvyo_laser_core::MachineProfile, RecordError> {
     read_record(&record_file_name(ID), &golden(name))
 }
 
-/// The format 6 text a format 5 golden writes: the version and the two keys of ADR 0065 §3 after
-/// `motorised_z`, off and GRBL.
-fn as_format_6(five: &str) -> String {
-    let at = five.find("  \"connection\"").unwrap();
-    let (head, tail) = five.split_at(at);
+/// The format 7 text a format 5 or 6 golden writes: the version, the two keys of ADR 0065 §3
+/// (off and GRBL) when absent, and the built-in default pair (`specs/0150`) before `connection`.
+fn as_format_7(old: &str) -> String {
+    let at = old.find("  \"connection\"").unwrap();
+    let (head, tail) = old.split_at(at);
+    let output = if head.contains("\"air_assist\"") {
+        ""
+    } else {
+        "  \"air_assist\": false,\n  \"output_format\": \"grbl\",\n"
+    };
+    let head = head
+        .replacen("\"format_version\": 5", "\"format_version\": 7", 1)
+        .replacen("\"format_version\": 6", "\"format_version\": 7", 1);
     format!(
-        "{}  \"air_assist\": false,\n  \"output_format\": \"grbl\",\n{tail}",
-        head.replacen("\"format_version\": 5", "\"format_version\": 6", 1)
+        "{head}{output}  \"default_power_pct\": 10.0,\n  \"default_speed_mm_min\": 1000,\n{tail}"
     )
 }
 
@@ -46,14 +54,18 @@ fn format_6_air_assist_and_output_format_read_and_write_back_byte_for_byte() {
     let profile = read("format6_air_assist.json").unwrap();
     assert!(profile.values.air_assist);
     assert_eq!(profile.values.output_format, OutputFormat::Grbl);
-    assert_eq!(write_record(&profile), text);
+    assert_eq!(
+        write_record(&profile),
+        as_format_7(&text),
+        "any write upgrades to 7"
+    );
     let five = read("format5_fixture_sets.json").unwrap();
     assert!(!five.values.air_assist, "format 5 reads air assist off");
     assert_eq!(five.values.output_format, OutputFormat::Grbl);
     assert_eq!(
         write_record(&five),
-        as_format_6(&golden("format5_fixture_sets.json")),
-        "any write upgrades to 6"
+        as_format_7(&golden("format5_fixture_sets.json")),
+        "any write upgrades to 7"
     );
 }
 
@@ -96,7 +108,7 @@ fn format_5_sets_read_in_order_and_write_back_byte_for_byte() {
     assert_eq!(pin.params["diameter_mm"], 6.0);
     assert_eq!(pin.jobs[1].role, Some(JobRole::Diameters));
     assert!(profile.values.motorised_z);
-    assert_eq!(write_record(&profile), as_format_6(&text));
+    assert_eq!(write_record(&profile), as_format_7(&text));
     assert!(!text.contains("on_page") && !text.contains("output") && !text.contains("active"));
     // 2026-11-16 (ADR 0060 §1 amended): ids everywhere, a locked set and a locked fixture.
     assert!(profile.fixture_sets[1].locked && !profile.fixture_sets[0].locked);
@@ -139,7 +151,7 @@ fn the_maximal_sets_read_and_fit_the_record_limit() {
             MAX_RECORD_TARGETS
         )
     );
-    assert_eq!(write_record(&profile), as_format_6(&text));
+    assert_eq!(write_record(&profile), as_format_7(&text));
     let one_more = text.replacen(
         "\"targets\": [\n",
         "\"targets\": [\n            \"clamp\",\n",
@@ -269,5 +281,9 @@ fn a_duplicated_built_in_reads_as_a_user_profile() {
     let profile = read_record(name, &text).unwrap();
     assert_eq!(profile.values.name, "Generic laser copy");
     assert!(!profile.is_builtin());
-    assert_eq!(write_record(&profile), as_format_6(&text));
+    assert_eq!(
+        write_record(&profile),
+        text,
+        "format 7 writes back byte for byte"
+    );
 }

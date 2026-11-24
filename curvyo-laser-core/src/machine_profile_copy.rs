@@ -1,5 +1,5 @@
 //! Reads and writes the machine profile copy of a manufacturing (ADR 0039 §1 to §3, §5, §6;
-//! ADR 0056 §7; ADR 0065 §3): the `mfg_profile` map, every field read on its own with its default on damage,
+//! ADR 0056 §7; ADR 0065 §3; `specs/0150` criterion 3): the `mfg_profile` map, every field read on its own with its default on damage,
 //! how the page's copy differs from its record (ADR 0039 §5) and whether a page's set mirror
 //! differs from its profile's sets (ADR 0059 §10).
 
@@ -10,9 +10,10 @@ use curvyo_extension_core::StoredParams;
 use serde_json::Value;
 
 use crate::machine_profile::{
-    FeedRate, GENERIC_LASER_ID, MachineProfile, OriginCorner, OutputFormat, PowerValue,
-    ProfileValues, is_valid_name,
+    DefaultNumbers, FeedRate, GENERIC_LASER_ID, MachineProfile, OriginCorner, OutputFormat,
+    PowerValue, ProfileValues, is_valid_name,
 };
+use crate::material::PowerPercent;
 
 const ID: &str = "id";
 const NAME: &str = "name";
@@ -23,6 +24,8 @@ const LASER_MODE: &str = "laser_mode";
 const MOTORISED_Z: &str = "motorised_z";
 const AIR_ASSIST: &str = "air_assist";
 const OUTPUT_FORMAT: &str = "output_format";
+const DEFAULT_POWER: &str = "default_power_pct";
+const DEFAULT_SPEED: &str = "default_speed_mm_min";
 
 /// The notice of a copy whose stored name was damaged (criterion 12).
 pub const DAMAGED_NAME_NOTICE: &str = "Name was damaged, showing Generic laser";
@@ -104,6 +107,22 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
         .get(NAME)
         .and_then(Value::as_str)
         .filter(|name| is_valid_name(name));
+    let max_feed = whole(stored.get(MAX_FEED))
+        .and_then(FeedRate::new)
+        .unwrap_or(defaults.max_feed);
+    // Each field of the pair on its own: missing or unreadable reads the built-in value, then the
+    // speed is limited to the copy's max feed (`specs/0150` adrs.md decision 1).
+    let pair = DefaultNumbers {
+        power: stored
+            .get(DEFAULT_POWER)
+            .and_then(Value::as_f64)
+            .and_then(PowerPercent::from_percent)
+            .unwrap_or(defaults.defaults.power),
+        speed: whole(stored.get(DEFAULT_SPEED))
+            .and_then(FeedRate::new)
+            .unwrap_or(defaults.defaults.speed),
+    }
+    .limited_to(max_feed);
     let values = ProfileValues {
         name: name.map_or(defaults.name, str::to_owned),
         origin: stored
@@ -111,9 +130,7 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
             .and_then(Value::as_str)
             .and_then(OriginCorner::from_name)
             .unwrap_or(defaults.origin),
-        max_feed: whole(stored.get(MAX_FEED))
-            .and_then(FeedRate::new)
-            .unwrap_or(defaults.max_feed),
+        max_feed,
         max_power: whole(stored.get(MAX_POWER))
             .and_then(PowerValue::new)
             .unwrap_or(defaults.max_power),
@@ -127,6 +144,7 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
             .unwrap_or(defaults.motorised_z),
         air_assist: air_assist.unwrap_or(defaults.air_assist),
         output_format: output_format.unwrap_or(defaults.output_format),
+        defaults: pair,
     };
     CopyRead {
         copy: ProfileCopy {
@@ -172,6 +190,14 @@ pub fn write_copy(copy: &ProfileCopy) -> StoredParams {
     map.insert(
         OUTPUT_FORMAT.to_owned(),
         Value::from(copy.values.output_format.as_str()),
+    );
+    map.insert(
+        DEFAULT_POWER.to_owned(),
+        Value::from(copy.values.defaults.power.percent()),
+    );
+    map.insert(
+        DEFAULT_SPEED.to_owned(),
+        Value::from(copy.values.defaults.speed.get()),
     );
     map
 }
@@ -297,6 +323,8 @@ mod tests {
             keys,
             vec![
                 "air_assist",
+                "default_power_pct",
+                "default_speed_mm_min",
                 "id",
                 "laser_mode",
                 "max_feed_mm_per_min",

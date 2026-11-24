@@ -37,8 +37,17 @@ fn page(kind: Option<&str>) -> (Vec<u8>, String, NodeId) {
     ));
     if let Some(kind) = kind {
         let m = laser.kind.manufacturing().unwrap();
-        d.add_operation(m, &NewOperation { kind, name: "Op 1" }, 0, &[vec![square]])
-            .unwrap();
+        d.add_operation(
+            m,
+            &NewOperation {
+                kind,
+                name: "Op 1",
+                settings: None,
+            },
+            0,
+            &[vec![square]],
+        )
+        .unwrap();
     }
     (pack(&d, "look").unwrap(), laser.id, square)
 }
@@ -217,7 +226,11 @@ fn placed_page(kind: Option<&str>) -> (Vec<u8>, String) {
         let m = laser.kind.manufacturing().unwrap();
         d.add_operation(
             m,
-            &NewOperation { kind, name: "Op 1" },
+            &NewOperation {
+                kind,
+                name: "Op 1",
+                settings: None,
+            },
             0,
             &[vec![placement]],
         )
@@ -253,8 +266,17 @@ fn clone_of_group(member_kind: Option<&str>) -> (Vec<u8>, String) {
     if let Some(kind) = member_kind {
         let m = laser.kind.manufacturing().unwrap();
         let path = d.clone_member_path(clone, first).unwrap();
-        d.add_operation(m, &NewOperation { kind, name: "Op 1" }, 0, &[])
-            .unwrap();
+        d.add_operation(
+            m,
+            &NewOperation {
+                kind,
+                name: "Op 1",
+                settings: None,
+            },
+            0,
+            &[],
+        )
+        .unwrap();
         // No command writes a member key any more (`specs/0111` criterion 14): an old file's.
         let d = legacy_key::with_legacy_key(&d, "Op 1", &path);
         return (pack(&d, "clone").unwrap(), laser.id);
@@ -313,6 +335,7 @@ fn curve_page(kind: curvyo_document_core::CurveKind) -> (Vec<u8>, String) {
         &NewOperation {
             kind: "cut",
             name: "Op 1",
+            settings: None,
         },
         0,
         &[vec![curve]],
