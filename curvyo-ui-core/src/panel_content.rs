@@ -26,6 +26,8 @@ pub enum PanelContent {
     History,
     /// The Fonts tab (`specs/0074-text-objects` criteria 15 to 19).
     Fonts,
+    /// The Library tab (`specs/0137-document-library`).
+    Library,
     /// Document snapping controls.
     Snapping,
     /// The active page's grid controls (`specs/0090-grid`).
@@ -63,6 +65,7 @@ pub fn panel_body(
         PanelTab::History => PanelContent::History,
         PanelTab::File => PanelContent::File,
         PanelTab::Fonts => PanelContent::Fonts,
+        PanelTab::Library => PanelContent::Library,
         PanelTab::Snapping => PanelContent::Snapping,
         PanelTab::Grid => PanelContent::Grid,
         PanelTab::Sketches => PanelContent::Sketches,

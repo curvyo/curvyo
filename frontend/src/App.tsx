@@ -6,6 +6,8 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { Canvas } from "@/components/Canvas";
 import { CanvasArea } from "@/components/CanvasArea";
 import { FontPreview } from "@/components/fontPreview/FontPreview";
+import { LibraryPreview } from "@/components/LibraryPreview";
+import { useLibraryPane } from "@/lib/libraryStore";
 import { useFontPreview } from "@/hooks/useFontPreview";
 import { CanvasNotice } from "@/components/CanvasNotice";
 import { ErrorDialog } from "@/components/ErrorDialog";
@@ -134,6 +136,8 @@ function Editor() {
   const adjust = useAdjustments(editor);
   const cropBar = useCropBar(editor);
   const beforeAfter = useBeforeAfter(editor);
+  // The Library's page preview: the canvas area's one side pane with the font preview (`0137`).
+  const libraryPane = useLibraryPane(preview.store.open);
   usePaneExclusion(preview.store.open, beforeAfter.open, preview.close, beforeAfter.close);
   const { getSession } = editor;
   const placeOn = usePlaceOn(editor);
@@ -461,14 +465,25 @@ function Editor() {
         <CanvasArea
           keepViewOrigin={keepViewOrigin}
           coverDrawing={editor.coverCanvasRight}
-          open={preview.store.open || beforeAfter.open}
-          wantFull={beforeAfter.open ? beforeAfter.full : preview.wantFull}
-          size={beforeAfter.open ? SIZE_RANGE.min : preview.size}
-          toggleFull={beforeAfter.open ? beforeAfter.toggleFull : preview.toggleFull}
-          split={beforeAfter.open ? beforeAfter.split : preview.split}
-          setSplit={beforeAfter.open ? beforeAfter.setSplit : preview.setSplit}
+          open={preview.store.open || beforeAfter.open || libraryPane.open}
+          wantFull={beforeAfter.open ? beforeAfter.full : libraryPane.open ? libraryPane.full : preview.wantFull}
+          size={beforeAfter.open || libraryPane.open ? SIZE_RANGE.min : preview.size}
+          toggleFull={beforeAfter.open ? beforeAfter.toggleFull : libraryPane.open ? libraryPane.toggleFull : preview.toggleFull}
+          split={beforeAfter.open ? beforeAfter.split : libraryPane.open ? libraryPane.split : preview.split}
+          setSplit={beforeAfter.open ? beforeAfter.setSplit : libraryPane.open ? libraryPane.setSplit : preview.setSplit}
+          dividerLabel={!beforeAfter.open && libraryPane.open ? "Page preview width" : undefined}
           pane={(layout, switchView, resizing) => beforeAfter.open ? (
             <BeforeAfterPane api={beforeAfter} layout={layout} onSwitchView={switchView} onReturnFocus={returnToText} />
+          ) : libraryPane.open ? (
+            <LibraryPreview
+              getSession={editor.getSession}
+              sync={editor.sync}
+              canvasRef={editor.canvasRef}
+              showNotice={editor.showHistoryNotice}
+              activeIsSketch={() => sketch.view.workbench === "sketch"}
+              layout={layout}
+              onSwitchView={switchView}
+            />
           ) : (
             <FontPreview
               preview={preview}

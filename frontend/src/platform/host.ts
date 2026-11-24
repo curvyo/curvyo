@@ -259,6 +259,16 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   // (`specs/0064-machine-connector`, UX notes §9).
   // The recovery copies live in this browser's IndexedDB (`recoveryStore`'s browser store), never
   // through these desktop commands (`specs/0136-autosave-and-restore`).
+  // The browser's library runs its own index over the stored workspaces (`libraryApi`, ADR 0084
+  // decision 10); it has no added folders and opens no file of the disk.
+  library_scan: () => notInTheBrowser("library_scan"),
+  library_rows: () => notInTheBrowser("library_rows"),
+  library_page_picture: () => notInTheBrowser("library_page_picture"),
+  library_read_document: () => notInTheBrowser("library_read_document"),
+  library_find_source: () => notInTheBrowser("library_find_source"),
+  library_add_folder: () => notInTheBrowser("library_add_folder"),
+  library_remove_folder: () => notInTheBrowser("library_remove_folder"),
+  library_open_path: () => notInTheBrowser("library_open_path"),
   recovery_list: () => notInTheBrowser("recovery_list"),
   recovery_begin: () => notInTheBrowser("recovery_begin"),
   recovery_write_asset: () => notInTheBrowser("recovery_write_asset"),

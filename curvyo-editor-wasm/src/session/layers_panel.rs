@@ -251,6 +251,15 @@ impl Session {
             .map(|(offset, row)| {
                 let mut json = row_json(row, first + offset);
                 json["homeLine"] = Value::from(home_lines[offset].clone());
+                // `specs/0137` criterion 7: the row tooltip's Came from line.
+                json["cameFromLine"] = self.document.came_from(row.id).map_or(Value::Null, |r| {
+                    let (now, offset_minutes) = self.clock.get();
+                    Value::from(curvyo_ui_core::library_index_text::came_from_tooltip(
+                        &r,
+                        now,
+                        offset_minutes,
+                    ))
+                });
                 // A fixture with jobs gets the chevron and its job rows (`specs/0103` UX J15).
                 if row.fixture.is_some() {
                     json["fixture"]["jobs"] = json!(self.fixture_layer_jobs(row.id));

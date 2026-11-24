@@ -693,9 +693,11 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         }
         const suggestedName = infoRef.current.suggestedName ?? null;
         const thumbnail = await editor.renderThumbnail();
+        // The thumbnail and the page pictures of the library are joined in one pass by the wasm
+        // (`specs/0095` criterion 6, `specs/0137` criterion 2); the host writes the bytes.
+        bytes = await editor.withPagePictures(bytes, thumbnail);
         const outcome = await invoke<SaveOutcome>("save_project_bytes", {
           bytes: Array.from(bytes),
-          thumbnail: thumbnail ? Array.from(thumbnail) : null,
           saveAs,
           fileName: infoRef.current.fileName ?? suggestedName ?? DEFAULT_FILE_NAME,
           suggestedName,

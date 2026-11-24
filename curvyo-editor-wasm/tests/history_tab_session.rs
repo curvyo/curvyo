@@ -82,10 +82,12 @@ fn the_history_tab_exists_and_the_shortcut_selects_it() {
         view.tabs
             .iter()
             .rev()
-            .take(6)
+            .take(7)
             .map(|t| t.name)
             .collect::<Vec<_>>(),
-        vec!["share", "grid", "snapping", "fonts", "history", "layers"]
+        vec![
+            "share", "grid", "snapping", "library", "fonts", "history", "layers"
+        ]
     );
 }
 

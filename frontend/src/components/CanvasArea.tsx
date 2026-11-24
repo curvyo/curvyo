@@ -36,6 +36,8 @@ interface CanvasAreaProps {
   /** The pane, given its layout, the Full view/Split view switch and whether the divider is being
    * dragged. */
   pane: (layout: PaneLayout, switchView: () => void, resizing: boolean) => ReactNode;
+  /** The divider's accessible name; the font preview's by default. */
+  dividerLabel?: string;
 }
 
 export function CanvasArea({
@@ -49,6 +51,7 @@ export function CanvasArea({
   setSplit,
   drawing,
   pane,
+  dividerLabel,
 }: CanvasAreaProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [areaWidth, setAreaWidth] = useState(0);
@@ -148,6 +151,7 @@ export function CanvasArea({
               onDragEnd={endDrag}
               onCommit={setSplit}
               onReset={() => setSplit(undefined)}
+              label={dividerLabel}
             />
           )}
           {pane(layout, switchView, dragging)}

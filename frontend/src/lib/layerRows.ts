@@ -76,6 +76,8 @@ export interface LayerRowData {
   readOnly?: boolean;
   /** "On Laser 1": the tooltip's muted line of a row whose object lies on another page. */
   homeLine?: string;
+  /** "From Box job › Lid, 24 Nov 12:03" for an imported object (`specs/0137` criterion 7). */
+  cameFromLine?: string | null;
   /** A fixture row under the Fixtures row (`specs/0102` criterion 12): its full id as the
    * fixture calls take it, its kind word and Active state; null elsewhere. */
   fixture?: { id: string; kind: string; active: boolean } | null;

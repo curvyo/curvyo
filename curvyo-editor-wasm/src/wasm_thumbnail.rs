@@ -12,9 +12,9 @@ use crate::wasm_api::WasmSession;
 /// session, so attaching it never holds a session across an `await`.
 #[wasm_bindgen]
 pub struct WasmThumbnail {
-    gpu: Gpu,
-    css_width: f64,
-    css_height: f64,
+    pub(crate) gpu: Gpu,
+    pub(crate) css_width: f64,
+    pub(crate) css_height: f64,
 }
 
 #[wasm_bindgen]
@@ -51,5 +51,47 @@ impl WasmSession {
             .thumbnail_frame(thumbnail.css_width, thumbnail.css_height);
         let pictures = self.session.frame_images(&mut draw_list);
         thumbnail.gpu.render(&draw_list, view, &pictures)
+    }
+
+    /// The ids of the pages a save draws pictures of, as a JSON array: the first
+    /// `MAX_PAGE_PICTURES` pages in page order (`specs/0137` criterion 2).
+    #[must_use]
+    pub fn picture_page_ids(&self) -> String {
+        let ids: Vec<String> = self
+            .session
+            .source_document()
+            .pages()
+            .into_iter()
+            .take(curvyo_document_core::MAX_PAGE_PICTURES)
+            .map(|page| page.id)
+            .collect();
+        serde_json::to_string(&ids).unwrap_or_default()
+    }
+
+    /// Draws the page `id` into `thumbnail`'s canvas, for its `pages/<id>.png`; false when there
+    /// is no such page.
+    ///
+    /// # Errors
+    /// A `JsValue` (a plain string) if the frame could not be submitted.
+    pub fn render_page_picture(
+        &mut self,
+        thumbnail: &mut WasmThumbnail,
+        id: &str,
+    ) -> Result<bool, JsValue> {
+        let Some(page) = self
+            .session
+            .source_document()
+            .pages()
+            .into_iter()
+            .find(|p| p.id == id)
+        else {
+            return Ok(false);
+        };
+        let (mut draw_list, view) =
+            self.session
+                .page_frame(&page, thumbnail.css_width, thumbnail.css_height);
+        let pictures = self.session.frame_images(&mut draw_list);
+        thumbnail.gpu.render(&draw_list, view, &pictures)?;
+        Ok(true)
     }
 }
