@@ -161,3 +161,61 @@ Phase 3: docs
 - `-io`: `tests/grbl_frame.rs` (simulator), `tests/frame_fake.rs` (running connector, fake controller).
 - App: `connector_frame` unit tests. Frontend: `tests/frame_0118.test.ts`.
 - Full gate of `CLAUDE.md` §7, `cargo deny`, `python3 -I scripts/check_docs.py`. The browser check is the tester's.
+
+# Plan for Machine control, slice 2c (origin and start-from)
+
+Criteria 29 to 33; Fragen 312 A, 341 MC-ORIGIN-WPOS A, 345 MC-ORIGIN-MACHINE C (defaults). Design:
+architect addendum O1 to O10 in `adrs.md`, UX notes W39 to W52. Branch `story/machine-origin`. No new
+crate, dependency or wire change; `format_version` 61 (`main` is at 60: 59 is `0150` (#468), 60 is `0145` slice 3 (#475)). Connector crates and `curvyo-app` stay untouched.
+Commits (conventional, scope = crate, at most five): docs, document-core, laser-core, ui-core and
+editor-wasm, frontend.
+
+## Affected crates/modules
+- `curvyo-document-core`: `laser_output_commands.rs` (`user_origin` spelling, `set_user_origin`,
+  `NoUserOrigin`, `BadUserOrigin`), `manufacturing.rs` (`write_profile`: a Pick of another record
+  resets Start User origin), `history/rows.rs`, `document.rs` (format 61); goldens
+  `user_origin_v61.curvyo`, `user_origin_damaged_v61.curvyo`.
+- `curvyo-laser-core`: `output_settings.rs` (`Start::UserOrigin`, `user_origin`), new `job_anchor.rs`,
+  `job_moves.rs` (`Job.shift`, `Job::machine_point`, run-out clamp at the placed position),
+  `job_build.rs` (the shift), writers `job_write_grbl.rs`, `job_write_frame.rs`, `job_frame.rs`,
+  `job_gate.rs` and `job_gate_text.rs` (`OutsideBed.over_um`); goldens
+  `output/grbl/start_user_origin_{bl,br,tl,tr}.gcode`, `grbl_frame/frame_user_origin.gcode`.
+- `curvyo-ui-core`: `history_names.rs`, `step_scope.rs` (labels).
+- `curvyo-editor-wasm`: `session/output/commands.rs` (`set_user_origin`), `input.rs` (the point into
+  `JobInput`), `view_json.rs` (pick lists User origin only when stored, the X, Y row), `toolpath.rs`
+  and `raster_view.rs` (drawn at the shift, items at 35 %), the cross and the dashed box overlay,
+  `print_and_cut.rs` (the warn).
+- `frontend`: `JogPad.tsx` (Set origin here in the centre cell), `machineControls.ts` (its causes),
+  `OutputGroup.tsx` and `outputView.ts` (the pick's fourth value, the User origin row).
+
+## Tasks
+Phase 1: document-core
+- [x] 1. `set_user_origin` writes the point and Start in one step, undo restores both, range
+        refused, `set_start("user_origin")` without a point refused (29, 30; O1, O2)
+- [x] 2. Format 61, goldens `user_origin_v61`, `user_origin_damaged_v61` (29; O3)
+- [x] 3. A profile Pick of another record resets Start User origin to Machine origin in the same
+        step, the point stays; the same record and every edit keep it (Frage 345 C; O9)
+Phase 2: laser-core
+- [x] 4. `Start::UserOrigin` and the point read, damaged shapes counted, User origin without a point
+        is `start_damaged` (30; O1, O4)
+- [x] 5. `job_anchor.rs`: burn box and the anchor per corner, shared with the Head position bed
+        offset (31; O5)
+- [x] 6. `Job.shift`, `Job::machine_point`, writers and frame outline; per corner the burn lines are
+        Machine origin's plus `U - A`; goldens per corner and the frame (31; O5, O7)
+- [x] 7. Bed check measures the placed job, `over_um` and "… bed by 12 mm." (31; O7, W50)
+Phase 3: ui-core, editor-wasm
+- [x] 8. Labels "Set origin here", "Start: User origin" (29, 30; O2)
+- [x] 9. `set_user_origin(x_mm, y_mm)`, the pick lists User origin only when stored, the X, Y row,
+        print and cut warns for User origin (29, 30; O4, O6, W42, W43)
+- [x] 10. Toolpath at the shift, items at 35 %, the cross and the dashed box in the view (31, 32;
+        O7, W46 to W48)
+Phase 4: frontend
+- [x] 11. Set origin here (W39 to W41, W51), its causes; the pick and the User origin row (W42, W43)
+
+## Validation
+- document-core: `tests/user_origin_format.rs` (goldens, undo, refusals, profile pick rule).
+- laser-core: `tests/user_origin_0118.rs` (per corner: burn lines equal Machine origin's plus the
+  offset, goldens, frame, bed check), unit tests in `job_anchor.rs`, `output_settings.rs`.
+- editor-wasm: `session/output/tests/user_origin_tests.rs`. Frontend: `tests/set_origin_0118.test.ts`.
+- Full gate of `CLAUDE.md` §7, `cargo deny`, `python3 -I scripts/check_docs.py`. The browser check is the
+  tester's.
