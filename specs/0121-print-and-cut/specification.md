@@ -1,6 +1,6 @@
 # Print and cut: registration marks on a printed sheet tell the laser where the sheet lies, so the cut lands on the print
 
-Status: Ready (reconciled 2026-11-23 with ADR 0081 and the UX notes; ADR 0081 is Proposed and `needs-customer`, accepted with the slice 1 PR; Fragen 328 to 333 at their defaults, customer may veto)
+Status: Slice 1 Done (PR #457; Ready 2026-11-23; ADR 0081 Accepted with PR #457; Fragen 328 to 333 at their defaults A)
 Priority: Could
 Origin: Customer request of 2026-11-17 ("Print then cut: place registration marks on the page yourself, print, and have the laser or cutter find them, with the camera of `0120`, to align the cut to the printed sheet"). The slice split, the mark shape, the fit and every number are the product owner's **(Proposal)**, vetoable at the demo.
 

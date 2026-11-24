@@ -2,8 +2,8 @@
 
 Architect, 2026-11-23. Slice 1 (Fragen 328 to 332 at their defaults, A each).
 
-- [ADR 0081](../../docs/adr/0081-print-and-cut-registration-marks-and-fit.md) (new, Proposed,
-  `needs-customer` for the document model and file format; accepted with the PR as 0045 was):
+- [ADR 0081](../../docs/adr/0081-print-and-cut-registration-marks-and-fit.md) (Accepted with
+  PR #457; `needs-customer` for the document model and file format):
   the `registration_mark` leaf kind and the tagged marks group (criteria 1 to 3, 6), never burns
   and always prints (4, 5), the measures register on the placement (7, 9, 19), the reading and
   its warnings in `curvyo-laser-core/src/print_and_cut.rs` (10, 13, 14, 18, 22), the fit in
