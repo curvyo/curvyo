@@ -5,7 +5,7 @@ Architect, 2026-11-24. One new ADR; Fragen 268 B and C, 269 A and 270 A are fixe
 documents (ADR 0084 decision 10). No new crate, no new dependency, no network.
 
 - [ADR 0084](../../docs/adr/0084-document-library-index-read-only-sources-and-copy-import.md)
-  (Proposed, `needs-customer`: document model and file format):
+  (Accepted with PR #470; `needs-customer`: document model and file format):
   - container members `library.json` and `pages/<page id>.png` written at save, with a native fallback for old files (criteria 1, 2, 13);
   - reading without opening, lock or write (2);
   - sources, `library-folders.toml` and the `library-index.json` cache (1, 3, 10);
