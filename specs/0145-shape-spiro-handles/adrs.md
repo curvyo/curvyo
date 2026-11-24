@@ -97,7 +97,7 @@ read on 2026-11-23.
   provisionally.
 - **8. 2026-11-23: Randomized (slice 3, criterion 17).** Registers `randomized` (`f64`, ±10) and
   `seed` (32-bit). PRNG: the existing `splitmix64` of `pattern_model.rs` (reference-tested,
-  portable integer arithmetic); seed creation and New seed reuse `PatternSeed`'s fresh/re-roll,
+  portable integer arithmetic); seed creation and Re-roll seed reuse `PatternSeed`'s fresh/re-roll,
   renamed to one shared seed type in a refactor commit, never a twin. Draw `k` of vertex `i`:
   `splitmix64(seed ^ splitmix64(4i + k))`, top 53 bits to `[−0.5, 0.5)`. Inkscape's structure,
   our numbers: vertex shift `r·2R_max·(d1, d2)`, handle (from the unshifted ring) turned by
