@@ -693,7 +693,13 @@ impl DocumentVersion {
 /// keys on its next Machine block edit and block such an operation as "No settings", so this
 /// build's files are refused there by version (ADR 0033 §7); a file of 58 opens unchanged and is
 /// not rewritten on read. Golden: `operation_defaults_v59.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 59;
+///
+/// Version 60 (`specs/0145-shape-spiro-handles` slice 3, `adrs.md` decisions 4 and 8): a polygon
+/// or star may carry the registers `randomized` (a finite number, absent = 0, limited to -10..=10
+/// where it is evaluated) and `seed` (a whole number of 32 bits, absent = 0). A build that stops
+/// at 59 would draw the vertices unmoved, so this build's files are refused there by version; a
+/// file of 59 opens unchanged. Golden: `randomized_v60.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 60;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -1290,6 +1296,12 @@ enum ObjectJson {
         /// The Rounded value; left out at 0.
         #[serde(skip_serializing_if = "Option::is_none")]
         rounded: Option<f64>,
+        /// The Randomized value; left out at 0.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        randomized: Option<f64>,
+        /// The seed of the Randomized value; left out at 0.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seed: Option<u32>,
         style: crate::style_model::Style,
         rotation: crate::units::Angle,
     },
@@ -1304,6 +1316,12 @@ enum ObjectJson {
         /// The Rounded value; left out at 0.
         #[serde(skip_serializing_if = "Option::is_none")]
         rounded: Option<f64>,
+        /// The Randomized value; left out at 0.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        randomized: Option<f64>,
+        /// The seed of the Randomized value; left out at 0.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seed: Option<u32>,
         style: crate::style_model::Style,
         rotation: crate::units::Angle,
     },
@@ -1408,12 +1426,15 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                         point_count,
                         curve,
                         rounded,
+                        randomized,
                     } => Self::Polygon {
                         id,
                         frame,
                         point_count: point_count.get(),
                         curve: stored_curve(curve, crate::ring_curve::Curve::POLYGON_DEFAULT),
                         rounded: (!rounded.is_zero()).then_some(rounded.get()),
+                        randomized: (!randomized.is_zero()).then_some(randomized.amount()),
+                        seed: (!randomized.is_zero()).then_some(randomized.seed().get()),
                         style,
                         rotation,
                     },
@@ -1423,9 +1444,12 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                         inner_ratio,
                         curve,
                         rounded,
+                        randomized,
                     } => Self::Star {
                         curve: stored_curve(curve, crate::ring_curve::Curve::POLYGON_DEFAULT),
                         rounded: (!rounded.is_zero()).then_some(rounded.get()),
+                        randomized: (!randomized.is_zero()).then_some(randomized.amount()),
+                        seed: (!randomized.is_zero()).then_some(randomized.seed().get()),
                         id,
                         frame,
                         point_count: point_count.get(),

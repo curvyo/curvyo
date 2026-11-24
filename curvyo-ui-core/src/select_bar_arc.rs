@@ -3,8 +3,8 @@
 //! complete while they apply, greyed with a reason where they would do nothing.
 
 use curvyo_document_core::{
-    ArcKind, Curve, NodeId, ObjectSnapshot, PrimitiveSnapshot, Rounded, Shape, effective_curve,
-    effective_rounded,
+    ArcKind, Curve, NodeId, ObjectSnapshot, PrimitiveSnapshot, Randomized, Rounded, Shape,
+    effective_curve, effective_rounded,
 };
 
 use crate::object_selection::{ObjectSelection, objects_with_ids};
@@ -64,6 +64,18 @@ pub struct RoundedBarState {
     /// Why the field is greyed (every ellipse selected has an arc, criterion 19), `None` when
     /// it applies.
     pub grey: Option<GreyReason>,
+}
+
+/// The "Randomized" field and its "Re-roll seed" button: shown while the selection holds a
+/// polygon or star, acting on those only (`specs/0145-shape-spiro-handles/` criteria 21, 22).
+#[derive(Debug, Clone, PartialEq)]
+pub struct RandomizedBarState {
+    /// The effective value of the shapes it acts on.
+    pub value: BarValue<f64>,
+    /// For a uniform value: the stored value, when it lies beyond -10..=10 (the "limited" tag).
+    pub limited: Option<f64>,
+    /// Whether "Re-roll seed" would change something: a polygon or star has a value other than 0.
+    pub reroll_enabled: bool,
 }
 
 fn shapes<'a>(objects: &'a [ObjectSnapshot], ids: &'a [NodeId]) -> Vec<&'a Shape> {
@@ -246,6 +258,50 @@ pub fn rounded_bar_state(
         value,
         limited,
         grey: None,
+    })
+}
+
+/// The "Randomized" group's state, `None` while the selection holds no polygon or star. A pending
+/// bar edit `preview` shows as committed.
+#[must_use]
+pub fn randomized_bar_state(
+    objects: &[ObjectSnapshot],
+    selection: &ObjectSelection,
+    preview: Option<&BarPreview>,
+) -> Option<RandomizedBarState> {
+    let acted = ids_of_kind(objects, selection, ObjectKind::Randomized);
+    let acted_shapes = shapes(objects, &acted);
+    let stored: Vec<f64> = acted_shapes
+        .iter()
+        .filter_map(|shape| match shape {
+            Shape::Polygon { randomized, .. } | Shape::Star { randomized, .. } => {
+                Some(randomized.amount())
+            }
+            _ => None,
+        })
+        .collect();
+    let effective: Vec<f64> = stored
+        .iter()
+        .map(|v| v.clamp(-Randomized::RANGE, Randomized::RANGE))
+        .collect();
+    let mut value = uniform(&effective, same_degrees)?;
+    let reroll_enabled = effective.iter().any(|v| *v != 0.0);
+    if let (Some(preview), BarValue::Uniform(_)) = (preview, value)
+        && let ParamValue::Randomized(shown) = preview.value
+    {
+        value = BarValue::Uniform(shown.clamp(-Randomized::RANGE, Randomized::RANGE));
+    }
+    let limited = match value {
+        BarValue::Uniform(_) => stored.iter().copied().find(|v| v.abs() > Randomized::RANGE),
+        BarValue::Mixed => None,
+    };
+    Some(RandomizedBarState {
+        value,
+        limited,
+        reroll_enabled: match (preview, value) {
+            (Some(_), BarValue::Uniform(shown)) => shown != 0.0,
+            _ => reroll_enabled,
+        },
     })
 }
 

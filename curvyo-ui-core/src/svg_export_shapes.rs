@@ -227,20 +227,29 @@ fn arc_kind(
 /// 140).
 #[allow(clippy::many_single_char_names)] // the centre and count of the specification
 fn ring_kind(shape: &Shape, rotation: Angle, t: Affine) -> (ExportKind, Shadow) {
-    let (frame, point_count, curve, rounded, ratio) = match *shape {
+    let (frame, point_count, curve, rounded, randomized, ratio) = match *shape {
         Shape::Polygon {
             frame,
             point_count,
             curve,
             rounded,
-        } => (frame, point_count, curve, rounded, None),
+            randomized,
+        } => (frame, point_count, curve, rounded, randomized, None),
         Shape::Star {
             frame,
             point_count,
             inner_ratio,
             curve,
             rounded,
-        } => (frame, point_count, curve, rounded, Some(inner_ratio.get())),
+            randomized,
+        } => (
+            frame,
+            point_count,
+            curve,
+            rounded,
+            randomized,
+            Some(inner_ratio.get()),
+        ),
         Shape::Rect { .. } | Shape::Ellipse { .. } => {
             return primitive_kind(shape, rotation, t);
         }
@@ -255,13 +264,19 @@ fn ring_kind(shape: &Shape, rotation: Angle, t: Affine) -> (ExportKind, Shadow) 
     let mut numbers = vec![c.x, c.y, radius, f64::from(n), angle, turn, curve.get()];
     numbers.extend(ratio);
     numbers.push(rounded.get());
+    // A randomized shape writes its value and seed as well and is always a path: Inkscape would
+    // redraw `inkscape:randomized` with its own numbers (`adrs.md` decision 8).
+    if !randomized.is_zero() {
+        numbers.push(randomized.amount());
+        numbers.push(f64::from(randomized.seed().get()));
+    }
     let id = if ratio.is_some() {
         PathId::Star
     } else {
         PathId::Polygon
     };
     // Rounded wins over Curve while it is not 0 (decision 3): such a shape is Inkscape's star.
-    if curve.get() != 0.0 && rounded.is_zero() {
+    if (curve.get() != 0.0 && rounded.is_zero()) || !randomized.is_zero() {
         let shadow = Shadow {
             kind: Some(if ratio.is_some() {
                 ShadowKind::Star

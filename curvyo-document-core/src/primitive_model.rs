@@ -17,6 +17,7 @@ use crate::corner_radii::CornerRadii;
 use crate::ellipse_arc::EllipseArc;
 use crate::path_model::{NodeId, PathSnapshot};
 use crate::ring_curve::Curve;
+use crate::ring_random::Randomized;
 use crate::ring_rounded::Rounded;
 use crate::style_model::Style;
 use crate::text_model::TextSnapshot;
@@ -255,6 +256,10 @@ pub enum Shape {
         /// The Rounded value of its corners (`specs/0145-shape-spiro-handles/`), stored raw,
         /// [`Rounded::ZERO`] straight; it wins over `curve` while it is not 0.
         rounded: Rounded,
+        /// The Randomized value and seed of its vertices (`specs/0145-shape-spiro-handles/`
+        /// slice 3), stored raw, [`Randomized::ZERO`] none.
+        #[serde(skip_serializing_if = "Randomized::is_unset")]
+        randomized: Randomized,
     },
     /// Acceptance criteria 10, 12, 13, 14, 15.
     Star {
@@ -268,6 +273,9 @@ pub enum Shape {
         curve: Curve,
         /// The Rounded value of its corners, as on the polygon.
         rounded: Rounded,
+        /// The Randomized value and seed of its vertices, as on the polygon.
+        #[serde(skip_serializing_if = "Randomized::is_unset")]
+        randomized: Randomized,
     },
 }
 
@@ -583,6 +591,7 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             point_count,
             curve,
             rounded,
+            randomized,
         } => Shape::Polygon {
             frame: StarFrame {
                 center: frame.center.translated(offset),
@@ -591,6 +600,7 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             point_count,
             curve,
             rounded,
+            randomized,
         },
         Shape::Star {
             frame,
@@ -598,6 +608,7 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             inner_ratio,
             curve,
             rounded,
+            randomized,
         } => Shape::Star {
             frame: StarFrame {
                 center: frame.center.translated(offset),
@@ -607,6 +618,7 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             inner_ratio,
             curve,
             rounded,
+            randomized,
         },
     }
 }
@@ -900,6 +912,7 @@ mod tests {
         ObjectSnapshot::Primitive(PrimitiveSnapshot {
             id: NodeId::from_parts(1, 1),
             shape: Shape::Polygon {
+                randomized: crate::Randomized::ZERO,
                 frame: StarFrame {
                     center: Point::new(0.0, 0.0),
                     radius: Length::from_mm(10.0),
@@ -1055,6 +1068,7 @@ mod tests {
         };
         assert_eq!(moved, arc);
         let star = Shape::Star {
+            randomized: crate::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(0.0, 0.0),
                 radius: Length::from_mm(10.0),
@@ -1119,6 +1133,7 @@ mod tests {
     #[test]
     fn shape_frame_bounds_of_a_star_is_its_circumscribed_frame() {
         let shape = Shape::Star {
+            randomized: crate::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(0.0, 0.0),
                 radius: Length::from_mm(10.0),

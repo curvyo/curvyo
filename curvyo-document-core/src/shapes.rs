@@ -54,6 +54,9 @@ pub enum ShapeEditError {
     /// so nothing is written.
     #[error("an ellipse cannot have both an arc and a curve")]
     ArcWithCurve,
+    /// A Randomized value that is not a finite number. Nothing is written.
+    #[error("a Randomized value must be a finite number")]
+    InvalidRandomized,
 }
 
 impl Document {
@@ -168,6 +171,7 @@ impl Document {
                 point_count,
                 curve: crate::Curve::POLYGON_DEFAULT,
                 rounded: crate::Rounded::ZERO,
+                randomized: crate::Randomized::ZERO,
             },
             Angle::from_radians(0.0),
         )
@@ -188,6 +192,7 @@ impl Document {
             inner_ratio,
             curve: crate::Curve::POLYGON_DEFAULT,
             rounded: crate::Rounded::ZERO,
+            randomized: crate::Randomized::ZERO,
         };
         self.create_primitive(shape, Angle::from_radians(0.0))
     }
@@ -1165,6 +1170,7 @@ mod tests {
             ),
             (
                 Shape::Polygon {
+                    randomized: crate::Randomized::ZERO,
                     frame: star_frame(),
                     point_count,
                     curve: crate::Curve::POLYGON_DEFAULT,
@@ -1174,6 +1180,7 @@ mod tests {
             ),
             (
                 Shape::Star {
+                    randomized: crate::Randomized::ZERO,
                     frame: star_frame(),
                     point_count,
                     inner_ratio: InnerRatio::new(0.5).expect("valid"),

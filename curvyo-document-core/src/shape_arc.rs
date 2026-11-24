@@ -8,9 +8,12 @@ use crate::ellipse_arc::EllipseArc;
 use crate::path_model::NodeId;
 use crate::primitive_model::{EllipseFrame, Shape};
 use crate::ring_curve::Curve;
+use crate::ring_random::Randomized;
 use crate::ring_rounded::Rounded;
+use crate::seed::Seed;
 use crate::shape_arc_codec::{
-    write_arc_if_changed, write_curve_if_changed, write_rounded_if_changed,
+    read_randomized, write_arc_if_changed, write_curve_if_changed, write_randomized_if_changed,
+    write_rounded_if_changed, write_seed_if_changed,
 };
 use crate::shape_codec::SHAPE_ELLIPSE;
 use crate::shapes::ShapeEditError;
@@ -196,6 +199,86 @@ impl Document {
         }
         if changed {
             self.commit_with_label("set_rounded");
+        }
+        Ok(())
+    }
+
+    /// Sets each named polygon's or star's stored Randomized value (limited to ±10, 0 deletes
+    /// the register) as **one commit** for the whole batch, labelled `set_randomized` ("Change
+    /// randomizing", criterion 21). A shape whose seed is still 0 when its value first leaves 0 gets a
+    /// fresh one in the same commit (criterion 22); a shape keeps its own seed otherwise.
+    ///
+    /// # Errors
+    /// [`ShapeEditError::NoSuchObject`] or [`ShapeEditError::NotAPrimitive`] if an id is not a
+    /// primitive, [`ShapeEditError::WrongShape`] for a rectangle or ellipse,
+    /// [`ShapeEditError::InvalidRandomized`] for a value that is not finite.
+    pub fn set_randomized(&self, values: &[(NodeId, f64)]) -> Result<(), ShapeEditError> {
+        let metas: Vec<_> = values
+            .iter()
+            .map(|&(id, amount)| {
+                let meta = self.require_primitive(id)?;
+                match self.primitive(id).map(|p| p.shape) {
+                    Some(Shape::Polygon { .. } | Shape::Star { .. }) => {}
+                    Some(_) => return Err(ShapeEditError::WrongShape),
+                    None => return Err(ShapeEditError::NotAPrimitive),
+                }
+                if !amount.is_finite() {
+                    return Err(ShapeEditError::InvalidRandomized);
+                }
+                Ok((
+                    id,
+                    meta,
+                    amount.clamp(-Randomized::RANGE, Randomized::RANGE),
+                ))
+            })
+            .collect::<Result<_, _>>()?;
+        let mut changed = false;
+        for (id, meta, amount) in metas {
+            changed |= write_randomized_if_changed(&meta, amount);
+            // Seed 0 is "none yet" (a shape never drawn a seed, or a file without one).
+            if amount != 0.0 && read_randomized(&meta).seed().get() == 0 {
+                changed |= write_seed_if_changed(&meta, Seed::fresh(id));
+            }
+        }
+        if changed {
+            self.commit_with_label("set_randomized");
+        }
+        Ok(())
+    }
+
+    /// Gives each named polygon or star whose Randomized value is not 0 the next seed of its own
+    /// (its fresh seed first when it has none) as **one commit**, labelled `reroll_seed` ("New
+    /// seed", criterion 22). A shape with Randomized 0 would not change, so it is left alone.
+    ///
+    /// # Errors
+    /// As [`Document::set_randomized`] but for the value.
+    pub fn reroll_seeds(&self, ids: &[NodeId]) -> Result<(), ShapeEditError> {
+        let metas: Vec<_> = ids
+            .iter()
+            .map(|&id| {
+                let meta = self.require_primitive(id)?;
+                match self.primitive(id).map(|p| p.shape) {
+                    Some(Shape::Polygon { .. } | Shape::Star { .. }) => Ok((id, meta)),
+                    Some(_) => Err(ShapeEditError::WrongShape),
+                    None => Err(ShapeEditError::NotAPrimitive),
+                }
+            })
+            .collect::<Result<_, _>>()?;
+        let mut changed = false;
+        for (id, meta) in metas {
+            let random = read_randomized(&meta);
+            if random.is_zero() {
+                continue;
+            }
+            let seed = if random.seed().get() == 0 {
+                Seed::fresh(id)
+            } else {
+                random.seed()
+            };
+            changed |= write_seed_if_changed(&meta, seed.next());
+        }
+        if changed {
+            self.commit_with_label("reroll_seed");
         }
         Ok(())
     }

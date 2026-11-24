@@ -364,6 +364,14 @@ fn outline_with_pieces(shape: &Shape, piece: f64) -> PrimitiveOutline {
             let (anchors, closed) = arc_outline(frame, arc, piece);
             PrimitiveOutline { anchors, closed }
         }
+        // Randomized moves the vertices of a polygon or star (`0145` slice 3, decision 8).
+        Shape::Polygon { randomized, .. } | Shape::Star { randomized, .. }
+            if !randomized.is_zero() =>
+        {
+            // invariant: a polygon or star with a non-zero Randomized value has an outline.
+            #[allow(clippy::unwrap_used)]
+            PrimitiveOutline::closed(crate::ring_random::randomized_outline(shape, piece).unwrap())
+        }
         Shape::Polygon { rounded, .. }
         | Shape::Star { rounded, .. }
         | Shape::Ellipse {

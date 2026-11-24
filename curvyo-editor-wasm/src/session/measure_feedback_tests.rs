@@ -93,6 +93,7 @@ fn a_star_edge_and_its_centre_are_picked() {
     let mut session = session();
     let star = session.document.create_primitive(
         Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(100.0, 100.0),
                 radius: Length::from_mm(30.0),

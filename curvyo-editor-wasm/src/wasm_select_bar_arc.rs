@@ -5,7 +5,8 @@
 
 use curvyo_document_core::ArcKind;
 use curvyo_ui_core::{
-    ArcEnd, BarValue, CurveBarState, EllipseBarState, EntryOutcome, GreyReason, RoundedBarState,
+    ArcEnd, BarValue, CurveBarState, EllipseBarState, EntryOutcome, GreyReason, RandomizedBarState,
+    RoundedBarState,
 };
 use wasm_bindgen::prelude::*;
 
@@ -66,6 +67,18 @@ pub struct ArcBarView {
     pub rounded_limited: bool,
     /// The stored value, for the tag's tooltip.
     pub rounded_stored: f64,
+    /// The "Randomized" group is shown (the selection holds a polygon or star).
+    pub randomized_shown: bool,
+    /// The effective Randomized value.
+    pub randomized: f64,
+    /// The polygons and stars show different values.
+    pub randomized_mixed: bool,
+    /// The stored value lies beyond -10..=10 (the "limited" tag).
+    pub randomized_limited: bool,
+    /// The stored value, for the tag's tooltip.
+    pub randomized_stored: f64,
+    /// "Re-roll seed" would change something: a selected polygon or star has a value other than 0.
+    pub reroll_enabled: bool,
 }
 
 fn grey(reason: Option<GreyReason>) -> String {
@@ -91,6 +104,7 @@ impl ArcBarView {
         ellipse: Option<&EllipseBarState>,
         curve: Option<&CurveBarState>,
         rounded: Option<&RoundedBarState>,
+        randomized: Option<&RandomizedBarState>,
     ) -> Self {
         let kind = match ellipse.and_then(|e| e.kind) {
             None => "",
@@ -102,6 +116,7 @@ impl ArcBarView {
         let (curve_value, curve_mixed) = value(curve.and_then(|c| c.value));
         let limited = curve.and_then(|c| c.limited);
         let (rounded_value, rounded_mixed) = value(rounded.map(|r| r.value));
+        let (randomized_value, randomized_mixed) = value(randomized.map(|r| r.value));
         Self {
             ellipse_shown: ellipse.is_some(),
             kind: kind.to_string(),
@@ -123,6 +138,12 @@ impl ArcBarView {
             rounded_grey: grey(rounded.and_then(|r| r.grey)),
             rounded_limited: rounded.is_some_and(|r| r.limited.is_some()),
             rounded_stored: rounded.and_then(|r| r.limited).unwrap_or(0.0),
+            randomized_shown: randomized.is_some(),
+            randomized: randomized_value,
+            randomized_mixed,
+            randomized_limited: randomized.is_some_and(|r| r.limited.is_some()),
+            randomized_stored: randomized.and_then(|r| r.limited).unwrap_or(0.0),
+            reroll_enabled: randomized.is_some_and(|r| r.reroll_enabled),
         }
     }
 }
@@ -148,6 +169,7 @@ impl WasmSession {
             state.ellipse.as_ref(),
             state.curve.as_ref(),
             state.rounded.as_ref(),
+            state.randomized.as_ref(),
         )
     }
 
@@ -178,6 +200,22 @@ impl WasmSession {
     /// Enter in "Rounded": a number, limited to -10..=10.
     pub fn set_selected_rounded(&mut self, text: &str) -> String {
         outcome_code(self.session.set_selected_rounded_text(text))
+    }
+
+    /// Enter in "Randomized": a number, limited to -10..=10.
+    pub fn set_selected_randomized(&mut self, text: &str) -> String {
+        outcome_code(self.session.set_selected_randomized_text(text))
+    }
+
+    /// A step of the "Randomized" field, on every key: writes nothing until
+    /// [`WasmSession::commit_selected_curve`].
+    pub fn preview_selected_randomized(&mut self, value: f64) {
+        self.session.preview_selected_randomized(value);
+    }
+
+    /// "Re-roll seed": a new seed for every selected polygon or star that has a value.
+    pub fn reroll_selected_seed(&mut self) -> String {
+        outcome_code(self.session.reroll_selected_seed())
     }
 
     /// A step of the "Rounded" field, on every tick or key: writes nothing until

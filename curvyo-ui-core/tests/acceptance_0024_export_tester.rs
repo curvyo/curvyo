@@ -176,12 +176,14 @@ fn star_shape(
     let curve = Curve::new(curve).unwrap();
     match ratio {
         None => Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame,
             point_count: PointCount::new(points).unwrap(),
             curve,
             rounded: curvyo_document_core::Rounded::ZERO,
         },
         Some(ratio) => Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame,
             point_count: PointCount::new(points).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),
@@ -1718,7 +1720,7 @@ fn items(d: &Document) -> Vec<Item> {
                         frame,
                         point_count,
                         curve,
-                        rounded: _,
+                        ..
                     } => {
                         exact.push_str(&format!(" polygon {point_count:?} curve={}", curve.get()));
                         nums.extend([
@@ -1733,7 +1735,7 @@ fn items(d: &Document) -> Vec<Item> {
                         point_count,
                         inner_ratio,
                         curve,
-                        rounded: _,
+                        ..
                     } => {
                         exact.push_str(&format!(
                             " star {point_count:?} ratio={} curve={}",
@@ -1871,8 +1873,9 @@ fn translated(nodes: &[DrawingNode], v: Vec2) -> Vec<DrawingNode> {
                         frame,
                         point_count,
                         curve,
-                        rounded: _,
+                        ..
                     } => Shape::Polygon {
+                        randomized: curvyo_document_core::Randomized::ZERO,
                         frame: StarFrame {
                             center: mv(frame.center),
                             ..frame
@@ -1886,8 +1889,9 @@ fn translated(nodes: &[DrawingNode], v: Vec2) -> Vec<DrawingNode> {
                         point_count,
                         inner_ratio,
                         curve,
-                        rounded: _,
+                        ..
                     } => Shape::Star {
+                        randomized: curvyo_document_core::Randomized::ZERO,
                         frame: StarFrame {
                             center: mv(frame.center),
                             ..frame

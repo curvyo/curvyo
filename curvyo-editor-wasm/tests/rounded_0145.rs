@@ -41,6 +41,7 @@ fn pt(x: f64, y: f64) -> Point {
 
 fn hexagon(radius: f64, curve: f64, rounded: f64) -> Shape {
     Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: StarFrame {
             center: pt(100.0, 80.0),
             radius: Length::from_mm(radius),
@@ -217,6 +218,7 @@ fn the_bar_field_limits_and_excludes_curve() {
 
 fn star_of(points: u32, q: f64) -> Shape {
     Shape::Star {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: StarFrame {
             center: pt(100.0, 80.0),
             radius: Length::from_mm(60.0),

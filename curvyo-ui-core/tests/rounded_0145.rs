@@ -27,6 +27,7 @@ fn frame(radius: f64, angle: f64) -> StarFrame {
 
 fn star(q: f64) -> Shape {
     Shape::Star {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: frame(40.0, 0.0),
         point_count: PointCount::new(5).unwrap(),
         inner_ratio: curvyo_document_core::InnerRatio::new(0.5).unwrap(),

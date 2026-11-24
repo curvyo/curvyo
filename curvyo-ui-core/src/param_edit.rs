@@ -14,6 +14,7 @@ use curvyo_document_core::{
 
 use crate::param_handles::{Corner, ParamHandle};
 use crate::shape_arc_edit::{ArcEnd, made_whole, with_arc_angle, with_arc_kind, with_curve};
+use crate::shape_random_edit::with_randomized;
 use crate::shape_rounded_edit::with_rounded;
 
 /// A value within this (millimetres, or a ratio) of the current one is "equal":
@@ -52,6 +53,9 @@ pub enum ParamValue {
     /// The Rounded value of a polygon or star, limited to -10..=10 when applied
     /// (`specs/0145-shape-spiro-handles/` criteria 2, 3 and 5).
     Rounded(f64),
+    /// The Randomized value of a polygon or star, limited to -10..=10 when applied
+    /// (`specs/0145-shape-spiro-handles/` criterion 21); the seed stays.
+    Randomized(f64),
 }
 
 /// The largest corner radius a rectangle allows: half its shorter side.
@@ -245,13 +249,14 @@ fn apply_corner_radius(
 
 /// `shape` with an arc or curve `value` applied (`specs/0021-ellipse-arcs-and-shaping/`);
 /// `None` when nothing changes or `value` is of another kind.
-fn arc_or_curve_shape(shape: &Shape, value: ParamValue) -> Option<Shape> {
+fn arc_or_curve_shape(shape: &Shape, id: NodeId, value: ParamValue) -> Option<Shape> {
     match value {
         ParamValue::ArcAngle(end, angle) => with_arc_angle(shape, end, angle),
         ParamValue::ArcKind(kind) => with_arc_kind(shape, kind),
         ParamValue::WholeEllipse => made_whole(shape),
         ParamValue::Curve(fraction) => with_curve(shape, fraction),
         ParamValue::Rounded(value) => with_rounded(shape, value),
+        ParamValue::Randomized(value) => with_randomized(shape, id, value),
         ParamValue::Radius(_)
         | ParamValue::CornerRadius(..)
         | ParamValue::Ratio(_)
@@ -270,12 +275,14 @@ fn ring_value_shape(shape: &Shape, value: ParamValue) -> Option<Shape> {
                 inner_ratio,
                 curve,
                 rounded,
+                randomized,
             },
             ParamValue::Ratio(ratio),
         ) => {
             let limited = clamped_ratio(ratio.get());
             ((limited.get() - inner_ratio.get()).abs() > PARAM_EQUAL_EPSILON).then_some(
                 Shape::Star {
+                    randomized,
                     frame,
                     point_count,
                     inner_ratio: limited,
@@ -290,9 +297,11 @@ fn ring_value_shape(shape: &Shape, value: ParamValue) -> Option<Shape> {
                 point_count,
                 curve,
                 rounded,
+                randomized,
             },
             ParamValue::PointCount(count),
         ) => (count != point_count).then_some(Shape::Polygon {
+            randomized,
             frame,
             point_count: count,
             curve,
@@ -305,9 +314,11 @@ fn ring_value_shape(shape: &Shape, value: ParamValue) -> Option<Shape> {
                 inner_ratio,
                 curve,
                 rounded,
+                randomized,
             },
             ParamValue::PointCount(count),
         ) => (count != point_count).then_some(Shape::Star {
+            randomized,
             frame,
             point_count: count,
             inner_ratio,
@@ -352,8 +363,8 @@ fn apply_to_primitive(start: &PrimitiveSnapshot, value: ParamValue) -> Primitive
             }
         }
         (shape, value) => {
-            let Some(shape) =
-                ring_value_shape(&shape, value).or_else(|| arc_or_curve_shape(&shape, value))
+            let Some(shape) = ring_value_shape(&shape, value)
+                .or_else(|| arc_or_curve_shape(&shape, start.id, value))
             else {
                 return start.clone();
             };
@@ -412,6 +423,7 @@ fn commit_arc_or_curve_batch(
     let mut arcs = Vec::new();
     let mut curves = Vec::new();
     let mut roundeds = Vec::new();
+    let mut randomizeds = Vec::new();
     for &id in ids {
         let old = document.object(id).ok_or(ShapeEditError::NoSuchObject)?;
         let ObjectSnapshot::Primitive(new) = apply_param(&old, value) else {
@@ -437,6 +449,12 @@ fn commit_arc_or_curve_batch(
             ) => {
                 roundeds.push((id, rounded));
             }
+            (
+                ParamValue::Randomized(_),
+                Shape::Polygon { randomized, .. } | Shape::Star { randomized, .. },
+            ) => {
+                randomizeds.push((id, randomized.amount()));
+            }
             (_, Shape::Ellipse { arc, .. }) => arcs.push((id, arc)),
             _ => {}
         }
@@ -449,6 +467,9 @@ fn commit_arc_or_curve_batch(
     }
     if !roundeds.is_empty() {
         document.set_rounded(&roundeds)?;
+    }
+    if !randomizeds.is_empty() {
+        document.set_randomized(&randomizeds)?;
     }
     Ok(())
 }
@@ -479,7 +500,8 @@ pub fn commit_param_batch(
         | ParamValue::ArcKind(_)
         | ParamValue::WholeEllipse
         | ParamValue::Curve(_)
-        | ParamValue::Rounded(_) => commit_arc_or_curve_batch(document, ids, value),
+        | ParamValue::Rounded(_)
+        | ParamValue::Randomized(_) => commit_arc_or_curve_batch(document, ids, value),
     }
 }
 

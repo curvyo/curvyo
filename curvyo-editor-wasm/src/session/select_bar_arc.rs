@@ -6,7 +6,7 @@
 use curvyo_document_core::{Angle, ArcKind};
 use curvyo_ui_core::{
     ArcEnd, EntryOutcome, InvalidReason, ParamValue, arc_announcement, curve_announcement,
-    parse_entry_number, rounded_announcement,
+    parse_entry_number, randomized_announcement, rounded_announcement,
 };
 
 use super::{Session, Tool};
@@ -39,6 +39,7 @@ impl Session {
             match value {
                 ParamValue::Curve(_) => curve_announcement(&shape),
                 ParamValue::Rounded(_) => rounded_announcement(&shape),
+                ParamValue::Randomized(_) => randomized_announcement(&shape),
                 _ => arc_announcement(&shape),
             }
         })
@@ -94,6 +95,52 @@ impl Session {
         self.commit_arc_or_curve(ParamValue::Rounded(value))
     }
 
+    /// Enter in "Randomized" (`specs/0145-shape-spiro-handles/` criterion 21): a number, limited
+    /// to -10..=10 and written as the limited value; text that is not a number keeps the field
+    /// open, marked invalid.
+    pub fn set_selected_randomized_text(&mut self, text: &str) -> EntryOutcome {
+        let Some(value) = parse_entry_number(text, false) else {
+            return EntryOutcome::Invalid {
+                field: 0,
+                reason: InvalidReason::NotANumber,
+            };
+        };
+        self.commit_arc_or_curve(ParamValue::Randomized(value))
+    }
+
+    /// A step of the "Randomized" field, on every key: nothing is written; committed once by
+    /// [`Session::commit_selected_curve`] on key-up.
+    pub fn preview_selected_randomized(&mut self, value: f64) {
+        if !value.is_finite() {
+            return;
+        }
+        let objects = self.objects();
+        self.select
+            .preview_bar_value(&objects, &self.selection, ParamValue::Randomized(value));
+    }
+
+    /// "Re-roll seed" (criterion 22): each selected polygon or star that has a value other than 0
+    /// gets a new seed, in one commit.
+    pub fn reroll_selected_seed(&mut self) -> EntryOutcome {
+        self.recording(|this| -> EntryOutcome {
+            if this.tool != Tool::Select {
+                return EntryOutcome::Unchanged;
+            }
+            let objects = this.objects();
+            let ids = curvyo_ui_core::ids_of_kind(
+                &objects,
+                &this.selection,
+                curvyo_ui_core::ObjectKind::Randomized,
+            );
+            let before = this.document.version();
+            let _ = this.document.reroll_seeds(&ids);
+            if this.document.version() == before {
+                return EntryOutcome::Unchanged;
+            }
+            EntryOutcome::Committed
+        })
+    }
+
     /// A step of the "Rounded" field, on every tick or key: nothing is written; committed once
     /// by [`Session::commit_selected_curve`] on release or key-up.
     pub fn preview_selected_rounded(&mut self, value: f64) {
@@ -141,7 +188,10 @@ impl Session {
         let before = self.document.version();
         self.commit_selected_ratio();
         if let Some(
-            value @ (ParamValue::Curve(_) | ParamValue::ArcAngle(..) | ParamValue::Rounded(_)),
+            value @ (ParamValue::Curve(_)
+            | ParamValue::ArcAngle(..)
+            | ParamValue::Rounded(_)
+            | ParamValue::Randomized(_)),
         ) = pending
             && self.document.version() != before
         {

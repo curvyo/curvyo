@@ -57,6 +57,7 @@ pub(crate) fn offset_primitive(
             let n = f64::from(point_count.get());
             match scaled_frame(frame, &regular_vertices(n, 1.0), d, join) {
                 Scaled::Stays(frame) => PrimitiveOffset::Stays(Shape::Polygon {
+                    randomized: curvyo_document_core::Randomized::ZERO,
                     frame,
                     point_count,
                     curve: Curve::POLYGON_DEFAULT,
@@ -75,6 +76,7 @@ pub(crate) fn offset_primitive(
             let n = f64::from(point_count.get());
             match scaled_frame(frame, &star_vertices(n, inner_ratio.get()), d, join) {
                 Scaled::Stays(frame) => PrimitiveOffset::Stays(Shape::Star {
+                    randomized: curvyo_document_core::Randomized::ZERO,
                     frame,
                     point_count,
                     inner_ratio,
@@ -139,8 +141,9 @@ fn has_default_sides(shape: &Shape) -> bool {
             rounded,
             ..
         } => arc.is_none() && *curve == Curve::ELLIPSE_DEFAULT && rounded.is_zero(),
-        Shape::Polygon { .. } | Shape::Star { .. } => {
-            curvyo_document_core::effective_curve(shape).is_some_and(|k| k.get() == 0.0)
+        Shape::Polygon { randomized, .. } | Shape::Star { randomized, .. } => {
+            randomized.is_zero()
+                && curvyo_document_core::effective_curve(shape).is_some_and(|k| k.get() == 0.0)
                 && curvyo_document_core::effective_rounded(shape).is_some_and(|q| q == 0.0)
         }
     }
@@ -403,6 +406,7 @@ mod tests {
     #[test]
     fn ac50_a_hexagon_grows_by_d_over_cos_30_with_miter_only() {
         let hexagon = Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(0.0, 0.0),
                 radius: Length::from_mm(10.0),
@@ -440,6 +444,7 @@ mod tests {
     #[test]
     fn ac40_a_star_scales_while_its_miters_stay_within_the_limit() {
         let star = |ratio: f64| Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame {
                 center: Point::new(0.0, 0.0),
                 radius: Length::from_mm(20.0),

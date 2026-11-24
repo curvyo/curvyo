@@ -537,7 +537,7 @@ fn ac8_a_text_object_keeps_its_text_and_font_name_in_the_copy() {
 #[test]
 fn ac9_format_is_58_with_the_came_from_record() {
     // Format 59 since `specs/0150-operation-always-has-numbers`.
-    assert_eq!(CURRENT_FORMAT_VERSION, 59);
+    assert_eq!(CURRENT_FORMAT_VERSION, 60);
 }
 
 #[test]

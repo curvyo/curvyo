@@ -218,6 +218,7 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
     let rounded = Rounded::new(star.rounded).filter(|r| r.get().abs() <= Rounded::RANGE)?;
     let shape = match valley {
         None => Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame,
             point_count: PointCount::new(star.sides).ok()?,
             curve: Curve::POLYGON_DEFAULT,
@@ -232,6 +233,7 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
             }
             if (r2 - star.r1).abs() <= rounding(star.r1, digits) + rounding(r2, digits) {
                 Shape::Polygon {
+                    randomized: curvyo_document_core::Randomized::ZERO,
                     frame,
                     point_count: PointCount::new(star.sides.checked_mul(2)?).ok()?,
                     curve: Curve::POLYGON_DEFAULT,
@@ -239,6 +241,7 @@ fn star_geometry(star: &StarData, drawn: &BezPath, m: Affine) -> Option<LeafGeom
                 }
             } else {
                 Shape::Star {
+                    randomized: curvyo_document_core::Randomized::ZERO,
                     frame,
                     point_count: PointCount::new(star.sides).ok()?,
                     inner_ratio: InnerRatio::new(r2.min(star.r1) / tip_r).ok()?,

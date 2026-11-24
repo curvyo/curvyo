@@ -218,6 +218,7 @@ fn the_start_of_each_carrier_kind_is_pinned() {
     let ellipse = circle(&d);
     let star = d.create_primitive(
         Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame::from_center_and_vertex(Point::new(0.0, 0.0), Point::new(0.0, -10.0)),
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: curvyo_document_core::InnerRatio::new(0.5).unwrap(),
@@ -538,6 +539,7 @@ fn golden_document() -> (Document, Vec<NodeId>) {
     put(on(rect), OnPathValues::at(Length::from_mm(10.0)));
     let star = d.create_primitive(
         Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame: StarFrame::from_center_and_vertex(
                 Point::new(300.0, 100.0),
                 Point::new(300.0, 60.0),

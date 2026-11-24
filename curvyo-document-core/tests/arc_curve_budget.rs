@@ -25,6 +25,7 @@ fn mean(shape: &Shape, runs: u32) -> Duration {
 
 fn polygon(n: u32, k: f64) -> Shape {
     Shape::Polygon {
+        randomized: curvyo_document_core::Randomized::ZERO,
         frame: StarFrame {
             center: Point::new(0.0, 0.0),
             radius: Length::from_mm(50.0),

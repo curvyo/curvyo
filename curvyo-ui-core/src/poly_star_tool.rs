@@ -43,12 +43,14 @@ impl PolyStarSettings {
     pub const fn shape(self, frame: StarFrame) -> Shape {
         match self.mode {
             PolyStarMode::Polygon => Shape::Polygon {
+                randomized: curvyo_document_core::Randomized::ZERO,
                 frame,
                 point_count: self.point_count,
                 curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
                 rounded: curvyo_document_core::Rounded::ZERO,
             },
             PolyStarMode::Star => Shape::Star {
+                randomized: curvyo_document_core::Randomized::ZERO,
                 frame,
                 point_count: self.point_count,
                 inner_ratio: self.ratio,

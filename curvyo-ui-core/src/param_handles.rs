@@ -205,8 +205,14 @@ pub fn param_handles(
         // A rounded polygon or star measures the threshold on its straight box, so a drag into
         // loops never makes knobs appear or vanish (`specs/0145-shape-spiro-handles/`
         // criterion 1).
-        Shape::Polygon { frame, .. } | Shape::Star { frame, .. }
-            if curvyo_document_core::effective_rounded(&primitive.shape)
+        // The same for a randomized one (`0145` slice 3): its vertices move, its knobs do not.
+        Shape::Polygon {
+            frame, randomized, ..
+        }
+        | Shape::Star {
+            frame, randomized, ..
+        } if !randomized.is_zero()
+            || curvyo_document_core::effective_rounded(&primitive.shape)
                 .is_some_and(|q| q != 0.0) =>
         {
             2.0 * frame.radius.as_mm()
@@ -397,6 +403,7 @@ mod tests {
         ObjectSnapshot::Primitive(PrimitiveSnapshot {
             id: id(),
             shape: Shape::Star {
+                randomized: curvyo_document_core::Randomized::ZERO,
                 frame: StarFrame {
                     center: Point::new(50.0, 40.0),
                     radius: Length::from_mm(radius),

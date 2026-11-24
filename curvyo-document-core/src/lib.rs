@@ -297,6 +297,7 @@ mod primitive_model;
 mod primitive_outline;
 mod replace;
 mod ring_curve;
+mod ring_random;
 mod ring_rounded;
 mod seed;
 mod segment_bend;
@@ -489,6 +490,7 @@ pub use ring_curve::{
     Curve, curve_from_position, curve_handle_position, curve_limit, curve_max, effective_curve,
     ring_bounds, ring_extent,
 };
+pub use ring_random::Randomized;
 pub use ring_rounded::{Q_C, Rounded, effective_rounded, rounded_bounds};
 pub use seed::{Seed, splitmix64};
 pub use shapes::ShapeEditError;

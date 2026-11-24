@@ -594,6 +594,7 @@ mod tests {
 
     fn polygon(n: u32, r: f64, k: f64) -> Shape {
         Shape::Polygon {
+            randomized: crate::Randomized::ZERO,
             frame: frame(r, 0.0),
             point_count: PointCount::new(n).unwrap(),
             curve: Curve::clamped(k),
@@ -603,6 +604,7 @@ mod tests {
 
     fn star(n: u32, ratio: f64, r: f64, k: f64) -> Shape {
         Shape::Star {
+            randomized: crate::Randomized::ZERO,
             frame: frame(r, 0.0),
             point_count: PointCount::new(n).unwrap(),
             inner_ratio: InnerRatio::new(ratio).unwrap(),
@@ -938,6 +940,7 @@ mod tests {
                 Shape::Polygon {
                     frame, point_count, ..
                 } => Shape::Polygon {
+                    randomized: crate::Randomized::ZERO,
                     frame,
                     point_count,
                     curve,
@@ -949,6 +952,7 @@ mod tests {
                     inner_ratio,
                     ..
                 } => Shape::Star {
+                    randomized: crate::Randomized::ZERO,
                     frame,
                     point_count,
                     inner_ratio,

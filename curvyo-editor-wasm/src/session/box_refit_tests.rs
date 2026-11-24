@@ -76,6 +76,7 @@ fn selected(
 fn hexagon(c: Point, r: f64, deg: f64) -> (Session, NodeId) {
     selected(
         |frame| Shape::Polygon {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame,
             point_count: PointCount::new(6).unwrap(),
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
@@ -90,6 +91,7 @@ fn hexagon(c: Point, r: f64, deg: f64) -> (Session, NodeId) {
 fn star(c: Point, r: f64, deg: f64) -> (Session, NodeId) {
     selected(
         |frame| Shape::Star {
+            randomized: curvyo_document_core::Randomized::ZERO,
             frame,
             point_count: PointCount::new(5).unwrap(),
             inner_ratio: InnerRatio::new(0.5).unwrap(),
