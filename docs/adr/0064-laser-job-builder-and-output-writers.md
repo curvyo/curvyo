@@ -4,6 +4,9 @@
 
 **Note (ADR 0069 §1, §13, with the `0123` story, 2026-11-19):** §4: raster output is the Image kind's (sweeps, `MoveKind::Sweep`, ADR 0069 §1); in every other kind the session hands an image on as the one closed ring of its frame and a gradient leaf as its outlines, so no pixel is read outside Image.
 
+
+**Note ([`specs/0150` adrs.md](../../specs/0150-operation-always-has-numbers/adrs.md), proposed 2026-11-24, with the `0150` story):** §3 and §8: `NoSettings` no longer exists and blocks nothing (`NumbersRead::NoSettings`, `Cause::NoSettings` and " has no power and speed." go); `DamagedSettings` stays a warning; the frame's stand-in numbers serve fixture blocks only (decisions 6, 8).
+
 ## Context
 
 `0029` turns a laser page into one job file and shows, before anything is written, the run on the page (Toolpath view with a scrub slider), its length and time, and a gate that names the machine and every number. GRBL G-code is the first output format; the customer expects others (Marlin, Ruida, LinuxCNC, ...) and wants adding one to be easy. Criterion 9 asks that view and file cannot differ; criterion 31 that two exports are byte-identical; criterion 36 sets CPU budgets. What must stay cheap to change: the core/platform boundary, determinism of the file, the single source of moves, and the seam where a format plugs in. What may change freely later: the time model, the order heuristic's speed, the formats themselves.
