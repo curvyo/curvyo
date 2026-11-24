@@ -478,90 +478,54 @@ impl Document {
             self.ensure_spiro_format();
         }
 
-        // `mov_after` needs the fractional-index feature on for this tree;
-        // enabled on every call, as `split_at_anchor` does.
-        tree.enable_fractional_index(0);
         // The version the copies are made from: the lineage of `specs/0041-object-history` reads
         // the source's steps in its causal past.
         let version = self.loro().oplog_frontiers();
-        // Linked clones are copied after every other node, shallow chains first, so each
-        // original's copy exists before the copies of its clones (`specs/0049-linked-clone`
-        // decision 8, ADR 0015 §3).
-        let links = self.clone_links();
-        let mut copying = Copying::default();
-        let mut created: Vec<Option<TreeID>> = vec![None; sources.len()];
-        for (index, source) in sources.iter().enumerate() {
-            let source_id = tree_id_of(source.id);
-            if links.contains_key(&source.id) {
-                copying.waiting.push((source_id, Place::After(source_id)));
-                continue;
-            }
-            let mut anchor_ids = source.anchor_ids.iter();
-            let new_tree_id = copy_subtree(
-                &tree,
-                source_id,
-                loro::TreeParentId::Root,
-                &mut anchor_ids,
-                (offset, &version),
-                (&links, &mut copying),
-            );
-            // invariant: the source was resolved above and the new node was
-            // just created: `mov_after` puts it next to its original.
-            #[allow(clippy::unwrap_used)]
-            tree.mov_after(new_tree_id, source_id).unwrap();
-            created[index] = Some(new_tree_id);
-        }
-        let mut waiting = std::mem::take(&mut copying.waiting);
-        crate::clone_copy::creation_order(&links, &mut waiting);
-        let position: std::collections::HashMap<TreeID, usize> = sources
+        let roots: Vec<crate::copy_roots::RootCopy<'_>> = sources
             .iter()
-            .enumerate()
-            .map(|(index, source)| (tree_id_of(source.id), index))
+            .map(|source| crate::copy_roots::RootCopy {
+                source: tree_id_of(source.id),
+                anchor_ids: &source.anchor_ids,
+                place: crate::copy_roots::RootPlace::AfterSource,
+            })
             .collect();
-        let mut nested = Vec::new();
-        for (source, place) in waiting {
-            let new_tree_id = copy_subtree(
-                &tree,
-                source,
-                loro::TreeParentId::Root,
-                &mut [].iter(),
-                (offset, &version),
-                (&links, &mut copying),
-            );
-            match place {
-                Place::After(after) => {
-                    // invariant: as above.
-                    #[allow(clippy::unwrap_used)]
-                    tree.mov_after(new_tree_id, after).unwrap();
-                    if let Some(&index) = position.get(&source) {
-                        created[index] = Some(new_tree_id);
-                    }
-                }
-                Place::Into(group, child) => nested.push((group, child, new_tree_id)),
-            }
-        }
-        // Each group's waiting children go to their own index, lowest first, so every index is
-        // counted among the children already placed.
-        nested.sort_unstable_by_key(|&(group, child, _)| (group.peer, group.counter, child));
-        for (group, child, node) in nested {
-            // invariant: the group copy and the node were created by this call.
-            #[allow(clippy::unwrap_used)]
-            tree.mov_to(node, loro::TreeParentId::Node(group), child)
-                .unwrap();
-        }
-        crate::clone_copy::relink_copied_clones(&tree, &copying.made, offset);
-        crate::text_carrier::relink_copied_texts(&tree, &copying.made, text_shifts);
-        crate::text_clone_commands::relink_copied_text_clones(&tree, &copying.made);
-        crate::dimension_commands::relink_copied_dimensions(self, &tree, &copying.made, offset);
-        crate::tiling_copy::relink_copied_tilings(&tree, &copying.made);
-        crate::test_grid_commands::give_copied_grids_rows(self, &tree, &copying.made);
-        self.assign_sketch_copies(&copying.made, &sketch_claims);
+        let copied = crate::copy_roots::copy_roots(
+            (&tree, &tree),
+            &roots,
+            (offset, Some(&version)),
+            &self.clone_links(),
+        );
+        let (created, made) = (copied.roots, copied.made);
+        self.relink_copies(self, &tree, &made, offset, text_shifts);
+        self.assign_sketch_copies(&made, &sketch_claims);
         self.commit_with_label("duplicate_objects");
         Ok(created
             .into_iter()
             .flatten()
             .map(|node| NodeId::from_parts(node.peer, node.counter))
             .collect())
+    }
+
+    /// The one remap of every reference among copies (ADR 0084 §6) made from `source` (this
+    /// document for Duplicate, the fragment's private copy for an import), shared by Duplicate and the
+    /// insert of a fragment: each copied reference to a copied node follows the copy (clone
+    /// links, text carriers and text clones, dimension slots, tiling sources and members, test
+    /// grid rows). Uncommitted.
+    pub(crate) fn relink_copies(
+        &self,
+        source: &Self,
+        tree: &loro::LoroTree,
+        made: &[(TreeID, TreeID)],
+        offset: Vec2,
+        text_shifts: &std::collections::HashMap<NodeId, crate::units::Length>,
+    ) {
+        crate::clone_copy::relink_copied_clones(tree, made, offset);
+        crate::text_carrier::relink_copied_texts(tree, made, text_shifts);
+        crate::text_clone_commands::relink_copied_text_clones(tree, made);
+        let from = source.loro().get_tree(OBJECTS_TREE);
+        crate::dimension_commands::relink_copied_dimensions((source, &from), tree, made, offset);
+        crate::tiling_copy::relink_copied_tilings(tree, made);
+        crate::test_grid_commands::give_copied_grids_rows(self, tree, made);
     }
 
     /// Writes a resolved rotation — the object after
@@ -788,19 +752,22 @@ fn check_anchor_ids(
     }
 }
 
-/// Copies the node `source` and everything under it to a new node under `parent`: every key of the
-/// meta maps as it is, a path's anchors renumbered from `anchor_ids` (one per anchor, in paint
-/// order), the geometry of each leaf displaced by `offset`. A group's copy is a new group with
-/// copies of its children in their order. Returns the copy.
+/// Copies the node `source` of the tree `from` and everything under it to a new node under
+/// `parent` of the tree `into` (the same tree for Duplicate, another document's for a fragment,
+/// ADR 0084 §6): every key of the meta maps as it is, a path's anchors renumbered from
+/// `anchor_ids` (one per anchor, in paint order), the geometry of each leaf displaced by `offset`.
+/// A group's copy is a new group with copies of its children in their order. With a `version`,
+/// every copy records its source for the object history; a copy from another document has none.
+/// Returns the copy.
 ///
 /// A linked clone among the children of a copied group is not copied here: it waits in
 /// `copying` with its place, and its copy is made after every other node.
-fn copy_subtree(
-    tree: &loro::LoroTree,
+pub(crate) fn copy_subtree(
+    (from, tree): (&loro::LoroTree, &loro::LoroTree),
     source: TreeID,
     parent: loro::TreeParentId,
     anchor_ids: &mut std::slice::Iter<'_, AnchorId>,
-    (offset, version): (Vec2, &loro::Frontiers),
+    (offset, version): (Vec2, Option<&loro::Frontiers>),
     (links, copying): (&crate::clone_transform::CloneLinks, &mut Copying),
 ) -> TreeID {
     // invariant: creating a node under the root or under a node this call just created cannot
@@ -811,17 +778,34 @@ fn copy_subtree(
     let meta = tree.get_meta(new_tree_id).unwrap();
     // invariant: the source was resolved by the caller (or is a child of one that was).
     #[allow(clippy::unwrap_used)]
-    let source_meta = tree.get_meta(source).unwrap();
+    let source_meta = from.get_meta(source).unwrap();
     copy_map(&source_meta, &meta, LINEAGE_KEYS);
     // Every copied node, a group's too, is a copy of its source for the object history
     // (`specs/0041-object-history`).
-    // invariant: the key is new in the meta map just created.
-    #[allow(clippy::unwrap_used)]
-    meta.insert(KEY_CLONE_OF, encode_clone_of(source, version))
-        .unwrap();
+    if let Some(version) = version {
+        // invariant: the key is new in the meta map just created.
+        #[allow(clippy::unwrap_used)]
+        meta.insert(KEY_CLONE_OF, encode_clone_of(source, version))
+            .unwrap();
+    }
     copying.made.push((source, new_tree_id));
+    // A laser page's machine data (a page import, `specs/0137`) is copied as it is: its nodes
+    // are records in page-local units, not paths in the plane.
+    if crate::manufacturing_codec::in_manufacturing_subtree(from, source) {
+        for child in from.children(source).unwrap_or_default() {
+            copy_subtree(
+                (from, tree),
+                child,
+                loro::TreeParentId::Node(new_tree_id),
+                anchor_ids,
+                (offset, version),
+                (links, copying),
+            );
+        }
+        return new_tree_id;
+    }
     if crate::group_tree::meta_is_group(&source_meta) {
-        for (index, child) in tree
+        for (index, child) in from
             .children(source)
             .unwrap_or_default()
             .into_iter()
@@ -834,7 +818,7 @@ fn copy_subtree(
                 continue;
             }
             copy_subtree(
-                tree,
+                (from, tree),
                 child,
                 loro::TreeParentId::Node(new_tree_id),
                 anchor_ids,

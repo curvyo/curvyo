@@ -298,7 +298,7 @@ fn free_circle(shown: &crate::dimension_model::Measured, offset: Vec2) -> CurveS
 /// into a free point or a free circle where it measured, moved by `offset` (ADR 0027 §5, as
 /// `relink_copied_texts`). The copies are uncommitted.
 pub(crate) fn relink_copied_dimensions(
-    document: &Document,
+    (document, from): (&Document, &LoroTree),
     tree: &LoroTree,
     made: &[(TreeID, TreeID)],
     offset: Vec2,
@@ -321,7 +321,7 @@ pub(crate) fn relink_copied_dimensions(
         let mut slots = original.slots.clone();
         let remap_anchor = |node: NodeId, anchor: AnchorId| -> Option<(NodeId, AnchorId)> {
             let copied = *copy_of.get(&node)?;
-            let at = anchor_order(tree, node).iter().position(|&a| a == anchor)?;
+            let at = anchor_order(from, node).iter().position(|&a| a == anchor)?;
             Some((copied, *anchor_order(tree, copied).get(at)?))
         };
         match &mut slots {

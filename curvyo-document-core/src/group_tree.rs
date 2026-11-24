@@ -151,6 +151,10 @@ pub(crate) fn has_ancestor_in(tree: &LoroTree, id: TreeID, set: &[TreeID]) -> bo
 
 /// The number of anchors in all leaves under `id` (`id` itself for a leaf).
 pub(crate) fn anchors_under(tree: &LoroTree, id: TreeID) -> usize {
+    // A laser page's machine data holds no path (`specs/0137`: a page import copies it whole).
+    if crate::manufacturing_codec::in_manufacturing_subtree(tree, id) {
+        return 0;
+    }
     let leaves = if is_group_node(tree, id) {
         leaves_under(tree, Some(id))
     } else {

@@ -175,7 +175,12 @@ mod tests {
         assert_eq!(&*reopened.assets.borrow().get(&hash).unwrap(), &*bytes);
         let saved = pack(&document, "0.1.0").unwrap();
         let mut a = members(&assembled);
-        let mut b = members(&saved);
+        // ADR 0084 §1: the page list is written by a save only; the restored copy gets it at
+        // its next save.
+        let mut b: Vec<_> = members(&saved)
+            .into_iter()
+            .filter(|name| name != crate::LIBRARY_MEMBER)
+            .collect();
         a.sort();
         b.sort();
         assert_eq!(a, b, "the same members as Save writes");

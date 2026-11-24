@@ -280,10 +280,8 @@ fn a_build_of_format_54_refuses_the_golden() {
     let newer = writer.finish().unwrap().into_inner();
     assert!(matches!(
         unpack(3, &newer),
-        Err(OpenError::FormatTooNew {
-            found: 58,
-            supported: 57
-        })
+        Err(OpenError::FormatTooNew { found, supported })
+            if found == CURRENT_FORMAT_VERSION + 1 && supported == CURRENT_FORMAT_VERSION
     ));
 }
 

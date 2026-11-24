@@ -124,6 +124,13 @@ fn pack_members(
         let (name, bytes) = crate::container_share::share_member(&record)?;
         write_member(&mut writer, name, &bytes, options)?;
     }
+    // ADR 0084 §1: the page list the library reads without opening, for a saved file only.
+    if members == Members::Save {
+        let summary = crate::library_summary::library_summary(document)
+            .to_bytes()
+            .map_err(|_| SaveError::Container)?;
+        write_member(&mut writer, crate::LIBRARY_MEMBER, &summary, options)?;
+    }
     if members != Members::Recovery {
         document.prune_derived_assets();
         crate::container_assets::write_assets(&mut writer, &document.assets.borrow())?;
@@ -243,6 +250,20 @@ mod tests {
         assert!(archive.by_name(MANIFEST_MEMBER).is_ok());
         assert!(archive.by_name(LORO_SNAPSHOT_MEMBER).is_ok());
         assert!(archive.by_name(DOCUMENT_JSON_MEMBER).is_ok());
+        assert!(archive.by_name(crate::LIBRARY_MEMBER).is_ok());
+    }
+
+    /// ADR 0084 §1: a relay snapshot and a recovery copy carry no page list.
+    #[test]
+    fn only_a_save_writes_the_page_list() {
+        let document = Document::new(1);
+        for bytes in [
+            pack_snapshot(&document, "0.1.0").expect("pack"),
+            pack_recovery(&document, "0.1.0").expect("pack"),
+        ] {
+            let mut archive = ZipArchive::new(Cursor::new(bytes.as_slice())).expect("zip");
+            assert!(archive.by_name(crate::LIBRARY_MEMBER).is_err());
+        }
     }
 
     // `Document` deliberately has no `Debug`/`PartialEq` (it wraps a Loro

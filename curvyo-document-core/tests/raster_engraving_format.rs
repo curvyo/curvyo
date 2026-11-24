@@ -360,7 +360,7 @@ fn damaged_bytes() -> Vec<u8> {
 /// `document.json` with the format number of a newer build put back to 50.
 fn as_format_50(json: &[u8]) -> String {
     String::from_utf8(json.to_vec()).unwrap().replacen(
-        "\"format_version\": 57,",
+        "\"format_version\": 58,",
         "\"format_version\": 50,",
         1,
     )
@@ -373,7 +373,7 @@ fn row(d: &Document, at: usize) -> curvyo_document_core::OperationSnapshot {
 #[test]
 fn the_format_is_50() {
     // Superseded by 0135 slice 1 (2026-11-19): format 51.
-    assert_eq!(CURRENT_FORMAT_VERSION, 57);
+    assert_eq!(CURRENT_FORMAT_VERSION, 58);
 }
 
 #[test]
@@ -443,8 +443,12 @@ fn saving_twice_gives_the_same_bytes_and_the_golden_saves_back_unchanged() {
         as_format_50(&members(&first)["document.json"]),
         as_format_50(&members(&bytes)["document.json"])
     );
+    // ADR 0084 §1: a save since format 58 adds the page list of the library.
     assert_eq!(
-        members(&first).keys().collect::<Vec<_>>(),
+        members(&first)
+            .keys()
+            .filter(|name| *name != "library.json")
+            .collect::<Vec<_>>(),
         members(&bytes).keys().collect::<Vec<_>>(),
         "the image is stored once, in assets/"
     );
@@ -504,8 +508,8 @@ fn a_file_of_the_next_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 58,
-            supported: 57
+            found: 59,
+            supported: 58
         })
     ));
 }
