@@ -15,6 +15,8 @@
     clippy::many_single_char_names
 )]
 
+mod budget_factor;
+
 use curvyo_extension_core::{
     ClosedPath, Contribution, Edit, Extension, GenerateRequest, Generated, Param, ParamKind,
     ParamValue, Part, ScaleFactor, Seed, StoredParams,
@@ -932,9 +934,10 @@ fn criterion_6_regenerating_a_box_of_about_400_slots_costs_under_100_ms_of_threa
         segments >= 1000,
         "the box carries about 400 slots: {segments} segments"
     );
+    let took = budget_factor::scaled(std::time::Duration::from_millis(best * 10));
     assert!(
-        best * 10 <= 100,
-        "regeneration took {} ms of thread CPU",
+        took <= std::time::Duration::from_millis(100),
+        "regeneration took {} ms of thread CPU (scaled by the CI factor: {took:?})",
         best * 10
     );
 }

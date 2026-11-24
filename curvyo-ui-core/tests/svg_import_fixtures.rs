@@ -2,6 +2,8 @@
 //! 3, 8, 13, 19, 26 to 28, 33, 45, 47, 50, 51, 73) and the hostile sweep (criterion 70 (a)).
 #![allow(clippy::unwrap_used, clippy::float_cmp)]
 
+mod budget_factor;
+
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -385,7 +387,7 @@ fn ac70_truncated_and_changed_fixtures_never_panic() {
 
 /// The calling thread's CPU time (Linux `schedstat`; wall time since the first call elsewhere),
 /// the same helper as `svg_import_slice2_fixtures.rs` (`CLAUDE.md` §5).
-fn thread_cpu() -> Duration {
+fn thread_cpu_unscaled() -> Duration {
     std::fs::read_to_string("/proc/thread-self/schedstat")
         .ok()
         .and_then(|s| s.split_whitespace().next()?.parse::<u64>().ok())
@@ -396,4 +398,8 @@ fn thread_cpu() -> Duration {
             },
             Duration::from_nanos,
         )
+}
+
+fn thread_cpu() -> Duration {
+    budget_factor::scaled(thread_cpu_unscaled())
 }

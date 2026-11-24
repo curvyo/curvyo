@@ -7,6 +7,8 @@
 
 #![allow(clippy::unwrap_used, clippy::cast_precision_loss)]
 
+mod budget_factor;
+
 use std::time::Duration;
 
 use curvyo_document_core::{
@@ -36,7 +38,7 @@ fn cpu_time_of<T>(work: impl FnOnce() -> T) -> (T, Duration) {
     };
     let start = now();
     let result = work();
-    (result, now().saturating_sub(start))
+    (result, budget_factor::scaled(now().saturating_sub(start)))
 }
 
 fn check(label: &str, took: Duration, budget: Duration) {

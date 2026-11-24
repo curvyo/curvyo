@@ -22,6 +22,8 @@
     missing_docs
 )]
 
+mod budget_factor;
+
 use std::f64::consts::{PI, TAU};
 use std::fmt::Write as _;
 use std::path::Path;
@@ -1643,7 +1645,7 @@ fn c111_retraced_spur_has_the_same_point_set() {
 
 /// Linux thread CPU time (`/proc/thread-self/schedstat`, ns on the CPU), as
 /// `curvyo-image-core/tests/common`; wall time elsewhere.
-fn cpu_now() -> Duration {
+fn cpu_now_unscaled() -> Duration {
     std::fs::read_to_string("/proc/thread-self/schedstat")
         .ok()
         .and_then(|s| s.split_whitespace().next()?.parse::<u64>().ok())
@@ -1654,6 +1656,10 @@ fn cpu_now() -> Duration {
             },
             Duration::from_nanos,
         )
+}
+
+fn cpu_now() -> Duration {
+    budget_factor::scaled(cpu_now_unscaled())
 }
 
 /// 1,000 real arcs, polygons and stars (copies of the saved ones, each moved by its own

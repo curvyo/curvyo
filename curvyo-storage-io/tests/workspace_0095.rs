@@ -3,6 +3,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+mod budget_factor;
+
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
@@ -264,7 +266,7 @@ fn cpu_time_of<T>(work: impl FnOnce() -> T) -> (T, Duration) {
     };
     let start = now();
     let result = work();
-    (result, now().saturating_sub(start))
+    (result, budget_factor::scaled(now().saturating_sub(start)))
 }
 
 #[test]

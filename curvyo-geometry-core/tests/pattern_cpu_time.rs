@@ -14,6 +14,8 @@
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(clippy::unwrap_used, missing_docs)]
 
+mod budget_factor;
+
 use std::time::Duration;
 
 use curvyo_document_core::{
@@ -86,7 +88,7 @@ fn star() -> Outlines {
 }
 
 #[cfg(unix)]
-fn thread_time() -> Duration {
+fn thread_time_unscaled() -> Duration {
     let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
     Duration::new(
         u64::try_from(now.tv_sec).unwrap(),
@@ -94,12 +96,22 @@ fn thread_time() -> Duration {
     )
 }
 
-#[cfg(not(unix))]
+#[cfg(unix)]
 fn thread_time() -> Duration {
+    budget_factor::scaled(thread_time_unscaled())
+}
+
+#[cfg(not(unix))]
+fn thread_time_unscaled() -> Duration {
     // Off Unix the budgets are not asserted; wall time stands in for the printout.
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
+}
+
+#[cfg(not(unix))]
+fn thread_time() -> Duration {
+    budget_factor::scaled(thread_time_unscaled())
 }
 
 fn timed_on(

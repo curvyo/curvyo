@@ -551,6 +551,11 @@ jobs:
   performance-budgets:
     name: performance budgets (release)
     runs-on: ubuntu-latest
+    env:
+      # Customer decision 2026-11-24 (Frage 368, CI-BUDGETS = A): the shared runner is slower than
+      # the development machine, so every thread-CPU budget test scales its spec value by this one
+      # factor; locally it is unset (1.0) and the spec values apply unchanged.
+      CURVYO_BUDGET_FACTOR: "1.6"
     steps:
       - uses: actions/checkout@v4
 

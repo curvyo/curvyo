@@ -25,6 +25,15 @@ inputs nobody thought of.
 - Machine output: verify the generated job against the machine's expected
   syntax and limits (power, speed, travel area) stated in the story.
 
+## Timing tests
+Measure thread CPU time, never wall time, and assert the spec value as written in the criterion;
+never raise a budget in one test for the CI runner. The shared runner is slower, so the budget
+job in `.github/workflows/ci.yml` sets `CURVYO_BUDGET_FACTOR` (Frage 368, currently 1.6) and each
+crate's budget helper (`tests/cpu_time/`, `tests/budget_factor/`) reads it once (default 1.0, finite,
+at least 1.0, else it panics) and scales the budget; locally it stays unset, so a budget must
+pass at its spec value on the development machine. A new budget test uses the crate's helper. A
+ratio between two measurements (for example "no more than Colour plus 30 %") is not scaled.
+
 ## Rules
 - You may write and edit test code and fixtures only. Never edit production
   code. If a test needs a seam that does not exist, report it.

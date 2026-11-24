@@ -14,6 +14,8 @@
     missing_docs
 )]
 
+mod budget_factor;
+
 mod common;
 
 use std::sync::Arc;
@@ -188,7 +190,7 @@ fn refs(faces: &[Arc<Face>]) -> Vec<&Face> {
 }
 
 /// The thread's CPU time (wall time off Unix).
-fn cpu_now() -> Duration {
+fn cpu_now_unscaled() -> Duration {
     #[cfg(unix)]
     {
         let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
@@ -203,6 +205,10 @@ fn cpu_now() -> Duration {
         static START: OnceLock<std::time::Instant> = OnceLock::new();
         START.get_or_init(std::time::Instant::now).elapsed()
     }
+}
+
+fn cpu_now() -> Duration {
+    budget_factor::scaled(cpu_now_unscaled())
 }
 
 #[test]
