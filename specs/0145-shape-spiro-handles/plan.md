@@ -1,5 +1,71 @@
 # Plan for "Shape loops: a Rounded handle on polygon, star and ellipse"
 
+## Slice 3: Randomized on polygon and star (Frage 308 at default A; criteria 17, 21 to 30, 18 import)
+
+Built to `adrs.md` decision 8 and `ux-notes.md` section 13. Polygon and star only (the ellipse has no
+Randomized). Slices 1 and 2's `Rounded`, `rounded_outline`, `set_rounded`, `shape_arc_codec`,
+select bar and shadow code are extended, not duplicated. `format_version` 58 (renumbered at
+rebase if `main` moved; it lives in `CURRENT_FORMAT_VERSION` and the golden fixture only).
+
+### Affected crates/modules
+
+- `curvyo-document-core`: `PatternSeed` renamed to the shared `Seed` and moved with `splitmix64` to
+  `seed.rs` (refactor commit, no new type beside it); new `ring_random.rs` (`Randomized { value, seed }`,
+  the draws, the moved ring and the randomized outline and bounds); `primitive_model.rs` (field
+  `randomized` on `Shape::Polygon`/`Star`), `primitive_outline.rs` (an arm ahead of Rounded),
+  `shape_arc_codec.rs` (registers `randomized` and `seed`), `shape_arc.rs` (`set_randomized`,
+  `reroll_seeds`), `shapes.rs` (Object to path), `document.rs` (format 58).
+- `curvyo-svg-core`: nothing (a randomized Inkscape star stays a path, `star_data` already refuses it).
+- `curvyo-ui-core`: `svg_export_shapes.rs` / `svg_import_shadow.rs` (a randomized shape exports as a
+  path with the shadow, `r` and seed appended), `svg_import_match.rs`, `offset_primitive.rs`,
+  `transform_primitive.rs`, `param_edit.rs`, `select_bar_arc.rs` (field and button state),
+  `history_names.rs` ("Change randomizing", "New seed").
+- `curvyo-editor-wasm`: bar surface (value, mixed, limited, re-roll enabled), setters, CPU-time test.
+- `frontend`: the Randomized group (field, Re-roll seed button), arrow-key steps 0.01 / 0.1.
+- `docs`: `design-system.md` rows (ux-notes section 13).
+
+### Tasks
+
+M0 refactor (own commit): `PatternSeed` becomes `Seed` in `seed.rs` with `splitmix64`; no behaviour
+change; the pattern tests are the net.
+
+M1 document-core (tests first):
+- [ ] 1. Draws: `splitmix64(seed ^ splitmix64(4i + k))`, top 53 bits to `[-0.5, 0.5)`; golden of the
+  first 3 draws of seed 1 and the ring of a 5-point star at `r = 1`, seed 1 (fulfils AC 23)
+- [ ] 2. Shift `r * 2 R_max * (d1, d2)`, bounded by `|r| R_max` per axis, linear in `r`; a different seed
+  gives a different ring (fulfils AC 24, 23)
+- [ ] 3. `r = 0` is today's outline, bounds and export for every polygon and star, whatever the seed
+  (fulfils AC 25)
+- [ ] 4. Rounded through the moved vertices, handles from the unshifted ring turned by `r*pi*d3` and
+  scaled by `1 + r*d4`; Curve arcs between moved vertices; every moved vertex on the outline (fulfils
+  AC 27)
+- [ ] 5. Bounds: today's box united with the exact box of the randomized outline; 4096 sampled points
+  inside; stays a live primitive; Object to path keeps the moved ring, strips the keys (fulfils AC 28, 29)
+- [ ] 6. Registers `randomized` (deleted at 0, non-finite is Damaged, limited on use) and `seed`;
+  `format_version` 58 plus a generated golden project; older files open unchanged (fulfils AC 26)
+- [ ] 7. `set_randomized` (one commit "Change randomizing", fresh seed when `r` first leaves 0 with no
+  seed) and `reroll_seeds` (one commit "New seed", only shapes with `r != 0`); undo restores (fulfils AC 21, 22, 26)
+
+M2 svg and ui-core: export as path with the shadow (never `inkscape:randomized`), the shadow appends
+`r` and the seed (older forms read as `r = 0`), imports back live; an Inkscape star with
+`inkscape:randomized != 0` stays a path (fulfils AC 18, 30). Knobs stay on the unrandomized shape
+(ux-notes 13): the knob code reads the shape with `randomized` zeroed. Bar state: field, Mixed, limited
+tag, Re-roll enabled (fulfils AC 21, 22).
+
+M3 wasm: setters (`set_selected_randomized`, preview, `reroll_selected_seed`), surface fields; CPU-time
+test in `curvyo-editor-wasm/tests/cpu_time/` (`cpu_time_of`, min of 5, asserts only when `TIMED`) for a
+1024-point star at `r = 10`, `q = 10` (fulfils AC 30); job-tolerance test for `r` = -10, -1, 1, 10 on a
+5-point star and a 1024-point polygon (fulfils AC 29).
+
+M4 frontend: the Randomized group after Rounded, Re-roll seed (`Dices`), steps 0.01 / 0.1; design-system
+rows (fulfils AC 21, 22).
+
+Built as commits: plan, seed refactor, Rust, frontend. Proposals: a stored seed stays when `r` returns to 0
+(the register `randomized` is deleted, `seed` kept, so `0 -> 1 -> 0 -> 1` reproduces); Re-roll on several
+shapes touches only those with `r != 0`; the shifts are taken in the ring's axes with the frame angle
+included (the literal reading of criterion 24).
+
+
 ## Slice 2: ellipse only (Frage 326 at default B; criteria 14, 15, 16, 19)
 
 Built to `adrs.md` decision 9 and `ux-notes.md` section 9. The rectangle keeps its corner radii
