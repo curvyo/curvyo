@@ -12,6 +12,9 @@ Note 2026-11-05: §4 amended by [ADR 0042](0042-page-kinds.md) (proposed): a pic
 
 **Note (ADR 0065, needs-customer, accepted 2026-11-17 with the `0029` story PR #371):** §1 and §5: the project's copy of a profile carries `air_assist` and `output_format` (`mfg_profile.air_assist`, `.output_format`); an unknown `output_format` makes the copy damaged; the project format is 48 (0065 §3).
 
+
+**Note ([`specs/0150` adrs.md](../../specs/0150-operation-always-has-numbers/adrs.md), needs-customer, proposed 2026-11-24, accepted with the `0150` story PR):** §1, §3 and §5: `mfg_profile` carries `default_power_pct` and `default_speed_mm_min`, read per field (missing or unreadable: the built-in pair, the speed limited to max feed), never rewritten on read, compared by "Differs from profile"; a step that changes the pair first stores the derived numbers of unfilled operations; the project format is 59 (decisions 1, 4 b, 7).
+
 ## Context
 
 ADR 0033 §1 gave the manufacturing a placeholder register `mfg_machine_name` and said it would be

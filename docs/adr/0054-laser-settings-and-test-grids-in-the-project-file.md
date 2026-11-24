@@ -6,6 +6,9 @@
 
 **Note (ADR 0069 §13, §14, with the `0123` story, 2026-11-19):** §2: an Image operation reads the material's **Image set** (Speed, Power, Passes, Interval), the fourth set per laser; Use material, the live link, the stored numbers and the refresh are unchanged, and a material without an Image set behaves as one without the kind's set ("Material has no Image set for this laser"), with no fallback to the Engrave set.
 
+
+**Note ([`specs/0150` adrs.md](../../specs/0150-operation-always-has-numbers/adrs.md), needs-customer, proposed 2026-11-24, accepted with the `0150` story PR):** §1 and §2: an absent `op_settings` no longer means No settings; it reads as own numbers from the copy's default pair (`SettingsRead::None` and `SettingsState::NoSettings` go). §3: three more writes store those numbers: the `add_operation` commit, a step that changes the copy's pair (before the change), and a save of a changed project in the reserved commit `refresh_material_numbers`; nothing is written on open (decisions 3 to 5).
+
 ## Context
 
 `0101` and `0103` stored no power, speed or passes. `0028` adds them to the work operations, adds a generated test grid whose cells each run with their own numbers, and lets an operation take its numbers from a material in the maker's library, with numbers the maker types on top. Three things must hold for a laser: a set of numbers that runs was chosen by someone (never mixed from two concurrent edits); a project opened on a computer without the maker's library still runs with known numbers; the numbers that will run are visible before the run.

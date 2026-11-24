@@ -10,6 +10,9 @@ exists. Spec: `specs/0026-machine-profile` criteria 2, 3, 4, 9, 10, 13, 14, 15.
 
 **Note (ADR 0065, needs-customer, accepted 2026-11-17 with the `0029` story PR #371):** §2: the profile values gain `air_assist` (default off) and `output_format` (closed enum, `grbl` only), and the profile record becomes format 6; format 5 reads as off and `grbl` (0065 §3).
 
+
+**Note ([`specs/0150` adrs.md](../../specs/0150-operation-always-has-numbers/adrs.md), needs-customer, proposed 2026-11-24, accepted with the `0150` story PR):** §2: the profile values gain the default pair `default_power_pct` (10 %) and `default_speed_mm_min` (1,000 mm/min, never above max feed), and the profile record becomes format 7; formats 5 and 6 read the built-in pair and are not rewritten on read (decisions 1, 2).
+
 ## Context
 
 A machine profile describes one physical laser (bed, origin corner, limits, how to reach it) and
