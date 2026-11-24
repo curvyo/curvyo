@@ -27,7 +27,12 @@ import { shiftStyle, useNoticeShift } from "@/hooks/useNoticeShift";
 import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
-import { ArcFieldGroup, CurveGroup, EllipseKindGroup } from "@/components/ArcCurveGroups";
+import {
+  ArcFieldGroup,
+  CurveGroup,
+  EllipseKindGroup,
+  RandomizedGroup,
+} from "@/components/ArcCurveGroups";
 import { AlignBarGroup, DistributeBarGroup } from "@/components/AlignGroup";
 import { GridBarGroup } from "@/components/GridGroup";
 import { FlipGroup } from "@/components/FlipGroup";
@@ -761,6 +766,10 @@ export function SelectToolbar({
   }
   if ((arcBar.state.curveShown || arcBar.state.roundedShown) && !arcBar.state.ellipseShown && edits) {
     groups.push(<CurveGroup key="curve" arc={arcBar} onReturnFocus={onReturnFocus} />);
+  }
+  // Directly after the Curve group: Randomized and "Re-roll seed", on polygons and stars only.
+  if (arcBar.state.randomizedShown && edits) {
+    groups.push(<RandomizedGroup key="randomized" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
   // The Text controls' row 1 in place, in the Text bar's order (`specs/0084-text-bar-second-row`
   // criteria 6 and 8): Font and Size, Alignment, Style, the expand button. Row 2 is the bottom

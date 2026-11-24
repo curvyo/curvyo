@@ -1,4 +1,4 @@
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, Dices } from "lucide-react";
 import { Tooltip } from "radix-ui";
 import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
@@ -25,6 +25,10 @@ const CURVE_LABEL_PX = 40;
 const ROUNDED_FIELD_PX = 104;
 const ROUNDED_LIMITED_FIELD_PX = 153;
 const ROUNDED_LABEL_PX = 56;
+/** Randomized: the longer label and "-10.00" (`ux-notes.md` section 13, measured at the build). */
+const RANDOMIZED_FIELD_PX = 118;
+const RANDOMIZED_LIMITED_FIELD_PX = 167;
+const RANDOMIZED_LABEL_PX = 72;
 
 const TOOLTIP_STYLE = {
   background: "var(--toolbar-bg)",
@@ -553,6 +557,78 @@ export function CurveGroup({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFoc
       <div className="flex h-9 items-center gap-1">
         {arc.state.curveShown && <CurveField arc={arc} onReturnFocus={onReturnFocus} />}
         {arc.state.roundedShown && <RoundedField arc={arc} onReturnFocus={onReturnFocus} />}
+      </div>
+    </Tooltip.Provider>
+  );
+}
+
+/** The "Randomized" field (`specs/0145-shape-spiro-handles/` criterion 21, `ux-notes.md` section
+ * 13): a factor from -10 to 10 with two decimals and no suffix, "Mixed", the "limited" tag. The
+ * arrow keys step it by 0.01 (Shift 0.1) live and commit once on key-up. */
+function RandomizedField({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocus: () => void }) {
+  const { state } = arc;
+  const limited = state.randomizedLimited
+    ? `Stored ${formatTwo(state.randomizedStored)}, limited to ${formatTwo(state.randomized)}.`
+    : null;
+  return (
+    <BarNumberField
+      label="Randomized"
+      labelPx={RANDOMIZED_LABEL_PX}
+      accessibleName="Randomized"
+      suffix=""
+      widthPx={limited ? RANDOMIZED_LIMITED_FIELD_PX : RANDOMIZED_FIELD_PX}
+      value={state.randomized}
+      mixed={state.randomizedMixed}
+      grey=""
+      tooltipName="Randomized"
+      limited={limited}
+      decimals={2}
+      step={0.01}
+      shiftStep={0.1}
+      onEnter={arc.setRandomized}
+      onStepPreview={arc.previewRandomized}
+      onStepCommit={arc.commitCurve}
+      onStepCancel={arc.cancelCurve}
+      onReturnFocus={onReturnFocus}
+    />
+  );
+}
+
+/** The "Re-roll seed" button (criterion 22): the `Dices` icon of the pattern block's button, one
+ * commit, greyed (never hidden) while no selected polygon or star has a value other than 0. */
+function RerollSeedButton({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocus: () => void }) {
+  const enabled = arc.state.rerollEnabled;
+  return (
+    <BarTooltip name="Re-roll seed" grey="">
+      <button
+        type="button"
+        aria-label="Re-roll seed"
+        aria-disabled={!enabled || undefined}
+        onClick={(event) => {
+          if (!enabled) {
+            return;
+          }
+          arc.rerollSeed();
+          if (event.detail > 0) {
+            onReturnFocus();
+          }
+        }}
+        className={`${ICON_BUTTON_CLASS} hover:bg-[var(--editor-accent-hover)] ${enabled ? "" : "opacity-40"}`}
+      >
+        <Dices size={16} strokeWidth={1.5} aria-hidden />
+      </button>
+    </BarTooltip>
+  );
+}
+
+/** The Randomized group for a selection that holds a polygon or star: the field, then the seed
+ * button, 4 px apart, directly after the Curve group (`ux-notes.md` section 13). */
+export function RandomizedGroup({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocus: () => void }) {
+  return (
+    <Tooltip.Provider delayDuration={400}>
+      <div className="flex h-9 items-center gap-1">
+        <RandomizedField arc={arc} onReturnFocus={onReturnFocus} />
+        <RerollSeedButton arc={arc} onReturnFocus={onReturnFocus} />
       </div>
     </Tooltip.Provider>
   );
