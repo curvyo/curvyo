@@ -239,7 +239,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(48))]
 
     /// Over random pans at random zooms, every frame equals a fresh build bit for bit, and
-    /// the read path's artwork equals the uncached one (`in_view` and the tessellation). Two
+    /// the read path's artwork equals the uncached one (`in_view` and the tessellation). Three
     /// small pans follow each jump, so the kept list is drawn and compared too.
     #[test]
     fn every_pan_frame_equals_a_fresh_build(
@@ -255,8 +255,9 @@ proptest! {
             let frame = session.frame_draw_list();
             prop_assert_eq!(&frame, &fresh_frame(&session));
             prop_assert_eq!(read_artwork(&session), uncached_artwork(&session));
-            // Small pans of the same view: the case the memo serves most.
-            for _ in 0..2 {
+            // Small pans of the same view: the case the memo serves most. Three, so one pan
+            // that moves an object across the edge of the view still leaves two alike.
+            for _ in 0..3 {
                 pan(&mut session, dx.signum() * 0.75, dy.signum() * 0.5);
                 let frame = session.frame_draw_list();
                 prop_assert_eq!(&frame, &fresh_frame(&session));
