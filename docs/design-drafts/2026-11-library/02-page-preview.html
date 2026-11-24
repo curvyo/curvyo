@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>02 · Page preview and import</title><link rel="stylesheet" href="kit.css">
+<style>
+.area{position:relative;width:820px;height:440px;background:var(--pasteboard-bg);overflow:hidden;flex:none;border-radius:2px}
+.pg{position:absolute;background:var(--canvas-bg)}
+.pane{position:absolute;top:0;right:0;bottom:0;width:287px;border-left:1px solid var(--line25);display:flex;flex-direction:column;background:var(--pasteboard-bg)}
+.ph{height:44px;background:var(--panel-bg);border-bottom:1px solid var(--line25);display:flex;align-items:center;gap:6px;padding:0 8px;flex:none}
+.pb{flex:1;position:relative}
+.pf{height:44px;background:var(--panel-bg);border-top:1px solid var(--line25);display:flex;align-items:center;gap:8px;padding:0 8px;flex:none}
+.ib{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:5px;flex:none}
+.pick{position:absolute;border:1px dashed var(--accent);box-shadow:0 0 0 1px #fff}
+.ghost{position:absolute;border:1px solid color-mix(in srgb,#2F6FEE 60%,transparent)}
+.badge{position:absolute;height:20px;background:var(--toolbar-bg);border:1px solid var(--line25);border-radius:8px;padding:0 6px;display:flex;align-items:center;gap:4px;font-size:12px}
+.rail{position:absolute;left:12px;top:12px;width:48px;height:200px;background:var(--toolbar-bg);border-radius:8px;box-shadow:var(--panel-elevation-shadow)}
+.tip{position:absolute;background:#2A2A2E;color:#fff;font-size:12px;padding:6px 8px;border-radius:5px;line-height:1.4;white-space:nowrap}
+.tip span{color:#C9C9CE}
+.stylep{width:280px;background:var(--panel-bg);padding:12px 24px 12px 12px}
+.div{height:1px;background:var(--line25);margin:12px 0}
+</style></head><body><div class="sheet">
+<h1>02 · Page preview pane, picking, dragging, Came from (0137 UX notes sections 6 to 8)</h1>
+<p class="lead">The canvas area with the page preview as its one side pane (the 0077 split: 35 %, divider, Full view, Close). Picks are the Select tool's dashed selection boxes without handles. Dashed outline on the controls = new. The Library tab beside it is draft 01 A (Front is the current page).</p>
+<div class="cols">
+<figure><figcaption>A · Split view: three picks, dragged over the drawing<span>Header: page name, kind chip, "Box job › Lid · Saved version", Full view, Close. Footer: the count and Import page, Import elements. The drag ghost outlines follow the pointer over the drawing with the Copy badge; the release imports at the drop point into the active layer.</span></figcaption>
+<div class="area">
+  <div class="rail"></div>
+  <div class="pg" style="left:110px;top:40px;width:300px;height:360px"></div>
+  <div class="ghost" style="left:200px;top:150px;width:70px;height:50px"></div>
+  <div class="ghost" style="left:280px;top:160px;width:40px;height:40px;border-radius:50%"></div>
+  <div class="ghost" style="left:205px;top:210px;width:110px;height:20px"></div>
+  <svg style="position:absolute;left:300px;top:205px" width="14" height="20" viewBox="0 0 14 20"><path d="M1 1v15l4-4 3 6 2-1-3-6h5z" fill="#000" stroke="#fff"/></svg>
+  <div class="badge" style="left:316px;top:221px"><i data-g="copy" data-s="12"></i>Copy</div>
+  <div class="pane new">
+    <div class="ph"><span class="nm">Front</span><span class="chip"><i data-g="pen" data-s="12"></i>Drawing</span><span class="sb" style="flex:1">Box job › Lid · Saved version</span><span class="ib"><i data-g="max"></i></span><span class="ib"><i data-g="x"></i></span></div>
+    <div class="pb">
+      <div class="pg" style="left:44px;top:24px;width:198px;height:280px"></div>
+      <svg style="position:absolute;left:44px;top:24px" width="198" height="280"><rect x="30" y="60" width="60" height="42" fill="none" stroke="#3A3A3F"/><circle cx="125" cy="80" r="18" fill="none" stroke="#3A3A3F"/><rect x="34" y="116" width="96" height="16" fill="#3A3A3F"/><path d="M30 200h140M30 220h120M30 240h130" stroke="#3A3A3F"/></svg>
+      <div class="pick" style="left:72px;top:82px;width:64px;height:46px"></div>
+      <div class="pick" style="left:149px;top:84px;width:40px;height:40px"></div>
+      <div class="pick" style="left:76px;top:138px;width:100px;height:20px"></div>
+    </div>
+    <div class="pf"><span class="sb" style="flex:1">3 of 12 elements picked</span><span class="btn w112" style="font-size:13px">Import page</span><span class="btn w112" style="font-size:13px">Import elements</span></div>
+  </div>
+</div></figure>
+
+<figure><figcaption>B · A page row dragged onto the canvas<span>The page thumbnail at 70 % with the badge "New page", also over a laser page: the library never places a page (0100's "Placed page" is the Pages-list drag). The release adds the page after the last one and activates it.</span></figcaption>
+<div class="area" style="width:360px;height:260px">
+  <div class="pg" style="left:60px;top:30px;width:240px;height:200px"></div>
+  <svg style="position:absolute;left:150px;top:100px;opacity:.7" width="56" height="40" viewBox="0 0 56 40"><rect x="14" y="2" width="28" height="36" fill="#fff" stroke="#888"/><rect x="17" y="12" width="22" height="16" rx="2" fill="none" stroke="#3A3A3F"/></svg>
+  <div class="badge" style="left:214px;top:146px"><i data-g="imp" data-s="12"></i>New page</div>
+</div>
+<figcaption style="margin-top:14px">C · Elements over a sketch page<span>Ghost at 40 %, the 0099 refusal badge, cursor not-allowed; the release changes nothing.</span></figcaption>
+<div class="area" style="width:360px;height:140px">
+  <div class="pg" style="left:60px;top:20px;width:240px;height:100px"></div>
+  <div class="ghost" style="left:150px;top:50px;width:60px;height:40px;opacity:.4"></div>
+  <div class="badge" style="left:222px;top:96px"><i data-g="ban" data-s="12"></i>Not on a sketch page</div>
+</div></figure>
+
+<figure><figcaption>D · Style tab: the Came from line, and the Layers tooltip<span>Last block of the Style tab after a divider; Open source only while the source is found. Several objects from different documents: "From 3 documents", no button.</span></figcaption>
+<div class="stylep">
+  <div class="hdr">Style <span class="s">Rectangle 3f9a1c</span></div>
+  <div class="sb" style="height:140px;border:1px dashed var(--line25);display:flex;align-items:center;justify-content:center">Stroke, Fill, Markers (unchanged)</div>
+  <div class="div"></div>
+  <div class="new" style="display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;align-items:center;gap:4px;color:var(--panel-muted-fg)"><i data-g="fin"></i><span class="sb">From Box job › Lid</span></div>
+    <span class="btn w244">Open source</span>
+  </div>
+</div>
+<div style="position:relative;height:90px;margin-top:16px">
+  <div class="r h28" style="width:244px;background:var(--panel-bg)"><span class="chev"></span><svg class="g" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg><span class="nm">Rectangle 3f9a1c</span></div>
+  <div class="tip" style="left:40px;top:34px">Rectangle 3f9a1c<br><span>From Box job › Lid, 24 Nov 12:03</span></div>
+</div></figure>
+</div></div><script src="kit.js"></script></body></html>
