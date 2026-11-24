@@ -1,10 +1,9 @@
 //! The adjustment budgets of `specs/0135-image-optimisation` criterion 55 (ADR 0073 §10) on a
 //! 4 Mpx picture (2,000 x 2,000), thread CPU time, native and in release
 //! (`cargo test --release -p curvyo-image-core --test adjust_budgets -- --ignored`): a
-//! regression guard, the wasm numbers are stated in the PR. Two assertions allow the shared CI
-//! runner more than the criterion: Resize [`RESIZE_BUDGET`] (60 ms against 40 ms) and the stored AI
-//! read and blend [`STORED_AI_BUDGET`] (100 ms against 60 ms), because the runner measured 41 ms and
-//! 82 ms on 2026-11-24 while this machine measures 27 ms and 46 ms.
+//! regression guard, the wasm numbers are stated in the PR. The shared CI runner measured 41 ms
+//! (Resize) and 82 ms (stored AI) on 2026-11-24 against 27 ms and 46 ms here: its job sets
+//! `CURVYO_BUDGET_FACTOR` (Frage 368), which scales the spec values; locally they apply as written.
 
 #![allow(clippy::unwrap_used, missing_docs)]
 
@@ -18,12 +17,11 @@ use curvyo_image_core::{AdjustRun, Analysis, PixelStep, SubPx, WorkingImage, run
 
 const SIDE: u32 = 2_000;
 
-/// Resize as asserted: the criterion says 40 ms, the CI runner needs headroom (module comment).
-const RESIZE_BUDGET: Duration = Duration::from_millis(60);
+/// Resize (the criterion).
+const RESIZE_BUDGET: Duration = Duration::from_millis(40);
 
-/// The stored AI read and blend as asserted: the criterion says 60 ms, the CI runner needs
-/// headroom (module comment).
-const STORED_AI_BUDGET: Duration = Duration::from_millis(100);
+/// The stored AI read and blend (the criterion).
+const STORED_AI_BUDGET: Duration = Duration::from_millis(60);
 
 fn picture() -> WorkingImage {
     let mut seed = 3_u32;
