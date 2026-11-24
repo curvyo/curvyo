@@ -1802,9 +1802,9 @@ Draft until `0135` is Done: `specs/0135-image-optimisation/ux-notes.md`, drafts 
 | Dither (amends `0123`) | Nine modes in both strips: a third fixed strip row Halftone \| Lines (tooltips "Halftone dots", "Line screen"); fields Cell size or Line pitch 136 (mm) and Angle 104 (°) as the last row; line 3 "Halftone 0.80 mm". The operation's strip applies to gradient fills only. The test grid's Dither segments stay at six |
 | Test grid (amends `0123` 5) | Picture segments Ramp \| Selected picture (56, 120px) lead row 2 of the Image grid's bar, before the Dither segments and Cell size (UI review 2026-11-21: row 1 holds the kind, material and the set; the picture is what the cells show, beside how they dither); with a picture that has a Preset, the axis parameters gain Strength (Min 0, Max 100 %, Count 5); with Selected picture no Dither segments (the cells use the picture's dither) |
 
-## Print and cut (`0121`, draft 2026-11-23)
+## Print and cut (`0121`)
 
-Draft until `0121` is Done: `specs/0121-print-and-cut/ux-notes.md`, drafts `docs/design-drafts/2026-11-print-and-cut/`. One new alias token (`--reg-mark`), no new hue. UI review 2026-11-23: the panel column measures 256px with an overlay scrollbar and 244px with a classic one; every row here fits 244.
+Built in PR #457 (slice 1): `specs/0121-print-and-cut/ux-notes.md`, drafts `docs/design-drafts/2026-11-print-and-cut/`. One new alias token (`--reg-mark`), no new hue. UI review 2026-11-23: the panel column measures 256px with an overlay scrollbar and 244px with a classic one; every row here fits 244.
 
 | Item | Value |
 |---|---|
