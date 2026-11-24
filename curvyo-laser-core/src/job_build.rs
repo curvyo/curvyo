@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use crate::job_anchor::{BurnBox, Placement, anchor, burn_box, shift};
 use crate::job_input::{BlockInput, JobInput, LeafGeometry, PointUm, um_of_mm};
 use crate::job_moves::{Block, Frame, Job, build_moves, running_z_um};
 use crate::job_numbers::{
@@ -95,7 +96,7 @@ fn build_with(
         built.job_block.push(job_block);
         built.plans.push(plan);
     }
-    add_moves(&mut built, frame, input.start);
+    add_moves(&mut built, frame, input);
     let ids: Vec<_> = input.blocks.iter().map(|b| b.id).collect();
     // The pictures and the stored AI results they read (ADR 0077 §3).
     let assets: Vec<curvyo_document_core::AssetHash> = input
@@ -177,6 +178,7 @@ fn empty_built(input: &JobInput, frame: Frame) -> Built {
             frame,
             start: input.start,
             home: frame.origin(),
+            shift: PointUm::default(),
             blocks: Vec::new(),
             moves: Vec::new(),
             sweeps: Vec::new(),
@@ -200,8 +202,8 @@ fn job_block_of(block: &BlockInput, numbers: &BlockNumbers, motorised_z: bool) -
     }
 }
 
-/// Fills the moves and the home of `built` from its blocks and plans.
-fn add_moves(built: &mut Built, frame: Frame, start: Start) {
+/// Fills the moves, the home and the shift of `built` from its blocks and plans.
+fn add_moves(built: &mut Built, frame: Frame, input: &JobInput) {
     let pairs: Vec<(Block, &Plan)> = built
         .job
         .blocks
@@ -209,8 +211,47 @@ fn add_moves(built: &mut Built, frame: Frame, start: Start) {
         .cloned()
         .zip(built.plans.iter().flatten().map(AsRef::as_ref))
         .collect();
-    let moves = build_moves(frame, start, &pairs);
+    let place = placement(frame, input.start, input.user_origin, &pairs);
+    let moves = build_moves(frame, input.start, place, &pairs);
     built.job.moves = moves.moves;
     built.job.home = moves.home;
+    built.job.shift = place.shift;
     built.job.sweeps = moves.sweeps;
+}
+
+/// Where the job of `pairs` stands (`specs/0118` O5): planned as for Machine origin; with User
+/// origin and a point, the box of every burn path point and sweep end is moved so its anchor
+/// lands on the point, and the job starts and ends there.
+fn placement(
+    frame: Frame,
+    start: Start,
+    origin: Option<PointUm>,
+    pairs: &[(Block, &Plan)],
+) -> Placement {
+    let at_origin = Placement::at_origin(frame);
+    let (Start::UserOrigin, Some(origin)) = (start, origin) else {
+        return at_origin;
+    };
+    let Some(b) = plan_box(pairs) else {
+        return at_origin;
+    };
+    Placement {
+        home: anchor(b, frame.corner),
+        shift: shift(frame, b, origin),
+    }
+}
+
+/// The box of the burn points of `pairs`: the points of every path that burns and both ends of
+/// every sweep (the set the frame outline and the bed check read from the moves).
+fn plan_box(pairs: &[(Block, &Plan)]) -> Option<BurnBox> {
+    let runs = pairs.iter().flat_map(|(_, plan)| &plan.runs);
+    let paths = runs
+        .clone()
+        .flat_map(|run| &run.paths)
+        .filter(|path| path.points.len() > 1)
+        .flat_map(|path| path.points.iter().copied());
+    let sweeps = runs
+        .flat_map(|run| &run.sweeps)
+        .flat_map(|planned| [planned.sweep.start, planned.sweep.end]);
+    burn_box(paths.chain(sweeps))
 }

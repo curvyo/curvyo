@@ -35,6 +35,9 @@ pub enum Cause {
         width_um: i64,
         /// The bed's height in µm.
         height_um: i64,
+        /// With User origin, the largest overshoot of the placed job over the bed's edges in µm
+        /// (`specs/0118` O7, W50); `None` for every other start.
+        over_um: Option<i64>,
     },
     /// 4 c: the profile copy is damaged or unreadable.
     MachineDamaged,

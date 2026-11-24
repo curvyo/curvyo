@@ -19,7 +19,7 @@ pub fn write_frame_grbl(job: &Job, shape: FrameShape) -> Option<Vec<u8>> {
     let ring = outline(job, shape)?;
     let relative = job.start.relative();
     let feed = FRAME_FEED.min(job.machine.max_feed.get());
-    let home = job.frame.machine_point(job.home);
+    let home = job.machine_point(job.home);
     let mut text = String::with_capacity(64 * ring.len() + 256);
     let _ = writeln!(text, "; Curvyo frame: {}", ascii(&job.name));
     let _ = writeln!(text, "; Machine: {}", ascii(&job.machine.name));

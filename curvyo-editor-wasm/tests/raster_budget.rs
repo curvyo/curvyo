@@ -102,6 +102,7 @@ fn page(pixels: &Arc<WorkingImage>, dither: Dither) -> JobInput {
         },
         start: Start::default(),
         start_damaged: false,
+        user_origin: None,
         fixture_material: None,
         blocks: vec![BlockInput {
             id: ids[0],

@@ -222,6 +222,7 @@ impl Session {
                 machine: machine_input(&copy),
                 start: settings.start,
                 start_damaged: settings.start_damaged,
+                user_origin: settings.user_origin,
                 fixture_material: settings.fixture_material,
                 blocks,
             },

@@ -79,12 +79,15 @@ fn c31_every_named_golden_exists_in_its_format_folder_and_reads() {
     // `specs/0123` criterion 40 adds the `raster_*` goldens to this folder and replaces
     // `image_skipped` (0029 criterion 18) by `raster_threshold`; they are checked there.
     // `specs/0121` criterion 17 adds `print_and_cut_cut_line`, checked in `job_output_goldens.rs`.
+    // `specs/0118` criterion 31 adds `start_user_origin_*`, checked in `user_origin_0118.rs`.
     let count = std::fs::read_dir(&dir)
         .unwrap()
         .filter(|e| {
             let name = e.as_ref().unwrap().file_name();
             let name = name.to_string_lossy();
-            !name.starts_with("raster_") && !name.starts_with("print_and_cut_")
+            !name.starts_with("raster_")
+                && !name.starts_with("print_and_cut_")
+                && !name.starts_with("start_user_origin_")
         })
         .count();
     assert_eq!(

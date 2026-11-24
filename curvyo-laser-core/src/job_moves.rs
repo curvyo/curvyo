@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use curvyo_document_core::NodeId;
 
+use crate::job_anchor::Placement;
 use crate::job_input::{PointUm, Ring, um_of_mm};
 use crate::job_numbers::{BlockNumbers, RunNumbers};
 use crate::job_plan::Plan;
@@ -163,6 +164,9 @@ pub struct Job {
     pub start: Start,
     /// Where the head stands when the job starts and where it returns, in page µm.
     pub home: PointUm,
+    /// The page vector every move is placed by on the bed: the user origin's shift
+    /// (`specs/0118` O5), zero for every other start.
+    pub shift: PointUm,
     /// The blocks that run, in run order.
     pub blocks: Vec<Block>,
     /// The moves; the last one is the travel back to [`Job::home`] when any move exists.
@@ -172,6 +176,22 @@ pub struct Job {
 }
 
 impl Job {
+    /// The machine coordinates of page point `p` placed by the job's shift: what every writer
+    /// and the frame outline write.
+    #[must_use]
+    pub const fn machine_point(&self, p: PointUm) -> PointUm {
+        self.frame
+            .machine_point(PointUm::new(p.x + self.shift.x, p.y + self.shift.y))
+    }
+
+    /// The page point of the job whose placed move lands on machine coordinates `m`: the
+    /// inverse of [`Job::machine_point`].
+    #[must_use]
+    pub const fn page_point(&self, m: PointUm) -> PointUm {
+        let placed = self.frame.page_point(m);
+        PointUm::new(placed.x - self.shift.x, placed.y - self.shift.y)
+    }
+
     /// Whether any move burns.
     #[must_use]
     pub fn burns(&self) -> bool {
@@ -202,15 +222,22 @@ pub struct BuiltMoves {
 
 /// Builds the moves of `blocks` with their plans (ADR 0064 §7): per block a Z move to its offset,
 /// its runs once per pass (Frage 223 A), the Z move back; Machine origin starts and ends at the
-/// origin (Home, then machine origin gives the same moves), Head position at the first point.
+/// origin (Home, then machine origin gives the same moves), User origin at `place.home`, Head
+/// position at the first point. Run-outs are shortened to the bed at their placed position.
 #[must_use]
-pub fn build_moves(frame: Frame, start: Start, blocks: &[(Block, &Plan)]) -> BuiltMoves {
-    let origin = frame.origin();
+pub fn build_moves(
+    frame: Frame,
+    start: Start,
+    place: Placement,
+    blocks: &[(Block, &Plan)],
+) -> BuiltMoves {
+    let origin = place.home;
     let mut moves = Moves {
         list: Vec::new(),
         sweeps: Vec::new(),
         head: origin,
         frame,
+        shift: place.shift,
         clamp: !start.relative(),
     };
     for (index, (block, plan)) in blocks.iter().enumerate() {
@@ -250,6 +277,7 @@ struct Moves {
     sweeps: Vec<Arc<Sweep>>,
     head: PointUm,
     frame: Frame,
+    shift: PointUm,
     clamp: bool,
 }
 
@@ -353,8 +381,8 @@ impl Moves {
         }
     }
 
-    /// The point `length` µm beyond `end` along `from -> end`, shortened to the bed in Machine
-    /// origin mode (ADR 0064 §6).
+    /// The point `length` µm beyond `end` along `from -> end`, shortened to the bed at the placed
+    /// position in an absolute mode (ADR 0064 §6).
     fn extend(&self, end: PointUm, from: PointUm, length: f64) -> PointUm {
         let (dx, dy) = (as_f64(from.x - end.x), as_f64(from.y - end.y));
         // Not `f64::hypot`: its result depends on the platform's libm, while `sqrt` is correctly
@@ -367,8 +395,9 @@ impl Moves {
         let (ux, uy) = (-dx / norm, -dy / norm);
         let mut length = length;
         if self.clamp {
-            length = length.min(room(as_f64(end.x), ux, as_f64(self.frame.width)));
-            length = length.min(room(as_f64(end.y), uy, as_f64(self.frame.height)));
+            let (x, y) = (end.x + self.shift.x, end.y + self.shift.y);
+            length = length.min(room(as_f64(x), ux, as_f64(self.frame.width)));
+            length = length.min(room(as_f64(y), uy, as_f64(self.frame.height)));
             length = length.max(0.0);
         }
         PointUm::new(end.x + round(ux * length), end.y + round(uy * length))

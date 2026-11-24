@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use curvyo_document_core::NodeId;
 
 use crate::GENERIC_LASER_ID;
+use crate::job_anchor::{anchor, burn_box};
 use crate::job_build::Built;
 use crate::job_gate_cause::{Cause, Severity};
 use crate::job_gate_raster::{bounding_points, raster_issues, raster_leaves};
@@ -17,6 +18,7 @@ use crate::job_timeline::Timeline;
 use crate::machine_profile::OutputFormat;
 use crate::operation_settings::Field;
 use crate::operation_settings_rule::StoredReason;
+use crate::output_settings::Start;
 
 /// The bed check's tolerance in µm (criterion 4 b).
 pub const BED_TOLERANCE_UM: i64 = 10;
@@ -202,11 +204,12 @@ fn page_issues(input: &JobInput, built: &Built, issues: &mut Vec<Issue>) {
     if !built.job.burns() && !built.unpriced() {
         issues.push(issue(Cause::NothingRuns, 1, Targets::None));
     }
-    let outside = outside_bed(input, built);
+    let (outside, over) = outside_bed(input, built);
     if !outside.is_empty() {
         let cause = Cause::OutsideBed {
             width_um: built.job.frame.width,
             height_um: built.job.frame.height,
+            over_um: (built.job.start == Start::UserOrigin).then_some(over),
         };
         issues.push(issue(cause, outside.len(), Targets::Items(outside)));
     }
@@ -375,63 +378,71 @@ fn source_issues(op: NodeId, source: &NumbersSource, issues: &mut Vec<Issue>) {
     }
 }
 
-/// The bed as the check measures it: the machine frame with Machine origin, else the work area
-/// placed with its origin corner on the matching corner of the burn moves' box (criterion 38).
-/// The offset is added to every page point before [`Frame::holds`].
+/// The bed as the check measures it: the machine frame with Machine origin, the job placed by
+/// its shift with User origin (`specs/0118` O7), else the work area placed with its origin corner
+/// on the matching corner of the burn moves' box (criterion 38). The offset is added to every
+/// page point before [`Frame::holds`].
 fn bed_offset(built: &Built) -> PointUm {
     let job = &built.job;
+    if job.start == Start::UserOrigin {
+        return job.shift;
+    }
     if !job.start.relative() {
         return PointUm::default();
     }
     let mut from = job.home;
-    let mut corners: Option<(PointUm, PointUm)> = None;
+    let mut points = Vec::new();
     for m in &job.moves {
         if matches!(m.kind, MoveKind::Burn { .. } | MoveKind::Sweep { .. }) {
-            for p in [from, m.to] {
-                let (lo, hi) = corners.get_or_insert((p, p));
-                *lo = PointUm::new(lo.x.min(p.x), lo.y.min(p.y));
-                *hi = PointUm::new(hi.x.max(p.x), hi.y.max(p.y));
-            }
+            points.extend([from, m.to]);
         }
         from = m.to;
     }
-    let Some((lo, hi)) = corners else {
+    let Some(b) = burn_box(points) else {
         return PointUm::default();
     };
-    let frame = job.frame;
-    let corner = PointUm::new(
-        if frame.corner.is_right() { hi.x } else { lo.x },
-        if frame.corner.is_bottom() { hi.y } else { lo.y },
-    );
-    let origin = frame.origin();
+    let corner = anchor(b, job.frame.corner);
+    let origin = job.frame.origin();
     PointUm::new(origin.x - corner.x, origin.y - corner.y)
+}
+
+/// How far placed page point `p` lies beyond the bed of `frame`, in µm (0 inside).
+fn overshoot(frame: Frame, p: PointUm) -> i64 {
+    [-p.x, -p.y, p.x - frame.width, p.y - frame.height]
+        .into_iter()
+        .max()
+        .unwrap_or(0)
+        .max(0)
 }
 
 /// Whether burn geometry of `built` lies outside the bed (4 b): the gate's measure, also for the
 /// job a frame traces.
 #[must_use]
 pub fn outside_the_bed(input: &JobInput, built: &Built) -> bool {
-    !outside_bed(input, built).is_empty()
+    !outside_bed(input, built).0.is_empty()
 }
 
 /// The leaves with a burn point outside the bed, in move order, each once; then the raster
 /// items whose frame reaches outside (`specs/0123` criterion 31: the frame counts even where its
-/// edge is transparent).
-fn outside_bed(input: &JobInput, built: &Built) -> Vec<NodeId> {
+/// edge is transparent); and the largest overshoot of a point outside, in µm.
+fn outside_bed(input: &JobInput, built: &Built) -> (Vec<NodeId>, i64) {
     let frame: Frame = built.job.frame;
     let offset = bed_offset(built);
+    let over = std::cell::Cell::new(0_i64);
     let holds = |p: PointUm| {
-        frame.holds(
-            PointUm::new(p.x + offset.x, p.y + offset.y),
-            BED_TOLERANCE_UM,
-        )
+        let placed = PointUm::new(p.x + offset.x, p.y + offset.y);
+        let inside = frame.holds(placed, BED_TOLERANCE_UM);
+        if !inside {
+            over.set(over.get().max(overshoot(frame, placed)));
+        }
+        inside
     };
     let mut seen = HashSet::new();
     let mut out = Vec::new();
     let mut from = built.job.home;
     for m in &built.job.moves {
         if let MoveKind::Burn { node, .. } | MoveKind::Sweep { node, .. } = m.kind
-            && (!holds(m.to) || !holds(from))
+            && !(holds(m.to) & holds(from))
             && seen.insert(node)
         {
             out.push(node);
@@ -443,13 +454,14 @@ fn outside_bed(input: &JobInput, built: &Built) -> Vec<NodeId> {
             continue;
         }
         for leaf in raster_leaves(block, &built.numbers[index]) {
+            // Every corner is measured, so the overshoot sees the farthest one.
             let outside = bounding_points(leaf)
                 .into_iter()
-                .any(|p| !holds(PointUm::of_mm(p)));
+                .fold(false, |out, p| !holds(PointUm::of_mm(p)) | out);
             if outside && seen.insert(leaf.node) {
                 out.push(leaf.node);
             }
         }
     }
-    out
+    (out, over.get())
 }

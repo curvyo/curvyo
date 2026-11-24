@@ -176,6 +176,7 @@ fn input(blocks: Vec<BlockInput>) -> JobInput {
         // Superseded by 0029 rework (2026-11-17): Start is one value.
         start: Start::MachineOrigin,
         start_damaged: false,
+        user_origin: None,
         fixture_material: None,
         blocks,
     }

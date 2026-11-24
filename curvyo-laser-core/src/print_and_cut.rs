@@ -111,6 +111,8 @@ pub enum Warning {
     SamePlace(u8, u8),
     /// Start is Head position.
     HeadPosition,
+    /// Start is User origin: the job moves away from the measured bed positions (`specs/0118` O4).
+    UserOrigin,
 }
 
 /// What Apply offers.
@@ -210,8 +212,10 @@ pub fn read_print_and_cut(input: &SheetInput<'_>) -> PrintAndCut {
             fill_fit(&mut reading, input, &fit, &numbers, &only, &measures);
         }
     }
-    if input.start == Start::HeadPosition {
-        reading.warnings.push(Warning::HeadPosition);
+    match input.start {
+        Start::HeadPosition => reading.warnings.push(Warning::HeadPosition),
+        Start::UserOrigin => reading.warnings.push(Warning::UserOrigin),
+        Start::MachineOrigin | Start::HomeThenOrigin => {}
     }
     reading
 }

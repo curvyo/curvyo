@@ -29,6 +29,7 @@ mod image_adjust_resolve;
 mod image_adjust_stored;
 mod image_dither;
 mod image_preset;
+mod job_anchor;
 mod job_build;
 mod job_effects;
 mod job_fingerprint;
@@ -161,6 +162,7 @@ pub mod print_and_cut {
 /// move list one page runs, its order, time and gate, the output registers of ADR 0065 §1 and the
 /// one entry point to every output format.
 pub mod job {
+    pub use crate::job_anchor::{BurnBox, anchor, burn_box};
     pub use crate::job_build::{Built, build_frame_job, build_job, prepare_job};
     pub use crate::job_effects::{ExportEffects, export_effects};
     pub use crate::job_frame::{FrameShape, outline as frame_outline};
@@ -198,8 +200,8 @@ pub mod job {
     pub use crate::job_write_frame::FRAME_FEED;
     pub use crate::job_write_grbl::{coordinate, s_value};
     pub use crate::output_settings::{
-        FIXTURE_MATERIAL_FIELD, OutputSettings, START_FIELD, Start, read_output_settings,
-        register_key,
+        FIXTURE_MATERIAL_FIELD, OutputSettings, START_FIELD, Start, USER_ORIGIN_FIELD,
+        USER_ORIGIN_LIMIT_UM, read_output_settings, register_key,
     };
 }
 

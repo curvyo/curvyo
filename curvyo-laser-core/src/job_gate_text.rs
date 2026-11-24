@@ -206,13 +206,15 @@ fn count_text(cause: &Cause, count: usize, names: &Names) -> CheckText {
         Cause::OutsideBed {
             width_um,
             height_um,
+            over_um,
         } => CheckText::led(
             items(count),
             format!(
-                " {} outside the {} × {} mm bed.",
+                " {} outside the {} × {} mm bed{}.",
                 verb(count, "lies", "lie"),
                 mm_text(mm_of_um(*width_um)),
-                mm_text(mm_of_um(*height_um))
+                mm_text(mm_of_um(*height_um)),
+                over_um.map_or_else(String::new, |um| format!(" by {}", overshoot_text(um)))
             ),
         ),
         Cause::NotAssigned => CheckText::led(
@@ -369,6 +371,19 @@ fn dither_text(dither: Dither, lowest_tenths: u16, power: PowerPercent) -> Strin
     }
 }
 
+/// An overshoot of `um` µm in words (`specs/0118` W50): whole millimetres rounded up, one
+/// decimal rounded up under 1 mm ("12 mm", "0.4 mm").
+fn overshoot_text(um: i64) -> String {
+    let um = um.max(1);
+    if um < 1_000 {
+        let tenths = (um + 99) / 100;
+        if tenths < 10 {
+            return format!("0.{tenths} mm");
+        }
+    }
+    format!("{} mm", (um + 999) / 1_000)
+}
+
 /// The Start pick's words of `start` (`ux-notes.md` section 10).
 #[must_use]
 pub const fn start_text(start: Start) -> &'static str {
@@ -376,6 +391,7 @@ pub const fn start_text(start: Start) -> &'static str {
         Start::MachineOrigin => "Machine origin",
         Start::HeadPosition => "Head position",
         Start::HomeThenOrigin => "Home, then machine origin",
+        Start::UserOrigin => "User origin",
     }
 }
 

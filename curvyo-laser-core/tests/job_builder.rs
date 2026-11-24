@@ -182,6 +182,7 @@ fn the_estimate_is_burn_over_feed_plus_travel_over_the_maximum_feed() {
         },
         start: Start::default(),
         home: PointUm::new(0, 0),
+        shift: PointUm::new(0, 0),
         blocks: vec![Block {
             id: ids[0],
             ring: Ring::Operation(1),
@@ -650,7 +651,8 @@ fn head_position_checks_the_bed_from_the_jobs_own_box_and_never_warns() {
         found,
         [Cause::OutsideBed {
             width_um: 400_000,
-            height_um: 300_000
+            height_um: 300_000,
+            over_um: None,
         }]
     );
     let g = gate_of(&page, &[], &GateFacts::default());

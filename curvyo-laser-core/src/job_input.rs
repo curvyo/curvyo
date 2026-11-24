@@ -218,6 +218,9 @@ pub struct JobInput {
     pub start: Start,
     /// Whether the page's Start register is damaged (block `StartDamaged`).
     pub start_damaged: bool,
+    /// The page's user origin in µm of the job file's coordinates (`specs/0118` O1), `None`
+    /// without a readable point; only Start User origin reads it.
+    pub user_origin: Option<PointUm>,
     /// The material id the fixture jobs run with, `None` without a pick.
     pub fixture_material: Option<String>,
     /// The runs, in run order: the fixture blocks, then the operations.
