@@ -364,14 +364,18 @@ fn outline_with_pieces(shape: &Shape, piece: f64) -> PrimitiveOutline {
             let (anchors, closed) = arc_outline(frame, arc, piece);
             PrimitiveOutline { anchors, closed }
         }
-        Shape::Ellipse { frame, curve, .. } if curve == Curve::ELLIPSE_DEFAULT => {
-            PrimitiveOutline::closed(ellipse_outline(frame))
-        }
-        Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. } if !rounded.is_zero() => {
-            // invariant: a polygon or star has a ring.
+        Shape::Polygon { rounded, .. }
+        | Shape::Star { rounded, .. }
+        | Shape::Ellipse {
+            rounded, arc: None, ..
+        } if !rounded.is_zero() => {
+            // invariant: a polygon, star or ellipse has a ring.
             #[allow(clippy::unwrap_used)]
             let ring = Ring::of(shape, true).unwrap();
             PrimitiveOutline::closed(rounded_outline(&ring, rounded.effective()))
+        }
+        Shape::Ellipse { frame, curve, .. } if curve == Curve::ELLIPSE_DEFAULT => {
+            PrimitiveOutline::closed(ellipse_outline(frame))
         }
         Shape::Polygon {
             frame, point_count, ..

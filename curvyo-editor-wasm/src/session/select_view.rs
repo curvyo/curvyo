@@ -418,33 +418,45 @@ impl Session {
         let ObjectSnapshot::Primitive(primitive) = object else {
             return Vec::new();
         };
-        let (Some(EditHandle::Param(ParamHandle::Rounded)), Some(q)) = (
-            active,
-            curvyo_document_core::effective_rounded(&primitive.shape),
-        ) else {
+        let (Some(EditHandle::Param(ParamHandle::Rounded)), Some(q)) =
+            (active, curvyo_ui_core::rounded_drawn(&primitive.shape))
+        else {
             return Vec::new();
         };
-        let (Shape::Polygon { frame, .. } | Shape::Star { frame, .. }) = primitive.shape else {
-            return Vec::new();
+        // Vertex 0 and the distance to the centre: a polygon's or star's outer radius, an
+        // ellipse's `rx` (its vertex E).
+        let (frame_center, frame_radius, is_ellipse) = match primitive.shape {
+            Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => {
+                (frame.center, frame.radius.as_mm(), false)
+            }
+            Shape::Ellipse {
+                frame, arc: None, ..
+            } => (frame.center, frame.rx.as_mm(), true),
+            _ => return Vec::new(),
         };
         let px = 1.0 / self.view().scale();
-        let (inset, radius) = (15.0 * px, frame.radius.as_mm());
+        let (inset, radius) = (15.0 * px, frame_radius);
         let unit = radius - inset;
         let at = |q: f64| {
             box_.to_document(Point::new(
-                frame.center.x + radius - inset - q * unit,
-                frame.center.y,
+                frame_center.x + radius - inset - q * unit,
+                frame_center.y,
             ))
         };
         guides.push((at(q.min(0.0)), at(q.max(1.0))));
-        [0.0, 1.0]
+        // An ellipse adds the third tick at `q_c`, where it draws today's ellipse (criterion 15).
+        let mut targets = vec![0.0, 1.0];
+        if is_ellipse {
+            targets.push(curvyo_document_core::Q_C);
+        }
+        targets
             .into_iter()
             .map(|target| {
                 let long = (q - target).abs() < 1e-9;
                 let half = if long { 8.0 } else { 5.0 } * px;
                 let (centre_x, y) = (
-                    frame.center.x + radius - inset - target * unit,
-                    frame.center.y,
+                    frame_center.x + radius - inset - target * unit,
+                    frame_center.y,
                 );
                 (
                     box_.to_document(Point::new(centre_x, y - half)),

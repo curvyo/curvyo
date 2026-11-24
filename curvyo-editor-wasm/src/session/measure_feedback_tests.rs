@@ -141,6 +141,7 @@ fn an_ellipse_measures_between_its_axis_ends_and_follows_a_resize() {
             },
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     );

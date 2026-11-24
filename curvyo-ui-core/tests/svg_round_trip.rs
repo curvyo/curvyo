@@ -193,6 +193,7 @@ fn everything() -> Vec<DrawingNode> {
         },
         arc,
         curve: Curve::ELLIPSE_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     let arc = |kind| {
         EllipseArc::new(
@@ -226,6 +227,18 @@ fn everything() -> Vec<DrawingNode> {
         frame: star_frame(100.0, 240.0, 20.0, -30.0),
         point_count: PointCount::new(5).unwrap(),
         inner_ratio: InnerRatio::new(0.5).unwrap(),
+        curve: Curve::POLYGON_DEFAULT,
+        rounded: curvyo_document_core::Rounded::new(q).unwrap(),
+    };
+    // Slice 2: a rounded ellipse leaves as a path with the shadow and comes back live (the
+    // seventh shadow number is `q`).
+    let rounded_ellipse = |q: f64| Shape::Ellipse {
+        frame: EllipseFrame {
+            center: Point::new(150.0, 280.0),
+            rx: Length::from_mm(30.0),
+            ry: Length::from_mm(12.0),
+        },
+        arc: None,
         curve: Curve::POLYGON_DEFAULT,
         rounded: curvyo_document_core::Rounded::new(q).unwrap(),
     };
@@ -294,6 +307,8 @@ fn everything() -> Vec<DrawingNode> {
                 rotated(rounded_polygon(-2.5), 0.0, default()),
                 rotated(rounded_star(1.0), 0.0, default()),
                 rotated(rounded_star(3.0), 12.0, default()),
+                rotated(rounded_ellipse(0.39), 0.0, default()),
+                rotated(rounded_ellipse(2.5), 20.0, default()),
                 DrawingNode::Group {
                     registers: named("one"),
                     layer: false,
@@ -485,7 +500,9 @@ fn items(document: &Document) -> Vec<Item> {
                                 corner_radii.bl.as_mm(),
                             ]);
                         }
-                        Shape::Ellipse { frame, arc, curve } => {
+                        Shape::Ellipse {
+                            frame, arc, curve, ..
+                        } => {
                             exact.push_str(&format!(
                                 " ellipse {:?} {}",
                                 arc.map(|a| a.kind),
@@ -752,6 +769,7 @@ fn arb_primitive() -> impl Strategy<Value = DrawingNode> {
                     },
                     arc: None,
                     curve: Curve::ELLIPSE_DEFAULT,
+                    rounded: curvyo_document_core::Rounded::ZERO,
                 },
                 2 => Shape::Polygon {
                     frame: star_frame(c.0, c.1, r, angle),
@@ -778,6 +796,7 @@ fn arb_primitive() -> impl Strategy<Value = DrawingNode> {
                         ArcKind::Chord,
                     ),
                     curve: Curve::ELLIPSE_DEFAULT,
+                    rounded: curvyo_document_core::Rounded::ZERO,
                 },
             };
             rotated(shape, rot, Style::default())

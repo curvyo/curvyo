@@ -163,7 +163,10 @@ pub(crate) fn shadow_primitive(leaf: &SvgLeaf, placement: Affine) -> Option<(Sha
                 rotation,
             )
         }
-        (ShadowKind::Ellipse, &[cx, cy, rx, ry, rotation, k]) => (
+        (
+            ShadowKind::Ellipse,
+            &[cx, cy, rx, ry, rotation, k] | &[cx, cy, rx, ry, rotation, k, _],
+        ) => (
             Shape::Ellipse {
                 frame: EllipseFrame {
                     center: center(cx, cy),
@@ -172,6 +175,11 @@ pub(crate) fn shadow_primitive(leaf: &SvgLeaf, placement: Affine) -> Option<(Sha
                 },
                 arc: None,
                 curve: curve(k)?,
+                // The seventh number is Rounded (absent in the older six-number form: 0).
+                rounded: frame
+                    .get(6)
+                    .and_then(|&q| curvyo_document_core::Rounded::new(q))
+                    .unwrap_or(curvyo_document_core::Rounded::ZERO),
             },
             rotation,
         ),
@@ -246,6 +254,7 @@ fn arc_by_frame(
             kind,
         )?),
         curve: Curve::ELLIPSE_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     let rotation = Angle::from_radians(rotation);
     draws(&shape, rotation, drawn).then_some((shape, rotation))

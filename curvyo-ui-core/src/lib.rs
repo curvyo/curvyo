@@ -551,8 +551,8 @@ pub use shape_placement::{
     placed_sentence,
 };
 pub use shape_rounded_edit::{
-    rounded_capable, rounded_from_drag, rounded_handle_position, rounded_snap_window,
-    rounded_unit_mm, with_rounded,
+    rounded_capable, rounded_drawn, rounded_from_drag, rounded_from_drag_to,
+    rounded_handle_position, rounded_snap_window, rounded_unit_mm, with_rounded,
 };
 pub use shape_tool_common::{CreateOutcome, CreatePreview};
 pub use skew_entry::SkewEntry;

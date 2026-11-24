@@ -125,6 +125,10 @@ pub(crate) fn read_curve(meta: &LoroMap, default: Curve) -> Curve {
 /// Whether an ellipse's arc and curve registers open (criteria 15, 33): a readable arc,
 /// a finite curve within -4..=4, and never an arc together with a curve other than 1.
 pub(crate) fn ellipse_arc_and_curve_are_valid(meta: &LoroMap) -> bool {
+    // A finite Rounded of any size opens, also beside an arc (the arc wins on use).
+    if matches!(stored_rounded(meta), Stored::Damaged) {
+        return false;
+    }
     let arc = match stored_arc(meta) {
         Stored::Damaged => return false,
         Stored::Absent => None,
@@ -213,9 +217,15 @@ pub(crate) fn write_curve_if_changed(meta: &LoroMap, curve: Curve, default: Curv
 pub(crate) fn write_arc_and_curve(meta: &LoroMap, shape: &crate::primitive_model::Shape) {
     use crate::primitive_model::Shape;
     match *shape {
-        Shape::Ellipse { arc, curve, .. } => {
+        Shape::Ellipse {
+            arc,
+            curve,
+            rounded,
+            ..
+        } => {
             write_arc_if_changed(meta, arc);
             write_curve_if_changed(meta, curve, Curve::ELLIPSE_DEFAULT);
+            write_rounded_if_changed(meta, rounded);
         }
         Shape::Polygon { curve, rounded, .. } | Shape::Star { curve, rounded, .. } => {
             write_curve_if_changed(meta, curve, Curve::POLYGON_DEFAULT);

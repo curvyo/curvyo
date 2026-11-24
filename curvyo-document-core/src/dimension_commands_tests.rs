@@ -56,6 +56,7 @@ fn circle(document: &Document) -> NodeId {
             },
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: crate::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     )

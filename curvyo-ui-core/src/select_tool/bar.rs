@@ -24,7 +24,8 @@ const fn kind_of(value: ParamValue) -> ObjectKind {
     match value {
         ParamValue::Radius(_) | ParamValue::CornerRadius(..) => ObjectKind::Rectangle,
         ParamValue::Ratio(_) => ObjectKind::Star,
-        ParamValue::PointCount(_) | ParamValue::Rounded(_) => ObjectKind::PolygonOrStar,
+        ParamValue::PointCount(_) => ObjectKind::PolygonOrStar,
+        ParamValue::Rounded(_) => ObjectKind::Rounded,
         ParamValue::ArcAngle(..) | ParamValue::ArcKind(_) | ParamValue::WholeEllipse => {
             ObjectKind::ArcEllipse
         }

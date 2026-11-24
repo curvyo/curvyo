@@ -42,6 +42,7 @@ fn ell(rx: f64, ry: f64, arc: Option<EllipseArc>, curve: f64) -> Shape {
         frame: frame(rx, ry),
         arc,
         curve: Curve::new(curve).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 
@@ -143,7 +144,9 @@ fn c1_c22_a_whole_ellipse_shows_both_arc_knobs_and_the_curve_knob() {
     assert!(find(&k, ParamHandle::ArcStart).is_some());
     assert!(find(&k, ParamHandle::ArcEnd).is_some());
     assert!(find(&k, ParamHandle::Curve).is_some());
-    assert_eq!(k.len(), 3);
+    // And, since `0145` slice 2, the Rounded knob.
+    assert!(find(&k, ParamHandle::Rounded).is_some());
+    assert_eq!(k.len(), 4);
 }
 
 #[test]
@@ -249,7 +252,7 @@ fn c1_c22_no_knobs_below_72_px_of_shorter_side() {
     let small = obj(ell(8.5, 8.5, None, 1.0), 0.0);
     assert!(knobs(&small).is_empty(), "68 px");
     let ok = obj(ell(9.25, 9.25, None, 1.0), 0.0);
-    assert_eq!(knobs(&ok).len(), 3, "74 px");
+    assert_eq!(knobs(&ok).len(), 4, "74 px");
     // Amended 2026-10-19 (lead, UX review 7): an arc's threshold is measured on its whole
     // ellipse, 2r: a half circle of radius 8.5 mm is 68 px -> no knobs; of radius 20 mm it is
     // 160 px -> both arc knobs

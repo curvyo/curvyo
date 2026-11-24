@@ -208,6 +208,7 @@ fn rectangle_ellipse_and_path_keep_the_rotation_register_as_box_direction() {
             },
             arc: None,
             curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         deg(-120.0),
     );

@@ -57,10 +57,13 @@ pub struct CurveBarState {
 /// only (`specs/0145-shape-spiro-handles/` criterion 3).
 #[derive(Debug, Clone, PartialEq)]
 pub struct RoundedBarState {
-    /// The effective value of the polygons and stars it acts on.
+    /// The effective value of the shapes it acts on (0 while greyed).
     pub value: BarValue<f64>,
     /// For a uniform value: the stored value, when it lies beyond -10..=10 (the "limited" tag).
     pub limited: Option<f64>,
+    /// Why the field is greyed (every ellipse selected has an arc, criterion 19), `None` when
+    /// it applies.
+    pub grey: Option<GreyReason>,
 }
 
 fn shapes<'a>(objects: &'a [ObjectSnapshot], ids: &'a [NodeId]) -> Vec<&'a Shape> {
@@ -204,8 +207,20 @@ pub fn rounded_bar_state(
     selection: &ObjectSelection,
     preview: Option<&BarPreview>,
 ) -> Option<RoundedBarState> {
-    let acted = ids_of_kind(objects, selection, ObjectKind::PolygonOrStar);
+    let acted = ids_of_kind(objects, selection, ObjectKind::Rounded);
     let acted_shapes = shapes(objects, &acted);
+    if acted_shapes.is_empty() {
+        // The only candidates are ellipses with an arc: the field is shown greyed (criterion 19).
+        let all = ids_of_kind(objects, selection, ObjectKind::Primitive);
+        return shapes(objects, &all)
+            .iter()
+            .any(|shape| matches!(shape, Shape::Ellipse { arc: Some(_), .. }))
+            .then_some(RoundedBarState {
+                value: BarValue::Uniform(0.0),
+                limited: None,
+                grey: Some(GreyReason::HasArc),
+            });
+    }
     let effective: Vec<f64> = acted_shapes
         .iter()
         .filter_map(|shape| effective_rounded(shape))
@@ -218,14 +233,20 @@ pub fn rounded_bar_state(
     }
     let limited = match value {
         BarValue::Uniform(_) => acted_shapes.iter().find_map(|shape| match shape {
-            Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. } => {
+            Shape::Polygon { rounded, .. }
+            | Shape::Star { rounded, .. }
+            | Shape::Ellipse { rounded, .. } => {
                 (rounded.get().abs() > Rounded::RANGE).then_some(rounded.get())
             }
-            _ => None,
+            Shape::Rect { .. } => None,
         }),
         BarValue::Mixed => None,
     };
-    Some(RoundedBarState { value, limited })
+    Some(RoundedBarState {
+        value,
+        limited,
+        grey: None,
+    })
 }
 
 #[cfg(test)]

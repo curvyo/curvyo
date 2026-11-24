@@ -491,7 +491,17 @@ fn assert_tiers(label: &str, series: &[(f64, usize)], edge: bool, centre: bool, 
     assert_eq!(d(48.0), d(71.5), "{label}: 48..72 constant");
     assert_eq!(d(71.5), d(71.9), "{label}: 48..72 constant");
     assert_eq!(d(72.0), d(73.0), "{label}: 72 and up constant");
-    assert_eq!(d(73.0), d(160.0), "{label}: 72 and up constant");
+    // An untouched ellipse rests its Rounded knob at `q_c`, 0.61 of `rx - 15 px` from the centre
+    // (`0145` slice 2): the centre glyph, which has no hit area, yields to it while that is
+    // within 20 px, so a small ellipse draws 20 triangles fewer than a large one.
+    if label.starts_with("ellipse") {
+        assert!(
+            d(73.0) <= d(160.0),
+            "{label}: the centre glyph only comes back"
+        );
+    } else {
+        assert_eq!(d(73.0), d(160.0), "{label}: 72 and up constant");
+    }
     assert_eq!(d(23.9) < d(24.0), edge, "{label}: edge tier at 24");
     assert_eq!(d(47.9) < d(48.0), centre, "{label}: centre tier at 48");
     assert_eq!(d(71.9) < d(72.0), param, "{label}: parameter tier at 72");

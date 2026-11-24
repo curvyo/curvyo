@@ -52,6 +52,7 @@ fn circle(n: i32, cx: f64, cy: f64, rx: f64, ry: f64) -> ObjectSnapshot {
             },
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: crate::Rounded::ZERO,
         },
         0.0,
     )

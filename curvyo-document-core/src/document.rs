@@ -666,7 +666,13 @@ impl DocumentVersion {
 /// is evaluated). A build that stops at 55 would draw the shape's corners straight, so this
 /// build's files are refused there by version; a file of 55 opens unchanged. Golden:
 /// `rounded_v56.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 56;
+///
+/// Version 57 (`specs/0145-shape-spiro-handles` slice 2, `adrs.md` decisions 4 and 9): an
+/// ellipse may carry the register `rounded` too (same rules as on a polygon or star; ignored
+/// while the ellipse has an arc). A build that stops at 56 would draw the ellipse without its
+/// loops, so this build's files are refused there by version; a file of 56 opens unchanged.
+/// Golden: `rounded_ellipse_v57.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 57;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -1247,6 +1253,9 @@ enum ObjectJson {
         /// The curve as a fraction; left out at the default.
         #[serde(skip_serializing_if = "Option::is_none")]
         curve: Option<f64>,
+        /// The Rounded value; left out at 0.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rounded: Option<f64>,
         style: crate::style_model::Style,
         rotation: crate::units::Angle,
     },
@@ -1359,11 +1368,17 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                         style,
                         rotation,
                     },
-                    Shape::Ellipse { frame, arc, curve } => Self::Ellipse {
+                    Shape::Ellipse {
+                        frame,
+                        arc,
+                        curve,
+                        rounded,
+                    } => Self::Ellipse {
                         id,
                         frame,
                         arc,
                         curve: stored_curve(curve, crate::ring_curve::Curve::ELLIPSE_DEFAULT),
+                        rounded: (!rounded.is_zero()).then_some(rounded.get()),
                         style,
                         rotation,
                     },

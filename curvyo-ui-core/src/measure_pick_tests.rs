@@ -64,6 +64,7 @@ fn circle(node: NodeId) -> ObjectSnapshot {
             },
             arc: None,
             curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         style: Style::default(),
         rotation: Angle::from_radians(0.0),

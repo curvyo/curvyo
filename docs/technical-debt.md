@@ -2947,3 +2947,12 @@ cover the real order.
 gear and box code before it (CLAUDE.md §5: units are newtypes). **Resolution:** a `Mm` newtype (and an
 `Angle`) used by `contour.rs`, `footprint.rs` and `wall*.rs` together, once a second path-based generator
 (`0149`) shares them. Trigger: the first unit mix-up, or `0149`'s slice 1.
+
+## Rounded on the ellipse: the look is the customer's call, no rectangle (`0145` slice 2, 2026-11-24)
+
+The ellipse is drawn on the unit 4-ring E, S, W, N scaled by `rx`, `ry`; only `q_c = 0.3905`
+gives today's ellipse, every other value is a diamond-to-flower family that the customer judges
+at the demo. The rectangle keeps its corner radii (Frage 326, answered B). A rounded ellipse
+exports as a path with the shadow (Inkscape has no live equivalent, so `d` is the outline) and
+imports back live from the seventh shadow number. **Resolution:** none planned; a squircle would be its own
+spec.

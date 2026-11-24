@@ -367,7 +367,12 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
         ],
         // The arc (whole: four zeros) and the curve take part
         // (`specs/0021-ellipse-arcs-and-shaping/`), so their edits are not "unchanged".
-        Shape::Ellipse { frame, arc, curve } => {
+        Shape::Ellipse {
+            frame,
+            arc,
+            curve,
+            rounded,
+        } => {
             let (whole, start, end, kind) = arc.map_or((0.0, 0.0, 0.0, 0.0), |arc| {
                 let kind = match arc.kind {
                     ArcKind::Pie => 1.0,
@@ -386,6 +391,7 @@ fn shape_numbers(shape: &Shape) -> Vec<f64> {
                 end,
                 kind,
                 curve.get(),
+                rounded.get(),
             ]
         }
         Shape::Polygon {

@@ -51,6 +51,7 @@ pub(crate) fn shape_of(primitive: &Primitive, rotation: Angle) -> (Shape, DocAng
             },
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Primitive::Polygon {
             centre,

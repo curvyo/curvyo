@@ -303,3 +303,148 @@ fn a_click_inside_a_loop_of_a_filled_shape_selects_it() {
         "inside at {p:?}"
     );
 }
+
+// Slice 2: the ellipse (criteria 14, 15, 19).
+
+fn ellipse(q: f64, curve: f64) -> Shape {
+    Shape::Ellipse {
+        frame: curvyo_document_core::EllipseFrame {
+            center: Point::new(100.0, 80.0),
+            rx: Length::from_mm(50.0),
+            ry: Length::from_mm(40.0),
+        },
+        arc: None,
+        curve: Curve::new(curve).unwrap(),
+        rounded: Rounded::new(q).unwrap(),
+    }
+}
+
+fn rounded_knob(shape: Shape) -> Option<Point> {
+    knobs(shape, 1.0)
+        .into_iter()
+        .find(|(h, _)| *h == ParamHandle::Rounded)
+        .map(|(_, at)| at)
+}
+
+/// Criterion 14: the knob lies on the ray through E, 15 px inside at q = 0 (Curve 0), and an
+/// untouched ellipse (q = 0, Curve 100 %) rests at `q_c`, where its look already is.
+#[test]
+fn the_ellipse_knob_rests_at_q_c_while_untouched() {
+    let at_zero = rounded_knob(ellipse(0.0, 0.0)).unwrap();
+    assert!((at_zero.x - (100.0 + 50.0 - 15.0)).abs() < 1e-9 && (at_zero.y - 80.0).abs() < 1e-9);
+    let untouched = rounded_knob(ellipse(0.0, 1.0)).unwrap();
+    let expected = 100.0 + 50.0 - (15.0 + curvyo_document_core::Q_C * (50.0 - 15.0));
+    assert!((untouched.x - expected).abs() < 1e-9, "{untouched:?}");
+    let one = rounded_knob(ellipse(1.0, 0.0)).unwrap();
+    assert!(one.x < 100.0 + 15.0 + 1e-9);
+}
+
+/// Criterion 19: an ellipse with an arc has no Rounded knob and takes no value.
+#[test]
+fn an_ellipse_with_an_arc_has_no_rounded_knob() {
+    let Shape::Ellipse { frame, curve, .. } = ellipse(0.0, 1.0) else {
+        unreachable!()
+    };
+    let arc = curvyo_document_core::EllipseArc::new(
+        Angle::from_radians(0.2),
+        Angle::from_radians(3.5),
+        curvyo_document_core::ArcKind::Pie,
+    );
+    let shape = Shape::Ellipse {
+        frame,
+        arc,
+        curve,
+        rounded: Rounded::ZERO,
+    };
+    assert!(rounded_knob(shape).is_none());
+    assert!(!curvyo_ui_core::rounded_capable(&shape));
+    assert!(curvyo_ui_core::with_rounded(&shape, 1.0).is_none());
+}
+
+/// Criteria 14 and 15: a release at `q_c` on an untouched ellipse writes nothing, a drag past
+/// it writes the value and sets Curve to 0, and the drag snaps to `q_c` within 2 percent and
+/// writes it exactly.
+#[test]
+fn a_release_at_q_c_writes_nothing_and_the_drag_snaps_to_it() {
+    use curvyo_document_core::Q_C;
+    let untouched = ellipse(0.0, 1.0);
+    assert!(curvyo_ui_core::with_rounded(&untouched, Q_C).is_none());
+    let Some(Shape::Ellipse { curve, rounded, .. }) = curvyo_ui_core::with_rounded(&untouched, 0.8)
+    else {
+        panic!("a value past q_c is written")
+    };
+    assert_eq!((curve, rounded.get()), (Curve::POLYGON_DEFAULT, 0.8));
+    // Press at q_c, move 0.5 percent of the unit: snapped to q_c exactly; far away: free.
+    let unit = 35.0;
+    let near = curvyo_ui_core::rounded_from_drag_to(
+        Q_C,
+        -0.005 * unit,
+        unit,
+        0.02,
+        false,
+        &[0.0, 1.0, Q_C],
+    );
+    assert_eq!(near, Q_C);
+    let far =
+        curvyo_ui_core::rounded_from_drag_to(Q_C, -0.2 * unit, unit, 0.02, false, &[0.0, 1.0, Q_C]);
+    assert!((far - (Q_C + 0.2)).abs() < 1e-12);
+    // A typed 0.39 is written (it differs from q_c by less than 0.05 % of the radius).
+    assert!(curvyo_ui_core::with_rounded(&untouched, 0.39).is_some());
+}
+
+/// Criterion 16: a rounded ellipse is exported as a path with the shadow and comes back as a
+/// live ellipse with the same value (`svg_round_trip.rs` pins the bytes); Object to path keeps
+/// four smooth nodes with the loops.
+#[test]
+fn a_rounded_ellipse_converts_to_four_nodes_with_the_loops() {
+    let document = curvyo_document_core::Document::new(1);
+    let id = document.create_primitive(ellipse(2.5, 0.0), Angle::from_radians(0.0));
+    let mut minter = AnchorIdMinter::new(7);
+    let conversions = build_primitive_conversions(&document, &mut minter, &[id]);
+    let anchors = &conversions[0].1;
+    assert_eq!(anchors.len(), 4);
+    let outline = outline_of(&ellipse(2.5, 0.0));
+    for (a, o) in anchors.iter().zip(&outline.anchors) {
+        assert_eq!(a.handle_out, o.handle_out);
+    }
+    // The handle of E is `q * sqrt(2) * ry` long, along +y.
+    assert!((anchors[0].handle_out.y - 2.5 * 2f64.sqrt() * 40.0).abs() < 1e-9);
+}
+
+/// Criterion 16: Object to path of an ellipse gives four nodes with the cubic handles
+/// of the outline, loops kept at q 3; q 0 (Curve 0) stays straight and `q_c` is today's ellipse.
+#[test]
+fn object_to_path_of_an_ellipse_keeps_loops_and_q_zero_and_q_c_are_unchanged() {
+    use curvyo_document_core::{Q_C, ellipse_outline};
+    for q in [3.0, 0.0, Q_C] {
+        let shape = ellipse(q, 0.0);
+        let document = curvyo_document_core::Document::new(1);
+        let id = document.create_primitive(shape, Angle::from_radians(0.0));
+        let mut minter = AnchorIdMinter::new(7);
+        let conversions = build_primitive_conversions(&document, &mut minter, &[id]);
+        let anchors = &conversions[0].1;
+        assert_eq!(anchors.len(), 4);
+        let outline = outline_of(&shape);
+        for (a, o) in anchors.iter().zip(&outline.anchors) {
+            assert_eq!(
+                (a.point, a.handle_in, a.handle_out),
+                (o.point, o.handle_in, o.handle_out)
+            );
+        }
+        match q {
+            0.0 => assert!(anchors.iter().all(|a| a.handle_out.length() == 0.0)),
+            Q_C => {
+                let Shape::Ellipse { frame, .. } = shape else {
+                    unreachable!()
+                };
+                for (a, o) in anchors.iter().zip(&ellipse_outline(frame)) {
+                    assert!((a.handle_out - o.handle_out).length() < 1e-9);
+                }
+            }
+            // q 3: the handle of E is 3 * sqrt(2) * ry long, longer than the ellipse is high.
+            _ => assert!((anchors[0].handle_out.y - 3.0 * 2f64.sqrt() * 40.0).abs() < 1e-9),
+        }
+        document.convert_to_paths(&conversions).unwrap();
+        assert!(document.primitive(id).is_none() && document.path(id).is_some());
+    }
+}

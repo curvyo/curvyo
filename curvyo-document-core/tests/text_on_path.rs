@@ -67,6 +67,7 @@ fn circle(d: &Document) -> NodeId {
             },
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     )
@@ -275,6 +276,7 @@ fn an_open_arc_is_an_open_carrier() {
                 ArcKind::Arc,
             ),
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     );
@@ -561,6 +563,7 @@ fn golden_document() -> (Document, Vec<NodeId>) {
                 ArcKind::Arc,
             ),
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     );

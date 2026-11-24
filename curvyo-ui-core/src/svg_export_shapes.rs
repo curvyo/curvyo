@@ -47,7 +47,8 @@ pub(crate) fn primitive_kind(shape: &Shape, rotation: Angle, t: Affine) -> (Expo
             frame,
             arc: None,
             curve,
-        } => ellipse_kind(shape, frame, curve, rotation, t),
+            rounded,
+        } => ellipse_kind(shape, frame, curve, rounded, rotation, t),
         Shape::Polygon { .. } | Shape::Star { .. } => ring_kind(shape, rotation, t),
     }
 }
@@ -123,12 +124,23 @@ fn ellipse_kind(
     shape: &Shape,
     frame: EllipseFrame,
     curve: Curve,
+    rounded: curvyo_document_core::Rounded,
     rotation: Angle,
     t: Affine,
 ) -> (ExportKind, Shadow) {
     let c = moved(frame.center, t);
     let (rx, ry) = (frame.rx.as_mm(), frame.ry.as_mm());
     let turn = rotation.as_radians();
+    if !rounded.is_zero() {
+        // Inkscape has no live ellipse with a rounded corner value: a path, with the shadow
+        // carrying Rounded as the seventh number (`specs/0145-shape-spiro-handles` slice 2).
+        let shadow = Shadow {
+            kind: Some(ShadowKind::Ellipse),
+            frame: Some(vec![c.x, c.y, rx, ry, turn, curve.get(), rounded.get()]),
+            ..Shadow::default()
+        };
+        return (rotated_path(shape, rotation, t, PathId::Ellipse), shadow);
+    }
     if curve.get() == 1.0 {
         let shadow = Shadow {
             frame: (turn != 0.0).then(|| vec![c.x, c.y, rx, ry, turn, 1.0]),

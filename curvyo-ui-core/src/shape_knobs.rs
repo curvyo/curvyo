@@ -122,6 +122,7 @@ fn curve_side_middle(shape: &Shape) -> Option<Point> {
             frame,
             arc: None,
             curve: curvyo_document_core::Curve::POLYGON_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Shape::Polygon {
             frame, point_count, ..
@@ -294,6 +295,7 @@ mod tests {
                 },
                 arc,
                 curve: Curve::new(curve).unwrap(),
+                rounded: curvyo_document_core::Rounded::ZERO,
             },
             style: Style::default(),
             rotation: Angle::from_radians(0.3),
@@ -316,7 +318,8 @@ mod tests {
         let k = knobs_of(&o);
         assert_eq!(k[0].0, ParamHandle::ArcStart);
         assert_eq!(k[1].0, ParamHandle::ArcEnd);
-        assert_eq!(k[2].0, ParamHandle::Curve);
+        assert_eq!(k[2].0, ParamHandle::Rounded);
+        assert_eq!(k[3].0, ParamHandle::Curve);
         let gap = k[0].1.vector_to(k[1].1).length();
         assert!((gap - 14.0).abs() < 1e-9, "14 px apart: {gap}");
         let ObjectSnapshot::Primitive(p) = &o else {
@@ -332,7 +335,7 @@ mod tests {
             std::f64::consts::FRAC_PI_4,
         );
         assert!(local(k[0].1).vector_to(seam).length() < 7.5);
-        let curve = local(k[2].1);
+        let curve = local(k[3].1);
         assert!(curve.x > 0.0 && curve.y < 0.0, "upper right: {curve:?}");
     }
 
@@ -353,7 +356,7 @@ mod tests {
         let k = knobs_of(&object(None, 0.3));
         assert_eq!(
             k.iter().map(|(h, _)| *h).collect::<Vec<_>>(),
-            [ParamHandle::Curve]
+            [ParamHandle::Rounded, ParamHandle::Curve]
         );
     }
 

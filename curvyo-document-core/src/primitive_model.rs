@@ -238,6 +238,10 @@ pub enum Shape {
         /// The curve of its four sides (Part B), [`Curve::ELLIPSE_DEFAULT`] the
         /// ellipse itself.
         curve: Curve,
+        /// The Rounded value of its four vertices E, S, W, N (`specs/0145-shape-spiro-handles/`
+        /// slice 2), stored raw, [`Rounded::ZERO`] none; it wins over `curve` while it is not 0
+        /// and is ignored while the ellipse has an arc.
+        rounded: Rounded,
     },
     /// Acceptance criteria 10, 11, 13, 15.
     Polygon {
@@ -560,13 +564,19 @@ pub fn translate_shape(shape: Shape, offset: Vec2) -> Shape {
             },
             corner_radii,
         },
-        Shape::Ellipse { frame, arc, curve } => Shape::Ellipse {
+        Shape::Ellipse {
+            frame,
+            arc,
+            curve,
+            rounded,
+        } => Shape::Ellipse {
             frame: EllipseFrame {
                 center: frame.center.translated(offset),
                 ..frame
             },
             arc,
             curve,
+            rounded,
         },
         Shape::Polygon {
             frame,
@@ -679,16 +689,27 @@ pub fn shape_frame_bounds(shape: &Shape) -> (Point, Point) {
         Shape::Ellipse { frame, .. } if is_beyond_ellipse(shape) => {
             crate::ring_curve::ring_bounds(shape).unwrap_or((frame.center, frame.center))
         }
-        Shape::Ellipse { frame, .. } => (
-            Point::new(
-                frame.center.x - frame.rx.as_mm(),
-                frame.center.y - frame.ry.as_mm(),
-            ),
-            Point::new(
-                frame.center.x + frame.rx.as_mm(),
-                frame.center.y + frame.ry.as_mm(),
-            ),
-        ),
+        Shape::Ellipse { frame, .. } => {
+            let plain = (
+                Point::new(
+                    frame.center.x - frame.rx.as_mm(),
+                    frame.center.y - frame.ry.as_mm(),
+                ),
+                Point::new(
+                    frame.center.x + frame.rx.as_mm(),
+                    frame.center.y + frame.ry.as_mm(),
+                ),
+            );
+            // A Rounded outline can leave the ellipse's box (criterion 16): the union of
+            // today's box and the exact box of the cubics.
+            match crate::ring_rounded::rounded_bounds(shape) {
+                Some((min, max)) => (
+                    Point::new(plain.0.x.min(min.x), plain.0.y.min(min.y)),
+                    Point::new(plain.1.x.max(max.x), plain.1.y.max(max.y)),
+                ),
+                None => plain,
+            }
+        }
         Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => {
             // The circumscribed box of the curved outline (criterion 47): it grows where a
             // star's sides bulge past the outer radius.
@@ -766,6 +787,7 @@ mod tests {
             },
             arc: None,
             curve: crate::Curve::ELLIPSE_DEFAULT,
+            rounded: crate::Rounded::ZERO,
         };
         assert_eq!(shape_center(&shape), Point::new(3.0, 4.0));
     }
@@ -1026,6 +1048,7 @@ mod tests {
             },
             arc,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: crate::Rounded::ZERO,
         };
         let Shape::Ellipse { arc: moved, .. } = translate_shape(shape, Vec2::new(1.0, 1.0)) else {
             panic!("an ellipse");

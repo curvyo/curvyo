@@ -20,7 +20,7 @@ use crate::param_edit::{
 };
 use crate::param_handles::ParamHandle;
 use crate::shape_arc_edit::{ArcEnd, arc_angle_from_pointer, curve_from_pointer};
-use crate::shape_rounded_edit::rounded_from_drag;
+use crate::shape_rounded_edit::rounded_from_drag_to;
 use crate::skew_math::{skew_angle, skew_factor, skew_frame};
 use crate::transform_commit::{commit_gesture, sane_or};
 use crate::transform_handle_layout::{EditHandle, Side};
@@ -266,7 +266,18 @@ fn start_rounded(start: &ObjectSnapshot) -> Option<f64> {
     let ObjectSnapshot::Primitive(primitive) = start else {
         return None;
     };
-    curvyo_document_core::effective_rounded(&primitive.shape)
+    crate::shape_rounded_edit::rounded_drawn(&primitive.shape)
+}
+
+/// The snap targets of a Rounded drag: 0 and 1, and `q_c` on an ellipse (criterion 15).
+fn rounded_stops(start: &ObjectSnapshot) -> Vec<f64> {
+    let mut stops = vec![0.0, 1.0];
+    if let ObjectSnapshot::Primitive(primitive) = start
+        && matches!(primitive.shape, curvyo_document_core::Shape::Ellipse { .. })
+    {
+        stops.push(curvyo_document_core::Q_C);
+    }
+    stops
 }
 
 /// What the live readout of a corner radius drag needs beyond the resolved
@@ -373,12 +384,13 @@ impl TransformDrag {
                 ) else {
                     return start.clone();
                 };
-                let value = rounded_from_drag(
+                let value = rounded_from_drag_to(
                     press,
                     local_delta.x,
                     self.param_gain,
                     self.rounded_snap,
                     ctrl,
+                    &rounded_stops(start),
                 );
                 sane_or(start, apply_param(start, ParamValue::Rounded(value)))
             }

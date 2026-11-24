@@ -146,6 +146,7 @@ fn ac143_ac144_guides_leave_their_layers_and_come_back_as_guides() {
             },
             arc: None,
             curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         rotation: Angle::from_radians(0.0),
         style: Style::default(),

@@ -144,11 +144,18 @@ fn with_arc(shape: &Shape, arc: Option<EllipseArc>) -> Option<Shape> {
         frame,
         arc: old,
         curve,
+        ..
     } = *shape
     else {
         return None;
     };
-    (old != arc).then_some(Shape::Ellipse { frame, arc, curve })
+    // The arc wins: Rounded is not carried onto an ellipse with an arc.
+    (old != arc).then_some(Shape::Ellipse {
+        frame,
+        arc,
+        curve,
+        rounded: curvyo_document_core::Rounded::ZERO,
+    })
 }
 
 /// `shape` with its curve set to `fraction`, limited to that shape's `[k_min, 100 %]`
@@ -172,6 +179,7 @@ pub fn with_curve(shape: &Shape, fraction: f64) -> Option<Shape> {
             frame,
             arc,
             curve: limited,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Shape::Polygon {
             frame, point_count, ..
@@ -213,6 +221,7 @@ mod tests {
             },
             arc,
             curve: Curve::new(curve).unwrap(),
+            rounded: curvyo_document_core::Rounded::ZERO,
         }
     }
 

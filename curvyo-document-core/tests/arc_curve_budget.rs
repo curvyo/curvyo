@@ -52,11 +52,13 @@ fn budget_a_one_arc_curved_ellipse_or_hexagon_within_50_microseconds() {
             ArcKind::Pie,
         ),
         curve: Curve::ELLIPSE_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     let curved = Shape::Ellipse {
         frame,
         arc: None,
         curve: Curve::new(-0.4).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     for shape in [arc, curved, polygon(6, 0.5)] {
         let t = mean(&shape, 2000);

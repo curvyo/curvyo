@@ -184,6 +184,7 @@ fn mirrored_primitive(primitive: &PrimitiveSnapshot, mirror: Mirror) -> Primitiv
             mut frame,
             arc,
             curve,
+            rounded,
         } => {
             frame.center = mirror.point(frame.center);
             let mirrored_rotation = mirror.orientation(rotation);
@@ -201,7 +202,15 @@ fn mirrored_primitive(primitive: &PrimitiveSnapshot, mirror: Mirror) -> Primitiv
                     mirror.linear(),
                 )
             });
-            (Shape::Ellipse { frame, arc, curve }, mirrored_rotation)
+            (
+                Shape::Ellipse {
+                    frame,
+                    arc,
+                    curve,
+                    rounded,
+                },
+                mirrored_rotation,
+            )
         }
         // The ring is symmetric, so the curve is unchanged (criterion 54).
         Shape::Polygon {

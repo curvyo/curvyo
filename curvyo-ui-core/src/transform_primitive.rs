@@ -72,13 +72,18 @@ pub(crate) fn resize_primitive(
             frame,
             arc: None,
             curve,
+            rounded,
         } if curvyo_document_core::is_beyond_ellipse(&primitive.shape) => Shape::Ellipse {
             frame: arc_frame_in_box(frame, (start_box.min, start_box.max), (min, max)),
             arc: None,
             curve,
+            rounded,
         },
         Shape::Ellipse {
-            arc: None, curve, ..
+            arc: None,
+            curve,
+            rounded,
+            ..
         } => Shape::Ellipse {
             frame: EllipseFrame {
                 center: Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y)),
@@ -87,6 +92,7 @@ pub(crate) fn resize_primitive(
             },
             arc: None,
             curve,
+            rounded,
         },
         // An arc's box is the box of the drawn part (`specs/0021-ellipse-arcs-and-shaping/`
         // criteria 9 and 10): the frame follows the map from the old box to the new one and
@@ -95,10 +101,12 @@ pub(crate) fn resize_primitive(
             frame,
             arc: Some(arc),
             curve,
+            ..
         } => Shape::Ellipse {
             frame: arc_frame_in_box(frame, (start_box.min, start_box.max), (min, max)),
             arc: Some(arc),
             curve,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Shape::Polygon { .. } | Shape::Star { .. } => {
             let magnitude = resized.sx.abs();
