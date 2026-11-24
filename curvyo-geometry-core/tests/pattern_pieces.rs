@@ -10,8 +10,8 @@
 )]
 
 use curvyo_document_core::{
-    Angle, GeneratorKind, Length, PatternFill, PatternGenerator, PatternMode, PatternParam,
-    PatternSeed, Point, Tolerance, Vec2,
+    Angle, GeneratorKind, Length, PatternFill, PatternGenerator, PatternMode, PatternParam, Point,
+    Seed, Tolerance, Vec2,
 };
 use curvyo_geometry_core::{
     PatternError, PatternOutline, PatternPiece, pattern_pieces, pattern_pieces_of,
@@ -45,7 +45,7 @@ fn fill(kind: GeneratorKind) -> PatternFill {
         generator: PatternGenerator::defaults(kind),
         margin: Length::from_mm(0.0),
         mode: PatternMode::Lines,
-        seed: PatternSeed::new(7),
+        seed: Seed::new(7),
         whole_pieces: false,
     }
 }
@@ -337,7 +337,7 @@ fn ac9_leaves_do_not_overlap_and_the_seed_reshuffles_them() {
         }
     }
     let mut other = f;
-    other.seed = PatternSeed::new(8);
+    other.seed = Seed::new(8);
     assert_ne!(run(&outer, &other), pieces);
 }
 
@@ -401,7 +401,7 @@ fn ac17_deterministic_and_the_seed_only_changes_seeded_generators() {
         let a = run(&holed(), &f);
         assert_eq!(a, run(&holed(), &f), "{kind:?}");
         let mut reseeded = f;
-        reseeded.seed = PatternSeed::new(99);
+        reseeded.seed = Seed::new(99);
         assert_eq!(a == run(&holed(), &reseeded), !kind.is_seeded(), "{kind:?}");
     }
 }

@@ -298,6 +298,7 @@ mod primitive_outline;
 mod replace;
 mod ring_curve;
 mod ring_rounded;
+mod seed;
 mod segment_bend;
 mod shape_arc;
 mod shape_arc_codec;
@@ -467,7 +468,7 @@ pub use paths::resolve_handle_pair;
 pub use pattern_convert::{CONVERT_PATTERN_COMMIT_LABEL, PatternConversion};
 pub use pattern_model::{
     FillPaint, GeneratorKind, PatternCount, PatternFill, PatternFraction, PatternGenerator,
-    PatternMode, PatternParam, PatternParamError, PatternSeed, splitmix64,
+    PatternMode, PatternParam, PatternParamError,
 };
 pub use pattern_schema::{MIN_LENGTH_MM, ParamKind, ParamSpec, spec_of, specs as pattern_params};
 pub use placement_commands::{
@@ -489,6 +490,7 @@ pub use ring_curve::{
     ring_bounds, ring_extent,
 };
 pub use ring_rounded::{Q_C, Rounded, effective_rounded, rounded_bounds};
+pub use seed::{Seed, splitmix64};
 pub use shapes::ShapeEditError;
 pub use smooth_handles::smooth_corner_handles;
 pub use snapping::{DocumentSnapping, GridSnapPoint};

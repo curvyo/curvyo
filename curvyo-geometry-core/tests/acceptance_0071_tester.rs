@@ -21,8 +21,8 @@
 #![allow(clippy::similar_names, clippy::needless_pass_by_value)]
 
 use curvyo_document_core::{
-    Angle, GeneratorKind, Length, PatternFill, PatternGenerator, PatternMode, PatternParam,
-    PatternSeed, Point, Tolerance, Vec2, pattern_params,
+    Angle, GeneratorKind, Length, PatternFill, PatternGenerator, PatternMode, PatternParam, Point,
+    Seed, Tolerance, Vec2, pattern_params,
 };
 use curvyo_geometry_core::{
     PATTERN_MAX_PIECES, PATTERN_NOTE_PIECES, PatternError, PatternOutline, PatternPiece,
@@ -230,7 +230,7 @@ fn fill(
         generator: g,
         margin: Length::from_mm(margin),
         mode,
-        seed: PatternSeed::new(12345),
+        seed: Seed::new(12345),
         whole_pieces: false,
     }
 }
@@ -778,7 +778,7 @@ fn c9_leaves_never_overlap_and_stay_in_the_region() {
                 1.0,
                 PatternMode::Shapes,
             );
-            f.seed = PatternSeed::new(seed);
+            f.seed = Seed::new(seed);
             let ps = pieces(&r, &f);
             assert!(
                 ps.len() > 20,
@@ -1220,7 +1220,7 @@ fn c17_same_input_same_pieces_and_the_seed_only_moves_leaves() {
             let mut a = fill(kind, &[], 1.0, mode);
             let first = pieces(&r, &a);
             assert_eq!(first, pieces(&r, &a), "{kind:?}: same run, same pieces");
-            a.seed = PatternSeed::new(54321);
+            a.seed = Seed::new(54321);
             let reseeded = pieces(&r, &a);
             if kind == GeneratorKind::LeafForest {
                 assert_ne!(first, reseeded, "a new seed moves the leaves");
@@ -1505,7 +1505,7 @@ proptest! {
             params.push((PatternParam::Angle, angle));
         }
         let mut f = fill(kind, &params, margin, if shapes { PatternMode::Shapes } else { PatternMode::Lines });
-        f.seed = PatternSeed::new(seed);
+        f.seed = Seed::new(seed);
         let ps = pattern_pieces_of(&region, Angle::from_radians(rot), &f, Length::from_mm(W), TOL).unwrap();
         assert_inside(&region, &ps, margin, &format!("{kind:?}"));
     }

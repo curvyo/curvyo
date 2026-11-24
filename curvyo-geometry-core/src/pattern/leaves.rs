@@ -5,7 +5,7 @@
 //! [`MAX_MISSES`] drops in a row (the box is as full as throwing gets it) or after
 //! [`MAX_THROWS`] candidates, so its work is bounded (`review-architecture.md` change 4).
 
-use curvyo_document_core::{Angle, Length, PatternFraction, PatternSeed, Point, Vec2};
+use curvyo_document_core::{Angle, Length, PatternFraction, Point, Seed, Vec2};
 
 use super::seed::Stream;
 use super::{Bounds, Raw};
@@ -168,7 +168,7 @@ pub(crate) fn leaves(
     size_jitter: PatternFraction,
     rotation_jitter: Angle,
     density: PatternFraction,
-    seed: PatternSeed,
+    seed: Seed,
 ) -> Vec<Raw> {
     let (lo, hi) = bounds;
     let wanted = leaf_count(bounds, leaf_size, density);

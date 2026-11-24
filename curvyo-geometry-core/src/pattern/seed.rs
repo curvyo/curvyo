@@ -1,7 +1,7 @@
 //! The seeded random stream of the seeded generators (ADR 0029 §5): `SplitMix64` over the pattern's
 //! seed, the same numbers on every platform and in wasm. Its algorithm is part of the format.
 
-use curvyo_document_core::{PatternSeed, splitmix64};
+use curvyo_document_core::{Seed, splitmix64};
 
 /// The golden ratio increment of `SplitMix64`.
 const INCREMENT: u64 = 0x9E37_79B9_7F4A_7C15;
@@ -13,7 +13,7 @@ pub(crate) struct Stream {
 
 impl Stream {
     /// The stream of `seed`.
-    pub(crate) fn new(seed: PatternSeed) -> Self {
+    pub(crate) fn new(seed: Seed) -> Self {
         Self {
             state: u64::from(seed.get()),
         }
@@ -45,9 +45,9 @@ mod tests {
 
     #[test]
     fn the_stream_is_fixed_by_its_seed() {
-        let mut a = Stream::new(PatternSeed::new(5));
-        let mut b = Stream::new(PatternSeed::new(5));
-        let mut c = Stream::new(PatternSeed::new(6));
+        let mut a = Stream::new(Seed::new(5));
+        let mut b = Stream::new(Seed::new(5));
+        let mut c = Stream::new(Seed::new(6));
         let xs: Vec<u64> = (0..4).map(|_| a.next_u64()).collect();
         let ys: Vec<u64> = (0..4).map(|_| b.next_u64()).collect();
         assert_eq!(xs, ys);

@@ -15,8 +15,8 @@ use std::path::PathBuf;
 
 use curvyo_document_core::{
     AnchorId, CURRENT_FORMAT_VERSION, CopySource, Document, FillPaint, GeneratorKind, Length,
-    NewAnchor, NodeId, PatternFill, PatternGenerator, PatternMode, PatternParam, PatternSeed,
-    Point, RectBounds, StyleEdit, StyleEditError, Vec2, pack, unpack,
+    NewAnchor, NodeId, PatternFill, PatternGenerator, PatternMode, PatternParam, Point, RectBounds,
+    Seed, StyleEdit, StyleEditError, Vec2, pack, unpack,
 };
 
 const PATTERN_FORMAT_VERSION: u32 = 32;
@@ -114,7 +114,7 @@ fn choosing_pattern_gives_hatch_defaults_and_the_shapes_fresh_seed() {
         pattern.generator,
         PatternGenerator::defaults(GeneratorKind::Hatch)
     );
-    assert_eq!(pattern.seed, PatternSeed::fresh(a));
+    assert_eq!(pattern.seed, Seed::fresh(a));
     assert_ne!(
         pattern_of(&document, b).seed,
         pattern.seed,

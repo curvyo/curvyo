@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use curvyo_document_core::{
     GeneratorKind, Length, PatternCount, PatternFill, PatternGenerator, PatternMode, PatternParam,
-    PatternSeed, Point, Tolerance, Vec2,
+    Point, Seed, Tolerance, Vec2,
 };
 use curvyo_geometry_core::{
     PATTERN_MAX_PIECES, PATTERN_NOTE_PIECES, PatternError, PatternOutline, PatternPiece,
@@ -132,7 +132,7 @@ fn fill(generator: PatternGenerator, mode: PatternMode) -> PatternFill {
         generator,
         margin: Length::from_mm(0.0),
         mode,
-        seed: PatternSeed::new(1),
+        seed: Seed::new(1),
         whole_pieces: false,
     }
 }

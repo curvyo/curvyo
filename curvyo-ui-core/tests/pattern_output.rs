@@ -185,13 +185,13 @@ fn ac26_the_export_of_every_generator_matches_its_golden() {
 /// UX notes §6: every pattern edit commits under a label the History tab names.
 #[test]
 fn every_pattern_edit_has_a_history_name() {
-    use curvyo_document_core::{PatternMode, PatternParam, PatternSeed, pattern_params};
+    use curvyo_document_core::{PatternMode, PatternParam, Seed, pattern_params};
     let mut edits = vec![
         StyleEdit::FillPaint(FillPaint::Pattern),
         StyleEdit::PatternMargin(Length::from_mm(1.0)),
         StyleEdit::PatternMode(PatternMode::Lines),
         StyleEdit::PatternMode(PatternMode::Shapes),
-        StyleEdit::PatternSeed(PatternSeed::new(1)),
+        StyleEdit::PatternSeed(Seed::new(1)),
         StyleEdit::PatternReroll,
         StyleEdit::PatternWholePieces(true),
     ];

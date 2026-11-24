@@ -15,8 +15,8 @@ use crate::path_model::{Color, NodeId};
 use crate::paths::tree_id_of;
 use crate::pattern_model::{
     FillPaint, GeneratorKind, PatternFill, PatternMode, PatternParam, PatternParamError,
-    PatternSeed,
 };
+use crate::seed::Seed;
 use crate::shape_codec::{ShapeTag, read_shape_tag_checked};
 use crate::style_codec::{read_style, write_changes};
 use crate::style_model::{
@@ -106,7 +106,7 @@ pub enum StyleEdit {
     /// Lines or Shapes.
     PatternMode(PatternMode),
     /// The pattern's seed.
-    PatternSeed(PatternSeed),
+    PatternSeed(Seed),
     /// Re-roll: each shape's seed becomes the next of its own.
     PatternReroll,
     /// Whole pieces only (criterion 29).
