@@ -20,6 +20,7 @@ mod tab_facts;
 #[cfg(test)]
 mod tests;
 mod toolpath;
+mod user_origin;
 mod view_json;
 
 use std::collections::HashSet;
@@ -33,6 +34,7 @@ pub use frame::shape_of;
 pub use play::PlayView;
 pub use send::{SendView, SentJobFile, send_notice};
 pub use tab_facts::RowRunView;
+pub(in crate::session) use toolpath::shifted;
 pub(in crate::session) use view_json::STALE_TIME;
 pub use view_json::{NumbersLineView, OutputGroupView};
 

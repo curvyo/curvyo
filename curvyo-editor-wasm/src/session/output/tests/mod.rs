@@ -10,6 +10,7 @@ mod play_tests;
 mod raster_tests;
 mod send_tests;
 mod toolpath_tests;
+mod user_origin_tests;
 
 use curvyo_document_core::{Direction, NodeId};
 

@@ -162,6 +162,17 @@ impl Session {
         self.laser_job_of(self.job_key(), self.document_read())
     }
 
+    /// The job the cache holds for the active laser page, built or stale, without building one
+    /// (the canvas marks read it every frame, `user_origin.rs`).
+    pub(super) fn held_laser_job(&self) -> Option<Arc<PageJob>> {
+        let manufacturing = self.active_manufacturing()?.id;
+        let held = self.output.job.held.borrow();
+        let (key, _, job) = held.as_ref()?;
+        (key.manufacturing == Some(manufacturing))
+            .then(|| job.clone())
+            .flatten()
+    }
+
     /// [`Session::laser_job`] for the job key and the drawing read of now.
     fn laser_job_of(&self, key: JobKey, read: Arc<DocumentRead>) -> Option<Arc<PageJob>> {
         let cache = &self.output.job;

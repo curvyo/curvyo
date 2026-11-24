@@ -89,10 +89,28 @@ impl WasmSession {
         self.session.set_fixture_material(id)
     }
 
-    /// Start: `start` is `machine_origin`, `head_position` or `home_then_origin`. Whether it
-    /// changed.
+    /// Start: `start` is `machine_origin`, `head_position`, `home_then_origin` or, with a stored
+    /// point, `user_origin`. Whether it changed.
     pub fn set_start(&mut self, start: &str) -> bool {
         self.session.set_start(start)
+    }
+
+    /// Set origin here and the typed X, Y pair (`specs/0118` criterion 29): stores the point in
+    /// bed mm as the page's user origin with Start User origin, one step. Whether it changed.
+    pub fn set_user_origin(&mut self, x_mm: f64, y_mm: f64) -> bool {
+        self.session.set_user_origin(x_mm, y_mm)
+    }
+
+    /// The typed X, Y pair of the User origin row: as `set_user_origin`, its own step
+    /// "User origin" (`specs/0118` W43).
+    pub fn type_user_origin(&mut self, x_mm: f64, y_mm: f64) -> bool {
+        self.session.type_user_origin(x_mm, y_mm)
+    }
+
+    /// The user origin's cross and dashed burn box in canvas CSS px (`{"cross", "box"}`).
+    #[must_use]
+    pub fn user_origin_marks_json(&self) -> String {
+        self.session.user_origin_marks_json()
     }
 
     /// The Air assist switch of the page's profile copy. Whether it changed.

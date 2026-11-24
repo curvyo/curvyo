@@ -36,15 +36,19 @@ pub struct OutputGroupView {
     pub frame: super::frame::FrameView,
 }
 
-/// The Start pick (criterion 38; UX P29): one value of three, no disabled state.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+/// The Start pick (criterion 38; UX P29; `specs/0118` W42, W43): one value of three, User origin
+/// the fourth while a point is stored, no disabled state.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StartView {
     /// The stored value's spelling; `None` while it is damaged (no option checked).
     pub value: Option<&'static str>,
     /// Whether the stored value is one this build does not read (the check `StartDamaged`).
     pub damaged: bool,
-    /// The three options in order.
+    /// The options in order.
     pub options: Vec<StartOptionView>,
+    /// The User origin row, while User origin is picked (`specs/0118` W43).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_origin: Option<super::user_origin::UserOriginView>,
 }
 
 /// One option of the Start pick.
@@ -277,11 +281,17 @@ impl Session {
                 damaged: settings.start_damaged,
                 options: Start::ALL
                     .into_iter()
+                    .filter(|&start| {
+                        start != Start::UserOrigin
+                            || settings.user_origin.is_some()
+                            || self.stores_user_origin_start()
+                    })
                     .map(|start| StartOptionView {
                         value: start.as_str(),
                         label: start_text(start),
                     })
                     .collect(),
+                user_origin: self.user_origin_view(),
             },
             checks: gate.issues.iter().map(|i| check_view(i, names)).collect(),
             total: self

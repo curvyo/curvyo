@@ -216,7 +216,10 @@ impl Session {
         let fraction = self.play_fraction();
         let head = (fraction < 1.0).then(|| job.timeline.head_at(&job.built.job, fraction).done);
         let pictures = self.toolpath_pictures(job);
-        let origin = self.laser_page_origin().unwrap_or(Point::new(0.0, 0.0));
+        let origin = self
+            .laser_page_origin()
+            .unwrap_or(Point::new(0.0, 0.0))
+            .translated(super::toolpath::shift_mm(&job.built.job));
         pictures
             .iter()
             .map(|(picture, first)| {
