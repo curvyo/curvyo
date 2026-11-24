@@ -1,6 +1,6 @@
 # Document library: take a page, or just the elements of a page, from any of my documents as a plain copy
 
-Status: Ready (2026-11-24; decisions of 2026-11-19 applied; `adrs.md` and `ux-notes.md` exist; ADR 0084 is Proposed, `needs-customer`, accepted with the slice PR; open Frage 341 has a default)
+Status: Done (PR #470; Ready 2026-11-24; ADR 0084 accepted with PR #470; Frage 341 answered C 2026-11-24)
 Priority: Should
 Origin: Customer (2026-11-19, translated): a library of all workspaces, documents and pages so that a page, or only the elements of a page, can be imported easily; an import is a plain copy that carries a reference info "where it came from". Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
