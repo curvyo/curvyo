@@ -50,6 +50,7 @@ fn ellipse(f: EllipseFrame, a: Option<EllipseArc>, curve: f64) -> Shape {
         frame: f,
         arc: a,
         curve: Curve::new(curve).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 

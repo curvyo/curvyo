@@ -201,6 +201,7 @@ mod tests {
             },
             arc: None,
             curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         };
         assert_eq!(
             placed_sentence(&circle, DisplayUnit::Mm),
@@ -214,6 +215,7 @@ mod tests {
             },
             arc: None,
             curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         };
         assert_eq!(
             placed_sentence(&ellipse, DisplayUnit::Cm),

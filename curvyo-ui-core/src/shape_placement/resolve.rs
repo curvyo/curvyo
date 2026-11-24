@@ -94,6 +94,7 @@ pub(crate) fn placed_ellipse(at: BoxAtA, angle: Angle) -> Shape {
         },
         arc: None,
         curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 

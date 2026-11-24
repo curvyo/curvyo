@@ -23,6 +23,7 @@ fn circle(session: &Session) -> NodeId {
             },
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         Angle::from_radians(0.0),
     )

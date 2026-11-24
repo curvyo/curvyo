@@ -61,12 +61,22 @@ impl Rounded {
     }
 }
 
-/// The Rounded value `shape` is drawn with, `None` for a rectangle or an ellipse (slice 2).
+/// The value of `q` at which the ellipse's Rounded outline is exactly today's ellipse:
+/// `KAPPA / sqrt(2)` (`adrs.md` decision 9, the side of the unit 4-ring is `sqrt(2)`).
+pub const Q_C: f64 = crate::primitive_outline::KAPPA * std::f64::consts::FRAC_1_SQRT_2;
+
+/// The Rounded value `shape` is drawn with: 0 for an ellipse with an arc (the arc wins), `None`
+/// for a rectangle.
 #[must_use]
 pub fn effective_rounded(shape: &Shape) -> Option<f64> {
     match *shape {
-        Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. } => Some(rounded.effective()),
-        Shape::Rect { .. } | Shape::Ellipse { .. } => None,
+        Shape::Polygon { rounded, .. }
+        | Shape::Star { rounded, .. }
+        | Shape::Ellipse {
+            rounded, arc: None, ..
+        } => Some(rounded.effective()),
+        Shape::Ellipse { arc: Some(_), .. } => Some(0.0),
+        Shape::Rect { .. } => None,
     }
 }
 
@@ -88,7 +98,11 @@ pub(crate) fn rounded_outline(ring: &Ring, q: f64) -> Vec<OutlineAnchor> {
         .map(|&vertex| {
             let radius = vertex.length();
             let handle = if radius > 0.0 {
-                Vec2::new(-vertex.y / radius * reach, vertex.x / radius * reach)
+                // The ellipse's unit ring is scaled by (rx, ry) afterwards, handles included.
+                Vec2::new(
+                    -vertex.y / radius * reach * ring.scale.0,
+                    vertex.x / radius * reach * ring.scale.1,
+                )
             } else {
                 Vec2::ZERO
             };

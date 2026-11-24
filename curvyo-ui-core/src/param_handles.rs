@@ -211,6 +211,14 @@ pub fn param_handles(
         {
             2.0 * frame.radius.as_mm()
         }
+        // The same for a rounded ellipse (slice 2): the threshold is on its own axes.
+        Shape::Ellipse {
+            frame, arc: None, ..
+        } if curvyo_document_core::effective_rounded(&primitive.shape)
+            .is_some_and(|q| q != 0.0) =>
+        {
+            2.0 * frame.rx.as_mm().min(frame.ry.as_mm())
+        }
         _ => box_.width().min(box_.height()),
     };
     if !handle_tiers(shorter, tolerances).param {
@@ -539,12 +547,14 @@ mod tests {
                 },
                 arc: None,
                 curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+                rounded: curvyo_document_core::Rounded::ZERO,
             },
             style: curvyo_document_core::Style::default(),
             rotation: Angle::from_radians(0.0),
         });
         // Since `specs/0021-ellipse-arcs-and-shaping/` (criteria 1 and 22) a whole ellipse
-        // has two arc handles and a curve handle.
+        // has two arc handles and a curve handle, and since `0145` slice 2 a Rounded handle
+        // between them.
         let kinds: Vec<ParamHandle> = param_handles(&ellipse, &oriented_bounds(&ellipse), &t)
             .into_iter()
             .map(|(handle, _)| handle)
@@ -554,6 +564,7 @@ mod tests {
             [
                 ParamHandle::ArcStart,
                 ParamHandle::ArcEnd,
+                ParamHandle::Rounded,
                 ParamHandle::Curve
             ]
         );

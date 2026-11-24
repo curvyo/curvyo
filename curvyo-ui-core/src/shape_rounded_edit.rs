@@ -3,7 +3,7 @@
 //! into a value, and a value applied to a shape, the one rule the drag, the entry chip and the
 //! bar share through [`crate::apply_param`].
 
-use curvyo_document_core::{Curve, Point, Rounded, Shape, effective_rounded};
+use curvyo_document_core::{Curve, Point, Q_C, Rounded, Shape, effective_curve, effective_rounded};
 
 use crate::transform_handle_layout::TransformHandleTolerances;
 
@@ -20,10 +20,40 @@ const ROUNDED_EQUAL_EPSILON: f64 = 1e-9;
 /// The smallest unit (millimetres per 1.0) a drag can divide by.
 const MIN_UNIT_MM: f64 = 1e-6;
 
-/// Whether `shape` takes a Rounded value now (criterion 3): a polygon or a star.
+/// Whether `shape` takes a Rounded value now (criteria 3, 14 and 19): a polygon, a star or an
+/// ellipse without an arc (the arc wins).
 #[must_use]
 pub fn rounded_capable(shape: &Shape) -> bool {
-    matches!(shape, Shape::Polygon { .. } | Shape::Star { .. })
+    matches!(
+        shape,
+        Shape::Polygon { .. } | Shape::Star { .. } | Shape::Ellipse { arc: None, .. }
+    )
+}
+
+/// The Rounded value the knob shows and a drag starts from: the effective one, except on an
+/// untouched ellipse (`q = 0`, Curve 100 %), which is drawn as `q_c` already, so the first pixel of
+/// a drag continues from the circle (criterion 14).
+#[must_use]
+pub fn rounded_drawn(shape: &Shape) -> Option<f64> {
+    let q = effective_rounded(shape)?;
+    let untouched_ellipse = matches!(shape, Shape::Ellipse { arc: None, .. })
+        && q == 0.0
+        && effective_curve(shape) == Some(Curve::ELLIPSE_DEFAULT);
+    Some(if untouched_ellipse { Q_C } else { q })
+}
+
+/// The distance from vertex 0 to the centre and the vertex-0 point's x offset basis: a
+/// polygon's or star's outer radius, an ellipse's `rx` (its vertex E).
+fn vertex0(shape: &Shape) -> Option<(Point, f64)> {
+    match shape {
+        Shape::Polygon { frame, .. } | Shape::Star { frame, .. } => {
+            Some((frame.center, frame.radius.as_mm()))
+        }
+        Shape::Ellipse {
+            frame, arc: None, ..
+        } => Some((frame.center, frame.rx.as_mm())),
+        _ => None,
+    }
 }
 
 /// The drag's unit `U = D - 15 px` in millimetres per 1.0 of `q` (`ux-notes.md` section 2):
@@ -31,10 +61,8 @@ pub fn rounded_capable(shape: &Shape) -> bool {
 /// or one too small to drag.
 #[must_use]
 pub fn rounded_unit_mm(shape: &Shape, tolerances: &TransformHandleTolerances) -> Option<f64> {
-    let (Shape::Polygon { frame, .. } | Shape::Star { frame, .. }) = shape else {
-        return None;
-    };
-    let unit = frame.radius.as_mm() - tolerances.param_inset_mm;
+    let (_, radius) = vertex0(shape)?;
+    let unit = radius - tolerances.param_inset_mm;
     (unit > MIN_UNIT_MM).then_some(unit)
 }
 
@@ -53,16 +81,11 @@ pub fn rounded_handle_position(
     shape: &Shape,
     tolerances: &TransformHandleTolerances,
 ) -> Option<Point> {
-    let (Shape::Polygon { frame, .. } | Shape::Star { frame, .. }) = shape else {
-        return None;
-    };
-    let q = effective_rounded(shape)?;
+    let (center, radius) = vertex0(shape)?;
+    let q = rounded_drawn(shape)?;
     let unit = rounded_unit_mm(shape, tolerances)?;
     let along = tolerances.param_inset_mm + q * unit;
-    Some(Point::new(
-        frame.center.x + frame.radius.as_mm() - along,
-        frame.center.y,
-    ))
+    Some(Point::new(center.x + radius - along, center.y))
 }
 
 /// The value a drag asks for: `press` plus the pointer's displacement `local_dx` along the
@@ -70,12 +93,27 @@ pub fn rounded_handle_position(
 /// 1 within `window`, or with `ctrl` to steps of 0.25, and limited to -10 to 10 (criterion 2).
 #[must_use]
 pub fn rounded_from_drag(press: f64, local_dx: f64, unit_mm: f64, window: f64, ctrl: bool) -> f64 {
+    rounded_from_drag_to(press, local_dx, unit_mm, window, ctrl, &[0.0, 1.0])
+}
+
+/// [`rounded_from_drag`] with the snap targets `stops`: an ellipse adds `q_c` to 0 and 1
+/// (criterion 15), and the snap to `q_c` writes it exactly.
+#[must_use]
+pub fn rounded_from_drag_to(
+    press: f64,
+    local_dx: f64,
+    unit_mm: f64,
+    window: f64,
+    ctrl: bool,
+    stops: &[f64],
+) -> f64 {
     let raw = press - local_dx / unit_mm;
     let snapped = if ctrl {
         (raw / ROUNDED_CTRL_STEP).round() * ROUNDED_CTRL_STEP
     } else {
-        [0.0, 1.0]
-            .into_iter()
+        stops
+            .iter()
+            .copied()
             .find(|stop| (raw - stop).abs() <= window)
             .unwrap_or(raw)
     };
@@ -92,8 +130,9 @@ pub fn with_rounded(shape: &Shape, value: f64) -> Option<Shape> {
         return None;
     }
     let limited = Rounded::clamped(value);
-    let effective = effective_rounded(shape)?;
-    if (limited.get() - effective).abs() <= ROUNDED_EQUAL_EPSILON {
+    // An untouched ellipse is drawn at `q_c`: a release there writes nothing (criterion 14).
+    let drawn = rounded_drawn(shape)?;
+    if (limited.get() - drawn).abs() <= ROUNDED_EQUAL_EPSILON {
         return None;
     }
     let curve = |old: Curve| {
@@ -128,7 +167,18 @@ pub fn with_rounded(shape: &Shape, value: f64) -> Option<Shape> {
             curve: curve(old),
             rounded: limited,
         },
-        Shape::Rect { .. } | Shape::Ellipse { .. } => return None,
+        Shape::Ellipse {
+            frame,
+            arc: None,
+            curve: old,
+            ..
+        } => Shape::Ellipse {
+            frame,
+            arc: None,
+            curve: curve(old),
+            rounded: limited,
+        },
+        Shape::Rect { .. } | Shape::Ellipse { arc: Some(_), .. } => return None,
     })
 }
 

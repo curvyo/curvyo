@@ -1099,8 +1099,9 @@ fn ac8_ring_plus_island_and_ac20_compound_results() {
     let _ = (big, mid, island);
     let mut s = session_of(&d);
     // select big and mid by their strokes
-    click(&mut s, pt(20.0, 0.0), false);
-    click(&mut s, pt(10.0, 0.0), true);
+    // On the left side: the right-hand side of a selected ellipse carries its Rounded knob.
+    click(&mut s, pt(-20.0, 0.0), false);
+    click(&mut s, pt(-10.0, 0.0), true);
     assert_eq!(s.selected_object_count(), 2);
     let out = s.apply_boolean(BooleanOp::Difference);
     assert_eq!(

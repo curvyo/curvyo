@@ -346,6 +346,7 @@ pub(crate) fn read_shape(meta: &LoroMap, shape_tag: &str) -> Option<Shape> {
             frame: read_ellipse_frame(meta)?,
             arc: read_arc(meta),
             curve: read_curve(meta, Curve::ELLIPSE_DEFAULT),
+            rounded: read_rounded(meta),
         }),
         SHAPE_POLYGON => Some(Shape::Polygon {
             frame: read_star_frame(meta)?,

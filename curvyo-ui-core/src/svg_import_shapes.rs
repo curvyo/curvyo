@@ -161,6 +161,7 @@ fn ellipse_geometry(center: kurbo::Point, rx: f64, ry: f64, m: Affine) -> LeafGe
                 },
                 arc: None,
                 curve: Curve::ELLIPSE_DEFAULT,
+                rounded: curvyo_document_core::Rounded::ZERO,
             },
             Angle::from_radians(turn),
         )
@@ -178,6 +179,7 @@ fn ellipse_geometry(center: kurbo::Point, rx: f64, ry: f64, m: Affine) -> LeafGe
                 },
                 arc: None,
                 curve: Curve::ELLIPSE_DEFAULT,
+                rounded: curvyo_document_core::Rounded::ZERO,
             };
             LeafGeometry::Path(vec![mapped_outline(&local, m)])
         }

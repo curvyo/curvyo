@@ -53,12 +53,15 @@ pub struct ArcBarView {
     pub curve_limited: bool,
     /// The stored curve, percent, for the tag's tooltip.
     pub curve_stored: f64,
-    /// The "Rounded" field is shown (the selection holds a polygon or star).
+    /// The "Rounded" field is shown (the selection holds a polygon, star or ellipse).
     pub rounded_shown: bool,
     /// The effective Rounded value.
     pub rounded: f64,
-    /// The polygons and stars show different values.
+    /// The polygons, stars and ellipses show different values.
     pub rounded_mixed: bool,
+    /// Why the Rounded field is greyed: `"arc"` (every selected ellipse has an arc), else empty.
+    #[wasm_bindgen(getter_with_clone)]
+    pub rounded_grey: String,
     /// The stored value lies beyond -10..=10 (the "limited" tag).
     pub rounded_limited: bool,
     /// The stored value, for the tag's tooltip.
@@ -117,6 +120,7 @@ impl ArcBarView {
             rounded_shown: rounded.is_some(),
             rounded: rounded_value,
             rounded_mixed,
+            rounded_grey: grey(rounded.and_then(|r| r.grey)),
             rounded_limited: rounded.is_some_and(|r| r.limited.is_some()),
             rounded_stored: rounded.and_then(|r| r.limited).unwrap_or(0.0),
         }

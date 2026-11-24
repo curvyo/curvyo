@@ -29,20 +29,20 @@ bar and SVG code are extended, not duplicated. `format_version` 57 (renumbered a
 ### Tasks
 
 M1 document-core (one commit, tests first):
-- [ ] 1. `Rounded` on an ellipse: unit 4-ring E, S, W, N then affine scale; `Q_C = KAPPA/sqrt(2)`
+- [x] 1. `Rounded` on an ellipse: unit 4-ring E, S, W, N then affine scale; `Q_C = KAPPA/sqrt(2)`
   gives exactly today's `ellipse_outline` within 0.05 % of `rx`, `ry`; a typed 0.39 too
   (fulfils AC 15)
-- [ ] 2. Arc wins: an ellipse with an arc ignores a stored `q`; `set_rounded` writes it anyway
+- [x] 2. Arc wins: an ellipse with an arc ignores a stored `q`; `set_rounded` writes it anyway
   but the outline is the arc (fulfils AC 19)
-- [ ] 3. Register `rounded` on the ellipse, deleted at 0, absent is 0, non-finite is Damaged;
+- [x] 3. Register `rounded` on the ellipse, deleted at 0, absent is 0, non-finite is Damaged;
   `format_version` 57 plus a generated golden project; both Curve and Rounded non-zero is
   valid, Rounded wins (fulfils AC 14, 16)
-- [ ] 4. `set_rounded` zeroes Curve on an ellipse in the same commit and `set_curves` zeroes
+- [x] 4. `set_rounded` zeroes Curve on an ellipse in the same commit and `set_curves` zeroes
   Rounded; undo restores both (fulfils AC 14)
-- [ ] 5. Stays a live ellipse over-range, bounds are the union with the exact Bezier box, Object
+- [x] 5. Stays a live ellipse over-range, bounds are the union with the exact Bezier box, Object
   to path keeps the loops, the 4096-point and the finiteness property tests (fulfils AC 16)
 
-M2 svg (one commit with M1 or M3): a rounded ellipse exports as a path with the shadow (`q`
+M2 svg (built with M3, `svg_export_shapes.rs`, `svg_import_shadow.rs`, `svg_import_match.rs`): a rounded ellipse exports as a path with the shadow (`q`
 appended, the older number forms still read as `q = 0`) and imports back as a live ellipse
 (fulfils AC 16).
 
@@ -54,7 +54,10 @@ CPU time, min of several runs, budgets only when `TIMED` (fulfils AC 14, 15, 16,
 
 M4 frontend: the field for the ellipse and its greyed state, design-system rows.
 
-Built as three commits (plan, Rust, frontend).
+Built as commits: plan, Frage 326 docs, Rust, frontend. Deviations (Proposals): `set_rounded` on an
+ellipse with an arc is refused with `ArcWithCurve` (writing Curve 0 beside an arc would make the
+file damaged); touching Curve on an ellipse always clears Rounded, since 100 % is a curve of its own;
+a rounded ellipse's import match compares the drawing outline, not the true ellipse.
 
 ## Slice 1 (Done, PR #461)
 

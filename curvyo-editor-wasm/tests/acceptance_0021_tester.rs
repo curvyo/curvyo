@@ -49,6 +49,7 @@ fn ell(rx: f64, ry: f64, arc: Option<EllipseArc>, curve: f64) -> Shape {
         },
         arc,
         curve: Curve::new(curve).unwrap(),
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 
@@ -812,6 +813,7 @@ fn c58_hidden_and_locked_ellipses_are_not_selectable_and_the_bar_skips_them() {
             },
             arc: None,
             curve: Curve::new(0.3).unwrap(),
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         ang(0.0),
     );
@@ -1016,11 +1018,13 @@ fn c10_c27_a_resize_drag_keeps_the_angles_and_the_curve() {
                     arc: a1,
                     curve: c1,
                     frame: f1,
+                    ..
                 },
                 Shape::Ellipse {
                     arc: a0,
                     curve: c0,
                     frame: f0,
+                    ..
                 },
             ) => {
                 assert_eq!(

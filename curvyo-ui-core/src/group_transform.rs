@@ -243,6 +243,7 @@ fn stretched_arc(
         frame,
         arc: Some(arc),
         curve,
+        ..
     } = primitive.shape
     else {
         return None;
@@ -266,6 +267,7 @@ fn stretched_arc(
             },
             arc: Some(arc_after_linear_map(arc, before, after, map)),
             curve,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
         rotation: Angle::from_radians(after.rotation),
         ..primitive.clone()
@@ -325,7 +327,12 @@ pub(crate) fn scale_primitive(
         }
         // A scale along the ellipse's own axes keeps its parametric angles and its curve
         // (`specs/0021-ellipse-arcs-and-shaping/` criteria 10 and 27).
-        Shape::Ellipse { frame, arc, curve } => Shape::Ellipse {
+        Shape::Ellipse {
+            frame,
+            arc,
+            curve,
+            rounded,
+        } => Shape::Ellipse {
             frame: EllipseFrame {
                 center: map_point(frame.center),
                 rx: Length::from_mm(frame.rx.as_mm() * kx),
@@ -333,6 +340,7 @@ pub(crate) fn scale_primitive(
             },
             arc,
             curve,
+            rounded,
         },
         Shape::Polygon {
             frame,

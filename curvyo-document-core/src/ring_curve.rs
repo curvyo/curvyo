@@ -266,7 +266,11 @@ pub fn effective_curve(shape: &Shape) -> Option<Curve> {
         Shape::Ellipse { arc: Some(_), .. } => Some(Curve::ELLIPSE_DEFAULT),
         // Rounded wins over Curve while it is not 0 (`specs/0145-shape-spiro-handles/adrs.md`
         // decision 3): the sides are straight, Rounded draws the corners.
-        Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. } if !rounded.is_zero() => {
+        Shape::Polygon { rounded, .. }
+        | Shape::Star { rounded, .. }
+        | Shape::Ellipse { rounded, .. }
+            if !rounded.is_zero() =>
+        {
             Some(Curve(0.0))
         }
         Shape::Ellipse { curve, .. } | Shape::Polygon { curve, .. } | Shape::Star { curve, .. } => {
@@ -563,6 +567,7 @@ mod tests {
             },
             arc: None,
             curve: Curve::clamped(k),
+            rounded: crate::Rounded::ZERO,
         }
     }
 
@@ -575,6 +580,7 @@ mod tests {
             },
             arc: None,
             curve: Curve::clamped(k),
+            rounded: crate::Rounded::ZERO,
         }
     }
 

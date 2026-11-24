@@ -86,6 +86,7 @@ pub(crate) fn arc_primitive(arc: &ArcData, m: Affine) -> Option<(Shape, Angle)> 
         },
         arc: local.map(|local| arc_after_linear_map(local, before, after, linear)),
         curve: Curve::ELLIPSE_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     Some((shape, Angle::from_radians(after.rotation)))
 }

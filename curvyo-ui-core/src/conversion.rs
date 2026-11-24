@@ -327,6 +327,7 @@ mod tests {
                     },
                     arc: None,
                     curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+                    rounded: curvyo_document_core::Rounded::ZERO,
                 },
                 rotation: Angle::from_radians(0.5),
                 ..p

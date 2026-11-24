@@ -49,9 +49,19 @@ pub(crate) fn draws_within(shape: &Shape, rotation: Angle, drawn: &BezPath, limi
 
 /// The outline `shape` stands for: the true ellipse or arc, else its drawing outline.
 fn reference(shape: &Shape, rotation: Angle) -> BezPath {
-    let Shape::Ellipse { frame, arc, .. } = *shape else {
+    // A rounded ellipse is its cubic outline, not the true ellipse (`0145` slice 2).
+    let Shape::Ellipse {
+        frame,
+        arc,
+        rounded,
+        ..
+    } = *shape
+    else {
         return outline_path(&drawing_outline_of_rotated(shape, rotation));
     };
+    if arc.is_none() && !rounded.is_zero() {
+        return outline_path(&drawing_outline_of_rotated(shape, rotation));
+    }
     let center = Point::new(frame.center.x, frame.center.y);
     let radii = Vec2::new(frame.rx.as_mm(), frame.ry.as_mm());
     let Some(arc) = arc else {
@@ -332,6 +342,7 @@ mod tests {
             },
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         }
     }
 

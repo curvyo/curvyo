@@ -69,6 +69,7 @@ impl EllipseTool {
                 frame,
                 arc: None,
                 curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+                rounded: curvyo_document_core::Rounded::ZERO,
             },
             anchor: b.anchor,
             pivot: b.centre,

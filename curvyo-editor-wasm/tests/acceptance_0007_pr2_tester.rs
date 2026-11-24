@@ -645,19 +645,20 @@ fn ac29_with_several_candidates_above_the_selection_the_topmost_wins() {
     fill(&d, r);
     let e = ellipse(&d, 35.0, 65.0, 12.0, 12.0);
     fill_with(&d, e, rgb(0, 0, 255), 1.0);
-    let p = polygon(&d, 40.0, 65.0, 4.0);
+    // The polygon lies off the ellipse's Rounded knob (which rests on its right-hand side).
+    let p = polygon(&d, 42.0, 61.0, 4.0);
     fill_with(&d, p, rgb(0, 255, 0), 1.0);
     let mut s = open(&d);
     click(&mut s, pt(10.0, 10.0));
     assert_eq!(selected(&s), "rect");
     // Both lie above the rectangle and contain the point: the polygon is on top.
-    click(&mut s, pt(42.0, 65.0));
+    click(&mut s, pt(42.0, 61.0));
     assert_eq!(selected(&s), "polygon");
     // Outside the polygon's box, inside the ellipse only.
     click(&mut s, pt(35.0, 74.0));
     assert_eq!(selected(&s), "ellipse");
     // With the ellipse selected, the polygon above it takes a press in its area.
-    click(&mut s, pt(42.0, 65.0));
+    click(&mut s, pt(42.0, 61.0));
     assert_eq!(selected(&s), "polygon");
 }
 

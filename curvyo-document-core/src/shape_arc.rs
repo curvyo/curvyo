@@ -147,7 +147,8 @@ impl Document {
             changed |= write_curve_if_changed(&meta, curve, default);
             // Rounded and Curve exclude each other (`specs/0145-shape-spiro-handles/`
             // criterion 5): a curve on a polygon or star zeroes Rounded in the same commit.
-            if curve != default && default == Curve::POLYGON_DEFAULT {
+            // An ellipse's default (100 %) is a curve too: touching it clears Rounded.
+            if curve != default || default == Curve::ELLIPSE_DEFAULT {
                 changed |= write_rounded_if_changed(&meta, Rounded::ZERO);
             }
         }
@@ -164,25 +165,33 @@ impl Document {
     ///
     /// # Errors
     /// [`ShapeEditError::NoSuchObject`] or [`ShapeEditError::NotAPrimitive`] if an id is not a
-    /// primitive, [`ShapeEditError::WrongShape`] for a rectangle or an ellipse.
+    /// primitive, [`ShapeEditError::WrongShape`] for a rectangle, [`ShapeEditError::ArcWithCurve`] for
+    /// a value other than 0 on an ellipse with an arc.
     pub fn set_rounded(&self, values: &[(NodeId, Rounded)]) -> Result<(), ShapeEditError> {
         let metas: Vec<_> = values
             .iter()
             .map(|&(id, rounded)| {
                 let meta = self.require_primitive(id)?;
                 match self.primitive(id).map(|p| p.shape) {
-                    Some(Shape::Polygon { .. } | Shape::Star { .. }) => Ok((meta, rounded)),
+                    Some(Shape::Polygon { .. } | Shape::Star { .. }) => {
+                        Ok((meta, rounded, Curve::POLYGON_DEFAULT))
+                    }
+                    // The arc wins (`adrs.md` decision 9): Rounded is not available on an arc.
+                    Some(Shape::Ellipse { arc: Some(_), .. }) if !rounded.is_zero() => {
+                        Err(ShapeEditError::ArcWithCurve)
+                    }
+                    Some(Shape::Ellipse { .. }) => Ok((meta, rounded, Curve::ELLIPSE_DEFAULT)),
                     Some(_) => Err(ShapeEditError::WrongShape),
                     None => Err(ShapeEditError::NotAPrimitive),
                 }
             })
             .collect::<Result<_, _>>()?;
         let mut changed = false;
-        for (meta, rounded) in metas {
+        for (meta, rounded, default) in metas {
             changed |= write_rounded_if_changed(&meta, rounded);
             if !rounded.is_zero() {
-                changed |=
-                    write_curve_if_changed(&meta, Curve::POLYGON_DEFAULT, Curve::POLYGON_DEFAULT);
+                // Curve 0 (straight sides) is the polygon's default and an ellipse's stored 0.
+                changed |= write_curve_if_changed(&meta, Curve::POLYGON_DEFAULT, default);
             }
         }
         if changed {

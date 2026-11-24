@@ -26,6 +26,8 @@ pub enum ObjectKind {
     Rectangle,
     /// A polygon or a star: "Points".
     PolygonOrStar,
+    /// A polygon, a star or an ellipse without an arc: "Rounded" (`0145` criteria 3, 14, 19).
+    Rounded,
     /// A star: "Ratio".
     Star,
     /// A rectangle, ellipse, polygon or star: "Object to path".
@@ -51,6 +53,7 @@ impl ObjectKind {
         match self {
             Self::Rectangle => matches!(shape, Shape::Rect { .. }),
             Self::PolygonOrStar => matches!(shape, Shape::Polygon { .. } | Shape::Star { .. }),
+            Self::Rounded => crate::shape_rounded_edit::rounded_capable(shape),
             Self::Star => matches!(shape, Shape::Star { .. }),
             Self::Primitive => true,
             Self::ArcEllipse => arc_capable(shape).is_some(),

@@ -389,7 +389,12 @@ pub(crate) fn commit_param(document: &Document, handle: ParamHandle, result: &Ob
         ) => {
             let _ = document.set_curves(&[(primitive.id, curve)]);
         }
-        (ParamHandle::Rounded, Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. }) => {
+        (
+            ParamHandle::Rounded,
+            Shape::Polygon { rounded, .. }
+            | Shape::Star { rounded, .. }
+            | Shape::Ellipse { rounded, .. },
+        ) => {
             let _ = document.set_rounded(&[(primitive.id, rounded)]);
         }
         _ => {}
@@ -426,7 +431,9 @@ fn commit_arc_or_curve_batch(
             }
             (
                 ParamValue::Rounded(_),
-                Shape::Polygon { rounded, .. } | Shape::Star { rounded, .. },
+                Shape::Polygon { rounded, .. }
+                | Shape::Star { rounded, .. }
+                | Shape::Ellipse { rounded, .. },
             ) => {
                 roundeds.push((id, rounded));
             }

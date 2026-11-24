@@ -133,7 +133,12 @@ fn offset_rect(
 fn has_default_sides(shape: &Shape) -> bool {
     match shape {
         Shape::Rect { .. } => true,
-        Shape::Ellipse { arc, curve, .. } => arc.is_none() && *curve == Curve::ELLIPSE_DEFAULT,
+        Shape::Ellipse {
+            arc,
+            curve,
+            rounded,
+            ..
+        } => arc.is_none() && *curve == Curve::ELLIPSE_DEFAULT && rounded.is_zero(),
         Shape::Polygon { .. } | Shape::Star { .. } => {
             curvyo_document_core::effective_curve(shape).is_some_and(|k| k.get() == 0.0)
                 && curvyo_document_core::effective_rounded(shape).is_some_and(|q| q == 0.0)
@@ -158,6 +163,7 @@ fn offset_ellipse(frame: EllipseFrame, d: f64) -> PrimitiveOffset {
             frame: grown,
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         })
     } else {
         PrimitiveOffset::Path
@@ -349,6 +355,7 @@ mod tests {
             },
             arc: None,
             curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         };
         for join in [OffsetJoin::Round, OffsetJoin::Miter, OffsetJoin::Bevel] {
             let PrimitiveOffset::Stays(Shape::Ellipse { frame, .. }) = off(&circle, 2.0, join)
@@ -380,6 +387,7 @@ mod tests {
             },
             arc: None,
             curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         };
         assert_eq!(
             off(&ellipse(20.0, 10.0), 2.0, OffsetJoin::Round),

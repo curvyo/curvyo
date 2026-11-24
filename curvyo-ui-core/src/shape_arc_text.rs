@@ -99,6 +99,7 @@ mod tests {
             },
             arc,
             curve: Curve::new(curve).unwrap(),
+            rounded: curvyo_document_core::Rounded::ZERO,
         }
     }
 

@@ -97,6 +97,7 @@ fn round_shape(
         },
         arc,
         curve: Curve::ELLIPSE_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     };
     let none = Angle::from_radians(0.0);
     match entity {

@@ -80,6 +80,7 @@ fn ellipse() -> ObjectSnapshot {
             },
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
     )
 }
@@ -242,6 +243,7 @@ fn a_circle_keeps_its_radius_pick_without_axis_ends() {
             },
             arc: None,
             curve: Curve::ELLIPSE_DEFAULT,
+            rounded: curvyo_document_core::Rounded::ZERO,
         },
     );
     assert!(matches!(

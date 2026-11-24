@@ -152,6 +152,7 @@ impl Document {
                 frame,
                 arc: None,
                 curve: crate::Curve::ELLIPSE_DEFAULT,
+                rounded: crate::Rounded::ZERO,
             },
             Angle::from_radians(0.0),
         )
@@ -1158,6 +1159,7 @@ mod tests {
                     },
                     arc: None,
                     curve: crate::Curve::ELLIPSE_DEFAULT,
+                    rounded: crate::Rounded::ZERO,
                 },
                 "create_ellipse",
             ),
@@ -1248,6 +1250,7 @@ mod tests {
                 frame,
                 arc: None,
                 curve: crate::Curve::ELLIPSE_DEFAULT,
+                rounded: crate::Rounded::ZERO,
             },
             Angle::from_radians(450_f64.to_radians()),
         );

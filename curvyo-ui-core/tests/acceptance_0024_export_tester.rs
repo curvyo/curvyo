@@ -155,6 +155,7 @@ fn ellipse_shape(cx: f64, cy: f64, rx: f64, ry: f64, arc: Option<EllipseArc>) ->
         },
         arc,
         curve: Curve::ELLIPSE_DEFAULT,
+        rounded: curvyo_document_core::Rounded::ZERO,
     }
 }
 
@@ -1698,7 +1699,9 @@ fn items(d: &Document) -> Vec<Item> {
                             ]
                         ));
                     }
-                    Shape::Ellipse { frame, arc, curve } => {
+                    Shape::Ellipse {
+                        frame, arc, curve, ..
+                    } => {
                         exact.push_str(&format!(" ellipse curve={}", curve.get()));
                         nums.extend([
                             frame.center.x,
@@ -1850,13 +1853,19 @@ fn translated(nodes: &[DrawingNode], v: Vec2) -> Vec<DrawingNode> {
                         },
                         corner_radii,
                     },
-                    Shape::Ellipse { frame, arc, curve } => Shape::Ellipse {
+                    Shape::Ellipse {
+                        frame,
+                        arc,
+                        curve,
+                        rounded,
+                    } => Shape::Ellipse {
                         frame: EllipseFrame {
                             center: mv(frame.center),
                             ..frame
                         },
                         arc,
                         curve,
+                        rounded,
                     },
                     Shape::Polygon {
                         frame,
