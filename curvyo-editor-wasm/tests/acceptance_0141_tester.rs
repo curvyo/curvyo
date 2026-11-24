@@ -133,21 +133,21 @@ fn c5_a_drag_from_any_edge_midpoint_of_a_generated_object_changes_nothing() {
     assert_eq!(value_of(&s, "module"), module_before, "no size change");
 }
 
-// Criterion 5: a corner drag keeps the proportions, and the size numbers are what changes.
+// Criterion 5 (revision 2: superseded, the corner drag writes Teeth and keeps the module).
 #[test]
-fn c5_a_corner_drag_grows_module_and_pitch_diameter_by_the_same_factor() {
+fn c5_a_corner_drag_grows_the_teeth_and_keeps_the_module() {
     let (mut s, _, high) = selected_gear();
     let module_before = value_of(&s, "module");
     let steps = s.history_len();
     let to = pt(high.x + 60.0, high.y + 60.0);
     drag(&mut s, high, to);
     let module_after = value_of(&s, "module");
-    assert!(module_after > module_before, "the module grew");
+    assert_eq!(module_after, module_before, "the module stays");
+    assert!(value_of(&s, "teeth") > 24.0, "the teeth grew");
     assert_eq!(s.history_len(), steps + 1, "one resize step");
     let name = newest_name(&mut s);
     assert_ne!(name, "Add gear", "the resize is its own step: {name}");
-    // The teeth and pressure angle stay (criterion 5).
-    assert_eq!(value_of(&s, "teeth"), 24.0);
+    // The pressure angle stays (criterion 5).
     assert_eq!(value_of(&s, "pressure_angle"), 20.0);
 }
 

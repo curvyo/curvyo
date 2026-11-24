@@ -21,6 +21,7 @@ use crate::anchor_id_minter::AnchorIdMinter;
 use crate::extensions::{ExtensionSettings, generate_object, manifests};
 use crate::instance_notice::notices;
 pub use crate::instance_notice::{clamp_notice, shown};
+pub use crate::instance_resize::{ResizeView, resize_view};
 
 /// Why an instance command did nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -136,6 +137,19 @@ pub(crate) fn generate(
     )
 }
 
+/// The record of a new object of `found` at its defaults as a ghost draws it: the outer
+/// outlines only (`Edit::Draft`).
+#[must_use]
+pub fn new_ghost_record(found: &KindRef) -> Option<GeneratedRecord> {
+    let defaults = Param::defaults(&found.kind.schema());
+    let generated = generate(found, &defaults, 0, Some(Edit::Draft))?;
+    Some(record_of(
+        &stored_kind(found.manifest.id, found.kind.id),
+        0,
+        &generated,
+    ))
+}
+
 /// The record of a new object of `found` at its defaults, and what the generator returned.
 #[must_use]
 pub fn new_record(found: &KindRef) -> Option<(GeneratedRecord, Generated)> {
@@ -184,6 +198,9 @@ pub struct ValuePlan {
     pub record: GeneratedRecord,
     /// The notice sentences of the clamps, the edited field's first.
     pub notices: Vec<String>,
+    /// The words the generator gave to values at a limit that is a shape ("full round"), by
+    /// parameter.
+    pub states: Vec<(&'static str, &'static str)>,
 }
 
 /// What setting the parameter `key` of the generated object `id` to `value` would give, without
@@ -224,6 +241,7 @@ pub fn plan_value(
         snapshot,
         record,
         notices,
+        states: generated.states,
     })
 }
 
@@ -244,6 +262,7 @@ pub fn change_value(
         snapshot,
         record,
         notices,
+        ..
     } = plan_value(document, settings, id, key, value)?;
     if record == snapshot.record {
         return Ok(Changed {
@@ -273,9 +292,13 @@ pub fn change_value(
 #[derive(Debug)]
 pub struct ResizePlan {
     id: NodeId,
-    record: GeneratedRecord,
-    frame: Affine,
+    pub(crate) record: GeneratedRecord,
+    pub(crate) frame: Affine,
     kind: String,
+    /// The factor the outline grew by.
+    pub(crate) factor: f64,
+    /// What the generator clamped (the gear's teeth at 6 or 200).
+    pub(crate) clamps: Vec<curvyo_extension_core::Clamp>,
 }
 
 /// Works out the resize of the generated object `result.id()` to the outline of `result` (a
@@ -314,6 +337,8 @@ pub fn plan_resize(
         record: record_of(&snapshot.record.kind, snapshot.record.seed, &generated),
         frame: orthonormalised(map.compose(snapshot.frame)),
         kind: snapshot.record.kind,
+        factor,
+        clamps: generated.clamps,
     })
 }
 
@@ -407,6 +432,12 @@ pub struct RowView {
     pub param: Param,
     /// The stored value (the default for a missing or invalid one).
     pub value: ParamValue,
+    /// For an automatic parameter stored as 0: the value the generator used, drawn muted.
+    pub used: Option<ParamValue>,
+    /// A word for a limit that is a shape ("full round"), reported by the generator.
+    pub state: Option<&'static str>,
+    /// The largest value a bound that depends on other values allows now, for the slider's end.
+    pub limit: Option<ParamValue>,
 }
 
 /// What the Properties panel shows for one generated object.
@@ -435,6 +466,11 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
         };
     };
     let schema = found.kind.schema();
+    // The generator tells what it used for automatic rows, the words of shapes and the limits.
+    let generated = generate(&found, &snapshot.record.params, snapshot.record.seed, None);
+    let (used, states, limits) = generated
+        .map(|generated| (generated.automatic, generated.states, generated.limits))
+        .unwrap_or_default();
     let rows = found
         .kind
         .groups
@@ -449,6 +485,18 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
             group,
             param: param.clone(),
             value: param.read(&snapshot.record.params),
+            used: used
+                .iter()
+                .find(|(key, _)| *key == param.key)
+                .map(|(_, value)| value.clone()),
+            state: states
+                .iter()
+                .find(|(key, _)| *key == param.key)
+                .map(|(_, word)| *word),
+            limit: limits
+                .iter()
+                .find(|(key, _)| *key == param.key)
+                .map(|(_, value)| value.clone()),
         })
         .collect();
     InstanceView {

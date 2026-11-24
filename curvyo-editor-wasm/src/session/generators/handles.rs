@@ -48,6 +48,8 @@ pub(super) struct KnobDrag {
     /// What the pointer asks for now, in millimetres, and what the generator allows.
     asked: f64,
     shown: f64,
+    /// The generator's word for the value shown ("full round"), if it has one.
+    state: Option<&'static str>,
 }
 
 /// The state of the knobs: the memo of the generator's answer and the drag.
@@ -167,6 +169,7 @@ impl Session {
             id,
             asked: knob.value_mm,
             shown: knob.value_mm,
+            state: None,
             knob,
             from: point,
         });
@@ -189,6 +192,11 @@ impl Session {
         );
         let (id, key) = (drag.id, drag.knob.key);
         if let Ok(plan) = plan {
+            let state = plan
+                .states
+                .iter()
+                .find(|(state_key, _)| *state_key == key)
+                .map(|(_, word)| *word);
             let shown = instance::find_kind(&self.manufacturing.extensions, &plan.record.kind)
                 .and_then(|found| {
                     let param = found.kind.params().find(|param| param.key == key)?;
@@ -207,6 +215,7 @@ impl Session {
             if let Some(drag) = self.generators.knobs.drag.as_mut() {
                 drag.asked = asked;
                 drag.shown = shown;
+                drag.state = state;
             }
         }
         true
@@ -250,15 +259,24 @@ impl Session {
         was
     }
 
-    /// The readout at the pointer while a knob is held: "Pitch diameter 48.0 mm", with "max" or
-    /// "min" at a bound.
+    /// The readout at the pointer while a knob is held: "Bore 6.0 mm", with "max" or "min" at a
+    /// bound; the corner radius reads "r 15.0 mm" and "full round" at its upper bound.
     pub(in crate::session) fn generator_knob_readout(
         &self,
     ) -> Option<super::super::shapes::LiveReadout> {
         let drag = self.generators.knobs.drag.as_ref()?;
-        let mut text = format!("{} {:.1} mm", drag.knob.label, drag.shown);
+        // The corner radius reads "r 15.0 mm"; a limit that is a shape has the generator's word.
+        let label = if drag.knob.key == "corner_radius" {
+            "r"
+        } else {
+            drag.knob.label
+        };
+        let mut text = format!("{label} {:.1} mm", drag.shown);
         let gap = drag.asked - drag.shown;
-        if gap > 5e-4 {
+        if let Some(word) = drag.state {
+            text.push(' ');
+            text.push_str(word);
+        } else if gap > 5e-4 {
             text.push_str(" max");
         } else if gap < -5e-4 {
             text.push_str(" min");

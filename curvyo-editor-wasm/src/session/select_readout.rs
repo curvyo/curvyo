@@ -93,6 +93,16 @@ impl Session {
                         format!("r {} mm", signed_size_text(frame.radius.as_mm(), false))
                     }
                     other => {
+                        if let Some(view) = curvyo_ui_core::instance::resize_view(
+                            &self.document,
+                            &self.manufacturing.extensions,
+                            other,
+                        ) {
+                            return Some(super::shapes::LiveReadout {
+                                text: view.readout,
+                                anchor,
+                            });
+                        }
                         let b = self.cached_oriented_bounds(other)?;
                         format!(
                             "{} × {} mm",

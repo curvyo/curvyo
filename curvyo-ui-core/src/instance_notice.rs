@@ -40,6 +40,12 @@ pub fn clamp_notice(kind: &GeneratorKind, clamp: &Clamp) -> Option<String> {
             "{} set to {value}, the most this {name} allows.",
             param.label
         ),
+        Bound::DependentMinimumFor(subject) => {
+            format!(
+                "{} set to {value}, the least the {subject} allows.",
+                param.label
+            )
+        }
         Bound::DependentMinimum => format!(
             "{} set to {value}, the least this {name} allows.",
             param.label

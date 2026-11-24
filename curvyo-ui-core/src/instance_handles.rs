@@ -85,16 +85,15 @@ mod tests {
     }
 
     #[test]
-    fn a_default_gear_has_the_pitch_diameter_and_the_bore_knob_on_its_circles() {
+    fn a_default_gear_has_the_bore_knob_on_its_circle_and_no_pitch_knob() {
         let knobs = knobs(&ExtensionSettings::default(), &gear(Affine::IDENTITY));
         let keys: Vec<&str> = knobs.iter().map(|knob| knob.key).collect();
-        assert_eq!(keys, ["pitch_diameter", "bore"], "solid: no hub, no rim");
-        // Module 2 and 24 teeth: pitch radius 24 mm, at 45 degrees.
-        let pitch = &knobs[0];
-        let radius = pitch.at.x.hypot(pitch.at.y);
-        assert!((radius - 24.0).abs() < 1e-6, "{radius}");
-        assert!((pitch.value_mm - 48.0).abs() < 1e-6, "{}", pitch.value_mm);
-        assert!((pitch.rate - 2.0).abs() < 1e-12);
+        assert_eq!(keys, ["bore"], "solid: no hub, no rim, no pitch diameter");
+        // Bore 6 mm: radius 3 mm, at 0 degrees; a diameter changes at twice the pointer.
+        let bore = &knobs[0];
+        assert!((bore.at.x.hypot(bore.at.y) - 3.0).abs() < 1e-6);
+        assert!((bore.value_mm - 6.0).abs() < 1e-6, "{}", bore.value_mm);
+        assert!((bore.rate - 2.0).abs() < 1e-12);
     }
 
     #[test]

@@ -1,7 +1,9 @@
 //! Small constructors for the parameter rows of the two generators.
 
 use curvyo_document_core::Length;
-use curvyo_extension_core::{ChoiceOption, Degrees, Param, ParamKind, ParamValue, ShownWhen};
+use curvyo_extension_core::{
+    ChoiceOption, Curve, Degrees, Param, ParamKind, ParamValue, ShownWhen, Track,
+};
 
 /// A length row.
 pub(crate) fn length(
@@ -20,9 +22,11 @@ pub(crate) fn length(
             max: Length::from_mm(max),
             step,
             decimals,
+            automatic: false,
         },
         default: ParamValue::Length(Length::from_mm(default)),
         shown_when: None,
+        track: None,
     }
 }
 
@@ -38,9 +42,14 @@ pub(crate) fn count(
         key,
         label,
         tooltip: label,
-        kind: ParamKind::Count { min, max },
+        kind: ParamKind::Count {
+            min,
+            max,
+            automatic: false,
+        },
         default: ParamValue::Count(default),
         shown_when: None,
+        track: None,
     }
 }
 
@@ -63,6 +72,7 @@ pub(crate) fn angle(
         },
         default: ParamValue::Angle(Degrees(default)),
         shown_when: None,
+        track: None,
     }
 }
 
@@ -75,6 +85,7 @@ pub(crate) fn switch(key: &'static str, label: &'static str) -> Param {
         kind: ParamKind::Switch,
         default: ParamValue::Switch(false),
         shown_when: None,
+        track: None,
     }
 }
 
@@ -92,11 +103,37 @@ pub(crate) fn choice(
         kind: ParamKind::Choice { options },
         default: ParamValue::Choice(default.to_owned()),
         shown_when: None,
+        track: None,
     }
 }
 
 /// `param` drawn only while `condition` holds.
 pub(crate) fn when(mut param: Param, condition: ShownWhen) -> Param {
     param.shown_when = Some(condition);
+    param
+}
+
+/// `param` drawn on a slider whose track runs from `from` to `to` (a drag past the ends goes on up
+/// to the parameter's own bounds).
+pub(crate) fn tracked(mut param: Param, from: f64, to: f64, curve: Curve) -> Param {
+    param.track = Some(Track { from, to, curve });
+    param
+}
+
+/// `param` stores 0 for automatic: the generator derives the value and reports it.
+pub(crate) fn automatic(mut param: Param) -> Param {
+    match &mut param.kind {
+        ParamKind::Length { automatic, .. } | ParamKind::Count { automatic, .. } => {
+            *automatic = true;
+        }
+        _ => {}
+    }
+    param
+}
+
+/// A switch row, on by default.
+pub(crate) fn switch_on(key: &'static str, label: &'static str) -> Param {
+    let mut param = switch(key, label);
+    param.default = ParamValue::Switch(true);
     param
 }

@@ -23,6 +23,7 @@ import {
   Ruler,
   Spline,
   Square,
+  SquareRoundCorner,
   Star,
   Type,
   Zap,
@@ -79,7 +80,11 @@ const KIND_GLYPHS: Record<string, Glyph> = {
 
 /** The glyph of a generated object by its generator's lower-case label (`specs/0141` UX notes
  * §3); an unavailable generator keeps the compound glyph. */
-const GENERATOR_GLYPHS: Record<string, Glyph> = { gear: Cog, box: Box };
+const GENERATOR_GLYPHS: Record<string, Glyph> = {
+  gear: Cog,
+  box: Box,
+  "rounded box": SquareRoundCorner,
+};
 
 /** The kind word of a fixture row as a glyph kind; anything unlisted is the unknown glyph. */
 function fixtureKindOf(word: string): FixtureKind {

@@ -1,20 +1,29 @@
-import { EntryField } from "@/components/panel/EntryField";
+import { useRef } from "react";
+
+import { ValueField } from "@/components/panel/ValueField";
 import { PanelSwitch } from "@/components/ui/switch";
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import type { GeneratorBlockApi } from "@/hooks/useGenerators";
 import {
   type GeneratedRow,
+  automaticWords,
+  dragSpan,
   parseNumber,
-  rowRange,
+  positionOf,
   rowText,
-  stepRowText,
+  sliderEnd,
+  shownNumber,
+  stepValue,
   unitOf,
+  unitWordsOf,
+  valueAt,
 } from "@/lib/generatedView";
 
 const MESSAGES = { number: "Enter a number" } as const;
 const WIDTH = 244;
 
-/** One number row: the Params field of the schema-rendered tab (`specs/0141` UX notes §4). */
+/** One number row: the panel's Value field, the filled-bar slider of Opacity and Width, drawn on
+ * the track the schema gives it (`specs/0141` revision 2, criterion 9, UX notes §15). */
 function NumberRow({
   row,
   api,
@@ -24,35 +33,79 @@ function NumberRow({
   api: GeneratorBlockApi;
   onReturnFocus: () => void;
 }) {
+  // The value of the last drag or key tick, committed once when the gesture ends.
+  const pending = useRef<number | null>(null);
+  // An automatic row stored as 0 shows the value the generator used, muted.
+  const current = row.used ?? (typeof row.value === "number" ? row.value : 0);
+  const stored = typeof row.value === "number" ? row.value : 0;
+  const automatic = row.used !== null;
+  const unit = unitOf(row.kind) ?? "";
+  const { min, limit } = dragSpan(row);
+  const bar = positionOf(row, current);
+  const commit = () => {
+    const value = pending.current;
+    pending.current = null;
+    if (value !== null) {
+      api.setValue(row.key, value);
+    }
+  };
+  const defaultNumber = typeof row.defaultValue === "number" ? row.defaultValue : stored;
   return (
-    <EntryField
-      label={row.label}
-      shown={rowText(row)}
-      mixed={false}
-      suffix={unitOf(row.kind)}
-      width={WIDTH}
-      prefix={row.label}
-      align="right"
-      inputMode="decimal"
-      range={rowRange(row) ?? undefined}
-      commitOnBlur
-      messages={MESSAGES}
-      onReturnFocus={onReturnFocus}
-      stepText={(text, key, shift, ctrl) => {
-        const next = stepRowText(row, text, key, shift, ctrl);
-        // The canvas follows the arrow key before the key-up commits it (UX notes §7).
-        const number = next === null ? null : parseNumber(next);
-        if (number !== null) {
-          api.preview(row.key, number);
+    <div onKeyUp={commit}>
+      <ValueField
+        label={row.label}
+        name={`${api.view?.label ?? ""} ${row.label.toLowerCase()}`.trim()}
+        text={rowText(row)}
+        bar={Math.min(1, Math.max(0, bar))}
+        dragBase={bar}
+        dragLimit={limit}
+        dragMin={min}
+        mixed={false}
+        // A derived field (Pitch diameter) reserves the slot but never offers a reset.
+        resettable={row.key !== "pitch_diameter" && stored !== defaultNumber}
+        muted={automatic}
+        valueText={`${rowText(row)} ${unitWordsOf(row)}${automaticWords(row)}`}
+        // The tooltip's first line says it too: "Rounded box lid thickness: 3 mm, follows wall
+        // thickness" (`specs/0147-rounded-box` UX notes §3).
+        tipValue={`${rowText(row)}${unit === "°" ? unit : unit ? ` ${unit}` : ""}${automaticWords(row)}`}
+        unit={unit}
+        valueNow={current}
+        unitWords={unitWordsOf(row)}
+        valueMin={row.track?.from}
+        valueMax={sliderEnd(row)}
+        defaultText={
+          "automatic" in row.kind && row.kind.automatic
+            ? "automatic"
+            : `${shownNumber(defaultNumber, 4)}${unit === "°" ? unit : unit ? ` ${unit}` : ""}`
         }
-        return next;
-      }}
-      onClose={api.cancelPreview}
-      onSubmit={(text) => {
-        const number = parseNumber(text);
-        return number === null ? "invalid:number" : api.setValue(row.key, number);
-      }}
-    />
+        messages={MESSAGES}
+        onPreview={(p, grid) => {
+          const value = valueAt(row, p, grid);
+          pending.current = value;
+          api.preview(row.key, value);
+        }}
+        onSettle={commit}
+        onStep={(steps, grid) => {
+          // The canvas follows the key; the key-up is the one commit (UX notes §15.2).
+          const next = stepValue(row, pending.current ?? current, steps, grid);
+          pending.current = next;
+          api.preview(row.key, next);
+        }}
+        onReset={() => api.setValue(row.key, defaultNumber)}
+        onCancel={() => {
+          pending.current = null;
+          api.cancelPreview();
+        }}
+        onSubmit={(text) => {
+          const number = parseNumber(text);
+          return number === null ? "invalid:number" : api.setValue(row.key, number);
+        }}
+        onReturnFocus={() => {
+          commit();
+          onReturnFocus();
+        }}
+      />
+    </div>
   );
 }
 

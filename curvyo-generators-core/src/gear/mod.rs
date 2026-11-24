@@ -57,16 +57,18 @@ fn edited(request: &GenerateRequest<'_>) -> StoredParams {
             put("module", diameter / f64::from(teeth));
         }
         Some(Edit::Scale(factor)) => {
-            for (key, default) in [
-                ("module", 2.0),
-                ("bore", 6.0),
-                ("keyway_width", 2.0),
-                ("keyway_depth", 1.0),
-                ("rim_width", 4.0),
-                ("hub_diameter", 12.0),
-            ] {
-                put(key, raw_mm(request.params, key, default) * factor.0);
-            }
+            // The outer diameter m (z + 2) follows the pointer by whole teeth (0141 criterion 5).
+            let teeth = request
+                .params
+                .get("teeth")
+                .and_then(ParamValue::from_stored)
+                .and_then(|value| value.count())
+                .unwrap_or(24);
+            // The schema clamps it to 6..=200 and reports that as the teeth's own clamp.
+            let scaled = (factor.0 * f64::from(teeth + 2) - 2.0).round().max(0.0);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let scaled = scaled.min(f64::from(u32::MAX)) as u32;
+            raw.insert("teeth".to_owned(), ParamValue::Count(scaled).to_stored());
         }
         _ => {}
     }
@@ -124,7 +126,6 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
     );
 
     let handles = handles(&Sizes {
-        pitch_radius: profile.pitch_radius,
         bore,
         hub: spoked.then_some(hub),
         rim_inner,
@@ -135,6 +136,9 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         parts: vec![Part { paths }],
         handles,
         clamps,
+        automatic: Vec::new(),
+        states: Vec::new(),
+        limits: Vec::new(),
     }
 }
 
@@ -171,16 +175,16 @@ fn keyway(v: &mut Values, bore: f64, hub_radius: Option<f64>, root: f64) -> Opti
 
 /// The radii the drag handles sit on.
 struct Sizes {
-    pitch_radius: f64,
     bore: f64,
     /// The hub diameter of a spoked gear.
     hub: Option<f64>,
     rim_inner: f64,
 }
 
-/// The drag handles: pitch circle always, bore when there is one, hub and rim when spoked.
+/// The drag handles: bore when there is one, hub and rim when spoked. There is no pitch diameter
+/// knob: the corner handle writes Teeth on the same diagonal (UX notes `0141` §15.6, Proposal).
 fn handles(sizes: &Sizes) -> Vec<Handle> {
-    let mut handles = vec![radial("pitch_diameter", sizes.pitch_radius, 45.0, 1.0, 2.0)];
+    let mut handles = Vec::new();
     if sizes.bore > 0.0 {
         handles.push(radial("bore", sizes.bore / 2.0, 0.0, 1.0, 2.0));
     }

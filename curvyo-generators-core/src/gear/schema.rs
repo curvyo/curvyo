@@ -2,7 +2,8 @@
 
 use curvyo_extension_core::{ChoiceOption, ParamGroup, ShownWhen};
 
-use crate::schema::{angle, choice, count, length, switch, when};
+use crate::schema::{angle, choice, count, length, switch, tracked, when};
+use curvyo_extension_core::Curve::{Linear, Log};
 
 pub(crate) const WEB: &[ChoiceOption] = &[
     ChoiceOption {
@@ -21,68 +22,127 @@ pub(crate) const MODULE_RANGE: (f64, f64) = (0.1, 25.0);
 pub(crate) const TEETH_RANGE: (u32, u32) = (6, 200);
 
 pub(crate) fn groups() -> Vec<ParamGroup> {
-    vec![
+    vec![teeth(), centre(), web()]
+}
+
+fn teeth() -> ParamGroup {
+    {
         ParamGroup {
             label: "Teeth",
             params: vec![
-                length("module", "Module", MODULE_RANGE, 2.0, (0.1, 4)),
-                count("teeth", "Teeth", TEETH_RANGE.0, TEETH_RANGE.1, 24),
-                length(
-                    "pitch_diameter",
-                    "Pitch diameter",
-                    (
-                        MODULE_RANGE.0 * f64::from(TEETH_RANGE.0),
-                        MODULE_RANGE.1 * f64::from(TEETH_RANGE.1),
-                    ),
-                    48.0,
-                    (1.0, 2),
+                tracked(
+                    length("module", "Module", MODULE_RANGE, 2.0, (0.1, 4)),
+                    0.1,
+                    10.0,
+                    Log,
                 ),
-                angle("pressure_angle", "Pressure angle", (10.0, 30.0), 20.0),
+                tracked(
+                    count("teeth", "Teeth", TEETH_RANGE.0, TEETH_RANGE.1, 24),
+                    6.0,
+                    100.0,
+                    Linear,
+                ),
+                tracked(
+                    length(
+                        "pitch_diameter",
+                        "Pitch diameter",
+                        (
+                            MODULE_RANGE.0 * f64::from(TEETH_RANGE.0),
+                            MODULE_RANGE.1 * f64::from(TEETH_RANGE.1),
+                        ),
+                        48.0,
+                        (1.0, 2),
+                    ),
+                    5.0,
+                    500.0,
+                    Log,
+                ),
+                tracked(
+                    angle("pressure_angle", "Pressure angle", (10.0, 30.0), 20.0),
+                    10.0,
+                    30.0,
+                    Linear,
+                ),
             ],
-        },
+        }
+    }
+}
+
+fn centre() -> ParamGroup {
+    {
         ParamGroup {
             label: "Centre",
             params: vec![
-                length("bore", "Bore", (0.0, 1000.0), 6.0, (0.5, 2)),
+                tracked(
+                    length("bore", "Bore", (0.0, 1000.0), 6.0, (0.5, 2)),
+                    0.0,
+                    100.0,
+                    Log,
+                ),
                 when(
                     switch("keyway", "Keyway"),
                     ShownWhen::Positive { key: "bore" },
                 ),
                 when(
-                    length("keyway_width", "Keyway width", (0.5, 100.0), 2.0, (0.1, 2)),
+                    tracked(
+                        length("keyway_width", "Keyway width", (0.5, 100.0), 2.0, (0.1, 2)),
+                        0.5,
+                        20.0,
+                        Log,
+                    ),
                     ShownWhen::On { key: "keyway" },
                 ),
                 when(
-                    length("keyway_depth", "Keyway depth", (0.2, 50.0), 1.0, (0.1, 2)),
+                    tracked(
+                        length("keyway_depth", "Keyway depth", (0.2, 50.0), 1.0, (0.1, 2)),
+                        0.2,
+                        10.0,
+                        Log,
+                    ),
                     ShownWhen::On { key: "keyway" },
                 ),
             ],
-        },
+        }
+    }
+}
+
+fn web() -> ParamGroup {
+    {
         ParamGroup {
             label: "Web",
             params: vec![
                 choice("web", "Web", WEB, "solid"),
                 when(
-                    count("spokes", "Spokes", 2, 12, 5),
+                    tracked(count("spokes", "Spokes", 2, 12, 5), 2.0, 12.0, Linear),
                     ShownWhen::Is {
                         key: "web",
                         choice: "spokes",
                     },
                 ),
                 when(
-                    length("rim_width", "Rim width", (0.5, 200.0), 4.0, (0.5, 2)),
+                    tracked(
+                        length("rim_width", "Rim width", (0.5, 200.0), 4.0, (0.5, 2)),
+                        0.5,
+                        50.0,
+                        Log,
+                    ),
                     ShownWhen::Is {
                         key: "web",
                         choice: "spokes",
                     },
                 ),
                 when(
-                    length(
-                        "hub_diameter",
-                        "Hub diameter",
-                        (1.0, 1000.0),
-                        12.0,
-                        (0.5, 2),
+                    tracked(
+                        length(
+                            "hub_diameter",
+                            "Hub diameter",
+                            (1.0, 1000.0),
+                            12.0,
+                            (0.5, 2),
+                        ),
+                        1.0,
+                        200.0,
+                        Log,
                     ),
                     ShownWhen::Is {
                         key: "web",
@@ -90,6 +150,6 @@ pub(crate) fn groups() -> Vec<ParamGroup> {
                     },
                 ),
             ],
-        },
-    ]
+        }
+    }
 }

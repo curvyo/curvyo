@@ -12,6 +12,19 @@ migration in that extension.
 - Parameter kinds `Count`, `Angle`, `Switch`, `Choice`; `Length` gains `step` and `decimals`; `Param`
   gains `shown_when`. Stored encodings `{"deg": n}`, `{"count": n}`, `{"on": b}`, `{"choice": "id"}`.
 
+- ADR 0082 §7 (amended by the architect): `Param` gains `track: Option<Track>` (`from`, `to`, `Curve::Linear` or `Log`): the span of the slider a number
+  is drawn on (`0141` revision 2 criterion 9). Source-breaking for code that builds a `Param` literal.
+- `ParamKind::Length` and `Count` gain `automatic: bool` (a stored 0 passes `Param::accept`, any other value keeps
+  the bounds); `Generated` gains `automatic` (the values used for parameters stored as 0), ADR 0082 §7
+  (`0147`). Source-breaking for code that builds a `ParamKind` or `Generated` literal.
+- `ShownWhen::AllOn { keys }`: a row drawn only while several switches are on (`0147`: Ring thickness and
+  Finger hollow need Lid and Lid seat).
+- ADR 0082 §7 revision 5 (`0147`): `Edit::Draft` (only outer outlines are wanted, for a ghost; never
+  stored), `Generated.states` (a word for a value at a limit that is a shape, "full round"),
+  `Generated.limits` (the largest value a dependent bound allows now) and `Bound::DependentMinimumFor`
+  (a minimum that a choice sets, "the least the Wave pattern allows"). Source-breaking for code that builds
+  a `Generated` literal or matches `Bound` or `Edit` exhaustively.
+
 ## Unreleased (`specs/0026-machine-profile`)
 
 - Block kind `MachineProfile { label }`: the machine profile picker and the copy's fields, drawn

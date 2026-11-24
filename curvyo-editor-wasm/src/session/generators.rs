@@ -505,7 +505,7 @@ impl Session {
             let Some(found) = instance::find_kind(&self.manufacturing.extensions, &kind) else {
                 return DrawList::default();
             };
-            let Some((record, _)) = instance::new_record(&found) else {
+            let Some(record) = instance::new_ghost_record(&found) else {
                 return DrawList::default();
             };
             *memo = Some((kind, record));

@@ -1,4 +1,4 @@
-import { Box, Cog } from "lucide-react";
+import { Box, Cog, SquareRoundCorner } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
@@ -7,7 +7,19 @@ import type { GeneratorKindsApi } from "@/hooks/useGenerators";
 const GLYPHS: Record<string, ReactNode> = {
   Box: <Box size={16} strokeWidth={1.5} aria-hidden />,
   Cog: <Cog size={16} strokeWidth={1.5} aria-hidden />,
+  SquareRoundCorner: <SquareRoundCorner size={16} strokeWidth={1.5} aria-hidden />,
 };
+
+/** The segment's width: 84 px, or wider for a longer name ("Rounded box"), so the text stays on
+ * one line (16 px glyph, 4 px gap, 12 px padding each side). */
+function segmentWidth(label: string): number {
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context) {
+    return 84;
+  }
+  context.font = `14px ${getComputedStyle(document.body).fontFamily}`;
+  return Math.max(84, Math.ceil(context.measureText(label).width) + 44);
+}
 
 /**
  * The Generators bar (`specs/0141-parametric-generators` UX notes §1): one pill with a radio group
@@ -28,8 +40,9 @@ export function GeneratorsBar({
     value: kind.id,
     label: kind.label,
     tooltip: "",
+    width: segmentWidth(kind.label),
     icon: (
-      <span className="flex items-center gap-1 text-sm">
+      <span className="flex items-center gap-1 text-sm whitespace-nowrap">
         {GLYPHS[kind.icon]}
         {kind.label}
       </span>

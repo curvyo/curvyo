@@ -9,6 +9,7 @@ use curvyo_extension_core::{
     Edit, GenerateRequest, Generated, Handle, Param, ParamValue, Part, StoredParams,
 };
 
+use crate::fingers::finger_count;
 use crate::outline::translated;
 use crate::values::Values;
 use plate::{Corner, Edge, Fingers, Plate};
@@ -50,14 +51,6 @@ fn edited(request: &GenerateRequest<'_>) -> StoredParams {
     raw
 }
 
-/// The number of fingers on an edge of `length`: odd, as close to `length / width` as possible.
-pub(crate) fn finger_count(length: f64, width: f64) -> u32 {
-    let pairs = ((length / width - 1.0) / 2.0).round().max(0.0);
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let pairs = pairs as u32;
-    2 * pairs + 1
-}
-
 /// How the lid is made.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Lid {
@@ -90,7 +83,7 @@ impl Sizes {
                 from: t,
                 to: length - t,
                 segments: count,
-                even_solid: false,
+                even_solid: true,
             })
         };
         Plate {
@@ -121,7 +114,7 @@ impl Sizes {
             from: t,
             to: across - t,
             segments: along,
-            even_solid: true,
+            even_solid: false,
         });
         let vertical = Edge::Fingered(Fingers {
             from: top,
@@ -288,6 +281,9 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         parts,
         handles,
         clamps,
+        automatic: Vec::new(),
+        states: Vec::new(),
+        limits: Vec::new(),
     }
 }
 
@@ -365,6 +361,143 @@ mod tests {
                 assert_on_one_line(&front.steps(3), &left.steps(1), clearance / 2.0);
                 assert_on_one_line(&front.steps(1), &left.steps(3), clearance / 2.0);
             }
+        }
+    }
+
+    fn vertices(path: &curvyo_extension_core::ClosedPath) -> Vec<Point> {
+        let mut points = vec![path.start];
+        points.extend(path.segments.iter().map(|segment| segment.to));
+        if points.len() > 1 && points.first() == points.last() {
+            points.pop();
+        }
+        points
+    }
+
+    /// Whether the segments `p1`-`p2` and `q1`-`q2` share a point (touching counts).
+    fn segments_meet(p1: Point, p2: Point, q1: Point, q2: Point) -> bool {
+        let cross = |from: Point, to: Point, at: Point| {
+            (to.x - from.x) * (at.y - from.y) - (to.y - from.y) * (at.x - from.x)
+        };
+        let within = |from: Point, to: Point, at: Point| {
+            at.x >= from.x.min(to.x) - 1e-9
+                && at.x <= from.x.max(to.x) + 1e-9
+                && at.y >= from.y.min(to.y) - 1e-9
+                && at.y <= from.y.max(to.y) + 1e-9
+        };
+        let (s1, s2) = (cross(q1, q2, p1), cross(q1, q2, p2));
+        let (t1, t2) = (cross(p1, p2, q1), cross(p1, p2, q2));
+        if s1 * s2 < -1e-12 && t1 * t2 < -1e-12 {
+            return true;
+        }
+        (s1.abs() < 1e-9 && within(q1, q2, p1))
+            || (s2.abs() < 1e-9 && within(q1, q2, p2))
+            || (t1.abs() < 1e-9 && within(p1, p2, q1))
+            || (t2.abs() < 1e-9 && within(p1, p2, q2))
+    }
+
+    /// No repeated vertex and no two non-adjacent edges that touch.
+    fn assert_simple(path: &curvyo_extension_core::ClosedPath, what: &str) {
+        let points = vertices(path);
+        let count = points.len();
+        for first in 0..count {
+            for second in first + 1..count {
+                let gap =
+                    (points[first].x - points[second].x).hypot(points[first].y - points[second].y);
+                assert!(gap > 1e-6, "{what}: vertex {first} repeats at {second}");
+            }
+        }
+        for first in 0..count {
+            for second in first + 2..count {
+                if first == 0 && second == count - 1 {
+                    continue;
+                }
+                assert!(
+                    !segments_meet(
+                        points[first],
+                        points[(first + 1) % count],
+                        points[second],
+                        points[(second + 1) % count]
+                    ),
+                    "{what}: edge {first} meets edge {second}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_plate_is_a_simple_polygon_at_kerf_zero_and_two_tenths() {
+        for kerf in [0.0, 0.2] {
+            for lid in ["none", "flat", "fingers"] {
+                for pieces in 1..=9 {
+                    let size = f64::from(pieces) * 6.0;
+                    let plates = plates_for_tests(&stored(&[
+                        ("inner_width", mm(size.max(10.0))),
+                        ("inner_depth", mm(size.max(10.0))),
+                        ("inner_height", mm(size.max(10.0))),
+                        ("finger_width", mm(6.0)),
+                        ("lid", ParamValue::Choice(lid.into())),
+                    ]));
+                    for (index, plate) in plates.iter().enumerate() {
+                        assert_simple(
+                            &plate.outline(kerf),
+                            &format!("plate {index}, lid {lid}, {pieces} pieces, kerf {kerf}"),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn every_piece_of_a_joint_edge_belongs_to_exactly_one_plate() {
+        use plate::Edge;
+        let plates = plates_for_tests(&stored(&[("lid", ParamValue::Choice("fingers".into()))]));
+        let pieces = |plate: &Plate, edge: usize| match plate.edges[edge] {
+            Edge::Fingered(f) => (0..f.segments)
+                .map(|i| !crate::fingers::is_notched(i, f.even_solid))
+                .collect::<Vec<_>>(),
+            Edge::Plain => Vec::new(),
+        };
+        // The 12 joint edges: the bottom's top and bottom edges against the front's and back's bottom edges, the
+        // bottom's left and right edges against the side walls'; the lid does the same on top.
+        let bottom = &plates[0];
+        let lid = &plates[5];
+        for (plate, edge, mate, mate_edge) in [
+            (bottom, 0, &plates[1], 2),
+            (bottom, 2, &plates[2], 2),
+            (bottom, 3, &plates[3], 2),
+            (bottom, 1, &plates[4], 2),
+            (lid, 0, &plates[1], 0),
+            (lid, 2, &plates[2], 0),
+            (lid, 3, &plates[3], 0),
+            (lid, 1, &plates[4], 0),
+            // The four vertical edges: front and back own the end pieces.
+            (&plates[1], 3, &plates[3], 1),
+            (&plates[1], 1, &plates[4], 3),
+            (&plates[2], 1, &plates[3], 3),
+            (&plates[2], 3, &plates[4], 1),
+        ] {
+            let (a, b) = (pieces(plate, edge), pieces(mate, mate_edge));
+            assert_eq!(a.len(), b.len());
+            assert_ne!(a.len(), 0);
+            for (index, (x, y)) in a.iter().zip(&b).enumerate() {
+                assert_ne!(
+                    x, y,
+                    "piece {index} of edge {edge} is owned by both or neither"
+                );
+            }
+            assert!(
+                a[0] && a[a.len() - 1],
+                "the owner keeps the pieces at the corners"
+            );
+        }
+        // The corner cubes belong to the bottom and the lid, and are cut from every wall.
+        for plate in [bottom, lid] {
+            assert!(plate.corners.iter().all(|c| *c == plate::Corner::Owned));
+        }
+        for wall in &plates[1..5] {
+            assert_eq!(wall.corners[2], plate::Corner::Notched);
+            assert_eq!(wall.corners[3], plate::Corner::Notched);
         }
     }
 
