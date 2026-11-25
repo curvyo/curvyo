@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 import { WasmLibrarySource } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
-import { setPreviewOpen } from "@/lib/fontPreviewStore";
 import { readLibraryDocument } from "@/lib/libraryApi";
+import { claimPane, registerPaneCloser, releasePane } from "@/lib/sidePaneStore";
 
 /** The page shown in the preview pane. */
 export interface PreviewPage {
@@ -18,6 +18,8 @@ export interface PreviewPage {
   subject: string;
   /** The document's name, for Came from. */
   documentName: string;
+  /** Opened by the library browser's Pick elements…: the header offers Back to it (UX U19). */
+  back?: boolean;
 }
 
 interface State {
@@ -63,8 +65,8 @@ export function previewNow(): State {
 
 /** Opens `page` in the pane; another page of the same document keeps the reader. */
 export async function openPreview(page: PreviewPage): Promise<void> {
-  // One side pane at a time (UX notes P15): the font preview closes.
-  setPreviewOpen(false);
+  // One side pane at a time (UX notes P15, `specs/0152` criterion 2): the open other kind closes.
+  claimPane("library-page");
   const same =
     state.page && state.page.source === page.source && state.page.path.join("/") === page.path.join("/");
   if (same && state.reader) {
@@ -94,7 +96,10 @@ export function closePreview(): void {
   opening += 1;
   state.reader?.free();
   set({ page: null, reader: null, error: "", picks: [] });
+  releasePane("library-page");
 }
+
+registerPaneCloser("library-page", closePreview);
 
 /** Sets the picks. */
 export function setPicks(picks: string[]): void {

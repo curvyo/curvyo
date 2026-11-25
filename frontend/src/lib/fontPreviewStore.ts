@@ -2,6 +2,7 @@
 // is open, and the Fonts tab's listed families as last published, so the preview keeps them
 // while another Properties tab is shown or the panel is collapsed.
 import type { RowTag } from "@/lib/fontRows";
+import { claimPane, registerPaneCloser, releasePane } from "@/lib/sidePaneStore";
 import type { FontFamily } from "@/lib/textText";
 
 /** One listed family and its tags (criterion 14): all of them as chips, Cuttable and Single line
@@ -69,10 +70,18 @@ export function previewState(): PreviewState {
 
 /** Opens or closes the preview; `focusSample` when a key opened it. */
 export function setPreviewOpen(open: boolean, focusSample = false): void {
+  // One side pane at a time (`specs/0152` criterion 2): opening closes the other kind.
+  if (open) {
+    claimPane("font-preview");
+  } else {
+    releasePane("font-preview");
+  }
   if (state.open !== open || state.focusSample !== focusSample) {
     set({ open, focusSample: open && focusSample });
   }
 }
+
+registerPaneCloser("font-preview", () => setPreviewOpen(false));
 
 /** The sample field took the focus it was asked to. */
 export function sampleFocused(): void {
