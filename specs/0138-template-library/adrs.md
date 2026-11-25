@@ -4,7 +4,7 @@ Architect, 2026-11-24. One new ADR; Fragen 271 B, 272 and 273 A are fixed; Frage
 (TPL-SEARCH) answered 2026-11-24: B; Frage 334 (TPL-HOST) answered 2026-11-24: A. fontsource is
 not part of this slice.
 
-- [ADR 0085](../../docs/adr/0085-online-template-sources-read-only.md) (Proposed,
+- [ADR 0085](../../docs/adr/0085-online-template-sources-read-only.md) (Accepted with PR #478,
   `needs-customer`: network, a new crate and a new dependency):
   - `online-sources.toml` and the ready Curvyo entry at
     `https://raw.githubusercontent.com/curvyo/templates/main/` (criteria 1, 7; Frage 334 A,
