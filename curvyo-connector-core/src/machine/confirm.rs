@@ -108,7 +108,10 @@ impl Machine {
     pub(super) fn shown_job(&self) -> Option<&super::Held> {
         // A waiting Home starts no job, so it names none (`specs/0118` M5).
         let waits_home = self.state == State::AwaitingLocalStart
-            && matches!(self.waiting, Waiting::Home | Waiting::Frame);
+            && matches!(
+                self.waiting,
+                Waiting::Home | Waiting::Frame | Waiting::Point
+            );
         let shown = self.options.start_rule == StartRule::OwnerConfirms
             && !waits_home
             && matches!(
@@ -120,6 +123,8 @@ impl Machine {
                     | State::Homing
                     | State::Jogging
                     | State::Framing
+                    | State::Focusing
+                    | State::Pulsing
                     | State::Done { .. }
             );
         self.held.as_ref().filter(|_| shown)
@@ -232,6 +237,11 @@ impl Machine {
         let requested_by = self.requester.take().unwrap_or_default();
         let resume = self.waiting == Waiting::Resume;
         let confirmed_by = owner.map(|p| p.name.clone());
+        if self.waiting == Waiting::Point {
+            // Only Enter lets a go to point run; no owner confirms one (adrs P11).
+            self.run_point(out);
+            return;
+        }
         if self.waiting == Waiting::Frame {
             out.confirmed = Some(Confirmation {
                 job_id: self.frame_id(),

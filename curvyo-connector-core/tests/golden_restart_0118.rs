@@ -48,6 +48,7 @@ fn status(state: State, line: u32, entering: bool) -> Message {
         machine_position: Some([-387.5, -300.0, 0.0].map(Millimetres)),
         work_offset: Some([-400.0, -300.0, 0.0].map(Millimetres)),
         frame_id: None,
+        target: None,
     }
 }
 

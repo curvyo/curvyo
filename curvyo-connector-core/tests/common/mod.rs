@@ -86,7 +86,9 @@ impl FakeController {
                 | ControllerCommand::Frame { .. }
                 | ControllerCommand::Jog { .. }
                 | ControllerCommand::JogHold { .. }
-                | ControllerCommand::JogCancel => {}
+                | ControllerCommand::JogCancel
+                | ControllerCommand::GoTo { .. }
+                | ControllerCommand::Pulse { .. } => {}
             }
         }
     }
