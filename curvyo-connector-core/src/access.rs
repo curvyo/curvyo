@@ -26,7 +26,7 @@ enum Kind {
     ApplyConfig,
     Login,
     Job,
-    /// `Jog`, `JogKeep`: moving the head by hand is an owner's (Frage 308 A).
+    /// `Jog`, `JogKeep`, `GoToPoint`: moving the head by hand is an owner's (Frage 308 A, 380 A).
     Motion,
     /// `MoveJob`, `RemoveJob`, `SetRunNext`: the job list.
     List,
@@ -41,7 +41,7 @@ fn kind(message: &Message) -> Kind {
         Message::ListPorts => Kind::ListPorts,
         Message::ApplyConfig { .. } => Kind::ApplyConfig,
         Message::Pair { .. } | Message::Auth { .. } => Kind::Login,
-        Message::Jog { .. } | Message::JogKeep => Kind::Motion,
+        Message::Jog { .. } | Message::JogKeep | Message::GoToPoint { .. } => Kind::Motion,
         Message::MoveJob { .. } | Message::RestartFromLine { .. } => Kind::OwnerList,
         Message::RemoveJob { .. } | Message::SetRunNext { .. } => Kind::List,
         Message::GetConfig
@@ -59,7 +59,7 @@ fn kind(message: &Message) -> Kind {
 /// Whether `peer` (`None`: not logged in) may send `message` in `mode`; the refusal's code when
 /// not. `Pair` and `Auth` pass outside maintenance mode: the session's login rules decide them.
 /// A member's `Home` passes: the job machine holds it until an owner confirms (`specs/0118` 37);
-/// a member's `Jog` and `JogKeep` are refused, `JogStop` passes.
+/// a member's `Jog`, `JogKeep` and `GoToPoint` are refused, `JogStop` passes.
 ///
 /// # Errors
 /// The `ErrorCode` of the refusal.
@@ -178,6 +178,14 @@ mod tests {
             ("JogKeep", Message::JogKeep),
             ("JogStop", Message::JogStop),
             (
+                "GoToPoint",
+                Message::GoToPoint {
+                    x: crate::Millimetres(1.0),
+                    y: crate::Millimetres(2.0),
+                    pulse: None,
+                },
+            ),
+            (
                 "MoveJob",
                 Message::MoveJob {
                     job_id: id,
@@ -274,6 +282,7 @@ mod tests {
             "Jog: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
             "JogKeep: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
             "JogStop: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
+            "GoToPoint: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
             "MoveJob: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
             "RemoveJob: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "RestartFromLine: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",

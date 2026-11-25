@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use super::{BUSY_WORDS, ControllerCommand, Machine, Output, Waiting};
+use super::{BUSY_WORDS, ControllerCommand, Machine, Output};
 use crate::jog::{JOG_DEAD_MAN, JogAxis, JogDirection, JogStep};
 use crate::message::{ErrorCode, Message, State};
 use crate::millimetres::Millimetres;
@@ -55,14 +55,10 @@ impl Machine {
             State::Homing => Some("Homing.".to_owned()),
             State::Running | State::Paused => Some("A job is running.".to_owned()),
             State::Receiving => Some("A job is arriving.".to_owned()),
-            State::AwaitingLocalStart if self.waiting == Waiting::Home => {
-                Some("A home waits.".to_owned())
-            }
-            State::AwaitingLocalStart if self.waiting == Waiting::Frame => {
-                Some("A frame waits.".to_owned())
-            }
-            State::AwaitingLocalStart => Some("A start waits at the machine.".to_owned()),
+            State::AwaitingLocalStart => Some(self.waiting_words().to_owned()),
             State::Framing => Some("Framing.".to_owned()),
+            State::Focusing => Some("Focus point.".to_owned()),
+            State::Pulsing => Some("Pulse.".to_owned()),
             State::NoController => Some("No controller.".to_owned()),
             State::Jogging => None,
         }
@@ -174,6 +170,7 @@ impl Machine {
     /// The clock: a hold whose keep-alive is late is cancelled (criterion 18).
     pub(super) fn on_clock(&mut self, now: Duration, out: &mut Output) {
         self.now = now;
+        self.pulse_clock(now, out);
         let late = self
             .jog
             .is_some_and(|r| r.deadline.is_some_and(|deadline| now >= deadline));

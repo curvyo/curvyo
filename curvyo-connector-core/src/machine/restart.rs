@@ -71,6 +71,8 @@ impl Machine {
             State::Homing => Some("Homing".to_owned()),
             State::Jogging => Some("Jogging".to_owned()),
             State::Framing => Some("Framing".to_owned()),
+            State::Focusing => Some("Focus point".to_owned()),
+            State::Pulsing => Some("Pulse".to_owned()),
             State::AwaitingLocalStart => Some(match (self.shown_requester(), self.waiting) {
                 (Some(r), Waiting::Home) => format!("Home requested by {r}"),
                 (Some(r), Waiting::Frame) => format!("Frame requested by {r}"),

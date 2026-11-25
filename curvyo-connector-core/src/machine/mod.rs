@@ -4,6 +4,7 @@ mod arrival;
 mod confirm;
 mod controls;
 mod event;
+mod focus;
 mod frame;
 mod home;
 mod interrupt;
@@ -23,8 +24,10 @@ use uuid::Uuid;
 use crate::assembly::{Assembly, Job};
 pub(crate) use crate::count::count;
 use crate::job_list::JobList;
+use crate::jog::TravelBox;
 use crate::message::{ErrorCode, JobKind, Message, Progress, RejectReason, State};
 use crate::millimetres::Millimetres;
+use focus::FocusRun;
 use frame::FrameRun;
 use jog::JogRun;
 use list::Transfer;
@@ -63,6 +66,9 @@ enum Waiting {
     Home,
     /// A member's frame (`specs/0118` 2b, adrs F5); the frame is in its own slot.
     Frame,
+    /// A go to point under `--require-local-start` (`specs/0118` 12, adrs P3); its target and
+    /// pulse are in the focus slot.
+    Point,
     /// A restart from a line (`specs/0118` 2e, adrs R8).
     Restart,
 }
@@ -91,6 +97,8 @@ pub struct Machine {
     held: Option<Held>,
     /// The frame that arrives, waits or runs, beside the held job (`specs/0118` 2b).
     frame: Option<FrameRun>,
+    /// The go to point that waits, moves or pulses (`specs/0118` 2d).
+    focus: Option<FocusRun>,
     position: Option<[Millimetres; 3]>,
     alarm: Option<String>,
     /// The sentence that explains the state.
@@ -120,6 +128,8 @@ pub struct Machine {
     /// The head's machine position and the work offset, as the controller reported them.
     mpos: Option<[Millimetres; 3]>,
     wco: Option<[Millimetres; 3]>,
+    /// The box the controller's travel allows, as the controller named it.
+    travel: Option<TravelBox>,
     /// Who pressed the start or resume that waits in `AwaitingLocalStart`.
     requester: Option<String>,
     /// Who sent the job being received.
@@ -160,6 +170,7 @@ impl Machine {
             assembly: None,
             held: None,
             frame: None,
+            focus: None,
             position: None,
             alarm: None,
             detail: None,
@@ -176,6 +187,7 @@ impl Machine {
             now: Duration::ZERO,
             mpos: None,
             wco: None,
+            travel: None,
             requester: None,
             sender: String::new(),
             list: JobList::default(),
@@ -215,7 +227,9 @@ impl Machine {
 
     fn shown_detail(&self) -> Option<String> {
         if self.stop_pending {
-            return Some("Stopping".to_owned());
+            // A stop the connector began itself names its cause (`specs/0118` adrs P6).
+            let cause = self.focus_failure().map(str::to_owned);
+            return Some(cause.unwrap_or_else(|| "Stopping".to_owned()));
         }
         if self.state == State::Homing {
             // The state says it; the controller's `Home` word is not repeated (`specs/0118` M3).
@@ -240,11 +254,16 @@ impl Machine {
                 | State::Homing
                 | State::Jogging
                 | State::Framing
+                | State::Focusing
+                | State::Pulsing
                 | State::Done { .. }
         );
-        // A waiting Home or frame starts no job, so it names none.
+        // A waiting Home, frame or go to point starts no job, so it names none.
         let waits_home = self.state == State::AwaitingLocalStart
-            && matches!(self.waiting, Waiting::Home | Waiting::Frame);
+            && matches!(
+                self.waiting,
+                Waiting::Home | Waiting::Frame | Waiting::Point
+            );
         let job = self
             .held
             .as_ref()
@@ -271,6 +290,7 @@ impl Machine {
             machine_position: self.mpos,
             work_offset: self.wco,
             frame_id: self.shown_frame_id(),
+            target: self.shown_target(),
         }
     }
 
@@ -325,12 +345,22 @@ impl Machine {
     fn enter(&mut self, state: State, out: &mut Output) {
         if !matches!(
             state,
-            State::Running | State::Paused | State::Homing | State::Jogging | State::Framing
+            State::Running
+                | State::Paused
+                | State::Homing
+                | State::Jogging
+                | State::Framing
+                | State::Focusing
+                | State::Pulsing
         ) {
             self.stop_pending = false;
         }
         if state != State::Jogging {
             self.jog = None;
+        }
+        let point_waits = state == State::AwaitingLocalStart && self.waiting == Waiting::Point;
+        if !matches!(state, State::Focusing | State::Pulsing) && !point_waits {
+            self.focus = None;
         }
         self.pause_pending &= state == State::Running;
         self.state = state;
@@ -356,7 +386,18 @@ impl Machine {
         self.assembly = None;
         self.held = None;
         self.frame = None;
+        self.focus = None;
         self.requester = None;
+    }
+
+    /// The cause of a refusal while `AwaitingLocalStart`, by what waits.
+    fn waiting_words(&self) -> &'static str {
+        match self.waiting {
+            Waiting::Home => "A home waits.",
+            Waiting::Frame => "A frame waits.",
+            Waiting::Point => "A focus point waits.",
+            Waiting::Start | Waiting::Resume | Waiting::Restart => "A start waits at the machine.",
+        }
     }
 
     fn reject(out: &mut Output, job_id: Uuid, reason: RejectReason) {
@@ -364,7 +405,10 @@ impl Machine {
     }
 
     fn on_message(&mut self, message: Message, peer: &Peer, out: &mut Output) {
-        if self.takes_as_request(&message, peer, out) || self.frame_refuses(&message, out) {
+        if self.takes_as_request(&message, peer, out)
+            || self.frame_refuses(&message, out)
+            || self.focus_refuses(&message, out)
+        {
             return;
         }
         match message {
@@ -405,6 +449,7 @@ impl Machine {
             Message::Jog { .. } | Message::JogKeep | Message::JogStop => {
                 self.jog_message(&message, out);
             }
+            Message::GoToPoint { x, y, pulse } => self.go_to_point([x, y], pulse, peer, out),
             _ => Self::error(
                 out,
                 ErrorCode::UnexpectedMessage,

@@ -24,14 +24,10 @@ impl Machine {
             State::Running | State::Paused => Some("A job is running.".to_owned()),
             State::Receiving => Some("A job is arriving.".to_owned()),
             State::Jogging => Some("Jogging.".to_owned()),
-            State::AwaitingLocalStart if self.waiting == Waiting::Home => {
-                Some("A home waits.".to_owned())
-            }
-            State::AwaitingLocalStart if self.waiting == Waiting::Frame => {
-                Some("A frame waits.".to_owned())
-            }
-            State::AwaitingLocalStart => Some("A start waits at the machine.".to_owned()),
+            State::AwaitingLocalStart => Some(self.waiting_words().to_owned()),
             State::Framing => Some("Framing.".to_owned()),
+            State::Focusing => Some("Focus point.".to_owned()),
+            State::Pulsing => Some("Pulse.".to_owned()),
             State::NoController => Some("No controller.".to_owned()),
         };
         if let Some(message) = refusal {
