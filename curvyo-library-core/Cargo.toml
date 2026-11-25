@@ -17,3 +17,6 @@ serde_json.workspace = true
 toml.workspace = true
 # The SHA-256 of a template file against its catalogue entry (ADR 0085 decision 4).
 sha2.workspace = true
+# Inflates the shipped keyword file (spec `0153`, ADR 0087 decision 7); already in both builds
+# through `zip`, now direct.
+flate2.workspace = true

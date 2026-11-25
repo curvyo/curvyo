@@ -111,3 +111,21 @@ impl From<VerifyError> for Failure {
         }
     }
 }
+
+/// Why the shipped keyword file is not used (spec `0153` criterion 4, ADR 0087 decision 3); the
+/// search then runs without keywords.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum KeywordsError {
+    /// The gzip layer does not inflate.
+    #[error("the keyword file does not inflate")]
+    Inflate,
+    /// Larger than 4 MiB once inflated.
+    #[error("the keyword file is too large")]
+    TooLarge,
+    /// Not a keyword file, or another format.
+    #[error("not a keyword file of format 1")]
+    NotKeywords,
+    /// A count, index, length, text or the name order is wrong.
+    #[error("the keyword file is damaged")]
+    Damaged,
+}

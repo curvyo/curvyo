@@ -1,0 +1,670 @@
+{
+  "search": {
+    "name": "search",
+    "category": "System",
+    "tags": [
+      "find",
+      "magnifier",
+      "magnifying-glass",
+      "lookup",
+      "zoom",
+      "explore",
+      "query",
+      "browse",
+      "search"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eb1c"
+      },
+      "filled": {
+        "version": "3.38",
+        "unicode": "101cb"
+      }
+    }
+  },
+  "zoom": {
+    "name": "zoom",
+    "category": "Map",
+    "tags": [
+      "search",
+      "find",
+      "magnifier",
+      "magnifying-glass",
+      "lookup",
+      "zoom",
+      "zooming",
+      "magnify"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "fdaa"
+      },
+      "filled": {
+        "version": "2.4",
+        "unicode": "f787"
+      }
+    }
+  },
+  "zoom-in": {
+    "name": "zoom-in",
+    "category": "Map",
+    "tags": [
+      "zoom-in",
+      "magnify",
+      "enlarge",
+      "plus",
+      "magnifier",
+      "magnifying-glass",
+      "scale",
+      "zooming",
+      "zoom",
+      "in"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eb56"
+      },
+      "filled": {
+        "version": "2.4",
+        "unicode": "f789"
+      }
+    }
+  },
+  "zoom-check": {
+    "name": "zoom-check",
+    "category": "Map",
+    "tags": [
+      "zoom",
+      "magnifier",
+      "magnifying-glass",
+      "search",
+      "done",
+      "success",
+      "confirmed",
+      "approved",
+      "verified",
+      "found",
+      "check"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.39",
+        "unicode": "ef09"
+      },
+      "filled": {
+        "version": "2.4",
+        "unicode": "f786"
+      }
+    }
+  },
+  "zoom-cancel": {
+    "name": "zoom-cancel",
+    "category": "Map",
+    "tags": [
+      "zoom",
+      "magnifier",
+      "magnifying-glass",
+      "search",
+      "cancel",
+      "clear-search",
+      "stop",
+      "close"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.11",
+        "unicode": "ec4d"
+      },
+      "filled": {
+        "version": "3.0",
+        "unicode": "fdc6"
+      }
+    }
+  },
+  "trash": {
+    "name": "trash",
+    "category": "System",
+    "tags": [
+      "delete",
+      "remove",
+      "bin",
+      "garbage",
+      "rubbish",
+      "waste-basket",
+      "trash-can",
+      "recycle-bin",
+      "trash"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eb41"
+      },
+      "filled": {
+        "version": "2.4",
+        "unicode": "f783"
+      }
+    }
+  },
+  "trash-x": {
+    "name": "trash-x",
+    "category": "System",
+    "tags": [
+      "delete",
+      "remove",
+      "bin",
+      "garbage",
+      "trash-can",
+      "empty-trash",
+      "discard",
+      "waste",
+      "rubbish",
+      "trash"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.46",
+        "unicode": "ef88"
+      },
+      "filled": {
+        "version": "2.4",
+        "unicode": "f784"
+      }
+    }
+  },
+  "trash-off": {
+    "name": "trash-off",
+    "category": "System",
+    "tags": [
+      "delete",
+      "remove",
+      "bin",
+      "garbage",
+      "trash-can",
+      "disabled",
+      "inactive",
+      "waste",
+      "rubbish",
+      "trash",
+      "off"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.31",
+        "unicode": "ed65"
+      }
+    }
+  },
+  "settings": {
+    "name": "settings",
+    "category": "System",
+    "tags": [
+      "cog",
+      "gear",
+      "preferences",
+      "configuration",
+      "options",
+      "config",
+      "setup",
+      "control",
+      "settings"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eb20"
+      },
+      "filled": {
+        "version": "2.0",
+        "unicode": "f69e"
+      }
+    }
+  },
+  "settings-2": {
+    "name": "settings-2",
+    "category": "System",
+    "tags": [
+      "cog",
+      "gear",
+      "preferences",
+      "configuration",
+      "options",
+      "config",
+      "setup",
+      "control",
+      "settings"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.110",
+        "unicode": "f5ac"
+      }
+    }
+  },
+  "heart": {
+    "name": "heart",
+    "category": "Shapes",
+    "tags": [
+      "heart",
+      "love",
+      "like",
+      "favorite",
+      "favourite",
+      "wishlist",
+      "valentine",
+      "emotion",
+      "health"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eabe"
+      },
+      "filled": {
+        "version": "2.0",
+        "unicode": "f67c"
+      }
+    }
+  },
+  "heart-off": {
+    "name": "heart-off",
+    "category": "Shapes",
+    "tags": [
+      "heart",
+      "love",
+      "like",
+      "favorite",
+      "favourite",
+      "unfavorite",
+      "unlike",
+      "disabled",
+      "off-state",
+      "unavailable",
+      "none",
+      "off"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.66",
+        "unicode": "f141"
+      }
+    }
+  },
+  "home": {
+    "name": "home",
+    "category": "Buildings",
+    "tags": [
+      "home",
+      "house",
+      "homepage",
+      "main",
+      "start",
+      "dashboard",
+      "building",
+      "residence",
+      "real-estate"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eac1"
+      },
+      "filled": {
+        "version": "3.0",
+        "unicode": "102b3"
+      }
+    }
+  },
+  "arrow-left": {
+    "name": "arrow-left",
+    "category": "Arrows",
+    "tags": [
+      "direction",
+      "west",
+      "previous",
+      "back",
+      "go-back",
+      "return",
+      "pointer",
+      "navigation",
+      "arrow",
+      "left"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "ea19"
+      }
+    }
+  },
+  "arrow-right": {
+    "name": "arrow-right",
+    "category": "Arrows",
+    "tags": [
+      "direction",
+      "east",
+      "next",
+      "forward",
+      "continue",
+      "proceed",
+      "go",
+      "pointer",
+      "arrow",
+      "right"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "ea1f"
+      }
+    }
+  },
+  "circle": {
+    "name": "circle",
+    "category": "Shapes",
+    "tags": [
+      "round",
+      "dot",
+      "shape",
+      "geometry",
+      "ellipse",
+      "ring",
+      "radio",
+      "record",
+      "full-stop",
+      "circle"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "ea6b"
+      },
+      "filled": {
+        "version": "2.0",
+        "unicode": "f671"
+      }
+    }
+  },
+  "square": {
+    "name": "square",
+    "category": "Shapes",
+    "tags": [
+      "box",
+      "rectangle",
+      "shape",
+      "geometry",
+      "stop",
+      "checkbox",
+      "square"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eb2c"
+      },
+      "filled": {
+        "version": "2.30",
+        "unicode": "fc40"
+      }
+    }
+  },
+  "star": {
+    "name": "star",
+    "category": "System",
+    "tags": [
+      "favorite",
+      "rating",
+      "rate",
+      "review",
+      "bookmark",
+      "like",
+      "featured",
+      "favourite",
+      "star"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eb2e"
+      },
+      "filled": {
+        "version": "2.0",
+        "unicode": "f6a6"
+      }
+    }
+  },
+  "bell": {
+    "name": "bell",
+    "category": "System",
+    "tags": [
+      "notification",
+      "alert",
+      "reminder",
+      "notify",
+      "alarm",
+      "notifications",
+      "ring",
+      "inbox",
+      "subscribe",
+      "bell"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "ea35"
+      },
+      "filled": {
+        "version": "2.0",
+        "unicode": "f669"
+      }
+    }
+  },
+  "folder-search": {
+    "name": "folder-search",
+    "category": "Document",
+    "tags": [
+      "directory",
+      "dir",
+      "files",
+      "find",
+      "magnifier",
+      "magnifying-glass",
+      "lookup",
+      "archive",
+      "project",
+      "zoom",
+      "query"
+    ],
+    "styles": {
+      "outline": {
+        "version": "2.10",
+        "unicode": "f918"
+      }
+    }
+  },
+  "file-search": {
+    "name": "file-search",
+    "category": "Document",
+    "tags": [
+      "search",
+      "find",
+      "lookup",
+      "magnifier",
+      "document",
+      "file",
+      "browse",
+      "explore",
+      "query"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.31",
+        "unicode": "ed5d"
+      }
+    }
+  },
+  "user-search": {
+    "name": "user-search",
+    "category": "System",
+    "tags": [
+      "person",
+      "account",
+      "profile",
+      "avatar",
+      "member",
+      "search",
+      "find",
+      "lookup",
+      "magnifier",
+      "directory",
+      "user"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.46",
+        "unicode": "ef89"
+      }
+    }
+  },
+  "ambulance": {
+    "name": "ambulance",
+    "category": "Vehicles",
+    "tags": [
+      "emergency",
+      "hospital",
+      "medical",
+      "paramedic",
+      "rescue",
+      "vehicle",
+      911,
+      "health",
+      "ems",
+      "ambulance"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.8",
+        "unicode": "ebf5"
+      }
+    }
+  },
+  "number-0": {
+    "name": "number-0",
+    "category": "Numbers",
+    "tags": [
+      "zero",
+      "number",
+      "digit",
+      "numeral",
+      "count",
+      null,
+      "nil",
+      "numeric",
+      "character"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.38",
+        "unicode": "edf0"
+      }
+    }
+  },
+  "sun": {
+    "name": "sun",
+    "category": "Weather",
+    "tags": [
+      "light-mode",
+      "light",
+      "theme",
+      "day",
+      "brightness",
+      "weather",
+      "sunny",
+      "bright",
+      "sun"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eb30"
+      },
+      "filled": {
+        "version": "2.0",
+        "unicode": "f6a9"
+      }
+    }
+  },
+  "lock": {
+    "name": "lock",
+    "category": "System",
+    "tags": [
+      "lock",
+      "padlock",
+      "locked",
+      "security",
+      "secure",
+      "password",
+      "private",
+      "protected"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "eae2"
+      },
+      "filled": {
+        "version": "3.0",
+        "unicode": "fe15"
+      }
+    }
+  },
+  "eraser": {
+    "name": "eraser",
+    "category": "Text",
+    "tags": [
+      "eraser",
+      "erase",
+      "rubber",
+      "delete",
+      "clear",
+      "remove",
+      "clean",
+      "wipe",
+      "clear-formatting"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.3",
+        "unicode": "eb8b"
+      }
+    }
+  },
+  "backspace": {
+    "name": "backspace",
+    "category": "Text",
+    "tags": [
+      "delete",
+      "erase",
+      "remove",
+      "keyboard",
+      "key",
+      "clear",
+      "undo",
+      "backspace"
+    ],
+    "styles": {
+      "outline": {
+        "version": "1.0",
+        "unicode": "ea2d"
+      },
+      "filled": {
+        "version": "2.9",
+        "unicode": "f7dc"
+      }
+    }
+  }
+}
