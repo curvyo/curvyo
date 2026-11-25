@@ -1,12 +1,17 @@
 # 0149 Path box: UX notes
 
-ux-engineer, 2026-11-24, revision 2. Checked against `specification.md` revision 3 (criteria 1 to 12;
+ux-engineer, 2026-11-24, revision 3. Checked against `specification.md` revision 3 (criteria 1 to 12;
 Fragen 364 to 366 at their defaults A), ADR 0083 revision 2 (§1 kind and label, §2 contract, source,
 placement and checks, §3 classification, §4 one rule per span, §5 corner joints, §7 plates and hollow,
 §8 parameters and layout, §11 warnings and marks), `adrs.md`, `specs/0147-rounded-box/ux-notes.md` revision 3 (the shared block; everything not
 named here is as there), `specs/0141-parametric-generators/ux-notes.md` and `docs/design-system.md` (rows
 "Pick mode", "Select bar layout", "Stroke to path", "Action notice", "Canvas notice slot", "Drag ghost",
 "Modifier badge", "Hidden, not disabled", `--mixed-hatch`).
+
+Revision 3 (as built in slice 1; lead decisions, all **(Proposal)**, vetoable at the demo): "Replace
+outline" is in slice 1, a button in the Size group that arms the pick mode (section 4); refusals in the
+canvas notice slot use the refusal look, and a Select bar refusal shows under the button only (sections
+1.1, 1.2); the finger hollow on a bent span is out of slice 1, the lid is built without it (section 5).
 
 Revision 2: the layout lies right of the source (section 4, question 2 B); kinks are built in slice 1
 and carry the bend hatch (section 3, question 1 A); the curves refusal in the button and the pick
@@ -36,7 +41,8 @@ offered where the outline is: on the selection, and as a pick on the canvas.
   before create).
 - **Press:** one step "Add path box"; the box is built from the outline (section 4), selected, the Style
   tab shows (`0141` section 2), focus goes to the canvas. The source is deselected and untouched.
-- **Refused** (Action notice under the button, the refusal look, `role="alert"`, 8 s): "The outline
+- **Refused** (Action notice under the button, the refusal look, `role="alert"`, 8 s; **only there**, not
+  a second time in the canvas notice slot, **(Proposal)**, lead): "The outline
   crosses itself. Nothing was changed." / "The outline is too small for a box with 3 mm walls. Nothing
   was changed." (area below (4 t_w)², t_w the default Wall thickness). In slice 1 an outline with a
   curved cubic: "This outline has curves. Box from path builds straight outlines only so far. Nothing
@@ -63,7 +69,9 @@ offered where the outline is: on the selection, and as a pick on the canvas.
   - A **click** on it builds the box from it: one step "Add path box", the box selected, back to Select
     (`0141` section 2). The source is untouched.
   - A click on an **ineligible** object (open path, group, text, crossing outline, too small, in slice 1
-    an outline with curves): nothing is built, the refusal in the canvas notice slot: "Select one
+    an outline with curves): nothing is built, the refusal in the canvas notice slot (the refusal look,
+    `role="alert"`, 8 s, as every text ending "Nothing was changed." there; warnings stay in the status
+    look, section 6; **(Proposal)**, lead): "Select one
     closed outline. Nothing was changed."; for a crossing, too small or curved outline the texts of
     1.1, so the curves case reads "This outline has curves. Box from path builds straight outlines
     only so far. Nothing was changed.".
@@ -124,11 +132,21 @@ hovered outline in the pick mode, an overlay shows how the outline was read. All
 
 ## 4. The box and its source (criteria 1, 8; Frage 364 A, 365 A; question 2 B)
 
-- **The copy.** The box keeps a copy of the outline (ADR 0083 §2). The block draws no row for it in
-  this story: re-picking an outline is out of scope. When "Replace outline" comes, it is a full-width
-  text button in the Size group above Inner height, "Replace from selection" per ADR 0083 §2. A stored
+- **The copy.** The box keeps a copy of the outline (ADR 0083 §2). The block draws no row for its
+  value. A stored
   outline that fails the shape check (a damaged or hand-edited file) reads as the **default outline, a
   coffin of 100 x 60 mm** (six straight edges, ADR 0083 §2), shown with a notice and never rewritten.
+- **Replace outline** (built in slice 1, **(Proposal)**, lead; it replaces ADR 0083 §2's "Replace from
+  selection", which needs a second selected object while the block shows for one selected box only). A
+  full-width text button **Replace outline** at the top of the Size group, above Inner height (the
+  look of the block's buttons, the focus ring). The press arms the **pick mode of section 1.2** for this
+  box: the Generators tool with the box's kind, hover highlight on an eligible outline, cursor
+  `pointer`. A **click**, or **Enter** with the pointer over an outline, replaces the stored copy with
+  that outline: one step **"Replace outline"**, the box keeps its place and its other values,
+  regenerates, stays selected, back to Select. The picked outline (the source) is untouched. **Escape**
+  or a **tool change** cancels; nothing changes. An ineligible pick is refused with the same sentences
+  as section 1.2 ("Select one closed outline. Nothing was changed.", or the crossing, too small or
+  curves text of 1.1), in the canvas notice slot in the refusal look; the pick stays armed.
 - **The source stays untouched:** same place, layer, style and operation, deselected after the build.
   Editing it later changes nothing in the box. On a laser page the source keeps its operation, so it is
   cut as well as the box's inner base until the maker deletes or unassigns it; nothing warns about that
@@ -177,8 +195,12 @@ differences:
   Inner height, the thicknesses stay; readout "W × H mm". The scale stops where 3 mm walls (the current
   Wall thickness) no longer fit (ADR 0083 §2, warning `smallest_size`), with the notice of section 6.
 - Clamps as `0147` §5 where the field exists. Extra texts: "No place for the finger hollow on this lid."
-  (ADR 0083 §7, the hollow left out); "The ring has no opening at this ring thickness." (the ring a full
-  plate).
+  (ADR 0083 §7, warning `hollow_left_out`); "The ring has no opening at this ring thickness." (the ring
+  a full plate).
+- **Slice 1** (**(Proposal)**, lead): the finger hollow sits on the lid's longest straight that holds it;
+  the hollow on a bent span (ADR 0083 §7, "else centred on its longest bent span") is not built. With no
+  such straight the lid is built without the hollow and the `hollow_left_out` text above shows, as a
+  warning of section 6.
 
 ## 6. Notices that build anyway (criteria 5, 7)
 
@@ -243,4 +265,4 @@ revision 2). Kept for the record.
    (section 6): the product owner aligns criteria 1, 2, 5, 7 and 12.
 
 To go into `docs/design-system.md` when Done: the Box from path button and segment, the pick of a
-generator source, the corner cross and the bend hatch, the piece badges.
+generator source (and its Replace outline use), the corner cross and the bend hatch, the piece badges.

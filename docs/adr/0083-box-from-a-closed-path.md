@@ -1,7 +1,8 @@
 # ADR 0083: A box from any closed path
 
 **Status:** Proposed by the architect 2026-11-24, revision 2 the same day with the lead's
-decisions on spec `0149` revision 3 and its UX notes revision 1 (all Proposal, vetoable at the
+decisions on spec `0149` revision 3 and its UX notes revision 1, revision 3 the same day with the
+lead's decisions from the slice-1 build and spec `0149` revision 4 (all Proposal, vetoable at the
 demo). Not `needs-customer` as a whole: no new crate,
 no `format_version` (a new generator kind is additive, ADR 0080 §5; the path is a parameter
 value); one new crate edge (`curvyo-generators-core → curvyo-geometry-core`, allowed by ADR 0034
@@ -11,7 +12,11 @@ value); one new crate edge (`curvyo-generators-core → curvyo-geometry-core`, a
 and outline checks that never swap the maker's outline on a thickness or scale edit (§2); slice 1
 builds kinks as bent spans (§3) and a curved cubic only from a newer file, as its chord (§2); the automatic
 spacing reports its smallest gap (§4); notices name wall pieces and travel as structured warnings,
-and the generator returns canvas marks (§4, §5, §7, §11); a seam on a straight loop (§6). The
+and the generator returns canvas marks (§4, §5, §7, §11); a seam on a straight loop (§6). Revision 3 changes (slice-1 build): the
+seam sits in the longest straight (§6); a kink's fillet is raised to hold two slit columns (§3,
+§4); cover and lid use `contour.rs`'s exact offset, not geometry-core's (§7); the heart's counts
+(§10); the shipped contract and `Document::create_generated_above` checked against §2 and §11
+(§12). The
 customer questions are the spec's: Frage 364 (copy, decided here as A), 365 (the source
 stays), 346 (Corner angle default 25°), 347 (answered by §4: no curve pattern is needed). Spec:
 [`0149`](../../specs/0149-path-box/specification.md) (Ready for slice 1, straight outlines; slice 2 curves). Per-part operations
@@ -111,7 +116,7 @@ nothing gained).
      own value. So the layout starts Gap right of the source, top edges aligned, and the source
      stays clickable. This holds at create only; later edits regenerate about the frame origin
      as for every generator. **Layer (revision 2, UX notes §4, accepted):** the box is written
-     directly above the source in the source's parent (`drawing_above.rs`), not on top of the
+     directly above the source in the source's parent (`create_generated_above`, §12), not on top of the
      active layer as `0141`'s placed generators. A derived object follows its source, as clones,
      trace results and Stroke to path already do; the source was just selected or picked, so its
      layer is visible and unlocked. Replace outline: `Edit::Param("outline")` with the new copy,
@@ -125,7 +130,7 @@ nothing gained).
      shown with a notice, never rewritten on read (ADR 0033 §3). The generator's dependent step
      in `path_box/` (one function, `path_box::check`) then normalises (clockwise on screen,
      starting at the first corner of §3 if any) and tests, in this order:
-     - **No self-intersection** (geometry-core `curve_intersections`): a crossing outline is
+     - **No self-intersection** (geometry-core `cut_parameters`, revision 3): a crossing outline is
        structurally unusable, so it is replaced by the default outline with the warning
        `outline_crosses` (§11). Only damage brings it here, since create refuses it.
      - **Size:** an area of at least (4 t_w)². This never replaces the outline. On create
@@ -153,15 +158,20 @@ nothing gained).
      needs only the line test; `arc_fit.rs` arrives with slice 2 (§2 for a curve in slice 1).
    - **Junctions.** At each join, the turn angle δ between the incoming and outgoing tangents.
      |δ| ≤ 1° is tangent (fitting noise). 1° < |δ| ≤ `corner_angle` is a **kink**: filleted on
-     the inner face with radius 2 t_w, so it becomes part of a bent span (Proposal; the outline
-     moves by at most 2 t_w (1/cos(δ/2) - 1) there, 0.07 t_w at 30°). |δ| > `corner_angle` is a
+     the inner face with radius r = max(2 t_w, 2 g / |δ|), g the least slit gap (slit width + 1
+     mm, divided by 0.88 for the Wave pattern, §4), so it becomes part of a bent span whose arc
+     r |δ| holds two slit columns (Proposal; revision 3, lead decision: at 2 t_w an 18° kink of a
+     3 mm wall gives a 1.9 mm arc, too short for the two columns the uncut-band test needs). The
+     outline moves by r (1/cos(δ/2) - 1) there: 0.07 t_w at 30° with r = 2 t_w, about g |δ| / 4
+     for a raised r. |δ| > `corner_angle` is a
      **corner**, convex or concave. **Kinks are slice 1** (revision 2, lead decision, Proposal;
      UX question 1 A): a fillet is an exact arc between two lines, so it needs no arc fit, and
      the bent span it makes is the rounded box's (slits, flat windows, the seam of §6). A
      straight too short for the fillets at both its ends (each takes 2 t_w tan(|δ|/2)) gives
      both fillets the radius whose tangent points meet in its middle; the straight is dropped
-     and the two arcs join into one bent span (ADR 0082 §5, degenerate straights). Such a
-     radius may fall below the bending limit of §4, which then warns.
+     and the two arcs join into one bent span (ADR 0082 §5, degenerate straights). This cap
+     applies after the raise above. Such a radius may fall below the bending limit of §4, which
+     then warns; the raise alone never does.
    - **Spans.** Between corners, consecutive arcs and fillets form one bent span; a line is a
      straight. The result is a `Footprint` (ADR 0082 §4) with corners marked.
    - `corner_angle`: an Angle parameter, default 25°, 5° to 90° (spec Frage 366 A).
@@ -180,7 +190,8 @@ nothing gained).
    width + 1 mm, as long as the column still fits before the band's end; then all gaps are
    scaled by one factor (at least 1, since only columns that fit were placed) so the last column
    lies as far from the band's end as the first from its start. So no gap falls below the
-   minimum. A typed spacing applies everywhere. **Reported value** (revision 2, UX notes §5,
+   minimum. A kink's arc holds at least two columns (§3, revision 3), except where §3's
+   short-straight cap lowers its radius. A typed spacing applies everywhere. **Reported value** (revision 2, UX notes §5,
    accepted): `Generated.automatic` carries one value per key, so `slit_spacing` reports the
    smallest gap after the scaling, over every bent span of every piece: the gap the minimum
    clamp guards and the place a crack starts, so a typed value never lies denser than the
@@ -211,19 +222,34 @@ nothing gained).
      pieces 3 and 4 is very sharp: 22°.", UX notes §6); built anyway.
    - On a bent span next to a corner the zone follows the tangent at the corner. The plate meets
      the wall's inner face, which is outside every zone.
-6. **Seam.** Only an outline with no corner has one, at the middle of the back (spec criterion
-   9): the outline's point with the least screen y (ties: least x), with tabs laid out half a
-   pitch either side of it (ADR 0082 §5). When the least y is held along a straight (a polygon
-   whose kinks left no corner, its top edge level), the seam is that straight's middle and the
-   straight takes the next even tab count, as the rounded box's back straight (revision 2). With
-   corners every piece runs corner to corner and the joints hold it.
+6. **Seam.** Only an outline with no corner has one (spec criterion 9). **Revision 3 (lead
+   decision, Proposal; spec `0149` revision 4):** it sits at the middle of the outline's longest
+   straight (ties: the straight with the least screen y, then the least x), never inside a bent
+   span; that straight takes the next even tab count, the tabs half a pitch either side of the
+   seam (ADR 0082 §5), as the rounded box's back straight. Only an outline without any straight
+   (a circle, slice 2) has the seam at the point with the least screen y (ties: least x), the
+   middle of the back as on the rounded box. Rejected: the least-y point everywhere (revision 2):
+   on a polygon of kinks it often lies inside a fillet, and a seam there cuts the bent span's
+   band short; the coffin at Corner angle 90° lost the slits of its kinks, against the uncut-band
+   rule (ADR 0082 §9). With corners every piece runs corner to corner and the joints hold it.
 7. **Plates** (`wall_plates.rs`). Inner base, tabbed lid and the ring's outline are the footprint
    with tabs, through `contour.rs` (exact; chords at windows, miter joins at corners, ADR 0082 §2).
-   The outer footprint (cover, seat lid) is the footprint offset outward by t_w + k/2 with Miter
-   joins, so it covers the walls' outer corners; the ring opening is the footprint offset inward
-   by 2 t_r + k/2 with Round joins. Both through geometry-core `offset`; its cubic result is the
-   part's `ClosedPath` (or hole) directly. An empty ring opening leaves the ring as a full plate
-   with the warning `ring_closed`. The finger hollow sits on the lid's longest straight that holds
+   **Revision 3 (lead decision, Proposal):** the outer footprint (cover, seat lid) is the
+   footprint offset outward by t_w with `contour.rs`'s exact offset (miter joins, so it covers
+   the walls' outer corners; at a convex corner a miter longer than 4 t_w is bevelled, which only
+   a corner that already carries `sharp_corner` reaches), turned back into a `Footprint` of spans, so the
+   finger hollow is cut into a span of it exactly as on the rounded box; the kerf is added as for
+   every plate. The ring opening is the footprint offset inward by 2 t_r + k/2 with Round joins
+   through geometry-core `offset` (it handles collapse; its cubic result is the hole directly),
+   and the crossing check of §2 is geometry-core's `cut_parameters`. Rejected: geometry-core
+   `offset` for the cover too (revision 2): its result is cubics without spans, so the hollow has
+   no straight to sit on. **Residual risk:** the exact offset does not resolve self-overlap, so
+   at a concave valley narrower than 2 t_w the two flanks' offsets pass each other, and at a
+   concave corner whose miter passes 4 t_w the two piece ends are joined directly, so the cover
+   can cross itself (a small loop). Covered so far only by the five-point star test (radii 60 and
+   24 mm, a simple cover); the remedy, once a test shows the case, is geometry-core's offset for
+   that cover without the hollow (not built).
+   An empty ring opening leaves the ring as a full plate with the warning `ring_closed`. The finger hollow sits on the lid's longest straight that holds
    the width plus 2 t_w, else centred on its longest bent span whose smallest radius is at least
    the hollow width, else it is left out with the warning `hollow_left_out` (§11).
 8. **Parameters** (keys are file format; Proposal): `outline` (Path), `inner_height`,
@@ -247,8 +273,9 @@ nothing gained).
    document-core with `0099` (ADR 0080 §2), the `Path` arm moves with it; sketch clones never hold
    one. Each committed edit stores the path once more (a 40-cubic heart: 242 numbers, about 2 KB).
 10. **Tests.** Arc fit against the cubic within 0.01 mm (sampled; explicit tolerance).
-    Classification goldens: a heart (two corners: the bottom convex, the top concave; two bent
-    spans), a shield, a coffin (corners only), a circle drawn as four cubics (no corner, one bent
+    Classification goldens: a heart (two corners: the bottom tip convex, the top notch concave;
+    its four curved cubics, two per lobe, merge tangent-continuously into exactly two bent spans,
+    one per side between the two corners, so two wall pieces; revision 3, spec revision 4), a shield, a coffin (corners only), a circle drawn as four cubics (no corner, one bent
     span). Corner joints at 60°, 90°, 120°, 135° and a concave 240° interior: the two pieces' fingers
     alternate, one owner per corner, tips within t_w |cot δ| / 2 of the outer face. Per bent span
     the uncut-band, slot-inside and spacing tests of ADR 0082 §9. The cover equals the outward
@@ -260,7 +287,9 @@ nothing gained).
     clamped and the outline kept; a scale-down below the minimum keeps the thickness and stops
     at the smallest outline with `smallest_size`; the placement translation of §2 (layout left edge Gap right of
     the source, tops equal) on a rotated source; the reported `slit_spacing` equals the smallest
-    gap. CPU (spec criterion 11): the coffin at most 100 ms and the heart with
+    gap. Revision 3: a five-point star (ten corners, convex and concave): one owner per corner
+    and a cover that does not cross itself; the coffin at Corner angle 90° (kinks only): every
+    kink keeps at least two slit columns and the seam lies in a straight. CPU (spec criterion 11): the coffin at most 100 ms and the heart with
     at least 400 slots at most 300 ms of thread CPU for the edit with its commit.
 
 11. **Warnings and canvas marks (revision 2; contract, run time only, never stored).** The UX
@@ -295,6 +324,24 @@ nothing gained).
     - No `format_version`: `Generated` is run time; the record still holds kind, seed, params and
       parts only.
 
+12. **Shipped contract, checked against §2 and §11 (revision 3).**
+    - `ParamKind::Path`, `ParamValue::Path(ClosedPath)` and the stored `{"path": [...]}` match
+      §2; the codec doc comment in `generated_codec.rs` carries the form (§9). Additions:
+      `ClosedPath::{flat, from_flat}`; `from_flat` also requires the last cubic to end at the
+      start (within 1e-6 mm), and the shape check requires at least two cubics, so a malformed
+      loop reads as the default outline (ADR 0033 §3).
+    - `GeneratorKind.source: Option<Source>`, `Source { param, command }` match §2; addition
+      `GeneratorKind::segment()` (the command, else the label), by which the registry orders.
+    - `Generated.warnings: Vec<Warning>` and `Generated.marks: Marks` match §11 field for field
+      (`Marks: Default` for the other kinds). Deviation to fix before the PR: `Mark::Piece.length`
+      is a bare `f64`; it becomes a `Length` (CLAUDE.md §5, units are newtypes at the contract).
+    - New public `Document::create_generated_above(record, frame, source)` in
+      `curvyo-document-core` (`generated_commands.rs`): the seeded create of
+      `create_generated_seeded`, written in the source's parent directly above it by `mov_after`,
+      as `drawing_above.rs` and clones place theirs (§2 named `drawing_above.rs` as the place; the
+      pattern is reused, the function lives with the other generated commands). One commit, the
+      "Add path box" step; `NoSuchObject` for a missing source or a layer. No format change.
+
 ## Consequences
 
 - One shape tool covers any footprint; the rounded box stays the quick one with size fields and
@@ -309,6 +356,8 @@ nothing gained).
   coffin). If slice 2's heart makes the hover lag, a classify-only request (option B of §11) is
   the next step.
 - `Generated` grows by `warnings` and `marks`; the other kinds return them empty.
+- The cover's exact offset can cross itself at a concave valley narrower than 2 t_w (§7); the
+  star test guards the common case only.
 
 ## Customer questions
 

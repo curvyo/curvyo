@@ -1,7 +1,8 @@
 # ADRs for the path box
 
 Status: Proposed (architect, 2026-11-24), revision 2 the same day with the lead's decisions and
-the UX notes revision 1. One new ADR (0083, Proposed, revision 2, no questions of its own); it
+the UX notes revision 1, revision 3 the same day with the lead's decisions from the slice-1 build
+(spec revision 4). One new ADR (0083, Proposed, revision 3, no questions of its own); it
 builds on ADR 0082 revision 3. Decisions marked **(Proposal)** are the architect's and
 vetoable at the demo.
 
@@ -26,10 +27,15 @@ vetoable at the demo.
     face, one owner per corner, very sharp corners built with a notice (criteria 4, 5);
   - slits on the flat developed strip, spacing from the local radius, the smallest gap reported
     as the automatic value (criterion 6; Frage 367 falls away);
-  - seam only without corners, at the back, a straight's middle when the top is level
-    (criterion 9);
-  - plates: tabbed plates exact, cover and ring opening through geometry-core `offset`, the
-    hollow's place (criterion 10);
+  - seam only without corners, at the middle of the longest straight, never in a bent span;
+    the least-y point only without any straight (criterion 9; revision 3);
+  - a kink's fillet radius raised so its arc holds two slit columns at the least gap
+    (criterion 6; revision 3);
+  - plates: tabbed plates, cover and lid by `contour.rs`'s exact offset (the hollow cut into a
+    span), ring opening and crossing test through geometry-core; residual risk at a concave
+    valley narrower than 2 t (criterion 10; revision 3);
+  - the shipped contract (`Path`, `Source`, `warnings`, `marks`) and the new public
+    `Document::create_generated_above` checked against the ADR (§12; revision 3);
   - tests and CPU budgets (criteria 3, 4, 6, 11).
 - [ADR 0082](../../docs/adr/0082-generator-plate-joints-corner-rule-and-rounded-box.md)
   revision 3: the corner rule (§1), kerf with miter joins (§2), the shared `footprint.rs`,
@@ -64,6 +70,12 @@ vetoable at the demo.
    clones, trace results and Stroke to path (ADR 0083 §2).
 7. 2026-11-24: **Placement** (lead decision, Proposal, UX question 2 B): the layout's left edge
    Gap right of the source's bounding box, tops aligned; at create only (ADR 0083 §2).
+8. 2026-11-24, revision 3: **Slice-1 build decisions** (lead, Proposal; ADR 0083 §3, §6, §7,
+   §10, §12): the seam in the longest straight (the least-y seam cut the coffin's kinks at
+   Corner angle 90° short of their slits); kink fillets of max(2 t, 2 g / |δ|) (an 18° kink at
+   2 t gave a 1.9 mm arc); cover and lid by the exact contour offset so the hollow sits on a
+   span, ring opening and crossing test by geometry-core; the heart's four curved cubics merge
+   into two bent spans. `Mark::Piece.length` is to become a `Length` before the PR.
 
 ## Spec issues (for the product owner)
 
