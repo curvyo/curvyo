@@ -14,6 +14,7 @@ mod codec;
 mod config;
 mod count;
 mod frame_text;
+mod gcode_words;
 mod handshake;
 mod job_list;
 mod jog;
