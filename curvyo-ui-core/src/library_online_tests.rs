@@ -167,7 +167,7 @@ fn an_expanded_catalogue_lists_folders_and_templates_with_their_licence_line() {
         "Font not included"
     );
     assert!(plate.label.ends_with("font not included"));
-    assert!(plate.unreadable, "format 59 is newer than this build");
+    assert!(plate.unreadable, "format 999 is newer than this build");
     assert_eq!(plate.line, "Cannot be loaded: made by a newer Curvyo.");
     let none = rows.iter().find(|r| r.name == "No licence stated").unwrap();
     assert_eq!(none.online.as_ref().unwrap().licence, "Licence unknown");

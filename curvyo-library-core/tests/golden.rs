@@ -50,7 +50,7 @@ fn an_entry_states_its_licence_credit_and_fonts() {
         plate.fonts_withheld(),
         "a font without a licence is not fetched"
     );
-    assert_eq!(plate.format_version, Some(59));
+    assert_eq!(plate.format_version, Some(999));
     let finger = catalogue.entry("boxes/finger-box").unwrap();
     assert!(!finger.fonts_withheld());
     assert!(finger.licence_known());

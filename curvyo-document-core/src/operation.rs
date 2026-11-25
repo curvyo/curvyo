@@ -82,8 +82,14 @@ pub enum OperationError {
     #[error("a test grid row takes no items and no settings")]
     GridRow,
     /// A Start value that is none of the three spellings (ADR 0065 §2).
-    #[error("the start is machine_origin, head_position or home_then_origin")]
+    #[error("the start is machine_origin, head_position, home_then_origin or user_origin")]
     BadStart,
+    /// Start User origin on a page with no stored user origin (`specs/0118` O2).
+    #[error("the page has no user origin")]
+    NoUserOrigin,
+    /// A user origin beyond ±10 m (`specs/0118` O1).
+    #[error("the user origin lies within ±10,000,000 µm")]
+    BadUserOrigin,
 }
 
 /// The operation nodes under `manufacturing`, in list (tree) order.

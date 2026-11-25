@@ -603,6 +603,7 @@ impl Document {
         let same_size = page.size.width.as_mm() == size.width.as_mm()
             && page.size.height.as_mm() == size.height.as_mm();
         let same_profile = manufacturing.profile.as_ref() == Some(profile);
+        let reset_start = user_origin_reset(&manufacturing, profile, change);
         let current = manufacturing.set_records();
         let all_on = manufacturing.sets.iter().all(|set| set.on_page)
             && manufacturing
@@ -624,22 +625,7 @@ impl Document {
             .get_tree(OBJECTS_TREE)
             .get_meta(tree_id_of(id))
             .map_err(|_| ManufacturingError::NotFound)?;
-        let shift = Vec2::new(
-            if anchor.right {
-                page.size.width.as_mm() - size.width.as_mm()
-            } else {
-                0.0
-            },
-            if anchor.bottom {
-                page.size.height.as_mm() - size.height.as_mm()
-            } else {
-                0.0
-            },
-        );
-        let frame = Frame {
-            origin: Point::new(page.origin.x + shift.x, page.origin.y + shift.y),
-            size,
-        };
+        let (shift, frame) = anchored_frame(&page, size, anchor);
         let pages = self.pages();
         let layout = if same_size {
             crate::page_layout::Layout::default()
@@ -659,6 +645,10 @@ impl Document {
                 .map_err(|_| ManufacturingError::OutOfRange)?;
             if !same_profile {
                 write_plain_map(&meta, KEY_PROFILE, profile);
+            }
+            if let Some(key) = &reset_start {
+                meta.insert(key, "machine_origin")
+                    .map_err(|_| ManufacturingError::NotFound)?;
             }
             if manufacturing.legacy_machine_name.is_some() {
                 meta.delete(KEY_MACHINE_NAME)
@@ -690,6 +680,43 @@ impl Document {
             Ok(true)
         })
     }
+}
+
+/// The shift of the page's origin and its new frame when the page takes `size` and keeps `anchor`.
+fn anchored_frame(page: &Page, size: DocumentSize, anchor: PageCorner) -> (Vec2, Frame) {
+    let shift = Vec2::new(
+        if anchor.right {
+            page.size.width.as_mm() - size.width.as_mm()
+        } else {
+            0.0
+        },
+        if anchor.bottom {
+            page.size.height.as_mm() - size.height.as_mm()
+        } else {
+            0.0
+        },
+    );
+    let frame = Frame {
+        origin: Point::new(page.origin.x + shift.x, page.origin.y + shift.y),
+        size,
+    };
+    (shift, frame)
+}
+
+/// The Start register of `manufacturing` when `change` puts another machine on the page while
+/// Start is User origin: a point taken from one head is no place on another, so Start returns to
+/// Machine origin in the same step and the point stays (`specs/0118` O9, Frage 345 C). Edits and
+/// a pick of the same record keep it.
+fn user_origin_reset(
+    manufacturing: &ManufacturingSnapshot,
+    profile: &FixtureParams,
+    change: ProfileChange,
+) -> Option<String> {
+    let key = format!("x.{}.start", manufacturing.process);
+    let other = manufacturing.profile.as_ref().and_then(|p| p.get("id")) != profile.get("id");
+    let user_origin =
+        manufacturing.process_values.get(&key) == Some(&serde_json::Value::from("user_origin"));
+    (change == ProfileChange::Pick && other && user_origin).then_some(key)
 }
 
 #[cfg(test)]
