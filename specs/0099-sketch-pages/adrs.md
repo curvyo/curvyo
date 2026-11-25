@@ -393,3 +393,204 @@ upstream rule, deterministic on every peer.
   original's shape instead.
 - Everything else of §12 (Own writes all current values, Original's drops all, per-key Back,
   muted inherited values, bare-name knob rule, value in sketch units) fits A2 to A7 as written.
+
+## Addendum A12ff, 2026-11-25: slice 2 (handles and links)
+
+Architect, 2026-11-25. Read against the branch after PR #482 (`CURRENT_FORMAT_VERSION` 62 on main
+and here), criteria 24, 25 and 31 to 37 as the product owner drafted them on 2026-11-25, UX notes
+12.3, the generator knobs (`curvyo-ui-core/src/instance_handles.rs`,
+`curvyo-editor-wasm/src/session/generators/handles.rs`), the sketch arm
+(`curvyo-ui-core/src/instance_sketch.rs`, `curvyo-editor-wasm/src/session/sketch_instance.rs`) and
+document-core's `instance_codec.rs`, `instance_commands.rs`, `instance_value.rs`,
+`sketch_instance.rs`, `clone_read.rs`, `clone_preview.rs`. Frage 373 B and 374 B are the customer's;
+everything else is **(Proposal)**.
+
+### A12. Canvas handles (criterion 25, 31 re-run)
+
+- **One knob type, two arms (ADR 0080 §6).** `instance_handles.rs` keeps `Knob` and `dragged_mm`;
+  `Knob` changes `key` and `label` from `&'static str` to `String` (sketch keys are runtime
+  strings) and gains `motion: KnobMotion { Along { direction: Vec2, rate: f64 }, Around { centre:
+  Point, sign: f64 } }` with `value: f64` (mm or degrees) in place of `value_mm`; the generator's
+  knobs become `Along`. `dragged_mm` becomes `dragged(knob, from, to, snap: bool) -> f64`: `Along`
+  projects the pointer's move on `direction` times `rate`; `Around` adds the signed angle swept
+  around `centre` since the press, times `sign`. The snap **modifier is chosen by the session per
+  arm** (generators keep Shift, `0141` §9; sketch clones Ctrl/Cmd, criterion 25), the math only
+  takes the bool.
+- **Anchors** in a new `curvyo-ui-core/src/instance_sketch_handles.rs` ("Where each exposed value
+  of a sketch clone puts its knob"): `knobs(sketch: &SketchSnapshot,
+  solved: &Sketch, clone: &CloneSnapshot, view) -> Vec<Knob>`. It needs the sketch page's
+  dimension geometry, today `pub(super)` in `curvyo-editor-wasm/src/session/sketch/dimension_geometry.rs`:
+  that file **moves to ui-core** unchanged (`curvyo-ui-core/src/sketch_dimension_geometry.rs`, a
+  `refactor` commit first; it only uses sketch-core, document-core and ui-core types; the sketch
+  page calls it from there). The clone arm calls it with `placement = composed · sketch.placement`
+  and lays it out with `layout_dimensions` and the dimension's stored label (`SketchSnapshot::labels`,
+  mapped the same way), so the knob and the hover guides (UX 12.3) are the sketch page's own marks:
+  - `Linear` / `Projected` (length of a line, distance, horizontal, vertical): the second
+    arrowhead's tip, `Along` the measured direction.
+  - `Radius` (radius, a circle's length, ellipse radius): where the leader meets the curve,
+    `Along` `toward`; `Diameter`: the same point, rate doubled.
+  - `Angle` (angle, axis angle): the second arrowhead's tip on the dimension arc, `Around` the
+    vertex, `sign = -1` when `det(composed) < 0` (a mirrored clone).
+  - Sweep has no dimension geometry (structural): field only; a count: field only.
+  - **Rate in sketch units:** `rate = base / |composed · placement · u|` for the local unit
+    direction `u` of the measurement (`base` 1, 2 for a diameter), so a 50 % clone gives 20 mm per
+    10 mm and a non-uniform scale is right along the knob's own direction.
+  - A `p:` key gets the knob of the one driving dimension whose expression is exactly
+    `Expression::Reference(id)`, none when zero or several (criterion 25); a `d:` key whose own
+    expression is not a literal still gets its knob (the own value replaces it, A2).
+- **Solved geometry, one solve per step.** `Document::instance_solution(clone: NodeId, own:
+  Option<&ValueSet>) -> Option<Arc<Sketch>>`: the solved graph for the clone's committed set
+  (`None` own) or a preview set, through the same `InstanceSolves::solved` entry that
+  `instance_preview` fills, so anchors at rest and the moving partner's knob during a drag (33)
+  cost no second solve. An empty set is the sketch's own `solution`. The knob memo (as
+  `KnobMemo`, keyed by clone id, `Arc::as_ptr` of `root_outline`, `composed`, own values) lives in
+  a new `curvyo-editor-wasm/src/session/sketch_instance_handles.rs`.
+- **Hit test, 72 px, collisions, readout, draw list, Escape**: session, shared with the generator
+  arm. `generators/handles.rs`' `visible_knobs` rule (72 px on the shorter box side, 16 px
+  collisions with earlier knobs and transform glyphs, none during a transform drag), `knob_at` and
+  the draw list become functions over `&[Knob]` used by both arms; each arm only supplies its raw
+  knobs and box. Knob press order in the pointer router: generator knob, then sketch knob, then
+  Select. A double-click on a knob opens the entry chip of `0052` with one field (the knob wins
+  over Select original, criterion 13).
+- **Drag step.** Each move calls `instance_sketch::plan(document, clone, key, number, only_this)`
+  (A14), which asks `Document::instance_preview` for the one clone: one solve per step for the
+  whole link group (one value set), no write. The knob drag uses the slice-1 slot
+  `InstanceState { previews, last_solvable }` of `session/sketch_instance.rs` (not the generator's
+  `Preview`), with a new `overlay: bool` so a knob drag draws blue-new over black-old (UX 12.3) and
+  the field drag keeps the in-place look it has. Release = `instance_sketch::change` with the
+  drag's `last_solvable`, one step "Change parameter"; Escape clears the slot. CPU test: the slice-1
+  `sketch_instances_cpu_time.rs` gains the knob drag and a linked drag (criterion 37: one solve per
+  step, the 199 other `root_outline` pointers unchanged).
+
+### A13. Links: data model and codec (`format_version` 64)
+
+**Link groups on the sketch.** Each `exposed_params` entry may carry `"link": "<group>"`, a
+string of 1 to 64 characters; entries with the same string form a group. A new group takes a
+string no stored entry uses (raw items included, since an invalid `link` is kept): the starting
+entry's key when free, else `<key>#2`, `#3`, ... (no id allocation; the list is one LWW value, so
+checking the current list is enough). Rejected: (B) a separate
+register `exposed_links: [[key, key], ...]`: it can name keys that are no longer exposed and races
+with `exposed_params` under LWW, while a field on the entry leaves with its entry in the one
+written list; (C) a link stored on each clone: the customer wants it set once in the sketch
+(Frage 374 B).
+
+```text
+exposed_params : [ { "key": "d:c7", "name": "Radius 1", "link": "d:c7" },
+                   { "key": "d:c8", "name": "Radius 2", "link": "d:c7" } ]
+```
+
+- Read: `ExposedEntry` and `ExposedParam` gain `link: Option<String>` (the decoded string) and
+  `ExposedParam` gains `group: Option<usize>` (resolved per read). A group's kind is the kind of
+  its first member in list order; a member of another kind is not in the group. A group of one
+  reads as no group. A `link` that is not a valid string is ignored and kept.
+- **Hazard fixed in this slice:** `set_exposed_limits` rebuilds the entry through `decode_entry`
+  and `ExposedEntry::to_json`, which drops every field it does not know. `to_json` writes `link`,
+  and the rebuild **merges into the raw map** of the stored entry, so later fields survive.
+- Commands (`instance_commands.rs`, one commit each): `link_exposed(sketch, a, b)` "Link
+  parameters" (both of one kind, else `InstanceError::NotLinkable`; neither grouped: both start a
+  new group; exactly one grouped: the other joins that group; both in different groups: `b`'s
+  whole group joins `a`'s);
+  `unlink_exposed(sketch, key)` "Unlink parameters" (removes its `link`; a group left with one
+  member loses that link too). In both cases the same commit drops the `instance_unlinked` marks
+  of keys that leave a group (35).
+
+**Unlinked state on a clone.** A new clone register, an LWW **list value** of keys written whole
+in the same commit as `instance_params`:
+
+```text
+instance_unlinked : ["d:c8"]   keys this clone changed alone (Shift); absent or [] = none
+```
+
+Rejected: a flag inside the value (`{"mm": 82, "unlinked": true}`): it breaks the one encoding
+`ParamValue` and `instance_fallback` share (A3), and `decode_value` refuses a two-key map, so
+every reader of that encoding would need a second shape.
+
+- Invariants: unlinked keys are a subset of the clone's own keys and are members of a group of two
+  or more; **per clone, never inherited** (36): a clone below reads only its own list. Read
+  ignores and keeps a key that does not parse, has no own value on this clone, or is in no group.
+  `CloneChain` gains `unlinked: KeySet` (the filtered own list; `KeySet` is a `BTreeSet<ExposedKey>`
+  newtype in `instance_value.rs`); `InstanceWrite` gains `unlinked: KeySet`.
+- **Damage:** `instance_unlinked` present on a clone and not a list value refuses the file:
+  `instance_codec::clone_shape_ok` checks the third register (`clone_codec::validate_clone_node`
+  already calls it). Residue on a non-clone node: never read, as A3.
+- **Stop exposing (35):** `unexpose_parameter` also drops the key from every clone's
+  `instance_unlinked`; if its group is left with one member, it removes that member's `link` and
+  every clone's mark for it, in the same commit. **A deleted parameter or dimension** applies 35
+  **by read** (its entry is residue, the group shrinks, a group of one is none, marks of a key in
+  no group are ignored); the sketch edit commands write nothing more (A6 precedent; Undo restores).
+- **Chains, Convert, Unlink, export:** values are already per clone in the read (A4), links change
+  no geometry: Unlink and Convert also remove `instance_unlinked`; the follower rule (A6),
+  `as_use` and output are unchanged.
+- **`format_version` 64** (next free after 63, which is 0118 slice 2d; renumberable at rebase). Links change no geometry at
+  read: a coupled edit writes the own value of every member, so a 63 build opening a 64 file
+  draws the same shapes. It must still refuse: its edits would couple nothing (members drift
+  apart while shown linked) and its limit edit (`to_json`) strips the `link` fields. The
+  `CURRENT_FORMAT_VERSION` doc comment gets the paragraph. Goldens in
+  `curvyo-document-core/tests/fixtures/`: `sketch_instance_links_v64.curvyo` (a sketch with a
+  group of two lengths and a group of two angles, one entry with an invalid `link` that is kept;
+  clones: none own, coupled own values, one with a key in `instance_unlinked`, a chain whose second
+  clone has its own coupled values) and `sketch_instance_links_damaged_v64.curvyo`
+  (`instance_unlinked` as a container). A unit test covers the residue cases (mixed-kind member,
+  group of one, mark without own value: opens, reads as stated, saves back equal).
+
+### A14. The edit in core: one function
+
+New pure module `curvyo-document-core/src/instance_links.rs` ("Applies one value change to a
+clone's own values through the sketch's link groups"):
+
+```rust
+pub struct LinkedChange { pub own: ValueSet, pub unlinked: KeySet, pub held: Option<Held> }
+pub fn linked_change(exposed: &[ExposedParam], own: &ValueSet, unlinked: &KeySet,
+                     key: &ExposedKey, number: f64, only_this: bool) -> LinkedChange
+pub fn linked_reset(own: &ValueSet, unlinked: &KeySet, key: Option<&ExposedKey>)
+                     -> (ValueSet, KeySet)
+```
+
+- Targets: `key` alone when `only_this`, when `key` is in no group, or when `key` is unlinked on
+  this clone; else `key` and every member of its group that is not unlinked on this clone.
+- Clamp: `number` into the intersection of the targets' limits (one value for all, so a partner
+  never leaves its limits); `Held` names the bound that held for the notice (the edited value's
+  label, A7 wording). An empty intersection (a member's minimum above another's maximum): each
+  target is clamped into its own limits and they differ (permit over refuse); finding F2.
+- `only_this` adds `key` to `unlinked` only when the value actually changes and `key` is in a
+  group of two or more (34), so the writer never stores a mark the read ignores.
+- `linked_reset(Some(key))` (Back): drops `key`'s own value and its mark; partners untouched (34).
+  `linked_reset(None)` (Original's): empty set, empty marks. `own_all` (Own) keeps the marks.
+- `instance_sketch::plan`, `change`, `reset`, `own_all` call these instead of their own
+  `own.insert` / `remove`; `plan` and `change` gain `only_this: bool`; several clones are planned
+  one by one, each coupled inside itself (33). `InstanceSource::Sketch` in `instance.rs`'
+  `change_parameter` passes `only_this = false`.
+
+### A15. Slice-1 leftovers folded in
+
+- **(a) Move preview of a no-solution clone** (`docs/technical-debt.md`, entry of 2026-11-25).
+  `RawLeaf::of_clone` sets `fallback: ValueSet::default()` because `CloneChain` holds no fallback.
+  Fix: `CloneChain` gains `fallback_values: ValueSet` (the decoded `instance_fallback`, filtered
+  like `own_values`), `of_clone` copies it and `unlinked`. Found with it: `clone_previews`
+  (`clone_preview.rs`, called from `session/clone_view.rs` and `session/sketch/draw.rs`) and the
+  limit check in `clone_write.rs` run `resolve(leaves)`, i.e. a **fresh** `InstanceSolves`, so each
+  move step re-solves every downstream clone with own values. They switch to `resolve_with` and
+  the document's cache (`Document::clone_previews` wraps the free function; the session calls the
+  method). The debt entry is removed in the same PR.
+- **(b) The pill reads Own during a drag.** `instance_sketch::view` counts `own_params` over
+  `clones_of(document, ids, stepped)`, which already holds the preview. Fix: `state`, each row's
+  `origin`, `chained` and the new `unlinked` flag come from the committed clones
+  (`clones_of(document, ids, &[])`); only `value` and `mixed` follow `stepped` (criterion 24).
+
+### A16. Findings for the product owner and UX
+
+1. Criterion 37's reason for refusing is not right: a 63 build would draw the same shapes (the
+   own values are written per member). It refuses because its edits would not couple and a limit
+   edit strips the links (A13).
+2. Criterion 33: say what happens when the members' limits do not overlap (A14: each clamped into
+   its own, they differ, no refusal).
+3. Criterion 34 covers Back on an unlinked value; say the same for Back on a linked value (only it
+   goes back, the partners keep theirs).
+4. Criterion 32: linking two values that are both already in different groups merges the groups
+   (A13), or the control is off; pick one (default merge).
+5. Criterion 25: the generator knobs of `0141` keep Shift for whole millimetres; sketch knobs use
+   Ctrl/Cmd. Two modifiers for one knob look; UX may want `0141` to follow (a separate change).
+6. `ValueField` steps without modifiers today, so Shift on arrows (34) collides with nothing; UX
+   notes should name Shift+arrow and Shift+field-drag as "only this".
+7. UX 12.3's knob for a `d:` with a formula: the knob stays (A12); criterion 25 says "field only"
+   only for a `p:` used by a formula or several dimensions. Consistent; mention it in the UX notes.
