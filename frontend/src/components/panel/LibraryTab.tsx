@@ -1,7 +1,20 @@
 // The Library tab (`specs/0137-document-library` criteria 1 to 4, 10, 11, 13; UX notes sections 2
 // to 5, 7.1, 9 and 10): the sources with their documents and page rows, the search, Add folder...
 // on the desktop, Import page by button or drag. The rows and every word come from Rust.
-import { ChevronDown, ChevronRight, FileText, Folder, FolderPlus, Globe, Import, Plus, Search, TriangleAlert, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Folder,
+  FolderPlus,
+  Globe,
+  Import,
+  LayoutGrid,
+  Plus,
+  Search,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddSourceForm } from "@/components/panel/AddSourceForm";
@@ -23,12 +36,17 @@ import {
   scanLibrary,
 } from "@/lib/libraryApi";
 import { watchCanvasDrag } from "@/lib/libraryDrag";
-import { importFromLibrary, loadTemplateInto } from "@/lib/libraryImport";
+import {
+  type DropAt,
+  type LoadContext,
+  importIcon as importLibraryIcon,
+  importPage as importLibraryPage,
+  isOnlineSource,
+  loadTemplate as loadLibraryTemplate,
+} from "@/lib/libraryLoad";
+import { BROWSE_BUTTON_ID, notifyLibraryChanged, onBrowserFetched, toggleBrowser, useBrowserOpen } from "@/lib/libraryBrowserStore";
 import {
   addReadySource,
-  loadOnlineTemplate,
-  onlineIconImport,
-  onlineTemplateOrigin,
   openLicence,
   openOnlineList,
   openOnlineSet,
@@ -38,12 +56,11 @@ import {
   searchOnlineSource,
   forgetOnlineIcons,
 } from "@/lib/onlineApi";
-import { WasmLibrarySource } from "@/wasm-bindings/curvyo_editor_wasm.js";
-import { openPreview, pageRowKey, previewNow, readerFor, usePreview } from "@/lib/libraryStore";
+import { openPreview, pageRowKey, usePreview } from "@/lib/libraryStore";
 import { useLibraryTreeKeys } from "@/hooks/useLibraryTreeKeys";
+import { Tooltip } from "@/components/ui/tooltip";
 import { isTauri } from "@/platform/host";
 import {
-  library_import_failed_text,
   library_no_match_text,
   library_online_searching_text,
   library_remove_armed_text,
@@ -97,8 +114,6 @@ function focusElement(element: HTMLElement | null | undefined) {
   (element?.querySelector<HTMLElement>("[data-icon-cell]") ?? element)?.focus();
 }
 
-/** Whether a row sits in the Online group (its source key is the online key). */
-const isOnlineSource = (key: string) => key.startsWith("online:");
 
 /** The name, cut with an ellipsis; its matched part semibold (P14). One text box, so the chip
  * beside it never shrinks and a match inside a word has no gap. */
@@ -162,6 +177,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
   const pendingFocus = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const { page: current } = usePreview();
+  const browserOpen = useBrowserOpen();
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
   const [armed, setArmed] = useState<string | null>(null);
@@ -181,10 +197,14 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
   const refreshRows = useCallback(() => {
     const dirty = getSession()?.is_dirty() ?? false;
     void libraryRows(query, expanded, dirty).then(setRows, () => setRows([]));
+    // The library browser shows what the tab holds: it asks again whenever the tab does (ADR 0086).
+    notifyLibraryChanged();
   }, [query, expanded, getSession]);
   // The online actions finish after the render that started them: they refresh by the newest state.
   const refreshNow = useRef(refreshRows);
   refreshNow.current = refreshRows;
+  // What the browser fetched shows in the tree too (one data, two views, `0152` UX notes 12).
+  useEffect(() => onBrowserFetched(() => refreshNow.current()), []);
 
   const scan = useCallback(() => {
     void scanLibrary().then((found) => {
@@ -381,45 +401,23 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
       ? rows.find((r) => r.kind === "template" && r.source === row.source && r.path.join("/") === row.path.join("/"))?.name
       : undefined;
 
-  const importPage = async (row: LibraryRow, drop: { x: number; y: number } | null) => {
-    const session = getSession();
-    if (!session || !row.page_id) {
+  const loadContext: LoadContext = { getSession, sync, showNotice };
+  const importPage = async (row: LibraryRow, drop: DropAt) => {
+    if (!row.page_id) {
       return;
     }
-    const open = previewNow();
-    const same = open.page && open.page.source === row.source && open.page.path.join("/") === row.path.join("/");
-    try {
-      const reader = same && open.reader ? open.reader : await readerFor(row.source, row.path);
-      // A page of a downloaded template carries where it came from and under which licence.
-      const origin = isOnlineSource(row.source) ? await onlineTemplateOrigin(row.source, row.path.join("/")) : null;
-      const answer = importFromLibrary(
-        session,
-        reader,
-        origin
-          ? {
-              documentName: sourceNameOf(row),
-              pageName: `${origin.name} › ${row.name}`,
-              pageId: row.page_id,
-              online: origin.origin,
-              withoutFonts: origin.without_fonts,
-            }
-          : { documentName: documentName(row), pageName: row.name, pageId: row.page_id },
-        true,
-        [],
-        drop,
-      );
-      if (reader !== open.reader) {
-        reader.free();
-      }
-      sync();
-      if (answer.error) {
-        showNotice(library_import_failed_text(row.name, answer.error), 8000, "canvas", "alert");
-      } else if (answer.notice) {
-        showNotice(answer.notice, 5000, "canvas", "status");
-      }
-    } catch (error) {
-      showNotice(library_import_failed_text(row.name, String(error)), 8000, "canvas", "alert");
-    }
+    await importLibraryPage(
+      loadContext,
+      {
+        source: row.source,
+        path: row.path,
+        pageId: row.page_id,
+        pageName: row.name,
+        documentName: documentName(row),
+        sourceName: sourceNameOf(row),
+      },
+      drop,
+    );
   };
 
   const addFolder = async () => {
@@ -450,84 +448,16 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     scan();
   };
 
-  const loadTemplate = async (row: LibraryRow, drop: { x: number; y: number } | null = null) => {
-    const session = getSession();
-    if (!session) {
-      return;
-    }
-    void drop;
-    const path = row.path.join("/");
-    const answer = await loadOnlineTemplate(row.source, path);
+  const loadTemplate = async (row: LibraryRow) => {
+    const name = await loadLibraryTemplate(loadContext, row.source, row.path, sourceNameOf(row));
     refreshNow.current();
-    if (answer.kind === "refused") {
-      showNotice(answer.text, 8000, "canvas", "alert");
-      return;
-    }
-    let reader: WasmLibrarySource | null = null;
-    try {
-      reader = await readerFor(row.source, row.path);
-      const result = loadTemplateInto(session, reader, {
-        documentName: sourceNameOf(row),
-        pageName: answer.name,
-        pageId: "",
-        online: answer.origin,
-        withoutFonts: answer.without_fonts,
-      });
-      sync();
-      if (result.error) {
-        showNotice(library_import_failed_text(answer.name, result.error), 8000, "canvas", "alert");
-      } else {
-        // No notice after a success (design system); the polite region says it.
-        if (result.notice) {
-          showNotice(result.notice, 5000, "canvas", "status");
-        }
-        setAnnounce(`Loaded ${answer.name}`);
-      }
-    } catch (error) {
-      showNotice(library_import_failed_text(answer.name, String(error)), 8000, "canvas", "alert");
-    } finally {
-      reader?.free();
+    if (name) {
+      setAnnounce(`Loaded ${name}`);
     }
   };
 
-  const importIcon = async (row: LibraryRow, cell: IconCell, at: { x: number; y: number } | null) => {
-    const session = getSession();
-    if (!session) {
-      return;
-    }
-    const icon = await onlineIconImport(row.source, cell.prefix, cell.name);
-    if (!icon) {
-      showNotice(library_import_failed_text(cell.name, "the icon could not be read"), 8000, "canvas", "alert");
-      return;
-    }
-    let reader: WasmLibrarySource | null = null;
-    try {
-      reader = WasmLibrarySource.open_svg(icon.svg, BigInt(Math.floor(Math.random() * 2 ** 48) + 1));
-      const roots = JSON.parse(reader.page_objects("first")) as { id: unknown }[];
-      const answer = importFromLibrary(
-        session,
-        reader,
-        {
-          documentName: sourceNameOf(row),
-          pageName: `${icon.set} › ${icon.name}`,
-          pageId: "first",
-          online: icon.origin,
-          step: "icon",
-        },
-        false,
-        roots.map((r) => JSON.stringify(r.id)),
-        at,
-      );
-      sync();
-      if (answer.error) {
-        showNotice(library_import_failed_text(cell.name, answer.error), 8000, "canvas", "alert");
-      }
-    } catch (error) {
-      showNotice(library_import_failed_text(cell.name, String(error)), 8000, "canvas", "alert");
-    } finally {
-      reader?.free();
-    }
-  };
+  const importIcon = (row: LibraryRow, cell: IconCell, at: DropAt) =>
+    importLibraryIcon(loadContext, row.source, cell.prefix, cell.name, sourceNameOf(row), at);
 
   const refreshSource = (row: LibraryRow) => {
     setRefreshing((now) => new Set(now).add(row.source));
@@ -679,6 +609,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
       <span className="sr-only" role="status">
         {announce || status}
       </span>
+      <div className="library-search-row">
       <label className="library-search">
         <Search size={16} aria-hidden="true" />
         <input
@@ -721,6 +652,24 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
           </button>
         ) : null}
       </label>
+      {/* The library browser (`specs/0152` criterion 1): the big grid of what this list holds. */}
+      <Tooltip side="left" content="Library browser">
+        <button
+          type="button"
+          id={BROWSE_BUTTON_ID}
+          aria-label="Library browser"
+          aria-pressed={browserOpen}
+          onClick={(event) => toggleBrowser(event.detail === 0)}
+          className={`flex size-7 shrink-0 items-center justify-center rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
+            browserOpen
+              ? "border-transparent bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:bg-[var(--toolbar-icon-active-bg)]"
+              : "text-[var(--toolbar-icon)]"
+          }`}
+        >
+          <LayoutGrid size={16} strokeWidth={1.5} aria-hidden />
+        </button>
+      </Tooltip>
+      </div>
       <div
         className="library-tree"
         role="treegrid"

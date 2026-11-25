@@ -134,6 +134,18 @@ export async function libraryRows(query: string, expanded: readonly string[], di
   ) as LibraryRow[];
 }
 
+/** The library browser's list as JSON and its revision (`specs/0152`, ADR 0086 decision 5): the
+ * host answers null while it is the list of `revision`; the browser build has its own documents. */
+export async function browserItems(revision: string): Promise<{ revision: string; json: string } | null> {
+  if (isTauri) {
+    return invoke<{ revision: string; json: string } | null>("library_browser_items", { revision });
+  }
+  if (!browserIndex) {
+    await browserScan();
+  }
+  return browserIndex ? { revision: "", json: browserIndex.browse_items_json() } : null;
+}
+
 /** The PNG of a page picture, empty when it has none. */
 export async function pagePicture(source: string, path: string[], page: string): Promise<Uint8Array> {
   if (isTauri) {

@@ -8,6 +8,10 @@ import { CanvasArea } from "@/components/CanvasArea";
 import { FontPreview } from "@/components/fontPreview/FontPreview";
 import { LibraryPreview } from "@/components/LibraryPreview";
 import { useLibraryPane } from "@/lib/libraryStore";
+import { LibraryBrowser } from "@/components/libraryBrowser/LibraryBrowser";
+import { useLibraryBrowser } from "@/hooks/useLibraryBrowser";
+import { paneLayoutSize } from "@/lib/libraryBrowserLayout";
+import { claimPane, registerPaneCloser, releasePane } from "@/lib/sidePaneStore";
 import { useFontPreview } from "@/hooks/useFontPreview";
 import { CanvasNotice } from "@/components/CanvasNotice";
 import { ErrorDialog } from "@/components/ErrorDialog";
@@ -139,6 +143,16 @@ function Editor() {
   // The Library's page preview: the canvas area's one side pane with the font preview (`0137`).
   const libraryPane = useLibraryPane(preview.store.open);
   usePaneExclusion(preview.store.open, beforeAfter.open, preview.close, beforeAfter.close);
+  // The library browser (`specs/0152`): the fourth kind of the one side pane.
+  const libraryBrowser = useLibraryBrowser();
+  useEffect(() => registerPaneCloser("before-after", beforeAfter.close), [beforeAfter.close]);
+  useEffect(() => {
+    if (beforeAfter.open) {
+      claimPane("before-after");
+    } else {
+      releasePane("before-after");
+    }
+  }, [beforeAfter.open]);
   const { getSession } = editor;
   const placeOn = usePlaceOn(editor);
   const keepViewOrigin = useCallback(
@@ -471,13 +485,59 @@ function Editor() {
         <CanvasArea
           keepViewOrigin={keepViewOrigin}
           coverDrawing={editor.coverCanvasRight}
-          open={preview.store.open || beforeAfter.open || libraryPane.open}
-          wantFull={beforeAfter.open ? beforeAfter.full : libraryPane.open ? libraryPane.full : preview.wantFull}
-          size={beforeAfter.open || libraryPane.open ? SIZE_RANGE.min : preview.size}
-          toggleFull={beforeAfter.open ? beforeAfter.toggleFull : libraryPane.open ? libraryPane.toggleFull : preview.toggleFull}
-          split={beforeAfter.open ? beforeAfter.split : libraryPane.open ? libraryPane.split : preview.split}
-          setSplit={beforeAfter.open ? beforeAfter.setSplit : libraryPane.open ? libraryPane.setSplit : preview.setSplit}
-          dividerLabel={!beforeAfter.open && libraryPane.open ? "Page preview width" : undefined}
+          open={preview.store.open || beforeAfter.open || libraryPane.open || libraryBrowser.open}
+          wantFull={
+            beforeAfter.open
+              ? beforeAfter.full
+              : libraryPane.open
+                ? libraryPane.full
+                : libraryBrowser.open
+                  ? libraryBrowser.wantFull
+                  : preview.wantFull
+          }
+          size={
+            beforeAfter.open || libraryPane.open
+              ? SIZE_RANGE.min
+              : libraryBrowser.open
+                ? paneLayoutSize(libraryBrowser.prefs.size)
+                : preview.size
+          }
+          toggleFull={
+            beforeAfter.open
+              ? beforeAfter.toggleFull
+              : libraryPane.open
+                ? libraryPane.toggleFull
+                : libraryBrowser.open
+                  ? libraryBrowser.toggleFull
+                  : preview.toggleFull
+          }
+          split={
+            beforeAfter.open
+              ? beforeAfter.split
+              : libraryPane.open
+                ? libraryPane.split
+                : libraryBrowser.open
+                  ? libraryBrowser.split
+                  : preview.split
+          }
+          setSplit={
+            beforeAfter.open
+              ? beforeAfter.setSplit
+              : libraryPane.open
+                ? libraryPane.setSplit
+                : libraryBrowser.open
+                  ? libraryBrowser.setSplit
+                  : preview.setSplit
+          }
+          dividerLabel={
+            beforeAfter.open
+              ? undefined
+              : libraryPane.open
+                ? "Page preview width"
+                : libraryBrowser.open
+                  ? "Resize library browser"
+                  : undefined
+          }
           pane={(layout, switchView, resizing) => beforeAfter.open ? (
             <BeforeAfterPane api={beforeAfter} layout={layout} onSwitchView={switchView} onReturnFocus={returnToText} />
           ) : libraryPane.open ? (
@@ -489,6 +549,17 @@ function Editor() {
               activeIsSketch={() => sketch.view.workbench === "sketch"}
               layout={layout}
               onSwitchView={switchView}
+            />
+          ) : libraryBrowser.open ? (
+            <LibraryBrowser
+              api={libraryBrowser}
+              layout={layout}
+              onSwitchView={switchView}
+              getSession={editor.getSession}
+              sync={editor.sync}
+              showNotice={editor.showHistoryNotice}
+              canvasRef={editor.canvasRef}
+              onReturnFocus={returnToText}
             />
           ) : (
             <FontPreview

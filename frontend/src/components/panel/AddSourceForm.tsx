@@ -5,7 +5,11 @@ import { GitBranch, Globe, LoaderCircle } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
 import { addOnlineSource, cancelOnlineAdd, removeOnlineSource } from "@/lib/onlineApi";
-import { library_online_add_sent_text } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { library_hosting_guide, library_online_add_sent_text } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { openGuide } from "@/lib/libraryBrowserStore";
+
+/** "The repository must be public.", worded in Rust (read when drawn: the wasm is loaded then). */
+const publicOnly = () => (JSON.parse(library_hosting_guide()) as { private: string }).private;
 
 type Kind = "git" | "iconify";
 
@@ -140,6 +144,18 @@ export function AddSourceForm({ onAdded, onCancel }: AddSourceFormProps) {
       <p id={ids.sent} className="library-line" style={{ margin: 0 }}>
         {library_online_add_sent_text(kind === "iconify")}
       </p>
+      {kind === "git" ? (
+        <>
+          {/* Frage 376 B: no token; the statement of what works (`specs/0152` criterion 33). */}
+          <p className="library-line" style={{ margin: 0 }}>
+            {publicOnly()}
+          </p>
+          {/* Where the catalogue format is explained (criterion 32, UX U48). */}
+          <button type="button" className="library-guide-link" onClick={() => openGuide()}>
+            Host your own library…
+          </button>
+        </>
+      ) : null}
       <div className="library-source-buttons">
         <button type="button" onClick={cancel}>
           Cancel

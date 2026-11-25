@@ -14,9 +14,20 @@ import { positionOfValue, valueAtPosition } from "@/lib/sliderValue";
 const THUMB = 14;
 const INSET = THUMB / 2 + 1;
 const TARGET_HEIGHT = 24;
-const SIZE_MESSAGE = "Enter a size from 16 to 160 px.";
+/** A slider's range, default and arrow steps; the font preview's unless given. */
+export interface SizeScale {
+  min: number;
+  max: number;
+  fallback: number;
+  step: number;
+  bigStep: number;
+}
+
+const FONT_SCALE: SizeScale = { min: SIZE_RANGE.min, max: SIZE_RANGE.max, fallback: DEFAULT_SIZE, step: 4, bigStep: 16 };
 
 interface SizeSliderProps {
+  /** The range, default and steps (the library browser's 48 to 256, `specs/0152` criterion 4). */
+  scale?: SizeScale;
   size: number;
   /** The slider's width in px (120 in one header row, flexible in two). */
   width: number;
@@ -24,17 +35,25 @@ interface SizeSliderProps {
   onReturnFocus: () => void;
 }
 
-export function SizeSlider({ size, width, onSize, onReturnFocus }: SizeSliderProps) {
+export function SizeSlider({ scale = FONT_SCALE, size, width, onSize, onReturnFocus }: SizeSliderProps) {
+  const range = { min: scale.min, max: scale.max, step: 1 };
+  const clamp = (value: number) =>
+    scale === FONT_SCALE
+      ? clampSize(value)
+      : Number.isFinite(value)
+        ? Math.min(scale.max, Math.max(scale.min, Math.round(value)))
+        : scale.fallback;
+  const message = `Enter a size from ${scale.min} to ${scale.max} px.`;
   const track = useRef<HTMLDivElement>(null);
   const [entry, setEntry] = useState<"pointer" | "keyboard" | null>(null);
   const start = useRef(size);
   const inner = Math.max(1, width - 2 * INSET);
-  const thumbLeft = INSET + positionOfValue(size, inner, SIZE_RANGE);
+  const thumbLeft = INSET + positionOfValue(size, inner, range);
 
   const pointer = useSliderPointer({
     thumb: () => ({ at: { x: thumbLeft, y: TARGET_HEIGHT / 2 }, radius: THUMB / 2 }),
-    onClick: (at) => onSize(clampSize(valueAtPosition(at.x - INSET, inner, SIZE_RANGE))),
-    onDrag: (at) => onSize(clampSize(valueAtPosition(at.x - INSET, inner, SIZE_RANGE))),
+    onClick: (at) => onSize(clamp(valueAtPosition(at.x - INSET, inner, range))),
+    onDrag: (at) => onSize(clamp(valueAtPosition(at.x - INSET, inner, range))),
     onDragEnd: () => {},
     onPointerCancel: () => onSize(start.current),
     onEscape: () => onSize(start.current),
@@ -49,36 +68,36 @@ export function SizeSlider({ size, width, onSize, onReturnFocus }: SizeSliderPro
     }
     if (event.key === "Backspace" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
-      onSize(DEFAULT_SIZE);
+      onSize(scale.fallback);
       return;
     }
-    const step = event.shiftKey ? 16 : 4;
+    const step = event.shiftKey ? scale.bigStep : scale.step;
     const by: Record<string, number> = {
       ArrowLeft: size - step,
       ArrowDown: size - step,
       ArrowRight: size + step,
       ArrowUp: size + step,
-      PageDown: size - 16,
-      PageUp: size + 16,
-      Home: SIZE_RANGE.min,
-      End: SIZE_RANGE.max,
+      PageDown: size - scale.bigStep,
+      PageUp: size + scale.bigStep,
+      Home: scale.min,
+      End: scale.max,
     };
     const next = by[event.key];
     if (next !== undefined) {
       event.preventDefault();
-      onSize(clampSize(next));
+      onSize(clamp(next));
     }
   };
 
   const submit = (text: string): string => {
     const typed = Number(text.replace(/px$/i, "").trim().replace(",", "."));
-    if (!Number.isFinite(typed) || typed < SIZE_RANGE.min || typed > SIZE_RANGE.max) {
+    if (!Number.isFinite(typed) || typed < scale.min || typed > scale.max) {
       return "invalid:range";
     }
     if (Math.round(typed) === size) {
       return "unchanged";
     }
-    onSize(clampSize(typed));
+    onSize(clamp(typed));
     return "committed";
   };
 
@@ -90,8 +109,8 @@ export function SizeSlider({ size, width, onSize, onReturnFocus }: SizeSliderPro
           role="slider"
           tabIndex={0}
           aria-label="Size"
-          aria-valuemin={SIZE_RANGE.min}
-          aria-valuemax={SIZE_RANGE.max}
+          aria-valuemin={scale.min}
+          aria-valuemax={scale.max}
           aria-valuenow={size}
           aria-valuetext={`${size} pixels`}
           aria-keyshortcuts="Enter F2"
@@ -131,7 +150,7 @@ export function SizeSlider({ size, width, onSize, onReturnFocus }: SizeSliderPro
           width={44}
           autoFocus
           inputMode="decimal"
-          messages={{ range: SIZE_MESSAGE }}
+          messages={{ range: message }}
           onSubmit={submit}
           onClose={() => setEntry(null)}
           onReturnFocus={() => (entry === "keyboard" ? track.current?.focus() : onReturnFocus())}

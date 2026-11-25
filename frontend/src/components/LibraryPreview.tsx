@@ -3,7 +3,7 @@
 // drawn read-only from its source with zoom and pan, picking by the Select tool's rules (click,
 // Shift+click, marquee by outline), the keyboard route, Import page, Import elements and a drag
 // of the picks onto the drawing.
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { ArrowLeft, Maximize2, Minimize2, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
@@ -17,6 +17,8 @@ import type { WasmSession } from "@/lib/editorSession";
 import type { PaneLayout } from "@/lib/fontPreviewLayout";
 import { watchCanvasDrag } from "@/lib/libraryDrag";
 import { importFromLibrary } from "@/lib/libraryImport";
+import { isBackKey } from "@/lib/browserBack";
+import { returnToBrowser } from "@/lib/libraryBrowserStore";
 import { closePreview, pageRowKey, setPicks, takePendingPage, usePreview } from "@/lib/libraryStore";
 
 const ZOOM_STEP = 1.2;
@@ -102,6 +104,14 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  // Opened by the browser's Pick elements…: its button is gone, so the page takes the keyboard
+  // (Escape goes back from here, `0152` UX U19).
+  useEffect(() => {
+    if (page?.back) {
+      canvas.current?.focus({ preventScroll: true });
+    }
+  }, [page?.back, page?.pageId, page?.source]);
 
   // A new page shows at fit.
   useEffect(() => {
@@ -354,6 +364,11 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
       if (picks.length > 0) {
         setPicks([]);
       } else {
+        // Opened by the library browser's Pick elements…: Escape goes back to it (`0152` UX U19).
+        if (page.back) {
+          returnToBrowser();
+          return;
+        }
         // The second Escape closes the pane and returns focus to the page row (UX notes 6.4).
         const row = document.querySelector<HTMLElement>(
           `[data-page-row="${CSS.escape(pageRowKey(page.source, page.path, page.pageId))}"]`,
@@ -372,8 +387,33 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
   const FullGlyph = layout.full ? Minimize2 : Maximize2;
 
   return (
-    <section className="library-preview" role="region" aria-label="Page preview">
+    <section
+      className="library-preview"
+      role="region"
+      aria-label="Page preview"
+      // Back to the library browser, as its Back (`specs/0152` criterion 30): Alt+Left or Cmd+[
+      // anywhere in the pane (ahead of the canvas's Left, which steps the picks), the mouse's back
+      // button over it.
+      onKeyDownCapture={(event) => {
+        if (page.back && isBackKey(event)) {
+          event.preventDefault();
+          event.stopPropagation();
+          returnToBrowser();
+        }
+      }}
+      onMouseUp={(event) => {
+        if (page.back && event.button === 3) {
+          event.preventDefault();
+          returnToBrowser();
+        }
+      }}
+    >
       <header className="library-preview-header">
+        {page.back ? (
+          <button type="button" aria-label="Back to library browser" title="Back to library browser" onClick={() => returnToBrowser()}>
+            <ArrowLeft size={16} />
+          </button>
+        ) : null}
         <span className="library-preview-name">{page.pageName}</span>
         {page.chip ? <span className="library-chip">{page.chip}</span> : null}
         <span className="library-preview-subject">{page.subject}</span>
