@@ -60,6 +60,8 @@ fn state_name(state: State) -> &'static str {
         State::Homing => "Homing",
         State::Jogging => "Jogging",
         State::Framing => "Framing",
+        State::Focusing => "Focusing",
+        State::Pulsing => "Pulsing",
         State::Running => "Running",
         State::Paused => "Paused",
         State::Done { .. } => "Done",
@@ -277,6 +279,7 @@ mod tests {
             machine_position: None,
             work_offset: None,
             frame_id: None,
+            target: None,
         };
         assert!(starts_after_send(true, Some(&done)));
     }

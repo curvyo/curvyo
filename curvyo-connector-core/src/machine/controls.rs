@@ -56,6 +56,11 @@ impl Machine {
             (Message::Stop, State::Jogging) => self.cancel_jog(true, out),
             (Message::Stop, State::Homing) => self.stop_homing(out),
             (Message::Stop, State::Framing) => self.stop_frame(out),
+            (Message::Stop, State::Focusing | State::Pulsing) => self.stop_focus(out),
+            (Message::Stop, State::AwaitingLocalStart) if self.waiting == Waiting::Point => {
+                // Stop discards a waiting go to point; the held job stays.
+                self.end_focus(None, out);
+            }
             (Message::Stop, State::AwaitingLocalStart) if self.waiting == Waiting::Frame => {
                 // Stop from anyone discards a waiting frame; the held job stays.
                 self.end_frame(None, out);
@@ -81,6 +86,9 @@ impl Machine {
             self.on_no_controller(event, out);
             return;
         }
+        let Some(event) = self.on_motion_event(event, out) else {
+            return;
+        };
         match event {
             Event::ControllerLost => self.lose(None, out),
             Event::ControllerLostWith { detail } => self.lose(Some(&detail), out),
@@ -111,10 +119,12 @@ impl Machine {
             }
             Event::LaserModeOff(off) => self.laser_off = off,
             Event::LaserModeUnknown(unknown) => self.laser_unknown = unknown,
+            Event::Travel(travel) => self.travel = travel,
             Event::ControllerWord(word) => {
                 if word != self.word {
                     self.word = word;
                     out.messages.push(self.status());
+                    self.word_during_pulse(out);
                 }
             }
             Event::LocalStartPressed if self.options.start_rule != StartRule::LocalPress => {}
@@ -140,34 +150,62 @@ impl Machine {
                 }
             }
             Event::ControllerReset => {
+                // A reset outside a motion: the position is not trusted any more.
                 self.homed = false;
-                if self.state == State::Jogging {
-                    self.on_jogging(Event::ControllerReset, out);
-                } else if self.state == State::Framing {
-                    self.on_framing(Event::ControllerReset, out);
-                } else {
-                    out.messages.push(self.status());
-                }
-            }
-            event @ (Event::JogEnded | Event::JogFailed { .. } | Event::Stopped)
-                if self.state == State::Jogging =>
-            {
-                self.on_jogging(event, out);
-            }
-            event @ (Event::JobFinished { .. }
-            | Event::JobFailed { .. }
-            | Event::JobFailedWith { .. }
-            | Event::Stopped
-            | Event::Progress { .. }
-            | Event::Held
-            | Event::Resumed
-            | Event::PauseDeferred)
-                if self.state == State::Framing =>
-            {
-                self.on_framing(event, out);
+                out.messages.push(self.status());
             }
             other => self.on_job_event(other, out),
         }
+    }
+
+    /// The events a running motion (jog, frame, go to point, pulse) takes; the event back when
+    /// none does.
+    fn on_motion_event(&mut self, event: Event, out: &mut Output) -> Option<Event> {
+        match (self.state, event) {
+            (
+                State::Jogging | State::Framing | State::Focusing | State::Pulsing,
+                Event::ControllerReset,
+            ) => {
+                self.homed = false;
+                match self.state {
+                    State::Jogging => self.on_jogging(Event::ControllerReset, out),
+                    State::Framing => self.on_framing(Event::ControllerReset, out),
+                    State::Focusing => self.on_focusing(Event::ControllerReset, out),
+                    _ => self.on_pulsing(Event::ControllerReset, out),
+                }
+            }
+            (
+                State::Jogging,
+                event @ (Event::JogEnded | Event::JogFailed { .. } | Event::Stopped),
+            ) => self.on_jogging(event, out),
+            (
+                State::Focusing,
+                event @ (Event::GoToTarget { .. }
+                | Event::JogEnded
+                | Event::JogFailed { .. }
+                | Event::Stopped),
+            ) => self.on_focusing(event, out),
+            (
+                State::Pulsing,
+                event @ (Event::PulseEnded
+                | Event::PulseFailed { .. }
+                | Event::PulseSkipped
+                | Event::Stopped),
+            ) => self.on_pulsing(event, out),
+            (
+                State::Framing,
+                event @ (Event::JobFinished { .. }
+                | Event::JobFailed { .. }
+                | Event::JobFailedWith { .. }
+                | Event::Stopped
+                | Event::Progress { .. }
+                | Event::Held
+                | Event::Resumed
+                | Event::PauseDeferred),
+            ) => self.on_framing(event, out),
+            (_, event) => return Some(event),
+        }
+        None
     }
 
     /// The events of a connector without a controller: only its coming and its words matter.
@@ -175,10 +213,12 @@ impl Machine {
         match event {
             Event::ControllerConnected => {
                 self.homed = false;
+                self.travel = None;
                 self.set(State::Idle, out);
             }
             Event::LaserModeOff(off) => self.laser_off = off,
             Event::LaserModeUnknown(unknown) => self.laser_unknown = unknown,
+            Event::Travel(travel) => self.travel = travel,
             Event::NoControllerDetail { detail }
                 if !self.sticky && self.detail.as_deref() != Some(detail.as_str()) =>
             {
@@ -209,7 +249,9 @@ impl Machine {
             | State::AwaitingLocalStart
             | State::Homing
             | State::Jogging
-            | State::Framing => Some("Lost the controller".to_owned()),
+            | State::Framing
+            | State::Focusing
+            | State::Pulsing => Some("Lost the controller".to_owned()),
             _ => None,
         };
         let detail = text.map(str::to_owned).or(loss);

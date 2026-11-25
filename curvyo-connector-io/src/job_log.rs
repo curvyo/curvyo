@@ -34,6 +34,10 @@ pub enum LogResult {
     Frame(String),
     /// The app of this name started a jog pad session (`specs/0118` criterion 12); no job name.
     Jog(String),
+    /// The app of this name sent a go to point the connector took (`specs/0118` 2d); no job name.
+    FocusPoint(String),
+    /// The connector wrote the pulse block of this app's go to point (`specs/0118` 35 c).
+    FocusPulse(String),
     /// A start that waited for an owner was withdrawn or discarded (`specs/0128` A14).
     Discarded,
 }
@@ -64,6 +68,8 @@ impl LogResult {
             Self::Home(client) => format!("Home: {}", clean(client)),
             Self::Jog(client) => format!("Jog: {}", clean(client)),
             Self::Frame(client) => format!("Frame: {}", clean(client)),
+            Self::FocusPoint(client) => format!("Focus point: {}", clean(client)),
+            Self::FocusPulse(client) => format!("Focus pulse: {}", clean(client)),
             Self::Discarded => "Discarded".to_owned(),
         }
     }
@@ -236,5 +242,19 @@ mod tests {
             .unwrap();
         let text = std::fs::read_to_string(dir.path().join(JOB_LOG_FILE)).unwrap();
         assert_eq!(text, include_str!("../tests/fixtures/jobs_v2.log"));
+    }
+
+    #[test]
+    fn the_go_to_point_lines_match_their_golden_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = JobLog::new(dir.path());
+        let none = LogPeople::default();
+        let t = |s: i64| OffsetDateTime::from_unix_timestamp(1_700_000_000 + s).unwrap();
+        log.append(t(900), "", &LogResult::FocusPoint("Laptop".into()), &none)
+            .unwrap();
+        log.append(t(960), "", &LogResult::FocusPulse("Laptop".into()), &none)
+            .unwrap();
+        let text = std::fs::read_to_string(dir.path().join(JOB_LOG_FILE)).unwrap();
+        assert_eq!(text, include_str!("../tests/fixtures/jobs_focus.log"));
     }
 }

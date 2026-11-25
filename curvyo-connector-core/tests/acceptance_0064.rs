@@ -117,6 +117,7 @@ fn all_messages() -> Vec<Message> {
             machine_position: None,
             work_offset: None,
             frame_id: None,
+            target: None,
         },
         Message::Error {
             code: ErrorCode::Malformed,
@@ -225,6 +226,17 @@ fn in_state(state: State, text: &str) -> FakeController {
         State::Homing => {
             let mut f = idle();
             f.send(Message::Home);
+            f
+        }
+        // `specs/0118` slice 2d: added so the match stays exhaustive; `focus_0118.rs` has its table.
+        State::Focusing | State::Pulsing => {
+            let mut f = idle();
+            f.event(Event::Homed);
+            f.send(Message::GoToPoint {
+                x: curvyo_connector_core::Millimetres(1.0),
+                y: curvyo_connector_core::Millimetres(1.0),
+                pulse: None,
+            });
             f
         }
         // `specs/0118` slice 2b: added so the match stays exhaustive; `frame_0118.rs` has its table.
@@ -416,6 +428,7 @@ fn p3_status_nulls_are_present() {
         machine_position: None,
         work_offset: None,
         frame_id: None,
+        target: None,
     })
     .unwrap();
     let v: Value = serde_json::from_str(&text).unwrap();
@@ -447,6 +460,7 @@ fn p3_status_with_job_and_position_round_trips() {
         machine_position: None,
         work_offset: None,
         frame_id: None,
+        target: None,
     };
     let text = encode(&msg).unwrap();
     assert_eq!(decode(&text).unwrap(), msg);

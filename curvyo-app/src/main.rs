@@ -19,6 +19,7 @@ mod connector;
 mod connector_frame;
 mod connector_jog;
 mod connector_link;
+mod connector_point;
 mod connector_send;
 mod connector_start;
 mod device_keys;

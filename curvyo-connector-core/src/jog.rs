@@ -118,14 +118,21 @@ pub struct TravelBox {
 impl TravelBox {
     /// The box of a machine with `travel` (`$130`, `$131`): `[-travel, 0]` on each axis, or
     /// `[0, travel]` for an axis in `positive` (homed towards its positive end in a build that
-    /// forces the origin to 0 there).
+    /// forces the origin to 0 there). A travel below 0 counts by its size and one that is not
+    /// finite as 0, so `min <= max` on each axis and no clamp into the box can panic.
     #[must_use]
     pub fn new(travel: [f64; 2], positive: [bool; 2]) -> Self {
         let pick = |i: usize| {
-            if positive[i] {
-                (0.0, travel[i])
+            // invariant: `size` is finite and at least 0, so each pair below is ordered.
+            let size = if travel[i].is_finite() {
+                travel[i].abs()
             } else {
-                (-travel[i], 0.0)
+                0.0
+            };
+            if positive[i] {
+                (0.0, size)
+            } else {
+                (-size, 0.0)
             }
         };
         let (x, y) = (pick(0), pick(1));

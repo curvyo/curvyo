@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 use curvyo_connector_core::{
-    ControllerCommand, ControllerInfo, Event, Job, Millimetres, check_frame,
+    ControllerCommand, ControllerInfo, Event, Feed, Job, Millimetres, check_frame,
 };
 
 use crate::controller::{Advance, Controller};
@@ -45,6 +45,8 @@ pub struct FakeController {
     homing_until: Option<Duration>,
     /// The head, moved by jogs.
     head: FakeHead,
+    /// When the go to point's pulse ends; `None` while none fires.
+    pulse_until: Option<Duration>,
 }
 
 impl FakeController {
@@ -58,6 +60,7 @@ impl FakeController {
             run: None,
             homing_until: None,
             head: FakeHead::default(),
+            pulse_until: None,
         }
     }
 
@@ -109,10 +112,17 @@ impl FakeController {
             ControllerCommand::Stop => {
                 self.run = None;
                 self.homing_until = None;
+                self.pulse_until = None;
                 self.head.cancel(at);
             }
-            // A frame needs its text for the moves: `take_frame`.
-            ControllerCommand::Unlock | ControllerCommand::Frame { .. } => {}
+            // A frame needs its text for the moves (`take_frame`), a go to point answers with its
+            // target (`go_to`).
+            ControllerCommand::Unlock
+            | ControllerCommand::Frame { .. }
+            | ControllerCommand::GoTo { .. } => {}
+            ControllerCommand::Pulse { length, .. } => {
+                self.pulse_until = Some(at + length.duration());
+            }
             ControllerCommand::Home => self.homing_until = Some(at + FAKE_HOMING),
             ControllerCommand::Jog {
                 axis,
@@ -155,9 +165,24 @@ impl FakeController {
         }
     }
 
+    /// A go to point: the head moves straight along X, then Y, to `target` (the fake's own
+    /// coordinates, no travel to clamp to); `JogEnded` at once when it is there already.
+    pub fn go_to(&mut self, target: [Millimetres; 2], feed: Feed, at: Duration) -> Vec<Event> {
+        self.head.trace(&[[target[0].0, target[1].0]], feed.0, at);
+        let mut events = vec![Event::GoToTarget { target }];
+        if !self.head.moving() {
+            events.push(Event::JogEnded);
+        }
+        events
+    }
+
     /// Lets time pass and returns the events that happened: the end of a homing, progress, the
     /// end of the job, or the alarm, after which the stream stops by itself.
     pub fn run_until(&mut self, at: Duration) -> Vec<Event> {
+        if self.pulse_until.is_some_and(|until| at >= until) {
+            self.pulse_until = None;
+            return vec![Event::PulseEnded];
+        }
         if self.homing_until.is_some_and(|until| at >= until) {
             self.homing_until = None;
             let mut events = vec![Event::Homed];
@@ -215,6 +240,9 @@ impl Controller for FakeController {
         if let (ControllerCommand::Frame { .. }, Some(job)) = (command, job) {
             self.take_frame(job, at);
             return Vec::new();
+        }
+        if let ControllerCommand::GoTo { target, feed } = command {
+            return self.go_to(*target, *feed, at);
         }
         let lines = job.map_or(0, |j| j.text.lines().count());
         self.take(command, u32::try_from(lines).unwrap_or(u32::MAX), at);

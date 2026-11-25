@@ -225,20 +225,13 @@ fn finish(printer: Option<std::thread::JoinHandle<()>>) {
     }
 }
 
-/// A running or paused job is stopped as a client's Stop would (G16); then the program exits.
+/// A running or paused job or a go to point is stopped as a client's Stop would (G16); then the
+/// program exits.
 /// A second signal during the stop is not awaited, so it changes nothing.
 fn stop_for_exit(server: &RunningServer) {
-    use curvyo_connector_core::State;
-    use std::time::{Duration, Instant};
-    /// The longest a stop at exit may take: G12's hold and banner limits plus `M5` and `M9`.
-    const EXIT_STOP: Duration = Duration::from_secs(6);
-
     if let Some(name) = server.stop_for_exit() {
         println!("Stopping {name}");
-        let until = Instant::now() + EXIT_STOP;
-        while matches!(server.state(), State::Running | State::Paused) && Instant::now() < until {
-            std::thread::sleep(Duration::from_millis(20));
-        }
+        server.await_exit_stop();
     }
 }
 

@@ -368,9 +368,11 @@ impl Session {
     fn on_logged_in(&mut self, socket: &mut Socket, message: Message, peer: &Peer) -> bool {
         let now = Instant::now();
         match message {
-            Message::Home | Message::Jog { .. } | Message::JogKeep | Message::JogStop => {
-                self.on_motion(socket, message, peer, now)
-            }
+            Message::Home
+            | Message::Jog { .. }
+            | Message::JogKeep
+            | Message::JogStop
+            | Message::GoToPoint { .. } => self.on_motion(socket, message, peer, now),
             Message::Unlock => {
                 let status = self.hub.unlock(peer, now);
                 self.limiter.answered(now);

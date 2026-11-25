@@ -79,6 +79,7 @@ fn p2_status_pause_pending_matches_its_golden_file_and_old_files_are_unchanged()
         machine_position: None,
         work_offset: None,
         frame_id: None,
+        target: None,
     };
     let golden = fixture("messages/status_pause_pending.json");
     assert_eq!(encode(&message).unwrap(), golden);
