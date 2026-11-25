@@ -52,21 +52,22 @@ test("rows say lines, size and sender, with 'this app' for the app's own job", (
   assert.equal(countsLine(entry(1), "Laptop"), "412 lines, 4.2 KiB, Phone");
   assert.equal(countsLine(entry(1), "Phone"), "412 lines, 4.2 KiB, this app");
   assert.equal(senderText("Laptop", "Laptop"), "this app");
-  assert.equal(interruptedLine(entry(1, { interrupted_at: 1234 }), "Laptop"), "Interrupted at line 1,234, Phone");
+  // `specs/0118` W65 (slice 2e): the sender moved to the third line, the counts line.
+  assert.equal(interruptedLine(entry(1, { interrupted_at: 1234 })), "Interrupted at line 1,234");
   assert.equal(rowText(entry(2), 3), "job2.gcode, 412 lines, 4.2 KiB, from Phone, 2 of 3");
   assert.equal(rowText(entry(2, { run_next: true }), 3), "job2.gcode, 412 lines, 4.2 KiB, from Phone, 2 of 3, runs next automatically");
-  assert.equal(rowText(entry(1, { interrupted_at: 1234, position: 0 }), 3), "job1.gcode, 412 lines, 4.2 KiB, from Phone, interrupted at line 1,234");
+  assert.equal(rowText(entry(1, { interrupted_at: 1234, position: 0 }), 3), "job1.gcode, 412 lines, 4.2 KiB, from Phone, interrupted at line 1,234 of 412");
 });
 
 test("rights: an owner everything, a member the flag and Remove of its own waiting job, nothing on another's", () => {
   const own = entry(1);
   const other = entry(2, { sent_by: "Tablet" });
   const interrupted = entry(3, { interrupted_at: 5, position: 0 });
-  assert.deepEqual(rights(true, "Laptop", other), { move: true, flag: true, remove: true });
-  assert.deepEqual(rights(true, "Laptop", interrupted), { move: false, flag: false, remove: true });
-  assert.deepEqual(rights(false, "Phone", own), { move: false, flag: true, remove: true });
-  assert.deepEqual(rights(false, "Phone", other), { move: false, flag: false, remove: false });
-  assert.deepEqual(rights(false, "Phone", entry(4, { interrupted_at: 5, position: 0 })), { move: false, flag: false, remove: false });
+  assert.deepEqual(rights(true, "Laptop", other), { move: true, flag: true, remove: true, restart: false });
+  assert.deepEqual(rights(true, "Laptop", interrupted), { move: false, flag: false, remove: true, restart: false });
+  assert.deepEqual(rights(false, "Phone", own), { move: false, flag: true, remove: true, restart: false });
+  assert.deepEqual(rights(false, "Phone", other), { move: false, flag: false, remove: false, restart: false });
+  assert.deepEqual(rights(false, "Phone", entry(4, { interrupted_at: 5, position: 0 })), { move: false, flag: false, remove: false, restart: false });
 });
 
 test("the order leaves the interrupted job out; Start takes the first waiting job and names it", () => {

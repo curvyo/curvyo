@@ -111,6 +111,9 @@ export interface LinkEntry {
   /** A member's waiting request that someone else discarded: its job's name, until the next
    * state change, send or test (`specs/0128` UX notes V16). */
   discarded: string | null;
+  /** The state now showing began with this app's own Stop: a restart that ended before its line
+   * then shows no "Not started" line here (`specs/0118` W74). */
+  stoppedHere: boolean;
 }
 
 type Payload =
@@ -171,6 +174,7 @@ const EMPTY: LinkEntry = {
   readError: null,
   session: null,
   discarded: null,
+  stoppedHere: false,
 };
 
 /** The job's name, "Home" or "Frame" when `next` shows that a member's own waiting request was
@@ -269,6 +273,7 @@ export function createLinkStore(host: LinkHost, timers: SendTimers = REAL_TIMERS
     const discarded = discardedName(now.status, status, now.session, now.busy === "stop");
     patch(profileId, {
       discarded: discarded ?? (changed ? null : now.discarded),
+      stoppedHere: changed ? now.busy === "stop" : now.stoppedHere,
       notStarted: ours ? now.notStarted : null,
       startedJob: started ? now.startedJob : null,
       status,

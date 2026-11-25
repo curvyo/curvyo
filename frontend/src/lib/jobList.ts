@@ -13,6 +13,12 @@ export interface ListEntry {
   position: number;
   run_next?: boolean;
   interrupted_at?: number | null;
+  /** An interrupted job: the line a restart begins at (`specs/0118` 39); absent when none can. */
+  restart_line?: number | null;
+  /** An interrupted job: the connector's cause that refuses a restart now; absent when it runs. */
+  restart_cause?: string | null;
+  /** The line was stored up to a second before a crash: "near line" (`specs/0118` W66). */
+  line_approximate?: boolean;
 }
 
 /** The connector's `JobList` message. */
@@ -30,13 +36,16 @@ export const LIST_LIMIT = 20;
 export type ListCall =
   | { kind: "move"; jobId: string; from: number; to: number }
   | { kind: "remove"; jobId: string }
-  | { kind: "runNext"; jobId: string; on: boolean };
+  | { kind: "runNext"; jobId: string; on: boolean }
+  | { kind: "restart"; jobId: string; line: number };
 
 /** What the app's role lets it do with a row (Frage 257 A; UX notes section 3). */
 export interface Rights {
   move: boolean;
   flag: boolean;
   remove: boolean;
+  /** Restart from line: an owner's, on an interrupted job that offers a line (`specs/0118` W67). */
+  restart: boolean;
 }
 
 /** The sender as a row says it: "this app" for the app's own job. */
@@ -49,21 +58,57 @@ export function countsLine(entry: ListEntry, me: string | null): string {
   return `${formatCount(entry.lines)} lines, ${formatSize(entry.bytes)}, ${senderText(entry.sent_by, me)}`;
 }
 
-/** The interrupted row's second line: "Interrupted at line 1,234, Phone". */
-export function interruptedLine(entry: ListEntry, me: string | null): string {
-  return `Interrupted at line ${formatCount(entry.interrupted_at ?? 0)}, ${senderText(entry.sent_by, me)}`;
+/** The one line number of an interrupted job (`specs/0118` W65): where a restart begins, the
+ * same in the row, the button, the confirm and the state line; the stored line when none can. */
+export function restartAt(entry: ListEntry): number {
+  return entry.restart_line ?? entry.interrupted_at ?? 0;
 }
+
+/** The interrupted row's second line: "Interrupted at line 1,234", "near line" after a crash. */
+export function interruptedLine(entry: ListEntry): string {
+  const where = entry.line_approximate === true ? "near" : "at";
+  return `Interrupted ${where} line ${formatCount(restartAt(entry))}`;
+}
+
+/** Restart's tooltip: "Restart from line 1,234". */
+export function restartLabel(entry: ListEntry): string {
+  return `Restart from line ${formatCount(restartAt(entry))}`;
+}
+
+/** Restart's accessible name: "Restart sign.gcode from line 1,234". */
+export function restartName(entry: ListEntry): string {
+  return `Restart ${entry.name} from line ${formatCount(restartAt(entry))}`;
+}
+
+/** The confirm's sentence (Frage 391 C, customer 2026-11-25): "Restart sign.gcode from line 1,234
+ * of 4,000?", the name cut at 40 characters as "Start <name>". */
+export function restartQuestion(entry: ListEntry): string {
+  const name = entry.name.length > 40 ? `${entry.name.slice(0, 37)}...` : entry.name;
+  return `Restart ${name} from line ${formatCount(restartAt(entry))} of ${formatCount(entry.lines)}?`;
+}
+
+/** Whether an open restart confirm still holds (`specs/0118` W69): its row is listed with the line
+ * it named and no cause greys Restart; else it closes without sending. */
+export function confirmHolds(row: ListEntry | undefined, line: number, cause: string | null): boolean {
+  return row !== undefined && restartAt(row) === line && cause === null;
+}
+
+/** The 400 ms in which the confirm's action ignores presses (`specs/0118` W69, `sendArm.ts`). */
+export const CONFIRM_GUARD_MS = 400;
 
 /** What a row says to a screen reader (UX notes section 7). */
 export function rowText(entry: ListEntry, total: number): string {
   const base = `${entry.name}, ${formatCount(entry.lines)} lines, ${formatSize(entry.bytes)}, from ${entry.sent_by}`;
-  if (entry.interrupted_at != null) return `${base}, interrupted at line ${formatCount(entry.interrupted_at)}`;
+  if (entry.interrupted_at != null) {
+    const where = entry.line_approximate === true ? "near" : "at";
+    return `${base}, interrupted ${where} line ${formatCount(restartAt(entry))} of ${formatCount(entry.lines)}`;
+  }
   const place = `${base}, ${entry.position} of ${total}`;
   return entry.run_next ? `${place}, runs next automatically` : place;
 }
 
 /** What a viewer may do with a row: an owner everything, a member the flag and Remove of its own
- * waiting job, nothing on an interrupted one but Remove for an owner. */
+ * waiting job, nothing on an interrupted one but Remove and Restart for an owner. */
 export function rights(owner: boolean, me: string | null, entry: ListEntry): Rights {
   const interrupted = entry.interrupted_at != null;
   const own = me !== null && entry.sent_by === me;
@@ -71,6 +116,7 @@ export function rights(owner: boolean, me: string | null, entry: ListEntry): Rig
     move: owner && !interrupted,
     flag: !interrupted && (owner || own),
     remove: owner || (own && !interrupted),
+    restart: owner && interrupted && entry.restart_line != null,
   };
 }
 
@@ -199,4 +245,10 @@ export function movedAnnouncement(after: JobListMessage | null, jobId: string): 
  * the job it sends waits behind it; with nothing held the job is the current one. */
 export function showsSendingRow(status: StatusMessage | null): boolean {
   return ["Ready", "AwaitingLocalStart", "Running", "Paused"].includes(status?.state.name ?? "");
+}
+
+/** The one Tab stop of the job grid: the focused row, else the selected, first or top row. */
+export function tabStop(rows: ListEntry[], selected: string | null, first: string | null, focused: string | null): string | null {
+  if (focused !== null && rows.some((row) => row.job_id === focused)) return focused;
+  return selected ?? first ?? rows[0]?.job_id ?? null;
 }

@@ -14,7 +14,16 @@ export type JobState =
 export interface StatusMessage {
   type: "Status";
   state: JobState;
-  job: { job_id: string; line: number; lines: number; elapsed_ms: number } | null;
+  job: {
+    job_id: string;
+    line: number;
+    lines: number;
+    elapsed_ms: number;
+    /** A restart from a line: the line it began at (`specs/0118` 2e); absent otherwise. */
+    from_line?: number | null;
+    /** The restart moves the head to its line with the laser off; absent when false. */
+    entering?: boolean;
+  } | null;
   position: [number, number, number] | null;
   alarm: string | null;
   /** The sentence that explains the state (`specs/0127`); absent when there is none. */
@@ -406,12 +415,21 @@ export function jobStateLine(status: StatusMessage, held: HeldJob | null, sessio
       // A frame is no job: neutral, no bar (`specs/0118` 22, W32).
       return neutral("Framing");
     case "Running":
-      return neutral(status.pause_pending === true ? PAUSE_PENDING_TEXT : "Running");
+      if (status.pause_pending === true) return neutral(PAUSE_PENDING_TEXT);
+      // A restart from a line (`specs/0118` W73): the move first, then the job's own lines.
+      if (status.job?.from_line != null) {
+        const from = formatCount(status.job.from_line);
+        return neutral(status.job.entering === true ? `Moving to line ${from}` : `Running from line ${from}`);
+      }
+      return neutral("Running");
     case "Paused":
       return neutral("Paused");
     case "Done":
       switch (status.state.result) {
         case "Completed":
+          if (status.job?.from_line != null) {
+            return neutral(`Completed, lines ${formatCount(status.job.from_line)} to ${formatCount(lines)}`);
+          }
           return neutral(`Completed, ${formatCount(lines)} lines`);
         case "Stopped":
           return neutral(`Stopped at line ${formatCount(line)}`);

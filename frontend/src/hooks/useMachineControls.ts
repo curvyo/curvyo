@@ -37,8 +37,9 @@ export interface MachineControlsModel {
   confirmFrame: () => void;
   /** This app sent the frame that runs: only this app draws the head ring (W33). */
   sentFrame: boolean;
-  /** A press in the job list (`specs/0132`); resolves when the connector answered. */
-  listPress: (call: ListCall) => Promise<void>;
+  /** A press in the job list (`specs/0132`); resolves with the answer's kind when the connector
+   * answered: "done", "stale", "ownerRequired", "refused" or "failed". */
+  listPress: (call: ListCall) => Promise<string>;
   /** The last list press found the list changed meanwhile: "The list changed" until the next
    * press in the list or push (UX notes section 4). */
   listChanged: boolean;
@@ -121,19 +122,26 @@ export function useMachineControls(profileId: string, address: string, enabled: 
   }, [entry.jobList]);
   const listChanged = changedAt !== undefined && changedAt === entry.jobList;
 
-  const listPress = async (call: ListCall) => {
-    if (!enabled) return;
+  const listPress = async (call: ListCall): Promise<string> => {
+    if (!enabled) return "failed";
     setChangedAt(undefined);
-    const answer = await invoke<{ kind: string; error?: LinkError }>("connector_list_command", {
+    const answer = await invoke<{ kind: string; error?: LinkError; cause?: string }>("connector_list_command", {
       profileId,
       address,
       call,
-    }).catch(() => ({ kind: "failed", error: { kind: "other", message: "Connector error" } as LinkError }));
+    }).catch((): { kind: string; error?: LinkError; cause?: string } => ({
+      kind: "failed",
+      error: { kind: "other", message: "Connector error" } as LinkError,
+    }));
     if (answer.kind === "stale" || answer.kind === "ownerRequired") {
       setChangedAt(latestList.current);
+    } else if (answer.kind === "refused" && answer.cause) {
+      // A restart's refusal reads in the job block's line, once (`specs/0118` W71).
+      show({ text: answer.cause, failure: true });
     } else if (answer.kind === "failed" && answer.error) {
       fail(answer.error);
     }
+    return answer.kind;
   };
 
   const show = (line: Line | null) => {
