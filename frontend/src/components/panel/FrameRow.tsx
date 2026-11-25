@@ -3,6 +3,7 @@ import { type KeyboardEvent, useEffect, useRef } from "react";
 
 import { GLYPH } from "@/components/workbench/machineStyles";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
+import { useFocusMode } from "@/hooks/useFocusPoint";
 import { type MachineControlsModel } from "@/hooks/useMachineControls";
 import { type FramePage } from "@/hooks/useFramePage";
 import { FRAME_SHAPES, frameSlot, headPlace, nextShape } from "@/lib/frameControls";
@@ -25,13 +26,16 @@ export function FrameRow({ model, frame }: { model: MachineControlsModel; frame:
   const framing = status?.state.name === "Framing";
   const sent = model.sentFrame;
   const { head, clearHead, relative } = frame;
+  // While the Focus point mode is on, the ring shows the head at its work position (W59).
+  const focusing = useFocusMode();
   useEffect(() => {
     if (!framing) first.current = null;
     else if (first.current === null && status?.position) first.current = [status.position[0], status.position[1]];
-    const place = framing && sent ? headPlace(status, relative, first.current) : null;
+    const at = status?.position ?? null;
+    const place = framing && sent ? headPlace(status, relative, first.current) : focusing && at !== null ? { x: at[0], y: at[1] } : null;
     if (place === null) clearHead();
     else head(place.x, place.y);
-  }, [status, framing, sent, relative, head, clearHead]);
+  }, [status, framing, sent, relative, head, clearHead, focusing]);
   useEffect(() => clearHead, [clearHead]);
   const move = (event: KeyboardEvent, at: number) => {
     const to = FRAME_SHAPES.findIndex((s) => s.value === nextShape(shape, event.key));

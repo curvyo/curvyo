@@ -19,6 +19,7 @@ import {
   refusalText,
 } from "@/lib/connectorText";
 import { type JobListMessage, type ListCall } from "@/lib/jobList";
+import { type FocusPulse } from "@/lib/focusPoint";
 import { type JogRequest } from "@/lib/jog";
 import { type OwnPress, SETTLES, heldAfterSend, refusalEnds } from "@/lib/machineControls";
 import { invoke } from "@/platform/host";
@@ -51,6 +52,9 @@ export interface MachineControlsModel {
     keep: () => Promise<boolean>;
     release: () => void;
   };
+  /** A press of the Focus point mode (`specs/0118` 34): the target in job file mm and the
+   * profile's pulse; resolves with whether the connector took it. */
+  goToPoint: (x: number, y: number, pulse: FocusPulse | null) => Promise<boolean>;
 }
 
 /** "Connector busy": the connector refused a command that no longer fits (UX notes section 5). */
@@ -283,9 +287,23 @@ export function useMachineControls(profileId: string, address: string, enabled: 
     },
   };
 
+  const goToPoint = async (x: number, y: number, pulse: FocusPulse | null) => {
+    if (!enabled) return false;
+    show(null);
+    const point = { x, y, pulse };
+    const answer = await invoke<CommandAnswer>("connector_command", { profileId, address, command: "go_to_point", point }).catch(
+      lostAnswer,
+    );
+    if (answer.kind === "failed") fail(answer.error);
+    else if (answer.kind === "wrongState") show({ text: BUSY_TEXT, failure: true });
+    await refresh();
+    return answer.kind === "done";
+  };
+
   return {
     entry,
     own: { sending: entry.busy === "send", failure },
+    goToPoint,
     send,
     command,
     frame,

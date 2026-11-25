@@ -295,6 +295,19 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
             onCheckedChange={(on) => api.setLaserMode(on)}
           />
         </div>
+        {/* The Focus point mode's pulse (`specs/0118` 35 a, W60 to W62): after Laser mode, which
+            greys it, GRBL profiles only. */}
+        {copy.output === "GRBL" ? (
+          <FocusPulseFields
+            copy={copy}
+            off={copy.laser_mode ? null : "Laser mode is off"}
+            onFocusPulse={(on) => api.setFocusPulse(on)}
+            onPower={(value) => show(api.setPulsePower(value), "pulse-power")}
+            onLength={(value) => show(api.setPulseLength(value), "pulse-length")}
+            noticeAt={noticeAt}
+            onReturnFocus={onReturnFocus}
+          />
+        ) : null}
         {/* The capability Z offset reads (`specs/0111` criterion 22): one undo step on the page's
             profile copy; default off. */}
         <div className={SWITCH_ROW}>
@@ -326,6 +339,87 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
         onCommit={(address, port, baud) => show(api.setConnection(address, port, baud), "connection")}
       />
     </section>
+  );
+}
+
+/**
+ * Focus pulse, Pulse power and Pulse length (`specs/0118` 35 a, W60 to W62): copy fields, one undo
+ * step per commit, clamped on commit with the built notice. While the copy's Laser mode is off all
+ * three are greyed in place at 40 % with the cause, their values kept; Power and Length stay
+ * editable while the pulse is off (W61).
+ */
+function FocusPulseFields({
+  copy,
+  off,
+  onFocusPulse,
+  onPower,
+  onLength,
+  noticeAt,
+  onReturnFocus,
+}: {
+  copy: { focus_pulse: boolean; pulse_power: number; pulse_length: number };
+  off: string | null;
+  onFocusPulse: (on: boolean) => void;
+  onPower: (value: number) => void;
+  onLength: (value: number) => void;
+  noticeAt: (anchor: string) => ReactNode;
+  onReturnFocus: () => void;
+}) {
+  const causeId = useId();
+  const greyed = off !== null;
+  return (
+    <>
+      <div className={`${SWITCH_ROW} ${greyed ? "opacity-40" : ""}`}>
+        <Tooltip side="left" content={greyed ? <Cause name="Focus pulse" cause={off} /> : "Focus pulse"}>
+          <span className="w-full">
+            <PanelSwitch
+              label="Focus pulse"
+              checked={copy.focus_pulse === true}
+              onCheckedChange={(on) => {
+                if (!greyed) onFocusPulse(on);
+              }}
+              onReturnFocus={onReturnFocus}
+              extra={greyed ? { "aria-disabled": "true", "aria-describedby": causeId } : undefined}
+            />
+          </span>
+        </Tooltip>
+      </div>
+      <NumberField
+        label="Pulse power"
+        unit="%"
+        accessibleName="Pulse power (percent of max power)"
+        value={copy.pulse_power}
+        notice={noticeAt("pulse-power")}
+        greyed={off}
+        describedBy={greyed ? causeId : undefined}
+        onCommit={onPower}
+      />
+      <NumberField
+        label="Pulse length"
+        unit="ms"
+        accessibleName="Pulse length (ms)"
+        value={copy.pulse_length}
+        notice={noticeAt("pulse-length")}
+        greyed={off}
+        describedBy={greyed ? causeId : undefined}
+        onCommit={onLength}
+      />
+      {greyed ? (
+        <span id={causeId} className="sr-only">
+          {off}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/** A greyed control's tooltip: its name, and the cause as the second line. */
+function Cause({ name, cause }: { name: string; cause: string }) {
+  return (
+    <>
+      <div>{name}</div>
+      <div className="text-muted-foreground">{cause}</div>
+    </>
   );
 }
 
@@ -424,6 +518,7 @@ function NumberField({
   value,
   notice,
   readOnly = false,
+  greyed = null,
   describedBy,
   onCommit,
 }: {
@@ -433,10 +528,38 @@ function NumberField({
   value: number;
   notice?: ReactNode;
   readOnly?: boolean;
+  /** Greyed in place with this cause (`aria-disabled`, 40 %): the value shows, typing changes
+   * nothing (`specs/0118` W62). */
+  greyed?: string | null;
   describedBy?: string;
   onCommit: (value: number) => void;
 }) {
   const draft = useDraft(numberText(value));
+  if (greyed !== null) {
+    return (
+      <div className="relative">
+        <Tooltip side="left" content={<Cause name={label} cause={greyed} />}>
+          <label className={`${FIELD} opacity-40`}>
+            <span className="shrink-0 text-[var(--toolbar-icon)]">{label}</span>
+            <input
+              aria-label={accessibleName}
+              aria-describedby={describedBy}
+              aria-disabled="true"
+              readOnly
+              value={numberText(value)}
+              className="min-w-0 flex-1 bg-transparent text-right tabular-nums outline-none"
+            />
+            {unit ? (
+              <span aria-hidden className="shrink-0 text-xs text-[var(--panel-muted-fg)]">
+                {unit}
+              </span>
+            ) : null}
+          </label>
+        </Tooltip>
+        {notice}
+      </div>
+    );
+  }
   const commit = () => {
     const typed = typedNumber(draft.text);
     if (typed === null) {

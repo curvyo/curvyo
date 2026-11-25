@@ -1,9 +1,12 @@
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, LocateFixed } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, LocateFixed, Target } from "lucide-react";
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import { GLYPH, ICON_BUTTON } from "@/components/workbench/machineStyles";
+import { type FocusPointToggle, focusMode, useFocusPoint } from "@/hooks/useFocusPoint";
+import { type FramePage } from "@/hooks/useFramePage";
 import { type MachineControlsModel } from "@/hooks/useMachineControls";
+import { FOCUS_POINT } from "@/lib/focusPoint";
 import {
   type Arrow,
   type Corner,
@@ -51,6 +54,8 @@ interface Props {
   onStep: (step: JogStep) => void;
   /** Set origin here: stores the work position `(x, y)` mm on the page; whether it changed. */
   onSetOrigin: (x: number, y: number) => boolean;
+  /** The active page's frame and focus API: the Focus point mode maps presses with it. */
+  frame: FramePage;
 }
 
 /** One arrow press at a time: which arrow, its reducer state, and what started it. */
@@ -72,8 +77,17 @@ interface Active {
  * 300 ms is one step, a press held past it moves the head until the release, kept alive every
  * 100 ms from here; the connector stops a hold whose keep-alive is late.
  */
-export function JogPad({ id, model, corner, step, onStep, onSetOrigin }: Props) {
+export function JogPad({ id, model, corner, step, onStep, onSetOrigin, frame }: Props) {
   const [pressed, setPressed] = useState<Arrow | null>(null);
+  // A jog of this pad keeps the Focus point mode on until the connector leaves Jogging (W56).
+  const [jogged, setJogged] = useState(false);
+  const jogging = model.entry.status?.state.name === "Jogging";
+  const [wasJogging, setWasJogging] = useState(jogging);
+  if (wasJogging !== jogging) {
+    setWasJogging(jogging);
+    if (!jogging && pressed === null) setJogged(false);
+  }
+  const focus = useFocusPoint(model, frame, jogged || pressed !== null);
   const [rover, setRover] = useState<Arrow>("up");
   const active = useRef<Active | null>(null);
   const buttons = useRef<Partial<Record<Arrow, HTMLButtonElement | null>>>({});
@@ -138,6 +152,7 @@ export function JogPad({ id, model, corner, step, onStep, onSetOrigin }: Props) 
       const now: Active = { arrow, state: IDLE, source, pointerId, holding: false, timeout: undefined, interval: undefined };
       active.current = now;
       setPressed(arrow);
+      setJogged(true);
       dispatch({ kind: "down", at });
       now.timeout = setTimeout(() => dispatch({ kind: "tick", at: performance.now() }), HOLD_AFTER_MS);
       return true;
@@ -201,7 +216,10 @@ export function JogPad({ id, model, corner, step, onStep, onSetOrigin }: Props) 
     }
     event.preventDefault();
     if (key === "enter") {
-      if (enabled) jog.step(requestOf(corner, arrow, step));
+      if (enabled) {
+        setJogged(true);
+        jog.step(requestOf(corner, arrow, step));
+      }
     } else {
       begin(arrow, "space", event.timeStamp);
     }
@@ -212,7 +230,19 @@ export function JogPad({ id, model, corner, step, onStep, onSetOrigin }: Props) 
 
   const arrows: Arrow[] = ["up", "left", "right", "down"];
   return (
-    <div id={id} role="group" aria-label="Jog" className="flex flex-wrap items-start gap-3 select-none [touch-action:none]">
+    <div
+      id={id}
+      role="group"
+      aria-label="Jog"
+      className="flex flex-wrap items-start gap-3 select-none [touch-action:none]"
+      onKeyDown={(event) => {
+        // Escape in the pad ends the Focus point mode, one step per press (W64).
+        if (event.key === "Escape" && focusMode.get()) {
+          event.stopPropagation();
+          focusMode.end();
+        }
+      }}
+    >
       <div className="grid grid-cols-[repeat(3,28px)] grid-rows-[repeat(3,28px)] gap-1 pointer-coarse:grid-cols-[repeat(3,36px)] pointer-coarse:grid-rows-[repeat(3,36px)]">
         {arrows.map((arrow) => {
           const name = ARROWS[corner][arrow].name;
@@ -265,6 +295,7 @@ export function JogPad({ id, model, corner, step, onStep, onSetOrigin }: Props) 
           );
         })}
         <SetOriginHere id={id} model={model} onSetOrigin={onSetOrigin} />
+        <FocusPointButton id={id} focus={focus} />
       </div>
       <StepPick step={step} onStep={onStep} homed={model.entry.status?.homed === true} />
     </div>
@@ -328,6 +359,56 @@ function SetOriginHere({ id, model, onSetOrigin }: Pick<Props, "id" | "model" | 
       <span role="status" aria-atomic="true" className="sr-only">
         {said.n % 2 === 1 ? `${said.text}\u00a0` : said.text}
       </span>
+    </div>
+  );
+}
+
+/**
+ * The Focus point toggle in the cross's top-left corner cell (`specs/0118` W53, W54, W64): its own
+ * Tab stop after Set origin here; on, a press on the canvas moves the head to that point. Greyed
+ * with its cause in the tooltip's second line; Enter or Space toggles on key down.
+ */
+function FocusPointButton({ id, focus }: { id: string; focus: FocusPointToggle }) {
+  const causeId = `${id}-focus-cause`;
+  const { on, cause, toggle } = focus;
+  return (
+    <div className="col-start-1 row-start-1">
+      <Tooltip
+        side="top"
+        content={
+          cause === null ? (
+            FOCUS_POINT
+          ) : (
+            <>
+              <div>{FOCUS_POINT}</div>
+              <div className="text-muted-foreground">{cause}</div>
+            </>
+          )
+        }
+      >
+        <button
+          type="button"
+          data-focus-point
+          aria-label={FOCUS_POINT}
+          aria-pressed={on && cause === null}
+          aria-disabled={cause !== null}
+          aria-describedby={cause === null ? undefined : causeId}
+          className={`${ICON_BUTTON} ${OFF} ${on ? PRESSED : ""}`}
+          onClick={toggle}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            if (!event.repeat) toggle();
+          }}
+        >
+          <Target {...GLYPH} />
+        </button>
+      </Tooltip>
+      {cause === null ? null : (
+        <span id={causeId} className="sr-only">
+          {cause}
+        </span>
+      )}
     </div>
   );
 }

@@ -42,6 +42,10 @@ export function frameCause(entry: LinkEntry, page: PageFrame | null): string | n
       return "Homing";
     case "Jogging":
       return "Jogging";
+    case "Focusing":
+      return "Focus point";
+    case "Pulsing":
+      return "Pulse";
     case "Running":
     case "Paused":
       return "A job is running";
