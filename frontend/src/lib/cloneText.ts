@@ -99,6 +99,13 @@ export const ADJUSTMENTS_SEGMENTS: OverrideSegment[] = [
   { own: true, label: "Own", name: "Own", title: "Has its own adjustments; the original's stay as they are." },
 ];
 
+/** The Parameters row of a clone of a sketch (`specs/0099-sketch-pages` criterion 24, UX notes
+ * 12.2): Original's drops every own value, Own writes the shown values as the clone's own. */
+export const PARAMETERS_SEGMENTS: OverrideSegment[] = [
+  { own: false, label: "Original's", name: "Original's", title: "Shows the original's values of the sketch." },
+  { own: true, label: "Own", name: "Own", title: "Has its own values; the sketch's stay as they are." },
+];
+
 export const STYLE_SEGMENTS: OverrideSegment[] = [
   {
     own: false,

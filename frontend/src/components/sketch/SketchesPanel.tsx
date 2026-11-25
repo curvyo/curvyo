@@ -6,6 +6,7 @@ import { KindChip } from "@/components/KindChip";
 import { selectClonesLabel, usageLine } from "@/lib/sketchPages";
 import type { SketchApi, SketchConstraint } from "@/hooks/useSketch";
 import { SketchField, sketchButton } from "./SketchField";
+import { ExposeControls } from "./ExposeControls";
 const title = (value: string) => value.replace(/(^|[-_])\w/g, part => part.replace(/[-_]/, " ").toUpperCase());
 function ConstraintRow({ row, sketch }: { row: SketchConstraint; sketch: SketchApi }) {
   const selected = row.selected;
@@ -31,6 +32,7 @@ function ConstraintRow({ row, sketch }: { row: SketchConstraint; sketch: SketchA
     </div>
     {row.expression !== null && <>
       {!row.reference && sketch.view.edit_constraint === row.id ? <SketchField autoFocus label={`${title(row.kind)} expression`} value={row.expression} commit={text => sketch.run(s => s.sketch_dimension_text(row.id, text, row.reference))} focusCanvas={sketch.focusCanvas} /> : <output className="block px-2 text-xs">{quantityText(row.value)}</output>}
+      {row.expose && !row.reference && <div className="px-2"><ExposeControls expose={row.expose} subject={row.expose.name ?? row.expose.suggest ?? title(row.kind)} sketch={sketch} /></div>}
       {selected && <label className="flex gap-2 px-2 text-xs"><input type="checkbox" checked={row.reference} onChange={e => sketch.run(s => s.sketch_dimension_text(row.id, row.expression ?? "", e.target.checked))} />Reference</label>}
     </>}
   </div>;

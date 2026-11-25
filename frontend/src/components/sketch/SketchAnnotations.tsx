@@ -35,12 +35,14 @@ export function SketchAnnotations({ sketch }: { sketch: SketchApi }) {
 function DimensionText({ label, onSelect, onEdit }: { label: SketchAnnotation; onSelect: () => void; onEdit: () => void }) {
   const color = label.selected ? "var(--editor-accent)" : label.reference ? "var(--dim-reference)" : "var(--dim-driving)";
   const border = label.conflicting || label.redundant ? "1px solid var(--destructive)" : label.selected ? "1px solid var(--editor-accent)" : "1px solid transparent";
-  return <button type="button" aria-label={label.name || label.text} aria-pressed={label.selected} data-sketch-dimension-text={label.id}
+  const name = `${label.name || label.text}${label.exposed ? ", exposed" : ""}`;
+  return <button type="button" aria-label={name} aria-pressed={label.selected} data-sketch-dimension-text={label.id}
     className="absolute rounded-full px-1 text-[12px] leading-4 whitespace-nowrap tabular-nums focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)]"
     style={{ ...AT(label.x, label.y), color, border, textShadow: HALO, visibility: label.editing ? "hidden" : undefined,
       background: label.hovered ? "var(--editor-accent-hover)" : undefined }}
     onClick={e => { if (e.detail === 0) onSelect(); }}
     onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onEdit(); } }}>
+    {label.exposed && <span aria-hidden data-exposed-mark className="mr-0.5 inline-block size-1.5 rounded-full align-middle" style={{ border: "1px solid currentColor" }} />}
     {label.fx && <span className="mr-0.5 text-[10px] text-[var(--panel-muted-fg)]">fx</span>}{label.text}
   </button>;
 }

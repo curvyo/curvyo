@@ -6,7 +6,9 @@ import { FillSection } from "@/components/panel/FillSection";
 import { collapseSpacer } from "@/lib/collapseSpacer";
 import { StrokeSection } from "@/components/panel/StrokeSection";
 import type { AdjustmentsApi } from "@/hooks/useAdjustments";
+import { SketchParametersRow } from "@/components/panel/SketchParametersRow";
 import type { ClonesApi } from "@/hooks/useClones";
+import type { SketchInstanceApi } from "@/hooks/useSketchInstance";
 import type { GradientApi } from "@/hooks/useGradient";
 import type { StylePanelApi } from "@/hooks/useStylePanel";
 import { ADJUSTMENTS_SEGMENTS } from "@/lib/cloneText";
@@ -49,6 +51,8 @@ interface StyleSectionProps {
   clones: ClonesApi;
   /** The Adjustments group of a selected picture (`specs/0135-image-optimisation`). */
   adjust: AdjustmentsApi;
+  /** The Parameters row of a clone of a sketch (`specs/0099-sketch-pages`). */
+  sketchInstance: SketchInstanceApi;
   /** The group's Before and after button. */
   onToggleBeforeAfter: () => void;
   onReturnFocus: () => void;
@@ -61,7 +65,7 @@ interface StyleSectionProps {
  * `0043`). Every value comes from the session; every
  * control sends one command back.
  */
-export function StyleSection({ panel, gradient, clones, adjust, onToggleBeforeAfter, onReturnFocus }: StyleSectionProps) {
+export function StyleSection({ panel, gradient, clones, adjust, sketchInstance, onToggleBeforeAfter, onReturnFocus }: StyleSectionProps) {
   const adjustments = adjust.view ? (
     <AdjustmentsGroup adjust={adjust} view={adjust.view} onToggleBeforeAfter={onToggleBeforeAfter} onReturnFocus={onReturnFocus} />
   ) : null;
@@ -209,17 +213,20 @@ export function StyleSection({ panel, gradient, clones, adjust, onToggleBeforeAf
           onReturnFocus={onReturnFocus}
           onPressedAt={pressedAt}
           extraRow={
-            adjust.view?.cloneRow ? (
-              <OverrideRow
-                label="Adjustments"
-                segments={ADJUSTMENTS_SEGMENTS}
-                state={adjust.view.cloneRow}
-                // Original's is Follow original; Own copies the original's adjustments whole.
-                onSet={(own) => void (own ? adjust.ownAdjustments() : adjust.followOriginal())}
-                onReturnFocus={onReturnFocus}
-                onPressedAt={() => undefined}
-              />
-            ) : null
+            <>
+              {adjust.view?.cloneRow ? (
+                <OverrideRow
+                  label="Adjustments"
+                  segments={ADJUSTMENTS_SEGMENTS}
+                  state={adjust.view.cloneRow}
+                  // Original's is Follow original; Own copies the original's adjustments whole.
+                  onSet={(own) => void (own ? adjust.ownAdjustments() : adjust.followOriginal())}
+                  onReturnFocus={onReturnFocus}
+                  onPressedAt={() => undefined}
+                />
+              ) : null}
+              <SketchParametersRow api={sketchInstance} onReturnFocus={onReturnFocus} onPressedAt={pressedAt} />
+            </>
           }
         />
         {notice}

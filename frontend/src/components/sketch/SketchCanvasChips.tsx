@@ -159,6 +159,8 @@ function EntryBox({ sketch, entry, containerRef }: { sketch: SketchApi; entry: S
   // Rust names the refused field; typing again hides the message until the next Enter.
   const refusal = dismissed ? null : entry.error ?? null;
   const single = entry.fields.length === 1;
+  // Row 2 of the box: Expose after Reference, for a driving dimension being edited (`0099` criterion 23).
+  const exposure = editing ? sketch.view.constraints.find(row => row.id === entry.constraint)?.expose ?? null : null;
   return <div ref={ref} role="group" aria-label={entry.group} data-sketch-entry
     className="absolute z-30 rounded-[8px] p-1.5"
     style={{ left: at.left, top: at.top, background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)", color: "var(--toolbar-icon)" }}
@@ -183,6 +185,13 @@ function EntryBox({ sketch, entry, containerRef }: { sketch: SketchApi; entry: S
     {entry.reference && <label className="mt-1 flex items-center gap-1 text-xs">
       <input type="checkbox" tabIndex={-1} className="size-3.5" checked={reference}
         onChange={event => { setReference(event.target.checked); inputs.current[0]?.focus(); }} />Reference
+    </label>}
+    {editing && !reference && exposure && <label className="mt-1 flex items-center gap-1 text-xs">
+      <input type="checkbox" tabIndex={-1} className="size-3.5" checked={exposure.on} aria-label={`Expose ${exposure.name ?? exposure.suggest ?? "dimension"}`}
+        onChange={event => {
+          sketch.run(s => { const refused = event.target.checked ? s.sketch_expose(exposure.key, exposure.suggest ?? "") : s.sketch_unexpose(exposure.key); if (refused !== "") throw refused; });
+          inputs.current[0]?.focus();
+        }} />Expose
     </label>}
     {refusal && <p id={messageId} role="alert" className="mt-1 text-xs text-[var(--field-invalid)]">{refusal.message}</p>}
   </div>;
