@@ -18,6 +18,10 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$root"
 [[ -f Cargo.toml ]] || exit 0   # no workspace yet (docs-only phase)
 
+# No incremental data: the hook builds the whole workspace on every stop, and its
+# incremental cache filled the disk (2026-11-25).
+export CARGO_INCREMENTAL=0
+
 # Only gate if Rust sources or manifests changed (tracked or untracked).
 changed=$(
   { git diff --name-only HEAD 2>/dev/null
