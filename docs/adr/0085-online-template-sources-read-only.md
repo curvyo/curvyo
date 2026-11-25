@@ -95,9 +95,9 @@ ADR 0007 (accepted) put the pure protocols in `curvyo-library-core` and HTTP in 
    | Failure | Shown on that source |
    |---|---|
    | connection level (DNS, connect, timeout, TLS) | "Offline" |
-   | `404` on the index | "No catalogue at this address." |
+   | `404` on the index | "No Git catalogue at this address." |
    | another HTTP status | "The server answered <code>." |
-   | unparsable index | "No catalogue at this address." |
+   | unparsable index | "No Git catalogue at this address." |
    | newer format, hash mismatch, too large | its own line |
 
    Other sources keep their state until their own request (UX F7: the app has no global online state). Local sources, drawing and saving are never affected, and loaded templates stay in the document (criterion 5).

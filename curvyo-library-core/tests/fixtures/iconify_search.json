@@ -1,0 +1,11 @@
+{
+  "icons": ["mdi:home", "mdi-light:home", "broken", "Bad:Name", "tabler:home-2"],
+  "total": 3,
+  "limit": 64,
+  "start": 0,
+  "collections": {
+    "mdi": {"name": "Material Design Icons", "total": 7447, "author": {"name": "Pictogrammers", "url": ""}, "license": {"title": "Apache 2.0", "spdx": "Apache-2.0", "url": ""}},
+    "tabler": {"name": "Tabler Icons", "total": 5000, "license": {"title": "MIT", "spdx": "MIT", "url": ""}}
+  },
+  "request": {"query": "home"}
+}

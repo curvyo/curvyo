@@ -1,0 +1,8 @@
+{
+  "prefix": "mdi",
+  "total": 4,
+  "title": "Material Design Icons",
+  "uncategorized": ["home", "account"],
+  "categories": {"Arrows": ["arrow-left", "home"], "Other": ["Bad Name"]},
+  "aliases": {"house": "home"}
+}
