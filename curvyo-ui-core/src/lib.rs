@@ -359,6 +359,7 @@ pub mod instance_source;
 mod instance_view;
 pub mod instance_warnings;
 pub mod path_box_marks;
+pub mod sketch_dimension_geometry;
 pub use extensions::{
     ExtensionSettings, active_extension_settings, generate_object, manifest, manifests, notice,
     set_active_extension_settings,
