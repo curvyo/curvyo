@@ -1,7 +1,7 @@
 //! The `Extension` trait and the generator contract (ADR 0080 §1, §2): what the registry holds and
 //! what a generator receives and returns.
 
-use curvyo_document_core::{Point, Vec2};
+use curvyo_document_core::{Length, Point, Vec2};
 use serde::Serialize;
 
 use crate::manifest::Manifest;
@@ -82,6 +82,45 @@ pub struct ClosedPath {
     pub segments: Vec<Cubic>,
 }
 
+impl ClosedPath {
+    /// The stored encoding of one subpath: `[x0, y0, c1x, c1y, c2x, c2y, x, y, ...]`, the start
+    /// point and then three points for every cubic, the closing one included (ADR 0080 §4).
+    #[must_use]
+    pub fn flat(&self) -> Vec<f64> {
+        let mut numbers = vec![self.start.x, self.start.y];
+        for cubic in &self.segments {
+            numbers.extend([
+                cubic.c1.x, cubic.c1.y, cubic.c2.x, cubic.c2.y, cubic.to.x, cubic.to.y,
+            ]);
+        }
+        numbers
+    }
+
+    /// The path a stored subpath of `2 + 6n` numbers holds, `None` for any other length or a
+    /// last cubic that does not end at the start (a closed path is closed by construction).
+    #[must_use]
+    pub fn from_flat(numbers: &[f64]) -> Option<Self> {
+        if numbers.len() < 2 || !(numbers.len() - 2).is_multiple_of(6) {
+            return None;
+        }
+        let point = |at: usize| Point::new(numbers[at], numbers[at + 1]);
+        let segments: Vec<Cubic> = (0..(numbers.len() - 2) / 6)
+            .map(|n| Cubic {
+                c1: point(2 + 6 * n),
+                c2: point(4 + 6 * n),
+                to: point(6 + 6 * n),
+            })
+            .collect();
+        let path = Self {
+            start: point(0),
+            segments,
+        };
+        let last = path.segments.last()?.to;
+        ((last.x - path.start.x).abs() < 1e-6 && (last.y - path.start.y).abs() < 1e-6)
+            .then_some(path)
+    }
+}
+
 /// One compound outline in frame-local mm: its subpaths, holes by the compound-path rule (`0035`).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Part {
@@ -132,6 +171,79 @@ pub struct Clamp {
     pub bound: Bound,
 }
 
+/// A fact about the result that the shell words as a notice (ADR 0083 §11): run time only, never
+/// stored. The shell writes the sentence because it formats lengths in the document's units and
+/// merges warnings of one id into the plural sentence.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Warning {
+    /// Which warning (`sharp_corner`, `tight_bend`, `ring_closed`, `hollow_left_out`,
+    /// `smallest_size`, `outline_crosses`, `outline_curved`).
+    pub id: &'static str,
+    /// The wall pieces it names, by their numbers (1 based, walk order).
+    pub pieces: Vec<u32>,
+    /// The value that caused it (an interior angle, a radius).
+    pub value: Option<ParamValue>,
+    /// The limit it breaks (the least radius).
+    pub limit: Option<ParamValue>,
+}
+
+/// One drawing the shell lays over the generated object (ADR 0083 §11): never geometry, never cut.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum Mark {
+    /// A corner (a finger joint): where, the unit direction of its bisector and whether it is
+    /// very sharp.
+    Corner {
+        /// The corner point.
+        at: Point,
+        /// The unit vector from the corner into the box.
+        bisector: Vec2,
+        /// Whether the interior angle is below 30 degrees.
+        sharp: bool,
+    },
+    /// A bent span: the stretch of the inner face as cubics, the band is drawn inside it.
+    Bend {
+        /// Where it starts.
+        start: Point,
+        /// The stretch.
+        segments: Vec<Cubic>,
+        /// Whether the radius is too small to bend (criterion 7).
+        tight: bool,
+    },
+    /// A wall piece's number badge.
+    Piece {
+        /// The number, 1 based, walk order.
+        number: u32,
+        /// The middle of the stretch the piece stands on (on a footprint) or of the piece (on a
+        /// part).
+        at: Point,
+        /// The unit vector from the stretch into the box (zero on a part).
+        inward: Vec2,
+        /// The stretch's length in mm.
+        length: Length,
+    },
+}
+
+/// The overlay marks of one generation (ADR 0083 §11).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Marks {
+    /// Where the stored outline's origin lies in the layout: the inner base's offset.
+    pub footprint: Vec2,
+    /// Marks in the stored outline's coordinates.
+    pub on_footprint: Vec<Mark>,
+    /// Marks in the object's frame (the badges on the wall pieces).
+    pub on_parts: Vec<Mark>,
+}
+
+impl Default for Marks {
+    fn default() -> Self {
+        Self {
+            footprint: Vec2::ZERO,
+            on_footprint: Vec::new(),
+            on_parts: Vec::new(),
+        }
+    }
+}
+
 /// The result of one generation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Generated {
@@ -151,4 +263,8 @@ pub struct Generated {
     /// The largest value a bound that depends on other parameters allows right now, by
     /// parameter: the block's slider ends there (aria-valuemax), not at the schema's.
     pub limits: Vec<(&'static str, ParamValue)>,
+    /// Facts the shell words as notices (a very sharp corner); empty for a kind without any.
+    pub warnings: Vec<Warning>,
+    /// The overlay marks; empty for a kind without any.
+    pub marks: Marks,
 }

@@ -5,6 +5,7 @@ import {
   type GeneratedView,
   type GeneratorKindEntry,
   decodeGeneratedView,
+  canvasNoticeLook,
   decodeKinds,
 } from "@/lib/generatedView";
 
@@ -12,8 +13,6 @@ type GeneratorsEditor = Pick<EditorSession, "getSession" | "sync" | "syncRevisio
 
 /** How long a clamp notice stays (UX notes §6). */
 const NOTICE_MS = 3000;
-/** How long the notice of unknown generator objects stays (UX notes §12). */
-const OPEN_NOTICE_MS = 5000;
 
 /** The Generators bar: the kinds and the chosen one (`specs/0141` UX notes §1). */
 export interface GeneratorKindsApi {
@@ -60,6 +59,8 @@ export interface GeneratorBlockApi {
   cancelPreview: () => void;
   /** Convert to paths. */
   convert: () => void;
+  /** Replace outline: arms the pick of a new outline (`0149`). */
+  replaceOutline: () => void;
 }
 
 /** The Generator block's state; also shows the once-only notice of an opened file with a
@@ -79,7 +80,8 @@ export function useGeneratorBlock(editor: GeneratorsEditor): GeneratorBlockApi {
     void syncRevision;
     const text = getSession()?.take_generated_notice() ?? "";
     if (text !== "") {
-      showHistoryNotice(text, OPEN_NOTICE_MS, "canvas", "status");
+      const look = canvasNoticeLook(text);
+      showHistoryNotice(text, look.ms, "canvas", look.kind);
     }
   }, [getSession, syncRevision, showHistoryNotice]);
 
@@ -128,5 +130,53 @@ export function useGeneratorBlock(editor: GeneratorsEditor): GeneratorBlockApi {
     setNotice(null);
     sync();
   }, [getSession, sync]);
-  return { view, notice, setValue, preview, cancelPreview, convert };
+  const replaceOutline = useCallback(() => {
+    getSession()?.begin_replace_outline();
+    sync();
+  }, [getSession, sync]);
+  return { view, notice, setValue, preview, cancelPreview, convert, replaceOutline };
+}
+
+/** The Select bar's Box from path (`specs/0149-path-box` UX notes §1.1). */
+export interface BoxFromPathApi {
+  /** One closed outline is selected: the button is in the bar. */
+  shown: boolean;
+  /** The press: builds the box, or shows the refusal under the button. */
+  apply: () => void;
+  /** The refusal under the button, `null` once it ended. */
+  notice: { id: number; text: string } | null;
+}
+
+/** How long a refusal stays (row "Action notice": 8 s). */
+const REFUSAL_MS = 8000;
+
+/** The Box from path button's state; every decision is the session's. */
+export function useBoxFromPath(editor: GeneratorsEditor): BoxFromPathApi {
+  const { getSession, sync, syncRevision } = editor;
+  const shown = useMemo(() => {
+    void syncRevision;
+    return getSession()?.box_from_path_shown() ?? false;
+  }, [getSession, syncRevision]);
+  const [notice, setNotice] = useState<{ id: number; text: string } | null>(null);
+  const counter = useRef(0);
+  useEffect(() => {
+    if (!notice) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setNotice(null), REFUSAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+  const apply = useCallback(() => {
+    const session = getSession();
+    const text = session?.apply_box_from_path() ?? "";
+    if (text !== "") {
+      // The session also keeps the refusal for the canvas notice slot; here it shows under the
+      // button only (UX notes §1.1), so it is taken before the sync shows it a second time.
+      session?.take_generated_notice();
+    }
+    sync();
+    counter.current += 1;
+    setNotice(text === "" ? null : { id: counter.current, text });
+  }, [getSession, sync]);
+  return { shown, apply, notice };
 }

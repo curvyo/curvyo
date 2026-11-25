@@ -337,6 +337,9 @@ pub mod instance_handles;
 mod instance_notice;
 pub mod instance_preview;
 mod instance_resize;
+pub mod instance_source;
+pub mod instance_warnings;
+pub mod path_box_marks;
 pub use extensions::{
     ExtensionSettings, active_extension_settings, generate_object, manifest, manifests, notice,
     set_active_extension_settings,

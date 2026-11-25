@@ -295,6 +295,7 @@ impl Session {
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
         list.extend(self.bend_preview_list(view, &objects));
         list.extend(self.generators_preview_overlay(view));
+        list.extend(self.path_box_marks_list(view));
         // The Node tool draws the nodes and handles of its editing set only (customer 2026-10-26).
         let control_paths: Vec<_> = paths.iter().map(super::node::control_view).collect();
         let decorated = if self.centre_lines_hides_marks() {

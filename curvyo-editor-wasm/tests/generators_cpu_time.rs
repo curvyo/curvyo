@@ -107,3 +107,34 @@ fn a_rounded_box_of_400_slots_edits_within_the_budget() {
     let panel = s.generated_panel_json();
     assert!(panel.contains("\"known\":true"), "{panel}");
 }
+
+/// `0149` criterion 11 (ADR 0083 §10): a path box of the default coffin edits within 100 ms.
+#[test]
+fn a_path_box_of_the_coffin_edits_within_the_budget() {
+    use curvyo_document_core::{NewAnchor, Point};
+    use curvyo_ui_core::AnchorIdMinter;
+    let document = Document::new(1);
+    let mut minter = AnchorIdMinter::new(9);
+    let anchors: Vec<NewAnchor> = [
+        (-50.0, -10.0),
+        (-25.0, -30.0),
+        (50.0, -20.0),
+        (50.0, 20.0),
+        (-25.0, 30.0),
+        (-50.0, 10.0),
+    ]
+    .iter()
+    .map(|&(x, y)| NewAnchor::corner(minter.mint(), Point::new(x, y)))
+    .collect();
+    let _source = document.create_path(&anchors, true);
+    let mut s = Session::open(2, &pack(&document, "0.1.0").unwrap()).unwrap();
+    s.resize_viewport(1600.0, 900.0);
+    s.set_tool(Tool::Generators);
+    s.set_generator_kind("curvyo.generators/path-box");
+    assert!(s.place_generated(50.0, 0.0), "pick the outline");
+    let (_, took) = cpu_time_of(|| {
+        set(&mut s, "inner_height", "60");
+        s.draw_list()
+    });
+    check("path box, coffin", took);
+}

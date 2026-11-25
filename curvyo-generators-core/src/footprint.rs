@@ -68,10 +68,13 @@ pub(crate) struct Footprint {
     pub(crate) spans: Vec<Span>,
     /// The wall thickness the neutral line is laid out for.
     pub(crate) wall: f64,
+    /// How far a tab keeps from either end of a straight (the wall thickness for the rounded
+    /// box; the finger zone and the wall thickness beside a corner of a path box).
+    pub(crate) margin: f64,
 }
 
 /// A piece of the cycle before the seam is chosen.
-struct Piece {
+pub(crate) struct Piece {
     shape: Shape,
     rank: usize,
 }
@@ -148,7 +151,36 @@ impl Footprint {
             Some(index) => (index, straight_length(&pieces[index].shape) / 2.0),
             None => back_middle(pieces, size),
         };
-        let seam = seam_in_straight.is_some();
+        Self::start_at(pieces, wall, (index, at), seam_in_straight.is_some())
+    }
+
+    /// The footprint of the closed loop `shapes` with its seam at distance `at` along shape
+    /// `index` (a loop without a corner, ADR 0083 §6).
+    pub(crate) fn from_loop(
+        shapes: &[Shape],
+        wall: f64,
+        (index, at, seam): (usize, f64, bool),
+    ) -> Self {
+        let pieces: Vec<Piece> = shapes
+            .iter()
+            .enumerate()
+            .map(|(rank, shape)| Piece {
+                shape: *shape,
+                rank,
+            })
+            .collect();
+        Self::start_at(&pieces, wall, (index, at), seam)
+    }
+
+    /// The spans of the cycle `pieces` started at distance `at` along piece `index`: that piece's
+    /// second half starts the strip, its first half ends it. `seam` says the cut is the middle
+    /// of a straight, whose two halves then count as one whole straight.
+    pub(crate) fn start_at(
+        pieces: &[Piece],
+        wall: f64,
+        (index, at): (usize, f64),
+        seam: bool,
+    ) -> Self {
         let whole_of =
             |piece_index: usize, offset: f64, is_seam: bool| match pieces[piece_index].shape {
                 Shape::Straight { .. } => Some(Whole {
@@ -187,7 +219,43 @@ impl Footprint {
             });
             s0 += length;
         }
-        Self { spans, wall }
+        Self {
+            spans,
+            wall,
+            margin: wall,
+        }
+    }
+
+    /// The footprint of `shapes` in walk order from the first one's start, which is a corner
+    /// (a piece starts there); every straight is a whole straight, there is no seam.
+    pub(crate) fn from_shapes(shapes: &[Shape], wall: f64, margin: f64) -> Self {
+        let mut s0 = 0.0;
+        let spans = shapes
+            .iter()
+            .enumerate()
+            .map(|(id, shape)| {
+                let length = neutral_length(shape, wall);
+                let span = Span {
+                    shape: *shape,
+                    s0,
+                    length,
+                    whole: matches!(shape, Shape::Straight { .. }).then(|| Whole {
+                        id,
+                        offset: 0.0,
+                        length,
+                        seam: false,
+                    }),
+                    window: false,
+                };
+                s0 += length;
+                span
+            })
+            .collect();
+        Self {
+            spans,
+            wall,
+            margin,
+        }
     }
 
     /// The strip's length on the neutral line.
@@ -196,10 +264,10 @@ impl Footprint {
     }
 }
 
-fn neutral_length(shape: &Shape, wall: f64) -> f64 {
+pub(crate) fn neutral_length(shape: &Shape, wall: f64) -> f64 {
     match *shape {
         Shape::Straight { .. } => straight_length(shape),
-        Shape::Bend { radius, sweep, .. } => sweep.abs() * (radius + wall / 2.0),
+        Shape::Bend { radius, sweep, .. } => sweep.abs() * (radius + sweep.signum() * wall / 2.0),
     }
 }
 
@@ -328,126 +396,5 @@ fn split(shape: &Shape, at: f64) -> (Shape, Option<Shape>) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn mm(value: f64) -> Length {
-        Length::from_mm(value)
-    }
-
-    fn footprint(w: f64, d: f64, r: f64, t: f64) -> Footprint {
-        Footprint::rounded_rect(mm(w), mm(d), mm(r), mm(t))
-    }
-
-    #[test]
-    fn the_strip_is_as_long_as_the_perimeter_on_the_neutral_line() {
-        // An independent sum, not the spans' own lengths (ADR 0082 §9).
-        for (w, d, r, t) in [
-            (120.0, 80.0, 15.0, 3.0),
-            (100.0, 40.0, 20.0, 3.0),
-            (40.0, 100.0, 20.0, 3.0),
-            (60.0, 60.0, 30.0, 3.0),
-            (120.0, 80.0, 6.0, 3.0),
-        ] {
-            let expected =
-                2.0 * (w - 2.0 * r) + 2.0 * (d - 2.0 * r) + std::f64::consts::PI * (2.0 * r + t);
-            let total = footprint(w, d, r, t).total();
-            assert!(
-                (total - expected).abs() < 1e-9,
-                "{w}x{d} r{r}: {total} vs {expected}"
-            );
-        }
-    }
-
-    #[test]
-    fn the_seam_is_the_middle_of_the_back_straight() {
-        let fp = footprint(120.0, 80.0, 15.0, 3.0);
-        assert_eq!(
-            fp.spans.len(),
-            9,
-            "two seam halves, four bends, three straights"
-        );
-        let Shape::Straight { from, .. } = fp.spans[0].shape else {
-            panic!("the strip starts on a straight");
-        };
-        assert!(
-            from.x.abs() < 1e-9 && (from.y + 40.0).abs() < 1e-9,
-            "{from:?}"
-        );
-        let tall = footprint(40.0, 100.0, 20.0, 3.0);
-        let Shape::Straight { from, .. } = tall.spans[0].shape else {
-            panic!("a right straight");
-        };
-        assert!(
-            (from.x - 20.0).abs() < 1e-9 && from.y.abs() < 1e-9,
-            "the longer side: {from:?}"
-        );
-    }
-
-    #[test]
-    fn a_stadium_has_two_straights_and_two_half_circles() {
-        let fp = footprint(100.0, 40.0, 20.0, 3.0);
-        let bends: Vec<f64> = fp
-            .spans
-            .iter()
-            .filter_map(|span| match span.shape {
-                Shape::Bend { sweep, .. } => Some(sweep),
-                Shape::Straight { .. } => None,
-            })
-            .collect();
-        assert_eq!(bends.len(), 2);
-        for sweep in bends {
-            assert!((sweep - std::f64::consts::PI).abs() < 1e-9, "{sweep}");
-        }
-    }
-
-    #[test]
-    fn a_circle_is_one_closed_bend_from_the_back_point() {
-        let fp = footprint(60.0, 60.0, 29.995, 3.0);
-        assert_eq!(fp.spans.len(), 1, "no straight, no zero-length piece");
-        let Shape::Bend {
-            centre,
-            radius,
-            from,
-            sweep,
-        } = fp.spans[0].shape
-        else {
-            panic!("a bend");
-        };
-        assert!(centre.x.abs() < 1e-9 && centre.y.abs() < 1e-9);
-        assert!((radius - 30.0).abs() < 1e-9, "snapped to half the side");
-        assert!((from + std::f64::consts::FRAC_PI_2).abs() < 1e-9);
-        assert!((sweep - std::f64::consts::TAU).abs() < 1e-9);
-    }
-
-    #[test]
-    fn tabs_sit_in_equal_sub_spans_and_the_seam_falls_between_two_tabs() {
-        let fp = footprint(120.0, 80.0, 15.0, 3.0);
-        let tabs = fp.straight_tabs(3.0);
-        // Top 90 mm: 3 rounds up to the even 4; right 50: 2; bottom 90: 3; left 50: 2.
-        assert_eq!(tabs.len(), 4 + 2 + 3 + 2);
-        let total = fp.total();
-        let seam_gap = tabs
-            .iter()
-            .map(|tab| tab.s.min(total - tab.s))
-            .fold(f64::MAX, f64::min);
-        assert!(
-            (seam_gap - 11.25).abs() < 1e-9,
-            "half a pitch from the seam: {seam_gap}"
-        );
-        for tab in &tabs {
-            assert!(tab.s > 0.0 && tab.s < total);
-        }
-    }
-
-    #[test]
-    fn a_short_straight_has_no_tab() {
-        // 40 x 28 with r 10: straights of 20 and 8 mm; wall 3 -> 8 < 4 * 3 has none.
-        let fp = footprint(40.0, 28.0, 10.0, 3.0);
-        let tabs = fp.straight_tabs(3.0);
-        assert!(
-            tabs.iter()
-                .all(|tab| (tab.centre.y.abs() - 14.0).abs() < 1e-9)
-        );
-    }
-}
+#[path = "footprint_tests.rs"]
+mod tests;

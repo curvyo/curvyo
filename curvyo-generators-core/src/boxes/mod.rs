@@ -284,6 +284,8 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         automatic: Vec::new(),
         states: Vec::new(),
         limits: Vec::new(),
+        warnings: Vec::new(),
+        marks: curvyo_extension_core::Marks::default(),
     }
 }
 

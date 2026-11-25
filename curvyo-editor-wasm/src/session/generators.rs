@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use curvyo_document_core::{GeneratedRecord, NodeId, ObjectSnapshot, Point, ViewTransform};
 use curvyo_render_core::DrawList;
 use curvyo_ui_core::instance::{self, InstanceError};
+use curvyo_ui_core::instance_source;
 use serde_json::{Value, json};
 
 use super::{Session, Tool};
@@ -47,12 +48,28 @@ pub(super) struct GeneratorsState {
     hover: Option<Point>,
     /// Whether the notice of an open file with unknown generator objects was not shown yet.
     notice_pending: bool,
+    /// The path box whose outline the next pick replaces (the Replace outline button).
+    pub(super) replace: Option<NodeId>,
+    /// The refusal of the last pick of an outline, for the canvas notice slot, taken once.
+    refusal: String,
     /// The drag knobs of the selected object and the drag in flight.
     knobs: handles::KnobState,
     /// The live preview in flight, if any.
     preview: Option<Preview>,
     /// The defaults of the chosen kind, for the ghost: generated once per kind.
     ghost: RefCell<Option<(String, GeneratedRecord)>>,
+}
+
+/// The render tone of an overlay tone.
+fn tone(tone: curvyo_ui_core::path_box_marks::Tone) -> curvyo_render_core::MarkTone {
+    use curvyo_render_core::MarkTone;
+    use curvyo_ui_core::path_box_marks::Tone;
+    match tone {
+        Tone::Accent => MarkTone::Accent,
+        Tone::Stripe => MarkTone::Stripe,
+        Tone::Warning => MarkTone::Warning,
+        Tone::OnDisc => MarkTone::OnDisc,
+    }
 }
 
 impl Session {
@@ -65,6 +82,9 @@ impl Session {
                 json!({
                     "id": format!("{}/{}", found.manifest.id, found.kind.id),
                     "label": found.kind.label,
+                    // What the segment shows: the command of a kind built from an outline.
+                    "segment": found.kind.segment(),
+                    "source": found.kind.source.is_some(),
                     "icon": found.kind.icon,
                 })
             })
@@ -131,6 +151,14 @@ impl Session {
         if self.refuse_drawing_into_layer() {
             return super::KeyOutcome::Ignored;
         }
+        if let Some(kind) = self.source_kind() {
+            // A refusal also answers with `ToolChanged`, so the host redraws and shows it.
+            return if self.pick_source(&kind, None) || !self.generators.refusal.is_empty() {
+                super::KeyOutcome::ToolChanged
+            } else {
+                super::KeyOutcome::Ignored
+            };
+        }
         let at = self.pointer_position.unwrap_or_else(|| {
             let (width, height) = self.viewport.canvas_size();
             self.viewport.screen_to_document(width / 2.0, height / 2.0)
@@ -143,6 +171,9 @@ impl Session {
     }
 
     fn place_generated_at(&mut self, at: Point) -> bool {
+        if let Some(kind) = self.source_kind() {
+            return self.pick_source(&kind, Some(at));
+        }
         let kind = self.generator_kind();
         let name = self
             .kind_label(&kind)
@@ -156,6 +187,192 @@ impl Session {
         self.selection.set(&[id]);
         self.set_tool(Tool::Select);
         true
+    }
+
+    /// The kind of the chosen segment when it is built from an outline, else `None`.
+    fn source_kind(&self) -> Option<String> {
+        let kind = self.generator_kind();
+        instance::find_kind(&self.manufacturing.extensions, &kind)
+            .filter(|found| found.kind.source.is_some())
+            .map(|_| kind)
+    }
+
+    /// The first generator kind built from an outline (`<extension>/<kind>`), for the Select bar
+    /// button.
+    fn first_source_kind(&self) -> Option<String> {
+        instance::enabled_kinds(&self.manufacturing.extensions)
+            .into_iter()
+            .find(|found| found.kind.source.is_some())
+            .map(|found| format!("{}/{}", found.manifest.id, found.kind.id))
+    }
+
+    /// Whether the Select bar shows Box from path: exactly one object is selected and it is one
+    /// closed outline (`0149` UX notes §1.1; the self-intersection and size tests run on the
+    /// press).
+    #[must_use]
+    pub fn box_from_path_shown(&self) -> bool {
+        let ids = self.selection.ids();
+        let [id] = ids else {
+            return false;
+        };
+        self.first_source_kind().is_some()
+            && !self.document.is_generated(*id)
+            && self
+                .document
+                .object(*id)
+                .is_some_and(|object| instance_source::outline_of(&object).is_some())
+    }
+
+    /// Box from path on the selected outline, in one step "Add path box": the box is selected,
+    /// the source untouched. Empty on success, else the refusal sentence ("Nothing was
+    /// changed.").
+    pub fn apply_box_from_path(&mut self) -> String {
+        let Some(kind) = self.first_source_kind() else {
+            return String::new();
+        };
+        let &[source] = self.selection.ids() else {
+            return instance_source::SourceRefusal::NotOneOutline.to_string();
+        };
+        self.build_from_source(&kind, source)
+    }
+
+    /// Replace outline: the pick mode of the Generators tool for the selected path box; the next
+    /// click or Enter on a closed outline replaces its stored outline. Escape cancels.
+    pub fn begin_replace_outline(&mut self) -> bool {
+        let &[id] = self.selection.ids() else {
+            return false;
+        };
+        let Some(snapshot) = self.document.generated(id) else {
+            return false;
+        };
+        if instance::find_kind(&self.manufacturing.extensions, &snapshot.record.kind)
+            .is_none_or(|found| found.kind.source.is_none())
+        {
+            return false;
+        }
+        self.generators.kind = snapshot.record.kind;
+        self.set_tool(Tool::Generators);
+        self.generators.replace = Some(id);
+        true
+    }
+
+    /// The outline under `at`, or under the pointer for Enter.
+    fn outline_under(&self, at: Option<Point>) -> Option<NodeId> {
+        let point = at.or(self.pointer_position)?;
+        let objects = self.objects();
+        curvyo_ui_core::hit_test_objects(&objects, point, self.object_tolerance())
+            .first()
+            .copied()
+    }
+
+    /// A pick while Replace outline is armed.
+    fn replace_pick(&mut self, target: NodeId, at: Option<Point>) -> bool {
+        let Some(source) = self.outline_under(at) else {
+            if at.is_none() {
+                self.generators.refusal = instance_source::SourceRefusal::NotOneOutline.to_string();
+            }
+            return false;
+        };
+        let outcome = self.recording_named_guarded(Some("Replace outline".to_owned()), |this| {
+            Some(instance_source::replace_outline(
+                &this.document,
+                &this.manufacturing.extensions,
+                target,
+                source,
+            ))
+        });
+        match outcome {
+            Some(Ok(())) => {
+                self.set_tool(Tool::Select);
+                self.selection.set(&[target]);
+                true
+            }
+            Some(Err(refusal)) => {
+                self.generators.refusal = refusal.to_string();
+                false
+            }
+            None => false,
+        }
+    }
+
+    /// A click of the pick mode on the object under `at`, or Enter on the selection.
+    fn pick_source(&mut self, kind: &str, at: Option<Point>) -> bool {
+        if let Some(target) = self.generators.replace {
+            return self.replace_pick(target, at);
+        }
+        let source = match at {
+            Some(point) => {
+                let objects = self.objects();
+                curvyo_ui_core::hit_test_objects(&objects, point, self.object_tolerance())
+                    .first()
+                    .copied()
+            }
+            None => match self.selection.ids() {
+                &[id] => Some(id),
+                _ => None,
+            },
+        };
+        match source {
+            Some(id) => self.build_from_source(kind, id).is_empty(),
+            // A click on empty canvas says nothing (the Pick mode rule); Enter says why.
+            None if at.is_none() => {
+                self.generators.refusal = instance_source::SourceRefusal::NotOneOutline.to_string();
+                false
+            }
+            None => false,
+        }
+    }
+
+    /// Builds from `source`; a refusal is returned and kept for the canvas notice slot.
+    fn build_from_source(&mut self, kind: &str, source: NodeId) -> String {
+        let name = self
+            .kind_label(kind)
+            .map(|label| format!("Add {}", label.to_lowercase()));
+        let outcome = self.recording_named_guarded(name, |this| {
+            Some(instance_source::place_from_source(
+                &this.document,
+                &this.manufacturing.extensions,
+                kind,
+                source,
+            ))
+        });
+        match outcome {
+            Some(Ok(id)) => {
+                self.selection.set(&[id]);
+                self.set_tool(Tool::Select);
+                // Warnings about the result go to the canvas notice slot (UX notes §6).
+                if let Some(snapshot) = self.document.generated(id) {
+                    self.generators.refusal =
+                        instance::warning_notices(&self.manufacturing.extensions, &snapshot)
+                            .join(" ");
+                }
+                String::new()
+            }
+            Some(Err(refusal)) => {
+                let text = refusal.to_string();
+                self.generators.refusal.clone_from(&text);
+                text
+            }
+            None => String::new(),
+        }
+    }
+
+    /// The cursor of the pick mode: `pointer` over an outline a box can be built from, the arrow
+    /// elsewhere, `None` outside the mode.
+    pub(in crate::session) fn pick_cursor(&self) -> Option<&'static str> {
+        if self.tool != Tool::Generators {
+            return None;
+        }
+        let kind = self.source_kind()?;
+        let eligible = self
+            .generators
+            .hover
+            .and_then(|point| self.outline_under(Some(point)))
+            .is_some_and(|id| {
+                instance_source::preview(&self.document, &self.manufacturing.extensions, &kind, id)
+                    .is_ok()
+            });
+        Some(if eligible { "pointer" } else { "arrow" })
     }
 
     /// Whether the selection holds a generated object whose generator is unknown or switched off:
@@ -387,6 +604,68 @@ impl Session {
         }
     }
 
+    /// The corner crosses and the bent stretches of a path box: on the selected box's inner base,
+    /// or on the outline under the pointer in the pick mode (`0149` UX notes §3), in the ghost
+    /// look; the hovered outline itself is drawn blue.
+    pub(in crate::session) fn path_box_marks_list(&self, view: ViewTransform) -> DrawList {
+        let pixel = 1.0 / view.scale();
+        let mut overlay = curvyo_ui_core::path_box_marks::Overlay::default();
+        let mut hovered: Option<ObjectSnapshot> = None;
+        let selected = match self.selection.ids() {
+            &[id] => self.document.generated(id),
+            _ => None,
+        };
+        if let Some(snapshot) = selected
+            && instance::find_kind(&self.manufacturing.extensions, &snapshot.record.kind)
+                .is_some_and(|found| found.kind.source.is_some())
+            && let Some(marks) = instance::marks_of(&self.manufacturing.extensions, &snapshot)
+        {
+            let (frame, shift) = (snapshot.frame, marks.footprint);
+            let base = move |p: Point| frame.apply_point(Point::new(p.x + shift.x, p.y + shift.y));
+            let part = move |p: Point| frame.apply_point(p);
+            overlay = curvyo_ui_core::path_box_marks::overlay(&marks, &base, &part, pixel, true);
+        } else if self.tool == Tool::Generators
+            && let (Some(kind), Some(at)) = (self.source_kind(), self.generators.hover)
+        {
+            let objects = self.objects();
+            if let Some(id) = self.outline_under(Some(at))
+                && let Ok((marks, centre)) = instance_source::hover_marks(
+                    &self.document,
+                    &self.manufacturing.extensions,
+                    &kind,
+                    id,
+                )
+            {
+                let map = move |p: Point| Point::new(p.x + centre.x, p.y + centre.y);
+                overlay = curvyo_ui_core::path_box_marks::overlay(&marks, &map, &map, pixel, false);
+                hovered = objects.iter().find(|o| o.id() == id).cloned();
+            }
+        }
+        let mut list = DrawList::default();
+        if let Some(object) = hovered {
+            list.extend(curvyo_render_core::build_live_edit_preview(&[object], view));
+        }
+        list.extend(curvyo_render_core::build_marks_overlay(
+            &overlay
+                .lines
+                .iter()
+                .map(|&(a, b, t)| (a, b, tone(t)))
+                .collect::<Vec<_>>(),
+            &overlay
+                .discs
+                .iter()
+                .map(|&(p, d, t)| (p, d, tone(t)))
+                .collect::<Vec<_>>(),
+            &overlay
+                .rings
+                .iter()
+                .map(|&(p, d, t)| (p, d, tone(t)))
+                .collect::<Vec<_>>(),
+            pixel,
+        ));
+        list
+    }
+
     /// The blue outline of a regenerated object over the committed one while a handle is dragged.
     pub(in crate::session) fn generators_preview_overlay(&self, view: ViewTransform) -> DrawList {
         let Some(preview) = self
@@ -480,6 +759,10 @@ impl Session {
     /// The status of an opened file with generator objects this build cannot rebuild, taken once
     /// (UX notes §12); empty when there is none or it was shown.
     pub fn take_generated_notice(&mut self) -> String {
+        let refusal = std::mem::take(&mut self.generators.refusal);
+        if !refusal.is_empty() {
+            return refusal;
+        }
         if !std::mem::take(&mut self.generators.notice_pending) {
             return String::new();
         }
@@ -493,6 +776,11 @@ impl Session {
     /// The outline of what a release would place, drawn under the pointer in the "Drag ghost"
     /// look: the real outline of the chosen kind at its defaults (UX notes §2).
     pub(in crate::session) fn generators_draw_list(&self, view: ViewTransform) -> DrawList {
+        // No ghost for a kind built from an outline: the box lands beside the outline, not under
+        // the pointer (`0149` UX notes §2).
+        if self.source_kind().is_some() {
+            return DrawList::default();
+        }
         let Some(at) = self.generators.hover.filter(|_| {
             self.tool == Tool::Generators && self.pointer_position.is_some() && !self.button_down
         }) else {

@@ -58,6 +58,22 @@ impl WasmSession {
         self.session.convert_selected_generated()
     }
 
+    /// Whether the Select bar shows Box from path: one closed outline is selected.
+    #[must_use]
+    pub fn box_from_path_shown(&self) -> bool {
+        self.session.box_from_path_shown()
+    }
+
+    /// Box from path on the selected outline; empty on success, else the refusal sentence.
+    pub fn apply_box_from_path(&mut self) -> String {
+        self.session.apply_box_from_path()
+    }
+
+    /// Replace outline: arms the pick of a new outline for the selected path box.
+    pub fn begin_replace_outline(&mut self) -> bool {
+        self.session.begin_replace_outline()
+    }
+
     /// The status of an opened file with generator objects this build cannot rebuild, once.
     pub fn take_generated_notice(&mut self) -> String {
         self.session.take_generated_notice()

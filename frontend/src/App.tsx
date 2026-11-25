@@ -24,7 +24,7 @@ import { CropOverlay } from "@/components/CropOverlay";
 import { WidthEditToggle } from "@/components/WidthEditToggle";
 import { GeneratorsBar } from "@/components/GeneratorsBar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
-import { useGeneratorKinds } from "@/hooks/useGenerators";
+import { useBoxFromPath, useGeneratorKinds } from "@/hooks/useGenerators";
 import { TextBar } from "@/components/TextBar";
 import { TestGridBar } from "@/components/TestGridBar";
 import { TraceBar } from "@/components/TraceBar";
@@ -220,6 +220,7 @@ function Editor() {
   const testGrid = useTestGridTool(editor, editor.tool === "test-grid", editor.containerRef);
   // The Generators tool's bar (`specs/0141-parametric-generators`).
   const generatorKinds = useGeneratorKinds(editor);
+  const boxFromPath = useBoxFromPath(editor);
   const gridBar = testGrid.view !== null && (editor.tool === "test-grid" || (editor.tool === "select" && testGrid.view.group !== null));
   // The workspace outlives the File tab: its scan and open document stay while other tabs show.
   const workspace = useWorkspace(editor, project);
@@ -303,6 +304,11 @@ function Editor() {
                 enabled: editor.selectBar.strokeToPathEnabled,
                 onPress: editor.strokeToPath.apply,
                 notice: editor.strokeToPath.notice,
+              }}
+              boxFromPath={{
+                shown: editor.flipEnabled && boxFromPath.shown,
+                onPress: boxFromPath.apply,
+                notice: boxFromPath.notice,
               }}
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}

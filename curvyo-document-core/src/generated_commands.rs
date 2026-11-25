@@ -98,7 +98,7 @@ impl Document {
         record: &GeneratedRecord,
         frame: Affine,
     ) -> Result<NodeId, GeneratedError> {
-        self.create_generated_with(record, frame, false)
+        self.create_generated_with(record, frame, false, None)
     }
 
     /// [`Document::create_generated`] with the seed set from the new node's id (ADR 0029 §5,
@@ -112,7 +112,23 @@ impl Document {
         record: &GeneratedRecord,
         frame: Affine,
     ) -> Result<NodeId, GeneratedError> {
-        self.create_generated_with(record, frame, true)
+        self.create_generated_with(record, frame, true, None)
+    }
+
+    /// [`Document::create_generated_seeded`] with the new object written directly above `source`
+    /// in its parent (a layer or a group), not on top of the active layer: a path box lands
+    /// beside the outline it was made from, in its layer (ADR 0083 §2).
+    ///
+    /// # Errors
+    /// [`GeneratedError::NoSuchObject`] when `source` does not exist or is a layer; otherwise as
+    /// [`Document::create_generated`].
+    pub fn create_generated_above(
+        &self,
+        record: &GeneratedRecord,
+        frame: Affine,
+        source: NodeId,
+    ) -> Result<NodeId, GeneratedError> {
+        self.create_generated_with(record, frame, true, Some(source))
     }
 
     fn create_generated_with(
@@ -120,15 +136,40 @@ impl Document {
         record: &GeneratedRecord,
         frame: Affine,
         seeded: bool,
+        above: Option<NodeId>,
     ) -> Result<NodeId, GeneratedError> {
         if !record_is_valid(record) || !frame_is_valid(frame) {
             return Err(GeneratedError::Invalid);
         }
         let tree = self.loro().get_tree(OBJECTS_TREE);
+        let below = match above {
+            Some(source) => {
+                let below = tree_id_of(source);
+                if !crate::path_codec::node_exists(&tree, below)
+                    || crate::group_tree::is_layer_node(&tree, below)
+                {
+                    return Err(GeneratedError::NoSuchObject);
+                }
+                Some(below)
+            }
+            None => None,
+        };
+        let parent = match below {
+            // invariant: `below` was just confirmed live, so it has a parent.
+            #[allow(clippy::unwrap_used)]
+            Some(below) => tree.parent(below).unwrap(),
+            None => self.drawing_parent(&tree),
+        };
         // invariant: creating a node under the root or a live group on a fresh tree handle
         // cannot fail.
         #[allow(clippy::unwrap_used)]
-        let tree_id = tree.create(self.drawing_parent(&tree)).unwrap();
+        let tree_id = tree.create(parent).unwrap();
+        if let Some(below) = below {
+            tree.enable_fractional_index(0);
+            // invariant: both nodes are live siblings and the fractional index is on.
+            #[allow(clippy::unwrap_used)]
+            tree.mov_after(tree_id, below).unwrap();
+        }
         // invariant: reading the meta map of a node this call just created cannot fail.
         #[allow(clippy::unwrap_used)]
         let meta = tree.get_meta(tree_id).unwrap();

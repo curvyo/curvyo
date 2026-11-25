@@ -424,10 +424,11 @@ fn a_full_round_corner_radius_reports_its_state_for_the_field() {
             .find(|row| row.param.key == "corner_radius")
             .unwrap()
             .state
+            .clone()
     };
     assert_eq!(state(&document), None);
     instance::change_value(&document, &settings, id, "corner_radius", &mm(40.0)).unwrap();
-    assert_eq!(state(&document), Some("full round"));
+    assert_eq!(state(&document), Some("full round".to_owned()));
 }
 
 #[test]

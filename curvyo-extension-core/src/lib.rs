@@ -17,12 +17,12 @@ mod param;
 
 pub use drawing::LineSegment;
 pub use extension::{
-    Bound, Clamp, ClosedPath, Cubic, Edit, Extension, GenerateRequest, Generated, Handle, Part,
-    ScaleFactor, Seed,
+    Bound, Clamp, ClosedPath, Cubic, Edit, Extension, GenerateRequest, Generated, Handle, Mark,
+    Marks, Part, ScaleFactor, Seed, Warning,
 };
 pub use manifest::{
-    Block, Contribution, FixtureKind, GeneratorKind, Manifest, ParamGroup, Tab, ToolboxCard,
-    ToolboxCommand, WorkbenchContribution,
+    Block, Contribution, FixtureKind, GeneratorKind, Manifest, ParamGroup, Source, Tab,
+    ToolboxCard, ToolboxCommand, WorkbenchContribution,
 };
 pub use notice::NoticeContext;
 pub use param::{

@@ -7,7 +7,7 @@
 //!   generated        : ONE map value, written whole by create, a parameter edit and a scale:
 //!     kind           : "<extension id>/<kind>"            e.g. "curvyo.generators/gear"
 //!     seed           : 0 ..= 4294967295
-//!     params         : { key: { "mm": n } | { "deg": n } | { "count": n } | { "on": b } | { "choice": "id" } }
+//!     params         : { key: { "mm": n } | { "deg": n } | { "count": n } | { "on": b } | { "choice": "id" } | { "path": [x0, y0, c1x, c1y, c2x, c2y, x, y, ...] } }
 //!     parts          : [ part, ... ]   one part per piece (a gear one, a box one per plate)
 //!       part         : [ subpath, ... ]   the outline and its holes
 //!       subpath      : [x0, y0, c1x, c1y, c2x, c2y, x, y, ...]   a start point, then cubics

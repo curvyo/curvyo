@@ -23,12 +23,18 @@ pub(crate) fn tabbed(
     half_width: f64,
     protrusion: f64,
 ) -> Contour {
-    walk(footprint, tabs, half_width, protrusion, None)
+    walk(footprint, tabs, (half_width, protrusion), None, None)
 }
 
 /// The footprint's outline as a plain plate, with the finger hollow in its front straight.
 pub(crate) fn plain(footprint: &Footprint, hollow: Option<Hollow>) -> Contour {
-    walk(footprint, &[], 0.0, 0.0, hollow)
+    walk(footprint, &[], (0.0, 0.0), hollow, None)
+}
+
+/// A plain plate with the finger hollow in the straight span `at` (a path box puts it on its
+/// longest straight, ADR 0083 §7).
+pub(crate) fn plain_at(footprint: &Footprint, hollow: Hollow, at: usize) -> Contour {
+    walk(footprint, &[], (0.0, 0.0), Some(hollow), Some(at))
 }
 
 /// The opening of a ring: the footprint, walked the other way as a hole.
@@ -54,11 +60,11 @@ fn front_straight(footprint: &Footprint) -> Option<usize> {
 fn walk(
     footprint: &Footprint,
     tabs: &[Tab],
-    half_width: f64,
-    protrusion: f64,
+    (half_width, protrusion): (f64, f64),
     hollow: Option<Hollow>,
+    at: Option<usize>,
 ) -> Contour {
-    let front = hollow.and_then(|_| front_straight(footprint));
+    let front = hollow.and_then(|_| at.or_else(|| front_straight(footprint)));
     let mut contour = Contour::new();
     for (index, span) in footprint.spans.iter().enumerate() {
         match span.shape {

@@ -31,7 +31,7 @@ pub(crate) const WALL_SLITS: &[ChoiceOption] = &[
     },
 ];
 
-const INNER: (f64, f64) = (10.0, 2000.0);
+pub(crate) const INNER: (f64, f64) = (10.0, 2000.0);
 const THICKNESS: (f64, f64) = (0.1, 50.0);
 
 fn size() -> ParamGroup {
@@ -72,7 +72,7 @@ fn size() -> ParamGroup {
     }
 }
 
-fn material() -> ParamGroup {
+pub(crate) fn material() -> ParamGroup {
     ParamGroup {
         label: "Material",
         params: vec![
@@ -92,8 +92,8 @@ fn material() -> ParamGroup {
     }
 }
 
-fn slits() -> ParamGroup {
-    ParamGroup {
+pub(crate) fn slits(wall_slits: bool) -> ParamGroup {
+    let mut group = ParamGroup {
         label: "Slits",
         params: vec![
             choice("slit_pattern", "Slit pattern", PATTERN, "straight"),
@@ -135,7 +135,11 @@ fn slits() -> ParamGroup {
                 },
             ),
         ],
+    };
+    if !wall_slits {
+        group.params.retain(|param| param.key != "wall_slits");
     }
+    group
 }
 
 /// A thickness that follows the wall thickness while stored 0.
@@ -148,7 +152,7 @@ fn following(key: &'static str, label: &'static str) -> curvyo_extension_core::P
     )
 }
 
-fn base() -> ParamGroup {
+pub(crate) fn base() -> ParamGroup {
     ParamGroup {
         label: "Base",
         params: vec![
@@ -168,7 +172,7 @@ fn base() -> ParamGroup {
     }
 }
 
-fn lid() -> ParamGroup {
+pub(crate) fn lid() -> ParamGroup {
     let on = |key| ShownWhen::On { key };
     let seated = ShownWhen::AllOn {
         keys: &["lid", "lid_seat"],
@@ -207,7 +211,7 @@ fn lid() -> ParamGroup {
     }
 }
 
-fn layout() -> ParamGroup {
+pub(crate) fn layout() -> ParamGroup {
     ParamGroup {
         label: "Layout",
         params: vec![tracked(
@@ -220,5 +224,5 @@ fn layout() -> ParamGroup {
 }
 
 pub(crate) fn groups() -> Vec<ParamGroup> {
-    vec![size(), material(), slits(), base(), lid(), layout()]
+    vec![size(), material(), slits(true), base(), lid(), layout()]
 }

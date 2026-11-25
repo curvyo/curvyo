@@ -1026,6 +1026,9 @@ impl Session {
     /// no acceptance criterion exercises switching tools mid-drag, so
     /// the same conservative stance applies.
     pub fn set_tool(&mut self, tool: Tool) {
+        if tool != Tool::Generators {
+            self.generators.replace = None;
+        }
         // Another tool cancels an open Find centre lines bar (`0117` UX notes §4).
         if tool != self.tool {
             self.centre_lines_close();

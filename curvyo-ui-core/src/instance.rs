@@ -51,7 +51,7 @@ pub struct KindRef {
 }
 
 /// `<extension id>/<kind>` as stored.
-fn stored_kind(extension: &str, kind: &str) -> String {
+pub(crate) fn stored_kind(extension: &str, kind: &str) -> String {
     format!("{extension}/{kind}")
 }
 
@@ -95,19 +95,8 @@ pub fn enabled_kinds(settings: &ExtensionSettings) -> Vec<KindRef> {
         .collect()
 }
 
-/// One subpath as `[x0, y0, c1x, c1y, c2x, c2y, x, y, ...]`.
-fn flat(path: &curvyo_extension_core::ClosedPath) -> Vec<f64> {
-    let mut numbers = vec![path.start.x, path.start.y];
-    for cubic in &path.segments {
-        numbers.extend([
-            cubic.c1.x, cubic.c1.y, cubic.c2.x, cubic.c2.y, cubic.to.x, cubic.to.y,
-        ]);
-    }
-    numbers
-}
-
 /// The stored record of what a generator returned.
-fn record_of(kind: &str, seed: u32, generated: &Generated) -> GeneratedRecord {
+pub(crate) fn record_of(kind: &str, seed: u32, generated: &Generated) -> GeneratedRecord {
     GeneratedRecord {
         kind: kind.to_owned(),
         seed,
@@ -115,7 +104,12 @@ fn record_of(kind: &str, seed: u32, generated: &Generated) -> GeneratedRecord {
         parts: generated
             .parts
             .iter()
-            .map(|part: &Part| part.paths.iter().map(flat).collect())
+            .map(|part: &Part| {
+                part.paths
+                    .iter()
+                    .map(curvyo_extension_core::ClosedPath::flat)
+                    .collect()
+            })
             .collect(),
     }
 }
@@ -135,6 +129,25 @@ pub(crate) fn generate(
             edit,
         },
     )
+}
+
+/// The warning sentences of the generated object `snapshot`, empty for an unknown kind.
+#[must_use]
+pub fn warning_notices(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Vec<String> {
+    find_kind(settings, &snapshot.record.kind)
+        .and_then(|found| generate(&found, &snapshot.record.params, snapshot.record.seed, None))
+        .map(|g| crate::instance_warnings::sentences(&g.warnings))
+        .unwrap_or_default()
+}
+
+/// The overlay marks of the generated object `snapshot` (ADR 0083 §11), `None` for an unknown kind.
+#[must_use]
+pub fn marks_of(
+    settings: &ExtensionSettings,
+    snapshot: &GeneratedSnapshot,
+) -> Option<curvyo_extension_core::Marks> {
+    let found = find_kind(settings, &snapshot.record.kind)?;
+    generate(&found, &snapshot.record.params, snapshot.record.seed, None).map(|g| g.marks)
 }
 
 /// The record of a new object of `found` at its defaults as a ghost draws it: the outer
@@ -236,7 +249,8 @@ pub fn plan_value(
     )
     .ok_or(InstanceError::UnknownKind)?;
     let record = record_of(&snapshot.record.kind, snapshot.record.seed, &generated);
-    let notices = notices(&found.kind, &generated.clamps);
+    let mut notices = notices(&found.kind, &generated.clamps);
+    notices.extend(crate::instance_warnings::sentences(&generated.warnings));
     Ok(ValuePlan {
         snapshot,
         record,
@@ -435,7 +449,7 @@ pub struct RowView {
     /// For an automatic parameter stored as 0: the value the generator used, drawn muted.
     pub used: Option<ParamValue>,
     /// A word for a limit that is a shape ("full round"), reported by the generator.
-    pub state: Option<&'static str>,
+    pub state: Option<String>,
     /// The largest value a bound that depends on other values allows now, for the slider's end.
     pub limit: Option<ParamValue>,
 }
@@ -468,6 +482,14 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
     let schema = found.kind.schema();
     // The generator tells what it used for automatic rows, the words of shapes and the limits.
     let generated = generate(&found, &snapshot.record.params, snapshot.record.seed, None);
+    let corners = generated.as_ref().map_or(0, |generated| {
+        generated
+            .marks
+            .on_footprint
+            .iter()
+            .filter(|mark| matches!(mark, curvyo_extension_core::Mark::Corner { .. }))
+            .count()
+    });
     let (used, states, limits) = generated
         .map(|generated| (generated.automatic, generated.states, generated.limits))
         .unwrap_or_default();
@@ -476,6 +498,8 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
         .groups
         .iter()
         .flat_map(|group| group.params.iter().map(|param| (group.label, param)))
+        // The outline has no row (ADR 0083 §2).
+        .filter(|(_, param)| !matches!(param.kind, ParamKind::Path))
         .filter(|(_, param)| {
             param.shown_when.is_none_or(|condition: ShownWhen| {
                 condition.holds(&schema, &snapshot.record.params)
@@ -492,7 +516,12 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
             state: states
                 .iter()
                 .find(|(key, _)| *key == param.key)
-                .map(|(_, word)| *word),
+                .map(|(_, word)| (*word).to_owned())
+                // The Corner angle says how many corners it makes (`0149` UX notes §5).
+                .or_else(|| {
+                    (param.key == "corner_angle")
+                        .then(|| format!("{corners} corner{}", if corners == 1 { "" } else { "s" }))
+                }),
             limit: limits
                 .iter()
                 .find(|(key, _)| *key == param.key)
@@ -524,7 +553,7 @@ pub fn value_from_number(param: &Param, number: f64) -> Option<ParamValue> {
             let count = (number + 0.5).floor().clamp(0.0, f64::from(u32::MAX)) as u32;
             Some(ParamValue::Count(count))
         }
-        ParamKind::Switch | ParamKind::Choice { .. } => None,
+        ParamKind::Switch | ParamKind::Choice { .. } | ParamKind::Path => None,
     }
 }
 

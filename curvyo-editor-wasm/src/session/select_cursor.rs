@@ -72,6 +72,9 @@ impl Session {
         if let Some(hint) = self.tiling_cursor() {
             return hint;
         }
+        if let Some(hint) = self.pick_cursor() {
+            return hint.to_owned();
+        }
         if self.tool != Tool::Select || self.tiling.is_some() {
             return "default".to_string();
         }

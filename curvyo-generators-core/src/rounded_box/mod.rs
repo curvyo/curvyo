@@ -1,8 +1,8 @@
 //! The rounded box: a box with rounded corners whose wall is one slit strip that bends round the
 //! corners, with an inner base, a cover, a seat ring and a lid (ADR 0082 §5, spec `0147`).
 
-mod layout;
-mod schema;
+pub(crate) mod layout;
+pub(crate) mod schema;
 
 use curvyo_document_core::{Length, Point, Vec2};
 use curvyo_extension_core::{
@@ -81,7 +81,7 @@ struct Sizes {
 }
 
 /// `key` as the maker typed it: `Some` unless it is stored 0 (automatic).
-fn own(v: &Values<'_>, key: &str) -> Option<f64> {
+pub(crate) fn own(v: &Values<'_>, key: &str) -> Option<f64> {
     let value = v.mm(key);
     (value > 0.0).then_some(value)
 }
@@ -160,10 +160,20 @@ fn clamp(v: &mut Values<'_>) -> Sizes {
 
 /// The slit values: typed ones are clamped, automatic ones derived and reported.
 fn slit_values(v: &mut Values<'_>, s: &Sizes, strip_height: f64) -> (SlitPattern, bool) {
+    slit_values_for(v, (s.wall, s.kerf, s.radius), strip_height)
+}
+
+/// The slit values for a wall of thickness `wall`, kerf `kerf` and bends of `radius` (the radius
+/// the automatic spacing is derived from).
+pub(crate) fn slit_values_for(
+    v: &mut Values<'_>,
+    (wall, kerf, radius): (f64, f64, f64),
+    strip_height: f64,
+) -> (SlitPattern, bool) {
     if own(v, "slit_width").is_some() {
-        v.limit_mm("slit_width", s.kerf + 0.2, f64::MAX);
+        v.limit_mm("slit_width", kerf + 0.2, f64::MAX);
     }
-    let width = own(v, "slit_width").unwrap_or(s.kerf + 0.3);
+    let width = own(v, "slit_width").unwrap_or(kerf + 0.3);
     let kind = match v.choice("slit_pattern").as_str() {
         "offset" => SlitKind::Offset,
         "wave" => SlitKind::Wave,
@@ -182,11 +192,11 @@ fn slit_values(v: &mut Values<'_>, s: &Sizes, strip_height: f64) -> (SlitPattern
             v.limit_mm("slit_spacing", least, f64::MAX);
         }
     }
-    let spacing = own(v, "slit_spacing").unwrap_or((0.22 * s.radius).max(least));
+    let spacing = own(v, "slit_spacing").unwrap_or((0.22 * radius).max(least));
     let rows = match v.count("slit_rows") {
         0 => {
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let rows = (strip_height / (10.0 * s.wall)).round().max(1.0) as u32;
+            let rows = (strip_height / (10.0 * wall)).round().max(1.0) as u32;
             rows
         }
         typed => typed,
@@ -196,7 +206,7 @@ fn slit_values(v: &mut Values<'_>, s: &Sizes, strip_height: f64) -> (SlitPattern
             kind,
             width: Length::from_mm(width),
             spacing: Length::from_mm(spacing),
-            bridge: Length::from_mm(s.wall),
+            bridge: Length::from_mm(wall),
             rows,
         },
         v.choice("wall_slits") == "all",
@@ -218,11 +228,7 @@ fn plates(
     let mm = Length::from_mm;
     let mut plates: Vec<Piece> = Vec::new();
     if cover_on {
-        plates.push(Piece {
-            contours: vec![plain(outer, None)],
-            thickness: s.cover,
-            role: "cover",
-        });
+        plates.push(Piece::new(vec![plain(outer, None)], s.cover, "cover"));
     }
     if lid_on {
         let hollow = (seat && v.switch("finger_hollow")).then(|| Hollow {
@@ -230,24 +236,20 @@ fn plates(
             depth: v.mm("hollow_depth"),
         });
         if seat {
-            plates.push(Piece {
-                contours: vec![plain(outer, hollow)],
-                thickness: s.lid,
-                role: "lid",
-            });
+            plates.push(Piece::new(vec![plain(outer, hollow)], s.lid, "lid"));
         } else {
-            plates.push(Piece {
-                contours: vec![tabbed(inner, tabs, s.lid, s.wall)],
-                thickness: s.lid,
-                role: "lid",
-            });
+            plates.push(Piece::new(
+                vec![tabbed(inner, tabs, s.lid, s.wall)],
+                s.lid,
+                "lid",
+            ));
         }
     }
-    plates.push(Piece {
-        contours: vec![tabbed(inner, tabs, s.base, s.wall)],
-        thickness: s.base,
-        role: "base",
-    });
+    plates.push(Piece::new(
+        vec![tabbed(inner, tabs, s.base, s.wall)],
+        s.base,
+        "base",
+    ));
     if lid_on && seat {
         let ring_width = 2.0 * s.ring;
         let hole = Footprint::rounded_rect(
@@ -256,11 +258,11 @@ fn plates(
             mm((s.radius - ring_width).max(0.0)),
             mm(s.wall),
         );
-        plates.push(Piece {
-            contours: vec![tabbed(inner, tabs, s.ring, s.wall), opening(&hole)],
-            thickness: s.ring,
-            role: "ring",
-        });
+        plates.push(Piece::new(
+            vec![tabbed(inner, tabs, s.ring, s.wall), opening(&hole)],
+            s.ring,
+            "ring",
+        ));
     }
     plates
 }
@@ -315,15 +317,18 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         slits_everywhere: everywhere,
         joints,
         draft: matches!(request.edit, Some(Edit::Draft)),
+        ends: None,
+        local_spacing: None,
     };
-    let strip = Piece {
-        contours: wall.contours(&tabs),
-        thickness: s.wall,
-        role: "strip",
-    };
+    let strip = Piece::new(wall.contours(&tabs), s.wall, "strip");
 
     let plates = plates(&v, &s, (&inner, &outer), &tabs);
-    let placed = place(&strip, plates, s.kerf, v.mm("gap") + s.kerf);
+    let placed = place(
+        std::slice::from_ref(&strip),
+        plates,
+        s.kerf,
+        v.mm("gap") + s.kerf,
+    );
     let handles = handles(&placed, &inner, &s);
     let automatic = used_values(&v, &s, &pattern);
     let states = if s.radius >= s.width.min(s.depth) / 2.0 - 0.005 {
@@ -340,6 +345,8 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         automatic,
         states,
         limits: s.limits.clone(),
+        warnings: Vec::new(),
+        marks: curvyo_extension_core::Marks::default(),
     }
 }
 
