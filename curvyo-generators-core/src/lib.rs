@@ -16,9 +16,12 @@ mod gear;
 mod manifest;
 mod outline;
 mod path_box;
+mod plate;
 mod rounded_box;
 mod schema;
 mod shape_ops;
+#[cfg(test)]
+mod simple_check;
 mod slit_bend;
 mod tab_layout;
 mod tab_runs;

@@ -154,6 +154,28 @@ pub fn marks_of(
     generate(&found, &snapshot.record.params, snapshot.record.seed, None).map(|g| g.marks)
 }
 
+/// Whether the selected generated object draws overlay marks: a path box always, a rounded box
+/// with the curved top (bend bands on the end plates' arcs, part numbers; ux-notes of `0147`
+/// §10.8, §10.9); Flat draws none.
+#[must_use]
+pub fn draws_marks(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> bool {
+    let Some(found) = find_kind(settings, &snapshot.record.kind) else {
+        return false;
+    };
+    found.kind.source.is_some()
+        || (snapshot.record.kind
+            == stored_kind(
+                curvyo_generators_core::PROCESS_ID,
+                curvyo_generators_core::ROUNDED_BOX,
+            )
+            && snapshot
+                .record
+                .params
+                .get("top_shape")
+                .and_then(ParamValue::from_stored)
+                .is_some_and(|value| value.choice() == Some("curved")))
+}
+
 /// The record of a new object of `found` at its defaults as a ghost draws it: the outer
 /// outlines only (`Edit::Draft`).
 #[must_use]

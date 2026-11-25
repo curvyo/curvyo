@@ -1,7 +1,6 @@
 //! The laser box: plates with finger joints, kerf compensation, an optional lid, laid out side by
 //! side in one row.
 
-mod plate;
 mod schema;
 
 use curvyo_document_core::{Length, Point, Vec2};
@@ -11,8 +10,8 @@ use curvyo_extension_core::{
 
 use crate::fingers::finger_count;
 use crate::outline::translated;
+use crate::plate::{Corner, Edge, Fingers, Plate};
 use crate::values::Values;
-use plate::{Corner, Edge, Fingers, Plate};
 
 pub(crate) use schema::groups;
 
@@ -96,8 +95,9 @@ impl Sizes {
                 edge(w, self.finger.0),
                 edge(d, self.finger.1),
             ],
-            depth: t,
+            depths: [t; 4],
             clearance: self.clearance,
+            hollow: None,
         }
     }
 
@@ -132,13 +132,18 @@ impl Sizes {
             height: h,
             corners: [upper, upper, Corner::Notched, Corner::Notched],
             edges: [
-                if capped { horizontal } else { Edge::Plain },
-                vertical,
+                if capped {
+                    horizontal.clone()
+                } else {
+                    Edge::Plain
+                },
+                vertical.clone(),
                 horizontal,
                 vertical,
             ],
-            depth: t,
+            depths: [t; 4],
             clearance: self.clearance,
+            hollow: None,
         }
     }
 }
@@ -148,9 +153,10 @@ fn plain(width: f64, height: f64, depth: f64, clearance: f64) -> Plate {
         width,
         height,
         corners: [Corner::Open; 4],
-        edges: [Edge::Plain; 4],
-        depth,
+        edges: [Edge::Plain, Edge::Plain, Edge::Plain, Edge::Plain],
+        depths: [depth; 4],
         clearance,
+        hollow: None,
     }
 }
 
@@ -325,6 +331,7 @@ pub(crate) fn plates_for_tests(sizes_json: &StoredParams) -> Vec<Plate> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::simple_check::assert_simple;
 
     fn stored(entries: &[(&str, ParamValue)]) -> StoredParams {
         entries
@@ -366,66 +373,6 @@ mod tests {
         }
     }
 
-    fn vertices(path: &curvyo_extension_core::ClosedPath) -> Vec<Point> {
-        let mut points = vec![path.start];
-        points.extend(path.segments.iter().map(|segment| segment.to));
-        if points.len() > 1 && points.first() == points.last() {
-            points.pop();
-        }
-        points
-    }
-
-    /// Whether the segments `p1`-`p2` and `q1`-`q2` share a point (touching counts).
-    fn segments_meet(p1: Point, p2: Point, q1: Point, q2: Point) -> bool {
-        let cross = |from: Point, to: Point, at: Point| {
-            (to.x - from.x) * (at.y - from.y) - (to.y - from.y) * (at.x - from.x)
-        };
-        let within = |from: Point, to: Point, at: Point| {
-            at.x >= from.x.min(to.x) - 1e-9
-                && at.x <= from.x.max(to.x) + 1e-9
-                && at.y >= from.y.min(to.y) - 1e-9
-                && at.y <= from.y.max(to.y) + 1e-9
-        };
-        let (s1, s2) = (cross(q1, q2, p1), cross(q1, q2, p2));
-        let (t1, t2) = (cross(p1, p2, q1), cross(p1, p2, q2));
-        if s1 * s2 < -1e-12 && t1 * t2 < -1e-12 {
-            return true;
-        }
-        (s1.abs() < 1e-9 && within(q1, q2, p1))
-            || (s2.abs() < 1e-9 && within(q1, q2, p2))
-            || (t1.abs() < 1e-9 && within(p1, p2, q1))
-            || (t2.abs() < 1e-9 && within(p1, p2, q2))
-    }
-
-    /// No repeated vertex and no two non-adjacent edges that touch.
-    fn assert_simple(path: &curvyo_extension_core::ClosedPath, what: &str) {
-        let points = vertices(path);
-        let count = points.len();
-        for first in 0..count {
-            for second in first + 1..count {
-                let gap =
-                    (points[first].x - points[second].x).hypot(points[first].y - points[second].y);
-                assert!(gap > 1e-6, "{what}: vertex {first} repeats at {second}");
-            }
-        }
-        for first in 0..count {
-            for second in first + 2..count {
-                if first == 0 && second == count - 1 {
-                    continue;
-                }
-                assert!(
-                    !segments_meet(
-                        points[first],
-                        points[(first + 1) % count],
-                        points[second],
-                        points[(second + 1) % count]
-                    ),
-                    "{what}: edge {first} meets edge {second}"
-                );
-            }
-        }
-    }
-
     #[test]
     fn every_plate_is_a_simple_polygon_at_kerf_zero_and_two_tenths() {
         for kerf in [0.0, 0.2] {
@@ -452,13 +399,12 @@ mod tests {
 
     #[test]
     fn every_piece_of_a_joint_edge_belongs_to_exactly_one_plate() {
-        use plate::Edge;
         let plates = plates_for_tests(&stored(&[("lid", ParamValue::Choice("fingers".into()))]));
-        let pieces = |plate: &Plate, edge: usize| match plate.edges[edge] {
+        let pieces = |plate: &Plate, edge: usize| match &plate.edges[edge] {
             Edge::Fingered(f) => (0..f.segments)
                 .map(|i| !crate::fingers::is_notched(i, f.even_solid))
                 .collect::<Vec<_>>(),
-            Edge::Plain => Vec::new(),
+            _ => Vec::new(),
         };
         // The 12 joint edges: the bottom's top and bottom edges against the front's and back's bottom edges, the
         // bottom's left and right edges against the side walls'; the lid does the same on top.
@@ -495,11 +441,11 @@ mod tests {
         }
         // The corner cubes belong to the bottom and the lid, and are cut from every wall.
         for plate in [bottom, lid] {
-            assert!(plate.corners.iter().all(|c| *c == plate::Corner::Owned));
+            assert!(plate.corners.iter().all(|c| *c == Corner::Owned));
         }
         for wall in &plates[1..5] {
-            assert_eq!(wall.corners[2], plate::Corner::Notched);
-            assert_eq!(wall.corners[3], plate::Corner::Notched);
+            assert_eq!(wall.corners[2], Corner::Notched);
+            assert_eq!(wall.corners[3], Corner::Notched);
         }
     }
 

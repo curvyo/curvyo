@@ -161,6 +161,15 @@ fn history_steps_are_named_after_the_kind_and_the_field() {
 }
 
 #[test]
+fn the_top_shape_step_of_a_rounded_box_is_named_after_the_kind_and_the_field() {
+    let mut s = session();
+    s.set_generator_kind("curvyo.generators/rounded-box");
+    assert!(s.place_generated(50.0, 50.0));
+    s.set_generated_value("top_shape", "\"curved\"");
+    assert_eq!(newest_name(&mut s), "Rounded box: Top shape");
+}
+
+#[test]
 fn the_object_history_names_the_steps_like_the_document_history() {
     let mut s = session();
     s.set_generator_kind("curvyo.generators/gear");

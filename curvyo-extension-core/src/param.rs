@@ -88,6 +88,16 @@ pub enum ShownWhen {
         /// The length's key.
         key: &'static str,
     },
+    /// Every one of the `conditions` holds (a row that hangs on a switch and a choice at once).
+    All {
+        /// The conditions, all of which must hold.
+        conditions: &'static [ShownWhen],
+    },
+    /// At least one of the `conditions` holds.
+    Any {
+        /// The conditions, one of which must hold.
+        conditions: &'static [ShownWhen],
+    },
 }
 
 impl ShownWhen {
@@ -112,6 +122,12 @@ impl ShownWhen {
             Self::Positive { key } => {
                 matches!(value(key), Some(ParamValue::Length(length)) if length.as_mm() > 0.0)
             }
+            Self::All { conditions } => conditions
+                .iter()
+                .all(|condition| condition.holds(schema, params)),
+            Self::Any { conditions } => conditions
+                .iter()
+                .any(|condition| condition.holds(schema, params)),
         }
     }
 }
@@ -444,6 +460,34 @@ mod tests {
         assert!(both.holds(&switches, &stored), "defaults are on");
         stored.insert("a".into(), ParamValue::Switch(false).to_stored());
         assert!(!both.holds(&switches, &stored));
+    }
+
+    #[test]
+    fn all_and_any_combine_conditions_and_a_missing_key_is_false() {
+        let switch = |key: &'static str, on: bool| Param {
+            key,
+            label: key,
+            tooltip: key,
+            kind: ParamKind::Switch,
+            default: ParamValue::Switch(on),
+            shown_when: None,
+            track: None,
+        };
+        let schema = [switch("a", true), switch("b", false)];
+        let (a, b) = (ShownWhen::On { key: "a" }, ShownWhen::On { key: "b" });
+        let none = StoredParams::new();
+        for (conditions, all, any) in [
+            (&[a, b][..], false, true),
+            (&[a, a][..], true, true),
+            (&[b, b][..], false, false),
+            (&[a, ShownWhen::On { key: "missing" }][..], false, true),
+        ] {
+            // The slices are leaked only in this test, to get the `'static` the variants need.
+            let conditions: &'static [ShownWhen] =
+                Box::leak(conditions.to_vec().into_boxed_slice());
+            assert_eq!(ShownWhen::All { conditions }.holds(&schema, &none), all);
+            assert_eq!(ShownWhen::Any { conditions }.holds(&schema, &none), any);
+        }
     }
 
     #[test]
