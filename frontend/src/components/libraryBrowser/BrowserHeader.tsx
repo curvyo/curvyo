@@ -13,7 +13,7 @@ const SCALE: SizeScale = { min: BROWSER_SIZE_RANGE.min, max: BROWSER_SIZE_RANGE.
 const ICON_BUTTON =
   "flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
-/** The view strip's value; the guide presses neither cell. */
+/** The view strip's value; the guide (and the keyword licences) press neither cell. */
 export type HeaderView = "items" | "sets" | "guide";
 
 interface HeaderProps {

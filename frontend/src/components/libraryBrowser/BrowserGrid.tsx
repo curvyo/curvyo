@@ -37,6 +37,8 @@ interface GridProps {
   /** The list's version: the words are asked again. */
   version: number;
   current: number | null;
+  /** Why the current tile matched, for its accessible description (`0153` UX K7); empty if none. */
+  currentWhy: string;
   onSelect: (index: number) => void;
   onLoad: (index: number, byKeyboard: boolean) => void;
   onShowPages: (index: number) => void;
@@ -236,6 +238,7 @@ export const BrowserGrid = forwardRef<GridHandle, GridProps>(function BrowserGri
                 words={words}
                 size={size}
                 current={current === words.index}
+                why={current === words.index ? props.currentWhy : ""}
                 focused={position === focusAt}
                 style={{
                   top: topOf(position),

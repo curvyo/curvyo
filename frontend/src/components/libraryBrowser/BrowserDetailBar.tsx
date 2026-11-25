@@ -2,7 +2,9 @@
 // A, UX notes sections 0.2, 0.5 and 8): the pane's last row with the hovered, else the current
 // item or card, its name, place, licence link, author and facts; licence and credit are readable
 // before anything is loaded. No button loads (H4): only Show pages and Pick elements…, text
-// buttons in the wide layout, icon buttons in the narrow one; a card has none.
+// buttons in the wide layout, icon buttons in the narrow one; a card has none. While searching, an
+// item that matched only through a keyword, category or related word says so on line 4
+// (`specs/0153-library-keywords` criterion 14, UX notes K4 to K6).
 import { Files, Folder, GitBranch, Globe, MousePointerClick } from "lucide-react";
 
 import { ItemPreview } from "@/components/libraryBrowser/ItemPreview";
@@ -10,6 +12,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { heldIconTile } from "@/lib/iconTiles";
 import { DETAIL_NARROW_PX, DETAIL_WIDE_PX } from "@/lib/libraryBrowserLayout";
 import type { CardWords, TileWords } from "@/lib/libraryBrowserQuery";
+import type { WhyWords } from "@/lib/libraryKeywords";
 
 type Action = TileWords["actions"][number];
 
@@ -27,6 +30,8 @@ interface DetailBarProps {
   /** Whether `words` is the current item (its buttons are drawn, UX U16). */
   isCurrent: boolean;
   wide: boolean;
+  /** Why the item matched the search, when not by its name. */
+  why: WhyWords | null;
   onAction: (action: Action, words: TileWords) => void;
   onLicence: (url: string) => void;
 }
@@ -48,7 +53,7 @@ function CardPicture({ card, box }: { card: CardWords; box: number }) {
   );
 }
 
-export function BrowserDetailBar({ words, card, isCurrent, wide, onAction, onLicence }: DetailBarProps) {
+export function BrowserDetailBar({ words, card, isCurrent, wide, why, onAction, onLicence }: DetailBarProps) {
   const box = wide ? 96 : 72;
   const actions = words && isCurrent ? words.actions : [];
   const shown = words ?? card;
@@ -56,6 +61,9 @@ export function BrowserDetailBar({ words, card, isCurrent, wide, onAction, onLic
   const licenceUrl = words ? words.licence_url : (card?.licence_url ?? "");
   const author = shown?.author ?? "";
   const facts = shown?.facts ?? "";
+  const reason = words ? why : null;
+  // The full reasons and facts the line cuts (K5, K6).
+  const boxTitle = [reason?.all, wide && !reason ? "" : facts].filter(Boolean).join("\n") || undefined;
   return (
     <div
       className="flex shrink-0 items-center gap-3 border-t border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] bg-[var(--panel-bg)] p-2"
@@ -65,7 +73,7 @@ export function BrowserDetailBar({ words, card, isCurrent, wide, onAction, onLic
         <>
           <div
             className="shrink-0 overflow-hidden rounded-[8px] border border-[var(--tile-edge)] bg-[var(--tile-bg)]"
-            title={wide ? undefined : facts}
+            title={boxTitle}
           >
             {words ? (
               <ItemPreview key={words.index} words={words} size={box - 2} />
@@ -116,7 +124,13 @@ export function BrowserDetailBar({ words, card, isCurrent, wide, onAction, onLic
                 {author}
               </p>
             ) : null}
-            {wide && facts ? <p className="truncate text-xs text-[var(--panel-muted-fg)]">{facts}</p> : null}
+            {wide && (facts || reason) ? (
+              <p className="flex min-w-0 text-xs whitespace-nowrap text-[var(--panel-muted-fg)]">
+                {reason ? <span className="max-w-full shrink-0 truncate">{reason.line}</span> : null}
+                {facts ? <span className="min-w-0 truncate">{reason ? `\u00a0· ${facts}` : facts}</span> : null}
+              </p>
+            ) : null}
+            {!wide && reason ? <p className="truncate text-xs text-[var(--panel-muted-fg)]">{reason.line}</p> : null}
           </div>
         </>
       ) : (
