@@ -6,7 +6,7 @@ use curvyo_laser_core::job::{
     Cause, FrameShape, Job, PointUm, Severity, Start, build_frame_job, mm_of_um, outside_the_bed,
     um_of_mm, write_frame,
 };
-use curvyo_render_core::{DrawList, head_ring};
+use curvyo_render_core::{DrawList, head_ring, target_ring};
 use serde::Serialize;
 
 use super::super::Session;
@@ -59,7 +59,7 @@ fn frame_cause(job: &PageJob, frame: (&Job, bool)) -> Option<&'static str> {
 
 /// Where the head ring stands: page millimetres of the document.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct FrameHead(Point);
+pub(super) struct FrameHead(pub(super) Point);
 
 /// The head ring's place for the machine position `(x_mm, y_mm)` the controller reports: work
 /// coordinates for an absolute frame, the offset from where the frame began for Head position.
@@ -78,7 +78,7 @@ fn head_place(traced: &Job, (x_mm, y_mm): (f64, f64), relative: bool) -> Point {
 impl Session {
     /// The job the frame of `job` traces and whether it reaches outside the bed: the page's own
     /// job, or the one with stand-in numbers built once when a block has none.
-    fn frame_of<'a>(&self, job: &'a PageJob) -> (&'a Job, bool) {
+    pub(super) fn frame_of<'a>(&self, job: &'a PageJob) -> (&'a Job, bool) {
         if !job.built.unpriced() {
             let outside = job
                 .gate
@@ -143,16 +143,29 @@ impl Session {
         self.output.frame_head.take().is_some()
     }
 
-    /// Whether the head ring shows (the play bar's own head hides, Play pauses; W34).
+    /// Whether the head ring or a go to point's target ring shows (the play bar's own head
+    /// hides, Play pauses; W34, W59).
     pub(in crate::session) fn frame_head_shown(&self) -> bool {
-        self.output.frame_head.is_some()
+        self.output.frame_head.is_some() || self.output.focus_ring.is_some()
     }
 
-    /// The head ring's draw list in `view`, `None` while no frame runs.
+    /// The draw list of the head ring and the target ring in `view`, `None` while neither shows.
     pub(in crate::session) fn frame_head_overlay(&self, view: ViewTransform) -> Option<DrawList> {
-        self.output
+        let target = self
+            .output
+            .focus_ring
+            .map(|FrameHead(at)| target_ring(at, view));
+        let head = self
+            .output
             .frame_head
-            .map(|FrameHead(at)| head_ring(at, view))
+            .map(|FrameHead(at)| head_ring(at, view));
+        match (target, head) {
+            (Some(mut list), Some(head)) => {
+                list.extend(head);
+                Some(list)
+            }
+            (list, None) | (None, list) => list,
+        }
     }
 }
 
