@@ -1,8 +1,9 @@
 //! The one-step commands of the laser page's output (`specs/0029` criteria 2, 25, 38; ADR
-//! 0065 §1 to §3; UX notes §6.2, §6.3, §8, §12): the fixture material pick, Start and the
-//! profile copy's Air assist, each one step.
+//! 0065 §1 to §3; UX notes §6.2, §6.3, §8, §12; `specs/0118` 35 a): the fixture material pick,
+//! Start and the profile copy's Air assist and focus pulse, each one step.
 
 use curvyo_document_core::ProfileChange;
+use curvyo_laser_core::{clamp_pulse_length, clamp_pulse_power};
 
 use super::super::Session;
 
@@ -71,5 +72,44 @@ impl Session {
             Some(None)
         });
         self.document.version() != before
+    }
+
+    /// The Focus pulse switch of the page's profile copy (`specs/0118` 35 a): one step "Edit
+    /// focus pulse". Whether it changed.
+    pub fn set_machine_focus_pulse(&mut self, on: bool) -> bool {
+        let before = self.document.version();
+        self.edit_copy(ProfileChange::FocusPulse { on }, |copy| {
+            if copy.values.focus_pulse.on == on {
+                return None;
+            }
+            copy.values.focus_pulse.on = on;
+            Some(None)
+        });
+        self.document.version() != before
+    }
+
+    /// The Pulse power field in percent, rounded to 0.1 % and set into 0.1 to 5 % on commit
+    /// (W60); the notice when it was limited or rounded. An unchanged value writes no step.
+    pub fn set_machine_pulse_power(&mut self, typed: f64) -> Option<String> {
+        self.edit_copy(ProfileChange::EditPulsePower, |copy| {
+            let limited = clamp_pulse_power(typed)?;
+            if copy.values.focus_pulse.power == limited.value && limited.notice.is_none() {
+                return None;
+            }
+            copy.values.focus_pulse.power = limited.value;
+            Some(limited.notice)
+        })
+    }
+
+    /// The Pulse length field in ms, rounded and set into 50 to 2,000 ms on commit (W60).
+    pub fn set_machine_pulse_length(&mut self, typed: f64) -> Option<String> {
+        self.edit_copy(ProfileChange::EditPulseLength, |copy| {
+            let limited = clamp_pulse_length(typed)?;
+            if copy.values.focus_pulse.length == limited.value && limited.notice.is_none() {
+                return None;
+            }
+            copy.values.focus_pulse.length = limited.value;
+            Some(limited.notice)
+        })
     }
 }

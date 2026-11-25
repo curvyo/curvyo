@@ -271,6 +271,16 @@ pub fn head_ring(at: Point, view: ViewTransform) -> DrawList {
     list
 }
 
+/// The target of a go to point: the head ring without its dot, constant in screen size
+/// (`specs/0118` W59), so the head's dot sits in it on arrival.
+#[must_use]
+pub fn target_ring(at: Point, view: ViewTransform) -> DrawList {
+    let px = 1.0 / view.scale();
+    let mut list = ring(at, 20.0 * px, 4.0 * px, SELECTION_CASING);
+    list.extend(ring(at, 16.0 * px, 2.0 * px, OP_INK));
+    list
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
