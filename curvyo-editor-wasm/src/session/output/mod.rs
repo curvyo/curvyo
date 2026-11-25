@@ -5,6 +5,7 @@
 mod commands;
 mod export;
 mod fixture_pick;
+mod focus;
 mod frame;
 mod gate_facts;
 mod input;
@@ -62,4 +63,6 @@ pub(in crate::session) struct OutputState {
     send: send::SendState,
     /// The head ring of a running frame (`frame.rs`); session state, never saved.
     frame_head: Option<frame::FrameHead>,
+    /// The target ring of a go to point (`focus.rs`); session state, never saved.
+    focus_ring: Option<frame::FrameHead>,
 }

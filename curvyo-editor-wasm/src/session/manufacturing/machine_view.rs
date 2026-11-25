@@ -67,6 +67,10 @@ impl Session {
                 "motorised_z": copy.values.motorised_z,
                 // `specs/0029` criteria 25 and 39 (UX notes §8): the switch and the read-only line.
                 "air_assist": copy.values.air_assist,
+                // `specs/0118` 35 a (W60): the focus pulse, its power in percent.
+                "focus_pulse": copy.values.focus_pulse.on,
+                "pulse_power": f64::from(copy.values.focus_pulse.power.get()) / 10.0,
+                "pulse_length": copy.values.focus_pulse.length.get(),
                 "output": if active.read.output_format_damaged {
                     "unknown"
                 } else {
