@@ -5,7 +5,8 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use super::Peer;
-use crate::jog::{Feed, JogAxis, JogDirection};
+use crate::focus::{PulseLength, PulsePower};
+use crate::jog::{Feed, JogAxis, JogDirection, TravelBox};
 use crate::message::Message;
 use crate::millimetres::Millimetres;
 
@@ -124,6 +125,25 @@ pub enum Event {
     /// The controller cannot hold now (a job's `$H` runs) and holds at its first safe moment;
     /// `Running` keeps the pause pending until `Held` (`specs/0133` P3).
     PauseDeferred,
+    /// The box the controller's travel allows in machine coordinates, `None` while unknown
+    /// (`$130`, `$131` not reported): a go to point is clamped into it before it moves
+    /// (`specs/0118` adrs P4).
+    Travel(Option<TravelBox>),
+    /// The go to point's target as the controller clamped it to the travel, in job file
+    /// coordinates (`specs/0118` adrs P4); the move ends with `JogEnded` or `JogFailed`.
+    GoToTarget {
+        /// The clamped target.
+        target: [Millimetres; 2],
+    },
+    /// The pulse block ran to its own `M5` (`specs/0118` 35 b).
+    PulseEnded,
+    /// The controller refused a line of the pulse block and switched the beam off.
+    PulseFailed {
+        /// The sentence the app shows.
+        detail: String,
+    },
+    /// The controller wrote no pulse (laser mode off or unknown, `$30` unknown, or `S` below 1).
+    PulseSkipped,
 }
 
 /// What the transport has to tell the controller.
@@ -178,4 +198,20 @@ pub enum ControllerCommand {
     },
     /// End the jog now; the position stays.
     JogCancel,
+    /// Move the head with the laser off to `target` (job file coordinates), already clamped to
+    /// the travel by core; the controller clamps it again with the same inputs before it writes
+    /// the jog and answers with `GoToTarget`, the target it moves to (`specs/0118` 2d, P4).
+    GoTo {
+        /// The target, clamped by core.
+        target: [Millimetres; 2],
+        /// The feed before the controller's own cap.
+        feed: Feed,
+    },
+    /// Fire one low-power pulse where the head stands, the beam off again after `length`.
+    Pulse {
+        /// The power in per mille of the controller's full power.
+        power: PulsePower,
+        /// The length.
+        length: PulseLength,
+    },
 }

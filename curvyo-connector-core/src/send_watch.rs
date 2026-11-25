@@ -98,6 +98,8 @@ const fn holds_progress(state: State) -> bool {
             | State::AwaitingLocalStart
             | State::Homing
             | State::Jogging
+            | State::Focusing
+            | State::Pulsing
             | State::Running
             | State::Paused
             | State::Done { .. }
@@ -132,6 +134,7 @@ mod tests {
             machine_position: None,
             work_offset: None,
             frame_id: None,
+            target: None,
         }
     }
 

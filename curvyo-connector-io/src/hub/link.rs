@@ -45,8 +45,9 @@ impl Hub {
         for event in advance.events {
             self.apply(inner, event, now, &mut Vec::new());
         }
-        if inner.machine.state() == State::Jogging {
-            // The dead-man of a held jog counts on the machine's clock (`specs/0118` J4).
+        if matches!(inner.machine.state(), State::Jogging | State::Pulsing) {
+            // The dead-man of a held jog and the pulse's deadline count on the machine's clock
+            // (`specs/0118` J4, adrs P6).
             self.apply(inner, Event::Clock(at), now, &mut Vec::new());
         }
         let Some(notice) = advance.close else {

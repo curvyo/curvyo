@@ -19,10 +19,18 @@ impl Machine {
     ) {
         let refusal = match self.state {
             State::NoController => Some(RejectReason::NoController),
-            State::Alarm | State::Homing | State::Jogging | State::Framing => {
-                Some(RejectReason::Busy)
-            }
-            State::AwaitingLocalStart if matches!(self.waiting, Waiting::Home | Waiting::Frame) => {
+            State::Alarm
+            | State::Homing
+            | State::Jogging
+            | State::Framing
+            | State::Focusing
+            | State::Pulsing => Some(RejectReason::Busy),
+            State::AwaitingLocalStart
+                if matches!(
+                    self.waiting,
+                    Waiting::Home | Waiting::Frame | Waiting::Point
+                ) =>
+            {
                 Some(RejectReason::Busy)
             }
             _ if self.laser_off => Some(RejectReason::LaserModeOff),

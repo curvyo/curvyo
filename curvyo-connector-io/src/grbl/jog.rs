@@ -92,7 +92,11 @@ impl GrblController {
 
     /// Whether another motion or a stop owns the link, so no jog may be written.
     fn jog_blocked(&self) -> bool {
-        self.stream.is_some() || self.stop.is_some() || self.home_in_flight() || self.alarmed
+        self.stream.is_some()
+            || self.stop.is_some()
+            || self.home_in_flight()
+            || self.alarmed
+            || self.pulse.is_some()
     }
 
     fn capped(&self, axis: JogAxis, feed: f64) -> f64 {
@@ -326,5 +330,30 @@ impl GrblController {
     /// Whether a jog runs or is being cancelled.
     pub(super) fn jogging(&self) -> bool {
         self.jog.is_some()
+    }
+
+    /// Writes the go to point's one `line` (an absolute `$J=`) that takes `seconds`, as a jog
+    /// GRBL ends at Idle or cancels with `0x85`; false when another motion owns the link or the
+    /// line does not fit GRBL's buffer.
+    pub(super) fn jog_absolute(&mut self, line: &str, seconds: f64, at: Duration) -> bool {
+        if self.jog_blocked() || self.jog.is_some() {
+            return false;
+        }
+        if self.owed_bytes() + LASER_OFF.len() + line.len() > self.rx_size {
+            return false;
+        }
+        self.laser_off_first();
+        self.out.extend_from_slice(line.as_bytes());
+        self.owed.push_back(Owed::Jog(line.len()));
+        let mut run = Jog::new(true);
+        run.busy_until = at + Duration::from_secs_f64(seconds.max(0.0));
+        self.jog = Some(run);
+        true
+    }
+
+    /// The jog feed `feed` capped at the slower of `$110` and `$111`, whole, at least 1.
+    pub(super) fn capped_both(&self, feed: f64) -> f64 {
+        self.capped(JogAxis::X, feed)
+            .min(self.capped(JogAxis::Y, feed))
     }
 }

@@ -76,12 +76,16 @@ impl GrblSim {
         self.print(&text);
     }
 
-    /// Whether the beam would be lit now: laser mode lights it only while moving.
+    /// Whether the beam would be lit now: laser mode lights it while moving, and at standstill
+    /// only for `M3` under motion mode `G1` (GRBL gives `M4` zero power at rest).
     #[must_use]
     pub fn laser_lit(&self) -> bool {
         let on = self.spindle_powered() && self.power > 0.0;
+        let at_rest = self.spindle == Spindle::Cw && self.motion_g1 && self.hold.is_none();
         if self.config.laser_mode {
-            on && (self.state_word() == "Run" || (self.held() && self.config.laser_on_in_hold))
+            on && (self.state_word() == "Run"
+                || (self.held() && self.config.laser_on_in_hold)
+                || at_rest)
         } else {
             on
         }

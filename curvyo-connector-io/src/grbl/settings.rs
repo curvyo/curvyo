@@ -48,11 +48,12 @@ impl Settings {
     }
 
     /// The travel of X and Y in millimetres, `$130` and `$131`, always millimetres whatever `$13`
-    /// says; a value that is not finite is no value (JSON cannot carry it).
+    /// says; a value that is not finite (JSON cannot carry it) or not above 0 (a non-GRBL
+    /// firmware's) is no value.
     #[must_use]
     pub fn travel(&self) -> Option<[f64; 2]> {
-        let finite = |n| self.number(n).filter(|v| v.is_finite());
-        Some([finite(130)?, finite(131)?])
+        let size = |n| self.number(n).filter(|v| v.is_finite() && *v > 0.0);
+        Some([size(130)?, size(131)?])
     }
 
     /// The homing direction mask, `$23`: bit 0 for X, bit 1 for Y.
@@ -143,6 +144,21 @@ mod tests {
         assert!((s.to_mm(1.0) - 25.4).abs() < 1e-9);
         s.set(32, "0");
         assert_eq!(s.laser_mode(), Some(false));
+    }
+
+    #[test]
+    fn a_travel_of_zero_or_below_is_no_travel() {
+        let mut s = Settings::default();
+        s.set(130, "-400");
+        s.set(131, "300");
+        assert_eq!(s.travel(), None);
+        s.set(130, "0");
+        assert_eq!(s.travel(), None);
+        s.set(130, "400");
+        s.set(131, "-0.5");
+        assert_eq!(s.travel(), None);
+        s.set(131, "300");
+        assert_eq!(s.travel(), Some([400.0, 300.0]));
     }
 
     #[test]

@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::admin::{ClientEntry, ConnectorMode, LogName, Role, Secret};
 use crate::config::ConnectorConfig;
+use crate::focus::{Pulse, within_reach};
 use crate::jog::{JogAxis, JogDirection, JogStep};
 use crate::millimetres::Millimetres;
 
@@ -71,6 +72,12 @@ pub enum State {
     Jogging,
     /// The controller runs a frame (`specs/0118` 2b); a kept `Ready` job is carried along.
     Framing,
+    /// The controller moves the head to a go to point (`specs/0118` 2d), laser off; a kept
+    /// `Ready` job is carried along.
+    Focusing,
+    /// The controller fires the go to point's low-power pulse (`specs/0118` 35); a kept `Ready`
+    /// job is carried along.
+    Pulsing,
     /// The controller is running the job.
     Running,
     /// The job is paused.
@@ -284,6 +291,19 @@ pub enum Message {
     JogKeep,
     /// Ends a jog at once (a released press); not `Stop`: outside a jog it does nothing.
     JogStop,
+    /// Moves the head, laser off, to a point in job file coordinates and, with `pulse`, fires one
+    /// low-power pulse there on arrival; an owner only (`specs/0118` criteria 34, 35).
+    GoToPoint {
+        /// X in job file coordinates, within 10,000 mm.
+        #[serde(deserialize_with = "within_reach")]
+        x: Millimetres,
+        /// Y in job file coordinates, within 10,000 mm.
+        #[serde(deserialize_with = "within_reach")]
+        y: Millimetres,
+        /// The pulse; left out when none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pulse: Option<Pulse>,
+    },
     /// Moves a waiting job from place `from` to place `to` (both 1-based; owner).
     MoveJob {
         /// The job.
@@ -470,6 +490,10 @@ pub enum Message {
         /// The frame that runs or waits for a confirmation (`specs/0118` 2b); left out otherwise.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         frame_id: Option<Uuid>,
+        /// The go to point's target, clamped to the travel, in job file coordinates, while it
+        /// moves, pulses or waits (`specs/0118` 2d); left out otherwise.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        target: Option<[Millimetres; 2]>,
     },
     /// A refusal that keeps the connection open, except where stated.
     Error {

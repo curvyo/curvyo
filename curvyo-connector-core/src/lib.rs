@@ -13,6 +13,7 @@ mod assembly;
 mod codec;
 mod config;
 mod count;
+mod focus;
 mod frame_text;
 mod handshake;
 mod job_list;
@@ -31,6 +32,9 @@ pub use config::{
     DEFAULT_LINES_PER_SECOND, MAX_BAUD, MAX_CLIENT_NAME, MAX_LABEL, check_client_name, check_text,
 };
 pub use count::count;
+pub use focus::{
+    ARRIVED, MAX_TARGET, PULSE_GRACE, Pulse, PulseLength, PulsePower, arrived, clamp_target,
+};
 pub use frame_text::{FrameMoves, NotAFrame, check as check_frame};
 pub use handshake::{Handshake, Outcome, PROTOCOL_VERSION};
 pub use job_list::{
