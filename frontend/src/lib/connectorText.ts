@@ -6,7 +6,20 @@
 /** The state of the connector's job, as the protocol sends it (`State` in `curvyo-connector-core`). */
 export type JobState =
   | {
-      name: "NoController" | "Idle" | "Receiving" | "Ready" | "AwaitingLocalStart" | "Homing" | "Jogging" | "Framing" | "Running" | "Paused" | "Alarm";
+      name:
+        | "NoController"
+        | "Idle"
+        | "Receiving"
+        | "Ready"
+        | "AwaitingLocalStart"
+        | "Homing"
+        | "Jogging"
+        | "Framing"
+        | "Focusing"
+        | "Pulsing"
+        | "Running"
+        | "Paused"
+        | "Alarm";
     }
   | { name: "Done"; result: "Completed" | "Stopped" | "Failed" };
 
@@ -35,6 +48,9 @@ export interface StatusMessage {
   work_offset?: [number, number, number] | null;
   /** The frame that runs or waits for a confirmation (`specs/0118` 2b); absent otherwise. */
   frame_id?: string | null;
+  /** The go to point's target, clamped to the travel, in job file coordinates, while it moves,
+   * pulses or waits (`specs/0118` 2d); absent otherwise. */
+  target?: [number, number] | null;
 }
 
 /** Who this app is on the connector (`specs/0128` A26): from the login answer, not stored. */
@@ -222,7 +238,9 @@ export function refusalText(reason: string, alarm: string | null): string {
 /** The states in which a job or a homing is in flight: a dropped connection is then "Connection
  * lost" (`specs/0118` M9). */
 export function jobIsActive(state: JobState): boolean {
-  return ["Receiving", "Ready", "AwaitingLocalStart", "Homing", "Jogging", "Framing", "Running", "Paused"].includes(state.name);
+  return ["Receiving", "Ready", "AwaitingLocalStart", "Homing", "Jogging", "Framing", "Focusing", "Pulsing", "Running", "Paused"].includes(
+    state.name,
+  );
 }
 
 /** Whether a pushed status ends a shown refusal (UX notes §8, "A refusal stays until the next
@@ -298,7 +316,10 @@ export function jobButtons(
     case "Homing":
     case "Jogging":
     case "Framing":
-      // Stop ends a homing, a jog or a frame too and never asks (`specs/0118` criteria 5, 10, 26).
+    case "Focusing":
+    case "Pulsing":
+      // Stop ends a homing, a jog, a frame or a go to point too and never asks (`specs/0118`
+      // criteria 5, 10, 26).
       return { ...none, stop: true };
     case "Running":
       // A pending pause is cancelled by Resume; Pause shows it as waiting (`specs/0133` H3, H6).
@@ -405,11 +426,21 @@ export function jobStateLine(status: StatusMessage, held: HeldJob | null, sessio
     case "Framing":
       // A frame is no job: neutral, no bar (`specs/0118` 22, W32).
       return neutral("Framing");
+    case "Focusing":
+      // A go to point's move and its pulse: neutral, no bar, in every app (`specs/0118` W58).
+      return neutral("Focus point");
+    case "Pulsing":
+      return neutral("Pulse");
     case "Running":
       return neutral(status.pause_pending === true ? PAUSE_PENDING_TEXT : "Running");
     case "Paused":
       return neutral("Paused");
     case "Done":
+      // A go to point, jog or frame from Done that ended short names its cause as from Idle and
+      // Ready (`specs/0118` 35 c); the job's line comes back with the next state.
+      if (status.state.result !== "Failed" && stateFailure(status) !== null) {
+        return failure(stateFailure(status) as string);
+      }
       switch (status.state.result) {
         case "Completed":
           return neutral(`Completed, ${formatCount(lines)} lines`);
@@ -442,19 +473,23 @@ export function isLossText(detail: string | null | undefined): boolean {
   );
 }
 
-/** The sentence of a failure in `Idle` or `Ready`: a lost job or a refused homing; never the
- * controller's own state word ("Controller state: Door"), never the "Stopping" of a stop. */
+/** The sentence of a failure in `Idle`, `Ready` or `Done`: a lost job, a refused homing or a go to
+ * point that ended short; never the controller's own state word ("Controller state: Door"), never
+ * the "Stopping" of a stop. */
 export function stateFailure(status: StatusMessage): string | null {
   const detail = status.detail ?? null;
   if (detail === null || detail === "" || detail === "Stopping" || controllerWord(status) !== null) return null;
   return detail;
 }
 
-/** Whether the job line is an alert (UX notes section 9): an alarm, a lost job, or a refused
- * homing, which answers the maker's press (`specs/0118` UX notes section 5). */
+/** Whether the job line is an alert (UX notes section 9): an alarm, a lost job, a refused homing
+ * or a go to point that ended short, which answers the maker's press (`specs/0118` UX notes
+ * section 5). */
 export function jobLineAlerts(status: StatusMessage | null): boolean {
   if (status === null) return false;
-  const failed = (status.state.name === "Idle" || status.state.name === "Ready") && stateFailure(status) !== null;
+  const name = status.state.name;
+  const settled = name === "Idle" || name === "Ready" || (name === "Done" && status.state.result !== "Failed");
+  const failed = settled && stateFailure(status) !== null;
   return status.state.name === "Alarm" || isLossText(status.detail) || failed;
 }
 

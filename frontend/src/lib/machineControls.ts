@@ -48,6 +48,10 @@ export function homeButton(entry: LinkEntry): HomeButton {
       return off("Jogging");
     case "Framing":
       return off("Framing");
+    case "Focusing":
+      return off("Focus point");
+    case "Pulsing":
+      return off("Pulse");
     case "Running":
     case "Paused":
       return off("A job is running");
@@ -90,6 +94,10 @@ export function jogCause(entry: LinkEntry, own: boolean): string | null {
       return own ? null : "Jogging";
     case "Framing":
       return "Framing";
+    case "Focusing":
+      return "Focus point";
+    case "Pulsing":
+      return "Pulse";
     case "Running":
     case "Paused":
       return "A job is running";
@@ -126,6 +134,8 @@ export function setOriginCause(entry: LinkEntry): string | null {
     case "Homing":
     case "Jogging":
     case "Framing":
+    case "Focusing":
+    case "Pulsing":
       return "Machine is moving";
     case "Alarm":
       return "Alarm";
@@ -312,7 +322,7 @@ export const SETTLES: Record<
   resume: { done: (s) => s?.state.name !== "Paused" && !pausePending(s), ms: 3_000 },
   pause: { done: (s) => s?.state.name !== "Running" || pausePending(s), ms: 3_000 },
   stop: {
-    done: (s) => !["Running", "Paused", "Homing"].includes(s?.state.name ?? ""),
+    done: (s) => !["Running", "Paused", "Homing", "Pulsing"].includes(s?.state.name ?? ""),
     ms: 8_000,
   },
   unlock: { done: (s) => s?.state.name !== "Alarm", ms: 5_000 },

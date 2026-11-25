@@ -57,6 +57,10 @@ export interface MachineView {
     motorised_z: boolean;
     /** Air assist is on (`specs/0029` criterion 25). */
     air_assist: boolean;
+    /** The Focus point mode's pulse (`specs/0118` 35 a): on, its power in percent, its length. */
+    focus_pulse: boolean;
+    pulse_power: number;
+    pulse_length: number;
     /** The output format's name, "GRBL", or "unknown" for a damaged value (criterion 39). */
     output: string;
     width: number;
@@ -145,6 +149,10 @@ export function useWorkbenches(editor: EditorSession) {
       setMotorisedZ: (on: boolean) => run((session) => session.set_motorised_z(on)),
       /** The Air assist switch of the page's profile copy: one undo step. */
       setAirAssist: (on: boolean) => run((session) => session.set_air_assist(on)),
+      /** The focus pulse fields (`specs/0118` 35 a): one undo step each; the notice or "". */
+      setFocusPulse: (on: boolean) => run((session) => session.set_focus_pulse(on)),
+      setPulsePower: (percent: number) => run((session) => session.set_pulse_power(percent)) ?? "",
+      setPulseLength: (ms: number) => run((session) => session.set_pulse_length(ms)) ?? "",
       /** The size the connected machine reports as an offer for this page, `[width, height]` in
        * mm, or null (`specs/0131`); read on every render, no command. */
       sizeOffer: (x: number, y: number): [number, number] | null => {

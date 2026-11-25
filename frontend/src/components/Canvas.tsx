@@ -6,7 +6,7 @@ import type { GradientApi } from "@/hooks/useGradient";
 import type { SketchApi } from "@/hooks/useSketch";
 import { SketchAnnotations } from "@/components/sketch/SketchAnnotations";
 import { SketchEntryBox, SketchModeLabel } from "@/components/sketch/SketchCanvasChips";
-import { useLayoutEffect, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { PageFrames } from "@/components/PageFrames";
 import { FixtureLabels } from "@/components/FixtureLabels";
@@ -39,6 +39,8 @@ import { clipboard_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
 import { usePenCue } from "@/hooks/usePenCue";
 import type { DroppedFiles } from "@/hooks/useProject";
 import { cursorForHint } from "@/lib/cursors";
+import { focusMode, useFocusMode } from "@/hooks/useFocusPoint";
+import { isClick } from "@/lib/focusPoint";
 import { isContextMenuKey } from "@/lib/centreLinesText";
 import { type Rect, placeReadout } from "@/lib/readoutPlacement";
 
@@ -102,6 +104,41 @@ export function Canvas({
   onToggleToolpathView,
 }: CanvasProps) {
   const penCue = usePenCue(editor);
+  // The Focus point mode (`specs/0118` W57): a primary click sends a go to point and selects
+  // nothing; a drag does nothing; pan and zoom stay as built. A tool change ends the mode (W56).
+  const focusing = useFocusMode();
+  const focusDown = useRef<{ id: number; x: number; y: number } | null>(null);
+  useEffect(() => focusMode.end(), [editor.tool]);
+  const takesFocusPress = (event: ReactPointerEvent<HTMLCanvasElement>) =>
+    focusing && event.button === 0 && !editor.isSpaceHeld && !editor.isPanning;
+  const onCanvasPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (!takesFocusPress(event)) {
+      editor.onPointerDown(event);
+      return;
+    }
+    event.preventDefault();
+    if (event.isPrimary) focusDown.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  };
+  const onCanvasPointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const down = focusDown.current;
+    if (down === null || down.id !== event.pointerId) {
+      editor.onPointerUp(event);
+      return;
+    }
+    focusDown.current = null;
+    if (!isClick(down, { x: event.clientX, y: event.clientY })) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    const point = editor.getSession()?.screen_to_document(event.clientX - box.left, event.clientY - box.top);
+    if (point === undefined) return;
+    const { x, y } = point;
+    point.free();
+    focusMode.press(x, y);
+  };
+  const onCanvasPointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    // The mode draws no hover outline, no handle and no marquee; a pan goes on as built.
+    if (focusing && !editor.isPanning && !editor.isSpaceHeld) return;
+    editor.onPointerMove(event);
+  };
   const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
     editor.showHistoryNotice(clipboard_notice("link", ""), 5000, "canvas", "alert"),
   );
@@ -111,6 +148,13 @@ export function Canvas({
       {...drop.handlers}
       tabIndex={0}
       onKeyDown={(event) => {
+        // Escape ends the Focus point mode before the selection clears (W64), one step per press.
+        if (event.key === "Escape" && focusMode.get()) {
+          event.preventDefault();
+          event.stopPropagation();
+          focusMode.end();
+          return;
+        }
         // Shift+F10 or the Menu key opens the Select context menu at the centre of the selection
         // box (`specs/0117-centre-lines` UX notes §1); the canvas itself never receives the key.
         // The open Centre lines bar: Enter applies, Escape cancels (`0117` UX notes §7).
@@ -158,6 +202,9 @@ export function Canvas({
       style={
         editor.isPanning || editor.isSpaceHeld
           ? undefined
+          : focusing
+            ? // The crosshair over the whole canvas while the Focus point mode is on (W57).
+              { cursor: "crosshair" }
           : // Rust decides the Sketch cursor (hit, draggable, drag in progress); CSS only shows it.
             { cursor: sketch.view.workbench === "sketch" ? (sketch.view.cursor ?? "default") : cursorForHint(editor.cursorHint) }
       }
@@ -233,9 +280,9 @@ export function Canvas({
           // Wider than its box by the part a side pane lies over (`specs/0077-font-preview`
           // criterion 2): the split never resizes the canvas.
           className="block h-full w-[calc(100%+var(--canvas-overhang,0px))] max-w-none"
-          onPointerDown={editor.onPointerDown}
-          onPointerMove={editor.onPointerMove}
-          onPointerUp={editor.onPointerUp}
+          onPointerDown={onCanvasPointerDown}
+          onPointerMove={onCanvasPointerMove}
+          onPointerUp={onCanvasPointerUp}
           onPointerLeave={editor.onPointerLeave}
           onPointerCancel={editor.onPointerCancel}
           onContextMenu={(event) => {
