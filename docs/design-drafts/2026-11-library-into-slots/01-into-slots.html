@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>01 · Library into slots</title><link rel="stylesheet" href="../2026-11-library/kit.css">
+<style>
+.area{position:relative;background:var(--pasteboard-bg);overflow:hidden;flex:none;border-radius:2px}
+.pg{position:absolute;background:var(--canvas-bg)}
+.badge{position:absolute;height:20px;background:var(--toolbar-bg);border:1px solid var(--line25);border-radius:8px;padding:0 6px;display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
+.notice{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;background:#fff;border:1px solid var(--field-invalid);color:var(--field-invalid);border-radius:8px;padding:6px 8px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:var(--panel-elevation-shadow);white-space:nowrap}
+.notice.st{background:var(--toolbar-bg);border-color:transparent;color:var(--toolbar-icon)}
+.rep{height:24px;width:72px;border:1px solid var(--field-border);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--toolbar-icon)}
+.rep.arm{background:var(--destructive);border-color:var(--destructive);color:#fff}
+.list{background:#fff;border:1px solid var(--field-border);border-radius:5px;margin:2px 0 4px 12px;display:flex;flex-direction:column}
+.li{height:28px;display:flex;align-items:center;gap:4px;padding:0 6px;font-size:13px}
+.li .o{margin-left:auto;font-size:12px;color:var(--panel-muted-fg);font-variant-numeric:tabular-nums}
+.li.foc{box-shadow:inset 0 0 0 2px var(--editor-accent)}
+.li.arm{background:#F7D3CF}
+.lh{height:24px;display:flex;align-items:flex-end;padding:0 6px 4px;font-size:12px;font-weight:600;color:var(--panel-muted-fg)}
+.lh span{margin-left:auto;font-weight:400;font-size:11px}
+.cap{height:28px;display:flex;align-items:center;gap:6px;padding:0 6px;border-bottom:1px solid var(--line25)}
+.tog{height:22px;padding:0 6px;border:1px solid var(--field-border);border-radius:5px;font-size:12px;display:flex;align-items:center;margin-left:auto}
+.pill{height:20px;width:72px;border-radius:5px;background:var(--destructive);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;margin-left:auto}
+.lay{width:280px;background:var(--panel-bg);padding:12px 24px 12px 12px}
+.lr{height:28px;display:flex;align-items:center;gap:6px;font-size:13px}
+.lr .m{color:var(--panel-muted-fg);font-size:12px}
+.db{width:420px;height:113px;background:var(--panel-bg);border-top:1px solid var(--line25);padding:8px;display:flex;gap:12px}
+.db .box{width:96px;height:96px;background:#fff;border:1px solid var(--line25);border-radius:8px;flex:none}
+.db .col{display:flex;flex-direction:column;gap:4px;margin-left:auto}
+</style></head><body><div class="sheet">
+<h1>01 · Library into slots (0154 UX notes sections 3 to 10)</h1>
+<p class="lead">A laser page with Holder 1: Slot 1 (30 × 30 mm), Slot 2 (60 × 40 mm), Slot 3 (circle 25 mm). The source is the library page "Coaster", 60 × 40 mm (a heart on the page). 1 mm = 2 px. Every look is an existing one: the 0102 fit light, the Drop badge, the Drag ghost, the Armed action, the canvas notice slot. Dashed outline on a control = new.</p>
+<div class="cols">
+
+<figure><figcaption>A · Over Slot 1: lit, the unit already fitted in it<span>The pointer's thumbnail hides; the page box and its content are drawn as the Drag ghost at the matrix they will get: 50 %, centred. The badge says it in words.</span></figcaption>
+<div id="a"></div></figure>
+
+<figure><figcaption>B · The same with Alt: real size<span>The ghost at 60 × 40 mm, centred on Slot 1, larger than the slot. Badge "· real size, too large". The release writes "Put into slot" and the notice "Real size: larger than Slot 1."</span></figcaption>
+<div id="b"></div></figure>
+
+<figure><figcaption>C · Shift: fill every empty slot of Holder 1<span>Slot 2 is filled and shows nothing; Slots 1 and 3 light with their own fit. Badge "Fill 2 of 3 slots · 29 to 50 %". Release: one step "Fill slots", notice "Filled 2 slots at 29 to 50 %; 1 was already filled."</span></figcaption>
+<div id="c"></div></figure>
+
+<figure><figcaption>D · A filled slot refuses; the notice offers Replace<span>D1 during the drag: outline without fill, Ban "Slot 2 is filled", no ghost, the cursor stays grabbing. D2 after the release: the alert with Replace; D3 armed (second press after 400 ms: "Replace slot content").</span></figcaption>
+<div id="d"></div></figure>
+
+<figure><figcaption>E · Into slot… from the Library tab row<span>The page row's action slot holds Into slot… (Magnet) and Import page. The list opens under the row, pushing the rows below: caption with the unit and the Real size toggle, the holder heading, Fill empty slots with its count, the slots with their outcome. Slot 2 is filled and armed by Enter.</span></figcaption>
+<div class="pwrap"><div class="panel" style="height:520px"><div class="hdr">Library <span class="s">214 documents</span></div>
+<div class="search"><i data-g="search"></i><span class="ph">Search library</span></div>
+<div class="tree">
+<div class="r h44"><span class="chev"><i data-g="chd" data-s="14"></i></span><span class="th d"></span><div class="tx"><span class="nm">Gifts</span><span class="sb">2 pages · 24 Nov 12:03</span></div></div>
+<div class="r h52 cur" style="padding-left:12px"><span class="th p"></span><div class="tx"><div class="l1"><span class="nm">Coaster</span><span class="chip">Drawing</span></div><span class="sb">60 × 40 mm</span></div><span class="act new">${MAG}</span><span class="act"><i data-g="imp"></i></span></div>
+<div class="list new" role="listbox">
+  <div class="cap"><span class="sb">Coaster · 60 × 40 mm</span><span class="tog">Real size</span></div>
+  <div class="lh">Holder 1<span>1 of 3 filled</span></div>
+  <div class="li foc">${FILL}<span>Fill empty slots</span><span class="o">2 of 3</span></div>
+  <div class="li">${SRECT}<span>Slot 1</span><span class="sb">30 × 30 mm</span><span class="o">50 %</span></div>
+  <div class="li arm">${SRECT}<span>Slot 2</span><span class="sb">60 × 40 mm</span><span class="pill">Replace</span></div>
+  <div class="li">${SCIRC}<span>Slot 3</span><span class="sb">⌀ 25 mm</span><span class="o">29 %</span></div>
+</div>
+<div class="r h52" style="padding-left:12px"><span class="th p"></span><div class="tx"><div class="l1"><span class="nm">Tag</span><span class="chip">Drawing</span></div><span class="sb">40 × 20 mm</span></div></div>
+</div></div><div class="strip"><b></b><hr><b></b><b></b><b></b><b></b><b></b><b></b><b class="on"><i data-g="lib"></i></b><b></b><b></b><b></b></div></div>
+<p class="ann">Here the focus ring sits on the Fill row (the first row on open), the armed look on Slot 2 shows the state after Enter on it. Without a target slot on the active page the Magnet button is not in the tree and the slot is 28 px.</p></figure>
+
+<figure><figcaption>F · Browser detail bar and page preview footer<span>Into slot… is the third stacked button of the reserved column (narrow layout: a 28 px Magnet icon button). In the page preview it sits left of Import page and takes the picks, else the page.</span></figcaption>
+<div class="db"><div class="box"></div><div class="tx" style="gap:4px"><span class="nm">Coaster</span><span class="sb">Gifts › Coaster</span><span class="sb">60 × 40 mm · Drawing page</span></div>
+<div class="col"><span class="btn w112" style="font-size:13px">Pick elements…</span><span class="btn w112 new" style="font-size:13px">Into slot…</span></div></div>
+<div style="height:12px"></div>
+<div class="db" style="height:44px;align-items:center;padding:0 8px"><span class="sb" style="flex:1">3 of 12 elements picked</span><span class="btn new" style="width:96px;font-size:13px">Into slot…</span><span class="btn w112" style="font-size:13px">Import page</span><span class="btn w112" style="font-size:13px">Import elements</span></div>
+</figure>
+
+<figure><figcaption>G · After the fill: canvas, Layers, Fixtures<span>The content is ordinary artwork over the slot's hole; a filled slot draws no name. Layers rows carry the computed " · Slot n"; the slot rows of the holder say "filled".</span></figcaption>
+<div id="g"></div>
+<div style="display:flex;gap:12px;margin-top:12px">
+<div class="lay"><div class="lr"><i data-g="chd" data-s="14"></i><span>Laser 1</span></div>
+<div class="lr" style="padding-left:20px">${GROUP}<span>Coaster</span><span class="m new">· Slot 1</span></div>
+<div class="lr" style="padding-left:20px">${GROUP}<span>Coaster</span><span class="m new">· Slot 2</span></div>
+<div class="lr" style="padding-left:20px">${GROUP}<span>Coaster</span><span class="m new">· Slot 3</span></div>
+<div class="lr"><span>Fixtures</span></div></div>
+<div class="lay"><div class="r h40"><span class="tx"><span class="l1">${HOLD}<span class="nm" style="font-size:13px">Holder 1</span></span><span class="sb" style="font-size:11px">Holder · 3 slots <span class="new">· 3 filled</span></span></span></div>
+<div class="lr">${SRECT}<span>Slot 1</span><span class="m new" style="font-size:11px">filled</span></div>
+<div class="lr">${SRECT}<span>Slot 2</span><span class="m new" style="font-size:11px">filled</span></div>
+<div class="lr">${SCIRC}<span>Slot 3</span><span class="m new" style="font-size:11px">filled</span></div></div>
+</div></figure>
+
+</div></div>
+<script src="slots.js"></script>
+<script>
+// Fill the ${...} placeholders of the static markup.
+const MAP = { MAG: g("magnet"), FILL: g("fill"), SRECT: g("srect"), SCIRC: g("scirc"), GROUP: g("group"), HOLD: g("holder") };
+const SH = document.querySelector(".sheet");
+SH.innerHTML = SH.innerHTML.replace(/\$\{(\w+)\}/g, (m, k) => MAP[k] ?? m);
+const W = 380, H = 230;
+document.getElementById("a").innerHTML = scene(W, H, jig([{ state: "ghost" }]), cursor(94, 112) + badge(110, 128, "magnet", "Into Slot 1 · 50 %"));
+document.getElementById("b").innerHTML = scene(W, H, jig([{ state: "lit", big: { x: 30, y: 66, w: 120, h: 80 } }]), cursor(94, 112) + badge(110, 128, "magnet", "Into Slot 1 · real size, too large"));
+document.getElementById("c").innerHTML = scene(W, H, jig([{ state: "ghost" }, { state: "filled" }, { state: "ghost" }]), cursor(94, 112) + badge(110, 128, "fill", "Fill 2 of 3 slots · 29 to 50 %"));
+document.getElementById("d").innerHTML =
+  scene(W, H, jig([{}, { state: "filledlit" }]), cursor(200, 116) + badge(216, 132, "ban", "Slot 2 is filled")) +
+  `<div style="height:8px"></div>` +
+  scene(W, 150, jig([{}, { state: "filled" }]), `<div class="notice">Slot 2 is filled.<span class="rep new">Replace</span></div>`) +
+  `<div style="height:8px"></div>` +
+  scene(W, 150, jig([{}, { state: "filled" }]), `<div class="notice">Slot 2 is filled.<span class="rep arm">Replace</span></div>`);
+document.getElementById("g").innerHTML = scene(W, H, jig([{ state: "filled" }, { state: "filled" }, { state: "filled" }]), `<div class="notice st">Filled 2 slots at 29 to 50 %; 1 was already filled.</div>`);
+</script>
+<script src="../2026-11-library/kit.js"></script></body></html>

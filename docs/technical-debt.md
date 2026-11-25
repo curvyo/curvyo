@@ -9,6 +9,16 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 (each names its slice). An entry is removed when its resolution lands, or stays with the note that
 it is accepted for good.
 
+## The copy kernel writes anchors more than once (`0154`, ADR 0088 decision 9, 2026-11-26)
+
+`objects::copy_subtree` (paste, duplicate, every import, the fill of `0154`) copies every register
+with `copy_map`, then rewrites the anchor ids with `renumber_anchors` and the points with
+`translate_meta`. A new object costs about 23 µs in a release build; a fill of 50 slots with a page
+of 200 objects takes about 0.40 s, so `0154` criterion 8 asserts 500 ms instead of 100 ms.
+
+**Resolution:** write each register once, with the new anchor ids and the offset applied while
+copying (behaviour-preserving, measured with `into_slot_budget.rs`); then tighten the `0154` budget.
+
 ## Document library: the browser's member reads on the page's thread (`0137`, 2026-11-24)
 
 In the browser build the Library reads the members of a changed stored entry (and unpacks a file

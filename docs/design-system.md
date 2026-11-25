@@ -1891,6 +1891,25 @@ Built in PR #457 (slice 1): `specs/0121-print-and-cut/ux-notes.md`, drafts `docs
 | Keys | Tab: divider, view switch, search, (Filters), Size, Back, Full view, Close, facets, grid, detail buttons, licence link. Grid: arrows, Home, End, Page Up and Down, Ctrl+Home and Ctrl+End; a printable key or Backspace to the search; Down or Enter in the search to the first tile (Enter searches online in the Items view only); Alt+Left Back |
 | Search keywords (`0153`, draft) | `specs/0153-library-keywords/ux-notes.md` K1 to K9. One ranked list, nothing on the tile. Detail bar, only when a typed word matched by keyword, category or related word alone: 'Matches “magnifier” (keyword)' / 'Matches “bin” (related to trash)', 12 px muted, leading line 4 (narrow: its own line 4), also the current tile's `aria-description`. No loading indicator; after 400 ms " · Loading keywords…" in the subject line; failure silent. Credit line at the foot of the facet column or filter band (Items view): "Search keywords: Lucide, Tabler Icons, Material Design Icons · **Licences**", names as links, Licences opens a browser place with the shipped licence texts (hosting-guide look) |
 
+## Library into slots (`0154`, draft 2026-11-25)
+
+**Draft until `0154` is Done**: `specs/0154-library-into-slots/ux-notes.md` (V1 to V22, K1 to K10;
+Fragen 377 C slice 1, 378 B, 379 A, 385 C at their defaults), draft
+`docs/design-drafts/2026-11-library-into-slots/`. No new token, no popup: the `0102` fit light, the
+Drop badge, the Drag ghost, the Armed action, the canvas notice slot.
+
+| Item | Value |
+|---|---|
+| Slot drop target | A library drag (tab page row, page preview picks, browser tile, icon) over a target slot of the active laser page (Active holder, eye off included, damaged excluded; hit 4 device px outside the outline, 12 coarse): the `0102` 7.2 light (`--accent-hover` fill, 2 px `--accent` outline, casing); the pointer ghost hides and the unit is drawn fitted **in the slot** as the Drag ghost (box, outlines, or the page thumbnail at 70 %), turned when the fit turns. Over no slot the `0137` and `0152` drop as built |
+| Badge words | `Magnet` "Into Slot 2", "Into Slot 2 · 50 %", "… · 67 %, turned", "… · turned", Alt "… · real size", "… · real size, too large"; the holder is added only when slot names repeat ("Into Slot 2 of Holder 1"); name cut at 24. Shift: `Grid2x2Plus` "Fill 12 of 15 slots" with "· 50 %" or "· 48 to 100 %". Refusals `Ban`: "Slot 2 is filled" (outline without fill, cursor stays `grabbing`), "No empty slot in Holder 1.", "Only one page goes into a slot." Alt and Shift switch live; the pointer-up flags decide |
+| Into slot… | Library tab page row: `Magnet` 24 px left of Import page (action slot 56 px); page preview footer: outline text 96 x 28 left of Import page (picks, else the page); browser detail bar: the last stacked button, under Pick elements… for a local page (narrow: 28 px icon). Hidden, not disabled, without a target |
+| Into slot list | Inline next to its button, pushing (under the tab row; a band above the preview footer or the detail bar), at most 50 % of the region: caption "Lid · 60 × 40 mm" with a **Real size** toggle (`aria-pressed`), per holder a 24 px heading "Holder 1 · 3 of 15 filled", a **Fill empty slots** row ("12 of 15", absent when none is empty), slot rows 28 px (shape glyph, name, size, outcome "50 %", "turned", "filled"). Roving rows, Enter or Space take, Escape closes to the button; a filled row arms **Replace** in place (`--destructive` pill, row `--destructive-soft`) |
+| Selected slot | While a target slot is the canvas selection, double-click and Enter (Ctrl+Enter on a tab row) on a library item put it into that slot; Import buttons keep importing |
+| Notices | Canvas notice slot, status 3 s, only when not a plain centre: "Fitted into Slot 2 at 50 %.", "… at 67 %, turned.", "Turned to fit Slot 2.", "Real size: larger than Slot 2.", "Filled 12 slots at 50 %.", "Filled 11 slots; 4 were already filled." |
+| Replace notice | **Exception to "a notice has no controls"**: refusal look, `role="alert"`, 8 s, "Slot 2 is filled." with one outline button **Replace** (24 x 72 px), an Armed action in `--destructive`; held while hovered or focused (WCAG 2.2.1); gone on any document change, a new drag, a page switch; reachable by Tab after the canvas |
+| Filled slot | The content is ordinary artwork over the hole; the slot draws no name; no mark. Layers rows of laser page members carry " · Slot 2" (12 px muted, computed); Fixtures slot rows "filled", holder line 2 "· 3 filled" |
+| Undo | "Put into slot", "Fill slots", "Replace slot content"; the unit (or every copy) is selected after |
+
 ## Keyboard shortcuts established so far
 
 | Action | Shortcut | Notes |
