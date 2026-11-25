@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>03 · Library browser states</title><link rel="stylesheet" href="../2026-11-library/kit.css"><link rel="stylesheet" href="browser.css">
+<style>.row3{display:flex;gap:8px;flex-wrap:wrap;background:var(--canvas-bg);padding:12px;align-items:flex-start;max-width:1060px}
+.ph2{height:44px;background:var(--panel-bg);border-bottom:1px solid var(--line25);display:flex;align-items:center;gap:6px;padding:0 8px;width:340px}</style></head><body><div class="sheet">
+<h1>03 · States: empty, nothing matches, cards, tile states, Back from the Page preview, Frage 374 B, the Add source form with the hosting link and the token sketch (0152 UX notes sections 0.2, 0.6, 0.7, 6, 7, 9.3, 10, 13)</h1>
+<p class="lead">Same tokens and pieces as drafts 01 and 02. Every state is text or a control in place; nothing is an alert or a popup. Offline is per card and per source. Dashed outline = new.</p>
+<div class="cols">
+<figure><figcaption>A · Nothing in the library yet, Items view<span>No local document, no source added: one line and Show sets, which presses the Sets cell.</span></figcaption><div id="a" class="area" style="width:340px;height:420px"></div></figure>
+<figure><figcaption>A2 · The same, Sets view<span>The Curvyo catalogue ready entry ("Not added"; opening it adds it and fetches its list), then Host your own library….</span></figcaption><div id="a2" class="area" style="width:340px;height:420px"></div></figure>
+<figure><figcaption>B · Nothing matches<span>The search text and the active filters by their values, then Clear all. No cards in the Items view.</span></figcaption><div id="b" class="area" style="width:340px;height:420px"></div></figure>
+<figure><figcaption>C · Cards<span>No buttons (rework): the bottom-right slot is a state. Unfetched source, not loaded, loaded, loading, offline, failed with its reason (opening again retries), the ready entry, a private catalogue with the lock (Frage 376 B only).</span></figcaption><div id="c" class="row3" style="width:660px"></div></figure>
+<figure><figcaption>D · Tile states at Size 96<span>Rest, hover, current (value fill and the 3 px bar), focus ring, body still loading (the quiet bar, never another icon), cannot be loaded (reason in tooltip and detail bar), a colour icon, "Licence unknown" in the same neutral chip, a template with its page count chip.</span></figcaption><div id="d" class="row3"></div>
+<div style="position:relative;height:60px;margin-top:8px"><div class="tipx" style="left:12px;top:0">Box with lid<br><span>Curvyo catalogue · CC BY 4.0 · Jane Doe · 24 KB</span></div></div></figure>
+<figure><figcaption>E · Page preview opened by Pick elements…<span>The 0137 Page preview in place of the browser (one side pane); Back returns to the browser as it was. Opened from the tab it has no Back.</span></figcaption><div class="ph2 new"><span class="ib"><i data-g="back"></i></span><span class="nm">Front</span><span class="chip"><i data-g="pen" data-s="12"></i>Drawing</span><span class="sb" style="flex:1">Box job › Lid</span><span class="ib"><i data-g="max"></i></span><span class="ib"><i data-g="x"></i></span></div></figure>
+<figure><figcaption>G · Add source form: Host your own library…, and the token field (Frage 376 B only)<span>The link sits under the "What is sent" line while the kind is Git catalogue. The Access token row (dashed red: exists only with Frage 376 B) is optional, masked, never shown again; its statement line says where the token goes.</span></figcaption><div id="g"></div></figure>
+<figure><figcaption>F · Frage 374 B for comparison<span>No detail bar: a press loads, both text lines at every Size, tiles at least 112 px wide (here Size 48 inside a 112 px tile).</span></figcaption><div id="f" class="row3" style="width:500px"></div></figure>
+</div></div>
+<script src="browser.js"></script>
+<script>
+document.getElementById("a").innerHTML = pane({w:340,S:96,subj:"0 items",empty:"Nothing in the library yet.",showSets:true});
+document.getElementById("a2").innerHTML = pane({w:340,view:"sets",back:"Back to Items",subj:"1 set",
+  groups:[{head:"Curvyo catalogue",cards:[{glyph:"globe",name:"Curvyo catalogue",meta:"Not added",ready:true}]}],item:null});
+document.getElementById("b").innerHTML = pane({w:340,S:96,q:"hrat",active:2,subj:"0 of 11,356 items",
+  empty:'Nothing matches "hrat" in Monochrome, Arrows.',clearBtn:true,item:null});
+document.getElementById("c").innerHTML = [
+  {glyph:"git",name:"Maker Guild",meta:"github.com"},
+  SETS.mdi,SETS.lu,{...SETS.ph,busy:true},{...SETS.wi,fail:"Offline"},{...SETS.fe,fail:"The server answered 500."},
+  {glyph:"globe",name:"Curvyo catalogue",meta:"Not added",ready:true},
+  {glyph:"git",name:"Shop templates",meta:"The token was refused.",lock:true,fail:"The token was refused."}].map(card).join("");
+document.getElementById("g").innerHTML = `<div class="pwrap"><div class="panel" style="height:470px"><div class="hdr">Library <span class="s">214 documents</span></div><div class="tree"><div class="hd">Online</div><div class="r h32"><span class="chev"><i data-g="chr" data-s="14"></i></span><i data-g="git"></i><span class="nm">Curvyo catalogue</span><span class="cnt">12</span></div><div class="r h32"><span class="chev"><i data-g="chr" data-s="14"></i></span><i data-g="git"></i><span class="nm">Shop templates</span><i data-g="lock" data-s="12"></i><span class="cnt">8</span></div></div>
+<div style="background:var(--toolbar-bg);border:1px solid var(--line25);border-radius:5px;padding:8px;display:flex;flex-direction:column;gap:6px;margin-top:8px"><span class="sb">Kind</span><div style="display:flex;height:28px;border:1px solid var(--field-border);border-radius:5px;overflow:hidden;font-size:13px"><span style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;background:var(--toolbar-icon-active-bg);color:#fff"><i data-g="git" data-s="14"></i>Git catalogue</span><span style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px"><i data-g="globe" data-s="14"></i>Iconify</span></div><span class="sb">Address</span><div class="search" style="margin:0">https://raw.githubusercontent.com/shop/templates/main/</div>
+<div style="display:flex;flex-direction:column;gap:6px;outline:1.5px dashed var(--destructive);outline-offset:2px"><span class="sb">Access token (optional)</span><div class="search" style="margin:0;letter-spacing:2px">••••••••••••••••</div><span class="sb" style="white-space:normal">The token is sent only to this address and kept in your system's key store.</span></div>
+<span class="sb" style="white-space:normal">Add sends one request to this address.</span><span class="hostlink new" style="height:28px;display:flex;align-items:center">Host your own library…</span><div style="display:flex;gap:8px"><span class="btn" style="width:108px">Cancel</span><span class="btn" style="width:108px">Add</span></div></div>
+<div class="foot"><span class="btn w118"><i data-g="folderplus"></i>Add folder...</span></div></div><div class="strip"><b></b><hr><b></b><b></b><b></b><b></b><b></b><b></b><b class="on"><i data-g="lib"></i></b><b></b><b></b><b></b><b></b></div></div>`;
+document.getElementById("d").innerHTML = [I.al,{...I.alc,st:"hov"},{...I.heart,st:"cur"},{...I.home,st:"foc"},{...I.star,skeleton:true},{...I.tsign,broken:true},I.cheart,I.ttag,I.tbox].map(t=>tile(t,96)).join("");
+document.getElementById("f").innerHTML = [I.al,I.csun,I.home,I.tbox].map(t=>`<div style="width:112px">`+tile({...t,always:true},48).replace('style="width:64px"','style="width:112px"').replace('style="width:48px;height:48px"','style="width:96px;height:48px"')+`</div>`).join("");
+finish();
+</script>
+<script src="../2026-11-library/kit.js"></script></body></html>

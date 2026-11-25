@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>02 · Library browser, full view</title><link rel="stylesheet" href="../2026-11-library/kit.css"><link rel="stylesheet" href="browser.css"></head><body><div class="sheet">
+<h1>02 · Library browser in Full view: Items, Sets, search, second level, hosting guide (0152 UX notes sections 0.1 to 0.6, 3 to 9)</h1>
+<p class="lead">From 640 px of pane width: one header row (Items | Sets, search, Size in Items, subject line with Back, Split view, Close), the 216 px facet column at the left, the grid, the wide detail bar (96 px preview, place, licence link, author, facts; only Show pages and Pick elements… as buttons). Sets live in the Sets view as 208 × 112 cards, loaded or not (Frage 373 A; rework of 2026-11-25). Dashed outline = new.</p>
+<div class="cols">
+<figure><figcaption>A · Items view, nothing filtered, a template current<span>Box with lid is current: the detail bar offers only Show pages (a double-click loads both pages, a drag works in split view only). No cards in this view.</span></figcaption>
+<div id="a" class="win" style="width:1060px;height:600px"></div></figure>
+
+<figure><figcaption>B · Sets view<span>Facets Sources (the sources), Colour (a set's palette), Category (the set categories); no Sort, no Customizable, no Size. Groups per source with sticky headers; a private Git catalogue (Frage 376 B only) carries the lock. Material Design Icons is current: not loaded, "· Not loaded" in the facts; a double-click or Enter loads it (one request) and opens it. Weather Icons failed offline (opening again retries). The last row is Host your own library….</span></figcaption>
+<div id="b" class="win" style="width:1060px;height:640px"></div></figure>
+
+<figure><figcaption>C · Typing "hart" (fuzzy), then Enter<span>Unchanged by the rework except the view switch: typing ranks what is fetched, Best match chosen by itself; Enter also asked the Iconify sources. The results are the source "Search results".</span></figcaption>
+<div id="c" class="win" style="width:1060px;height:470px"></div></figure>
+
+<figure><figcaption>D · Second level: the pages of Lid, Size 160<span>A double-click on a local document with several pages (or Show pages, or a press on its page-count chip) lists its pages; Back "Back to all items", Escape or Alt+Left go back. Front is current: only Pick elements… (a double-click imports the page).</span></figcaption>
+<div id="d" class="win" style="width:1060px;height:440px"></div></figure>
+
+<figure><figcaption>E · Host your own library…<span>Opened from the end of the Sets view (or the Add source form): a place of the browser with Back "Back to Sets", the Info-mode look, at most 640 px of text. Outline only; the product owner writes the final words. Its last paragraph follows Frage 376 (here A).</span></figcaption>
+<div id="e" class="win" style="width:1060px;height:640px"></div></figure>
+</div></div>
+<script src="browser.js"></script>
+<script>
+const srcs = [{n:"My documents",k:"214"},{n:"Box job",k:"14",ind:true},{n:"Logos",k:"31",ind:true},{n:"Curvyo catalogue",k:"12"},{n:"Lucide",k:"1,540"},{n:"Tabler Icons",k:"5,880"},{n:"Noto Emoji",k:"3,710"}];
+const cats = [{n:"Animals",k:"212"},{n:"Arrows",k:"318"},{n:"Box job",k:"14"},{n:"Emoji",k:"3,710"},{n:"General",k:"7,420"},{n:"Logos",k:"31"},{n:"Weather",k:"96"},{n:"Uncategorised",k:"12"}];
+document.getElementById("a").innerHTML = pane({full:true,wide:true,S:96,subj:"11,356 items",sources:srcs,cats,
+  items:[I.al,I.alc,I.an,I.ar,I.bell,{...I.tbox,st:"cur"},I.cam,I.cl,I.tco,I.cof,I.tsign,I.gift,{...I.heart,st:"hov"},I.home,I.key,I.dlid,I.cleaf,I.logo],
+  item:I.tbox});
+document.getElementById("b").innerHTML = pane({full:true,wide:true,view:"sets",back:"Back to Items",subj:"287 sets · 3 loaded",
+  sources:[{n:"My documents",k:"2"},{n:"Curvyo catalogue",k:"1"},{n:"Maker Guild",k:"1"},{n:"api.iconify.design",k:"280"}],
+  cats:[{n:"Emoji",k:"24"},{n:"General",k:"96"},{n:"Logos",k:"12"},{n:"Material",k:"18"},{n:"Thematic",k:"31"},{n:"Uncategorised",k:"20"}],
+  groups:[
+    {head:"My documents · 2 folders",cards:[{glyph:"folder",name:"Box job",meta:"14 documents · 38 pages"},{glyph:"folder",name:"Logos",meta:"31 documents · 31 pages"}]},
+    {head:"Curvyo catalogue",cards:[{glyph:"git",name:"Curvyo catalogue",meta:"12 templates",loaded:true}]},
+    {head:"Maker Guild",lock:true,cards:[{glyph:"git",name:"Maker Guild",meta:"github.com",lock:true}]},
+    {head:"api.iconify.design · 280 sets · 3 loaded",cards:[SETS.fe,SETS.lu,{...SETS.mdi,st:"cur"},SETS.no,{...SETS.ph,busy:true},SETS.tb,{...SETS.wi,fail:"Offline"}]}],
+  item:SETS.mdi});
+document.getElementById("c").innerHTML = pane({full:true,wide:true,S:96,q:"hart",online:true,clear:true,sort:"Best match",back:"Back to Items",subj:'7 of 11,404 items · "hart": 48 icons',
+  sources:[...srcs.slice(0,1),...srcs.slice(3),{n:"Search results",k:"48"}],cats:[{n:"Emoji",k:"2"},{n:"General",k:"5"}],
+  items:[{...I.heart,st:"cur foc"},I.heart2,I.cheart,{...I.heart,name:"heart-handshake",src:"Lucide"},{...I.heart2,name:"heart-broken",src:"Search results"},{...I.cheart,name:"heart-on-fire",src:"Search results",skeleton:true},{...I.al,name:"chart-line",src:"Tabler",icon:"arrow-right"}],
+  item:I.heart});
+document.getElementById("d").innerHTML = pane({full:true,wide:true,S:160,back:"Back to all items",subj:"Box job › Lid · 3 pages",sources:srcs,cats,
+  items:[{...I.dfront,st:"cur"},{...I.dfront,name:"Back",thumb:"box"},{...I.dfront,name:"Inlay",thumb:"tag"}],item:I.dfront});
+document.getElementById("e").innerHTML = pane({full:true,wide:true,guide:true,view:"none",back:"Back to Sets",subj:"Host your own library"});
+finish();
+</script>
+<script src="../2026-11-library/kit.js"></script></body></html>
