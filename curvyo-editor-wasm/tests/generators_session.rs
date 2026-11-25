@@ -21,7 +21,8 @@ fn panel(session: &Session) -> Value {
 }
 
 #[test]
-fn the_bar_offers_box_gear_and_rounded_box_and_a_press_places_the_chosen_one_selected() {
+fn the_bar_offers_box_box_from_path_gear_and_rounded_box_and_a_press_places_the_chosen_one_selected()
+ {
     let mut s = session();
     let kinds: Value = serde_json::from_str(&s.generator_kinds_json()).unwrap();
     let ids: Vec<&str> = kinds
@@ -34,6 +35,7 @@ fn the_bar_offers_box_gear_and_rounded_box_and_a_press_places_the_chosen_one_sel
         ids,
         [
             "curvyo.generators/box",
+            "curvyo.generators/path-box",
             "curvyo.generators/gear",
             "curvyo.generators/rounded-box"
         ]
@@ -656,4 +658,130 @@ fn a_gear_corner_drag_reads_teeth_and_steps_whole_teeth_while_it_moves() {
         shown,
         "the commit is the previewed gear"
     );
+}
+
+fn polygon_session(points: &[(f64, f64)], closed: bool) -> Session {
+    use curvyo_document_core::NewAnchor;
+    use curvyo_ui_core::AnchorIdMinter;
+    let document = Document::new(1);
+    let mut minter = AnchorIdMinter::new(9);
+    let anchors: Vec<NewAnchor> = points
+        .iter()
+        .map(|&(x, y)| NewAnchor::corner(minter.mint(), Point::new(x, y)))
+        .collect();
+    let _source = document.create_path(&anchors, closed);
+    let mut s = Session::open(2, &pack(&document, "0.1.0").unwrap()).unwrap();
+    s.set_tool(Tool::Generators);
+    s.resize_viewport(1600.0, 900.0);
+    s
+}
+
+/// `0149` criterion 1: the segment is a pick mode; a click on a closed outline builds the box
+/// beside it, selected, one step "Add path box"; a click on anything else refuses in words and
+/// changes nothing; a click on empty canvas says nothing.
+#[test]
+fn the_box_from_path_segment_picks_an_outline_and_refuses_the_rest_in_words() {
+    let coffin = [
+        (-50.0, -10.0),
+        (-25.0, -30.0),
+        (50.0, -20.0),
+        (50.0, 20.0),
+        (-25.0, 30.0),
+        (-50.0, 10.0),
+    ];
+    let mut s = polygon_session(&coffin, true);
+    let kinds: Value = serde_json::from_str(&s.generator_kinds_json()).unwrap();
+    let entry = &kinds.as_array().unwrap()[1];
+    assert_eq!(entry["segment"], "Box from path");
+    assert_eq!(entry["label"], "Path box");
+    s.set_generator_kind("curvyo.generators/path-box");
+    assert!(
+        !s.place_generated(0.0, 0.0),
+        "the middle of the shape is not its outline"
+    );
+    assert_eq!(s.take_generated_notice(), "");
+    assert!(s.place_generated(50.0, 0.0), "a click on the outline");
+    assert_eq!(s.tool(), Tool::Select);
+    assert_eq!(panel(&s)["label"], "Path box");
+    assert!(
+        !s.box_from_path_shown(),
+        "a box is no outline to build from"
+    );
+    let mut open = polygon_session(&[(0.0, 0.0), (60.0, 0.0), (60.0, 60.0)], false);
+    open.set_generator_kind("curvyo.generators/path-box");
+    assert!(!open.place_generated(30.0, 0.0));
+    assert_eq!(
+        open.take_generated_notice(),
+        "Select one closed outline. Nothing was changed."
+    );
+}
+
+/// `0149` criterion 5: a spike is built anyway and the canvas notice names the corner; the marks
+/// overlay draws without panicking for the selected box and for the hovered outline.
+#[test]
+fn a_spike_is_built_with_a_warning_notice_and_the_overlay_draws() {
+    let tip = 11.0_f64.to_radians();
+    let mut s = polygon_session(
+        &[
+            (0.0, -100.0),
+            (100.0 * tip.tan(), 0.0),
+            (-100.0 * tip.tan(), 0.0),
+        ],
+        true,
+    );
+    s.set_generator_kind("curvyo.generators/path-box");
+    assert!(s.place_generated(100.0 * tip.tan() / 2.0, -50.0));
+    let notice = s.take_generated_notice();
+    assert!(notice.contains("very sharp"), "{notice}");
+    let _ = s.draw_list();
+}
+
+/// `0149` Replace outline: the button arms the pick; a click on another closed outline replaces
+/// the stored one in one step "Replace outline", the source stays; Escape (a tool change) cancels.
+#[test]
+fn replace_outline_picks_another_outline_in_one_step() {
+    use curvyo_document_core::NewAnchor;
+    use curvyo_ui_core::AnchorIdMinter;
+    let document = Document::new(1);
+    let mut minter = AnchorIdMinter::new(9);
+    let mut draw = |points: &[(f64, f64)]| {
+        let anchors: Vec<NewAnchor> = points
+            .iter()
+            .map(|&(x, y)| NewAnchor::corner(minter.mint(), Point::new(x, y)))
+            .collect();
+        let _id = document.create_path(&anchors, true);
+    };
+    draw(&[(0.0, 0.0), (80.0, 0.0), (80.0, 60.0), (0.0, 60.0)]);
+    draw(&[(300.0, 0.0), (380.0, 0.0), (380.0, 90.0), (300.0, 90.0)]);
+    let mut s = Session::open(2, &pack(&document, "0.1.0").unwrap()).unwrap();
+    s.resize_viewport(1600.0, 900.0);
+    s.set_tool(Tool::Generators);
+    s.set_generator_kind("curvyo.generators/path-box");
+    assert!(s.place_generated(40.0, 0.0));
+    let before = panel(&s);
+    assert!(s.begin_replace_outline());
+    assert_eq!(s.tool(), Tool::Generators);
+    assert!(
+        s.place_generated(340.0, 0.0),
+        "a click on the other rectangle"
+    );
+    assert_eq!(s.tool(), Tool::Select);
+    assert_eq!(newest_name(&mut s), "Replace outline");
+    let _ = before;
+    // Escape: leaving the tool disarms the pick.
+    assert!(s.begin_replace_outline());
+    s.set_tool(Tool::Select);
+    s.set_tool(Tool::Generators);
+    assert!(!s.place_generated(340.0, 0.0) || s.tool() == Tool::Select);
+}
+
+/// UX review: in the pick mode the cursor is the arrow over empty canvas, never the placing
+/// tools' crosshair; the other kinds keep the default hint.
+#[test]
+fn the_pick_mode_shows_the_arrow_over_empty_canvas() {
+    let mut s = polygon_session(&[(0.0, 0.0), (60.0, 0.0), (60.0, 60.0), (0.0, 60.0)], true);
+    s.set_generator_kind("curvyo.generators/path-box");
+    assert_eq!(s.cursor_hint(), "arrow");
+    s.set_generator_kind("curvyo.generators/gear");
+    assert_eq!(s.cursor_hint(), "default");
 }

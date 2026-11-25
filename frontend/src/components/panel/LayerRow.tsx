@@ -84,6 +84,7 @@ const GENERATOR_GLYPHS: Record<string, Glyph> = {
   gear: Cog,
   box: Box,
   "rounded box": SquareRoundCorner,
+  "path box": Spline,
 };
 
 /** The kind word of a fixture row as a glyph kind; anything unlisted is the unknown glyph. */

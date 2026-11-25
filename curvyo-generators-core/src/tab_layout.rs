@@ -61,8 +61,8 @@ impl Footprint {
                 if local < 0.0 || local >= length {
                     continue;
                 }
-                if u - half_width < self.wall - 1e-9
-                    || u + half_width > whole.length - self.wall + 1e-9
+                if u - half_width < self.margin - 1e-9
+                    || u + half_width > whole.length - self.margin + 1e-9
                 {
                     continue;
                 }
@@ -147,6 +147,7 @@ impl Footprint {
 /// The spans and tabs of the footprint with its windows, built one span at a time.
 struct Layout {
     wall: f64,
+    margin: f64,
     spans: Vec<Span>,
     tabs: Vec<Tab>,
     s0: f64,
@@ -158,6 +159,7 @@ impl Layout {
     fn new(footprint: &Footprint) -> Self {
         Self {
             wall: footprint.wall,
+            margin: footprint.margin,
             spans: Vec::new(),
             tabs: Vec::new(),
             s0: 0.0,
@@ -170,6 +172,7 @@ impl Layout {
             Footprint {
                 spans: self.spans,
                 wall: self.wall,
+                margin: self.margin,
             },
             self.tabs,
         )
@@ -197,7 +200,9 @@ impl Layout {
     /// neutral length also holds the kink of half a wall thickness times the turn.
     fn push(&mut self, shape: Shape, window: bool) {
         let length = match shape {
-            Shape::Bend { radius, sweep, .. } => sweep.abs() * (radius + self.wall / 2.0),
+            Shape::Bend { radius, sweep, .. } => {
+                sweep.abs() * (radius + sweep.signum() * self.wall / 2.0)
+            }
             Shape::Straight { from, to } => {
                 let chord = libm::hypot(to.x - from.x, to.y - from.y);
                 chord + self.wall / 2.0 * self.turn

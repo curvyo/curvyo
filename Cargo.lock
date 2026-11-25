@@ -1105,6 +1105,7 @@ version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
  "curvyo-extension-core",
+ "curvyo-geometry-core",
  "libm",
  "serde_json",
 ]

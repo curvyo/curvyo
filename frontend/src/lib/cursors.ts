@@ -121,6 +121,10 @@ export function cursorForHint(hint: string): string | undefined {
   if (hint === "crosshair") {
     return "crosshair";
   }
+  if (hint === "arrow") {
+    // The pick mode of Box from path: the arrow, not the placing tools' crosshair (`0149`).
+    return "default";
+  }
   if (hint === "lasso") {
     // An arrow with a dashed squiggle trailing from its lower right: the
     // dashes echo the 4 / 3 line a lasso draws. Hotspot at the arrow tip.

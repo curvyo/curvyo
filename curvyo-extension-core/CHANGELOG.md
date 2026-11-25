@@ -25,6 +25,14 @@ migration in that extension.
   (a minimum that a choice sets, "the least the Wave pattern allows"). Source-breaking for code that builds
   a `Generated` literal or matches `Bound` or `Edit` exhaustively.
 
+- ADR 0083 §2, §11 (`0149` path box): `ParamKind::Path` and `ParamValue::Path(ClosedPath)`, stored
+  `{"path": [x0, y0, c1x, c1y, c2x, c2y, x, y, ...]}` (shape check: 2 to 2,000 cubics, finite, within
+  1e7 mm); `ClosedPath::{flat, from_flat}`; `GeneratorKind.source: Option<Source>` with
+  `Source { param, command }` and `GeneratorKind::segment`; `Generated.warnings: Vec<Warning>` and
+  `Generated.marks: Marks` (`Mark::{Corner, Bend, Piece}`), run time only, never stored. Source-breaking
+  for code that builds a `GeneratorKind` or `Generated` literal or matches `ParamKind` or `ParamValue`
+  exhaustively.
+
 ## Unreleased (`specs/0026-machine-profile`)
 
 - Block kind `MachineProfile { label }`: the machine profile picker and the copy's fields, drawn

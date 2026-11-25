@@ -15,6 +15,7 @@ mod footprint;
 mod gear;
 mod manifest;
 mod outline;
+mod path_box;
 mod rounded_box;
 mod schema;
 mod slit_bend;
@@ -26,7 +27,7 @@ mod wave_slot;
 
 use curvyo_extension_core::{Extension, GenerateRequest, Generated, Manifest};
 
-pub use manifest::{BOX, GEAR, PROCESS_ID, ROUNDED_BOX, manifest};
+pub use manifest::{BOX, GEAR, PATH_BOX, PROCESS_ID, ROUNDED_BOX, manifest};
 
 /// The generators as a compiled-in extension.
 #[derive(Debug, Clone, Copy)]
@@ -45,6 +46,7 @@ impl Extension for Generators {
             GEAR => Some(gear::generate(request)),
             BOX => Some(boxes::generate(request)),
             ROUNDED_BOX => Some(rounded_box::generate(request)),
+            PATH_BOX => Some(path_box::generate(request)),
             _ => None,
         }
     }

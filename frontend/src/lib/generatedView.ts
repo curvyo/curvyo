@@ -14,7 +14,8 @@ export type GeneratedKind =
   | { kind: "count"; min: number; max: number; automatic?: boolean }
   | { kind: "angle"; min: number; max: number; step: number; decimals: number }
   | { kind: "switch" }
-  | { kind: "choice"; options: GeneratedOption[] };
+  | { kind: "choice"; options: GeneratedOption[] }
+  | { kind: "path" };
 
 /** The span a number's slider is drawn on. */
 export interface GeneratedTrack {
@@ -106,7 +107,12 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
 export interface GeneratorKindEntry {
   /** `<extension>/<kind>`. */
   id: string;
+  /** The object's name ("Path box"). */
   label: string;
+  /** What the segment shows: the command of a kind built from an outline ("Box from path"). */
+  segment: string;
+  /** Built from the selected outline, not placed at the pointer. */
+  source: boolean;
   /** The Lucide glyph name. */
   icon: string;
 }
@@ -115,10 +121,22 @@ export interface GeneratorKindEntry {
 export function decodeKinds(text: string): GeneratorKindEntry[] {
   try {
     const raw: unknown = JSON.parse(text);
-    return Array.isArray(raw) ? (raw as GeneratorKindEntry[]) : [];
+    return Array.isArray(raw)
+      ? (raw as GeneratorKindEntry[]).map((kind) => ({ ...kind, segment: kind.segment ?? kind.label }))
+      : [];
   } catch {
     return [];
   }
+}
+
+/**
+ * How the canvas notice slot shows a generator notice: a refusal (it ends "Nothing was changed.")
+ * in the refusal look for 8 s, anything else (a warning about a built box, an opened file's
+ * unknown generator) as a status for 5 s (`specs/0149-path-box` UX notes §1.2 and §6; design
+ * system, "Action notice").
+ */
+export function canvasNoticeLook(text: string): { kind: "status" | "alert"; ms: number } {
+  return text.endsWith("Nothing was changed.") ? { kind: "alert", ms: 8000 } : { kind: "status", ms: 5000 };
 }
 
 /** A number as the field shows it: at most `decimals` places, trailing zeros trimmed. */

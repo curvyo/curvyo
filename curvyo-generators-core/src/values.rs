@@ -89,6 +89,10 @@ impl<'a> Values<'a> {
         self.value(key).count().unwrap_or(0)
     }
 
+    pub(crate) fn path(&self, key: &str) -> Option<curvyo_extension_core::ClosedPath> {
+        self.value(key).path().cloned()
+    }
+
     pub(crate) fn degrees(&self, key: &str) -> f64 {
         self.value(key).degrees().unwrap_or(0.0)
     }

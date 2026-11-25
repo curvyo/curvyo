@@ -13,6 +13,24 @@ pub(crate) struct Piece {
     pub(crate) thickness: f64,
     /// Which part it is: `strip`, `cover`, `lid`, `base` or `ring`.
     pub(crate) role: &'static str,
+    /// The number of a wall piece of a path box (1 based), 0 for any other part.
+    pub(crate) number: u32,
+    /// Holes already offset by the kerf, in the part's own coordinates (the ring's opening of a
+    /// path box, which comes from the boolean offset and not from a contour).
+    pub(crate) holes: Vec<ClosedPath>,
+}
+
+impl Piece {
+    /// A part of the rounded box: contours, thickness and role.
+    pub(crate) fn new(contours: Vec<Contour>, thickness: f64, role: &'static str) -> Self {
+        Self {
+            contours,
+            thickness,
+            role,
+            number: 0,
+            holes: Vec::new(),
+        }
+    }
 }
 
 /// A placed part and the offset its own coordinates were moved by.
@@ -20,6 +38,7 @@ pub(crate) struct Placed {
     pub(crate) part: Part,
     pub(crate) offset: (f64, f64),
     pub(crate) role: &'static str,
+    pub(crate) number: u32,
 }
 
 /// The plates in the order of their runs: parts of equal thickness together, runs in the order of
@@ -42,9 +61,9 @@ fn size(piece: &Piece) -> (f64, f64, f64, f64) {
     piece.contours[0].bounds()
 }
 
-/// Places the strip and the plates; each part carries the kerf-offset paths. `spacing` is the
-/// gap plus the kerf.
-pub(crate) fn place(strip: &Piece, plates: Vec<Piece>, kerf: f64, spacing: f64) -> Vec<Placed> {
+/// Places the strip pieces (one for the rounded box) in the first row and the plates in the
+/// second; each part carries the kerf-offset paths. `spacing` is the gap plus the kerf.
+pub(crate) fn place(strips: &[Piece], plates: Vec<Piece>, kerf: f64, spacing: f64) -> Vec<Placed> {
     let plates = by_runs(plates);
     let row = |pieces: &[&Piece]| -> f64 {
         let widths: f64 = pieces
@@ -65,9 +84,9 @@ pub(crate) fn place(strip: &Piece, plates: Vec<Piece>, kerf: f64, spacing: f64) 
             })
             .fold(0.0, f64::max)
     };
-    let first = [strip];
+    let first: Vec<&Piece> = strips.iter().collect();
     let second: Vec<&Piece> = plates.iter().collect();
-    let rows = [first.to_vec(), second];
+    let rows = [first, second];
     let filled: Vec<&Vec<&Piece>> = rows.iter().filter(|r| !r.is_empty()).collect();
     let total_height: f64 =
         filled.iter().map(|r| height(r)).sum::<f64>() + spacing * gaps(filled.len());
@@ -87,10 +106,17 @@ pub(crate) fn place(strip: &Piece, plates: Vec<Piece>, kerf: f64, spacing: f64) 
                         .contours
                         .iter()
                         .map(|c| translated(&c.offset(kerf / 2.0).to_path(), offset.0, offset.1))
+                        .chain(
+                            piece
+                                .holes
+                                .iter()
+                                .map(|hole| translated(hole, offset.0, offset.1)),
+                        )
                         .collect::<Vec<ClosedPath>>(),
                 },
                 offset,
                 role: piece.role,
+                number: piece.number,
             });
             x += b.2 - b.0 + spacing;
         }

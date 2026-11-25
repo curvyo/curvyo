@@ -50,11 +50,16 @@ function NumberRow({
     }
   };
   const defaultNumber = typeof row.defaultValue === "number" ? row.defaultValue : stored;
+  // A path box's automatic spacing is the smallest gap laid (`0149` UX notes §5).
+  const words =
+    api.view?.label === "Path box" && row.key === "slit_spacing" && row.used !== null
+      ? ", at the tightest curve, automatic"
+      : automaticWords(row);
   return (
     <div onKeyUp={commit}>
       <ValueField
         label={row.label}
-        name={`${api.view?.label ?? ""} ${row.label.toLowerCase()}`.trim()}
+        name={row.key === "corner_angle" ? row.label : `${api.view?.label ?? ""} ${row.label.toLowerCase()}`.trim()}
         text={rowText(row)}
         bar={Math.min(1, Math.max(0, bar))}
         dragBase={bar}
@@ -64,10 +69,10 @@ function NumberRow({
         // A derived field (Pitch diameter) reserves the slot but never offers a reset.
         resettable={row.key !== "pitch_diameter" && stored !== defaultNumber}
         muted={automatic}
-        valueText={`${rowText(row)} ${unitWordsOf(row)}${automaticWords(row)}`}
+        valueText={`${rowText(row)} ${unitWordsOf(row)}${words}`}
         // The tooltip's first line says it too: "Rounded box lid thickness: 3 mm, follows wall
         // thickness" (`specs/0147-rounded-box` UX notes §3).
-        tipValue={`${rowText(row)}${unit === "°" ? unit : unit ? ` ${unit}` : ""}${automaticWords(row)}`}
+        tipValue={`${rowText(row)}${unit === "°" ? unit : unit ? ` ${unit}` : ""}${words}`}
         unit={unit}
         valueNow={current}
         unitWords={unitWordsOf(row)}
@@ -188,6 +193,19 @@ export function GeneratorBlock({
       {groups.map((group) => (
         <section key={group.label} className="flex flex-col gap-2">
           <h3 className="text-sm text-[var(--toolbar-icon)]">{group.label}</h3>
+          {group.label === "Size" && view.label === "Path box" ? (
+            <button
+              type="button"
+              data-generator-replace-outline
+              onClick={() => {
+                api.replaceOutline();
+                onReturnFocus();
+              }}
+              className="h-7 w-[244px] rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+            >
+              Replace outline
+            </button>
+          ) : null}
           {group.rows.map((row) => (
             // Each row is the anchor of its clamp notice, 4 px under it (UX notes §6).
             <div key={row.key} className="relative w-fit">

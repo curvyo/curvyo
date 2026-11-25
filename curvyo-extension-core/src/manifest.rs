@@ -58,15 +58,35 @@ pub enum Contribution {
 pub struct GeneratorKind {
     /// The kind id inside the extension (`gear`); stored as `<extension id>/<id>`.
     pub id: &'static str,
-    /// The name of a new object and of the bar segment ("Gear").
+    /// The name of a new object ("Gear"): the layer row, the history steps and the status bar. A
+    /// kind without a `source` is also the text of its bar segment.
     pub label: &'static str,
     /// The Lucide glyph name of the segment and the layer row ("Cog").
     pub icon: &'static str,
     /// The parameter groups of the Generator block, in order.
     pub groups: Vec<ParamGroup>,
+    /// `Some` for a kind built from the selected outline instead of placed at the pointer.
+    pub source: Option<Source>,
+}
+
+/// A kind built from a selected closed outline (ADR 0083 §2): which `Path` parameter the outline
+/// fills and the text of the command that builds it.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct Source {
+    /// The key of the `Path` parameter filled from the selection.
+    pub param: &'static str,
+    /// The text of the bar segment and of the Select bar button ("Box from path").
+    pub command: &'static str,
 }
 
 impl GeneratorKind {
+    /// The text the bar segment shows: the command of a kind with a source, else its label. The
+    /// registry orders the segments by it.
+    #[must_use]
+    pub fn segment(&self) -> &'static str {
+        self.source.map_or(self.label, |source| source.command)
+    }
+
     /// Every parameter of every group, in order.
     pub fn params(&self) -> impl Iterator<Item = &Param> {
         self.groups.iter().flat_map(|group| group.params.iter())

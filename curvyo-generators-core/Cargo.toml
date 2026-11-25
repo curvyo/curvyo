@@ -12,6 +12,8 @@ workspace = true
 [dependencies]
 curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+# The boolean offset of the ring opening and the self-intersection test (ADR 0083 §2, §7).
+curvyo-geometry-core = { path = "../curvyo-geometry-core", version = "0.1.0" }
 # `sin`, `cos`, `tan`, `acos`: the same bits on every target, so two peers write equal outlines
 # (ADR 0029 §5, ADR 0080 §2). MIT OR Apache-2.0, already in `Cargo.lock`.
 libm.workspace = true

@@ -383,8 +383,9 @@ fn criterion_1_rounded_box_is_a_third_generator_segment_after_box_and_gear() {
         .contributions
         .iter()
         .filter_map(|contribution| match contribution {
-            Contribution::Generator(kind) => Some((kind.id, kind.label)),
-            Contribution::Workbench(_) => None,
+            // The path box is built from a selected outline, not placed (`0149`).
+            Contribution::Generator(kind) if kind.source.is_none() => Some((kind.id, kind.label)),
+            Contribution::Generator(_) | Contribution::Workbench(_) => None,
         })
         .collect();
     let ids: Vec<&str> = kinds.iter().map(|(id, _)| *id).collect();

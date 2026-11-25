@@ -3,6 +3,7 @@ import { CircleAlert, Link, Unlink } from "lucide-react";
 import { AlignmentGroup } from "@/components/AlignmentGroup";
 import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { StyleGroup } from "@/components/StyleGroup";
+import { BoxFromPathButton } from "@/components/BoxFromPathButton";
 import { StrokeToPathButton } from "@/components/StrokeToPathButton";
 import { TraceButton } from "@/components/TraceBar";
 import { RecogniseTextButton } from "@/components/RecogniseBar";
@@ -105,6 +106,9 @@ export interface SelectToolbarProps {
     onPress: () => void;
     notice: StrokeToPathBarNotice | null;
   };
+  /** The Box from path button (`specs/0149-path-box` UX notes §1.1): hidden unless one closed
+   * outline is selected. */
+  boxFromPath?: { shown: boolean; onPress: () => void; notice: { id: number; text: string } | null };
   /** The Linked clone button is shown (`specs/0049-linked-clone` criterion 4). */
   linkedCloneShown: boolean;
   onLinkedClone: () => void;
@@ -664,6 +668,7 @@ export function SelectToolbar({
   onSetTextOrientation,
   textPath,
   strokeToPath,
+  boxFromPath,
   linkedCloneShown,
   onLinkedClone,
   placeOn,
@@ -879,6 +884,18 @@ export function SelectToolbar({
     // Last, in a group of its own, so no earlier control moves (UX notes, "The button in the
     // Select bar"); no link glyph, which the Link corners toggle already uses.
     groups.push(linkedClone);
+  }
+  if (edits && boxFromPath && (boxFromPath.shown || boxFromPath.notice)) {
+    // Last in the bar but for the tool commands, in a group of its own, so no earlier control
+    // moves (`0149` UX notes §1.1).
+    groups.push(
+      <BoxFromPathButton
+        key="box-from-path"
+        onPress={boxFromPath.onPress}
+        onReturnFocus={onReturnFocus}
+        notice={boxFromPath.notice}
+      />,
+    );
   }
   if (traceShown && onTrace && edits) {
     // Last, in a group of its own, so no earlier control moves (`0025` UX notes section 1).

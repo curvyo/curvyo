@@ -142,7 +142,7 @@ mod tests {
                 kinds += 1;
             }
         }
-        assert_eq!(kinds, 3, "box, gear, rounded box");
+        assert_eq!(kinds, 4, "box, path box, gear, rounded box");
         let request = GenerateRequest {
             kind: "gear",
             params: &StoredParams::new(),
@@ -160,9 +160,9 @@ mod tests {
             assert_eq!(json["id"], manifest.id);
         }
         let generators = serde_json::to_value(manifest("curvyo.generators").unwrap()).unwrap();
-        assert_eq!(generators["contributions"][1]["kind"], "generator");
-        assert_eq!(generators["contributions"][1]["id"], "gear");
-        let web = &generators["contributions"][1]["groups"][2]["params"][0];
+        assert_eq!(generators["contributions"][2]["kind"], "generator");
+        assert_eq!(generators["contributions"][2]["id"], "gear");
+        let web = &generators["contributions"][2]["groups"][2]["params"][0];
         assert_eq!(web["kind"]["kind"], "choice");
         assert_eq!(web["kind"]["options"][1]["id"], "spokes");
     }

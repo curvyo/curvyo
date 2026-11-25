@@ -1,5 +1,6 @@
 //! The parameter schema and typed values (ADR 0034 §4) and their stored encoding (ADR 0033 §3).
 
+use crate::extension::ClosedPath;
 use curvyo_document_core::Length;
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -14,6 +15,10 @@ const DEG: &str = "deg";
 const COUNT: &str = "count";
 const ON: &str = "on";
 const CHOICE: &str = "choice";
+const PATH: &str = "path";
+/// The most cubics a stored outline may hold, and the largest coordinate it may use (mm).
+const MAX_PATH_CUBICS: usize = 2000;
+const MAX_PATH_MM: f64 = 1e7;
 
 /// One field of a schema-rendered block.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -171,6 +176,8 @@ pub enum ParamKind {
         /// The options, in order.
         options: &'static [ChoiceOption],
     },
+    /// One closed outline in frame-local mm (ADR 0083 §2); the block draws no field for it.
+    Path,
 }
 
 /// A typed parameter value.
@@ -187,6 +194,8 @@ pub enum ParamValue {
     Switch(bool),
     /// The id of the chosen option.
     Choice(String),
+    /// One closed outline, as `{"path": [x0, y0, c1x, c1y, c2x, c2y, x, y, ...]}`.
+    Path(ClosedPath),
 }
 
 impl ParamValue {
@@ -200,6 +209,7 @@ impl ParamValue {
             Self::Angle(degrees) => (DEG, Value::from(degrees.0)),
             Self::Switch(on) => (ON, Value::from(*on)),
             Self::Choice(id) => (CHOICE, Value::from(id.as_str())),
+            Self::Path(path) => (PATH, Value::from(path.flat())),
         };
         let mut map = Map::new();
         map.insert(key.to_owned(), value);
@@ -224,6 +234,14 @@ impl ParamValue {
             COUNT => Some(Self::Count(u32::try_from(inner.as_u64()?).ok()?)),
             ON => Some(Self::Switch(inner.as_bool()?)),
             CHOICE => Some(Self::Choice(inner.as_str()?.to_owned())),
+            PATH => {
+                let numbers: Option<Vec<f64>> = inner
+                    .as_array()?
+                    .iter()
+                    .map(|number| number.as_f64().filter(|n| n.is_finite()))
+                    .collect();
+                Some(Self::Path(ClosedPath::from_flat(&numbers?)?))
+            }
             _ => None,
         }
     }
@@ -264,6 +282,15 @@ impl ParamValue {
         }
     }
 
+    /// The outline this value holds, if it is one.
+    #[must_use]
+    pub const fn path(&self) -> Option<&ClosedPath> {
+        match self {
+            Self::Path(path) => Some(path),
+            _ => None,
+        }
+    }
+
     /// The chosen option id this value holds, if it is a choice.
     #[must_use]
     pub fn choice(&self) -> Option<&str> {
@@ -272,6 +299,19 @@ impl ParamValue {
             _ => None,
         }
     }
+}
+
+/// The shape check of an outline (ADR 0083 §2): at least two cubics, at most 2,000, every number
+/// finite within 1e7 mm. Whether the outline can be built is the generator's check.
+fn path_is_usable(path: &ClosedPath) -> bool {
+    let finite = |x: f64, y: f64| x.abs() <= MAX_PATH_MM && y.abs() <= MAX_PATH_MM;
+    (2..=MAX_PATH_CUBICS).contains(&path.segments.len())
+        && finite(path.start.x, path.start.y)
+        && path.segments.iter().all(|cubic| {
+            [cubic.c1, cubic.c2, cubic.to]
+                .iter()
+                .all(|point| finite(point.x, point.y))
+        })
 }
 
 impl Param {
@@ -324,6 +364,9 @@ impl Param {
                 if options.iter().any(|option| option.id == id) =>
             {
                 Some(ParamValue::Choice(id))
+            }
+            (ParamKind::Path, ParamValue::Path(path)) if path_is_usable(&path) => {
+                Some(ParamValue::Path(path))
             }
             _ => None,
         }
@@ -533,5 +576,64 @@ mod tests {
             }
             .holds(std::slice::from_ref(&choice), &StoredParams::new())
         );
+    }
+
+    fn square(side: f64) -> ClosedPath {
+        use crate::extension::Cubic;
+        use curvyo_document_core::Point;
+        let corners = [(side, 0.0), (side, side), (0.0, side), (0.0, 0.0)];
+        ClosedPath {
+            start: Point::new(0.0, 0.0),
+            segments: corners
+                .iter()
+                .map(|&(x, y)| Cubic {
+                    c1: Point::new(x, y),
+                    c2: Point::new(x, y),
+                    to: Point::new(x, y),
+                })
+                .collect(),
+        }
+    }
+
+    fn outline() -> Param {
+        Param {
+            key: "outline",
+            label: "Outline",
+            tooltip: "Outline",
+            kind: ParamKind::Path,
+            default: ParamValue::Path(square(10.0)),
+            shown_when: None,
+            track: None,
+        }
+    }
+
+    #[test]
+    fn a_path_is_stored_as_the_flat_numbers_and_reads_back_unchanged() {
+        let value = ParamValue::Path(square(20.0));
+        let stored = value.to_stored();
+        assert_eq!(stored["path"].as_array().map(Vec::len), Some(2 + 6 * 4));
+        assert_eq!(ParamValue::from_stored(&stored), Some(value.clone()));
+        let mut map = StoredParams::new();
+        map.insert("outline".into(), stored);
+        assert_eq!(outline().read(&map), value, "read compares accept(v) == v");
+    }
+
+    #[test]
+    fn a_path_of_the_wrong_shape_reads_as_the_default() {
+        let mut map = StoredParams::new();
+        for bad in [
+            serde_json::json!({"path": [0.0, 0.0, 1.0]}),
+            serde_json::json!({"path": [0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 5.0, 5.0]}),
+            serde_json::json!({"path": "x"}),
+            serde_json::json!({"path": [0.0, 0.0, 1.0e9, 1.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}),
+        ] {
+            map.insert("outline".into(), bad);
+            assert_eq!(outline().read(&map), outline().default);
+        }
+        let many = ClosedPath {
+            segments: vec![square(1.0).segments[0]; 2001],
+            ..square(1.0)
+        };
+        assert_eq!(outline().accept(ParamValue::Path(many)), None);
     }
 }

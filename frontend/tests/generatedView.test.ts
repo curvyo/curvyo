@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  canvasNoticeLook,
   decodeGeneratedView,
   decodeKinds,
   parseNumber,
@@ -256,4 +257,14 @@ test("the slider's end is the live limit when it is lower than the track's end",
   assert.ok(view);
   assert.equal(sliderEnd(view.rows[0]), 40);
   assert.equal(sliderEnd({ ...view.rows[0], limit: null }), 60);
+});
+
+test("a refusal shows in the refusal look for 8 s, a warning as a status for 5 s (0149 UX §1.2, §6)", () => {
+  assert.deepEqual(canvasNoticeLook("This outline has curves. Box from path builds straight outlines only so far. Nothing was changed."), {
+    kind: "alert",
+    ms: 8000,
+  });
+  assert.deepEqual(canvasNoticeLook("Select one closed outline. Nothing was changed."), { kind: "alert", ms: 8000 });
+  assert.deepEqual(canvasNoticeLook("The corner between pieces 4 and 5 is very sharp: 9.5°."), { kind: "status", ms: 5000 });
+  assert.deepEqual(canvasNoticeLook("No place for the finger hollow on this lid."), { kind: "status", ms: 5000 });
 });

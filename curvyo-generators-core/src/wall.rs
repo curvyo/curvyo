@@ -19,6 +19,32 @@ pub(crate) struct Joint {
     pub(crate) from_top: bool,
 }
 
+/// One step of the end edge of a strip piece: the heights `y0..y1` reach out to `x`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Step {
+    pub(crate) y0: f64,
+    pub(crate) y1: f64,
+    pub(crate) x: f64,
+}
+
+/// A strip piece that ends at corners (ADR 0083 §5): the steps of its two end edges, top to
+/// bottom, and how far the first and last slit column keep from the ends.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Ends {
+    pub(crate) start: Vec<Step>,
+    pub(crate) end: Vec<Step>,
+    pub(crate) lead: f64,
+    pub(crate) trail: f64,
+}
+
+/// The spacing of an automatic pattern from the local radius (ADR 0083 §4): `factor` times the
+/// bend's radius, at least `least`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct LocalSpacing {
+    pub(crate) factor: f64,
+    pub(crate) least: f64,
+}
+
 /// What the strip is made of.
 #[derive(Debug, Clone)]
 pub(crate) struct Wall<'a> {
@@ -30,6 +56,10 @@ pub(crate) struct Wall<'a> {
     pub(crate) joints: Vec<Joint>,
     /// Only the plain outline, for the ghost (`Edit::Draft`): no slits and no tab slots.
     pub(crate) draft: bool,
+    /// Finger ends of a piece between corners; `None` for the rounded box's closed strip.
+    pub(crate) ends: Option<Ends>,
+    /// The spacing from each bend's radius; `None` uses `pattern.spacing` everywhere.
+    pub(crate) local_spacing: Option<LocalSpacing>,
 }
 
 /// An axis-aligned rectangle in strip coordinates.
@@ -47,7 +77,13 @@ impl Wall<'_> {
         let length = self.footprint.total();
         let height = self.height.as_mm();
         if self.draft {
-            return vec![outline(length, height, Vec::new(), Vec::new())];
+            return vec![outline(
+                length,
+                height,
+                Vec::new(),
+                Vec::new(),
+                self.ends.as_ref(),
+            )];
         }
         let mut rects = self.tab_rects(tabs, height);
         let windows: Vec<Window> = rects
@@ -58,8 +94,9 @@ impl Wall<'_> {
             })
             .collect();
         let mut waves: Vec<(Slot, bool)> = Vec::new();
-        for band in self.bands(length, height) {
-            for slot in slots(&band, &self.pattern, &windows) {
+        for (band, radius) in self.bands(length, height) {
+            let pattern = self.pattern_for(&band, radius);
+            for slot in slots(&band, &pattern, &windows) {
                 match slot.wave {
                     Some(_) => waves.push((slot, slot.y0 <= 1e-9)),
                     None => rects.push(slot_rect(&slot)),
@@ -89,7 +126,7 @@ impl Wall<'_> {
             .iter()
             .copied()
             .filter(|r| r.y0 > 1e-9 && r.y1 < height - 1e-9);
-        let mut contours = vec![outline(length, height, top, bottom)];
+        let mut contours = vec![outline(length, height, top, bottom, self.ends.as_ref())];
         contours.extend(holes.map(hole));
         contours
     }
@@ -116,25 +153,58 @@ impl Wall<'_> {
         rects
     }
 
-    /// The stretches that carry slit columns: the bent spans, or the whole strip.
-    fn bands(&self, length: f64, height: f64) -> Vec<Band> {
+    /// The pattern of `band`: with local spacing, the columns are fitted by floor so no gap is
+    /// below the spacing the radius asks for (the two-column minimum aside).
+    fn pattern_for(&self, band: &Band, radius: f64) -> SlitPattern {
+        match self.local_spacing {
+            Some(local) if radius > 0.0 => SlitPattern {
+                spacing: Length::from_mm(column_pitch(
+                    band.from.as_mm(),
+                    band.to.as_mm(),
+                    (local.factor * radius).max(local.least),
+                )),
+                ..self.pattern
+            },
+            _ => self.pattern,
+        }
+    }
+
+    /// The gap between two columns of every band (the smallest of them is the reported
+    /// automatic spacing).
+    pub(crate) fn pitches(&self) -> Vec<f64> {
+        let length = self.footprint.total();
+        self.bands(length, self.height.as_mm())
+            .iter()
+            .map(|(band, radius)| self.pattern_for(band, *radius).spacing.as_mm())
+            .collect()
+    }
+
+    /// The stretches that carry slit columns, with the radius of the bend: the bent spans, or the
+    /// whole strip.
+    fn bands(&self, length: f64, height: f64) -> Vec<(Band, f64)> {
         let bridge = self.pattern.bridge.as_mm();
+        let (lead_min, trail_min) = self.ends.as_ref().map_or((bridge, bridge), |e| {
+            (e.lead.max(bridge), e.trail.max(bridge))
+        });
         let height = Length::from_mm(height);
         let band = |from: f64, to: f64| Band {
-            from: Length::from_mm(from.max(bridge)),
-            to: Length::from_mm(to.min(length - bridge)),
+            from: Length::from_mm(from.max(lead_min)),
+            to: Length::from_mm(to.min(length - trail_min)),
             height,
         };
         if self.slits_everywhere {
-            return vec![band(0.0, length)];
+            return vec![(band(0.0, length), 0.0)];
         }
         // A bend ends one bridge from a window; at a straight it runs on to the junction.
         let spans = &self.footprint.spans;
         spans
             .iter()
             .enumerate()
-            .filter(|(_, span)| matches!(span.shape, Shape::Bend { .. }))
-            .map(|(index, span)| {
+            .filter_map(|(index, span)| match span.shape {
+                Shape::Bend { radius, .. } => Some((index, span, radius)),
+                Shape::Straight { .. } => None,
+            })
+            .map(|(index, span, radius)| {
                 let before = index.checked_sub(1).and_then(|i| spans.get(i));
                 let after = spans.get(index + 1);
                 let lead = if before.is_some_and(|s| s.window) {
@@ -147,11 +217,21 @@ impl Wall<'_> {
                 } else {
                     0.0
                 };
-                band(span.s0 + lead, span.s0 + span.length - trail)
+                (band(span.s0 + lead, span.s0 + span.length - trail), radius)
             })
-            .filter(|band| band.to.as_mm() > band.from.as_mm())
+            .filter(|(band, _)| band.to.as_mm() > band.from.as_mm())
             .collect()
     }
+}
+
+/// The distance between two columns of a band `from..to` that asks for `spacing`: as many columns
+/// as fit (at least two, or a bend would keep an uncut band), spread evenly.
+pub(crate) fn column_pitch(from: f64, to: f64, spacing: f64) -> f64 {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let columns = (((to - from) / spacing).floor() as usize).max(2);
+    #[allow(clippy::cast_precision_loss)]
+    let pitch = (to - from) / columns as f64;
+    pitch
 }
 
 fn slot_rect(slot: &Slot) -> Rect {
@@ -264,12 +344,22 @@ fn go(contour: &mut Contour, here: &mut Point, to: Point) {
     *here = to;
 }
 
-/// The rectangle `length` x `height` with notches in its top and bottom edges.
-fn outline(length: f64, height: f64, mut top: Vec<Notch>, mut bottom: Vec<Notch>) -> Contour {
+/// The rectangle `length` x `height` with notches in its top and bottom edges; the end edges
+/// follow `ends` when a piece has them.
+fn outline(
+    length: f64,
+    height: f64,
+    mut top: Vec<Notch>,
+    mut bottom: Vec<Notch>,
+    ends: Option<&Ends>,
+) -> Contour {
     top.sort_by(|a, b| a.enter.x.total_cmp(&b.enter.x));
     bottom.sort_by(|a, b| b.enter.x.total_cmp(&a.enter.x));
     let mut contour = Contour::new();
-    let mut here = p(0.0, 0.0);
+    let left = ends
+        .and_then(|e| e.start.first())
+        .map_or(0.0, |step| step.x);
+    let mut here = p(left, 0.0);
     for notch in top {
         go(&mut contour, &mut here, notch.enter);
         for seg in notch.segs {
@@ -277,8 +367,15 @@ fn outline(length: f64, height: f64, mut top: Vec<Notch>, mut bottom: Vec<Notch>
         }
         here = notch.exit;
     }
-    go(&mut contour, &mut here, p(length, 0.0));
-    go(&mut contour, &mut here, p(length, height));
+    if let Some(ends) = ends {
+        for step in &ends.end {
+            go(&mut contour, &mut here, p(step.x, step.y0));
+            go(&mut contour, &mut here, p(step.x, step.y1));
+        }
+    } else {
+        go(&mut contour, &mut here, p(length, 0.0));
+        go(&mut contour, &mut here, p(length, height));
+    }
     for notch in bottom {
         go(&mut contour, &mut here, notch.enter);
         for seg in notch.segs {
@@ -286,8 +383,15 @@ fn outline(length: f64, height: f64, mut top: Vec<Notch>, mut bottom: Vec<Notch>
         }
         here = notch.exit;
     }
-    go(&mut contour, &mut here, p(0.0, height));
-    go(&mut contour, &mut here, p(0.0, 0.0));
+    if let Some(ends) = ends {
+        for step in ends.start.iter().rev() {
+            go(&mut contour, &mut here, p(step.x, step.y1));
+            go(&mut contour, &mut here, p(step.x, step.y0));
+        }
+    } else {
+        go(&mut contour, &mut here, p(0.0, height));
+        go(&mut contour, &mut here, p(0.0, 0.0));
+    }
     contour
 }
 
