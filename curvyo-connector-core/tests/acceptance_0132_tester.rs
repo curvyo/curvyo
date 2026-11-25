@@ -655,8 +655,26 @@ fn c11_every_other_end_cancels_the_chain_clears_flags_and_says_so() {
                     "{case}: no job starts after it"
                 );
                 let snap = list_in(&out).unwrap_or_else(|| panic!("{case}: no JobList"));
-                assert_eq!(snap.waiting.len(), 1, "{case}: the job waits, not started");
-                assert!(!snap.waiting[0].run_next, "{case}: flag cleared");
+                // Frage 390 C (customer 2026-11-25): a Stop, an alarm or a loss keeps the ended
+                // job listed as interrupted, ahead of the order; a failure does not.
+                let interrupted = end != End::Failed;
+                assert_eq!(
+                    snap.waiting.len(),
+                    1 + usize::from(interrupted),
+                    "{case}: {:?}",
+                    snap.waiting
+                );
+                let waiting = snap.waiting.last().unwrap();
+                assert_eq!(waiting.id, id(2), "{case}: the job waits, not started");
+                assert_eq!(waiting.position, 1, "{case}: first in the order");
+                assert!(!waiting.run_next, "{case}: flag cleared");
+                if interrupted {
+                    // An interrupted entry stands outside the order: position 0 (`0132` L8).
+                    let ended = &snap.waiting[0];
+                    assert_eq!(ended.id, id(1), "{case}: the ended job");
+                    assert_eq!(ended.position, 0, "{case}: interrupted, outside the order");
+                    assert!(!ended.run_next, "{case}");
+                }
                 let note = snap.note.unwrap_or_else(|| panic!("{case}: no note"));
                 assert!(note.starts_with("Chain stopped: "), "{case}: {note}");
             }

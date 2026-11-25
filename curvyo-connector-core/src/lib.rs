@@ -21,6 +21,8 @@ mod jog;
 mod machine;
 mod message;
 mod millimetres;
+mod modal;
+mod restart;
 mod send_watch;
 
 pub use access::{Mode, admit, refusal};
@@ -35,8 +37,8 @@ pub use count::count;
 pub use frame_text::{FrameMoves, NotAFrame, check as check_frame};
 pub use handshake::{Handshake, Outcome, PROTOCOL_VERSION};
 pub use job_list::{
-    Chain, Dropped, End, Entry, Item, JobList, MAX_BYTES, MAX_ENTRIES, Restored, StoredCurrent,
-    StoredList, next as chain_next, restore,
+    Chain, Dropped, End, Entry, Item, JobList, MAX_BYTES, MAX_ENTRIES, Restored, StopPoint,
+    StoredCurrent, StoredList, next as chain_next, restore,
 };
 pub use jog::{EDGE, Feed, JOG_DEAD_MAN, JogAxis, JogDirection, JogStep, TravelBox, clamp};
 pub use machine::{

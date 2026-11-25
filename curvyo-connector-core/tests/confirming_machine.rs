@@ -32,6 +32,8 @@ fn progress(line: u32, lines: u32, elapsed_ms: u64) -> Option<Progress> {
         line,
         lines,
         elapsed_ms,
+        from_line: None,
+        entering: false,
     })
 }
 
@@ -224,7 +226,24 @@ fn g12_g30_stop_answers_stopping_at_once_and_ends_once_when_confirmed() {
             result: JobResult::Stopped,
         };
         assert_eq!(m.state(), done);
-        assert_eq!(out.messages.len(), 1, "Done {{ Stopped }} exactly once");
+        // Frage 390 C: exactly one `Status` (Done { Stopped }) and one `JobList` with the
+        // stopped job's interrupted row, nothing else.
+        assert_eq!(out.messages.len(), 2, "{:?}", out.messages);
+        let statuses: Vec<_> = out
+            .messages
+            .iter()
+            .filter(|m| matches!(m, Message::Status { .. }))
+            .collect();
+        assert_eq!(statuses.len(), 1, "Done {{ Stopped }} exactly once");
+        let rows = out.messages.iter().find_map(|m| match m {
+            Message::JobList { waiting, .. } => Some(waiting.clone()),
+            _ => None,
+        });
+        let Some(rows) = rows else {
+            panic!("the list with the interrupted row: {:?}", out.messages)
+        };
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert!(rows[0].interrupted_at.is_some(), "{rows:?}");
         assert_eq!(detail(&m), None);
         assert!(m.handle(Event::Stopped).messages.is_empty());
     }
@@ -304,6 +323,17 @@ fn g15_a_loss_names_the_line_and_stays_through_the_reconnect_until_the_next_send
         "a client after the reconnect reads it too"
     );
     assert!(m.held_job().is_none(), "never resumed");
+    // Frage 390 C: the lost job is listed as interrupted; a new send carries a new id.
+    let Message::JobList { waiting, .. } = m.job_list() else {
+        panic!()
+    };
+    assert_eq!(waiting[0].interrupted_at, Some(6));
+    app(
+        &mut m,
+        Message::RemoveJob {
+            job_id: waiting[0].job_id,
+        },
+    );
     app(&mut m, submit(JOB_TEXT, JobKind::Job));
     assert_eq!(detail(&m), None);
 }

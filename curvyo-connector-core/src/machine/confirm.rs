@@ -192,7 +192,7 @@ impl Machine {
         }
         if self.state != State::Ready {
             Self::wrong_state(out);
-            if !self.list.is_empty() {
+            if self.list.first_waiting().is_some() {
                 self.refresh_list(out);
             }
         } else if held_id != Some(job_id) {
@@ -240,6 +240,10 @@ impl Machine {
                 what: Confirms::Frame,
             });
             self.run_frame(out);
+            return;
+        }
+        if self.waiting == Waiting::Restart {
+            self.run_restart(out);
             return;
         }
         if self.waiting == Waiting::Home {

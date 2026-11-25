@@ -120,6 +120,8 @@ mod tests {
                 line: 0,
                 lines: 3,
                 elapsed_ms: 0,
+                from_line: None,
+                entering: false,
             }),
             position: None,
             alarm: None,
@@ -280,6 +282,9 @@ mod tests {
             position: 1,
             run_next: false,
             interrupted_at: None,
+            restart_line: None,
+            restart_cause: None,
+            line_approximate: false,
         };
         let list = |current, waiting| Message::JobList {
             current,

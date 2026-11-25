@@ -41,6 +41,7 @@ impl Machine {
                     self.stop_pending = true;
                     out.messages.push(self.status());
                 } else {
+                    self.interrupt(true);
                     self.set(
                         State::Done {
                             result: JobResult::Stopped,
@@ -87,7 +88,11 @@ impl Machine {
             Event::StopUnconfirmed => self.lose(Some("Could not confirm the machine stopped"), out),
             Event::Alarm { text } => {
                 self.homed = false;
+                self.breaks = self.breaks.wrapping_add(1);
                 let in_flight = self.in_flight();
+                if in_flight {
+                    self.interrupt(false);
+                }
                 self.discard();
                 if self.state != State::Alarm || self.alarm.is_none() {
                     // The first alarm's text stands until the alarm clears (`specs/0127` G13).
@@ -140,12 +145,15 @@ impl Machine {
                 }
             }
             Event::ControllerReset => {
-                self.homed = false;
+                let was_homed = std::mem::replace(&mut self.homed, false);
+                self.breaks = self.breaks.wrapping_add(1);
                 if self.state == State::Jogging {
                     self.on_jogging(Event::ControllerReset, out);
                 } else if self.state == State::Framing {
                     self.on_framing(Event::ControllerReset, out);
-                } else {
+                } else if was_homed {
+                    // Only `homed` changes; a stop whose reset came before `Hold:0` sends this
+                    // right after its `Stopped`, which must not read as a second end.
                     out.messages.push(self.status());
                 }
             }
@@ -175,6 +183,7 @@ impl Machine {
         match event {
             Event::ControllerConnected => {
                 self.homed = false;
+                self.breaks = self.breaks.wrapping_add(1);
                 self.set(State::Idle, out);
             }
             Event::LaserModeOff(off) => self.laser_off = off,
@@ -191,11 +200,19 @@ impl Machine {
 
     /// The controller is gone: a job in flight is dropped and named in a detail that stays
     /// through the reconnect (`specs/0127` G15, UX notes V7).
-    fn lose(&mut self, text: Option<&str>, out: &mut Output) {
+    pub(super) fn lose(&mut self, text: Option<&str>, out: &mut Output) {
         self.homed = false;
+        self.breaks = self.breaks.wrapping_add(1);
+        if self.planner != crate::restart::PLANNER_BLOCKS {
+            self.planner = crate::restart::PLANNER_BLOCKS;
+            self.plan_all();
+        }
+        let in_flight = self.in_flight();
+        if in_flight {
+            self.interrupt(false);
+        }
         self.mpos = None;
         self.wco = None;
-        let in_flight = self.in_flight();
         let line = self.held.as_ref().map_or(0, |h| h.line);
         let loss = match self.state {
             _ if self.waits_for_resume() => {
@@ -287,6 +304,7 @@ impl Machine {
                 self.set(State::Running, out);
             }
             Event::Stopped if self.stop_pending => {
+                self.interrupt(true);
                 let done = State::Done {
                     result: JobResult::Stopped,
                 };

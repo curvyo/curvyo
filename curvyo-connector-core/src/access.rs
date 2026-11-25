@@ -30,8 +30,8 @@ enum Kind {
     Motion,
     /// `MoveJob`, `RemoveJob`, `SetRunNext`: the job list.
     List,
-    /// `MoveJob`: only an owner reorders.
-    Reorder,
+    /// `MoveJob`, `RestartFromLine`: only an owner reorders or restarts.
+    OwnerList,
     OwnerCall,
 }
 
@@ -42,7 +42,7 @@ fn kind(message: &Message) -> Kind {
         Message::ApplyConfig { .. } => Kind::ApplyConfig,
         Message::Pair { .. } | Message::Auth { .. } => Kind::Login,
         Message::Jog { .. } | Message::JogKeep => Kind::Motion,
-        Message::MoveJob { .. } => Kind::Reorder,
+        Message::MoveJob { .. } | Message::RestartFromLine { .. } => Kind::OwnerList,
         Message::RemoveJob { .. } | Message::SetRunNext { .. } => Kind::List,
         Message::GetConfig
         | Message::IssueCode { .. }
@@ -78,7 +78,7 @@ pub fn admit(mode: Mode, peer: Option<Role>, message: &Message) -> Result<(), Er
         Mode::Configured => match (kind, peer) {
             (Kind::Login, _) | (_, Some(Role::Owner)) => Ok(()),
             (Kind::ListPorts | Kind::ApplyConfig, _)
-            | (Kind::OwnerCall | Kind::Motion | Kind::Reorder, Some(Role::Member)) => {
+            | (Kind::OwnerCall | Kind::Motion | Kind::OwnerList, Some(Role::Member)) => {
                 Err(ErrorCode::OwnerRequired)
             }
             (_, None) => Err(ErrorCode::PairingRequired),
@@ -187,6 +187,13 @@ mod tests {
             ),
             ("RemoveJob", Message::RemoveJob { job_id: id }),
             (
+                "RestartFromLine",
+                Message::RestartFromLine {
+                    job_id: id,
+                    line: 12,
+                },
+            ),
+            (
                 "SetRunNext",
                 Message::SetRunNext {
                     job_id: id,
@@ -269,6 +276,7 @@ mod tests {
             "JogStop: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "MoveJob: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
             "RemoveJob: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
+            "RestartFromLine: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired yes",
             "SetRunNext: Maintenance Maintenance PairingRequired yes yes PairingRequired yes",
             "GetConfig: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired OwnerRequired",
             "IssueCode: Maintenance Maintenance PairingRequired OwnerRequired yes PairingRequired OwnerRequired",

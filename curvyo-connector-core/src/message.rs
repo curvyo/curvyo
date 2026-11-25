@@ -95,6 +95,12 @@ pub struct Progress {
     pub lines: u32,
     /// Milliseconds since the start, counted by the caller.
     pub elapsed_ms: u64,
+    /// A restart from a line: the line it began at, through its wait, its run and its `Done`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_line: Option<u32>,
+    /// A restart moves the head to its line with the laser off; left out when false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub entering: bool,
 }
 
 /// The controller the connector talks to.
@@ -147,6 +153,15 @@ pub struct ListEntry {
     /// A job that ran when the connector stopped: the line it had reached.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interrupted_at: Option<u32>,
+    /// An interrupted job: the line a restart begins at (`specs/0118` 39); absent when none can.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restart_line: Option<u32>,
+    /// An interrupted job: why a restart is refused now; absent when it would run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restart_cause: Option<String>,
+    /// An interrupted job's line was stored up to a second before a crash; left out when false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub line_approximate: bool,
 }
 
 /// The code of an `Error` message.
@@ -297,6 +312,14 @@ pub enum Message {
     RemoveJob {
         /// The job.
         job_id: Uuid,
+    },
+    /// Restarts the interrupted job from `line`, the restart line the app showed (owner only,
+    /// `specs/0118` 38, `specs/0132` 12).
+    RestartFromLine {
+        /// The job.
+        job_id: Uuid,
+        /// The line the owner confirmed.
+        line: u32,
     },
     /// Sets or clears "Run next automatically" on a waiting job (its sender, or an owner).
     SetRunNext {

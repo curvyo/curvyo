@@ -73,7 +73,7 @@ impl FakeController {
     pub fn obey(&mut self, out: &Output) {
         for command in &out.commands {
             match command {
-                ControllerCommand::Start { job_id } => {
+                ControllerCommand::Start { job_id } | ControllerCommand::StartAt { job_id, .. } => {
                     self.streaming = Some(*job_id);
                     self.line = 0;
                     self.paused = false;

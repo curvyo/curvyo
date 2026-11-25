@@ -67,6 +67,8 @@ fn p2_status_pause_pending_matches_its_golden_file_and_old_files_are_unchanged()
             line: 3,
             lines: 6,
             elapsed_ms: 1500,
+            from_line: None,
+            entering: false,
         }),
         position: None,
         alarm: None,
