@@ -35,6 +35,8 @@ pub struct Identified {
     pub alarm: Option<u16>,
     /// GRBL said `[MSG:'$H'|'$X' to unlock]`.
     pub locked: bool,
+    /// The planner blocks `$I` named (`[OPT:V,15,128]`), for the restart line (`specs/0118` 39).
+    pub planner: Option<u32>,
 }
 
 /// Why identify failed.
@@ -72,6 +74,19 @@ pub struct Identify {
     settings: Settings,
     alarm: Option<u16>,
     locked: bool,
+    planner: Option<u32>,
+}
+
+/// The planner blocks of an `[OPT:<codes>,<blocks>,<rx>]` line.
+fn planner_blocks(text: &str) -> Option<u32> {
+    let inner = text.strip_prefix("[OPT:")?.strip_suffix(']')?;
+    inner
+        .split(',')
+        .nth(1)?
+        .trim()
+        .parse()
+        .ok()
+        .filter(|n| *n > 0)
 }
 
 impl Identify {
@@ -88,6 +103,7 @@ impl Identify {
             settings: Settings::default(),
             alarm: None,
             locked: false,
+            planner: None,
         }
     }
 
@@ -98,6 +114,9 @@ impl Identify {
             Reply::Alarm(n) => self.alarm = Some(n),
             Reply::Message(text) if text.contains("to unlock") => self.locked = true,
             Reply::Setting(n, value) if self.step == Step::Settings => self.settings.set(n, &value),
+            Reply::Other(text) if self.step == Step::Info && planner_blocks(&text).is_some() => {
+                self.planner = planner_blocks(&text);
+            }
             Reply::Ok | Reply::Error(_) if self.step == Step::Info => {
                 out.extend_from_slice(b"$$\n");
                 self.step = Step::Settings;
@@ -116,6 +135,7 @@ impl Identify {
                     report,
                     alarm: self.alarm,
                     locked: self.locked,
+                    planner: self.planner,
                 }));
             }
             Reply::Other(text) if self.step == Step::Banner && self.got.is_none() => {
@@ -212,6 +232,16 @@ mod tests {
         assert_eq!(found.settings.s_max(), Some(1000));
         assert_eq!(found.report.state, "Idle");
         assert!(!found.locked);
+        assert_eq!(found.planner, Some(15));
+    }
+
+    #[test]
+    fn the_planner_size_is_read_from_opt() {
+        assert_eq!(planner_blocks("[OPT:V,15,128]"), Some(15));
+        assert_eq!(planner_blocks("[OPT:VL,35,254]"), Some(35));
+        assert_eq!(planner_blocks("[OPT:V,0,128]"), None);
+        assert_eq!(planner_blocks("[OPT:V]"), None);
+        assert_eq!(planner_blocks("[VER:1.1h.20190825:]"), None);
     }
 
     #[test]

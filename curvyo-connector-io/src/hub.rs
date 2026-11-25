@@ -101,6 +101,8 @@ pub(crate) struct Inner {
     last_stored: Option<(curvyo_connector_core::StoredList, Duration)>,
     /// The job list is not written any more (the connector is stopping a running job).
     frozen: bool,
+    /// A restart ended before its line: the state change it causes writes no result line.
+    pub(crate) restart_returned: bool,
     pub(crate) notices: Sender<String>,
     /// Bytes the controller produced outside the serial thread's turn.
     pending_write: Vec<u8>,
@@ -216,6 +218,7 @@ impl Hub {
                 stored_ids: HashSet::new(),
                 last_stored: None,
                 frozen: false,
+                restart_returned: false,
                 notices,
                 pending_write: Vec::new(),
                 mode: HubMode::Foreground,

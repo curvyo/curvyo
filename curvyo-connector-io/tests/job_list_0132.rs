@@ -126,7 +126,9 @@ fn three_jobs_are_listed_reordered_for_everyone_and_started_by_a_press() {
     );
     a.send(&Message::GetStatus).unwrap();
     let (_, kept) = first_list(&rig.open(&record).0);
-    assert_eq!(names(&kept), ["two.gcode"]);
+    // Frage 390 C (customer 2026-11-25): the stopped job stays first as an interrupted entry.
+    assert_eq!(names(&kept), ["three.gcode", "two.gcode"]);
+    assert!(kept[0].interrupted_at.is_some());
 }
 
 #[test]
@@ -293,7 +295,9 @@ fn a_chain_follows_by_its_flags_and_an_alarm_in_the_second_job_cancels_it() {
     a.send(&Message::GetStatus).unwrap();
     wait_state(&mut a, State::Alarm);
     assert!(current.is_none(), "the alarm dropped the held job");
-    assert_eq!(names(&waiting), ["three.gcode"]);
+    // Frage 390 C: the job the alarm ended stays first as an interrupted entry.
+    assert_eq!(names(&waiting), ["two.gcode", "three.gcode"]);
+    assert!(waiting[0].interrupted_at.is_some());
     assert!(waiting.iter().all(|e| !e.run_next), "the flags are cleared");
     assert_eq!(note.as_deref(), Some("Chain stopped: Alarm"));
     let log = rig.log();

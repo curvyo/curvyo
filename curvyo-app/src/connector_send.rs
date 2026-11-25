@@ -448,6 +448,8 @@ mod tests {
                 line: 0,
                 lines: 3,
                 elapsed_ms: 0,
+                from_line: None,
+                entering: false,
             }),
             position: None,
             alarm: None,

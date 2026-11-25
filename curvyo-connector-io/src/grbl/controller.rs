@@ -36,7 +36,7 @@ pub struct GrblController {
     pub(super) timing: Timing,
     lines: Lines,
     identify: Option<Identify>,
-    info: Option<ControllerInfo>,
+    pub(super) info: Option<ControllerInfo>,
     pub(super) settings: Settings,
     /// GRBL's receive buffer as `Bf:` reported it at identify (empty then), else 128.
     pub(super) rx_size: usize,
@@ -81,6 +81,10 @@ pub struct GrblController {
     pub(super) home_mpos: Option<[f64; 2]>,
     /// A homing ended and the next report shows where the head stands.
     pub(super) home_pending: bool,
+    /// A restart from a line moves to the work X and Y of its line (`specs/0118` 2e).
+    pub(super) entering: Option<[f64; 2]>,
+    /// A restart that waits for its `$$` answer before the first byte (`specs/0118` 38).
+    pub(super) recheck: Option<crate::grbl::restart::Recheck>,
 }
 
 impl GrblController {
@@ -126,6 +130,8 @@ impl GrblController {
             spindle_off: false,
             home_mpos: None,
             home_pending: false,
+            entering: None,
+            recheck: None,
         }
     }
 
@@ -140,6 +146,8 @@ impl GrblController {
         self.stream = None;
         self.stop = None;
         self.jog = None;
+        self.entering = None;
+        self.recheck = None;
     }
 
     fn on_identify(&mut self, outcome: Outcome, at: Duration) {
@@ -193,6 +201,9 @@ impl GrblController {
                     self.notices.push(texts::LASER_MODE_UNKNOWN.to_owned());
                 }
                 let laser_off = self.settings.laser_mode() == Some(false);
+                if let Some(blocks) = found.planner {
+                    self.events.push(Event::Planner { blocks });
+                }
                 self.events.push(Event::LaserModeOff(laser_off));
                 self.events.push(Event::LaserModeUnknown(unknown));
                 self.events.push(Event::ControllerConnected);
@@ -215,6 +226,11 @@ impl GrblController {
             Reply::Error(code) => self.on_answer(Some(code), at),
             Reply::Alarm(code) => self.on_alarm_line(code),
             Reply::Banner(_) => self.on_banner(),
+            Reply::Setting(number, value) => {
+                if let Some(recheck) = self.recheck.as_mut() {
+                    recheck.set(number, &value);
+                }
+            }
             Reply::Message(text) if text.contains("to unlock") => self.locked = true,
             _ => {}
         }
@@ -330,8 +346,12 @@ impl GrblController {
 
     /// Streams the prepared `lines`: a job's or a frame's.
     pub(super) fn begin_stream(&mut self, lines: Vec<String>, at: Duration) {
+        self.begin(Stream::new(lines, at));
+    }
+
+    /// Streams `stream`: a job's, a frame's or a restart's.
+    pub(super) fn begin(&mut self, mut stream: Stream) {
         self.spindle_off = false;
-        let mut stream = Stream::new(lines, at);
         stream.fill(self.owed_bytes(), &mut self.out);
         if stream.all_answered() {
             stream.finished_at_report = Some(self.reports);
@@ -349,6 +369,11 @@ impl GrblController {
     /// the Home command's homing, which GRBL ends by the reset alone (G9).
     pub(super) fn begin_stop(&mut self, failure: Option<String>, at: Duration) {
         if self.stop.is_some() {
+            return;
+        }
+        if self.recheck.take().is_some() {
+            // A restart that waits for its `$$` wrote nothing that moves: it ends at once.
+            self.events.push(Event::Stopped);
             return;
         }
         let (held, homing, hold_sent) = match self.stream.as_ref() {
@@ -394,6 +419,21 @@ impl Controller for GrblController {
         }
         match command {
             ControllerCommand::Start { .. } => self.start(job, at),
+            ControllerCommand::StartAt {
+                from_line,
+                entry,
+                target,
+                homed,
+                ..
+            } => {
+                let start = crate::grbl::restart::StartAt {
+                    from_line: *from_line,
+                    entry,
+                    target: *target,
+                    homed: *homed,
+                };
+                self.start_at(job, &start);
+            }
             ControllerCommand::Pause => self.pause(at),
             ControllerCommand::Resume => self.resume(),
             ControllerCommand::Stop => self.begin_stop(None, at),
@@ -457,6 +497,7 @@ impl Controller for GrblController {
         }
         if !self.closed {
             self.note_homing(at);
+            self.note_arrival();
         }
         self.take()
     }

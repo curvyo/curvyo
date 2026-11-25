@@ -12,6 +12,7 @@ pub mod jog;
 pub mod prepare;
 mod replies;
 pub mod reply;
+mod restart;
 pub mod settings;
 pub mod stop;
 pub mod stream;

@@ -33,6 +33,12 @@ struct Run {
     reported: u32,
     /// A frame: it moves the head and never raises the fake alarm.
     frame: bool,
+    /// A restart from a line: the lines before it, counted as done.
+    from: u32,
+    /// The restart's travel to its line, in milliseconds of the run.
+    travel_ms: u64,
+    /// The travel is over (`EntryReached` was given).
+    reached: bool,
 }
 
 /// The fake controller.
@@ -92,6 +98,32 @@ impl FakeController {
                     paused: false,
                     reported: 0,
                     frame: false,
+                    from: 0,
+                    travel_ms: 0,
+                    reached: true,
+                });
+            }
+            ControllerCommand::StartAt {
+                from_line, target, ..
+            } => {
+                let head = self.head.position();
+                let to = [target[0].0, target[1].0];
+                let distance = (to[0] - head[0]).hypot(to[1] - head[1]);
+                self.head.trace(&[to], FRAME_FEED, at);
+                let from = from_line.saturating_sub(1);
+                self.run = Some(Run {
+                    total: job_lines,
+                    ran_ms: 0,
+                    last: at,
+                    paused: false,
+                    reported: from,
+                    frame: false,
+                    from,
+                    travel_ms: u64::try_from(
+                        Duration::from_secs_f64(distance / FRAME_FEED * 60.0).as_millis(),
+                    )
+                    .unwrap_or(u64::MAX),
+                    reached: false,
                 });
             }
             ControllerCommand::Pause => {
@@ -142,6 +174,9 @@ impl FakeController {
             paused: false,
             reported: 0,
             frame: true,
+            from: 0,
+            travel_ms: 0,
+            reached: true,
         });
         if let Ok(moves) = check_frame(&job.text) {
             let head = self.head.position();
@@ -169,7 +204,13 @@ impl FakeController {
             return events;
         };
         Self::catch_up(&mut run, at);
-        let done = run.ran_ms.saturating_mul(u64::from(self.lines_per_second)) / 1000;
+        if !run.reached && run.ran_ms >= run.travel_ms {
+            run.reached = true;
+            events.push(Event::EntryReached);
+        }
+        let moving = run.ran_ms.saturating_sub(run.travel_ms);
+        let done = moving.saturating_mul(u64::from(self.lines_per_second)) / 1000;
+        let done = u64::from(run.from).saturating_add(done);
         let mut line = u32::try_from(done.min(u64::from(run.total))).unwrap_or(run.total);
         let alarm = self
             .alarm_at_line
@@ -318,7 +359,8 @@ mod tests {
         let mut c = FakeController::new(20, None);
         c.take(&ControllerCommand::Home, 0, ms(1000));
         assert_eq!(c.run_until(ms(2999)), Vec::new());
-        assert_eq!(c.run_until(ms(3000)), vec![Event::Homed]);
+        // The head's position follows every homing (`specs/0118` 2e: the restart needs it).
+        assert_eq!(c.run_until(ms(3000))[0], Event::Homed);
         assert_eq!(c.run_until(ms(9000)), Vec::new(), "homed once");
     }
 
@@ -338,7 +380,7 @@ mod tests {
         let events = c.run_until(ms(1000));
         assert!(matches!(events.last(), Some(Event::Alarm { .. })));
         c.take(&ControllerCommand::Home, 0, ms(1000));
-        assert_eq!(c.run_until(ms(3000)), vec![Event::Homed]);
+        assert_eq!(c.run_until(ms(3000))[0], Event::Homed);
     }
 
     #[test]

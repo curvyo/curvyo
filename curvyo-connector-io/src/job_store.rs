@@ -198,6 +198,7 @@ mod tests {
             sent_by: "Phone".into(),
             run_next_by: None,
             interrupted_at: None,
+            stop: None,
         }
     }
 
@@ -247,5 +248,56 @@ mod tests {
         let loaded = load(dir.path());
         assert!(loaded.restored.items.is_empty());
         assert!(loaded.list_dropped.is_some());
+    }
+
+    /// `specs/0118` 2e (adrs R2, R11): a started current job is stored with where it stood; it
+    /// comes back interrupted with that point, and a slice-1 file without it reads `stop: None`.
+    #[test]
+    fn an_interrupted_job_keeps_its_stop_point_and_an_old_file_has_none() {
+        use curvyo_connector_core::{Millimetres, StopPoint, StoredCurrent};
+        let text = "G21\nG90\nG0 X1 Y1\n";
+        let mut current = entry(1, text);
+        current.lines = 3;
+        current.stop = Some(StopPoint {
+            machine_position: Some([-30.0, -40.0, 0.0].map(Millimetres)),
+            work_offset: Some([0.0; 3].map(Millimetres)),
+            run_from: 1,
+            exact: true,
+        });
+        let list = StoredList {
+            format: 1,
+            current: Some(StoredCurrent {
+                entry: current,
+                started: true,
+                line: 2,
+            }),
+            waiting: vec![],
+        };
+        let golden = include_str!("../tests/fixtures/jobs/list_interrupted.json");
+        assert_eq!(
+            serde_json::to_string_pretty(&list).unwrap(),
+            golden.trim_end()
+        );
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("jobs")).unwrap();
+        fs::write(dir.path().join("jobs").join(LIST_FILE), golden).unwrap();
+        fs::write(
+            dir.path()
+                .join("jobs")
+                .join(format!("{}.gcode", Uuid::from_u128(1))),
+            text,
+        )
+        .unwrap();
+        let loaded = load(dir.path());
+        let back = &loaded.restored.items[0].entry;
+        assert_eq!(back.interrupted_at, Some(2));
+        assert!(back.stop.as_ref().unwrap().exact);
+        let old = golden.replace(
+            &golden[golden.find(",\n    \"stop\"").unwrap()
+                ..golden.find(",\n    \"started\"").unwrap()],
+            "",
+        );
+        let parsed: StoredList = serde_json::from_str(&old).unwrap();
+        assert_eq!(parsed.current.unwrap().entry.stop, None);
     }
 }

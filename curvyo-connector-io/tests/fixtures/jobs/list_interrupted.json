@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "current": {
+    "job_id": "00000000-0000-0000-0000-000000000001",
+    "name": "j1.gcode",
+    "lines": 3,
+    "bytes": 17,
+    "sha256": "e93fbf46761d6af2bd8ea6d96447735ba1cd74d3f57d15b7e346727b54cbb6e2",
+    "sent_by": "Phone",
+    "stop": {
+      "machine_position": [
+        -30.0,
+        -40.0,
+        0.0
+      ],
+      "work_offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "run_from": 1,
+      "exact": true
+    },
+    "started": true,
+    "line": 2
+  },
+  "waiting": []
+}

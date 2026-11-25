@@ -53,6 +53,8 @@ mod tests {
                 line,
                 lines: 10_000,
                 elapsed_ms: 0,
+                from_line: None,
+                entering: false,
             }),
             position: None,
             alarm: None,
