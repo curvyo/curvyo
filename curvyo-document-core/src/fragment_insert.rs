@@ -20,6 +20,10 @@ use crate::units::Vec2;
 pub const IMPORT_PAGE_COMMIT_LABEL: &str = "import_page";
 /// The label of the step that imports elements.
 pub const IMPORT_ELEMENTS_COMMIT_LABEL: &str = "import_elements";
+/// The label of the step that loads every page of an online template (`specs/0138` criterion 3).
+pub const LOAD_ONLINE_TEMPLATE_COMMIT_LABEL: &str = "load_online_template";
+/// The label of the step that imports an online icon (`specs/0138` criterion 3).
+pub const IMPORT_ICON_COMMIT_LABEL: &str = "import_icon";
 
 /// Where a fragment goes.
 #[derive(Debug, Clone, Copy)]
@@ -141,6 +145,39 @@ impl Document {
                 }))
             }
         }
+    }
+
+    /// Inserts the page of every fragment of `pages` after the last page, in order, as plain
+    /// copies with `came_from`, in **one** step labelled [`LOAD_ONLINE_TEMPLATE_COMMIT_LABEL`]. Each
+    /// fragment is a page import with its own anchor ids. Everything is checked before the
+    /// first write.
+    ///
+    /// # Errors
+    /// [`ImportError`]; nothing is written then.
+    pub fn insert_fragment_pages(
+        &self,
+        pages: &[(&Fragment, &[AnchorId])],
+        came_from: &CameFrom,
+    ) -> Result<Vec<FragmentReport>, ImportError> {
+        for (fragment, anchor_ids) in pages {
+            let distinct: HashSet<_> = anchor_ids.iter().collect();
+            if anchor_ids.len() != fragment.anchor_count() || distinct.len() != anchor_ids.len() {
+                return Err(ImportError::AnchorIds);
+            }
+            if fragment.page.is_none() {
+                return Err(ImportError::NoSuchPage);
+            }
+            self.check_budget(fragment)?;
+        }
+        Ok(self.batch(LOAD_ONLINE_TEMPLATE_COMMIT_LABEL, |doc| {
+            pages
+                .iter()
+                .filter_map(|(fragment, anchor_ids)| {
+                    let source = fragment.page.as_ref()?;
+                    Some(doc.insert_page(fragment, source, came_from, anchor_ids))
+                })
+                .collect()
+        }))
     }
 
     /// Refuses a fragment whose new pictures and fonts would pass the project limit.

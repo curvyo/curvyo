@@ -95,7 +95,7 @@ row of `0137` with a licence line:
 | Row | Height (coarse) | Anatomy |
 |---|---|---|
 | Folder of the catalogue (if the index nests) | 32 (36) | the `0137` folder row |
-| Template | 52 (56); 68 (72) with line 3 | chevron 16, the catalogue thumbnail 40 x 28 (loaded for visible rows after 100 ms of rest, like local thumbnails; a thumbnail is part of the list fetch, Q8), 8, line 1 name 14 px; line 2, 12 px muted: author, " · ", the **licence name as a link** (cell of its own, underline, `--toolbar-icon`, Q9), " · ", size ("24 KB"); line 3 only when criterion 9 applies: "Font not included" 12 px muted; action slot 28 px: **Load** `Import` 24 x 24, shown on hover, focus within and on the current row |
+| Template | 52 (56); 68 (72) with line 3 | chevron 16, the catalogue thumbnail 40 x 28 (loaded for visible rows after 100 ms of rest, like local thumbnails; a thumbnail is part of the list fetch, Q8), 8, line 1 name 14 px; line 2, 12 px muted: the **licence name as a link** (cell of its own, underline, `--toolbar-icon`, Q9), " · ", author, " · ", size ("24 KB"), licence first so a cut line never hides it (as the Came from line, Q23); line 3 only when criterion 9 applies: "Font not included" 12 px muted; action slot 28 px: **Load** `Import` 24 x 24, shown on hover, focus within and on the current row |
 
 - **Licence link**: opens the licence's address in the system browser (the maker's own act,
   Q10); the tooltip names the address. In the accessible name: "Box with lid, template by Jane
@@ -122,7 +122,7 @@ import of `0024`.
 
 | Row | Height (coarse) | Anatomy |
 |---|---|---|
-| Icon set | 44 (48) | chevron 16, a 28 x 28 sample of three icons from the set's own list data (no extra request), 8, name 14 px over line 2 12 px muted: author " · " licence link (as in section 5) " · " "1,240 icons" |
+| Icon set | 44 (48) | chevron 16, a 28 x 28 sample of three icons from the set's own list data (no extra request), 8, name 14 px over line 2 12 px muted: licence link (as in section 5) " · " author " · " "1,240 icons" |
 | Icon grid row | 40 (44) | at the child level, up to **5 cells** of 36 x 36 (40 coarse), 4 px apart; the icon 24 px in `--toolbar-icon` on white, 1 px `--toolbar-icon` at 25 %, `rounded-[5px]` (Q13) |
 
 - **Expanding a set fetches its icon list** (the set's own list, one request; Frage 273 A).
@@ -257,6 +257,7 @@ import of `0024`.
 | Q20 | Enter expands every Iconify source with a results row on top |
 | Q21 | Clearing the search hides the results; they stay fetched for the session |
 | Q22 | Tooltips of the ready entry and online source rows name the host (Curvyo catalogue: raw.githubusercontent.com) |
+| Q23 | Line 2 of template and icon set rows starts with the licence link, then author and size (UX review 2026-11-25: in the 244 px column real author names pushed the licence out of sight) |
 
 ## 12. Spec deltas for the product owner
 

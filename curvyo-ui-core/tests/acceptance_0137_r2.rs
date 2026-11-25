@@ -196,6 +196,7 @@ fn ac7_the_layers_and_pages_tooltip_reads_from_document_to_page() {
         page_id: "p-1".to_owned(),
         item: Some("Lid tab".to_owned()),
         at: UnixMillis::new(1_700_000_000_000),
+        online: None,
     };
     let tip = came_from_tooltip(&record, 1_700_000_500_000, 0);
     assert!(tip.contains("From Box job › Lid"), "{tip}");

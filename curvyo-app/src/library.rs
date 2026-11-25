@@ -30,7 +30,7 @@ pub(crate) struct LibraryState {
     sources: Mutex<Vec<(LibrarySource, PathBuf)>>,
 }
 
-fn data_file(app: &AppHandle, name: &str) -> Option<PathBuf> {
+pub(crate) fn data_file(app: &AppHandle, name: &str) -> Option<PathBuf> {
     app.path().app_data_dir().ok().map(|dir| dir.join(name))
 }
 
@@ -266,7 +266,7 @@ pub(crate) fn library_rows(app: AppHandle, args: RowsArgs) -> Vec<LibraryRow> {
         })
     });
     let expanded = args.expanded.into_iter().collect();
-    curvyo_ui_core::library_tree::library_rows(
+    let mut rows = curvyo_ui_core::library_tree::library_rows(
         &sources,
         &index,
         &TreeView {
@@ -275,7 +275,10 @@ pub(crate) fn library_rows(app: AppHandle, args: RowsArgs) -> Vec<LibraryRow> {
             now: (args.now, args.offset_minutes),
             saved_version: saved.as_ref().map(|(k, p)| (k.as_str(), p.as_slice())),
         },
-    )
+    );
+    // The third group (`specs/0138`): what this session fetched of the sources the maker added.
+    rows.extend(crate::online::rows_of(&app, &expanded, &args.query));
+    rows
 }
 
 fn root_of(app: &AppHandle, source: &str) -> Result<PathBuf, String> {
@@ -300,6 +303,11 @@ pub(crate) fn library_page_picture(
     path: Vec<String>,
     page: String,
 ) -> Result<Response, String> {
+    // A downloaded template of an online source: its page pictures come from the held bytes.
+    if let Some(bytes) = crate::online::template_bytes(&app, &source, &path) {
+        let png = curvyo_document_core::read_page_picture(std::io::Cursor::new(&**bytes), &page);
+        return Ok(Response::new(png.unwrap_or_default()));
+    }
     let root = root_of(&app, &source)?;
     curvyo_storage_io::read_page_picture(&root, &path, &page)
         .map(|png| Response::new(png.unwrap_or_default()))
@@ -315,6 +323,10 @@ pub(crate) fn library_read_document(
     source: String,
     path: Vec<String>,
 ) -> Result<Response, String> {
+    // A template the maker loaded or expanded was downloaded and checked before it is read here.
+    if let Some(bytes) = crate::online::template_bytes(&app, &source, &path) {
+        return Ok(Response::new((*bytes).clone()));
+    }
     let root = root_of(&app, &source)?;
     curvyo_storage_io::library_read(&root, &path)
         .map(Response::new)
@@ -419,6 +431,7 @@ pub(crate) fn library_find_source(app: AppHandle, record: CameFromArgs) -> Optio
         page_id: record.page_id,
         item: None,
         at: curvyo_document_core::UnixMillis::new(0),
+        online: None,
     };
     let found = index.source_of(&record)?;
     let sources = library.sources.lock().ok()?;

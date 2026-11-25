@@ -31,6 +31,8 @@ interface FileTabProps {
   /** Export SVG… and its switches (`specs/0024-svg-import-export` criterion 147), its own section
    * below the button block; the panel passes `ExportSvgSection`. */
   exportSvg?: ReactNode;
+  /** The Credits block (`specs/0138` criterion 4), 12 px below the export options. */
+  credits?: ReactNode;
   /** The Extensions group (`specs/0093` UX notes §7), at the end of the tab. */
   extensions?: ReactNode;
   /** The Workspace section (`specs/0095-workspace` `ux-notes.md` section 1), appended below Export
@@ -57,6 +59,7 @@ export function FileTab({
   tooltipFor,
   onReturnFocus,
   exportSvg,
+  credits,
   extensions,
   workspace,
   recovery,
@@ -83,6 +86,7 @@ export function FileTab({
         )}
       </div>
       {exportSvg}
+      {credits}
       {workspace}
       {desktop ? (
         <>

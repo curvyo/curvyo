@@ -1,11 +1,20 @@
 // The Library tab (`specs/0137-document-library` criteria 1 to 4, 10, 11, 13; UX notes sections 2
 // to 5, 7.1, 9 and 10): the sources with their documents and page rows, the search, Add folder...
 // on the desktop, Import page by button or drag. The rows and every word come from Rust.
-import { ChevronDown, ChevronRight, FileText, Folder, FolderPlus, Import, Search, TriangleAlert, X } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Folder, FolderPlus, Globe, Import, Plus, Search, TriangleAlert, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { AddSourceForm } from "@/components/panel/AddSourceForm";
+import {
+  OnlineRowContent,
+  OnlineSourceCells,
+  OnlineSourceGlyph,
+  type OnlineHandlers,
+} from "@/components/panel/OnlineRows";
+import { isOnlineKind, onlineHeight } from "@/lib/onlineKinds";
 import type { WasmSession } from "@/lib/editorSession";
 import {
+  type IconCell,
   type LibraryRow,
   addLibraryFolder,
   libraryRows,
@@ -14,13 +23,29 @@ import {
   scanLibrary,
 } from "@/lib/libraryApi";
 import { watchCanvasDrag } from "@/lib/libraryDrag";
-import { importFromLibrary } from "@/lib/libraryImport";
+import { importFromLibrary, loadTemplateInto } from "@/lib/libraryImport";
+import {
+  addReadySource,
+  loadOnlineTemplate,
+  onlineIconImport,
+  onlineTemplateOrigin,
+  openLicence,
+  openOnlineList,
+  openOnlineSet,
+  openOnlineTemplate,
+  removeOnlineSource,
+  beginOnlineSearch,
+  searchOnlineSource,
+  forgetOnlineIcons,
+} from "@/lib/onlineApi";
+import { WasmLibrarySource } from "@/wasm-bindings/curvyo_editor_wasm.js";
 import { openPreview, pageRowKey, previewNow, readerFor, usePreview } from "@/lib/libraryStore";
 import { useLibraryTreeKeys } from "@/hooks/useLibraryTreeKeys";
 import { isTauri } from "@/platform/host";
 import {
   library_import_failed_text,
   library_no_match_text,
+  library_online_searching_text,
   library_remove_armed_text,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
@@ -30,6 +55,11 @@ const HEIGHTS: Record<LibraryRow["kind"], number> = {
   folder: 32,
   document: 44,
   page: 52,
+  ready: 32,
+  template: 52,
+  set: 44,
+  icons: 40,
+  status: 28,
 };
 const OVERSCAN_PX = 200;
 const ARM_MS = 4000;
@@ -61,6 +91,14 @@ function documentName(row: LibraryRow): string {
   const file = row.path[row.path.length - 1] ?? "";
   return file.replace(/\.[^.]*$/, "");
 }
+
+/** Focuses a row's element, or the first cell of an icon row (its cells are its content). */
+function focusElement(element: HTMLElement | null | undefined) {
+  (element?.querySelector<HTMLElement>("[data-icon-cell]") ?? element)?.focus();
+}
+
+/** Whether a row sits in the Online group (its source key is the online key). */
+const isOnlineSource = (key: string) => key.startsWith("online:");
 
 /** The name, cut with an ellipsis; its matched part semibold (P14). One text box, so the chip
  * beside it never shrinks and a match inside a word has no gap. */
@@ -128,6 +166,14 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
   const [expanded, setExpanded] = useState<string[]>([]);
   const [armed, setArmed] = useState<string | null>(null);
   const [refusal, setRefusal] = useState("");
+  const [addingSource, setAddingSource] = useState(false);
+  const [refreshing, setRefreshing] = useState<ReadonlySet<string>>(new Set());
+  const [announce, setAnnounce] = useState("");
+  const searchTicket = useRef(0);
+  /** A row to focus once the rows hold it (an added source); Add source... after the form closes. */
+  const focusWhenListed = useRef<string | null>(null);
+  const addSourceRef = useRef<HTMLButtonElement>(null);
+  const focusAddSource = useRef(false);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(400);
   const listRef = useRef<HTMLDivElement>(null);
@@ -136,6 +182,9 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     const dirty = getSession()?.is_dirty() ?? false;
     void libraryRows(query, expanded, dirty).then(setRows, () => setRows([]));
   }, [query, expanded, getSession]);
+  // The online actions finish after the render that started them: they refresh by the newest state.
+  const refreshNow = useRef(refreshRows);
+  refreshNow.current = refreshRows;
 
   const scan = useCallback(() => {
     void scanLibrary().then((found) => {
@@ -182,7 +231,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     let at = 0;
     const stack: number[] = [];
     for (const [index, row] of rows.entries()) {
-      const height = row.kind === "heading" && index === 0 ? FIRST_HEADING : HEIGHTS[row.kind];
+      const height = row.kind === "heading" && index === 0 ? FIRST_HEADING : (onlineHeight(row) ?? HEIGHTS[row.kind]);
       if (row.kind === "heading") {
         stack.length = 0;
         result.push({ top: at, height, parent: -1, posinset: 0, setsize: 0, place: "" });
@@ -220,14 +269,16 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
   }, [rows]);
 
   // Roving focus: the tree is one Tab stop (UX notes 11); the focused row stays rendered.
-  const focusable = rows.map((row, index) => ({ row, index })).filter(({ row }) => row.kind !== "heading");
+  const focusable = rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => row.kind !== "heading" && row.kind !== "status");
   const active = focusable.find(({ row }) => row.key === focusKey) ?? focusable[0] ?? null;
 
   const focusRow = (index: number) => {
     const row = rows[index];
     const meta = tops.result[index];
     const list = listRef.current;
-    if (!row || !meta || row.kind === "heading") {
+    if (!row || !meta || row.kind === "heading" || row.kind === "status") {
       return;
     }
     if (list) {
@@ -239,7 +290,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     }
     pendingFocus.current = true;
     setFocusKey(row.key);
-    listRef.current?.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(row.key)}"]`)?.focus();
+    focusElement(listRef.current?.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(row.key)}"]`));
   };
 
   useEffect(() => {
@@ -248,28 +299,67 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     }
     pendingFocus.current = false;
     const element = listRef.current?.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(active.row.key)}"]`);
-    if (element && document.activeElement !== element) {
-      element.focus();
+    if (element && !element.contains(document.activeElement)) {
+      focusElement(element);
     }
   });
+
+  // An added source takes the focus once the rows list it (UX notes 3); a closed form gives it back
+  // to Add source....
+  useEffect(() => {
+    const key = focusWhenListed.current;
+    const index = key ? rows.findIndex((row) => row.key === key) : -1;
+    if (index >= 0) {
+      focusWhenListed.current = null;
+      focusRow(index);
+    }
+    // focusRow reads the rows of this render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+  useEffect(() => {
+    if (!addingSource && focusAddSource.current) {
+      focusAddSource.current = false;
+      addSourceRef.current?.focus();
+    }
+  }, [addingSource]);
 
   const status =
     count === null ? "Reading..." : count === 1 ? "1 document" : `${count} documents`;
   useEffect(() => onSubject(status), [onSubject, status]);
 
+  // Opening an online source, set or template is the maker's act and fetches what it lists
+  // (ADR 0085 decision 2); the rows show "Loading..." until the host answers.
+  const openOnline = (row: LibraryRow) => {
+    const source = row.source;
+    const done = () => refreshNow.current();
+    if (row.kind === "source") {
+      void openOnlineList(source, false).then(done, done);
+    } else if (row.kind === "set" && row.path[0]) {
+      void openOnlineSet(source, row.path[0]).then(done, done);
+    } else if (row.kind === "template") {
+      void openOnlineTemplate(source, row.path.join("/")).then(done, done);
+    }
+  };
+
   const toggle = (row: LibraryRow) => {
     if (!row.expandable || query.trim()) {
       return;
     }
+    const opening = !expanded.includes(row.key);
     setExpanded((keys) => (keys.includes(row.key) ? keys.filter((k) => k !== row.key) : [...keys, row.key]));
+    if (opening && isOnlineSource(row.source)) {
+      openOnline(row);
+    }
   };
 
   const subjectOf = (row: LibraryRow) => {
     const at = rows.indexOf(row);
     const source = rows.slice(0, at).reverse().find((r) => r.kind === "source");
-    const document = rows.find((r) => r.kind === "document" && r.source === row.source && r.path.join("/") === row.path.join("/"));
+    const document = rows.find(
+      (r) => (r.kind === "document" || r.kind === "template") && r.source === row.source && r.path.join("/") === row.path.join("/"),
+    );
     const saved = document?.line.startsWith("Saved version") ? " · Saved version" : "";
-    return `${source?.name ?? ""} › ${documentName(row)}${saved}`;
+    return `${source?.name ?? ""} › ${document?.kind === "template" ? document.name : documentName(row)}${saved}`;
   };
 
   const openRow = (row: LibraryRow) => {
@@ -280,9 +370,16 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
       pageName: row.name,
       chip: row.chip ?? "",
       subject: subjectOf(row),
-      documentName: documentName(row),
+      documentName: onlineTemplateName(row) ?? documentName(row),
     });
   };
+
+  const sourceNameOf = (row: LibraryRow) => rows.find((r) => r.kind === "source" && r.source === row.source)?.name ?? "";
+  /** The template row's name for a page row of a downloaded template. */
+  const onlineTemplateName = (row: LibraryRow) =>
+    isOnlineSource(row.source)
+      ? rows.find((r) => r.kind === "template" && r.source === row.source && r.path.join("/") === row.path.join("/"))?.name
+      : undefined;
 
   const importPage = async (row: LibraryRow, drop: { x: number; y: number } | null) => {
     const session = getSession();
@@ -293,10 +390,20 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     const same = open.page && open.page.source === row.source && open.page.path.join("/") === row.path.join("/");
     try {
       const reader = same && open.reader ? open.reader : await readerFor(row.source, row.path);
+      // A page of a downloaded template carries where it came from and under which licence.
+      const origin = isOnlineSource(row.source) ? await onlineTemplateOrigin(row.source, row.path.join("/")) : null;
       const answer = importFromLibrary(
         session,
         reader,
-        { documentName: documentName(row), pageName: row.name, pageId: row.page_id },
+        origin
+          ? {
+              documentName: sourceNameOf(row),
+              pageName: `${origin.name} › ${row.name}`,
+              pageId: row.page_id,
+              online: origin.origin,
+              withoutFonts: origin.without_fonts,
+            }
+          : { documentName: documentName(row), pageName: row.name, pageId: row.page_id },
         true,
         [],
         drop,
@@ -332,9 +439,182 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
       return;
     }
     setArmed(null);
+    if (isOnlineSource(row.source)) {
+      forgetOnlineIcons(row.source);
+      // A newer sources file is left alone: the refusal is the tab's alert line, as Add folder's.
+      setRefusal((await removeOnlineSource(row.source)) ?? "");
+      refreshNow.current();
+      return;
+    }
     await removeLibraryFolder(row.source);
     scan();
   };
+
+  const loadTemplate = async (row: LibraryRow, drop: { x: number; y: number } | null = null) => {
+    const session = getSession();
+    if (!session) {
+      return;
+    }
+    void drop;
+    const path = row.path.join("/");
+    const answer = await loadOnlineTemplate(row.source, path);
+    refreshNow.current();
+    if (answer.kind === "refused") {
+      showNotice(answer.text, 8000, "canvas", "alert");
+      return;
+    }
+    let reader: WasmLibrarySource | null = null;
+    try {
+      reader = await readerFor(row.source, row.path);
+      const result = loadTemplateInto(session, reader, {
+        documentName: sourceNameOf(row),
+        pageName: answer.name,
+        pageId: "",
+        online: answer.origin,
+        withoutFonts: answer.without_fonts,
+      });
+      sync();
+      if (result.error) {
+        showNotice(library_import_failed_text(answer.name, result.error), 8000, "canvas", "alert");
+      } else {
+        // No notice after a success (design system); the polite region says it.
+        if (result.notice) {
+          showNotice(result.notice, 5000, "canvas", "status");
+        }
+        setAnnounce(`Loaded ${answer.name}`);
+      }
+    } catch (error) {
+      showNotice(library_import_failed_text(answer.name, String(error)), 8000, "canvas", "alert");
+    } finally {
+      reader?.free();
+    }
+  };
+
+  const importIcon = async (row: LibraryRow, cell: IconCell, at: { x: number; y: number } | null) => {
+    const session = getSession();
+    if (!session) {
+      return;
+    }
+    const icon = await onlineIconImport(row.source, cell.prefix, cell.name);
+    if (!icon) {
+      showNotice(library_import_failed_text(cell.name, "the icon could not be read"), 8000, "canvas", "alert");
+      return;
+    }
+    let reader: WasmLibrarySource | null = null;
+    try {
+      reader = WasmLibrarySource.open_svg(icon.svg, BigInt(Math.floor(Math.random() * 2 ** 48) + 1));
+      const roots = JSON.parse(reader.page_objects("first")) as { id: unknown }[];
+      const answer = importFromLibrary(
+        session,
+        reader,
+        {
+          documentName: sourceNameOf(row),
+          pageName: `${icon.set} › ${icon.name}`,
+          pageId: "first",
+          online: icon.origin,
+          step: "icon",
+        },
+        false,
+        roots.map((r) => JSON.stringify(r.id)),
+        at,
+      );
+      sync();
+      if (answer.error) {
+        showNotice(library_import_failed_text(cell.name, answer.error), 8000, "canvas", "alert");
+      }
+    } catch (error) {
+      showNotice(library_import_failed_text(cell.name, String(error)), 8000, "canvas", "alert");
+    } finally {
+      reader?.free();
+    }
+  };
+
+  const refreshSource = (row: LibraryRow) => {
+    setRefreshing((now) => new Set(now).add(row.source));
+    forgetOnlineIcons(row.source);
+    const done = () => {
+      setRefreshing((now) => {
+        const next = new Set(now);
+        next.delete(row.source);
+        return next;
+      });
+      refreshNow.current();
+    };
+    void openOnlineList(row.source, true).then(done, done);
+  };
+
+  // Enter in the search also sends the words to the Iconify sources added (Frage 340 B); typing
+  // sends nothing. Every Iconify source opens with its results on top.
+  const searchOnlineNow = () => {
+    const words = query.trim();
+    if (!isTauri || !words) {
+      return;
+    }
+    const mine = ++searchTicket.current;
+    void beginOnlineSearch(query).then((begun) => {
+      if (mine !== searchTicket.current || !begun || begun.keys.length === 0) {
+        return;
+      }
+      setAnnounce(library_online_searching_text(begun.keys.length));
+      setExpanded((now) => [...new Set([...now, ...begun.keys.map((key) => `s:${key}\u001f`)])]);
+      // The rows say "Searching" now; each source answers on its own, with its own announcement.
+      refreshNow.current();
+      for (const key of begun.keys) {
+        void searchOnlineSource(key, begun.words).then(
+          (said) => {
+            if (mine === searchTicket.current) {
+              setAnnounce(said);
+              refreshNow.current();
+            }
+          },
+          () => undefined,
+        );
+      }
+    }, () => undefined);
+  };
+  const hasIconify = rows.some((r) => r.kind === "source" && r.online?.glyph === "iconify");
+
+  const handlers: OnlineHandlers = {
+    addReady: () => {
+      void addReadySource().then((answer) => {
+        setRefusal(answer.kind === "refused" ? answer.text : "");
+        // The entry becomes the source row in the same place; the focus stays on it.
+        if (answer.kind === "added" && document.activeElement?.closest(".library-tree")) {
+          focusWhenListed.current = `s:${answer.key}\u001f`;
+        }
+        refreshNow.current();
+      });
+    },
+    refresh: refreshSource,
+    remove: (row) => void remove(row),
+    load: (row) => void loadTemplate(row),
+    licence: (url) => void openLicence(url).catch(() => undefined),
+    importIcon: (row, cell, at) => void importIcon(row, cell, at),
+    dragIcon: (event, row, cell) => {
+      if (event.button !== 0) {
+        return;
+      }
+      watchCanvasDrag(event, () => canvasRef.current, cell.name, () => "copy", (at) => {
+        void importIcon(row, cell, at);
+      });
+    },
+    armed,
+    armedText: (row) => library_remove_armed_text(row.name),
+    refreshing,
+    onCellFocus: (key) => setFocusKey(key),
+    leaveGrid: (row, delta) => {
+      const at = focusable.findIndex((f) => f.row.key === row.key);
+      const next = focusable[at + delta];
+      if (next) {
+        focusRow(next.index);
+      }
+    },
+  };
+  // A source row is busy while its list, a set or a template of it loads, or Refresh runs.
+  const busySources = new Set([
+    ...refreshing,
+    ...rows.filter((r) => r.kind === "status" && r.online?.status === "loading").map((r) => r.source),
+  ]);
 
   const first = tops.result.findIndex((meta) => meta.top + meta.height >= scrollTop - OVERSCAN_PX);
   const shown = rows
@@ -355,7 +635,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     focusRow,
     toggle,
     openRow,
-    importPage: (row) => void importPage(row, null),
+    importPage: (row) => (row.kind === "template" ? void loadTemplate(row) : void importPage(row, null)),
     remove: (row) => void remove(row),
     typeIntoSearch: (key) => {
       setQuery((q) => q + key);
@@ -365,6 +645,13 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
   });
 
   const tooltipOf = (row: LibraryRow, index: number) => {
+    if (row.kind === "source" && row.online?.host) {
+      return `${row.name}\n${row.online.host}`;
+    }
+    // A refused template's reason is cut in the narrow column; the tooltip says it whole.
+    if (row.kind === "template" && row.unreadable) {
+      return `${row.name}\n${row.line}`;
+    }
     const place = tops.result[index]?.place ?? "";
     return place ? `${row.name}\n${place}` : row.name;
   };
@@ -390,7 +677,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     <div className="library-tab">
       {/* The visible subject is the panel header's (row 1); this region announces it. */}
       <span className="sr-only" role="status">
-        {status}
+        {announce || status}
       </span>
       <label className="library-search">
         <Search size={16} aria-hidden="true" />
@@ -405,12 +692,29 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
             if (event.key === "Escape" && query) {
               event.stopPropagation();
               setQuery("");
+            } else if (event.key === "Enter") {
+              searchOnlineNow();
             } else if (event.key === "ArrowDown" && active) {
               event.preventDefault();
               focusRow(active.index);
             }
           }}
         />
+        {query && isTauri && hasIconify ? (
+          <button
+            type="button"
+            className="library-search-online"
+            aria-label="Search Iconify sources (Enter)"
+            title="Search Iconify sources (Enter)"
+            tabIndex={-1}
+            onClick={() => {
+              searchOnlineNow();
+              searchRef.current?.focus();
+            }}
+          >
+            <Globe size={16} />
+          </button>
+        ) : null}
         {query ? (
           <button type="button" aria-label="Clear search" onClick={() => setQuery("")}>
             <X size={16} />
@@ -441,11 +745,13 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
                 aria-setsize={row.kind === "heading" ? undefined : tops.result[index]?.setsize}
                 aria-rowindex={index + 1}
                 aria-expanded={row.expandable ? row.expanded : undefined}
+                aria-busy={row.kind === "source" && busySources.has(row.source) ? true : undefined}
+                data-status={row.kind === "status" ? row.online?.status : undefined}
                 aria-label={row.kind === "heading" ? undefined : row.label}
                 aria-selected={row.kind === "page" ? isCurrent(row) : undefined}
                 style={{ top: tops.result[index]?.top, height: tops.result[index]?.height, paddingLeft: 4 + 12 * Math.min(row.level, 6) }}
                 onClick={() => {
-                  if (row.kind === "heading") {
+                  if (row.kind === "heading" || row.kind === "status" || row.kind === "icons" || row.kind === "ready") {
                     return;
                   }
                   setFocusKey(row.key);
@@ -457,7 +763,19 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
                 }}
                 onKeyDown={(event) => rowKey(event, row, index)}
                 onPointerDown={(event) => {
-                  if (row.kind !== "page" || event.button !== 0 || (event.target as HTMLElement).closest("button")) {
+                  if (
+                    (row.kind !== "page" && !(row.kind === "template" && row.online?.loadable)) ||
+                    event.button !== 0 ||
+                    (event.target as HTMLElement).closest("button")
+                  ) {
+                    return;
+                  }
+                  if (row.kind === "template") {
+                    // A template row dragged onto the drawing loads it, as Load does (UX Q12).
+                    const picture = event.currentTarget.querySelector<HTMLImageElement>("img.library-document-picture")?.src ?? null;
+                    watchCanvasDrag(event, () => canvasRef.current, row.name, () => "import", () => {
+                      void loadTemplate(row);
+                    }, picture);
                     return;
                   }
                   const picture = event.currentTarget.querySelector<HTMLImageElement>("img.library-page-picture")?.src ?? null;
@@ -470,6 +788,8 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
               >
                 {row.kind === "heading" ? (
                   <span className="library-heading">{row.name}</span>
+                ) : isOnlineKind(row.kind) ? (
+                  <OnlineRowContent row={row} handlers={handlers} />
                 ) : (
                   <>
                     {row.kind !== "page" ? (
@@ -479,6 +799,8 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
                     ) : null}
                     {row.unreadable ? (
                       <TriangleAlert size={16} aria-hidden="true" />
+                    ) : row.kind === "source" && row.online ? (
+                      <OnlineSourceGlyph row={row} />
                     ) : row.kind === "source" || row.kind === "folder" ? (
                       <Folder size={16} aria-hidden="true" />
                     ) : (
@@ -493,7 +815,9 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
                         <span className="library-line">{row.line}</span>
                       ) : null}
                     </span>
-                    {row.kind === "source" || row.kind === "folder" ? (
+                    {row.kind === "source" && row.online ? (
+                      <OnlineSourceCells row={row} handlers={handlers} />
+                    ) : row.kind === "source" || row.kind === "folder" ? (
                       row.unreadable ? null : <span className="library-count">{row.line}</span>
                     ) : null}
                     {row.kind === "page" ? (
@@ -515,7 +839,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
                         <Import size={16} />
                       </button>
                     ) : null}
-                    {row.removable ? (
+                    {row.removable && !row.online ? (
                       <button
                         type="button"
                         className={armed === row.key ? "library-action library-armed" : "library-action"}
@@ -537,12 +861,35 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
           </div>
         )}
       </div>
+      {isTauri && addingSource ? (
+        <AddSourceForm
+          onAdded={(key) => {
+            setAddingSource(false);
+            // The new source is opened and focused: its list was fetched by the check that added it.
+            focusWhenListed.current = `s:${key}\u001f`;
+            setExpanded((now) => [...new Set([...now, `s:${key}\u001f`])]);
+            refreshNow.current();
+          }}
+          onCancel={() => {
+            focusAddSource.current = true;
+            setAddingSource(false);
+          }}
+        />
+      ) : null}
       {isTauri ? (
         <div className="library-footer">
-          <button type="button" className="library-add" onClick={() => void addFolder()}>
-            <FolderPlus size={16} aria-hidden="true" />
-            Add folder...
-          </button>
+          <div className="library-footer-buttons">
+            <button type="button" className="library-add" onClick={() => void addFolder()}>
+              <FolderPlus size={16} aria-hidden="true" />
+              Add folder...
+            </button>
+            {addingSource ? null : (
+              <button type="button" ref={addSourceRef} className="library-add" onClick={() => setAddingSource(true)}>
+                <Plus size={16} aria-hidden="true" />
+                Add source...
+              </button>
+            )}
+          </div>
           {refusal ? (
             <p className="library-refusal" role="alert">
               {refusal}

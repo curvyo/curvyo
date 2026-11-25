@@ -74,6 +74,16 @@ pub enum RowKind {
     Document,
     /// A page of a document.
     Page,
+    /// The Curvyo catalogue offered with an Add button (`specs/0138`, UX notes 2).
+    Ready,
+    /// A template of an online catalogue.
+    Template,
+    /// An icon set of an Iconify source.
+    Set,
+    /// One row of icon cells.
+    Icons,
+    /// A state line under a source: loading, offline, failed, the search results.
+    Status,
 }
 
 /// One row of the tree.
@@ -119,6 +129,9 @@ pub struct LibraryRow {
     pub matched: Option<(usize, usize)>,
     /// The accessible name ("Lid, document, 3 pages, changed 2 Nov 12:03").
     pub label: String,
+    /// What an online row adds (`specs/0138`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub online: Option<crate::library_online::OnlineExtra>,
 }
 
 /// How the rows are built.
@@ -143,6 +156,11 @@ pub fn row_key(kind: RowKind, source: &str, path: &[String], page: Option<&str>)
         RowKind::Folder => "f",
         RowKind::Document => "d",
         RowKind::Page => "p",
+        RowKind::Ready => "r",
+        RowKind::Template => "t",
+        RowKind::Set => "e",
+        RowKind::Icons => "i",
+        RowKind::Status => "x",
     };
     let mut key = format!("{tag}:{source}\u{1f}{}", path.join("\u{1f}"));
     if let Some(page) = page {
@@ -299,7 +317,13 @@ fn push_level(
     }
 }
 
-fn plain_row(key: String, kind: RowKind, level: usize, name: &str, source: &str) -> LibraryRow {
+pub(crate) fn plain_row(
+    key: String,
+    kind: RowKind,
+    level: usize,
+    name: &str,
+    source: &str,
+) -> LibraryRow {
     LibraryRow {
         key,
         kind,
@@ -318,6 +342,7 @@ fn plain_row(key: String, kind: RowKind, level: usize, name: &str, source: &str)
         removable: false,
         matched: None,
         label: name.to_owned(),
+        online: None,
     }
 }
 
@@ -381,7 +406,7 @@ fn push_document(
 }
 
 /// The page rows of an expanded document; while searching only its matching pages.
-fn push_pages(
+pub(crate) fn push_pages(
     rows: &mut Vec<LibraryRow>,
     document: &IndexedDocument,
     found: Option<&SearchMatch>,
@@ -417,7 +442,7 @@ fn push_pages(
 }
 
 /// The char range of the first case-insensitive match of `query` in `name`.
-fn matched(name: &str, query: &str) -> Option<(usize, usize)> {
+pub(crate) fn matched(name: &str, query: &str) -> Option<(usize, usize)> {
     let needle: Vec<char> = query.trim().to_lowercase().chars().collect();
     if needle.is_empty() {
         return None;

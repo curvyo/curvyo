@@ -35,6 +35,7 @@ fn record() -> CameFrom {
         page_id: "first".into(),
         item: None,
         at: UnixMillis::new(1_764_000_000_000),
+        online: None,
     }
 }
 
@@ -328,4 +329,36 @@ fn duplicate_carries_came_from() {
         )
         .unwrap();
     assert_eq!(target.came_from(copies[0]), Some(record()));
+}
+
+/// `0138` criterion 3: every page of a template comes in as new pages in one step "Load template";
+/// one undo takes them all away.
+#[test]
+fn several_pages_come_in_as_one_load_template_step() {
+    let source = Document::new(1);
+    source.set_draw_into_initial_layer(true);
+    let a = square(&source, 10.0, 10.0);
+    let second = source.add_page();
+    let b = square(&source, 30.0, 30.0);
+    let target = Document::new(2);
+    let first = source.extract_fragment(&[a], Some("first")).unwrap();
+    let other = source.extract_fragment(&[b], Some(&second.id)).unwrap();
+    let ids_a = fresh(first.anchor_count());
+    let ids_b = fresh(other.anchor_count());
+    let steps = target.own_steps().len();
+    let reports = target
+        .insert_fragment_pages(&[(&first, &ids_a), (&other, &ids_b)], &record())
+        .unwrap();
+    assert_eq!(reports.len(), 2);
+    assert_eq!(target.pages().len(), 3, "the first page plus two");
+    let own = target.own_steps();
+    assert_eq!(own.len(), steps + 1);
+    assert_eq!(
+        own.last().unwrap().label,
+        curvyo_document_core::LOAD_ONLINE_TEMPLATE_COMMIT_LABEL
+    );
+    target.undo_step(own.last().unwrap().step).unwrap();
+    assert_eq!(target.pages().len(), 1);
+    let refused = target.insert_fragment_pages(&[(&first, &ids_b[..1])], &record());
+    assert_eq!(refused.err(), Some(ImportError::AnchorIds));
 }

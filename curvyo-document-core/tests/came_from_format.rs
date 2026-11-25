@@ -30,6 +30,7 @@ fn record() -> CameFrom {
         page_id: "11-4".into(),
         item: None,
         at: UnixMillis::new(1_764_000_000_000),
+        online: None,
     }
 }
 

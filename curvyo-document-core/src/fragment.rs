@@ -78,6 +78,15 @@ impl Fragment {
         &self.source
     }
 
+    /// This fragment without the embedded font files its texts use: the copies keep their font
+    /// reference and name and draw with the fallback (`specs/0138` criterion 9, `0107`).
+    #[must_use]
+    pub fn without_fonts(mut self) -> Self {
+        let fonts = self.source.used_font_hashes();
+        self.assets.retain(|(hash, _, _)| !fonts.contains(hash));
+        self
+    }
+
     /// The source page of a page import.
     #[must_use]
     pub const fn page(&self) -> Option<&Page> {
@@ -320,7 +329,7 @@ impl Document {
 
 /// Walks the tree under `parent` depth first in paint order; `visit(node)` returns whether to
 /// descend into the node.
-fn walk(tree: &LoroTree, parent: TreeParentId, visit: &mut dyn FnMut(TreeID) -> bool) {
+pub(crate) fn walk(tree: &LoroTree, parent: TreeParentId, visit: &mut dyn FnMut(TreeID) -> bool) {
     for child in tree.children(parent).unwrap_or_default() {
         if visit(child) {
             walk(tree, TreeParentId::Node(child), visit);

@@ -370,6 +370,7 @@ body[data-history-preview="document"] canvas {
 .library-tab { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 0; }
 .library-line, .library-count { font-size: 12px; color: var(--panel-muted-fg); font-variant-numeric: tabular-nums; }
 .library-search { display: flex; align-items: center; gap: 4px; height: 28px; padding: 0 6px; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 40%, transparent); border-radius: 5px; color: var(--toolbar-icon); }
+.library-search input::-webkit-search-cancel-button { display: none; }
 .library-search input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font-size: 14px; color: var(--toolbar-icon); }
 .library-tree { flex: 1; min-height: 176px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-gutter: stable; position: relative; }
 .library-empty { margin-top: 24px; font-size: 14px; color: var(--panel-muted-fg); }
@@ -392,7 +393,8 @@ body[data-history-preview="document"] canvas {
 .library-row:hover .library-action, .library-row:focus-within .library-action, .library-action.library-armed { opacity: 1; }
 .library-action.library-armed { background: var(--destructive); color: #fff; }
 .library-footer { display: flex; flex-direction: column; gap: 4px; }
-.library-add { display: inline-flex; align-items: center; gap: 4px; width: 118px; height: 28px; padding: 0 8px; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent); font-size: 14px; color: var(--toolbar-icon); }
+.library-footer-buttons { display: flex; gap: 8px; }
+.library-add { display: inline-flex; flex: none; align-items: center; gap: 4px; width: 118px; height: 28px; padding: 0 8px; white-space: nowrap; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent); font-size: 14px; color: var(--toolbar-icon); }
 .library-refusal { font-size: 12px; color: var(--field-invalid); }
 html[data-library-drag="grabbing"], html[data-library-drag="grabbing"] * { cursor: grabbing !important; }
 html[data-library-drag="refused"], html[data-library-drag="refused"] * { cursor: not-allowed !important; }
@@ -420,3 +422,34 @@ html[data-library-drag="refused"], html[data-library-drag="refused"] * { cursor:
 .came-from-line { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--panel-muted-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .came-from-line > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .came-from-open { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 28px; width: 100%; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent); font-size: 14px; color: var(--toolbar-icon); }
+/* The Online group of the Library tab (`specs/0138-template-library` UX notes 2 to 8). */
+.library-online-add { height: 24px; width: 52px; flex: none; margin-right: 4px; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent); font-size: 12px; color: var(--toolbar-icon); background: transparent; }
+.library-online-add:hover { background: var(--editor-accent-hover); }
+.library-action.library-action-shown { opacity: 1; }
+.library-licence-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.library-licence-link { background: transparent; border: 0; padding: 0; color: var(--toolbar-icon); text-decoration: underline; font: inherit; cursor: pointer; }
+/* Five 36 px cells and the child indent fit the 244 px column (UX notes 6). */
+.library-icon-cells { display: flex; gap: 4px; }
+.library-icon-cell { width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent); border-radius: 5px; }
+.library-icon-cell:focus-visible { outline: 2px solid var(--editor-accent); outline-offset: 1px; }
+@media (pointer: coarse) { .library-icon-cell { width: 40px; height: 40px; } }
+.library-set-samples { display: inline-flex; width: 28px; height: 28px; flex: none; overflow: hidden; gap: 0; }
+.library-set-samples img { width: 9px; height: 9px; }
+.library-source-form { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--toolbar-bg); border-radius: 5px; }
+.library-source-form label { font-size: 12px; color: var(--panel-muted-fg); }
+.library-source-form input[type="url"], .library-source-form input[type="text"] { height: 28px; padding: 0 6px; font-size: 14px; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 40%, transparent); background: transparent; color: var(--toolbar-icon); }
+.library-source-form input[aria-invalid="true"] { border-color: var(--field-invalid); }
+.library-kind { display: flex; gap: 0; }
+.library-kind button { flex: 1; height: 28px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent); color: var(--toolbar-icon); background: transparent; }
+.library-kind button[aria-checked="true"] { background: var(--editor-accent); color: #fff; border-color: var(--editor-accent); }
+.library-source-buttons { display: flex; gap: 8px; }
+.library-source-buttons button { width: 118px; height: 28px; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent); font-size: 14px; color: var(--toolbar-icon); display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.library-search-online { width: 24px; height: 24px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.credits-block { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.credits-block header { height: 28px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600; }
+.credits-block header span { font-size: 12px; font-weight: 400; color: var(--panel-muted-fg); }
+.credits-block p { margin: 0; }
+.credits-block button { background: transparent; border: 0; padding: 0; text-decoration: underline; font: inherit; color: var(--toolbar-icon); cursor: pointer; }
+/* "Loading..." and the other loading lines show after 150 ms (UX notes 4), so a quick answer never flashes. */
+.library-row[data-status="loading"] > * { animation: library-late 0s linear 150ms both; }
+@keyframes library-late { from { visibility: hidden; } to { visibility: visible; } }

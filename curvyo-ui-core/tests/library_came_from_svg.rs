@@ -34,6 +34,7 @@ fn the_svg_export_writes_nothing_of_came_from() {
                 page_id: "first".into(),
                 item: None,
                 at: UnixMillis::new(1_764_000_000_000),
+                online: None,
             },
             &[
                 AnchorId::new(2, 1),

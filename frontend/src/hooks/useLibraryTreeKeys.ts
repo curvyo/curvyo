@@ -1,8 +1,8 @@
-// The Library tree's keyboard (`specs/0137-document-library` UX notes section 11): Up, Down,
-// Page Up, Page Down, Home and End between rows; Right expands, then reaches the action cell;
-// Left goes back, collapses, then to the parent; Enter or Space toggles or opens a page in the
-// preview; Ctrl+Enter imports a page; Delete arms Remove; Escape returns to the canvas; a
-// printable key goes to the search field.
+// The Library tree's keyboard (`specs/0137-document-library` UX notes section 11, `0138` section
+// 10): Up, Down, Page Up, Page Down, Home and End between rows; Right expands, then walks the
+// row's cells; Left walks back, collapses, then goes to the parent; Enter or Space toggles or
+// opens a page in the preview; Ctrl+Enter imports a page or loads a template; Delete arms Remove;
+// Escape returns to the canvas; a printable key goes to the search field.
 import type { KeyboardEvent } from "react";
 
 import type { LibraryRow } from "@/lib/libraryApi";
@@ -26,6 +26,10 @@ interface TreeKeys {
   onReturnFocus: () => void;
 }
 
+/** The cells a row's Right and Left reach after its name cell, in their visual order: the licence
+ * link, Load or Import page, Refresh, Remove, and the ready entry's Add (`0138` UX notes 10). */
+const CELLS = ".library-licence-link, .library-action, .library-online-add";
+
 /** The key handler of one row at `index`. */
 export function useLibraryTreeKeys(keys: TreeKeys) {
   const { rows, focusable, parentOf, pageRows, searching, focusRow, toggle, openRow } = keys;
@@ -38,10 +42,15 @@ export function useLibraryTreeKeys(keys: TreeKeys) {
   };
   return (event: KeyboardEvent<HTMLDivElement>, row: LibraryRow, index: number) => {
     if (event.target !== event.currentTarget) {
-      // The action cell (Import page, Remove): Left goes back to the name cell.
+      // An action cell: Right goes to the next cell, Left to the previous one, then the name cell.
+      const cells = [...event.currentTarget.querySelectorAll<HTMLElement>(CELLS)];
+      const at = cells.indexOf(event.target as HTMLElement);
       if (event.key === "ArrowLeft") {
         event.preventDefault();
-        event.currentTarget.focus();
+        (cells[at - 1] ?? event.currentTarget).focus();
+      } else if (event.key === "ArrowRight" && at >= 0) {
+        event.preventDefault();
+        cells[at + 1]?.focus();
       } else if (event.key === "Escape") {
         keys.onReturnFocus();
       }
@@ -55,9 +64,18 @@ export function useLibraryTreeKeys(keys: TreeKeys) {
       Home: -rows.length,
       End: rows.length,
     };
-    if (row.kind === "page" && event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    const importable = row.kind === "page" || (row.kind === "template" && row.online?.loadable === true);
+    if (importable && event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       keys.importPage(row);
+    } else if ((event.key === "Enter" || event.key === " ") && (row.kind === "ready" || row.kind === "icons")) {
+      // The ready entry's one act is Add; an icon row's cells are its content.
+      event.preventDefault();
+      if (row.kind === "ready") {
+        event.currentTarget.querySelector<HTMLElement>(".library-online-add")?.click();
+      } else {
+        event.currentTarget.querySelector<HTMLElement>("[data-icon-cell]")?.focus();
+      }
     } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       if (row.kind === "page") {
@@ -75,7 +93,7 @@ export function useLibraryTreeKeys(keys: TreeKeys) {
       if (row.expandable && !row.expanded && !searching) {
         toggle(row);
       } else {
-        event.currentTarget.querySelector<HTMLElement>(".library-action")?.focus();
+        event.currentTarget.querySelector<HTMLElement>(row.kind === "icons" ? "[data-icon-cell]" : CELLS)?.focus();
       }
     } else if (event.key === "ArrowLeft") {
       event.preventDefault();

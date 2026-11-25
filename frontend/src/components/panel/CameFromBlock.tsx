@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 import { type CameFromRecord, type SourcePlace, findLibrarySource, openLibraryPath, scanLibrary } from "@/lib/libraryApi";
 import { openSource } from "@/lib/libraryOpenSource";
+import { openLicence } from "@/lib/onlineApi";
 import { isTauri } from "@/platform/host";
 import { activateWhenOpen } from "@/lib/libraryStore";
 
@@ -17,6 +18,8 @@ interface CameFromView {
   tooltip: string | null;
   open: boolean;
   record: CameFromRecord | null;
+  /** The licence line of an online item ("CC BY 4.0 · Jane Doe"). */
+  online?: { licence: string; licence_url: string; author: string } | null;
 }
 
 interface CameFromBlockProps {
@@ -116,6 +119,23 @@ export function CameFromBlock({ getSession, pageId, revision, openInWorkspace, o
         <FileInput size={16} aria-hidden="true" />
         <span>{view.text}</span>
       </p>
+      {view.online ? (
+        <p className="library-line" style={{ margin: 0 }}>
+          {view.online.licence_url && isTauri ? (
+            <button
+              type="button"
+              className="library-licence-link"
+              title={view.online.licence_url}
+              onClick={() => void openLicence(view.online?.licence_url ?? "").catch(() => undefined)}
+            >
+              {view.online.licence}
+            </button>
+          ) : (
+            view.online.licence
+          )}
+          {view.online.author ? ` · ${view.online.author}` : ""}
+        </p>
+      ) : null}
       {found ? (
         <button type="button" className="came-from-open" aria-busy={busy || undefined} onClick={run}>
           {busy ? <LoaderCircle size={16} aria-hidden className="motion-safe:animate-spin" /> : null}

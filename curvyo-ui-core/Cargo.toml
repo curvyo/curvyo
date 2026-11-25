@@ -10,6 +10,8 @@ description = "The Curvyo interaction layer: pen/node tool state machines, hit-t
 workspace = true
 
 [dependencies]
+# The online library's catalogue, sets and failures the Online rows show (ADR 0085 decision 8).
+curvyo-library-core = { path = "../curvyo-library-core", version = "0.1.0" }
 curvyo-sketch-core = { path = "../curvyo-sketch-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 curvyo-geometry-core = { path = "../curvyo-geometry-core", version = "0.1.0" }
