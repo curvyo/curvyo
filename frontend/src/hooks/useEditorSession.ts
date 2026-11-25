@@ -396,6 +396,13 @@ function readLiveReadout(
   return readout;
 }
 
+/** The live readout with the glyph of a sketch clone's knob drag. */
+function readSessionReadout(session: WasmSession | null | undefined): LiveReadout | null {
+  const readout = readLiveReadout(session?.live_readout());
+  const glyph = readout ? session?.sketch_knob_chip_glyph() : "";
+  return readout && (glyph === "link" || glyph === "unlink") ? { ...readout, glyph } : readout;
+}
+
 /** The Offset tool's readout chip during a drag (`specs/0038-path-offset` criteria 12, 15, 18),
  * at the pointer; `null` without a drag. */
 function offsetLiveReadout(session: WasmSession, x: number, y: number): LiveReadout | null {
@@ -436,6 +443,9 @@ export interface LiveReadout {
   third?: string;
   /** The third line is in the invalid colour (the Offset tool's stop). */
   thirdInvalid?: boolean;
+  /** The chain glyph before the text: a sketch clone's knob drag of a linked value
+   * (`specs/0099-sketch-pages` UX notes 12.9.4). */
+  glyph?: "link" | "unlink";
 }
 
 /** One field of the typed numeric entry chip (`object-transform-
@@ -2598,9 +2608,10 @@ export function useEditorSession(
         return;
       }
       const offsetReadout = session?.tool() === "offset" ? offsetLiveReadout(session, x, y) : null;
-      setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
-      if (offsetReadout) {
-        // The handles and the preview follow an Offset drag live (`0038` criterion 15).
+      setLiveReadout(offsetReadout ?? readSessionReadout(session));
+      if (offsetReadout || session?.sketch_knob_dragging()) {
+        // The handles and the preview follow an Offset drag live (`0038` criterion 15); the
+        // Parameters fields follow a sketch clone's knob and its partners (`0099` criterion 33).
         syncFromSession();
       }
       setCursorHint(session?.cursor_hint() ?? "default");
@@ -2843,7 +2854,7 @@ export function useEditorSession(
       // An Offset drag keeps its own readout through a modifier change (`0038` criteria 15, 19).
       const offsetReadout =
         session.tool() === "offset" ? offsetLiveReadout(session, last.x, last.y) : null;
-      setLiveReadout(offsetReadout ?? readLiveReadout(session?.live_readout()));
+      setLiveReadout(offsetReadout ?? readSessionReadout(session));
       setHandleHint("");
     }
     setCursorHint(session.cursor_hint());
@@ -2998,7 +3009,7 @@ export function useEditorSession(
         return;
       }
       if (handleKeyOutcome(outcome)) {
-        setLiveReadout(readLiveReadout(session.live_readout()));
+        setLiveReadout(readSessionReadout(session));
         setCursorHint(session.cursor_hint());
         syncFromSession();
         return;
@@ -3026,7 +3037,7 @@ export function useEditorSession(
         keyHintCounter.current += 1;
         setKeyHint({ text: hint, id: keyHintCounter.current });
       }
-      setLiveReadout(readLiveReadout(session?.live_readout()));
+      setLiveReadout(readSessionReadout(session));
       setCursorHint(session.cursor_hint());
       syncFromSession();
     },

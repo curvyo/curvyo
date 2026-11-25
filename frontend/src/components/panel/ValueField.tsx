@@ -1,6 +1,6 @@
 import { RotateCcw } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
 import { SliderTip } from "@/components/SliderTip";
@@ -82,12 +82,22 @@ interface ValueFieldProps {
   describedBy?: string;
   /** The message of a refused typed value. */
   messages: Readonly<Record<string, string>>;
+  /** Shift means "only this value", never coarse (a value in a link group, `specs/0099` UX notes
+   * 12.9.3); `onlyThis` of the callbacks says whether it was held at the gesture's start. */
+  shiftOnlyThis?: boolean;
+  /** PageUp and PageDown step ten times (the Parameters row, `specs/0099` UX notes 12.9.3). */
+  pageSteps?: boolean;
+  /** A mark drawn right after the label (the link mark of a linked value). */
+  labelMark?: ReactNode;
+  /** It follows another field's gesture (a linked partner, `specs/0099` UX notes 12.9.3): the
+   * border takes the hover strength. */
+  following?: boolean;
   /** A tick of a drag: position `p` (0 to 1) on the field's scale, rounded to `grid`. */
-  onPreview: (p: number, grid: GridName) => void;
+  onPreview: (p: number, grid: GridName, onlyThis?: boolean) => void;
   /** A click: ends the gesture its `onPreview` started, committing the value once. */
   onSettle: () => void;
   /** An arrow key: `steps` steps from the shown value. */
-  onStep: (steps: number, grid: GridName) => void;
+  onStep: (steps: number, grid: GridName, onlyThis?: boolean) => void;
   /** The reset icon or Ctrl+Backspace. */
   onReset: () => void;
   /** Enter or Tab in the typed field: `"committed"`, `"unchanged"` or `"invalid:<code>"`. */
@@ -142,6 +152,10 @@ export function ValueField({
   messages,
   note,
   describedBy,
+  shiftOnlyThis = false,
+  pageSteps = false,
+  labelMark,
+  following = false,
   onPreview,
   onSettle,
   onStep,
@@ -156,6 +170,7 @@ export function ValueField({
     limit: dragLimit,
     min: dragMin,
     mixed,
+    shiftOnlyThis,
     onTick: onPreview,
     // A click sets the value at the pointer and commits it; a double-click types
     // (`specs/0047-transform-polish/` criteria 33 to 36).
@@ -171,15 +186,18 @@ export function ValueField({
   const slot = noResetSlot ? 0 : 30;
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const grid = gridOf(event);
+    const grid = gridOf(event, shiftOnlyThis);
     const step = (steps: number) => {
       event.preventDefault();
-      onStep(steps, grid);
+      onStep(steps, grid, shiftOnlyThis && event.shiftKey);
     };
     if (event.key === "ArrowRight" || event.key === "ArrowUp") {
       step(1);
     } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
       step(-1);
+    } else if (pageSteps && (event.key === "PageUp" || event.key === "PageDown")) {
+      event.preventDefault();
+      onStep(event.key === "PageUp" ? 10 : -10, "normal", false);
     } else if (event.key === "Home" || event.key === "End") {
       event.preventDefault();
       onPreview(event.key === "Home" ? 0 : 1, "normal");
@@ -265,10 +283,10 @@ export function ValueField({
               valueText ??
               (mixed ? "Mixed" : `${text} ${text === "1" && unitWordOne ? unitWordOne : unitWords}`)
             }
-            aria-keyshortcuts="Control+Backspace Enter F2"
+            aria-keyshortcuts={pageSteps ? "Control+Backspace Enter F2 PageUp PageDown" : "Control+Backspace Enter F2"}
             onKeyDown={onKeyDown}
             {...handlers}
-            className={`relative h-7 w-full cursor-ew-resize overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
+            className={`relative h-7 w-full cursor-ew-resize overflow-hidden rounded-[5px] border ${following ? "border-[var(--toolbar-icon)]" : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]"} bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
             style={{ touchAction: "pan-y" }}
           >
             {!mixed && bar > barFrom && (
@@ -304,9 +322,10 @@ export function ValueField({
             <span
               ref={labelSpan}
               aria-hidden
-              className="absolute top-1/2 left-2 -translate-y-1/2 text-sm text-[var(--toolbar-icon)]"
+              className="absolute top-1/2 left-2 flex -translate-y-1/2 items-center gap-1 text-sm text-[var(--toolbar-icon)]"
             >
               {label}
+              {labelMark}
             </span>
             {modifier !== "normal" && (
               <span

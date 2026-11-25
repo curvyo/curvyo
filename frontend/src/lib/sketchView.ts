@@ -2,7 +2,11 @@ export type SketchQuantity = { value: number; dimension: "Length" | "Angle" | "S
 /** What a clone may set of a value (`specs/0099` criterion 23): `on` is whether it is exposed, `min`
  * and `max` the limits in millimetres or degrees (`null`: none), `holders` how many clones hold an
  * own value of it, `suggest` the name a dimension is exposed under. */
-export type SketchExpose = { key: string; on: boolean; name?: string | null; min: number | null; max: number | null; holders: number; suggest?: string; angle: boolean };
+export type SketchExpose = { key: string; on: boolean; name?: string | null; min: number | null; max: number | null; holders: number; suggest?: string; angle: boolean; link?: SketchLink | null };
+/** The Link line of an exposed value (`specs/0099` criterion 32, UX notes 12.9.1): its group letter
+ * and partners, or (not grouped) what its list offers: groups of its kind first, then ungrouped
+ * values of its kind. `null` while nothing of its kind could partner it. */
+export type SketchLink = { group: string | null; partners?: string[]; options?: { with: string; group: string | null; label: string }[] };
 export type SketchConstraint = { id: string; kind: string; entities: string[]; reference: boolean; expression: string | null; value: SketchQuantity | null; conflicting: boolean; redundant: boolean; selected: boolean; expose?: SketchExpose | null };
 export type SketchParameter = { id: string; name: string; dimension: SketchQuantity["dimension"]; expression: string | null; value: SketchQuantity | null; expose?: SketchExpose | null };
 /** The mode label at the segment start; `away_*` names the quadrant it sits in (y down). */
@@ -17,7 +21,7 @@ export type SketchEntry = { kind: "construction" | "dimension" | "edit"; action:
 /** A Constraints rail tool: what a press does now, and its tooltip (AC24). */
 export type SketchRailTool = { name: string; label: string; state: "apply" | "arm" | "unavailable"; tooltip: string; pressed: boolean };
 /** A dimension text or transient label, placed by Rust in CSS pixels (AC31). */
-export type SketchAnnotation = { preview?: boolean; id: string; x: number; y: number; text: string; name?: string; dimension: boolean; selected: boolean; hovered?: boolean; exposed?: boolean; reference?: boolean; fx?: boolean; editing?: boolean; conflicting: boolean; redundant?: boolean; glyph?: string };
+export type SketchAnnotation = { preview?: boolean; id: string; x: number; y: number; text: string; name?: string; dimension: boolean; selected: boolean; hovered?: boolean; exposed?: boolean; group?: string; reference?: boolean; fx?: boolean; editing?: boolean; conflicting: boolean; redundant?: boolean; glyph?: string };
 /** A constraint symbol badge, or a thinned dot, placed by Rust (AC32). */
 export type SketchSymbol = { id: string; glyph: string; index: number | null; name: string; x: number; y: number; selected: boolean; hovered: boolean; conflicting: boolean; redundant: boolean; dot: boolean };
 export type SketchSymbolMore = { count: number; x: number; y: number };

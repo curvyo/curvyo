@@ -1,5 +1,5 @@
-import { TriangleAlert } from "lucide-react";
-import { useId, useRef } from "react";
+import { Link, TriangleAlert, Unlink } from "lucide-react";
+import { useId, useRef, useState } from "react";
 
 import { OverrideRow } from "@/components/panel/CloneBlock";
 import { ValueField } from "@/components/panel/ValueField";
@@ -17,12 +17,36 @@ import { PARAMETERS_SEGMENTS } from "@/lib/cloneText";
 import {
   asGeneratedRow,
   followsWords,
+  linkMarkTitle,
+  linkWords,
   NO_SOLUTION_LINE,
   resetName,
   type SketchInstanceRow,
 } from "@/lib/sketchInstanceView";
 
 const MESSAGES = { number: "Enter a number" } as const;
+
+/** The link mark after a field's label (UX notes 12.9.2): `Link` and the group letter muted for a
+ * coupled value, `Unlink` at full strength for one this clone holds alone; none otherwise. */
+function LinkMark({ row }: { row: SketchInstanceRow }) {
+  if (row.group === null || (row.link !== "linked" && row.link !== "unlinked")) {
+    return null;
+  }
+  const unlinked = row.link === "unlinked";
+  const Glyph = unlinked ? Unlink : Link;
+  return (
+    <span
+      aria-hidden
+      data-link-mark={row.link}
+      title={linkMarkTitle(row)}
+      className="pointer-events-auto inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium tabular-nums"
+      style={{ color: unlinked ? "var(--toolbar-icon)" : "var(--panel-muted-fg)" }}
+    >
+      <Glyph size={12} strokeWidth={1.5} />
+      {row.group}
+    </span>
+  );
+}
 
 /** One value of the sketch: the panel's Value field on the track Rust gives it, muted while it
  * follows the original (`specs/0099-sketch-pages` criterion 24, UX notes 12.2). */
@@ -32,15 +56,24 @@ function ValueRow({
   cloneName,
   describedBy,
   onReturnFocus,
+  following,
+  onGesture,
 }: {
   row: SketchInstanceRow;
   api: SketchInstanceApi;
   cloneName: string;
   describedBy: string | undefined;
   onReturnFocus: () => void;
+  /** A coupled gesture on a partner moves this field: its border follows (UX notes 12.9.3). */
+  following: boolean;
+  /** A gesture on this field starts (coupled or only this) or ends (`null`). */
+  onGesture: (coupled: boolean | null) => void;
 }) {
-  // The value of the last drag or key tick, committed once when the gesture ends.
+  // The value of the last drag or key tick, committed once when the gesture ends, and whether
+  // Shift was held at the gesture's start on a linked value (only this, criterion 34).
   const pending = useRef<number | null>(null);
+  const onlyThis = useRef(false);
+  const grouped = row.group !== null;
   const field = asGeneratedRow(row);
   const decimals = row.unit === "deg" ? 1 : 2;
   const unit = row.unit === "deg" ? "°" : "mm";
@@ -53,7 +86,16 @@ function ValueRow({
     const value = pending.current;
     pending.current = null;
     if (value !== null) {
-      api.setValue(row.key, value);
+      api.setValue(row.key, value, onlyThis.current);
+    }
+    onlyThis.current = false;
+    onGesture(null);
+  };
+  /** Latches "only this" at the first tick of a gesture: a later Shift changes nothing. */
+  const latch = (shift: boolean | undefined) => {
+    if (pending.current === null) {
+      onlyThis.current = grouped && shift === true;
+      onGesture(!onlyThis.current);
     }
   };
   const words = row.unit === "deg" ? "degrees" : "millimetres";
@@ -71,7 +113,7 @@ function ValueRow({
         resettable={own}
         resetLabel={resetName(row)}
         muted={!own}
-        valueText={`${text} ${words}${followsWords(row)}`}
+        valueText={`${text} ${words}${followsWords(row)}${linkWords(row)}`}
         tipValue={`${text}${row.unit === "deg" ? unit : ` ${unit}`}${followsWords(row)}`}
         unit={unit}
         valueNow={current}
@@ -81,21 +123,29 @@ function ValueRow({
         defaultText={`${shownNumber(row.sketchValue, 4)}${row.unit === "deg" ? unit : ` ${unit}`}`}
         messages={MESSAGES}
         describedBy={describedBy}
-        onPreview={(p, grid) => {
+        shiftOnlyThis={grouped}
+        following={following}
+        pageSteps
+        labelMark={<LinkMark row={row} />}
+        onPreview={(p, grid, shift) => {
+          latch(shift);
           const value = valueAt(field, p, grid);
           pending.current = value;
-          api.preview(row.key, value);
+          api.preview(row.key, value, onlyThis.current);
         }}
         onSettle={commit}
-        onStep={(steps, grid) => {
+        onStep={(steps, grid, shift) => {
           // The canvas follows the key; the key-up is the one commit (the Generator block's rule).
+          latch(shift);
           const next = stepValue(field, pending.current ?? current, steps, grid);
           pending.current = next;
-          api.preview(row.key, next);
+          api.preview(row.key, next, onlyThis.current);
         }}
         onReset={() => api.reset(row.key)}
         onCancel={() => {
           pending.current = null;
+          onlyThis.current = false;
+          onGesture(null);
           api.cancelPreview();
         }}
         onSubmit={(typed) => {
@@ -141,6 +191,8 @@ export function SketchParametersRow({
 }) {
   const { view } = api;
   const lineId = useId();
+  // The field whose coupled gesture is in flight: its partners' borders follow.
+  const [leading, setLeading] = useState<SketchInstanceRow | null>(null);
   if (!view) {
     return null;
   }
@@ -177,6 +229,15 @@ export function SketchParametersRow({
           cloneName={cloneName}
           describedBy={view.noSolution ? lineId : undefined}
           onReturnFocus={onReturnFocus}
+          following={
+            leading !== null &&
+            leading.key !== row.key &&
+            leading.group !== null &&
+            leading.group === row.group &&
+            leading.link === "linked" &&
+            row.link === "linked"
+          }
+          onGesture={(coupled) => setLeading(coupled ? row : null)}
         />
       ))}
     </div>

@@ -6,6 +6,7 @@ import type { GradientApi } from "@/hooks/useGradient";
 import type { SketchApi } from "@/hooks/useSketch";
 import { SketchAnnotations } from "@/components/sketch/SketchAnnotations";
 import { SketchEntryBox, SketchModeLabel } from "@/components/sketch/SketchCanvasChips";
+import { Link, Unlink } from "lucide-react";
 import { type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { PageFrames } from "@/components/PageFrames";
@@ -30,6 +31,7 @@ import { PlacementChip } from "@/components/PlacementChip";
 import { SelectionAnnouncer } from "@/components/SelectionAnnouncer";
 import { TextPathEntryChip } from "@/components/TextPathEntryChip";
 import { TilingEntryChip } from "@/components/TilingEntryChip";
+import { SketchKnobEntryChip } from "@/components/SketchKnobEntryChip";
 import { TransformEntryChip } from "@/components/TransformEntryChip";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { ColourPickChip } from "@/components/ColourPickChip";
@@ -362,6 +364,7 @@ export function Canvas({
           containerRef={editor.containerRef}
         />
       )}
+      <SketchKnobEntryChip editor={editor} />
       {editor.moveEntry && (
         <MoveEntryChip
           entry={editor.moveEntry}
@@ -450,6 +453,7 @@ export function Canvas({
           second={editor.liveReadout.second}
           third={editor.liveReadout.third}
           thirdInvalid={editor.liveReadout.thirdInvalid}
+          glyph={editor.liveReadout.glyph}
           x={editor.liveReadout.x}
           y={editor.liveReadout.y}
           containerRef={editor.containerRef}
@@ -492,6 +496,8 @@ interface ReadoutChipProps {
   third?: string;
   /** The third line in the invalid colour. */
   thirdInvalid?: boolean;
+  /** The chain glyph before the text (`specs/0099` UX notes 12.9.4). */
+  glyph?: "link" | "unlink";
   /** Canvas-relative CSS pixels, already converted by Rust
    * (`specs/0004-canvas-navigation-and-selection/adrs.md`: "Anything the
    * DOM positions... is returned already converted"). */
@@ -508,7 +514,7 @@ interface ReadoutChipProps {
  * render so it can be kept fully inside the canvas — flipped left or below
  * the pointer near the right and top edges — instead of vanishing there.
  */
-function ReadoutChip({ text, second, third, thirdInvalid, x, y, containerRef }: ReadoutChipProps) {
+function ReadoutChip({ text, second, third, thirdInvalid, glyph, x, y, containerRef }: ReadoutChipProps) {
   const chipRef = useRef<HTMLDivElement>(null);
   const [sizes, setSizes] = useState({
     chip: { width: 0, height: 0 },
@@ -567,7 +573,11 @@ function ReadoutChip({ text, second, third, thirdInvalid, x, y, containerRef }: 
         border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)",
       }}
     >
-      <div>{text}</div>
+      <div className="flex items-center gap-1">
+        {glyph === "link" && <Link size={12} strokeWidth={1.5} aria-hidden />}
+        {glyph === "unlink" && <Unlink size={12} strokeWidth={1.5} aria-hidden />}
+        {text}
+      </div>
       {second && <div className="text-muted-foreground">{second}</div>}
       {third && (
         <div style={thirdInvalid ? { color: "var(--field-invalid)" } : undefined}>{third}</div>

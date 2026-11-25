@@ -24,6 +24,12 @@ export interface SketchInstanceRow {
   trackLog: boolean;
   /** A selected clone follows another clone ("Back to the original's value"). */
   chained: boolean;
+  /** The letter of its link group ("A"), `null` when it is in none (UX notes 12.9). */
+  group: string | null;
+  /** The labels of the other members of its group. */
+  partners: string[];
+  /** Whether the selected clones couple it (`linked`), hold it alone (`unlinked`) or differ. */
+  link: "none" | "linked" | "unlinked" | "mixed";
 }
 
 /** The row of the pill and the fields. */
@@ -73,6 +79,9 @@ export function decodeSketchInstance(text: string): SketchInstanceView | null {
       trackMax: Number(row.track_max),
       trackLog: row.track_log === true,
       chained: row.chained === true,
+      group: typeof row.group === "string" ? row.group : null,
+      partners: Array.isArray(row.partners) ? row.partners.map(String) : [],
+      link: (["linked", "unlinked", "mixed"].includes(String(row.link)) ? row.link : "none") as SketchInstanceRow["link"],
     })),
   };
 }
@@ -117,7 +126,64 @@ export function followsWords(row: SketchInstanceRow): string {
 }
 
 /** "3 clones go back to the sketch's value" (`specs/0099` UX notes 12.1): what Stop exposing does. */
-export function stopTitle(holders: number): string {
-  if (holders === 0) return "Stop exposing: clones can no longer set this value";
-  return `Stop exposing: ${holders} ${holders === 1 ? "clone goes" : "clones go"} back to the sketch's value`;
+export function stopTitle(holders: number, partners: string[] = []): string {
+  // A linked member names the link first (UX notes 12.9.1).
+  const link = partners.length > 0 ? `Leaves the link with ${partners.join(", ")}. ` : "";
+  if (holders === 0) return `${link}Stop exposing: clones can no longer set this value`;
+  return `${link}Stop exposing: ${holders} ${holders === 1 ? "clone goes" : "clones go"} back to the sketch's value`;
+}
+
+/** The tail of a field's accessible value text for a linked value (UX notes 12.9.5). */
+export function linkWords(row: SketchInstanceRow): string {
+  const partners = row.partners.join(", ");
+  switch (row.link) {
+    case "linked":
+      return `, linked with ${partners}`;
+    case "unlinked":
+      return `, unlinked from ${partners}`;
+    case "mixed":
+      return ", linked on some clones";
+    default:
+      return "";
+  }
+}
+
+/** The tooltip of a field's link mark (UX notes 12.9.2), empty when it shows none. */
+export function linkMarkTitle(row: SketchInstanceRow): string {
+  const partners = row.partners.join(", ");
+  return row.link === "linked" ? `Linked with ${partners}` : row.link === "unlinked" ? `Unlinked from ${partners}` : "";
+}
+
+/** The open entry chip of a sketch clone's knob (`specs/0099` criterion 25). */
+export interface SketchKnobEntry {
+  key: string;
+  label: string;
+  unit: "mm" | "deg";
+  value: number;
+  /** The link mark after the label: coupled, held alone, or none. */
+  glyph: "link" | "unlink" | "";
+  /** The knob, in canvas CSS pixels. */
+  x: number;
+  y: number;
+}
+
+/** The decoder of `sketch_knob_entry_json`: `null` while no chip is open. */
+export function decodeKnobEntry(text: string): SketchKnobEntry | null {
+  if (text === "") {
+    return null;
+  }
+  try {
+    const raw = JSON.parse(text) as Record<string, unknown>;
+    return {
+      key: String(raw.key),
+      label: String(raw.label),
+      unit: raw.unit === "deg" ? "deg" : "mm",
+      value: Number(raw.value),
+      glyph: raw.glyph === "link" || raw.glyph === "unlink" ? raw.glyph : "",
+      x: Number(raw.x),
+      y: Number(raw.y),
+    };
+  } catch {
+    return null;
+  }
 }
