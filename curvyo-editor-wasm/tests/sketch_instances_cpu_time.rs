@@ -1,4 +1,5 @@
-//! The cost of a Parameters field drag (`specs/0099-sketch-pages` criterion 31, `adrs.md` A4):
+//! The cost of a Parameters field drag and of a knob drag (`specs/0099-sketch-pages` criteria 31
+//! and 37, `adrs.md` A4, A12):
 //! 200 clones of the 100-entity sketch of `0066` criterion 6, each with a distinct own value; each
 //! step of a field drag solves only the clone being changed and builds the canvas view of that
 //! frame within 16 ms of thread CPU (`tests/cpu_time/`), and none of the other 199 clones is
@@ -66,9 +67,19 @@ fn key() -> ExposedKey {
     ExposedKey::dimension(&"distance0".into())
 }
 
+fn partner() -> ExposedKey {
+    ExposedKey::dimension(&"distance1".into())
+}
+
 /// The sketch page, its sketch exposing the first distance, and 200 clones on a grid of the
 /// pasteboard, each with its own value of it.
 fn document() -> (Document, Vec<NodeId>) {
+    document_with(false)
+}
+
+/// [`document`]; with `linked`, the second distance is exposed too and linked with the first,
+/// and every clone holds both at one distinct coupled value.
+fn document_with(linked: bool) -> (Document, Vec<NodeId>) {
     let d = Document::new(9930);
     let page = d
         .add_page_of(&curvyo_document_core::PageKind::Sketch)
@@ -78,6 +89,11 @@ fn document() -> (Document, Vec<NodeId>) {
         .unwrap();
     d.expose_parameter(sketch, &key(), Some("Distance 1"))
         .unwrap();
+    if linked {
+        d.expose_parameter(sketch, &partner(), Some("Distance 2"))
+            .unwrap();
+        d.link_exposed(sketch, &key(), &partner()).unwrap();
+    }
     let mut clones = Vec::new();
     let mut writes = Vec::new();
     for n in 0..CLONES {
@@ -88,6 +104,12 @@ fn document() -> (Document, Vec<NodeId>) {
         let clone = d.place_linked_clone(sketch, to).unwrap();
         let mut own = ValueSet::default();
         own.insert(key(), InstanceValue::from_mm(12.0 + f64::from(n) * 0.04));
+        if linked {
+            own.insert(
+                partner(),
+                InstanceValue::from_mm(12.0 + f64::from(n) * 0.04),
+            );
+        }
         writes.push(InstanceWrite {
             clone,
             own,
@@ -147,7 +169,7 @@ fn a_field_drag_over_200_distinct_clones_solves_one_clone_per_step_within_16_ms(
     for step in 1..=40 {
         let value = 12.003 + f64::from(step) * 0.05;
         let (answer, time) = cpu_time::cpu_time_of(|| {
-            let answer = s.preview_sketch_instance_value("d:distance0", value);
+            let answer = s.preview_sketch_instance_value("d:distance0", value, false);
             let _ = s.frame_draw_list();
             answer
         });
@@ -167,10 +189,105 @@ fn a_field_drag_over_200_distinct_clones_solves_one_clone_per_step_within_16_ms(
     assert_eq!(outlines, after, "the other clones' outlines are untouched");
     let before = s.instance_solve_count();
     let (written, release) =
-        cpu_time::cpu_time_of(|| s.set_sketch_instance_value("d:distance0", 14.0));
+        cpu_time::cpu_time_of(|| s.set_sketch_instance_value("d:distance0", 14.0, false));
     assert!(written.contains("\"written\":true"), "{written}");
     eprintln!(
         "release commit: {release:?} (not budgeted), {} further solves",
         s.instance_solve_count() - before
+    );
+}
+
+/// Zooms with Ctrl+wheel until the selected clone shows its knobs (its box at least 72 px).
+fn zoom_until_knobs(s: &mut Session) {
+    for _ in 0..200 {
+        if !s.sketch_knob_points().is_empty() {
+            return;
+        }
+        s.wheel(0.0, -20.0, 0.0, 0.0, false, true);
+    }
+    panic!("no knobs at {} %", s.zoom_percent());
+}
+
+/// Criteria 31 and 37: each step of a coupled knob drag (the first distance linked with the
+/// second) re-solves only the dragged clone, once for the whole group, and builds the frame within
+/// 16 ms of thread CPU; the other 199 clones' outlines are untouched; the release solves nothing.
+#[test]
+fn a_coupled_knob_drag_over_200_distinct_clones_solves_once_per_step_within_16_ms() {
+    let (d, clones) = document_with(true);
+    let bytes = pack(&d, "budget").unwrap();
+    let mut s = Session::open(9932, &bytes).unwrap();
+    s.resize_viewport(1920.0, 1080.0);
+    let _ = s.frame_draw_list();
+    s.set_tool(Tool::Select);
+    let read = d.read_objects();
+    let ObjectSnapshot::Clone(first) = read.get(clones[0]).unwrap() else {
+        panic!("clone")
+    };
+    let anchor = first.resolved.anchors[0].point;
+    let at = Point::new(anchor.x, anchor.y + 1.0);
+    s.pointer_down(at, false);
+    s.pointer_up(at, false, false);
+    zoom_until_knobs(&mut s);
+    let knob = s
+        .sketch_knob_points()
+        .into_iter()
+        .find(|(key, _)| key == "d:distance0")
+        .unwrap()
+        .1;
+    let outlines: Vec<usize> = clones
+        .iter()
+        .map(|id| s.object_outline_ptr(*id).unwrap_or_default())
+        .collect();
+    let steps = s.history_len();
+    s.pointer_down(knob, false);
+    assert_eq!(
+        s.sketch_knob_chip_glyph(),
+        "link",
+        "the press took the knob"
+    );
+    let solves = s.instance_solve_count();
+    let mut worst = 0.0_f64;
+    for step in 1..=40 {
+        let shift = f64::from(step) * 0.05;
+        let to = Point::new(knob.x + shift, knob.y + shift);
+        let ((), time) = cpu_time::cpu_time_of(|| {
+            s.pointer_hover(to, false, false);
+            let _ = s.frame_draw_list();
+        });
+        worst = worst.max(time.as_secs_f64());
+    }
+    // A step whose value equals another clone's own set reuses that clone's solve.
+    let ran = s.instance_solve_count() - solves;
+    assert!(
+        (30..=40).contains(&ran),
+        "at most one solve per step for the whole group, none for the 199 others: {ran}"
+    );
+    report("coupled knob drag step", worst);
+    assert_eq!(s.history_len(), steps, "nothing written during the drag");
+    let before = s.instance_solve_count();
+    let last = Point::new(knob.x + 2.0, knob.y + 2.0);
+    let ((), release) = cpu_time::cpu_time_of(|| {
+        s.pointer_up(last, false, false);
+        let _ = s.frame_draw_list();
+    });
+    assert_eq!(s.history_len(), steps + 1, "one step on release");
+    eprintln!(
+        "knob release commit: {release:?} (not budgeted), {} further solves",
+        s.instance_solve_count() - before
+    );
+    let after: Vec<_> = clones
+        .iter()
+        .skip(1)
+        .map(|id| s.object_outline_ptr(*id).unwrap_or_default())
+        .collect();
+    assert_eq!(
+        &outlines[1..],
+        &after[..],
+        "the other clones' outlines are untouched"
+    );
+    let rows: serde_json::Value = serde_json::from_str(&s.sketch_instance_json()).unwrap();
+    assert_eq!(
+        rows["rows"][0]["value"], rows["rows"][1]["value"],
+        "coupled"
     );
 }

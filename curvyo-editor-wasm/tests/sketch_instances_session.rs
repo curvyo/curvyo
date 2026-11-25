@@ -79,7 +79,7 @@ fn the_fields_follow_a_stepped_value_before_it_is_committed() {
     let shown = |s: &Session| -> serde_json::Value {
         serde_json::from_str(&s.sketch_instance_json()).unwrap()
     };
-    s.preview_sketch_instance_value("d:length", 77.0);
+    s.preview_sketch_instance_value("d:length", 77.0, false);
     assert_eq!(
         shown(&s)["rows"][0]["value"].as_f64(),
         Some(77.0),
@@ -130,7 +130,7 @@ fn expose_on_the_sketch_page_then_a_clone_sets_its_own_value() {
     assert_eq!(panel["state"], "original");
     assert_eq!(panel["rows"][0]["label"], "Distance 1");
     assert_eq!(panel["rows"][0]["origin"], "sketch");
-    let answer = s.set_sketch_instance_value("d:length", 90.0);
+    let answer = s.set_sketch_instance_value("d:length", 90.0, false);
     assert!(answer.contains("\"written\":true"), "{answer}");
     let panel: serde_json::Value = serde_json::from_str(&s.sketch_instance_json()).unwrap();
     assert_eq!(

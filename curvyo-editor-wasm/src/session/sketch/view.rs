@@ -127,6 +127,7 @@ impl Session {
             "holders": self.clones_holding(snapshot.id, key.as_str()),
             "suggest": suggested_name(&snapshot.graph, id, &snapshot.exposed),
             "angle": dimension == Some(Dimension::Angle),
+            "link": link_view(&snapshot.exposed, &key),
         })
     }
 
@@ -150,6 +151,7 @@ impl Session {
             "max": exposed.and_then(|param| param.max),
             "holders": self.clones_holding(snapshot.id, key.as_str()),
             "angle": dimension == Dimension::Angle,
+            "link": link_view(&snapshot.exposed, &key),
         })
     }
 }
@@ -182,23 +184,80 @@ impl Session {
     }
 }
 
-/// Adds `"exposed": true` to the dimension pills whose dimension a clone may set.
+/// The Link line of an exposed value (`0099` criterion 32, UX notes 12.9.1): its group letter and
+/// partners when it is in a group, else what its list offers: every group of its kind (joined
+/// through its first member) and every ungrouped exposed value of its kind; `null` when it is
+/// not exposed or nothing of its kind could partner it (the line is not in the tree).
+fn link_view(
+    exposed: &[curvyo_document_core::ExposedParam],
+    key: &curvyo_document_core::ExposedKey,
+) -> Value {
+    let Some(param) = exposed.iter().find(|param| &param.key == key) else {
+        return Value::Null;
+    };
+    let same_kind = || {
+        exposed
+            .iter()
+            .filter(|other| other.kind == param.kind && other.key != param.key)
+    };
+    if same_kind().next().is_none() {
+        return Value::Null;
+    }
+    if let Some(group) = param.group {
+        let partners: Vec<&str> = same_kind()
+            .filter(|other| other.group == Some(group))
+            .map(|other| other.label.as_str())
+            .collect();
+        return json!({
+            "group": curvyo_ui_core::instance_sketch::group_letter(group),
+            "partners": partners,
+        });
+    }
+    let mut options: Vec<Value> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for other in same_kind() {
+        match other.group {
+            Some(group) if seen.insert(group) => {
+                let members: Vec<&str> = same_kind()
+                    .filter(|m| m.group == Some(group))
+                    .map(|m| m.label.as_str())
+                    .collect();
+                options.push(json!({
+                    "with": other.key,
+                    "group": curvyo_ui_core::instance_sketch::group_letter(group),
+                    "label": members.join(", "),
+                }));
+            }
+            Some(_) => {}
+            None => options.push(json!({"with": other.key, "group": null, "label": other.label})),
+        }
+    }
+    // Groups first, then the ungrouped values (UX notes 12.9.1).
+    options.sort_by_key(|option| option["group"].is_null());
+    json!({"group": null, "options": options})
+}
+
+/// Adds `"exposed": true` to the dimension pills whose dimension a clone may set, and the group
+/// letter of a linked one (UX notes 12.9.1).
 fn mark_exposed_pills(annotations: &mut Value, snapshot: &curvyo_document_core::SketchSnapshot) {
-    let exposed: std::collections::HashSet<&str> = snapshot
+    let exposed: std::collections::HashMap<&str, Option<usize>> = snapshot
         .exposed
         .iter()
-        .filter_map(|param| param.key.as_str().strip_prefix("d:"))
+        .filter_map(|param| Some((param.key.as_str().strip_prefix("d:")?, param.group)))
         .collect();
     let Some(list) = annotations.as_array_mut() else {
         return;
     };
     for annotation in list {
-        let marked = annotation["dimension"] == true
-            && annotation["id"]
-                .as_str()
-                .is_some_and(|id| exposed.contains(id));
-        if marked {
+        let group = annotation["id"]
+            .as_str()
+            .filter(|_| annotation["dimension"] == true)
+            .and_then(|id| exposed.get(id).copied());
+        if let Some(group) = group {
             annotation["exposed"] = json!(true);
+            if let Some(group) = group {
+                annotation["group"] = json!(curvyo_ui_core::instance_sketch::group_letter(group));
+            }
         }
     }
 }

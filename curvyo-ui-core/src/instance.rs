@@ -257,7 +257,7 @@ pub fn change_parameter(
                 ParamValue::Angle(degrees) => degrees.0,
                 _ => return Err(InstanceError::WrongValue),
             };
-            crate::instance_sketch::change(document, &[clone], key, number, &[])
+            crate::instance_sketch::change(document, &[clone], key, number, false, &[])
         }
     }
 }

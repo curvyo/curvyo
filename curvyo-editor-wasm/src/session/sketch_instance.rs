@@ -21,8 +21,11 @@ use super::Session;
 /// value set that solved (saved as the fallback when the commit has no solution).
 #[derive(Debug, Default)]
 pub(super) struct InstanceState {
-    previews: Vec<CloneSnapshot>,
-    last_solvable: HashMap<NodeId, ValueSet>,
+    pub(super) previews: Vec<CloneSnapshot>,
+    pub(super) last_solvable: HashMap<NodeId, ValueSet>,
+    /// A knob drag: the preview is drawn blue over the committed clone instead of in its place
+    /// (UX notes 12.3).
+    pub(super) overlay: bool,
 }
 
 impl Session {
@@ -55,7 +58,14 @@ impl Session {
     /// clones are drawn as the sketch solved with it. Answers JSON `{"notices": [...],
     /// "no_solution": bool}`, or `{"error": "..."}`. A value without solution keeps the last
     /// solvable preview on the canvas.
-    pub fn preview_sketch_instance_value(&mut self, key: &str, number: f64) -> String {
+    /// `only_this` (Shift at the gesture's start on a value in a link group) changes that value
+    /// alone and unlinks it (criterion 34); without it the group's other members follow (33).
+    pub fn preview_sketch_instance_value(
+        &mut self,
+        key: &str,
+        number: f64,
+        only_this: bool,
+    ) -> String {
         let clones = self.sketch_clones();
         if clones.is_empty() {
             return json!({"error": "no sketch clone"}).to_string();
@@ -64,7 +74,7 @@ impl Session {
         let mut no_solution = false;
         let mut previews = Vec::new();
         for id in clones {
-            match instance_sketch::plan(&self.document, id, key, number) {
+            match instance_sketch::plan(&self.document, id, key, number, only_this) {
                 Ok(plan) => {
                     if notices.is_empty() {
                         notices.extend(plan.notices);
@@ -97,7 +107,8 @@ impl Session {
 
     /// A value typed or stepped into the field `key`, one step "Change parameter" for every
     /// selected clone. Answers JSON `{"written": bool, "notices": [...]}` or `{"error": "..."}`.
-    pub fn set_sketch_instance_value(&mut self, key: &str, number: f64) -> String {
+    /// `only_this` as for [`Session::preview_sketch_instance_value`].
+    pub fn set_sketch_instance_value(&mut self, key: &str, number: f64, only_this: bool) -> String {
         let clones = self.sketch_clones();
         let last: Vec<(NodeId, ValueSet)> = std::mem::take(&mut self.instances.last_solvable)
             .into_iter()
@@ -112,6 +123,7 @@ impl Session {
                 &clones,
                 key,
                 number,
+                only_this,
                 &last,
             ))
         });
@@ -143,7 +155,7 @@ impl Session {
 
     /// Replaces the clones being previewed in the artwork of this frame by what they would read.
     pub(super) fn apply_instance_preview(&self, objects: &mut [ObjectSnapshot]) {
-        if self.instances.previews.is_empty() {
+        if self.instances.previews.is_empty() || self.instances.overlay {
             return;
         }
         for object in objects.iter_mut() {
@@ -157,6 +169,45 @@ impl Session {
                 *clone = shown.clone();
             }
         }
+    }
+
+    /// The blue outline of a knob drag's clone over the committed one (UX notes 12.3: blue new,
+    /// black old).
+    pub(super) fn instance_preview_overlay(&self, view: ViewTransform) -> DrawList {
+        if !self.instances.overlay || self.instances.previews.is_empty() {
+            return DrawList::default();
+        }
+        let paths: Vec<ObjectSnapshot> = self
+            .instances
+            .previews
+            .iter()
+            .map(|clone| ObjectSnapshot::Path((*clone.resolved).clone()))
+            .collect();
+        curvyo_render_core::build_live_edit_preview(&paths, view)
+    }
+
+    /// Links the exposed values `a` and `b` of the active sketch page's sketch (criterion 32);
+    /// one step "Link parameters". Answers an empty string or the refusal sentence.
+    pub fn sketch_link(&mut self, a: &str, b: &str) -> String {
+        let (Some(sketch), Some(a), Some(b)) = (
+            self.sketch.active,
+            ExposedKey::parse(a),
+            ExposedKey::parse(b),
+        ) else {
+            return "These values cannot be linked".to_owned();
+        };
+        let outcome = self.recording(|this| Some(this.document.link_exposed(sketch, &a, &b)));
+        link_refusal(outcome)
+    }
+
+    /// Takes the exposed `key` out of its link group (criteria 32, 35); one step "Unlink
+    /// parameters", a group left with one member dissolves.
+    pub fn sketch_unlink(&mut self, key: &str) -> String {
+        let (Some(sketch), Some(key)) = (self.sketch.active, ExposedKey::parse(key)) else {
+            return "This value is not linked".to_owned();
+        };
+        let outcome = self.recording(|this| Some(this.document.unlink_exposed(sketch, &key)));
+        link_refusal(outcome)
     }
 
     /// How many sketch solves the instance cache has run: a diagnostic for the budget test and
@@ -258,6 +309,13 @@ impl Session {
                     if clone.chain.root == sketch && clone.chain.own_values.get(&key).is_some())
             })
             .count()
+    }
+}
+
+fn link_refusal(outcome: Option<Result<(), curvyo_document_core::InstanceError>>) -> String {
+    match outcome {
+        Some(Ok(())) => String::new(),
+        Some(Err(_)) | None => "These values cannot be linked".to_owned(),
     }
 }
 

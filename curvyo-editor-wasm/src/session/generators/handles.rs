@@ -12,14 +12,14 @@ use curvyo_render_core::{
 };
 use curvyo_ui_core::SelectTool;
 use curvyo_ui_core::instance::{self, change_value, plan_value};
-use curvyo_ui_core::instance_handles::{Knob, dragged_mm, knobs};
+use curvyo_ui_core::instance_handles::{Knob, dragged, knobs};
 
 use super::{
     super::{Session, Tool},
     Preview,
 };
 
-/// A shorter box side on screen under which a generated object shows no knob (UX notes §9).
+/// A shorter box side on screen under which a parametric instance shows no knob (UX notes §9).
 const MIN_SIDE_PX: f64 = 72.0;
 /// Two knobs, or a knob and a transform handle, closer than this on screen: the later one is not
 /// drawn.
@@ -108,15 +108,28 @@ impl Session {
     /// The knobs drawn and hit right now: the 72 px rule, then the collision rule in the order of
     /// the table of UX notes §9.
     fn visible_knobs(&self) -> Vec<Knob> {
-        if self.generators.knobs.drag.is_none()
+        let Some((_, raw, bounds)) = self.raw_knobs() else {
+            return Vec::new();
+        };
+        self.shown_knobs(raw, bounds, self.generators.knobs.drag.is_some())
+    }
+
+    /// Of the `raw` knobs of an instance whose box has the corners `bounds`, those drawn and hit
+    /// now: none during a transform drag or a move-only scope (unless a knob is `dragging`), none
+    /// on a box shorter than 72 px on screen, and none closer than 16 px to an earlier knob or a
+    /// transform handle (UX notes §9). Both parametric instances share it (`0099` A12).
+    pub(in crate::session) fn shown_knobs(
+        &self,
+        raw: Vec<Knob>,
+        (low, high): (Point, Point),
+        dragging: bool,
+    ) -> Vec<Knob> {
+        if !dragging
             && (self.select.drag_in_flight()
                 || self.edit_scope() == curvyo_ui_core::Scope::MoveOnly)
         {
             return Vec::new();
         }
-        let Some((_, raw, (low, high))) = self.raw_knobs() else {
-            return Vec::new();
-        };
         let scale = self.view().scale();
         if (high.x - low.x).min(high.y - low.y) * scale < MIN_SIDE_PX {
             return Vec::new();
@@ -144,7 +157,7 @@ impl Session {
     }
 
     /// The knob under `point`, within the parameter handle's hit radius.
-    fn knob_at(&self, knobs: &[Knob], point: Point) -> Option<usize> {
+    pub(in crate::session) fn knob_at(&self, knobs: &[Knob], point: Point) -> Option<usize> {
         let radius = self.transform_handle_tolerances().param_hit.as_mm();
         knobs
             .iter()
@@ -167,8 +180,8 @@ impl Session {
         let knob = knobs[index].clone();
         self.generators.knobs.drag = Some(KnobDrag {
             id,
-            asked: knob.value_mm,
-            shown: knob.value_mm,
+            asked: knob.value,
+            shown: knob.value,
             state: None,
             knob,
             from: point,
@@ -181,21 +194,21 @@ impl Session {
         let Some(drag) = self.generators.knobs.drag.as_ref() else {
             return false;
         };
-        let asked = dragged_mm(&drag.knob, drag.from, point, self.held.shift);
+        let asked = dragged(&drag.knob, drag.from, point, self.held.shift);
         let value = ParamValue::Length(Length::from_mm(asked));
         let plan = plan_value(
             &self.document,
             &self.manufacturing.extensions,
             drag.id,
-            drag.knob.key,
+            &drag.knob.key,
             &value,
         );
-        let (id, key) = (drag.id, drag.knob.key);
+        let (id, key) = (drag.id, drag.knob.key.clone());
         if let Ok(plan) = plan {
             let state = plan
                 .states
                 .iter()
-                .find(|(state_key, _)| *state_key == key)
+                .find(|(state_key, _)| *state_key == key.as_str())
                 .map(|(_, word)| *word);
             let shown = instance::find_kind(&self.manufacturing.extensions, &plan.record.kind)
                 .and_then(|found| {
@@ -228,7 +241,7 @@ impl Session {
             return false;
         };
         self.generators.preview = None;
-        if (drag.shown - drag.knob.value_mm).abs() < 1e-9 {
+        if (drag.shown - drag.knob.value).abs() < 1e-9 {
             return true;
         }
         let name = self
@@ -242,7 +255,7 @@ impl Session {
                 &this.document,
                 &this.manufacturing.extensions,
                 drag.id,
-                drag.knob.key,
+                &drag.knob.key,
                 &value,
             )
             .is_ok()
@@ -269,7 +282,7 @@ impl Session {
         let label = if drag.knob.key == "corner_radius" {
             "r"
         } else {
-            drag.knob.label
+            drag.knob.label.as_str()
         };
         let mut text = format!("{label} {:.1} mm", drag.shown);
         let gap = drag.asked - drag.shown;
@@ -290,27 +303,39 @@ impl Session {
     /// The knobs drawn over the transform handles: the "Parameter handle" glyph, filled while held.
     pub(in crate::session) fn generator_knobs_draw_list(&self) -> DrawList {
         let knobs = self.visible_knobs();
-        if knobs.is_empty() {
-            return DrawList::default();
-        }
-        let hovered = self
-            .pointer_position
-            .filter(|_| self.generators.knobs.drag.is_none())
-            .and_then(|point| self.knob_at(&knobs, point));
         let held = self
             .generators
             .knobs
             .drag
             .as_ref()
-            .map(|drag| drag.knob.key);
+            .map(|drag| drag.knob.key.as_str());
+        self.knobs_draw_list(&knobs, held, |_| false)
+    }
+
+    /// The "Parameter handle" glyphs of `knobs`: filled for the `held` key, the hover ground under
+    /// the pointer (no drag) and on every knob `follows` names (the partners of a linked value,
+    /// `0099` UX notes 12.9.4).
+    pub(in crate::session) fn knobs_draw_list(
+        &self,
+        knobs: &[Knob],
+        held: Option<&str>,
+        follows: impl Fn(&Knob) -> bool,
+    ) -> DrawList {
+        if knobs.is_empty() {
+            return DrawList::default();
+        }
+        let hovered = self
+            .pointer_position
+            .filter(|_| held.is_none())
+            .and_then(|point| self.knob_at(knobs, point));
         let handles = knobs
             .iter()
             .enumerate()
             .map(|(index, knob)| TransformHandleGlyph {
                 position: knob.at,
                 kind: TransformGlyphKind::Parameter,
-                dragging: held == Some(knob.key),
-                hovered: hovered == Some(index),
+                dragging: held == Some(knob.key.as_str()),
+                hovered: hovered == Some(index) || follows(knob),
             })
             .collect();
         build_transform_draw_list(

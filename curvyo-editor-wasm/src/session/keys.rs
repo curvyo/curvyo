@@ -487,7 +487,7 @@ impl Session {
         if self.page_drag.take().is_some() {
             return true;
         }
-        if self.cancel_generator_knob_drag() {
+        if self.cancel_generator_knob_drag() || self.cancel_sketch_knob_drag() {
             return true;
         }
         match self.tool {

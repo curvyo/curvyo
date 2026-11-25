@@ -202,6 +202,11 @@ impl Session {
         if self.generator_knob_press(point) {
             return;
         }
+        // Then a knob of a selected sketch clone (`0099` criterion 25); Shift at the press changes
+        // only that value.
+        if self.sketch_knob_press(point, shift) {
+            return;
+        }
         // While the Crop bar is open the picture cannot be moved; a press elsewhere leaves the
         // bar and is an ordinary press (`specs/0135`, `ux-notes.md` §3.9).
         if self.crop_bar_takes_press(point) {
@@ -375,7 +380,7 @@ impl Session {
         self.pointer_position = Some(point);
         self.held.shift = shift;
         self.held.ctrl = ctrl;
-        if self.generator_knob_drag_end(point) {
+        if self.generator_knob_drag_end(point) || self.sketch_knob_drag_end(point) {
             return;
         }
         self.sync_select_units();
@@ -474,7 +479,7 @@ impl Session {
     /// lets a drag in flight note the pointer (the dead zone, once left,
     /// stays left).
     pub(super) fn select_hover(&mut self, point: Point, modifiers: Modifiers) {
-        if self.generator_knob_drag_move(point) {
+        if self.generator_knob_drag_move(point) || self.sketch_knob_drag_move(point) {
             return;
         }
         self.sync_select_units();
