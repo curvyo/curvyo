@@ -83,6 +83,7 @@ fn document() -> (Document, [NodeId; 3]) {
             clone: own,
             own: set,
             last_solvable: None,
+            unlinked: curvyo_document_core::KeySet::default(),
         }],
         "change_parameter",
         None,

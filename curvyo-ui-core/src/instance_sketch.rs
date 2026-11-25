@@ -311,6 +311,7 @@ pub fn change(
                     .iter()
                     .find(|(clone, _)| *clone == id)
                     .map(|(_, set)| set.clone()),
+                unlinked: read.chain.unlinked.clone(),
             });
         }
     }
@@ -357,6 +358,7 @@ pub fn reset(
                 clone: id,
                 own,
                 last_solvable: None,
+                unlinked: read.chain.unlinked.clone(),
             });
         }
     }
@@ -401,6 +403,7 @@ pub fn own_all(document: &Document, ids: &[NodeId]) -> Result<bool, InstanceErro
                 clone: id,
                 own,
                 last_solvable: None,
+                unlinked: read.chain.unlinked.clone(),
             });
         }
     }

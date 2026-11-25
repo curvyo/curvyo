@@ -101,6 +101,7 @@ fn own(clone: NodeId, pairs: &[(&ExposedKey, f64)]) -> InstanceWrite {
         clone,
         own: set,
         last_solvable: None,
+        unlinked: curvyo_document_core::KeySet::default(),
     }
 }
 

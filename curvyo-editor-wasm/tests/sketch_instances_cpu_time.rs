@@ -92,6 +92,7 @@ fn document() -> (Document, Vec<NodeId>) {
             clone,
             own,
             last_solvable: None,
+            unlinked: curvyo_document_core::KeySet::default(),
         });
         clones.push(clone);
     }

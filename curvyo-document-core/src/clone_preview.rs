@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::affine::Affine;
-use crate::clone_read::{RawLeaf, resolve};
+use crate::clone_read::{RawLeaf, resolve_with};
 use crate::clone_transform::{CloneLinks, HeldClones, Hold, clone_matrices_after_maps};
 use crate::outline_map::object_map;
 use crate::path_model::{NodeId, PathSnapshot};
@@ -30,6 +30,43 @@ pub fn clone_previews(
     cap: usize,
     held: &HeldClones,
     transform: bool,
+) -> Option<Vec<PathSnapshot>> {
+    previews_with(
+        objects,
+        changed,
+        (cap, held, transform),
+        &crate::InstanceSolves::default(),
+    )
+}
+
+impl crate::Document {
+    /// [`clone_previews`] through this document's solve cache, so a move step re-solves no
+    /// downstream sketch clone whose value set the last read solved (`specs/0099-sketch-pages`
+    /// A15).
+    #[must_use]
+    #[allow(clippy::implicit_hasher)]
+    pub fn clone_previews(
+        &self,
+        objects: &[ObjectSnapshot],
+        changed: &[ObjectSnapshot],
+        cap: usize,
+        held: &HeldClones,
+        transform: bool,
+    ) -> Option<Vec<PathSnapshot>> {
+        previews_with(
+            objects,
+            changed,
+            (cap, held, transform),
+            &self.instance_solves,
+        )
+    }
+}
+
+fn previews_with(
+    objects: &[ObjectSnapshot],
+    changed: &[ObjectSnapshot],
+    (cap, held, transform): (usize, &HeldClones, bool),
+    solves: &crate::InstanceSolves,
 ) -> Option<Vec<PathSnapshot>> {
     let mut followers: HashMap<NodeId, Vec<usize>> = HashMap::new();
     let mut at: HashMap<NodeId, usize> = HashMap::new();
@@ -111,7 +148,7 @@ pub fn clone_previews(
         .collect();
     let wanted: HashSet<NodeId> = downstream.iter().map(|&i| objects[i].id()).collect();
     Some(
-        resolve(leaves)
+        resolve_with(leaves, solves)
             .leaves
             .into_iter()
             .flatten()

@@ -22,7 +22,7 @@ pub(crate) fn exposed_of(graph: &Sketch, entries: &[ExposedEntry]) -> Vec<Expose
     let Ok((parameters, dimensions)) = graph.evaluated_values() else {
         return Vec::new();
     };
-    entries
+    let mut exposed: Vec<ExposedParam> = entries
         .iter()
         .filter_map(|entry| {
             let (label, dimension, default) = match entry.key.target() {
@@ -66,9 +66,42 @@ pub(crate) fn exposed_of(graph: &Sketch, entries: &[ExposedEntry]) -> Vec<Expose
                 min,
                 max,
                 default,
+                link: entry.link.clone(),
+                group: None,
             })
         })
-        .collect()
+        .collect();
+    resolve_groups(&mut exposed);
+    exposed
+}
+
+/// Gives each value its link group (`adrs.md` A13): entries with the same link string form one;
+/// its kind is its first member's, a member of another kind is in none, a group of one is none;
+/// groups are numbered in the order of their first member.
+fn resolve_groups(exposed: &mut [ExposedParam]) {
+    let mut kinds: Vec<(&str, InstanceKind, usize)> = Vec::new();
+    for param in exposed.iter() {
+        let Some(link) = param.link.as_deref() else {
+            continue;
+        };
+        match kinds.iter_mut().find(|(name, _, _)| *name == link) {
+            Some((_, kind, count)) if *kind == param.kind => *count += 1,
+            Some(_) => {}
+            None => kinds.push((link, param.kind, 1)),
+        }
+    }
+    let groups: Vec<(String, InstanceKind)> = kinds
+        .into_iter()
+        .filter(|(_, _, count)| *count >= 2)
+        .map(|(name, kind, _)| (name.to_owned(), kind))
+        .collect();
+    for param in exposed.iter_mut() {
+        param.group = param.link.as_deref().and_then(|link| {
+            groups
+                .iter()
+                .position(|(name, kind)| name == link && *kind == param.kind)
+        });
+    }
 }
 
 /// A value set a sketch cannot be solved with.

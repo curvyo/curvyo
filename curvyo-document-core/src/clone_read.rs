@@ -54,6 +54,8 @@ pub(crate) struct RawOverrides {
     pub(crate) params: crate::ValueSet,
     /// The last value set that solved (`instance_fallback`, `0099` criterion 26).
     pub(crate) fallback: crate::ValueSet,
+    /// The keys it changed alone (`instance_unlinked`, `0099` criterion 34).
+    pub(crate) unlinked: crate::KeySet,
 }
 
 impl RawLeaf {
@@ -93,7 +95,8 @@ impl RawLeaf {
                         .unwrap_or_default()
                 }),
                 params: clone.chain.own_values.clone(),
-                fallback: crate::ValueSet::default(),
+                fallback: clone.chain.fallback_values.clone(),
+                unlinked: clone.chain.unlinked.clone(),
             },
         )
     }
@@ -280,6 +283,7 @@ struct Draw {
 
 /// Resolves every clone of `leaves` (stacking order) without the tree around them: a clone of a
 /// group is an orphan here. See [`resolve_in`].
+#[cfg(test)]
 pub(crate) fn resolve(leaves: Vec<RawLeaf>) -> Resolution {
     resolve_in(leaves, None)
 }
@@ -293,6 +297,7 @@ pub(crate) fn resolve_with(leaves: Vec<RawLeaf>, solves: &crate::InstanceSolves)
 /// leaves, a clone of a group draws the group's drawn subtree (ADR 0045 §2). No recursion: a
 /// chain or ring of any length costs one stack entry per clone. Whether a clone is an orphan
 /// depends only on the leaves, not on the order of the walk.
+#[cfg(test)]
 pub(crate) fn resolve_in(leaves: Vec<RawLeaf>, structure: Option<&Structure>) -> Resolution {
     resolve_in_with(leaves, structure, &crate::InstanceSolves::default())
 }
@@ -519,6 +524,13 @@ fn outline_clones(
                     no_solution: draw.no_solution,
                     own_values: sets.get(source.own).clone(),
                     inherited_values: sets.get(source.inherited).clone(),
+                    unlinked: own_marks(&leaves[root], overrides, sets.get(source.own)),
+                    fallback_values: match &leaves[root] {
+                        RawLeaf::Sketch(sketch) => {
+                            crate::sketch_instance::filtered(&sketch.exposed, &overrides.fallback)
+                        }
+                        _ => crate::ValueSet::default(),
+                    },
                     root_outline,
                     picture: None,
                     picture_members: None,
@@ -534,6 +546,23 @@ fn outline_clones(
         }
     }
     (clones, pictures, by_depth)
+}
+
+/// The stored unlinked keys of a clone of the sketch `root` that count: own values of a value in a
+/// link group (`adrs.md` A13); any other is ignored and kept.
+fn own_marks(root: &RawLeaf, overrides: &RawOverrides, own: &crate::ValueSet) -> crate::KeySet {
+    let RawLeaf::Sketch(sketch) = root else {
+        return crate::KeySet::default();
+    };
+    let mut marks = overrides.unlinked.clone();
+    marks.retain(|key| {
+        own.get(key).is_some()
+            && sketch
+                .exposed
+                .iter()
+                .any(|param| &param.key == key && param.group.is_some())
+    });
+    marks
 }
 
 /// What each clone of a sketch root draws (`0099` criterion 26, `adrs.md` A5): the set it follows

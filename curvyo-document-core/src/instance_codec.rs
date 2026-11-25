@@ -1,12 +1,15 @@
-//! The three registers of a sketch instance (`specs/0099-sketch-pages/adrs.md` A3): the sketch's
-//! `exposed_params` list and a clone's `instance_params` and `instance_fallback` maps, each one
-//! LWW value written whole, and the one-key encoding `{"mm": n}` or `{"deg": n}` of a number.
+//! The registers of a sketch instance (`specs/0099-sketch-pages/adrs.md` A3, A13): the sketch's
+//! `exposed_params` list, a clone's `instance_params` and `instance_fallback` maps and its
+//! `instance_unlinked` list, each one LWW value written whole, and the one-key encoding
+//! `{"mm": n}` or `{"deg": n}` of a number.
 //!
 //! ```text
 //! exposed_params    : [ { "key": "p:width", "min": {"mm": 20}, "max": {"mm": 200} },
-//!                       { "key": "d:c7", "name": "Radius 1" } ]
+//!                       { "key": "d:c7", "name": "Radius 1", "link": "d:c7" },
+//!                       { "key": "d:c8", "name": "Radius 2", "link": "d:c7" } ]
 //! instance_params   : { "p:width": {"mm": 82}, "d:c7": {"deg": 30} }
 //! instance_fallback : { "p:width": {"mm": 150} }
+//! instance_unlinked : ["d:c8"]
 //! ```
 //!
 //! Damage is a wrong register shape only; a value that does not decode is ignored and kept.
@@ -14,7 +17,7 @@
 use loro::{LoroMap, LoroValue, ValueOrContainer};
 use serde_json::{Map, Value};
 
-use crate::instance_value::{ExposedKey, InstanceValue, ValueSet};
+use crate::instance_value::{ExposedKey, InstanceValue, KeySet, ValueSet};
 
 /// The sketch register.
 pub(crate) const KEY_EXPOSED_PARAMS: &str = "exposed_params";
@@ -22,6 +25,8 @@ pub(crate) const KEY_EXPOSED_PARAMS: &str = "exposed_params";
 pub(crate) const KEY_INSTANCE_PARAMS: &str = "instance_params";
 /// The clone register of the last value set that solved.
 pub(crate) const KEY_INSTANCE_FALLBACK: &str = "instance_fallback";
+/// The clone register of the keys it changed alone, unlinked from their group.
+pub(crate) const KEY_INSTANCE_UNLINKED: &str = "instance_unlinked";
 
 const MM: &str = "mm";
 const DEG: &str = "deg";
@@ -95,12 +100,23 @@ pub(crate) struct ExposedEntry {
     pub(crate) name: Option<String>,
     pub(crate) min: Option<InstanceValue>,
     pub(crate) max: Option<InstanceValue>,
+    /// Its link group's string, `None` without a valid one.
+    pub(crate) link: Option<String>,
 }
 
 impl ExposedEntry {
     /// The stored JSON of the entry.
     pub(crate) fn to_json(&self) -> Value {
-        let mut map = Map::new();
+        self.merged_into(Map::new())
+    }
+
+    /// The entry written over the stored map `raw`: its own fields replace theirs (an absent one
+    /// is removed), every field it does not know is kept.
+    pub(crate) fn merged_into(&self, raw: Map<String, Value>) -> Value {
+        let mut map = raw;
+        for field in ["key", "name", "min", "max", "link"] {
+            map.remove(field);
+        }
         map.insert("key".into(), Value::from(self.key.as_str()));
         if let Some(name) = &self.name {
             map.insert("name".into(), Value::from(name.as_str()));
@@ -110,6 +126,9 @@ impl ExposedEntry {
         }
         if let Some(max) = self.max {
             map.insert("max".into(), encode_value(max));
+        }
+        if let Some(link) = &self.link {
+            map.insert("link".into(), Value::from(link.as_str()));
         }
         Value::Object(map)
     }
@@ -143,12 +162,31 @@ pub(crate) fn decode_entry(value: &Value) -> Option<ExposedEntry> {
         min = None;
         max = None;
     }
+    let link = map
+        .get("link")
+        .and_then(Value::as_str)
+        .filter(|link| name_is_valid(link))
+        .map(str::to_owned);
     Some(ExposedEntry {
         key,
         name,
         min,
         max,
+        link,
     })
+}
+
+/// The stored link strings of `exposed_params`, valid or not, so a new group never takes one an
+/// entry already uses (`adrs.md` A13).
+pub(crate) fn used_links(items: &[Value]) -> std::collections::HashSet<String> {
+    items
+        .iter()
+        .filter_map(|item| item.get("link"))
+        .map(|link| match link {
+            Value::String(text) => text.clone(),
+            other => other.to_string(),
+        })
+        .collect()
 }
 
 /// The register's items as stored, `None` when it is absent or not a list value.
@@ -244,6 +282,41 @@ fn write_value(meta: &LoroMap, key: &str, value: Option<Value>) {
     }
 }
 
+/// Reads a clone's `instance_unlinked`: the keys that parse, nothing else checked.
+pub(crate) fn read_unlinked(meta: &LoroMap) -> KeySet {
+    read_unlinked_raw(meta)
+        .iter()
+        .filter_map(Value::as_str)
+        .filter_map(ExposedKey::parse)
+        .collect()
+}
+
+/// The stored items of `instance_unlinked`, empty when absent or not a list value.
+pub(crate) fn read_unlinked_raw(meta: &LoroMap) -> Vec<Value> {
+    match meta.get(KEY_INSTANCE_UNLINKED) {
+        Some(ValueOrContainer::Value(value @ LoroValue::List(_))) => match Value::from(value) {
+            Value::Array(items) => items,
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
+    }
+}
+
+/// Writes `keys` whole, keeping the stored items that do not parse; an empty list is the absent
+/// key.
+pub(crate) fn write_unlinked(meta: &LoroMap, keys: &KeySet) {
+    let mut items: Vec<Value> = read_unlinked_raw(meta)
+        .into_iter()
+        .filter(|item| item.as_str().and_then(ExposedKey::parse).is_none())
+        .collect();
+    items.extend(keys.iter().map(|key| Value::from(key.as_str())));
+    write_value(
+        meta,
+        KEY_INSTANCE_UNLINKED,
+        (!items.is_empty()).then_some(Value::Array(items)),
+    );
+}
+
 /// Whether `exposed_params` on a sketch node is absent or a list value.
 pub(crate) fn sketch_shape_ok(meta: &LoroMap) -> bool {
     matches!(
@@ -252,7 +325,8 @@ pub(crate) fn sketch_shape_ok(meta: &LoroMap) -> bool {
     )
 }
 
-/// Whether the two clone registers are absent or map values.
+/// Whether the two clone value registers are absent or map values and `instance_unlinked` is
+/// absent or a list value.
 pub(crate) fn clone_shape_ok(meta: &LoroMap) -> bool {
     [KEY_INSTANCE_PARAMS, KEY_INSTANCE_FALLBACK]
         .into_iter()
@@ -262,6 +336,10 @@ pub(crate) fn clone_shape_ok(meta: &LoroMap) -> bool {
                 None | Some(ValueOrContainer::Value(LoroValue::Map(_)))
             )
         })
+        && matches!(
+            meta.get(KEY_INSTANCE_UNLINKED),
+            None | Some(ValueOrContainer::Value(LoroValue::List(_)))
+        )
 }
 
 #[cfg(test)]
@@ -336,6 +414,44 @@ mod tests {
         let raw = read_values_raw(&meta, KEY_INSTANCE_PARAMS);
         assert_eq!(raw.len(), 3);
         assert_eq!(raw["p:width"], json!({"mm": 6.0}));
+    }
+
+    /// Criterion 37: a link is read from its entry, an invalid one is ignored and kept, and the
+    /// entry written over its stored map keeps the fields it does not know.
+    #[test]
+    fn a_link_decodes_and_a_rewrite_keeps_unknown_fields() {
+        let linked =
+            decode_entry(&json!({"key": "d:c7", "name": "Radius 1", "link": "d:c7"})).unwrap();
+        assert_eq!(linked.link.as_deref(), Some("d:c7"));
+        let bad = decode_entry(&json!({"key": "d:c8", "name": "Radius 2", "link": 5})).unwrap();
+        assert_eq!(bad.link, None, "ignored");
+        let raw = json!({"key": "d:c7", "name": "Radius 1", "link": "g", "later": 1});
+        let mut entry = decode_entry(&raw).unwrap();
+        entry.min = Some(InstanceValue::from_mm(2.0));
+        let written = entry.merged_into(raw.as_object().unwrap().clone());
+        assert_eq!(written["link"], json!("g"));
+        assert_eq!(written["later"], json!(1));
+        assert_eq!(written["min"], json!({"mm": 2.0}));
+        assert_eq!(used_links(&[raw, json!({"link": 5})]).len(), 2);
+    }
+
+    /// Criterion 37: the unlinked list keeps items that do not parse; a container refuses.
+    #[test]
+    fn the_unlinked_list_keeps_what_does_not_parse_and_a_container_is_damage() {
+        let (_doc, meta) = meta();
+        meta.insert(
+            KEY_INSTANCE_UNLINKED,
+            LoroValue::from(json!(["d:c8", 3, "zz"])),
+        )
+        .unwrap();
+        let keys = read_unlinked(&meta);
+        assert!(keys.contains(&ExposedKey::parse("d:c8").unwrap()));
+        write_unlinked(&meta, &KeySet::default());
+        assert_eq!(read_unlinked_raw(&meta), vec![json!(3), json!("zz")]);
+        assert!(clone_shape_ok(&meta));
+        meta.insert_container(KEY_INSTANCE_UNLINKED, LoroMap::new())
+            .unwrap();
+        assert!(!clone_shape_ok(&meta));
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! The values of a sketch instance: what a clone may set (an exposed key), the number it sets and
 //! the canonical set a solve is keyed by (`specs/0099-sketch-pages/adrs.md` A2, A3).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use curvyo_sketch_core::{ConstraintId, ParameterId, Quantity};
 
@@ -209,6 +209,51 @@ impl ValueSet {
     }
 }
 
+/// A set of exposed keys: the values a clone changed alone and holds unlinked from their link group
+/// (`instance_unlinked`, `specs/0099-sketch-pages/adrs.md` A13).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct KeySet(BTreeSet<ExposedKey>);
+
+impl KeySet {
+    /// Adds `key`.
+    pub fn insert(&mut self, key: ExposedKey) {
+        self.0.insert(key);
+    }
+
+    /// Removes `key`.
+    pub fn remove(&mut self, key: &ExposedKey) {
+        self.0.remove(key);
+    }
+
+    /// Whether `key` is in the set.
+    #[must_use]
+    pub fn contains(&self, key: &ExposedKey) -> bool {
+        self.0.contains(key)
+    }
+
+    /// Whether the set is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The keys in order.
+    pub fn iter(&self) -> impl Iterator<Item = &ExposedKey> {
+        self.0.iter()
+    }
+
+    /// Keeps only the keys `keep` says yes to.
+    pub fn retain(&mut self, keep: impl FnMut(&ExposedKey) -> bool) {
+        self.0.retain(keep);
+    }
+}
+
+impl FromIterator<ExposedKey> for KeySet {
+    fn from_iter<I: IntoIterator<Item = ExposedKey>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
 fn value_of(kind: InstanceKind, bits: u64) -> InstanceValue {
     let number = f64::from_bits(bits);
     match kind {
@@ -233,6 +278,11 @@ pub struct ExposedParam {
     pub max: Option<f64>,
     /// The sketch's own value in millimetres or degrees.
     pub default: f64,
+    /// The stored link string of its entry, `None` without one (`adrs.md` A13).
+    pub link: Option<String>,
+    /// Its link group: the index of the group among the sketch's groups in exposed order, `None`
+    /// when it is in no group of two or more of its kind.
+    pub group: Option<usize>,
 }
 
 impl ExposedParam {
@@ -248,6 +298,15 @@ impl ExposedParam {
         }
         #[allow(clippy::float_cmp)] // exactly the unchanged number
         (clamped, clamped != number)
+    }
+
+    /// The value of this parameter's kind with `number` (millimetres or degrees).
+    #[must_use]
+    pub fn value(&self, number: f64) -> InstanceValue {
+        match self.kind {
+            InstanceKind::Length => InstanceValue::from_mm(number),
+            InstanceKind::Angle => InstanceValue::from_deg(number),
+        }
     }
 
     /// The default as a value.

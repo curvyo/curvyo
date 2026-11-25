@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use curvyo_document_core::{HeldClones, ObjectSnapshot, PathSnapshot, clone_previews};
+use curvyo_document_core::{HeldClones, ObjectSnapshot, PathSnapshot};
 use curvyo_render_core::CloneTrace;
 use curvyo_ui_core::{CloneMarks, MarkForm, MarkFrame, MarkRect, MarkRole, clone_marks};
 
@@ -216,17 +216,18 @@ impl Session {
         changed: &[ObjectSnapshot],
         transform: bool,
     ) -> Vec<ObjectSnapshot> {
-        clone_previews(
-            objects,
-            changed,
-            MAX_CLONE_PREVIEWS,
-            &self.own_placement_clones(),
-            transform,
-        )
-        .unwrap_or_default()
-        .into_iter()
-        .map(ObjectSnapshot::Path)
-        .collect()
+        self.document
+            .clone_previews(
+                objects,
+                changed,
+                MAX_CLONE_PREVIEWS,
+                &self.own_placement_clones(),
+                transform,
+            )
+            .unwrap_or_default()
+            .into_iter()
+            .map(ObjectSnapshot::Path)
+            .collect()
     }
 
     /// How each clone with own placement holds back its original's change, read once per

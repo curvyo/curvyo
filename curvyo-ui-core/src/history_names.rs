@@ -180,6 +180,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("reset_parameter", "Back to the sketch's value"),
     ("reset_parameters", "Back to the sketch's values"),
     ("own_parameters", "Own parameter values"),
+    // `specs/0099-sketch-pages` slice 2, criterion 32.
+    ("link_parameters", "Link parameters"),
+    ("unlink_parameters", "Unlink parameters"),
     ("convert_generated", "Convert to paths"),
     ("create_star", "Draw star"),
     // `specs/0074-text-objects` criteria 7 and 13.

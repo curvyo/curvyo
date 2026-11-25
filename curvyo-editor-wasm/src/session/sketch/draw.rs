@@ -210,14 +210,16 @@ impl Session {
         changed.resolved = path;
         let changed = ObjectSnapshot::Sketch(Box::new(changed));
         let all = self.document_read();
-        let clones = curvyo_document_core::clone_previews(
-            &all.leaves,
-            std::slice::from_ref(&changed),
-            usize::MAX,
-            &curvyo_document_core::HeldClones::new(),
-            false,
-        )
-        .unwrap_or_default();
+        let clones = self
+            .document
+            .clone_previews(
+                &all.leaves,
+                std::slice::from_ref(&changed),
+                usize::MAX,
+                &curvyo_document_core::HeldClones::new(),
+                false,
+            )
+            .unwrap_or_default();
         let clones = clones
             .into_iter()
             .map(|p| (p.id, p))

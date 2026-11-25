@@ -271,7 +271,7 @@ fn format_61_round_trip_keeps_the_point_and_the_pick() {
     d.set_user_origin(second, [1_000, 2_000]).unwrap();
     d.set_start(second, "machine_origin").unwrap();
     let bytes = pack(&d, "0.1.0").unwrap();
-    assert_eq!(format_of(&bytes), 63);
+    assert_eq!(format_of(&bytes), 64);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let pages = opened.manufacturings();

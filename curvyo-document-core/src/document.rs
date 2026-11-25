@@ -727,7 +727,15 @@ impl DocumentVersion {
 /// type or out of range reads its default (a damaged switch reads off) and counts one value;
 /// nothing is repaired on read. Goldens: `focus_pulse_v63.curvyo`,
 /// `focus_pulse_damaged_v63.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 63;
+/// Version 64 (`specs/0099-sketch-pages` slice 2, `adrs.md` A13): an `exposed_params` entry may
+/// carry `"link": "<group>"` (entries with the same string form a link group; a group of one, a
+/// member of another kind and an invalid link read as no group and are kept), a clone the
+/// register `instance_unlinked` (one list value of exposed keys it changed alone). A container
+/// there refuses the file. Links change no geometry at read, but a build that stops at 63 would
+/// not couple the linked values on edit and its limit edit would strip the `link` fields, so this
+/// build's files are refused there by version; a file of 63 or lower opens unchanged. Goldens:
+/// `sketch_instance_links_v64.curvyo`, `sketch_instance_links_damaged_v64.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 64;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -1091,10 +1099,13 @@ impl Document {
             ObjectJson::Clone {
                 instance_params,
                 instance_fallback,
+                instance_unlinked,
                 ..
             } => {
                 *instance_params = raw(crate::instance_codec::KEY_INSTANCE_PARAMS);
                 *instance_fallback = raw(crate::instance_codec::KEY_INSTANCE_FALLBACK);
+                let marks = crate::instance_codec::read_unlinked_raw(&meta);
+                *instance_unlinked = (!marks.is_empty()).then_some(serde_json::Value::Array(marks));
             }
             _ => {}
         }
@@ -1127,6 +1138,7 @@ impl Document {
                         style,
                         instance_params: None,
                         instance_fallback: None,
+                        instance_unlinked: None,
                     }
                 } else {
                     ObjectJson::from(self.object(id)?)
@@ -1293,6 +1305,9 @@ enum ObjectJson {
         /// The `instance_fallback` map as stored.
         #[serde(skip_serializing_if = "Option::is_none")]
         instance_fallback: Option<serde_json::Value>,
+        /// The `instance_unlinked` list as stored (`specs/0099-sketch-pages` criterion 37).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        instance_unlinked: Option<serde_json::Value>,
     },
     /// A text object (`specs/0074-text-objects`, ADR 0020 §1): string, font reference, size and
     /// placement `[a, b, c, d, e, f]`; never outlines.
@@ -1466,6 +1481,7 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 style: clone.chain.own_style.then_some(clone.resolved.style),
                 instance_params: None,
                 instance_fallback: None,
+                instance_unlinked: None,
             },
             ObjectSnapshot::Primitive(primitive) => {
                 let id = primitive.id;
