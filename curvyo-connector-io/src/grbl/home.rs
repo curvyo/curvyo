@@ -17,6 +17,13 @@ pub enum Owed {
     Home,
     /// A jog's `$J=` line, with its bytes.
     Jog(usize),
+    /// A line of the go to point's pulse block, with its bytes; `last` for its `M5 S0`.
+    Pulse {
+        /// The bytes of the line.
+        bytes: usize,
+        /// The block's last line.
+        last: bool,
+    },
     /// A restart's `$$`, which reads `$32` again before the entry (`specs/0118` 38).
     Settings,
 }
@@ -26,7 +33,7 @@ impl Owed {
     #[must_use]
     pub fn bytes(self) -> usize {
         match self {
-            Self::Line(bytes) | Self::Jog(bytes) => bytes,
+            Self::Line(bytes) | Self::Jog(bytes) | Self::Pulse { bytes, .. } => bytes,
             Self::Home => HOME_LINE.len(),
             Self::Settings => crate::grbl::restart::SETTINGS_LINE.len(),
         }

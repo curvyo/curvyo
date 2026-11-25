@@ -74,16 +74,31 @@ impl GrblSim {
         self.print("ok");
     }
 
-    /// A `$J=` line (relative, millimetres): refused while locked, while homing or when soft
-    /// limits would be crossed; else a jog block that takes the time its feed asks for.
+    /// A `$J=` line (relative, or absolute in work coordinates with `G90`; millimetres): refused
+    /// while locked, while homing or when soft limits would be crossed; else a jog block that
+    /// takes the time its feed asks for. The parser's own motion mode is left as it was.
     fn jog_line(&mut self, text: &str) {
         let mut delta = [0.0; 3];
+        let mut absolute = [None; 3];
+        let mut g90 = false;
         let mut feed = None;
         for (letter, value) in words(text) {
             match letter {
-                'X' | 'Y' | 'Z' => delta[usize::from(letter as u8 - b'X')] = value,
+                'G' if value == 90.0 => g90 = true,
+                'X' | 'Y' | 'Z' => {
+                    let axis = usize::from(letter as u8 - b'X');
+                    delta[axis] = value;
+                    absolute[axis] = Some(value);
+                }
                 'F' => feed = Some(value),
                 _ => {}
+            }
+        }
+        if g90 {
+            for axis in 0..3 {
+                delta[axis] = absolute[axis].map_or(0.0, |work| {
+                    work + self.config.wco[axis] - self.planned[axis]
+                });
             }
         }
         let Some(feed) = feed.filter(|f| *f > 0.0) else {
@@ -126,8 +141,16 @@ impl GrblSim {
         let mut motion = false;
         let mut spindle = None;
         let mut power = None;
+        let mut dwell = false;
+        let mut seconds = 0.0;
         for (letter, value) in words(line) {
             match letter {
+                'G' if value == 0.0 => self.motion_g1 = false,
+                'G' if [1.0, 2.0, 3.0].contains(&value) => {
+                    self.motion_g1 = true;
+                }
+                'G' if value == 4.0 => dwell = true,
+                'P' => seconds = value,
                 'G' if value == 90.0 => self.relative = false,
                 'G' if value == 91.0 => self.relative = true,
                 'G' if [0.0, 1.0, 2.0, 3.0].contains(&value) => motion = true,
@@ -162,6 +185,16 @@ impl GrblSim {
             let steps = self.config.steps_per_motion;
             self.planned = target;
             self.push_block(Block::Move { target, steps });
+        }
+        if dwell {
+            // `G4 P<seconds>`: GRBL answers when the dwell is over; one step is 10 ms.
+            let steps = (seconds / 0.01).ceil().max(1.0);
+            // invariant: a positive finite step count far below u32::MAX in these tests.
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let steps = steps as u32;
+            self.dwell = Some(steps);
+            self.dwells.push(seconds);
+            return;
         }
         self.print("ok");
     }

@@ -164,6 +164,14 @@ pub struct GrblSim {
     pub clock: u64,
     /// The clock at the last status report.
     pub last_report: Option<u64>,
+    /// The parser's motion mode is `G1` (or `G2`, `G3`), not `G0`: laser mode powers `M3` then.
+    pub(crate) motion_g1: bool,
+    /// Steps left of a `G4` dwell; its `ok` comes when it ends and no line is parsed meanwhile.
+    pub(crate) dwell: Option<u32>,
+    /// Every dwell's seconds, in order.
+    pub dwells: Vec<f64>,
+    /// Steps in which the beam was lit.
+    pub lit_steps: u32,
 }
 
 impl GrblSim {
@@ -224,6 +232,10 @@ impl GrblSim {
             no_jog_cancel: false,
             clock: 0,
             last_report: None,
+            motion_g1: false,
+            dwell: None,
+            dwells: Vec::new(),
+            lit_steps: 0,
         }
     }
 
@@ -333,6 +345,8 @@ impl GrblSim {
         self.spindle_stop = false;
         self.parse_wait = 0;
         self.critical = false;
+        self.motion_g1 = false;
+        self.dwell = None;
         if let Some(code) = raised {
             // GRBL 1.1: a reset while moving loses steps, so it locks with `ALARM:3`.
             self.alarm = true;
@@ -413,7 +427,18 @@ impl GrblSim {
             return Vec::new();
         }
         self.run_planner();
-        self.parse_next();
+        if self.laser_lit() {
+            self.lit_steps += 1;
+        }
+        if let Some(left) = self.dwell.as_mut() {
+            *left = left.saturating_sub(1);
+            if *left == 0 {
+                self.dwell = None;
+                self.print("ok");
+            }
+        } else {
+            self.parse_next();
+        }
         std::mem::take(&mut self.out)
     }
 

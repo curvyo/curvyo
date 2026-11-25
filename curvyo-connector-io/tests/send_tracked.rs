@@ -183,6 +183,7 @@ fn a_dead_connector_after_the_cut_leaves_the_send_unresolved_for_the_watcher() {
         machine_position: None,
         work_offset: None,
         frame_id: None,
+        target: None,
     };
     assert_eq!(
         observe_shared(&watch, &status),

@@ -1,15 +1,12 @@
 //! A session's setup and owner calls (A6, A9 to A11, A16, A18, A19): the access gate has let them
 //! through; this sends each to the hub and answers.
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use curvyo_connector_core::{ConnectorConfig, Message, Peer, Role, Secret, State};
+use curvyo_connector_core::{ConnectorConfig, Message, Peer, Role, Secret};
 
 use super::{Session, Socket, send};
 use crate::hub::ExitReason;
-
-/// The longest a stop before a reset may take: G12's hold and banner limits plus `M5` and `M9`.
-const RESET_STOP: Duration = Duration::from_secs(6);
 
 impl Session {
     /// `ApplyConfig`: in maintenance mode the sender becomes the owner, and this connection goes
@@ -100,12 +97,7 @@ impl Session {
             return send(socket, refused.message());
         }
         if self.hub.stop_for_exit(Instant::now()).is_some() {
-            let until = Instant::now() + RESET_STOP;
-            while matches!(self.hub.state(), State::Running | State::Paused)
-                && Instant::now() < until
-            {
-                std::thread::sleep(Duration::from_millis(20));
-            }
+            self.hub.await_exit_stop();
         }
         let _ = send(socket, Message::ResetDone);
         let _ = socket.flush();
