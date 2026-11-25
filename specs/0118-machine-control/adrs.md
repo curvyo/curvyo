@@ -512,6 +512,193 @@ Frage 341 (MC-ORIGIN-WPOS): Which head position does "Set origin here" store?
 - **C** As B, and Set origin here is greyed while the controller holds a work offset ("Work offset on the controller").
 Recommendation **A** (equal to B without an offset, which Curvyo never writes; right also with one). Default if unanswered: **A**.
 
+## Second slice 2d (focus point)
+
+Architect, 2026-11-25, criteria 34 to 36 with 35 a to e (Frage 313 B MC-FOCUS; defaults of Fragen 369 B,
+370 A, 371 A; ux-notes W53 to W64 and Frage 380 MC-FOCUS-MEMBER default A). **No new ADR, crate or
+dependency; wire additive in protocol 0; one `format_version` bump and profile record format 8.**
+Amends ADR 0035 §6, §7, ADR 0038 §2, ADR 0039 §1, §5, ADR 0071 decision 7 (P11); the notes go onto those
+ADRs with the story PR. All is **(Proposal)** unless quoted.
+
+**P1. Canvas to machine (`curvyo-editor-wasm`, pure laser-core underneath).** A press gives a page point
+`p` (µm). Machine origin and Home, then machine origin: `job.frame.machine_point(p)` (the bed mirror per
+origin corner, `0029` 26; no job needed, W55). User origin: `Job::machine_point(p)` of 2c O5 (`frame.
+machine_point(p + shift)`), the job being `job_build::build_frame_job`'s (2b, Frage 335 B: it exists for
+every page with items, also without power or speed), so the press lands where that drawing point burns;
+User origin with nothing to build greys the toggle ("Nothing to place", text UX's). Head position is
+greyed (criterion 34). The result is in **job file coordinates** (what a `G90` line writes, 2c O6), rounded
+to µm and sent in mm. New wasm `focus_target(page, x_mm, y_mm) -> {x, y} | cause` and `focus_ring(page, x,
+y)` (the inverse, `Job::page_point` / `frame.page_point`, for W59's ring). No clamp in the app (P4).
+
+**P2. Wire (`message.rs`, `codec.rs`).** App to connector: `GoToPoint { x, y, pulse }` (`KNOWN_TYPES` 43),
+`x`, `y` `Millimetres` in job file coordinates, each within ±10,000 mm (else `Malformed`); `pulse` left
+out when none, else `{ power_permille, length_ms }`: `PulsePower` (u16, 1 to 50 = 0.1 to 5 %) and
+`PulseLength` (u16 ms, 50 to 2,000) are bounded newtypes in `src/focus.rs` whose serde `try_from` refuses
+anything outside (`Malformed`, nothing moves): **the connector owns both caps, whatever the app sends**
+(35 c). New states `State::Focusing` (the move) and `State::Pulsing` (the pulse), two names so every app
+shows "Focus point" and "Pulse" from the state, not from a sentence (M1's reasoning; lead's point 1).
+`Status.target: Option<[Millimetres; 2]>` (omitted when `None`): the **clamped** target in job file
+coordinates, set in `Focusing`, `Pulsing` and while a go to point waits for Enter. Goldens in
+`tests/fixtures/messages/`: `command_go_to_point.json`, `command_go_to_point_pulse.json`,
+`status_focusing.json`, `status_pulsing.json`, `status_awaiting_point.json`; old goldens keep their bytes.
+*Rejected:* a frame job of one point (`JobKind::Frame`): F3 forbids `S` > 0 and must stay the proof that a
+frame is laser off; a submit plus chunk per click is also three messages for one press. *Rejected:* reusing
+`Jogging` (W58 and lead's point 1 need the own words; `JogStop`/dead-man semantics do not apply).
+
+**P3. Core rules (`machine/focus.rs`, "how the job machine takes a go to point and its pulse").** Both
+machines. `GoToPoint` in `Idle`, `Ready`, `Done` without a busy word and with `homed` (J5) gives
+`ControllerCommand::GoTo { target, feed }` (the pulse stays in core's `FocusRun` and goes out as its own
+`ControllerCommand::Pulse` after arrival; architect 2026-11-25, as built) and `Focusing`, `motion_from` as Home (a Ready job stays
+held, its `Progress` in `Status`); refused with criterion 8's `WrongState` words in every other state,
+"Alarm" in `Alarm`, **"Not homed"** without `homed` (the app greys it, W55; this is the backstop). In
+`Focusing` and `Pulsing` a second `GoToPoint` is `WrongState` ("Focus point", "Pulse"; W58: the app sends
+none), `SubmitJob` `Busy`, `Start`, `Home`, `Jog`, `Frame`, `Pause`, `Resume` `WrongState` with that word.
+`feed` is `JogStep::Ten.feed()` (3,000 mm/min; -io caps it at `$110`/`$111` as J6). On `JogEnded` in
+`Focusing` (P5): the last `Event::Position` within `ARRIVED = 0.05 mm` of `target` per axis, a pulse asked,
+no stop pending, no busy word, `laser_off` and `laser_unknown` false (G34's flags) gives
+`ControllerCommand::Pulse { power, length }` and `Pulsing`; otherwise back to `motion_from` with no pulse
+(missed by more: detail "Did not reach the point", text UX's; laser mode off or unknown: no detail, W9's
+controller warning already names it; lead's point 3). `PulseEnded` returns to `motion_from`; `PulseFailed {
+detail }` returns with it. Under `LocalPress` a go to point waits (`Waiting::Point { target, pulse }`,
+ADR 0070 decision 2); Enter runs it, Stop discards it. A closing client ends nothing (as a frame).
+
+**P4. The clamp is one pure function (`src/focus.rs`; lead's point 2).** `clamp_target(target, wco, box) ->
+[Millimetres; 2]`: machine target = `target + wco`, each axis clamped into `jog::TravelBox` (J6's box,
+sign by `$23` and force origin), back to job file coordinates; no box (`$130`/`$131` unknown): unclamped,
+GRBL's limits apply. Called once, by -io, with the settings only the connector knows; core stores its
+result as `Status.target`, and the app draws W59's ring from that `Status` (it arrives with the answer, the
+state being `Focusing` at once as Home's `Homing`), mapped back by `focus_ring`. So the ring **is** the
+connector's target, not a second computation. *Rejected:* the app clamping with the core function in wasm:
+the box needs `$23` and the after-homing force-origin test, which the wire does not carry, and two inputs
+could disagree. *Amended (tester finding, Proposal):* core clamps too, in `go_to_point`, before
+`Focusing` or the wait is entered, with the box -io names in `Event::Travel(Option<TravelBox>)` (sent
+when it changes, reset on connect) and the reported work offset, so no `Status` of the move carries the
+typed point beyond the travel; -io's clamp and `GoToTarget` stay and give the same result.
+**Accepted (architect, 2026-11-25).** Still one function, now called at two layers with the same inputs
+(`travel_box()` and the reported `WCO`, both from the one `GrblController` of the link, which is new per
+connection, so "reset on connect" holds by construction). Core's call keeps the first `Status` honest;
+-io's call is the byte-layer backstop that guards the `$J=` it writes, and its `GoToTarget` stays the
+authority (it overwrites core's target, so a work offset that changed in between cannot leave the ring
+and the head apart). `Event::Travel` is additive inside the process (not on the wire, no golden).
+`ControllerCommand::GoTo`'s doc names the target as already clamped by core, re-clamped by -io.
+`TravelBox` stays bare `[f64; 2]` (J6's debt, unchanged here); `clamp_target` must not panic on a box
+with `min > max` (a `$130`/`$131` below 0 from a non-GRBL firmware): `Settings::travel` keeps only
+values above 0, so `TravelBox::new` always gives `min <= max`.
+
+**P5. GRBL bytes (`-io/src/grbl/focus.rs`, "the go to point jog and its pulse block, from the command to
+Idle").** The move is a **GRBL jog in absolute work coordinates**: `M5\nM9\n` first unless `spindle_off`
+(J6), then `$J=G90 G21 X<x> Y<y> F<f>` with the clamped target, owed as `Owed::Jog`, fast polling;
+`JogEnded` at `Idle` with nothing owed, emitted after the `Position` of the same report; `error:15` gives
+`JogFailed` (built text). A jog is refused by GRBL's soft limits instead of alarming, leaves the parser
+state untouched and is cancelled by `0x85` with the position kept. The **pulse block**, written in one
+write, never split:
+`G1 M3 S<s>` / `G4 P<t>` / `M5 S0`, with `s = floor(power_permille x $30 / 1000)` and `t` the length in
+**seconds** with three decimals (GRBL's `G4 P` is seconds; `P0.300`). It is written only when `$32=1` and
+`$30` are known and `s >= 1`; else `PulseSkipped` (core treats it as a pulse left out). `ok` to `M5 S0`
+gives `PulseEnded` (`Owed::Pulse`); an `error:<n>` on line 1 or 2 gives `PulseFailed` after the remaining
+answers (GRBL still runs `M5 S0`); one on line 3 runs the G12 stop. Golden
+`curvyo-connector-io/tests/fixtures/grbl/focus_pulse.gcode` (`M5`, `M9`, the `$J=`, the block).
+- **Why `M3`, not `M4` (35 b's preference rejected).** GRBL 1.1 in laser mode sets an `M4` (dynamic)
+  spindle to zero power whenever it is not moving (`spindle_set_state`: CCW in laser mode gives rpm 0), so
+  an `M4` pulse at standstill fires nothing. `M3` with motion mode `G1` keeps the set power while stopped
+  (GRBL's "M3 constant laser power" rule); a `$J=` does not set the parser's motion mode and GRBL starts in
+  `G0`, under which laser mode disables the output, hence the bare `G1` (valid without axis words, no
+  motion). 35 b's concern, a missed move burning a standing dot, is met otherwise: the pulse is written
+  only after `Idle` within 0.05 mm, and the block carries its own end, so the controller switches the beam
+  off after `t` even if the app, the connector or the cable is gone. To confirm on the real laser at the
+  customer's try (the simulator cannot show a beam).
+- **S from `$30`, not from the profile's max power.** The connector owns the power cap, and `$30` is the
+  scale GRBL applies to `S`; with a profile that agrees (the built controller warning names a mismatch)
+  both are the same percent. Hence `S` at most 5 % of `$30`, and at least 1 or no pulse.
+
+**P6. Safety in the state machine (35 c).** No pulse in any state but `Focusing` after P3's arrival test,
+so none in `Alarm`, `Hold`, `Door`, `Running`, `Paused`, a pending stop or a pulse already running.
+**Stop** in `Focusing`: `JogCancel` as J3 (fake at once; GRBL "Stopping" until `JogEnded`), back to
+`motion_from`, no pulse (criterion 10 amended: the move is a jog). Stop in `Pulsing`: `ControllerCommand::
+Stop`, the G12 sequence (hold, reset, banner, `M5`, `M9`); `begin_stop` also starts when no stream exists
+but an `Owed::Pulse` is in flight (as M4 for `$H`); the reset switches the laser off at once and, with no
+motion, raises no alarm, so `homed` is kept (J5). A busy word (`Hold`, `Door`) or an alarm while
+`Pulsing`: alarm as M3 (drops a Ready job; GRBL already stops the spindle); a busy word runs the G12 stop.
+**Length cap twice:** `PulseLength` caps the dwell at 2,000 ms on decode, and core sets `deadline = now +
+length + PULSE_GRACE` (1 s) on `Event::Clock` (J4); a `Clock` past it while `Pulsing` runs the G12 stop with
+detail "The pulse did not end" (text UX's). **Losses:** the app's connection: nothing (no keep-alive; the
+block ends itself); `ControllerLost`: `NoController` as Home (the controller has the block or was reset by
+the port); the connector's shutdown while `Pulsing`: the hub sends `Stop` before closing the port, and the exit
+waits for that stop to end (G12's reset, as for a running job; architect 2026-11-25: `stop_for_exit`
+names "Focus point" and both exit waits include `Focusing` and `Pulsing`).
+`--require-local-start`: P3's wait. A member: P11.
+
+**P7. Profile fields (`curvyo-laser-core`; 35 a, W60 to W62).** `ProfileValues.focus_pulse: FocusPulse {
+on: bool, power: PulsePermille, length: PulseMs }`, two `bounded_integer!` newtypes in `machine_profile.rs`
+(1 to 50, default 10; 50 to 2,000, default 300), `on` default false (Frage 369 B), Generic laser the same.
+Per mille, not a float percent (exact one decimal, no `-0.0`, as O1's µm). The UI clamps on commit and
+rounds to 0.1 % and 1 ms (W60's notices); the ranges equal connector-core's by a `curvyo-editor-wasm`
+test (laser-core does not depend on connector-core). **Record format 8** (`machine_profile_file.rs`): after
+the default pair of record format 7 (`0150`), `"focus_pulse": false`, `"focus_pulse_power_permille": 10`, `"focus_pulse_length_ms":
+300`, always written; format 5 to 7 records read the defaults and are not rewritten on read; one of the
+keys in a format 5 to 7 record damages it (`deny_unknown_fields`, as ADR 0065 §3); above 8 is newer. **Page
+copy** (`machine_profile_copy.rs`): the same three keys in `mfg_profile`, absent = default; a wrong type
+or a value out of range reads as the default, counts one damaged value (`CopyRead` gains the flag) and is
+never rewritten on read, so a damaged `focus_pulse` reads **off**. Pick, Reset, Save as and the edits write
+them with the map; "Differs from profile" compares them exactly. Only the webview reads them, to build
+`pulse` (P1): sent only when the copy has Focus pulse **and** Laser mode on.
+
+**P8. Format (`curvyo-document-core`).** `CURRENT_FORMAT_VERSION` +1, to **63**: `main` is at 62 (59 is
+`0150`, #468; 60 is `0145` slice 3, #475; 61 is slice 2c, #477; 62 is `0099` slice 1, #482). Needed for
+ADR 0065 §4's reason: a build of 62 rewrites the whole `mfg_profile` map from its type on a
+field edit and would drop the three keys silently; by the bump it refuses the file. No migration: a file
+of 62 or lower opens with the defaults, unchanged. `ProfileChange` gains `FocusPulse { on }`,
+`EditPulsePower`, `EditPulseLength`, one commit and undo step each, labels per W60 (`history_names.rs`,
+`step_scope.rs`, `history/rows.rs`). Goldens `focus_pulse_v63.curvyo` (pulse on, 2.5 %, 500 ms; a second
+page with the defaults; a third without the keys) and `focus_pulse_damaged_v63.curvyo` (`"on"`, `0`,
+`2001`, `1.5`: each reads its default, counts one, saves back unchanged); `machine_profiles/
+format8_focus_pulse.json` (round trip byte for byte), `format6_focus_pulse_key.json` (damaged),
+`newer_format.json` moves to 9, every format 5 to 7 golden reads the defaults.
+
+**P9. Logs and terminal (`-io`).** `jobs.log` `Focus point: <client>` when a go to point is taken (as
+`Frame:`, criterion 12) and `Focus pulse: <client>` when the pulse block is written (35 c), so a press with
+the pulse writes two lines: the move and the laser emission are logged apart (`LogResult::FocusPoint`,
+`FocusPulse`; golden `jobs.log` gains both; a pad session's `Jog:` run ends at either). Terminal: "Focus
+point sent by <client>", and for the Enter wait the line of a waiting start.
+
+**P10. App, fake, crates.** `curvyo-app`: `connector_command` takes `"go_to_point"` with `{ x, y, pulse? }`
+(fresh paired connection, `CommandAnswer`, as Home). Fake controller: the move takes injected time at the
+feed and moves the fake position; the pulse is a fake dwell of `length` in injected time, then
+`PulseEnded`; Stop cancels both; the fake reports `$32=1`, `$30=1000`. Simulator: `$J=G90`, `G1` without
+axis words, `M3` power while idle in laser mode, `G4 P` seconds with the `ok` after the dwell, the byte
+log. Crates: `curvyo-connector-core` (P2 to P4, P6, access P11, `journal.rs`: a waiting point is no
+waiting Home, it carries `target`), `curvyo-connector-io` (P5, P6, P9, fake, simulator),
+`curvyo-laser-core` (P7), `curvyo-document-core` (P8), `curvyo-ui-core` (labels), `curvyo-editor-wasm`
+(P1, profile fields view, range test), `curvyo-app`, frontend (W53 to W64). Untouched: `-server` beyond
+the terminal line in -io, `-ctl` (no member confirm, P11).
+
+**P11. Members (Frage 380 A; ADR 0071 decision 7 amended).** `GoToPoint` is `Kind::Motion` in
+`access.rs`, as `Jog`: a member gets `OwnerRequired`, maintenance mode `Maintenance`; the app has no
+toggle for a member (W63). So no `Waiting::Point` for an owner's confirm, no `Confirms::Point`, no
+`curvyoctl confirm-start` case. Decision 7's "`0118`'s motion waits for an owner" now holds for Home and
+Frame; Go to point is owner-only like Jog. With Frage 380 B it becomes F5's path (a request id on the
+wire, `Start { job_id }` confirms), additive later.
+
+**P12. Tests, no sleeps.** Laser-core and wasm: `focus_target` per origin corner x {Machine origin, Home
+then machine origin, User origin} (table, the user-origin row equals `Job::machine_point`), Head position
+and no-job causes, `focus_ring` as its inverse; record and copy reading tables (P7, P8). Core: P3 per
+state in both machines (`Not homed`, `Alarm`, busy words, `Ready` kept), arrival at 0.049 / 0.051 mm, no
+pulse with `laser_off`, `laser_unknown`, a pending stop or a busy word, `PulseEnded`, the deadline by
+`Clock`, Stop in each state, `Waiting::Point` with Enter and Stop, `clamp_target` per `$23` and box,
+decode refusals for 0, 51, 49, 2,001 ms, the goldens, the access row. Simulator (`tests/grbl_focus.rs`):
+bytes golden, `M5` first, no `S` above 0 before the block, the block in one write, `S` per `$30` (1000 and
+255, the `s = 0` skip), `$32=0` writes no block, Stop mid-move (`0x85`, no block) and mid-pulse (reset,
+`M5`, `M9`, no alarm, `homed` kept), `error:15`. Hub: both `jobs.log` lines, a second client sees
+`Focusing`/`Pulsing` and may Stop. Frontend: W55 causes table, the mode reducer (W56), the pulse built from
+the copy.
+
+**Spec points fixed in `specification.md` (no customer question).** 10: a go to point's move stops with
+the jog cancel, its pulse with G12 (P6). 12: Go to point is owner-only (Frage 380 A, P11); under
+`--require-local-start` it still waits for Enter. 34: Home, then machine origin maps as Machine origin;
+the ring is W59's at `Status.target`. 35 b: `M3` and the bare `G1` (P5); `S` from `$30`. 35 c: the end of
+the pulse is the block's own `M5 S0` plus Stop, the deadline and the shutdown Stop; no keep-alive exists;
+"member's press" is gone. 35 d: "What the maker sees" (ux-notes point 1). New Frage: none.
+
 ## Second slice 2e (run from line)
 
 Architect, 2026-11-25, criteria 38 and 39 with `0132` criteria 12 and 13 (Frage 258 C, Frage 314 A by

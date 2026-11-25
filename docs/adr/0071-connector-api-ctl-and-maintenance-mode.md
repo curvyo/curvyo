@@ -346,6 +346,14 @@ confirmation as `start-confirmed`, subject the requester, detail `Home`; `jobs.l
 request as `Home: <client>`. `Jog` and `JogKeep` join the owner-only rows of the table (`JogStop`
 passes). `Confirmation` in core names what ran (`Start`, `Resume`, `Home`).
 
+## Amendment 2026-11-25: Go to point is owner-only (spec `0118`, slice 2d, Frage 380 A)
+
+Decision 7's "`0118`'s motion waits for an owner" holds for Home and Frame; `GoToPoint` is an
+owner's motion like `Jog`: a member gets `OwnerRequired`, maintenance mode `Maintenance`. There is
+no `Waiting` of a member's go to point, no `Confirms` value for it and no `curvyoctl confirm-start`
+case; under `--require-local-start` an owner's go to point waits for Enter as a start does. Details:
+`specs/0118-machine-control/adrs.md` P11.
+
 ## Amendment 2026-11-25: restart from a line (spec `0118` slice 2e, spec `0132` slice 2)
 
 Decision 3's table gains one owner-only row: `RestartFromLine { job_id, line }` (a member gets
