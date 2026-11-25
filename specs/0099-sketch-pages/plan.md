@@ -126,3 +126,92 @@ as the safety net of the refactor.
 - The status bar line "Linked clone, Page 2, no solution" of criterion 26 is not built: the app has
   no status bar for a selection today; the Parameters row's state line carries the message.
 - Slice 2 (canvas handles, criterion 25) is not built.
+
+## Revision 2026-11-19, slice 2: canvas handles and linked values (criteria 24, 25, 26, 31 to 37)
+
+Implementer, 2026-11-25. Branch `story/sketch-instance-handles`. Decisions A12 to A16 of `adrs.md`;
+Fragen 373 B and 374 B. `format_version` 64.
+
+### Affected crates/modules
+
+- **`curvyo-ui-core`**: refactor commit first: `curvyo-editor-wasm/src/session/sketch/dimension_geometry.rs`
+  moves unchanged to `sketch_dimension_geometry.rs` (A12). Then `instance_handles.rs` (`Knob` with
+  `String` key and label, `KnobMotion::{Along, Around}`, `dragged`), new
+  `instance_sketch_handles.rs` (where each exposed value of a sketch clone puts its knob),
+  `instance_sketch.rs` (`only_this`, coupled plan and change through `instance_links`, the pill and
+  marks from committed state, group letters and partners per row), `history_names.rs`,
+  `step_scope.rs` (the two link steps).
+- **`curvyo-document-core`**: new `instance_links.rs` (`linked_change`, `linked_reset`), `KeySet` in
+  `instance_value.rs`, `link` on `exposed_params` entries and the clone register
+  `instance_unlinked` (`instance_codec.rs`), groups resolved in `sketch_instance::exposed_of`,
+  `link_exposed` / `unlink_exposed` and the Stop exposing rule (`instance_commands.rs`),
+  `CloneChain::{unlinked, fallback_values}` copied by `RawLeaf::of_clone` (A15a),
+  `Document::instance_solution`, `Document::clone_previews` on the document's solve cache, Unlink and
+  Convert drop `instance_unlinked`, format 64, goldens `sketch_instance_links_v64.curvyo` and
+  `sketch_instance_links_damaged_v64.curvyo`.
+- **`curvyo-editor-wasm`**: new `session/sketch_instance_handles.rs` (memo, press, drag, release,
+  Escape, readout, draw list of the sketch-clone knobs), the shared knob rules of
+  `session/generators/handles.rs` as functions over `&[Knob]`, the pointer router (generator knob,
+  sketch knob, Select), `only_this` on the preview and commit bindings, Link and Unlink bindings and
+  the Link list in the sketch view JSON; CPU test `tests/sketch_instances_cpu_time.rs` gains the
+  knob drag and the coupled knob drag.
+- **`frontend`**: the Link line and list on exposed rows (Parameters and Sketches tabs), the group
+  letter in the dimension pill, the link mark in the clone fields, Shift = only this at the gesture
+  start on grouped fields with "only this", PageUp / PageDown, the knob drag chip glyph;
+  `docs/design-system.md` rows (UX notes 12.8), the debt entry of A15a removed from
+  `docs/technical-debt.md`.
+
+### Tasks
+
+- [x] 1. Refactor, behaviour-preserving: `dimension_geometry.rs` moves to ui-core (AC 25 prerequisite).
+- [x] 2. `linked_change` / `linked_reset`, tests first: targets, intersection clamp with the held
+  bound, empty intersection, only this marks only a changed grouped value, Back of one and of all
+  (AC 33, 34).
+- [x] 3. Codec: `link` on entries, kept through a limit edit; `instance_unlinked` list register and
+  its damage rule; groups resolved at read (kind of the first member, a group of one is none)
+  (AC 32, 37).
+- [x] 4. Commands: Link (new group, join, merge) and Unlink (a group of one dissolves, marks dropped);
+  Stop exposing leaves the group in the same step; the clone writes its marks with its values; a
+  deleted value leaves its group by read (AC 32, 35, 36).
+- [x] 5. `CloneChain::{unlinked, fallback_values}`, `of_clone` copies them, `clone_previews` on the
+  document cache, `instance_solution`; Unlink and Convert drop the marks (AC 26, 29, 36, A15a).
+- [x] 6. Format 64, doc paragraph, goldens incl. damaged, residue test, tests moved 63 to 64 (AC 37).
+- [x] 7. ui-core: `Knob` motions and `dragged`; sketch knob anchors and rates (50 % clone, rotated,
+  mirrored angle, bare-name rule, diameter x2) (AC 25).
+- [x] 8. ui-core sketch arm: `only_this`, coupled clamp notice naming the member whose limit held,
+  pill and marks from committed state during a gesture, group letter and partners per row (AC 24,
+  32 to 34, 36).
+- [x] 9. Session and wasm: sketch knobs (72 px, collisions, Ctrl/Cmd snap, Shift at the press, partner
+  knobs live, readout, Escape, one step on release), Link and Unlink bindings, `only_this`
+  arguments; CPU test of a knob drag and a coupled knob drag with 200 clones (AC 25, 31, 33, 34, 37).
+- [x] 10. Frontend: Link line and list, group letter on the pill, link marks in the fields, Shift
+  rule, PageUp / PageDown; design-system rows; debt entry removed (AC 24, 32 to 36).
+
+### Validation
+
+Unit tests per crate before the code (`instance_links.rs`, codec, the knob anchors); goldens under
+`curvyo-document-core/tests/fixtures/`; the CPU-time test under `curvyo-editor-wasm/tests/`; the
+generator knob tests of `0141` as the safety net of the `Knob` change; frontend unit tests for the
+decoders and the Shift rule.
+
+### Notes for the lead
+
+- Measured (release, `cargo test --release -p curvyo-editor-wasm --test sketch_instances_cpu_time
+  -- --nocapture`, 200 clones of the 100-entity sketch): a field-drag step 7.7 ms worst, a coupled
+  knob-drag step 7.9 ms worst (budget 16 ms), open with the first frame 259 ms, the field release
+  10 ms and the knob release 16 ms, both with 0 further solves. A knob step solves at most once for
+  the whole group; a step whose set equals another clone's reuses that solve.
+- Built after the first review: the numeric entry chip on a knob double-click (one field with the
+  link mark, Enter commits coupled, Escape and a blur write nothing), the `--dim-guide` extension
+  lines and arrowheads of the knob's dimension and its partners' on hover and drag, the follower
+  border on partner fields during a coupled field drag. The link commands live in
+  `instance_link_commands.rs`. Not built: the focus moves after Link and Unlink (UX notes 12.9.1)
+  and the status-bar line of criterion 26 (not built by the criterion).
+- (Proposal) `linked_change` takes the clone's inherited values besides its own (A14 lists only the
+  own), so "the value changes" of criterion 34 compares with what the clone shows up a chain.
+- (Proposal) The dimension pill's accessible name adds ", linked in group A" (UX notes ask for
+  ", linked with Radius 2"; the pill JSON carries the letter only).
+- (Proposal) The 72 px rule is the generator knobs' rule (the shorter side of the box), shared: a
+  clone of a single straight line never shows knobs.
+- Format: `origin/story/machine-focus` (commit f6a55072, laser-core record format 8) also claims
+  document format 62; whichever merges second renumbers.

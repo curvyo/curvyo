@@ -10,16 +10,22 @@ export const DRAG_THRESHOLD_PX = 3;
 
 /** The factor a modifier gives the drag: Shift ten times as fast, Ctrl (Cmd on
  * macOS) ten times slower (`specs/0017-style-panel-rework` criterion 38). */
-function factorOf(event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): number {
-  if (event.shiftKey) {
+function factorOf(
+  event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
+  shiftOnlyThis = false,
+): number {
+  if (event.shiftKey && !shiftOnlyThis) {
     return 10;
   }
   return event.ctrlKey || event.metaKey ? 0.1 : 1;
 }
 
 /** The rounding grid that goes with a factor. */
-export function gridOf(event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): GridName {
-  const factor = factorOf(event);
+export function gridOf(
+  event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
+  shiftOnlyThis = false,
+): GridName {
+  const factor = factorOf(event, shiftOnlyThis);
   return factor === 10 ? "coarse" : factor === 0.1 ? "fine" : "normal";
 }
 
@@ -40,6 +46,8 @@ interface Drag {
   width: number;
   limit: number;
   min: number;
+  /** Shift at the press on a value that takes Shift as "only this" (`specs/0099` UX notes 12.9.3). */
+  onlyThis: boolean;
 }
 
 interface ValueDragOptions {
@@ -51,8 +59,12 @@ interface ValueDragOptions {
   min?: number;
   /** The edited objects differ: the pointer's own position is the value. */
   mixed: boolean;
-  /** A tick: position `p` on the field's scale and the grid. */
-  onTick: (p: number, grid: GridName) => void;
+  /** Shift means "only this value" (a value in a link group, `specs/0099` UX notes 12.9.3): it is
+   * latched at the press and is never coarse. */
+  shiftOnlyThis?: boolean;
+  /** A tick: position `p` on the field's scale, the grid and whether Shift was held at the press
+   * of a `shiftOnlyThis` field. */
+  onTick: (p: number, grid: GridName, onlyThis: boolean) => void;
   /** A click (a press and release with less than the slop of movement, not the second click of
    * a double-click): the value goes to position `p`, 0 to 1, under the pointer, and is
    * committed (`specs/0047-transform-polish/` criterion 33). */
@@ -79,6 +91,7 @@ export function useValueDrag({
   limit,
   min = 0,
   mixed,
+  shiftOnlyThis = false,
   onTick,
   onClickAt,
   onDoubleClick,
@@ -86,7 +99,7 @@ export function useValueDrag({
   onEscape,
 }: ValueDragOptions) {
   const drag = useRef<Drag | null>(null);
-  const [modifier, setModifier] = useState<GridName>("normal");
+  const [modifier, setModifier] = useState<GridName | "only this">("normal");
 
   const finish = useCallback(() => {
     drag.current = null;
@@ -109,16 +122,17 @@ export function useValueDrag({
       if (!current?.dragging) {
         return;
       }
-      const factor = factorOf(event);
+      const factor = factorOf(event, shiftOnlyThis);
       if (factor !== current.factor) {
         current.baseP = current.lastP;
         current.baseX = current.lastX;
         current.factor = factor;
-        setModifier(gridOf(event));
-        onTick(current.lastP, gridOf(event));
+        const grid = gridOf(event, shiftOnlyThis);
+        setModifier(current.onlyThis && grid === "normal" ? "only this" : grid);
+        onTick(current.lastP, grid, current.onlyThis);
       }
     },
-    [onTick],
+    [onTick, shiftOnlyThis],
   );
 
   useEffect(() => {
@@ -149,12 +163,15 @@ export function useValueDrag({
       if (!current.dragging) {
         current.dragging = true;
         document.documentElement.setAttribute("data-value-drag", "");
+        if (current.onlyThis) {
+          setModifier("only this");
+        }
       }
       rebase(event);
       const p = dragPosition(current, event.clientX);
       current.lastP = p;
       current.lastX = event.clientX;
-      onTick(p, gridOf(event));
+      onTick(p, gridOf(event, shiftOnlyThis), current.onlyThis);
     },
     onDragEnd: () => {
       finish();
@@ -180,7 +197,7 @@ export function useValueDrag({
       startX: event.clientX,
       baseP: bar,
       baseX: event.clientX,
-      factor: factorOf(event),
+      factor: factorOf(event, shiftOnlyThis),
       lastP: bar,
       lastX: event.clientX,
       mixed,
@@ -189,6 +206,7 @@ export function useValueDrag({
       width: box.width,
       limit,
       min,
+      onlyThis: shiftOnlyThis && event.shiftKey,
     };
     pointer.onPointerDown(event);
   };

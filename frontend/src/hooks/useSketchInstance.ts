@@ -15,10 +15,11 @@ export interface SketchInstanceApi {
   view: SketchInstanceView | null;
   /** The clamp notice of the last edit and the key of the field it sits under. */
   notice: { key: string; text: string } | null;
-  /** A number into the field `key` (one step); `"committed"`, `"unchanged"` or `"invalid:number"`. */
-  setValue: (key: string, value: number) => string;
+  /** A number into the field `key` (one step); `"committed"`, `"unchanged"` or `"invalid:number"`.
+   * `onlyThis` (Shift at the gesture's start on a linked value) changes it alone (criterion 34). */
+  setValue: (key: string, value: number, onlyThis?: boolean) => string;
   /** A value stepped into a field, shown on the canvas without writing. */
-  preview: (key: string, value: number) => void;
+  preview: (key: string, value: number, onlyThis?: boolean) => void;
   cancelPreview: () => void;
   /** Back to the sketch's (or the original's) value of one field. */
   reset: (key: string) => void;
@@ -40,12 +41,12 @@ export function useSketchInstance(editor: InstanceEditor): SketchInstanceApi {
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   const setValue = useCallback(
-    (key: string, value: number): string => {
+    (key: string, value: number, onlyThis = false): string => {
       const session = getSession();
       if (!session) {
         return "invalid:number";
       }
-      const answer = JSON.parse(session.set_sketch_instance_value(key, value)) as {
+      const answer = JSON.parse(session.set_sketch_instance_value(key, value, onlyThis)) as {
         written?: boolean;
         notices?: string[];
         error?: string;
@@ -65,8 +66,8 @@ export function useSketchInstance(editor: InstanceEditor): SketchInstanceApi {
     [getSession, sync],
   );
   const preview = useCallback(
-    (key: string, value: number) => {
-      getSession()?.preview_sketch_instance_value(key, value);
+    (key: string, value: number, onlyThis = false) => {
+      getSession()?.preview_sketch_instance_value(key, value, onlyThis);
       sync();
     },
     [getSession, sync],
