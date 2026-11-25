@@ -118,6 +118,49 @@ impl WasmSession {
         self.session.set_machine_air_assist(on)
     }
 
+    /// The Focus pulse switch of the page's profile copy (`specs/0118` 35 a). Whether it changed.
+    pub fn set_focus_pulse(&mut self, on: bool) -> bool {
+        self.session.set_machine_focus_pulse(on)
+    }
+
+    /// The Pulse power field in percent; the "limited to" or "rounded to" notice, else empty.
+    pub fn set_pulse_power(&mut self, percent: f64) -> String {
+        self.session
+            .set_machine_pulse_power(percent)
+            .unwrap_or_default()
+    }
+
+    /// The Pulse length field in ms; the notice, else empty.
+    pub fn set_pulse_length(&mut self, ms: f64) -> String {
+        self.session
+            .set_machine_pulse_length(ms)
+            .unwrap_or_default()
+    }
+
+    /// The go to point target of a canvas press at document `(x_mm, y_mm)` (`specs/0118` 34,
+    /// adrs P1): `{"x", "y"}` in job file coordinates or `{"cause"}`; `null` off a laser page.
+    #[must_use]
+    pub fn focus_target_json(&self, x_mm: f64, y_mm: f64) -> String {
+        serde_json::to_string(&self.session.focus_target(x_mm, y_mm)).unwrap_or_default()
+    }
+
+    /// The pulse a press asks for, `{"power_permille", "length_ms"}`, or `null` while the copy's
+    /// Focus pulse or Laser mode is off (adrs P7).
+    #[must_use]
+    pub fn focus_pulse_json(&self) -> String {
+        serde_json::to_string(&self.session.focus_pulse()).unwrap_or_default()
+    }
+
+    /// The target ring at the connector's clamped target (job file mm, W59); whether placed.
+    pub fn set_focus_ring(&mut self, x_mm: f64, y_mm: f64) -> bool {
+        self.session.set_focus_ring(x_mm, y_mm)
+    }
+
+    /// The target ring leaves. Whether one was shown.
+    pub fn clear_focus_ring(&mut self) -> bool {
+        self.session.clear_focus_ring()
+    }
+
     /// Moves the play slider to `fraction` (0 to 1) of the job's time.
     pub fn set_play_position(&mut self, fraction: f64) {
         self.session.set_play_position(fraction);
