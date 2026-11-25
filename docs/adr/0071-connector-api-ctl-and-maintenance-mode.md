@@ -345,3 +345,14 @@ discards it). A second member's `Home` meanwhile is `WrongState`. `admin.log` re
 confirmation as `start-confirmed`, subject the requester, detail `Home`; `jobs.log` writes the
 request as `Home: <client>`. `Jog` and `JogKeep` join the owner-only rows of the table (`JogStop`
 passes). `Confirmation` in core names what ran (`Start`, `Resume`, `Home`).
+
+## Amendment 2026-11-25: restart from a line (spec `0118` slice 2e, spec `0132` slice 2)
+
+Decision 3's table gains one owner-only row: `RestartFromLine { job_id, line }` (a member gets
+`OwnerRequired`; in foreground mode every paired client acts as an owner), protocol 0, additive.
+`ListEntry` carries `restart_line`, `restart_cause` and `line_approximate` on an interrupted entry,
+`Progress` carries `from_line` and `entering`. `admin.log` gains `restart-from-line` (owner, job,
+line), `jobs.log` the line `Restart from line <n>: <client>`; `jobs/list.json` stays format 1 with
+the stop point added. A job ended by Stop, an alarm or a lost controller now also stays listed as
+interrupted (Frage 390 C, customer 2026-11-25). No new crate, no new dependency. Details:
+`specs/0118-machine-control/adrs.md` R1 to R11 and its implementation notes.

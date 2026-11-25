@@ -88,3 +88,30 @@ Frage 303 (QUEUE-MEMBER-FLAG): A member marks its own job "Run next automaticall
 A: it follows the job before it but waits for an owner's confirmation, like every member start.
 B: it starts at once, as if an owner marked it. C: only owners mark jobs.
 Recommendation A (one member start rule, `0128` A13). Default if unanswered: A.
+
+## Slice 2 (restart from the interrupted line, criteria 12 and 13)
+
+Architect, 2026-11-25. Built in one PR with `0118` sub-slice 2e; the decisions are `0118` adrs R1 to R11
+("Second slice 2e"), ux-notes W65 to W78 (`0118`) and section 11 here. **No new ADR, crate, dependency or
+`format_version`**; protocol 0 additive; `list.json` stays `format: 1`. All is **(Proposal)**.
+
+**L8. What slice 2 adds to the list core.** `Entry.stop: Option<StopPoint>` (machine position, work
+offset, `run_from`, `exact`) and the same fields on `StoredCurrent` (`0118` R2); `Item.restart` (the
+restart line, the rebuild and its cause, computed once per interrupted entry and on `Event::Planner`,
+R3, R5). `stored::restore` fills `restart` and keeps `exact` (false after a crash). Which ends make an
+entry interrupted is UX Frage 390, answered C by the customer 2026-11-25: a connector restart (L6), Stop, an alarm or a lost controller (`0118` adrs, implementation notes; `machine/interrupt.rs`).
+L1's "homed since from `Event::Homed`" is 2a's J5, built.
+
+**L9. Messages** (amends L3). `RestartFromLine { job_id, line }` (owner only, `0118` R7, R8);
+`ListEntry` gains `restart_line`, `restart_cause`, `line_approximate` on an interrupted entry; `Progress`
+gains `from_line`, `entering`. A stale `line` answers `WrongState` and a fresh `JobList`, as `MoveJob`.
+
+**L10. Rights and chain** (amends L4, L5). `access.rs`: `Kind::Reorder` becomes `Kind::OwnerList` and
+takes `RestartFromLine` (member `OwnerRequired`; foreground every paired client). Criterion 11's "a
+restart is pending" is the restart waiting for Enter (`Waiting::Restart`) or entering (`Progress.entering`):
+the machine is not `Done` then, so `chain::next` is never asked; a restarted job that ends `Done` chains
+as an owner's Start (L5). Interrupted entries are never `first_waiting` (built).
+
+**L11. Logs** (criterion 13). `admin.log` `restart-from-line` (owner, job name, line n), `jobs.log`
+`Restart from line <n>: <client>`; goldens in `curvyo-connector-io/tests/fixtures/`. Restore after a crash
+logs nothing new (L6's `job-dropped` stays).

@@ -219,3 +219,67 @@ Phase 4: frontend
 - editor-wasm: `session/output/tests/user_origin_tests.rs`. Frontend: `tests/set_origin_0118.test.ts`.
 - Full gate of `CLAUDE.md` §7, `cargo deny`, `python3 -I scripts/check_docs.py`. The browser check is the
   tester's.
+
+# Plan for Machine control, slice 2e (run from line, with `0132` slice 2)
+
+Criteria 38 and 39 here, `0132` criteria 12 and 13; Frage 314 A (default); 390 C, 391 C (customer 2026-11-25). Design:
+architect notes R1 to R11 in `adrs.md`, `0132` adrs L8 to L11, UX notes W65 to W78 and `0132` ux-notes
+section 11. Branch `story/machine-run-from-line`. No new crate or dependency, protocol 0 additive, no
+`format_version` change (`jobs/list.json` stays `format: 1`, new fields `serde(default)`). Which ends
+make an interrupted job stays in one place (`machine/interrupt.rs`, Frage 390 C; a connector restart through `job_list/stored.rs` `restore`).
+Commits (at most five): docs, the word-reader refactor, connector-core, connector-io with server and
+app, frontend.
+
+## Affected crates/modules
+- `curvyo-connector-core`: `gcode_words.rs` (moved from `frame_text.rs`), new `modal.rs` (the rebuild),
+  new `restart.rs` (restart line, position proof, entry lines), new `machine/restart.rs` (the message,
+  causes, entering, an end before line n), `job_list` (`Entry.stop`, `StopPoint`), `message.rs`
+  (`RestartFromLine`, `ListEntry`, `Progress` fields), `machine/event.rs` (`StartAt`, `EntryReached`,
+  `Planner`), `access.rs` (`Kind::OwnerList`); goldens `tests/fixtures/restart/`, six message goldens.
+- `curvyo-connector-io`: `grbl/restart.rs` (`StartAt`: travel check, entry then lines n..),
+  `grbl/stream.rs` (`Stream::new_at`), `grbl/identify.rs` (`[OPT:]` planner size),
+  `fake_controller.rs`, `hub/journal.rs` (logs, `exact`), `job_log.rs`, `admin_log.rs`; goldens.
+- `curvyo-connector-server`: the terminal line. `curvyo-app`: `connector_command` "restart_from_line".
+- `frontend`: `jobList.ts`, `JobList.tsx` (row, Restart, confirm), `connectorText.ts` (state lines),
+  `MachineControls.tsx` (focus to Stop), the connector bridge.
+
+## Tasks
+Phase 1: refactor
+- [x] 1. `strip`, `number`, `words` move to `gcode_words.rs`, behaviour kept (R5)
+Phase 2: connector-core
+- [x] 2. `modal::before` table and goldens: groups, position, inch, arcs, refusals G92, G10, G28, M2,
+        unknown words, Head position (38, `0132` 12 d; R5, R11)
+- [x] 3. `restart_line` with 15 and 16 blocks, arcs, `run_from` floor (39; R3)
+- [x] 4. `position`: missing reports, "Work offset changed" also after Home, "Not homed" (39,
+        `0132` 12 a; R4)
+- [x] 5. `entry` lines: M5 M9, G21 G90 G17 G94, travel `G1 … S0` at 3000 with Z first when up, the
+        rebuilt state, S with M3/M4; goldens `.entry` (38, `0132` 12 d; R6)
+- [x] 6. `RestartFromLine` owner only, stale line WrongState and a fresh list, cause order of W68,
+        `ListEntry` fields, `Progress.from_line` and `entering` (38, `0132` 12 b, 12 c; R7, R8, L9, L10)
+- [x] 7. An end before line n returns the entry unchanged; `LocalPress` waits; `Planner` recomputes
+        (38, 39; R8, R9)
+- [x] 8. `Entry.stop` stored with the line, `exact` only at the exit flush (39; R2, L8)
+- [x] 8a. Frage 390 C: Stop, an alarm and a lost controller leave an interrupted entry, exact; a Stop
+        with no break since proves the position by the same machine position (39, `0132` 12 a; R1, R4)
+Phase 3: connector-io, server, app
+- [x] 9. `StartAt` streams the entry, then lines n..; travel check; `EntryReached`; planner from
+        `[OPT:]`; fake controller (38; R9)
+- [x] 10. `jobs.log` "Restart from line <n>: <client>", `admin.log` `restart-from-line`, terminal
+        line; no result line before line n (`0132` 13; R10, L11)
+- [x] 11. Simulator tests: entry bytes, no M3/M4/S>0 before step 5, Stop during the travel, Not homed
+        after a restart then Home, a changed WCO after Home, `$32=0` (38, 39; R11)
+- [x] 12. `curvyo-app` `connector_command` "restart_from_line" (38; R11)
+Phase 4: frontend
+- [x] 13. Interrupted row 56 px, three lines, "near line"; Restart left of Remove, its causes; the
+        confirm, busy, refusals, focus to Stop; state lines (38, `0132` 12 b; W65 to W78)
+Phase 5: docs
+- [x] 14. ADR 0071 amendment line, design-system row, spec status (R7)
+
+## Validation
+- connector-core: unit tables in `modal.rs`, `restart.rs`; `tests/restart_0118.rs` (both machines,
+  `LocalPress`, ends before line n, `entering`), goldens in `tests/fixtures/restart/` and `messages/`.
+- connector-io: `tests/grbl_restart.rs` (pty simulator), `tests/restart_hub.rs` (fake, logs), the
+  `list_interrupted.json` golden.
+- frontend: `tests/restart_from_line_0118.test.ts`.
+- Full gate of `CLAUDE.md` §7, `cargo deny`, `python3 -I scripts/check_docs.py`. The browser check is the
+  tester's.
