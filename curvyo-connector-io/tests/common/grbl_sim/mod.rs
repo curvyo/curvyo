@@ -60,6 +60,9 @@ pub struct SimConfig {
     pub travel: [f64; 2],
     /// `$20=1`: a `$J=` line that ends outside `[-travel, 0]` is refused with `error:15`.
     pub soft_limits: bool,
+    /// Drops the `ALARM:3` of a reset while moving from its output (a line lost on the wire), so
+    /// only the connector's own rule (no `Hold:0` before the reset) distrusts the position.
+    pub quiet_reset_alarm: bool,
 }
 
 impl Default for SimConfig {
@@ -81,6 +84,7 @@ impl Default for SimConfig {
             homing_fails: None,
             travel: [400.0, 300.0],
             soft_limits: false,
+            quiet_reset_alarm: false,
         }
     }
 }
@@ -330,8 +334,11 @@ impl GrblSim {
         self.parse_wait = 0;
         self.critical = false;
         if let Some(code) = raised {
+            // GRBL 1.1: a reset while moving loses steps, so it locks with `ALARM:3`.
             self.alarm = true;
-            self.print(&format!("ALARM:{code}"));
+            if !(code == 3 && self.config.quiet_reset_alarm) {
+                self.print(&format!("ALARM:{code}"));
+            }
         }
         if self.garbage {
             self.print("AT+CGMI");

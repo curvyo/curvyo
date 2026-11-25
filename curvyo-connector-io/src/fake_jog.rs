@@ -91,14 +91,11 @@ impl FakeHead {
         self.moves.clear();
     }
 
-    /// The head is at the machine origin (a homing cycle ended); the position events if it moved.
+    /// The head is at the machine origin (a homing cycle ended): its position events, also when
+    /// it stood there, so the position is known after every homing (`specs/0118` 2e).
     pub fn home(&mut self) -> Vec<Event> {
         self.moves.clear();
-        let before = self.pos;
         self.pos = [0.0; 2];
-        if Self::same(self.pos, before) {
-            return Vec::new();
-        }
         self.position_events()
     }
 

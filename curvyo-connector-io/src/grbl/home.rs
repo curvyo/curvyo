@@ -17,6 +17,8 @@ pub enum Owed {
     Home,
     /// A jog's `$J=` line, with its bytes.
     Jog(usize),
+    /// A restart's `$$`, which reads `$32` again before the entry (`specs/0118` 38).
+    Settings,
 }
 
 impl Owed {
@@ -26,6 +28,7 @@ impl Owed {
         match self {
             Self::Line(bytes) | Self::Jog(bytes) => bytes,
             Self::Home => HOME_LINE.len(),
+            Self::Settings => crate::grbl::restart::SETTINGS_LINE.len(),
         }
     }
 }

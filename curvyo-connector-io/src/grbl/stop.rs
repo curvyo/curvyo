@@ -33,6 +33,9 @@ pub struct Stop {
     step: Step,
     hold: Duration,
     banner: Duration,
+    /// The reset went out after `Hold:0` (motion complete): GRBL keeps its position. A reset
+    /// while moving loses steps (GRBL raises `ALARM:3`), so the position is not trusted.
+    kept: bool,
     /// The sentence the job ends with instead of `Stopped`.
     pub failure: Option<String>,
 }
@@ -62,6 +65,7 @@ impl Stop {
             step,
             hold: hold_limit,
             banner: banner_limit,
+            kept: held && !homing,
             failure,
         }
     }
@@ -71,7 +75,16 @@ impl Stop {
         if matches!(self.step, Step::Holding(_)) && report.hold_complete() {
             out.push(RESET);
             self.step = Step::Resetting(at + self.banner);
+            self.kept = true;
         }
+    }
+
+    /// Whether the reset followed `Hold:0`, so the machine position is still GRBL's count. A
+    /// reset after the hold limit, during homing, or any reset before `Hold:0` (the machine's
+    /// button) is not.
+    #[must_use]
+    pub fn kept_position(&self) -> bool {
+        self.kept
     }
 
     /// Whether a banner now confirms the stop.
@@ -130,6 +143,7 @@ mod tests {
         stop.on_report(&report("<Hold:0|MPos:0,0,0>"), s(1), &mut out);
         assert_eq!(out, [HOLD, RESET]);
         assert!(stop.confirms());
+        assert!(stop.kept_position(), "the reset followed Hold:0");
         assert_eq!(stop.on_time(s(3), &mut out), Tick::Waiting);
         assert_eq!(stop.on_time(s(4), &mut out), Tick::Unconfirmed);
     }
@@ -141,6 +155,11 @@ mod tests {
             let stop = Stop::start(held, homing, false, None, LIMITS, s(0), &mut out);
             assert_eq!(out, [RESET]);
             assert!(stop.confirms());
+            assert_eq!(
+                stop.kept_position(),
+                held,
+                "a reset while homing loses the position"
+            );
         }
     }
 
@@ -151,8 +170,10 @@ mod tests {
         assert!(out.is_empty(), "the pending pause already sent `!`");
         stop.on_time(s(1), &mut out);
         assert!(out.is_empty());
+        assert!(!stop.kept_position());
         stop.on_time(s(2), &mut out);
         assert_eq!(out, [RESET]);
+        assert!(!stop.kept_position(), "the reset came while moving");
         assert_eq!(stop.on_time(s(4), &mut out), Tick::Waiting);
         assert_eq!(stop.on_time(s(5), &mut out), Tick::Unconfirmed);
         assert_eq!(stop.hold_limit(), s(2));

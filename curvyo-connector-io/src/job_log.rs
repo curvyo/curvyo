@@ -36,6 +36,13 @@ pub enum LogResult {
     Jog(String),
     /// A start that waited for an owner was withdrawn or discarded (`specs/0128` A14).
     Discarded,
+    /// The owner of this name restarted the interrupted job from this line (`specs/0118` 2e).
+    Restart {
+        /// The line.
+        line: u32,
+        /// The owner.
+        by: String,
+    },
 }
 
 /// The clients behind a line: who sent the job, who pressed Start, which owner confirmed it.
@@ -65,6 +72,7 @@ impl LogResult {
             Self::Jog(client) => format!("Jog: {}", clean(client)),
             Self::Frame(client) => format!("Frame: {}", clean(client)),
             Self::Discarded => "Discarded".to_owned(),
+            Self::Restart { line, by } => format!("Restart from line {line}: {}", clean(by)),
         }
     }
 }
@@ -236,5 +244,26 @@ mod tests {
             .unwrap();
         let text = std::fs::read_to_string(dir.path().join(JOB_LOG_FILE)).unwrap();
         assert_eq!(text, include_str!("../tests/fixtures/jobs_v2.log"));
+    }
+
+    /// `specs/0118` 2e (adrs R10): a restart from a line is one line with its owner; a golden of
+    /// its own, the older ones stay as they were.
+    #[test]
+    fn a_restart_from_a_line_matches_its_golden_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = JobLog::new(dir.path());
+        let t = OffsetDateTime::from_unix_timestamp(1_700_000_900).unwrap();
+        let restart = LogResult::Restart {
+            line: 1234,
+            by: "Laptop".into(),
+        };
+        let people = LogPeople {
+            sent_by: "Phone".into(),
+            started_by: "Laptop".into(),
+            ..LogPeople::default()
+        };
+        log.append(t, "sign.gcode", &restart, &people).unwrap();
+        let text = std::fs::read_to_string(dir.path().join(JOB_LOG_FILE)).unwrap();
+        assert_eq!(text, include_str!("../tests/fixtures/jobs_restart.log"));
     }
 }

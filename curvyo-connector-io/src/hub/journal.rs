@@ -80,7 +80,7 @@ impl Hub {
     }
 
     /// A change of the job list that `admin.log` records (`specs/0132` L6).
-    pub(super) fn log_list_change(&self, inner: &Inner, log: &ListLog) {
+    pub(super) fn log_list_change(&self, inner: &mut Inner, log: &ListLog) {
         match log {
             ListLog::Removed {
                 job_id,
@@ -107,6 +107,38 @@ impl Hub {
                     on: *on,
                 };
                 self.append_admin(inner, by, &event);
+            }
+            ListLog::Restarted {
+                job_id,
+                name,
+                line,
+                by,
+            } => {
+                // The terminal and both logs name the line the restart begins at (R10).
+                inner.job_name.clone_from(name);
+                let _ = inner.notices.send(format!(
+                    "Restart {name} from line {} by {by}",
+                    curvyo_connector_core::count(*line)
+                ));
+                let people = log_people(inner.machine.people());
+                let result = LogResult::Restart {
+                    line: *line,
+                    by: by.clone(),
+                };
+                self.append_job_line(inner, name, &result, &people);
+                let event = AdminEvent::RestartFromLine {
+                    job_name: name.clone(),
+                    job_id: job_id.to_string(),
+                    line: *line,
+                };
+                self.append_admin(inner, by, &event);
+            }
+            ListLog::RestartReturned { name, line, .. } => {
+                inner.restart_returned = true;
+                let _ = inner.notices.send(format!(
+                    "Not started: Restart {name} from line {}",
+                    curvyo_connector_core::count(*line)
+                ));
             }
         }
     }
@@ -190,6 +222,14 @@ impl Hub {
         if after == before {
             return;
         }
+        if inner.restart_returned {
+            // A restart that ended before its line burned nothing: no result line (R8).
+            inner.restart_returned = false;
+            if let Some(line) = terminal_alarm(before, after, &inner.machine.status()) {
+                let _ = inner.notices.send(line);
+            }
+            return;
+        }
         let status = inner.machine.status();
         let current = inner.machine.people().cloned().or(people);
         let people = log_people(current.as_ref());
@@ -258,7 +298,7 @@ impl Inner {
         if inner.frozen {
             return;
         }
-        let mut stored = inner.machine.stored();
+        let mut stored = inner.machine.stored_at(force_line);
         let texts = inner.machine.stored_texts();
         let ids: std::collections::HashSet<_> = texts.iter().map(|(id, _)| *id).collect();
         let line = stored.current.as_ref().map_or(0, |c| c.line);

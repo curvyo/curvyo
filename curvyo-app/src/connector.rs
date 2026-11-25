@@ -477,7 +477,8 @@ pub(crate) fn connector_command(
     }
 }
 
-/// A press in the job list (`specs/0132`): move, remove or run next automatically.
+/// A press in the job list (`specs/0132`): move, remove, run next automatically or restart an
+/// interrupted job from its line (`specs/0118` 2e).
 #[derive(Debug, serde::Deserialize)]
 #[serde(
     tag = "kind",
@@ -488,6 +489,7 @@ pub(crate) enum ListCall {
     Move { job_id: Uuid, from: u32, to: u32 },
     Remove { job_id: Uuid },
     RunNext { job_id: Uuid, on: bool },
+    Restart { job_id: Uuid, line: u32 },
 }
 
 impl ListCall {
@@ -496,12 +498,13 @@ impl ListCall {
             Self::Move { job_id, from, to } => Message::MoveJob { job_id, from, to },
             Self::Remove { job_id } => Message::RemoveJob { job_id },
             Self::RunNext { job_id, on } => Message::SetRunNext { job_id, on },
+            Self::Restart { job_id, line } => Message::RestartFromLine { job_id, line },
         }
     }
 }
 
 /// How a press in the list ended.
-#[derive(Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
@@ -514,6 +517,10 @@ pub(crate) enum ListAnswer {
     Stale,
     /// Only an owner may.
     OwnerRequired,
+    /// The connector refused a restart with this cause (`specs/0118` ux-notes W71).
+    Refused {
+        cause: String,
+    },
     Failed {
         error: LinkError,
     },
@@ -543,6 +550,9 @@ pub(crate) fn connector_list_command(
         Ok(opened) => opened,
         Err(e) => return ListAnswer::Failed { error: e.into() },
     };
+    if let ListCall::Restart { job_id, line } = call {
+        return crate::connector_restart::restart_from_line(&mut connection, job_id, line);
+    }
     match connection.command(&call.message(), job_state(&status)) {
         Ok(_) => ListAnswer::Done,
         Err(ClientError::Protocol(code)) if code == "WrongState" || code == "UnknownJob" => {
@@ -787,6 +797,8 @@ mod tests {
                 line: 0,
                 lines: 3,
                 elapsed_ms: 0,
+                from_line: None,
+                entering: false,
             }),
             position: None,
             alarm: None,

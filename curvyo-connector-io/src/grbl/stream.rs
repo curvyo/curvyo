@@ -40,6 +40,10 @@ pub struct Stream {
     last: Duration,
     /// The report count when the last line was answered: the next `Idle` report completes it.
     pub finished_at_report: Option<u64>,
+    /// A restart from a line: the entry lines that come first, owed but no job line.
+    entry: usize,
+    /// The job line of the first line after the entry (1 for a whole job).
+    first_line: u32,
 }
 
 impl Stream {
@@ -55,7 +59,36 @@ impl Stream {
             ran: Duration::ZERO,
             last: at,
             finished_at_report: None,
+            entry: 0,
+            first_line: 1,
         }
+    }
+
+    /// A restart from `first_line` (`specs/0118` 2e, adrs R9): the `entry` lines, then `lines`,
+    /// the job's lines from `first_line` on. The entry lines count no job line.
+    #[must_use]
+    pub fn new_at(entry: Vec<String>, lines: Vec<String>, first_line: u32, at: Duration) -> Self {
+        let count = entry.len();
+        let mut all = entry;
+        all.extend(lines);
+        Self {
+            entry: count,
+            first_line: first_line.max(1),
+            ..Self::new(all, at)
+        }
+    }
+
+    /// The job line of the line at `index` of the stream; an entry line is its restart line's.
+    fn job_line(&self, index: usize) -> u32 {
+        let past = index.saturating_sub(self.entry);
+        let past = u32::try_from(past).unwrap_or(u32::MAX);
+        self.first_line.saturating_add(past)
+    }
+
+    /// Whether every entry line was answered (a restart reached its own lines' turn).
+    #[must_use]
+    pub fn entry_answered(&self) -> bool {
+        usize::try_from(self.flow.answered()).unwrap_or(usize::MAX) >= self.entry
     }
 
     /// Counts the time up to `at`, pauses excluded (`0064` Q14).
@@ -82,7 +115,7 @@ impl Stream {
             if self.system {
                 break;
             }
-            let job_line = u32::try_from(self.next + 1).unwrap_or(u32::MAX);
+            let job_line = self.job_line(self.next);
             if line.is_empty() {
                 self.flow.push(job_line, 0);
                 self.next += 1;
@@ -123,10 +156,13 @@ impl Stream {
         line
     }
 
-    /// Lines answered.
+    /// Lines answered, counted in the job's text: a restart from line n starts at n - 1 and the
+    /// entry lines count none.
     #[must_use]
     pub fn answered(&self) -> u32 {
-        self.flow.answered()
+        let lines = usize::try_from(self.flow.answered()).unwrap_or(usize::MAX);
+        let past = u32::try_from(lines.saturating_sub(self.entry)).unwrap_or(u32::MAX);
+        (self.first_line - 1).saturating_add(past)
     }
 
     /// Bytes in flight.
@@ -238,6 +274,34 @@ mod tests {
         assert!(!stream.send_deferred_hold(), "exactly once");
         stream.fill(0, &mut out);
         assert_eq!(out, b"$H\n", "nothing while the hold is requested");
+    }
+
+    #[test]
+    fn a_restart_counts_from_its_line_and_its_entry_counts_none() {
+        let mut stream = Stream::new_at(
+            lines(&["M5", "G1X1F3000S0"]),
+            lines(&["G1X2", "G1X3"]),
+            11,
+            Duration::ZERO,
+        );
+        let mut out = Vec::new();
+        stream.fill(0, &mut out);
+        assert_eq!(out, b"M5\nG1X1F3000S0\nG1X2\nG1X3\n");
+        assert_eq!(stream.answered(), 10);
+        assert_eq!(
+            stream.answer(),
+            Some(11),
+            "an entry line is its restart line's"
+        );
+        assert!(!stream.entry_answered());
+        stream.answer();
+        assert!(stream.entry_answered());
+        assert_eq!(stream.answered(), 10);
+        assert_eq!(stream.answer(), Some(11));
+        assert_eq!(stream.answered(), 11);
+        assert_eq!(stream.answer(), Some(12));
+        assert_eq!(stream.answered(), 12);
+        assert!(stream.all_answered());
     }
 
     #[test]

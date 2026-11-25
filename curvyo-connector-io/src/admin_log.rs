@@ -80,6 +80,15 @@ pub enum AdminEvent {
         /// The new value.
         on: bool,
     },
+    /// An owner restarted an interrupted job from a line (`specs/0132` criterion 13).
+    RestartFromLine {
+        /// The job's name.
+        job_name: String,
+        /// The job's id.
+        job_id: String,
+        /// The line.
+        line: u32,
+    },
     /// A stored job did not come back after a restart: its name, then its id and the cause.
     JobDropped {
         /// The job's name.
@@ -153,6 +162,15 @@ impl AdminEvent {
                 "run-next-set",
                 job_name.clone(),
                 format!("{job_id} {}", if *on { "on" } else { "off" }),
+            ),
+            Self::RestartFromLine {
+                job_name,
+                job_id,
+                line,
+            } => (
+                "restart-from-line",
+                job_name.clone(),
+                format!("{job_id} line {line}"),
             ),
             Self::JobDropped { job_name, detail } => {
                 ("job-dropped", job_name.clone(), detail.clone())
@@ -316,5 +334,22 @@ mod tests {
         .unwrap();
         let text = std::fs::read_to_string(dir.path().join(ADMIN_LOG_FILE)).unwrap();
         assert_eq!(text, include_str!("../tests/fixtures/admin_home.log"));
+    }
+
+    /// `specs/0132` criterion 13 (`specs/0118` adrs R10): a restart from a line names the owner,
+    /// the job and the line; a golden of its own.
+    #[test]
+    fn a_restart_from_a_line_names_owner_job_and_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = AdminLog::new(dir.path());
+        let t = OffsetDateTime::from_unix_timestamp(1_795_014_131).unwrap();
+        let event = AdminEvent::RestartFromLine {
+            job_name: "sign.gcode".into(),
+            job_id: "67e55044-10b1-426f-9247-bb680e5fe0c8".into(),
+            line: 1234,
+        };
+        log.append(t, "Laptop", &event).unwrap();
+        let text = std::fs::read_to_string(dir.path().join(ADMIN_LOG_FILE)).unwrap();
+        assert_eq!(text, include_str!("../tests/fixtures/admin_restart.log"));
     }
 }

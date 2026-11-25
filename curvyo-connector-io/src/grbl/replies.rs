@@ -200,6 +200,7 @@ impl GrblController {
             match owed {
                 Owed::Home => self.on_home_answer(code),
                 Owed::Jog(_) => self.on_jog_answer(code, at),
+                Owed::Settings => self.on_settings_answer(code, at),
                 Owed::Line(_) => {}
             }
             return;
@@ -271,6 +272,7 @@ impl GrblController {
             return;
         }
         self.jog = None;
+        let _waiting = self.recheck.take();
         if self.stream.take().is_some() {
             // Every unsent line is discarded; the reset switches the spindle off (G13).
             self.out.push(RESET);
@@ -290,6 +292,12 @@ impl GrblController {
             self.finish_stop();
         } else if self.expect_banner {
             self.expect_banner = false;
+        } else if let Some(recheck) = self.recheck.take() {
+            // Reset while the restart waited for its `$$`: nothing of it went out.
+            self.events.push(Event::JobFailedWith {
+                elapsed_ms: 0,
+                detail: texts::reset_at(recheck.first_line().saturating_sub(1)),
+            });
         } else if let Some(stream) = self.stream.take() {
             let detail = texts::reset_at(stream.answered());
             self.events.push(Event::JobFailedWith {
@@ -312,10 +320,17 @@ impl GrblController {
         self.out.extend_from_slice(b"M5\nM9\n");
         self.owed.extend([Owed::Line(3), Owed::Line(3)]);
         let elapsed_ms = self.stream.take().map_or(0, |s| s.elapsed_ms());
+        let kept = stop.kept_position();
         self.events.push(match stop.failure {
             Some(detail) => Event::JobFailedWith { elapsed_ms, detail },
             None => Event::Stopped,
         });
+        if !kept {
+            // The reset did not follow `Hold:0`: GRBL may have lost steps (its `ALARM:3`), so
+            // the position is not trusted, as after a reset nobody here asked for (`specs/0118`
+            // 13, adrs R4's Stop branch).
+            self.events.push(Event::ControllerReset);
+        }
         if std::mem::take(&mut self.deferred_alarm) {
             let text = self.alarm_words();
             self.events.push(Event::Alarm { text });
