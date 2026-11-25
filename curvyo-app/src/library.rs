@@ -281,6 +281,23 @@ pub(crate) fn library_rows(app: AppHandle, args: RowsArgs) -> Vec<LibraryRow> {
     rows
 }
 
+/// The sources of the last scan and the index, for the library browser (`specs/0152`).
+pub(crate) fn local_parts(app: &AppHandle) -> (Vec<LibrarySource>, LibraryIndex) {
+    let library = app.state::<LibraryState>();
+    let sources = library
+        .sources
+        .lock()
+        .map(|s| s.iter().map(|(source, _)| source.clone()).collect())
+        .unwrap_or_default();
+    let index = library
+        .index
+        .lock()
+        .ok()
+        .and_then(|slot| slot.clone())
+        .unwrap_or_default();
+    (sources, index)
+}
+
 fn root_of(app: &AppHandle, source: &str) -> Result<PathBuf, String> {
     app.state::<LibraryState>()
         .sources

@@ -8,8 +8,8 @@ use serde::Serialize;
 
 use curvyo_document_core::{OnlineOrigin, UnixMillis};
 use curvyo_library_core::{
-    Catalogue, Failure, IconBody, IconSet, Licence, Millimetres, Millis, SourceEntry, SourceKind,
-    Sources, base_address, host_of, icon_svg_mm, is_ready, needs_credit, search_words,
+    Catalogue, Failure, IconBody, IconSet, Licence, Millimetres, Millis, SetListing, SourceEntry,
+    SourceKind, Sources, base_address, host_of, icon_svg_mm, is_ready, needs_credit, search_words,
 };
 use curvyo_storage_io::{
     Transport, UreqTransport, fetch_catalogue, fetch_collection, fetch_collections, fetch_icons,
@@ -31,7 +31,8 @@ pub(crate) struct Held {
     pub(crate) failure: Option<Failure>,
     pub(crate) catalogue: Option<Catalogue>,
     pub(crate) sets: Option<Vec<IconSet>>,
-    pub(crate) set_icons: HashMap<String, Vec<String>>,
+    pub(crate) set_icons: HashMap<String, SetListing>,
+    pub(crate) set_failures: HashMap<String, Failure>,
     pub(crate) bodies: HashMap<(String, String), IconBody>,
     pub(crate) search: Option<SearchView>,
     pub(crate) files: HashMap<String, Arc<Vec<u8>>>,
@@ -145,18 +146,22 @@ impl OnlineState {
         });
     }
 
-    /// The icon names of one set, fetched once per session.
+    /// The list of one set (names, groups, aliases), fetched once per session.
     pub(crate) fn open_set(&self, transport: &dyn Transport, entry: &SourceEntry, prefix: &str) {
         let key = entry.key();
         if self.with(&key, |held| held.set_icons.contains_key(prefix)) {
             return;
         }
         match fetch_collection(transport, &entry.address, prefix) {
-            Ok(names) => self.with(&key, |held| {
+            Ok(listing) => self.with(&key, |held| {
                 held.failure = None;
-                held.set_icons.insert(prefix.to_owned(), names);
+                held.set_failures.remove(prefix);
+                held.set_icons.insert(prefix.to_owned(), listing);
             }),
-            Err(failure) => self.with(&key, |held| held.failure = Some(failure)),
+            Err(failure) => self.with(&key, |held| {
+                held.failure = Some(failure);
+                held.set_failures.insert(prefix.to_owned(), failure);
+            }),
         }
     }
 
@@ -333,19 +338,17 @@ impl OnlineState {
         search_done_text(&entry.name, words, counted)
     }
 
-    /// The Online rows for the sources, what was fetched and the tree's state.
-    pub(crate) fn rows(
+    /// Runs `read` over the views of `sources` with what this session fetched of them.
+    pub(crate) fn with_views<R>(
         &self,
         sources: &Sources,
-        expanded: &std::collections::HashSet<String>,
-        query: &str,
-    ) -> Vec<LibraryRow> {
+        read: impl FnOnce(Vec<OnlineSourceView<'_>>) -> R,
+    ) -> R {
         let all = self
             .held
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let empty = Held::default();
-        let no_icons = HashMap::new();
         let views = sources
             .entries()
             .iter()
@@ -359,23 +362,32 @@ impl OnlineState {
                     failure: held.failure,
                     catalogue: held.catalogue.as_ref(),
                     sets: held.sets.as_deref(),
-                    set_icons: if held.set_icons.is_empty() {
-                        &no_icons
-                    } else {
-                        &held.set_icons
-                    },
+                    set_icons: &held.set_icons,
+                    set_failures: &held.set_failures,
                     search: held.search.as_ref(),
                     templates: &held.documents,
                     refused: &held.refused,
                 }
             })
             .collect();
+        read(views)
+    }
+
+    /// The Online rows for the sources, what was fetched and the tree's state.
+    pub(crate) fn rows(
+        &self,
+        sources: &Sources,
+        expanded: &std::collections::HashSet<String>,
+        query: &str,
+    ) -> Vec<LibraryRow> {
         let ready_added = sources.entries().iter().any(|e| is_ready(&e.address));
-        online_rows(&OnlineView {
-            sources: views,
-            ready_offered: !ready_added,
-            expanded,
-            query,
+        self.with_views(sources, |views| {
+            online_rows(&OnlineView {
+                sources: views,
+                ready_offered: !ready_added,
+                expanded,
+                query,
+            })
         })
     }
 

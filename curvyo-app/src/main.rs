@@ -36,6 +36,7 @@ mod import_dialog;
 mod import_preview;
 mod job_export;
 mod library;
+mod library_browse;
 mod local_files;
 mod machine_profiles;
 mod materials;
@@ -94,6 +95,8 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         library::library_remove_folder,
         library::library_find_source,
         library::library_open_path,
+        library_browse::library_browser_items,
+        library_browse::online_icon_tiles,
         online::online_add,
         online::online_add_ready,
         online::online_remove,

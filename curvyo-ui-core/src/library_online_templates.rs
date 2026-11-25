@@ -103,7 +103,7 @@ fn walk(
 }
 
 /// Why a template cannot be loaded: its own refusal this session, a newer file or too large.
-fn refusal(source: &OnlineSourceView<'_>, entry: &TemplateEntry) -> Option<Failure> {
+pub(crate) fn refusal(source: &OnlineSourceView<'_>, entry: &TemplateEntry) -> Option<Failure> {
     let newer = entry
         .format_version
         .is_some_and(|v| v > CURRENT_FORMAT_VERSION);

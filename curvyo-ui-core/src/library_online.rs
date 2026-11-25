@@ -5,7 +5,9 @@ use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 
-use curvyo_library_core::{Catalogue, Failure, IconRef, IconSet, READY_HOST, SourceKind, host_of};
+use curvyo_library_core::{
+    Catalogue, Failure, IconRef, IconSet, READY_HOST, SetListing, SourceKind, host_of,
+};
 
 use crate::library_index::IndexedDocument;
 use crate::library_online_icons::push_iconify;
@@ -97,8 +99,10 @@ pub struct OnlineSourceView<'a> {
     pub catalogue: Option<&'a Catalogue>,
     /// The icon sets, once fetched.
     pub sets: Option<&'a [IconSet]>,
-    /// The icon names of the sets opened, by prefix.
-    pub set_icons: &'a HashMap<String, Vec<String>>,
+    /// The lists of the sets opened, by prefix.
+    pub set_icons: &'a HashMap<String, SetListing>,
+    /// The sets whose list could not be fetched, by prefix (`specs/0152` set cards).
+    pub set_failures: &'a HashMap<String, Failure>,
     /// The last Enter search.
     pub search: Option<&'a SearchView>,
     /// The downloaded and read templates, by template path.
