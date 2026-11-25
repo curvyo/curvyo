@@ -373,8 +373,8 @@ pub fn library_page_picture(bytes: &[u8], page: &str) -> Vec<u8> {
 /// search and rows as the desktop host, over the workspaces the browser stores.
 #[wasm_bindgen]
 pub struct WasmLibraryIndex {
-    index: LibraryIndex,
-    sources: Vec<LibrarySource>,
+    pub(crate) index: LibraryIndex,
+    pub(crate) sources: Vec<LibrarySource>,
 }
 
 #[derive(serde::Deserialize)]
