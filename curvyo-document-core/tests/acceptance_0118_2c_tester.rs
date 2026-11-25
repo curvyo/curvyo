@@ -271,7 +271,8 @@ fn format_61_round_trip_keeps_the_point_and_the_pick() {
     d.set_user_origin(second, [1_000, 2_000]).unwrap();
     d.set_start(second, "machine_origin").unwrap();
     let bytes = pack(&d, "0.1.0").unwrap();
-    assert_eq!(format_of(&bytes), 61);
+    // Format 62 since `0118` slice 2d (adrs P8); the point and the pick ride along unchanged.
+    assert_eq!(format_of(&bytes), 62);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let pages = opened.manufacturings();
@@ -325,8 +326,9 @@ fn format_61_a_damaged_point_is_kept_as_stored_and_saved_back_unchanged() {
 }
 
 #[test]
-fn format_61_is_the_current_format_and_a_picked_start_survives_open() {
-    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 61);
+fn format_62_is_the_current_format_and_a_picked_start_survives_open() {
+    // Format 62 since `0118` slice 2d (adrs P8).
+    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 62);
     let d = Document::new(1);
     let m = laser_page(&d);
     d.set_start(m, "head_position").unwrap();

@@ -10,8 +10,8 @@ use curvyo_extension_core::StoredParams;
 use serde_json::Value;
 
 use crate::machine_profile::{
-    DefaultNumbers, FeedRate, GENERIC_LASER_ID, MachineProfile, OriginCorner, OutputFormat,
-    PowerValue, ProfileValues, is_valid_name,
+    DefaultNumbers, FeedRate, FocusPulse, GENERIC_LASER_ID, MachineProfile, OriginCorner,
+    OutputFormat, PowerValue, ProfileValues, PulseMs, PulsePermille, is_valid_name,
 };
 use crate::material::PowerPercent;
 
@@ -26,6 +26,9 @@ const AIR_ASSIST: &str = "air_assist";
 const OUTPUT_FORMAT: &str = "output_format";
 const DEFAULT_POWER: &str = "default_power_pct";
 const DEFAULT_SPEED: &str = "default_speed_mm_min";
+const FOCUS_PULSE: &str = "focus_pulse";
+const FOCUS_PULSE_POWER: &str = "focus_pulse_power_permille";
+const FOCUS_PULSE_LENGTH: &str = "focus_pulse_length_ms";
 
 /// The notice of a copy whose stored name was damaged (criterion 12).
 pub const DAMAGED_NAME_NOTICE: &str = "Name was damaged, showing Generic laser";
@@ -64,16 +67,20 @@ pub struct CopyRead {
     /// `output_format` is present but no spelling this build knows, so the copy cannot be
     /// written (block 4 c, criterion 39; never written as GRBL).
     pub output_format_damaged: bool,
+    /// How many of the three focus pulse keys are present but unreadable, so they read their
+    /// defaults (a damaged switch reads off; `specs/0118` adrs P7).
+    pub focus_pulse_damaged: usize,
 }
 
 impl CopyRead {
     /// How many of the copy's values are present but unreadable (the name, Air assist, the output
-    /// format).
+    /// format, the focus pulse's three).
     #[must_use]
     pub fn damaged_values(&self) -> usize {
         usize::from(self.name_damaged)
             + usize::from(self.air_assist_damaged)
             + usize::from(self.output_format_damaged)
+            + self.focus_pulse_damaged
     }
 }
 
@@ -94,6 +101,7 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
             name_damaged: false,
             air_assist_damaged: false,
             output_format_damaged: false,
+            focus_pulse_damaged: 0,
         };
     };
     let defaults = ProfileValues::default();
@@ -103,6 +111,7 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
         .map_or(Some(OutputFormat::Grbl), |value| {
             value.as_str().and_then(OutputFormat::parse)
         });
+    let (focus_pulse, focus_pulse_damaged) = read_focus_pulse(stored);
     let name = stored
         .get(NAME)
         .and_then(Value::as_str)
@@ -145,6 +154,7 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
         air_assist: air_assist.unwrap_or(defaults.air_assist),
         output_format: output_format.unwrap_or(defaults.output_format),
         defaults: pair,
+        focus_pulse,
     };
     CopyRead {
         copy: ProfileCopy {
@@ -154,7 +164,30 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
         name_damaged: name.is_none(),
         air_assist_damaged: stored.contains_key(AIR_ASSIST) && air_assist.is_none(),
         output_format_damaged: stored.contains_key(OUTPUT_FORMAT) && output_format.is_none(),
+        focus_pulse_damaged,
     }
+}
+
+/// The focus pulse of a stored copy and how many of its keys were damaged: an absent key reads
+/// its default, a present one of the wrong type or out of range too, counted.
+fn read_focus_pulse(stored: &StoredParams) -> (FocusPulse, usize) {
+    let defaults = FocusPulse::default();
+    let on = stored.get(FOCUS_PULSE).map(Value::as_bool);
+    let power = stored
+        .get(FOCUS_PULSE_POWER)
+        .map(|v| whole(Some(v)).and_then(PulsePermille::new));
+    let length = stored
+        .get(FOCUS_PULSE_LENGTH)
+        .map(|v| whole(Some(v)).and_then(PulseMs::new));
+    let damaged = usize::from(matches!(on, Some(None)))
+        + usize::from(matches!(power, Some(None)))
+        + usize::from(matches!(length, Some(None)));
+    let pulse = FocusPulse {
+        on: on.flatten().unwrap_or(defaults.on),
+        power: power.flatten().unwrap_or(defaults.power),
+        length: length.flatten().unwrap_or(defaults.length),
+    };
+    (pulse, damaged)
 }
 
 /// A stored whole number: an integer, or an integral finite double (ADR 0039 §1).
@@ -198,6 +231,13 @@ pub fn write_copy(copy: &ProfileCopy) -> StoredParams {
     map.insert(
         DEFAULT_SPEED.to_owned(),
         Value::from(copy.values.defaults.speed.get()),
+    );
+    let pulse = copy.values.focus_pulse;
+    map.insert(FOCUS_PULSE.to_owned(), Value::from(pulse.on));
+    map.insert(FOCUS_PULSE_POWER.to_owned(), Value::from(pulse.power.get()));
+    map.insert(
+        FOCUS_PULSE_LENGTH.to_owned(),
+        Value::from(pulse.length.get()),
     );
     map
 }
@@ -325,6 +365,9 @@ mod tests {
                 "air_assist",
                 "default_power_pct",
                 "default_speed_mm_min",
+                "focus_pulse",
+                "focus_pulse_length_ms",
+                "focus_pulse_power_permille",
                 "id",
                 "laser_mode",
                 "max_feed_mm_per_min",
@@ -517,6 +560,52 @@ mod tests {
         let record = MachineProfile::generic_laser();
         let mut copy = ProfileCopy::of(&record);
         copy.values.air_assist = true;
+        assert!(differs(&copy, record.work_area, &record));
+    }
+
+    #[test]
+    fn the_focus_pulse_is_copied_absent_reads_off_and_damage_reads_the_default_counted() {
+        let mut profile = MachineProfile::generic_laser();
+        profile.values.focus_pulse = FocusPulse {
+            on: true,
+            power: PulsePermille::new(25).unwrap(),
+            length: PulseMs::new(500).unwrap(),
+        };
+        let map = write_copy(&ProfileCopy::of(&profile));
+        assert_eq!(map.get("focus_pulse"), Some(&json!(true)));
+        assert_eq!(map.get("focus_pulse_power_permille"), Some(&json!(25)));
+        assert_eq!(map.get("focus_pulse_length_ms"), Some(&json!(500)));
+        let read = read_copy(Some(&map), None);
+        assert_eq!(read.copy.values.focus_pulse, profile.values.focus_pulse);
+        assert_eq!(read.damaged_values(), 0);
+        let old = read_copy(Some(&stored(json!({"name": "K40"}))), None);
+        assert_eq!(old.copy.values.focus_pulse, FocusPulse::default());
+        assert_eq!(old.damaged_values(), 0);
+        for (value, damaged) in [
+            (json!({"name": "K40", "focus_pulse": "on"}), 1),
+            (json!({"name": "K40", "focus_pulse_power_permille": 0}), 1),
+            (json!({"name": "K40", "focus_pulse_power_permille": 1.5}), 1),
+            (json!({"name": "K40", "focus_pulse_length_ms": 2001}), 1),
+            (
+                json!({"name": "K40", "focus_pulse": 1, "focus_pulse_power_permille": 51, "focus_pulse_length_ms": 49}),
+                3,
+            ),
+        ] {
+            let read = read_copy(Some(&stored(value.clone())), None);
+            assert_eq!(
+                read.copy.values.focus_pulse,
+                FocusPulse::default(),
+                "{value}"
+            );
+            assert_eq!(read.focus_pulse_damaged, damaged, "{value}");
+        }
+    }
+
+    #[test]
+    fn differs_compares_the_focus_pulse() {
+        let record = MachineProfile::generic_laser();
+        let mut copy = ProfileCopy::of(&record);
+        copy.values.focus_pulse.length = PulseMs::new(301).unwrap();
         assert!(differs(&copy, record.work_area, &record));
     }
 }
