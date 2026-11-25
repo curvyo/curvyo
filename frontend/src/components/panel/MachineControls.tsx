@@ -6,6 +6,7 @@ import { JobList } from "@/components/panel/JobList";
 import { FrameRow } from "@/components/panel/FrameRow";
 import { JogPad } from "@/components/panel/JogPad";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
+import { focusMode } from "@/hooks/useFocusPoint";
 import { type FramePage } from "@/hooks/useFramePage";
 import { type MachineControlsModel, useMachineControls } from "@/hooks/useMachineControls";
 import { useJogView } from "@/hooks/useJogView";
@@ -142,9 +143,10 @@ function ControlsBody({ model, corner, frame }: { model: MachineControlsModel; c
   const notStarted = notStartedLine(model.entry);
   // Quiet from the confirm until the started job leaves Ready (the start's answer can come first).
   const startedJob = model.entry.startedJob;
-  // "Jogging" is not said either: each step would be read (`specs/0118` W23).
+  // "Jogging" is not said either: each step would be read (`specs/0118` W23); nor are a go to
+  // point's "Focus point" and "Pulse", one press of many (W58).
   const quiet =
-    status?.state.name === "Jogging" ||
+    ["Jogging", "Focusing", "Pulsing"].includes(status?.state.name ?? "") ||
     (status?.state.name === "Ready" && (model.entry.startStep || (startedJob !== null && startedJob === status.job?.job_id)));
   // A refused page send while a job is held reads under that job's line, said once (P17).
   const refused = notStarted === null ? (sendFailureBelow(model.entry) ?? ownFailureBelow(model.entry, model.own)) : null;
@@ -168,6 +170,7 @@ function ControlsBody({ model, corner, frame }: { model: MachineControlsModel; c
           step={view.step}
           onStep={(step) => setView({ ...view, step })}
           onSetOrigin={frame.setOrigin}
+          frame={frame}
         />
       ) : null}
       <p role="status" className="sr-only">
@@ -255,7 +258,11 @@ function Toolbar({
       press: () => model.command(resume ? "resume" : "start"),
     },
     { key: "pause", name: "Pause", enabled: pause.enabled, busy: pause.busy, cause: pause.cause, icon: <Pause {...GLYPH} />, press: () => model.command("pause") },
-    { key: "stop", name: "Stop", enabled: buttons.stop && idle, busy: entry.busy === "stop", icon: <Square {...GLYPH} />, press: () => model.command("stop") },
+    { key: "stop", name: "Stop", enabled: buttons.stop && idle, busy: entry.busy === "stop", icon: <Square {...GLYPH} />, press: () => {
+        // Stop ends the Focus point mode: the canvas is not left armed (W56).
+        focusMode.end();
+        model.command("stop");
+      } },
   ];
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const [rover, setRover] = useState(0);
