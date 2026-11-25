@@ -71,7 +71,7 @@ Unit tests in each crate for core logic, written before the code; session tests 
 ## Revision 2026-11-19, slice 1: sketch instances (criteria 23, 24, 26 to 31; slice 2 handles not built)
 
 Implementer, 2026-11-25. Branch `story/sketch-instances`. Decisions A1 to A11 of `adrs.md`; Frage 372
-at its default A (the fallback is saved). `format_version` 61.
+at its default A (the fallback is saved). `format_version` 62.
 
 ### Affected crates/modules
 
@@ -82,8 +82,8 @@ at its default A (the fallback is saved). `format_version` 61.
   (new: solve once per value set, content-keyed cache), `clone_read.rs` (effective sets, per-set
   refinement), `object_read.rs`, `clone_model.rs` (`own_params`, `no_solution`),
   `instance_commands.rs` (new: expose, limits, change, reset, own, fallback), the follower rule in
-  Convert, Delete and Unlink, `document.rs` (format 61), goldens
-  `sketch_instances_v61.curvyo` and `sketch_instances_damaged_v61.curvyo`.
+  Convert, Delete and Unlink, `document.rs` (format 62), goldens
+  `sketch_instances_v62.curvyo` and `sketch_instances_damaged_v62.curvyo`.
 - **`curvyo-extension-core`**: `ParamValue::to_stored`/`from_stored` call the document-core codec for
   `mm` and `deg`.
 - **`curvyo-ui-core`**: refactor commit first (`instance.rs` view code to `instance_view.rs`);
@@ -98,20 +98,31 @@ at its default A (the fallback is saved). `format_version` 61.
 
 ### Tasks
 
-- [ ] 1. Refactor, behaviour-preserving: `instance.rs` view code moves to `instance_view.rs`.
-- [ ] 2. Sketch-core `with_values` and the exposed value read, tests first (AC 23, 26).
-- [ ] 3. Document-core value type, codec, registers, damage rules, format 61 and goldens (AC 30).
-- [ ] 4. Read pass: effective sets over chains, per-set solve with the content-keyed cache, the
+- [x] 1. Refactor, behaviour-preserving: `instance.rs` view code moves to `instance_view.rs`.
+- [x] 2. Sketch-core `with_values` and the exposed value read, tests first (AC 23, 26).
+- [x] 3. Document-core value type, codec, registers, damage rules, format 62 and goldens (AC 30).
+- [x] 4. Read pass: effective sets over chains, per-set solve with the content-keyed cache, the
   fallback rule, `own_params` and `no_solution` on the chain (AC 26, 27, 28, 31).
-- [ ] 5. Commands: Expose, Stop exposing (drops clone values), limits and name, change, reset,
+- [x] 5. Commands: Expose, Stop exposing (drops clone values), limits and name, change, reset,
   own, the fallback write (AC 23, 24, 27, 28).
-- [ ] 6. Follower rule in Convert, Delete, Unlink; SVG `as_use` (AC 15, 16, 17, 29).
-- [ ] 7. ui-core `InstanceSource` and the sketch arm: rows, clamp notice, plan (AC 24).
-- [ ] 8. Session: preview slot, bindings, status bar, CPU test (AC 24, 26, 31).
-- [ ] 9. Frontend: Expose, Parameters row, no-solution look; design-system rows (AC 23, 24, 26).
+- [x] 6. Follower rule in Convert, Delete, Unlink; SVG `as_use` (AC 15, 16, 17, 29).
+- [x] 7. ui-core `InstanceSource` and the sketch arm: rows, clamp notice, plan (AC 24).
+- [x] 8. Session: preview slot, bindings, status bar, CPU test (AC 24, 26, 31).
+- [x] 9. Frontend: Expose, Parameters row, no-solution look; design-system rows (AC 23, 24, 26).
 
 ### Validation
 
 Unit tests per crate before the code; goldens under `curvyo-document-core/tests/fixtures/` and
 `curvyo-ui-core/tests/fixtures/`; CPU-time test under `curvyo-editor-wasm/tests/`; the 0141 tests
 as the safety net of the refactor.
+
+### Notes for the lead
+
+- Measured (release, `cargo test --release -p curvyo-editor-wasm --test sketch_instances_cpu_time`):
+  a field-drag step with the 200-clone workload 7.6 ms worst of 40 steps (budget 16 ms), the open
+  with its first frame (200 solves) 265 ms, the release commit 10 ms with 0 further solves. One
+  solve of the 100-entity sketch costs about 1.3 ms, under the 4 ms of A4, so `SolveMode::Edit` is
+  used and no `SolveMode::Values` was added.
+- The status bar line "Linked clone, Page 2, no solution" of criterion 26 is not built: the app has
+  no status bar for a selection today; the Parameters row's state line carries the message.
+- Slice 2 (canvas handles, criterion 25) is not built.

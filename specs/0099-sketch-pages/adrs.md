@@ -157,7 +157,7 @@ type: two codecs, two orders, and the shared value block needs one key anyway.
   **Scalar is not exposable** in this revision (spec lists length, angle, count; it would need a
   new value encoding and `ParamKind`): see PO finding 2 and UX mismatch U3.
 
-### A3. Data model and codec (`format_version` 61)
+### A3. Data model and codec (`format_version` 62)
 
 One value type in document-core, `InstanceValue { Length(Length), Angle(Angle) }` (unit
 newtypes; `Angle` in radians in memory). Its stored encoding is ADR 0080 §2's one-key map,
@@ -208,14 +208,14 @@ register shape, never a value):
 - Names: uniqueness among exposed names is the writer's rule (UX 12.1 "Name in use"); a merge
   that duplicates one is not damage.
 
-`format_version` **61** (next free after 60; renumberable at rebase: ADR 0082 §10 `part_keys`
+`format_version` **62** (next free after 61, renumbered from 61 at rebase; renumberable at rebase: ADR 0082 §10 `part_keys`
 also claims "the next"). A build that stops at 60 would draw every clone with the sketch's values
-and cut the wrong part, so it refuses 61 by version; a file of 60 opens unchanged. The
+and cut the wrong part, so it refuses 62 by version; a file of 61 opens unchanged. The
 `CURRENT_FORMAT_VERSION` doc comment gets the paragraph. Goldens in
-`curvyo-document-core/tests/fixtures/`: `sketch_instances_v61.curvyo` (a sketch exposing one
+`curvyo-document-core/tests/fixtures/`: `sketch_instances_v62.curvyo` (a sketch exposing one
 parameter with limits and one dimension with a name; clones: none own, one own, a chain whose
 second clone has its own second value, one with no solution and a fallback);
-`sketch_instances_damaged_v61.curvyo` (an `instance_params` container); a residue case as a unit
+`sketch_instances_damaged_v62.curvyo` (an `instance_params` container); a residue case as a unit
 test (stale keys, wrong unit, out of limits: opens, reads as stated, saves back equal).
 
 ### A4. Where solving happens, and the cache (criteria 26, 31)
@@ -334,7 +334,7 @@ upstream rule, deterministic on every peer.
 ### A8. Slices (Proposal)
 
 1. **Expose, values, Params row** (criteria 23, 24, 26, 27, 28, 29, 30, 31 for the field drag):
-   format 61 with goldens, codec, cache and read pass, Expose UI on the sketch page, the Parameters
+   format 62 with goldens, codec, cache and read pass, Expose UI on the sketch page, the Parameters
    override row with `ValueField`s, no-solution look and fallback, Convert / Unlink / export
    rules, the CPU test with the field drag. The customer can expose a value and type or drag it
    per clone: one PR.
@@ -353,7 +353,7 @@ upstream rule, deterministic on every peer.
   unchanged here, but the instance cache must not depend on it being cheap.
 - `instance.rs` split and the `Preview` generalisation touch merged generator code; the 0141
   tests are the safety net.
-- `format_version` 61 races with ADR 0082 §10; renumber at rebase, goldens renamed with it.
+- `format_version` 62 races with ADR 0082 §10; renumber at rebase, goldens renamed with it.
 
 ### A10. Findings for the product owner (spec text)
 
@@ -374,7 +374,7 @@ upstream rule, deterministic on every peer.
    restores); a deleted parameter or dimension does the same by read.
 8. Criterion 30: the change is three registers (`exposed_params`, `instance_params`,
    `instance_fallback`); "its clone matrix and override flags as of 0057" are unchanged. The
-   Links "Format" line needs a revision entry: 61.
+   Links "Format" line needs a revision entry: 62.
 9. Criterion 24 "and one for all": UX 12.2 folds it into the Original's segment; align the text.
 10. Criterion 31 budgets the drag step only; say that file open and the release commit are
     measured, not budgeted.

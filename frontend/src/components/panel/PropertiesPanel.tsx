@@ -48,6 +48,7 @@ import { CloneBlock } from "@/components/panel/CloneBlock";
 import { GeneratorBlock } from "@/components/panel/GeneratorBlock";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { useGeneratorBlock } from "@/hooks/useGenerators";
+import { useSketchInstance } from "@/hooks/useSketchInstance";
 import { TraceInfoPage } from "@/components/panel/TraceInfoPage";
 import { ShareTab } from "@/components/panel/ShareTab";
 import type { MembershipApi } from "@/hooks/useMembership";
@@ -200,6 +201,7 @@ export function PropertiesPanel({
   const focusAfterShortcut = useRef(false);
   const panel = useStylePanel(editor);
   const generators = useGeneratorBlock(editor);
+  const sketchInstance = useSketchInstance(editor);
   // Placing a generated object shows the Style tab, and the panel body if it was hidden, even from
   // History, Layers or File (`specs/0141` UX notes §2, a stated exception to "they never switch by
   // themselves").
@@ -682,6 +684,7 @@ export function PropertiesPanel({
                       gradient={gradient}
                       clones={editor.clones}
                       adjust={adjust}
+                      sketchInstance={sketchInstance}
                       onToggleBeforeAfter={onToggleBeforeAfter}
                       onReturnFocus={returnFocus}
                     />

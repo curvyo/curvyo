@@ -78,6 +78,8 @@ interface ValueFieldProps {
   defaultText: string;
   /** A further muted line of the field's one tooltip, or nothing. */
   note?: string;
+  /** The id of a line that explains the field's state (`aria-describedby`). */
+  describedBy?: string;
   /** The message of a refused typed value. */
   messages: Readonly<Record<string, string>>;
   /** A tick of a drag: position `p` (0 to 1) on the field's scale, rounded to `grid`. */
@@ -139,6 +141,7 @@ export function ValueField({
   onCancel,
   messages,
   note,
+  describedBy,
   onPreview,
   onSettle,
   onStep,
@@ -256,6 +259,7 @@ export function ValueField({
             aria-label={name}
             aria-valuemin={valueMin}
             aria-valuemax={valueMax}
+            aria-describedby={describedBy}
             aria-valuenow={mixed ? undefined : Math.min(valueMax, roundedNow(valueNow))}
             aria-valuetext={
               valueText ??
