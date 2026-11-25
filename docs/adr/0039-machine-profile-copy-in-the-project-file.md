@@ -115,3 +115,12 @@ it.
   controller_port, baud_rate }`; decision 2 is withdrawn; a "Not in your profiles" copy gets
   editable connection fields; criterion 15's "no network address in a shared file" no longer
   holds. Same bump if decided before merge.
+
+## Amendment 2026-11-25: the focus pulse in the copy (spec `0118`, slice 2d)
+
+Decisions 1 and 5: the copy `mfg_profile` gains `focus_pulse`, `focus_pulse_power_permille` and
+`focus_pulse_length_ms` (absent = off, 10, 300); a wrong type or a value out of range reads its
+default, counts one damaged value and is never rewritten on read. Pick, Reset, Save as and the
+three field edits (`focus_pulse_on` / `_off`, `edit_pulse_power`, `edit_pulse_length`) write them
+with the map; "Differs from profile" compares them exactly. `format_version` 61 (next free at
+merge). Details: `specs/0118-machine-control/adrs.md` P7, P8.

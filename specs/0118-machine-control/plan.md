@@ -219,3 +219,82 @@ Phase 4: frontend
 - editor-wasm: `session/output/tests/user_origin_tests.rs`. Frontend: `tests/set_origin_0118.test.ts`.
 - Full gate of `CLAUDE.md` §7, `cargo deny`, `python3 -I scripts/check_docs.py`. The browser check is the
   tester's.
+
+# Plan for Machine control, slice 2d (focus point)
+
+Criteria 10, 12, 34 to 36 with 35 a to e; Fragen 369 B (pulse off in a new profile), 370 A, 371 A,
+380 A (defaults). Design: architect addendum P1 to P12 in `adrs.md`, UX notes W53 to W64. Branch
+`story/machine-focus`, stacked on `story/machine-origin` (#477). No new crate or dependency; protocol
+0 stays (additive `GoToPoint`, `Focusing`, `Pulsing`, `Status.target`); profile record format 8 (7 is
+`0150`'s, #468) and `format_version` 62 (61 is slice 2c, #477).
+Commits (conventional, scope = crate, at most five with the docs commit): docs, connector-core and
+-io, laser-core and document-core, editor-wasm and app, frontend.
+
+## Affected crates/modules
+- `curvyo-connector-core`: new `focus.rs` (`PulsePower`, `PulseLength`, `Pulse`, `clamp_target`,
+  the target bound), `message.rs` (`GoToPoint`, `Focusing`, `Pulsing`, `Status.target`),
+  `codec.rs` (43 types), `access.rs` (`GoToPoint` is `Motion`), new `machine/focus.rs` (P3, P6),
+  `machine/event.rs` (`GoTo`, `Pulse`, `GoToTarget`, `PulseEnded`, `PulseFailed`, `PulseSkipped`),
+  the state lists of `home.rs`, `jog.rs`, `arrival.rs`, `controls.rs`, `confirm.rs`. Goldens
+  `command_go_to_point*.json`, `status_focusing.json`, `status_pulsing.json`,
+  `status_awaiting_point.json`.
+- `curvyo-connector-io`: new `grbl/focus.rs` (the `$J=G90` move, the pulse block, `Owed::Pulse`),
+  `grbl/controller.rs`, `grbl/replies.rs` (answers, Hold or Door mid-pulse, the stop), `fake_jog.rs`
+  and `fake_controller.rs` (move and dwell in injected time), `hub/motion.rs` (`go_to_point`, the two
+  `jobs.log` lines), `hub/link.rs` (the clock while pulsing), `hub.rs` (shutdown Stop),
+  `session.rs`, `job_log.rs`; simulator `$J=G90`, `G1`, `M3` at rest, `G4 P` seconds. Golden
+  `tests/fixtures/grbl/focus_pulse.gcode`.
+- `curvyo-laser-core`: `machine_profile.rs` (`FocusPulse`, `PulsePermille`, `PulseMs`),
+  `machine_profile_file.rs` (record format 8), `machine_profile_copy.rs` (three keys, damage flag).
+- `curvyo-document-core`: `manufacturing.rs` (`ProfileChange` variants), `history/rows.rs`,
+  `document.rs` (format 62); goldens `focus_pulse_v62.curvyo`, `focus_pulse_damaged_v62.curvyo`.
+- `curvyo-ui-core`: `history_names.rs`, `step_scope.rs`.
+- `curvyo-editor-wasm`: `session/output/focus.rs` (`focus_target`, `focus_ring`), profile setters,
+  `machine_view.rs` (three fields), the range test against connector-core.
+- `curvyo-app`: `connector.rs` (`"go_to_point"` with `{ x, y, pulse? }`).
+- `frontend`: `JogPad.tsx` (Focus point toggle), `lib/focusPoint.ts` (causes, mode reducer, the
+  pulse from the copy), the canvas press and the two rings, `MachineBlock.tsx` (three fields).
+
+## Tasks
+Phase 1: connector-core
+- [x] 1. `focus.rs`: bounded `PulsePower`, `PulseLength` refuse 0, 51, 49, 2,001 on decode; the
+        target within 10,000 mm; `clamp_target` per `$23` and box, no box unclamped (35 c; P2, P4)
+- [x] 2. `GoToPoint`, `Focusing`, `Pulsing`, `Status.target`, goldens, access row (12, 34; P2, P11)
+- [x] 3. Machine: P3 per state in both machines (Not homed, Alarm, busy words, Ready kept), arrival
+        at 0.049 / 0.051 mm, no pulse with laser off or unknown, a pending stop or a busy word,
+        `PulseEnded`, the deadline by `Clock`, Stop in each state, `Waiting::Point` with Enter and
+        Stop (10, 12, 34, 35, 35 c; P3, P6)
+Phase 2: connector-io
+- [x] 4. GRBL: `M5`/`M9` first, `$J=G90 G21`, the block in one write, `S` per `$30` (1000, 255, the
+        `s = 0` skip), `$32=0` no block, Stop mid-move (`0x85`, no block) and mid-pulse (reset, `M5`,
+        `M9`, no alarm, homed kept), Hold/Door mid-pulse, `error:15`, golden (9, 10, 35 b, 35 c; P5, P6)
+- [x] 5. Fake controller, hub `go_to_point`, both `jobs.log` lines, the clock while pulsing, the
+        shutdown Stop, the session (12, 35 c; P9, P10)
+Phase 3: laser-core, document-core, ui-core
+- [x] 6. `FocusPulse` fields, record format 8, copy keys, damaged values read the default and count
+        (35 a; P7)
+- [x] 7. Format 62, `ProfileChange` for the three fields, labels, goldens (35 a; P8)
+Phase 4: editor-wasm, app
+- [x] 8. `focus_target` per corner and start pick (table), Head position and Nothing to place
+        causes, `focus_ring` its inverse, the profile setters and view fields, the range test
+        (34, 35 a, 36; P1, P7)
+- [x] 9. `"go_to_point"` command (34; P10)
+Phase 5: frontend
+- [x] 10. Toggle, causes, mode reducer, canvas press, target and head rings, the three fields
+        (34, 35 a, 35 d; W53 to W64)
+Phase 6: docs
+- [x] 11. ADR amendments (P2 to P11 onto ADR 0035, 0038, 0039, 0071), `specs/README.md` row
+Phase 7: tester findings
+- [x] 12. The pulse deadline counts from the pulse's start; Stop mid-pulse holds before the reset (a
+        Hold or Door report starts at the reset); the target is clamped in core before `Focusing`
+        (`Event::Travel`); the late pulse's sentence shows while the stop waits; the focus lines of
+        `jobs.log` in their own golden `jobs_focus.log`, `jobs_v2.log` back to its bytes (10, 34, 35 c)
+
+## Validation
+- Core: `tests/focus_0118.rs` (P12 core rows, goldens); unit tests in `focus.rs`.
+- `-io`: `tests/grbl_focus.rs` (simulator), `tests/focus_hub.rs` (fake, jobs.log, a second client).
+- laser-core: unit tests in `machine_profile_file.rs`, `machine_profile_copy.rs`; record goldens.
+- document-core: `tests/focus_pulse_format.rs`. editor-wasm: `session/output/tests/focus_tests.rs`.
+- Frontend: `tests/focus_point_0118.test.ts`.
+- Full gate of `CLAUDE.md` §7, `cargo deny`, `python3 -I scripts/check_docs.py`. The browser check is
+  the tester's.

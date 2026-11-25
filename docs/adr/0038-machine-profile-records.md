@@ -140,3 +140,10 @@ them. The question is which pattern the machine profiles follow.
 - **Frage 122 C** (no library): this ADR is withdrawn; nothing of decisions 1 to 7 is built.
 - **Frage 123 B** (connection travels with the file): this ADR is unchanged; the record keeps the
   connection, and ADR 0039 §2 adds it to the copy.
+
+## Amendment 2026-11-25: profile record format 8 (spec `0118`, slice 2d)
+
+Decision 2: record format 8 writes `"focus_pulse"` (boolean), `"focus_pulse_power_permille"` (1 to
+50) and `"focus_pulse_length_ms"` (50 to 2,000) after the default pair of record format 7 (`0150`,
+#468), always. Formats 5 to 7 read the defaults (off, 10, 300) and are not rewritten on read; one
+of the keys in a format 5 to 7 record damages it; above 8 is newer. Details: `specs/0118-machine-control/adrs.md` P7.
