@@ -55,3 +55,14 @@ J1 4 visible rows, then an inner scroll. J2 the sender in the counts line. J3 Mo
 
 ## 10. Question for the customer
 Frage 301 (QUEUE-START-ARM): Is Start armed when it starts the first waiting job? A: one press, as Start today (`0064` Q14); the name "Start <name>" says which job. B: an armed press in `--armed-accent` (`sendArm.ts` rules: 400 ms guard, 4 s, fresh status) only when Start promotes a waiting job; a held Ready job stays one press. C: Start armed always. Recommendation **A** (one Start behaviour; the job is named; `--require-local-start` is the safety at the machine). Default if unanswered: **A**.
+
+## 11. Slice 2: restart from the interrupted line (criteria 12, 13)
+
+ux-engineer, 2026-11-25. The notes live in `specs/0118-machine-control/ux-notes.md`, "Second slice 2e (run from line)", W65 to W78, Fragen 390 and 391; this section lists what they change here.
+- **Section 2, interrupted row** (amended): 56px (60 coarse), three lines: the name; `CircleAlert` "Interrupted at line 1,234" (`--destructive`; "near line" when the stored line is approximate after a crash); "4,000 lines, 4.2 KiB, Phone" (muted). Owner actions, right to left: Remove, **Restart from line** (`ListRestart`, tooltip "Restart from line 1,234", name "Restart sign.gcode from line 1,234"), greyed with the connector's cause (W68). "No restart control in this slice" no longer holds.
+- **Section 3, rights** (amended): Restart from line is owner only and absent for a member (drawn, not greyed); it never waits for an owner.
+- **Criterion 12 b**: the Inline confirm in the row's place: "Restart sign.gcode from line 1,234 of 4,000?" (Frage 391 C, customer 2026-11-25), Cancel (focused, 76px) and "Restart from line 1,234" (160px, accent look, 400 ms guard); while it is open the grid shows at most two waiting rows (W69, W70, W77).
+- **Section 5, Start** (unchanged): Start never restarts the interrupted job; nothing starts by itself while a restart confirm is open or the restart waits for the start at the machine.
+- **Section 6, keyboard** (added): Left/Right reach Restart in the row; Enter or Space opens the confirm; the block's Cancel and Restart are two Tab stops outside the grid; Escape returns the focus to Restart (W76).
+- **Section 8, texts** (added): "Restart from line <n>", "Restart <name> from line <n>", "Restart <name> from line <n> of <total>?", "Cancel", "Interrupted at line <n>", "Interrupted near line <n>", "Another job is ready", "Work offset changed", "Not homed", "Starts at the head position", "Cannot rebuild the state before line <n>: <word>", "Moving to line <n>", "Running from line <n>", "Completed, lines <n> to <total>", "Not started: Restart from line <n>".
+- **Criterion 13** (`admin.log`) has no UI.

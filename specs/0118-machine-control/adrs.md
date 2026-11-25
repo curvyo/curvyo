@@ -511,3 +511,205 @@ Frage 341 (MC-ORIGIN-WPOS): Which head position does "Set origin here" store?
 - **B** The machine position: with a work offset on the controller the job burns off by that offset (the Notice of criterion 14 shows it).
 - **C** As B, and Set origin here is greyed while the controller holds a work offset ("Work offset on the controller").
 Recommendation **A** (equal to B without an offset, which Curvyo never writes; right also with one). Default if unanswered: **A**.
+
+## Second slice 2e (run from line)
+
+Architect, 2026-11-25, criteria 38 and 39 with `0132` criteria 12 and 13 (Frage 258 C, Frage 314 A by
+default: interrupted jobs only), ux-notes W65 to W78 (Fragen 390, 391); one PR with `0132` slice 2 (its
+notes L8 to L11 in `0132` adrs). **No new ADR, crate or dependency; wire additive in protocol 0; no
+`format_version` change** (the project file is untouched; `jobs/list.json` stays `format: 1`, fields
+added with `serde(default)`). Amends ADR 0071 decision 3 (one more owner-only message), as a dated line
+with the story PR. Base: `main` with 2a to 2c; 2d (#484) is not needed. All is **(Proposal)** unless quoted.
+
+**R1. Which ends interrupt a job (UX Frage 390).** Built (`0132` slice 1): a started job (running,
+paused, a resume waiting) becomes an interrupted entry only through a connector restart (`stored::
+restore`; the SIGTERM stop of `hub.rs`). That is Frage 390 A, the default: **nothing new is built for it.** *(Customer 2026-11-25: Frage 390 **C**; `machine/interrupt.rs` is built, see the implementation notes below.)*
+With 390 B, a new `machine/interrupt.rs` ("how a started job that ends early stays listed as
+interrupted") also keeps a job that ends by an alarm or a lost controller while the connector runs (end
+state and `jobs.log` result line as built); with 390 C also one ended by Stop. `Done { Completed }`,
+`Failed` and a job that never started are never interrupted; several interrupted entries count against
+the 20 / 256 MiB limits (`0132` L2); an owner removes them (built). R4's second branch exists only with C.
+
+**R2. What is stored at the interruption.** `Entry.interrupted_at` keeps its built meaning: the last line
+GRBL **acknowledged** (`ok`, `Progress.line`). New persisted `Entry.stop: Option<StopPoint>`, `StopPoint
+{ machine_position, work_offset: Option<[Millimetres; 3]>, run_from: u32, exact: bool }`: the machine's
+last `MachinePosition`, the first job line of the run (1 for a whole run, n for a restarted one), and
+whether the line is exact. `StoredCurrent` gains the same fields, written with its `line`; `exact` is true
+only in the SIGTERM flush of `stop_for_exit` (and, with 390 B or C, at `Stopped`, `Alarm`,
+`ControllerLost*`), false in L6's once-a-second writes, so a **crash** restores `exact: false` and the app
+reads "near line n" (W66, `ListEntry.line_approximate`, R7). In memory only (`Item`, not serialized):
+`restart: Restart`, R3 to R6 computed once when the entry becomes interrupted or is restored, and again on
+`Event::Planner` (R9). The **homed flag is not stored** (criterion 39 amended): rule a reads it at the
+restart; J5 clears it on every reset, alarm, loss and reconnect, so "homed now" is "homed since the last
+break", and a connector restart always needs a Home. Modal state is not stored: it is rebuilt (R5).
+
+**R3. The restart line n (criterion 39 amended; lead's point 1).** GRBL's `ok` means "in the planner",
+not "burned": a stop loses up to one planner of acknowledged moves. `restart::restart_line(text, acked,
+run_from, blocks) -> u32` walks back from `acked` over `blocks` motion lines (a line with an axis word in
+`G0` to `G3`; an arc counts one, so the walk is never short) and returns the first of them, never below
+`run_from`; `blocks` is GRBL's planner size from `$I` (`[OPT:V,15,128]`: 15), `PLANNER_BLOCKS = 16` until
+read. So a few segments may burn twice, none is skipped. After a crash `acked` is the last stored line
+(up to 1 s behind), so n is further back still, and `exact: false` says so. n is the **one number** of
+W65: row, button, confirm and state line read `ListEntry.restart_line`. *Rejected:* `acked + 1` (as 39
+read: up to 15 segments unburned); GRBL's `Ln:` (needs `N` words and a build option); `Bf:` (needs `$10`
+bit 1, which Curvyo does not write, and lags a report).
+
+**R4. The position proof (rule a), `restart::position(stop, now) -> Result<(), Cause>`** (`now` = J5's
+`homed`, the last machine position and work offset). Missing now or stored: "No position from the machine"
+(W40's words; a `list.json` of slice 1 has no `stop` and reads so). The **work offset** must equal the
+stored one within `SAME = 0.01 mm` per axis **also after a Home** (the job's `G90` lines are work
+coordinates; Curvyo writes no `G10`/`G92`, so a Home never clears it; lead's point 3): "Work offset
+changed". Then `homed`, else **"Not homed"** (lead's point 4, W68 8; replaces "Home first"). Only with
+Frage 390 C a second branch: no break since the stop (`Item.unbroken`, cleared by J5's events) and the
+same machine position within `SAME` also prove it (a Stop keeps GRBL's count).
+
+**R5. The modal rebuild, `curvyo-connector-core/src/modal.rs`** ("the machine state a G-code text leaves
+before one of its lines"; pure, wasm32). `modal::before(text, n) -> Result<Modal, Unrebuildable>`. The
+word reader (`strip`, `number`, `words`) moves from `frame_text.rs` to a new `gcode_words.rs` ("the words
+of one G-code line"), refactor commit first. Lines 1 to n-1; comments, blank lines, `N` words and a `$H`
+line skipped. Groups kept, the last value wins: motion `G0 G1 G2 G3 G80`; plane `G17 G18 G19`; distance
+`G90 G91`, arc distance `G91.1`; units `G20 G21`; feed mode `G93 G94`; work system `G54` to `G59`; `F`;
+`S`; spindle `M3 M4 M5`; coolant `M7`, `M8` (each on, both off by `M9`). Accepted without state: `G4` with
+`P`, `G40`, `G61`, `M0`, `M1`. **Position** X, Y, Z in mm (`G20` values times 25.4), each `Option`: an
+absolute move sets it, an incremental one adds to a known value, an unknown stays unknown; `G2`/`G3` end
+points as `G1`. **Refused**, first one wins: any other G or M word (`G10`, `G28`, `G30`, `G38.x`, `G43.1`,
+`G53`, `G92`, `M2`, `M30`, ...), another letter (A, B, C, ...), another `$` line (`$J=`, `$X`, ...), a word
+that is not a plain number: "Cannot rebuild the state before line <n>: <word>"; X or Y unknown at line n
+(a Head position job, `G91` from the top): "Starts at the head position"; n past the last line: the entry
+is not offered (`restart_line` absent). Defaults before any word are GRBL's power-up ones (`G0 G17 G90 G21
+G94 G54 M5 M9`, no `F`, `S0`). *Rejected:* storing the modal state (a second truth beside the text, lost
+in a crash); parsing in `-io` (not pure, not wasm-checked).
+
+**R6. The entry lines, `restart::entry(modal, z_now) -> Vec<String>`** ("the lines that take a stopped
+machine to line n, laser off"). Order (criterion 38 amended to `0132` 12 d's order: the travel's `G21 G90
+G1` would overwrite a state set before it):
+1. `M5`, `M9` (laser and air off; criterion 9's rule holds for the travel).
+2. `G21 G90 G17 G94`, and the job's work system when it set one other than `G54`.
+3. the travel to the position before line n: `G1 X<x> Y<y> F3000 S0` (the 10 mm jog feed,
+   `JogStep::Ten.feed()`; `G1 … S0`, never `G0`, F1; GRBL's planner caps it at `$110`/`$111`); a known Z
+   as its own `G1 Z<z> F3000 S0` **before** XY when it goes up (from `z_now`, the work Z now) and after XY
+   when it goes down; three decimals, never `-0.000`.
+4. the rebuilt state in the job's words: `G20|G21 G90|G91 [G91.1] G17|G18|G19 G93|G94`, the motion word
+   with `F<f>` when an `F` was set (`G1 F1200`; GRBL keeps a motion word without axis words as the modal
+   value), `M7`/`M8` when on.
+5. `S<s>` with `M3` or `M4` when the spindle was on, else `S<s>` alone (S is modal).
+6. line n and the rest of the text, unchanged.
+No `M3`/`M4` and no `S` above 0 before step 5; laser mode (`$32=1`, required, R8) fires nothing without
+motion. Goldens per case (R11).
+
+**R7. Wire (protocol 0, additive).** App to connector **`RestartFromLine { job_id, line }`** (`KNOWN_TYPES`
+one more: 43, or 44 when #484 merges first); `line` is the n the confirm named (rule b): another n (the
+entry changed under the press) is `Error { WrongState }` and a fresh `JobList`, as a stale `MoveJob`.
+`ListEntry` gains, on an interrupted entry only, `restart_line: Option<u32>` (R3), `restart_cause:
+Option<String>` (the connector's first failing cause of R8, omitted when a restart would run; lead's
+point 1, W68: one rule, one place, the app greys with it and adds only its own "Connection lost" and
+status-read texts) and `line_approximate: bool` (omitted when false; W66). Core recomputes the cause on
+every event that can change it (state, word, laser flags, `homed`, positions) and pushes `JobList` only
+when an entry changed (its built `last_list` comparison). **`Progress`** gains `from_line: Option<u32>`
+(omitted when `None`; set through a restarted run, also in its `AwaitingLocalStart` and its `Done`) and
+`entering: bool` (omitted when false): true from the accept until the head stands at the travel target
+(R9), so the app reads "Moving to line n" while true and "Running from line n" after (lead's point 2,
+W73); "Completed, lines n to total" from `Done` with `from_line`. `Progress.line` counts in the whole
+text from n - 1. No new `State` or `ErrorCode`. Goldens in `curvyo-connector-core/tests/fixtures/
+messages/`: `command_restart_from_line.json`, `job_list_restart_not_homed.json`,
+`job_list_restart_near.json` (`line_approximate`, no cause), `status_restart_moving.json`,
+`status_restart_running.json`, `status_done_from_line.json`; old goldens keep their bytes.
+
+**R8. Core rules, `machine/restart.rs`** ("how the job machine takes a restart from a line"), both
+machines. The connector's cause order is W68's without the app's own first two: the job text (R5);
+the state (criterion 8's words; `Ready`: "Another job is ready", the restart takes the current-job place;
+`Running`/`Paused`: "A job is running"; `Receiving`: "Sending"; the waits, "Homing", "Jogging",
+"Framing"); `Alarm`, `NoController` and the busy words ("Controller state: <word>"); the laser mode ("Laser
+mode is off ($32=0)", G34's unknown text); the position (R4: offset, then "Not homed"). `RestartFromLine`
+for an unknown or not interrupted id is `UnknownJob`; a failing cause is `Error { WrongState }` with it.
+Accepted: the entry leaves the list and becomes the held job (`line = n - 1`, `from_line = n`, `entering`),
+`ControllerCommand::StartAt { job_id, from_line: n, entry, target }`, `Running`; `jobs.log` and
+`admin.log` lines (R10). Under `LocalPress` it waits for Enter first (`Waiting::Restart`, ADR 0070
+decision 2). Rights (`access.rs`): `RestartFromLine` joins `Kind::Reorder` (renamed `Kind::OwnerList`):
+member `OwnerRequired`, maintenance `Maintenance`, foreground every paired client; it never waits for an
+owner (W75). **An end before line n** (Stop, a discarded wait, an alarm, a loss, the travel check of R9)
+puts the entry back in the list **unchanged** (W74: nothing burned; `stop` and `restart_line` as before)
+and returns to `Idle` with the detail "Not started: Restart from line <n>"; no job result line. From line
+n on the run is a job as any (`0127` G5 to G12, Pause, Stop, `0132` L5's chain after `Done`); how it can
+be interrupted again is R1 with `run_from = n`.
+
+**R9. `-io`.** `StartAt` streams `entry`, then lines n.. (`Stream::new_at(entry, lines, first_line = n)`:
+entry lines are owed but count no job line); every line passes `prepare` (G5) before the first byte.
+Homed with `$130`/`$131` and the offset known, `target` (work coordinates) is checked with
+`jog::TravelBox` (F6's check and words, "Outside the travel by <n> mm", no byte); if 2d's `Event::Travel`
+(#484, P4) is on `main` when this is built, the check moves into core's R8 instead, same words. **Arrival**:
+`Event::EntryReached` once the travel line is answered and a report puts the work position within
+`ARRIVED = 0.05 mm` of `target` (2d's constant if merged, else defined here), or once a job line past n
+is answered (a report missed); core clears `entering`. `grbl/identify.rs` reads the planner size from
+`[OPT:...]`, `Event::Planner { blocks }`. `hub/journal.rs` writes `StoredCurrent.stop` fields with the
+line. Fake controller: `StartAt` runs from line n in injected time, `EntryReached` after its travel.
+
+**R10. Logs.** `jobs.log`: `Restart from line <n>: <client name>` at the accept (`LogResult::Restart {
+line, by }`; golden `tests/fixtures/jobs.log` gains it, old lines stay); the run's end writes the result
+line as any job. `admin.log` (`0132` criterion 13): `restart-from-line`, owner, job name, n
+(`ListLog::Restarted`; golden `admin.log` gains it). Terminal: "Restart <name> from line <n> by <client>".
+
+**R11. Crates and tests (no wall-clock sleeps).** `curvyo-connector-core` (`gcode_words.rs`, `modal.rs`,
+`restart.rs`, `machine/restart.rs`, `machine/interrupt.rs` only with 390 B or C, `Entry`/`StoredCurrent`
+fields, R7, R8); `curvyo-connector-io` (R9, R10, `job_store`, simulator); `curvyo-connector-server`
+(terminal line); `curvyo-app` (`connector_command` "restart_from_line" with `job_id` and `line`, fresh
+connection); frontend (UX W65 to W78). Untouched: `curvyo-laser-core`, `curvyo-document-core`,
+`curvyo-editor-wasm`, `curvyo-connector-ctl`. Core goldens `tests/fixtures/restart/<case>.gcode` and
+`<case>.entry` (R6's lines for the n of the test table): `curvyo_m4`, `curvyo_m3_air` (copies of
+`curvyo-laser-core` GRBL output goldens: M4 with `S` in `G1`; M3 with `M5`/`M3` around travels, `M8`),
+`feed_and_s_change`, `inch_g20`, `z_up`, `z_down`, `arc_g2`, `home_first_line`; refused
+`head_position_g91`, `unknown_g28`, `program_end_m2`. Tables: `restart_line` (15 and 16 blocks, arc,
+`run_from` floor), `position` (homed, offset changed after Home, missing reports), the cause order per
+state, `exact` per write. Machine tests `tests/restart_0118.rs` (both machines, `LocalPress`, each end
+before line n back to the list unchanged, `entering` until `EntryReached`). `-io`
+`tests/fixtures/jobs/list_interrupted.json` (golden with `stop`; a slice-1 file restores with `stop:
+None`). Simulator `tests/grbl_restart.rs`: the entry bytes line by line, no `M3`/`M4`/`S` > 0 before step
+5; Stop during the travel returns the entry; a restart after a connector restart refused "Not homed",
+accepted after Home; a changed `WCO` (the test sets `G10 L20` in the simulator) refused after Home;
+outside the travel writes nothing; `$32=0` refused; the crash case (`exact: false`). Hub/server: member
+`OwnerRequired`, `--require-local-start` waits, both log goldens.
+
+**Spec points fixed in `specification.md` and `0132` (no question).** 38: the order of the entry (R6),
+`G1 … S0` at 3,000 mm/min (F1), the cause order and words (R8, W68; "Not homed" for "Home first"),
+"Another job is ready"; 39: n backs off from the acknowledged line (R3), the homed flag is read, not
+stored (R2), the work offset is compared also after a Home (R4), which ends interrupt is Frage 390; `0132`
+12 a, c, d to the same words. No new Frage: UX Frage 390 is the one on which ends interrupt.
+
+**Implementation notes (implementer, 2026-11-25, story PR).** (Proposal unless the customer answered.)
+- *Frage 390 C* (customer): `machine/interrupt.rs` is the one place that decides which ends make an
+  interrupted entry: a started job (past its line when it is a restart) that ends by Stop (on the
+  confirming machine at `Stopped`), an alarm or a lost controller is listed as interrupted at its
+  acknowledged line with the machine position and offset, `exact: true`, `run_from` its first line;
+  `Done { Completed }`, `Failed` and a job that never started are not. R4's second branch is built: a
+  break counter (J5's events: reset, alarm, loss, reconnect) proves "no break since the Stop", and the
+  same machine position within 0.01 mm then proves the position without a Home. A new job still
+  becomes current when the list holds only interrupted entries (they stand outside the order), and
+  the current job is not shown twice while its Done row is also the interrupted entry.
+- *Frage 391 C* (customer): the confirm reads "Restart <name> from line <n> of <total>?" only.
+- *R9 arrival*: GRBL's `ok` to a job line after the entry means "in the planner", not "the head is
+  there", so it does not end `entering`; `EntryReached` comes from a report within `ARRIVED` of the
+  target after every entry line was answered, or the stream's end.
+- *R5 arcs*: GRBL refuses `G2`/`G3` without axis words (error 26), so an arc mode cannot be set on
+  its own: the entry writes `G1 F<f>` and line n must name its motion, else "Cannot rebuild the state
+  before line <n>: G2".
+- The fake controller reports its position after every homing (it reported none when the head
+  already stood at its origin), so the position proof holds on the fake.
+- The log goldens are files of their own, `jobs_restart.log` and `admin_restart.log` (the `0133`
+  tester's rule keeps existing fixtures unchanged), not lines added to `jobs.log` and `admin.log`.
+- The app's restart goes through `connector_list_command` (`ListCall::Restart`) and answers
+  `refused` with the connector's cause (W71), not through `connector_command`.
+- *`$32` read again (tester finding, safety)*: `$32` can change on the controller after connect
+  (its own panel, another program). `StartAt` passes every check that needs no answer, then
+  writes `$$` and waits for its `ok`; the settings read replace the cached ones (a changed laser
+  mode reaches core as `LaserModeOff`/`LaserModeUnknown`, so the row's cause follows), and only
+  with `$32=1` the entry's `M5` goes out. `$32=0`, an error or an empty answer end the restart
+  before the entry ("Laser mode is off ($32=0)", back to the list unchanged); the next press is
+  then refused at once from the fresh value. A Stop, an alarm or a reset while it waits ends it
+  with nothing written but `$$`.
+- *390 C's Stop proof (tester finding, safety)*: on GRBL 1.1 a soft reset during motion loses
+  steps (`ALARM:3`); only a reset after the feed hold completed (`Hold:0`) keeps the position.
+  The stop sequence records whether its reset followed `Hold:0`; when it did not (the hold
+  limit passed, homing, a reset button before `Hold:0`), `-io` sends `ControllerReset` right
+  after `Stopped`, which clears `homed` and counts a break, so the Stop proves nothing and the
+  cause reads "Not homed". With `ALARM:3` seen, the alarm does the same. The proof therefore is:
+  `Hold:0` before the reset, no break since, the same machine position and work offset.
