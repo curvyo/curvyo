@@ -2,7 +2,8 @@
 // pane with two views, Items (big previews of everything the Library tab holds) and Sets (one card
 // per set, catalogue, folder or source), filters as strips and lists, the fuzzy search that runs in
 // the page, a history of places with Back, and the detail bar. A press selects; a double-click,
-// Enter or a drag loads an item; a double-click or Enter opens a card (Part G).
+// Enter or a drag loads an item; a double-click or Enter opens a card (Part G). The search gains
+// the keyword file on the first text (`specs/0153-library-keywords`).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BrowserDetailBar } from "@/components/libraryBrowser/BrowserDetailBar";
@@ -10,6 +11,7 @@ import { BrowserFacets } from "@/components/libraryBrowser/BrowserFacets";
 import { BrowserGrid, type GridHandle } from "@/components/libraryBrowser/BrowserGrid";
 import { BrowserHeader } from "@/components/libraryBrowser/BrowserHeader";
 import { GuideView } from "@/components/libraryBrowser/GuideView";
+import { KeywordLicencesView } from "@/components/libraryBrowser/KeywordLicencesView";
 import { SetsGrid, type SetsHandle } from "@/components/libraryBrowser/SetsGrid";
 import type { LibraryBrowserApi } from "@/hooks/useLibraryBrowser";
 import type { PaneLayout } from "@/lib/fontPreviewLayout";
@@ -44,6 +46,7 @@ import {
   useBrowserStore,
 } from "@/lib/libraryBrowserStore";
 import { watchCanvasDrag } from "@/lib/libraryDrag";
+import { useKeywords, wantKeywords, whyMatched } from "@/lib/libraryKeywords";
 import { type LoadContext, importIcon, importPage, loadTemplate } from "@/lib/libraryLoad";
 import { openPreview } from "@/lib/libraryStore";
 import {
@@ -76,7 +79,10 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
   const { session } = store;
   const { prefs, keep } = api;
   const wide = isWide(layout.width);
-  const view = session.guide ? "guide" : prefs.view;
+  const view = session.guide ? "guide" : session.licences ? "licences" : prefs.view;
+  /** The guide or the keyword licences stand in for the views. */
+  const standIn = view === "guide" || view === "licences";
+  const keywords = useKeywords();
   const searchRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<GridHandle>(null);
   const setsRef = useRef<SetsHandle>(null);
@@ -106,10 +112,17 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
   const queryKey = JSON.stringify(query);
   const { answer, order } = useMemo(
     () => runQuery(query),
-    // The query's text and the list's version decide the answer.
+    // The query's text, the list's version and the keyword file decide the answer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [queryKey, store.version],
+    [queryKey, store.version, keywords.version],
   );
+  // The keyword file is fetched on the first search text, and after a failure again when the
+  // field next goes from empty to text (ADR 0087 decision 5, UX K3).
+  useEffect(() => {
+    if (searching && view === "items") {
+      wantKeywords();
+    }
+  }, [searching, view]);
   const setsKey = JSON.stringify(session.sets);
   const sets = useMemo(
     () => runSetsQuery(session.sets),
@@ -128,6 +141,17 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
     () => (view !== "sets" || shownIndex === null ? null : (cardWords([shownIndex])[0] ?? null)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, shownIndex, store.version],
+  );
+  // Why the shown and the current item matched (criterion 14), one call each, not per keystroke.
+  const shownWhy = useMemo(
+    () => (view === "items" && searching ? whyMatched(shownIndex, prefs.text) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [view, searching, shownIndex, prefs.text, store.version, keywords.version],
+  );
+  const currentWhy = useMemo(
+    () => (view === "items" && searching ? (whyMatched(current, prefs.text)?.line ?? "") : ""),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [view, searching, current, prefs.text, store.version, keywords.version],
   );
   const back = backName();
   void store.history;
@@ -200,6 +224,7 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
     setHovered(null);
     setBrowserSession({
       guide: place.view === "guide",
+      licences: place.view === "licences",
       sources: place.items.sources,
       categories: place.items.categories,
       level: place.items.level,
@@ -297,7 +322,7 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
     }
     leave(null, false);
     keep({ view: next });
-    setBrowserSession({ guide: false });
+    setBrowserSession({ guide: false, licences: false });
   };
 
   const load = async (words: TileWords, byKeyboard: boolean, drop: { x: number; y: number } | null = null) => {
@@ -379,7 +404,7 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
     leave(opened, true);
     const items = narrowedItems(key);
     applyItems(items);
-    setBrowserSession({ guide: false, sources: items.sources, categories: [], level: null, narrowed: items.narrowed });
+    setBrowserSession({ guide: false, licences: false, sources: items.sources, categories: [], level: null, narrowed: items.narrowed });
     // The opened card leaves the page: the keyboard goes on in the new place (Escape, Alt+Left).
     window.setTimeout(() => gridRef.current?.focusFirst(), 0);
   };
@@ -497,7 +522,7 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
   const canClear = (view === "sets" ? session.sets.text.trim() !== "" : searching) || facetsActive > 0;
 
   const facets =
-    view === "guide" ? null : view === "sets" ? (
+    standIn ? null : view === "sets" ? (
       <BrowserFacets
         answer={sets}
         sets
@@ -532,6 +557,10 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
         onCategories={(categories) => setBrowserSession({ categories })}
         canClear={canClear}
         onClearAll={clearAll}
+        onKeywordLicences={() => {
+          leave(null, true);
+          setBrowserSession({ licences: true });
+        }}
       />
     );
 
@@ -539,7 +568,16 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
     goBack();
   };
 
-  const subject = view === "guide" ? "Host your own library" : view === "sets" ? sets.subject : answer.subject;
+  const subject =
+    view === "guide"
+      ? "Host your own library"
+      : view === "licences"
+        ? "Search keyword licences"
+        : view === "sets"
+          ? sets.subject
+          : keywords.slow && searching && !answer.subject.includes(" · ")
+            ? `${answer.subject} · Loading keywords…`
+            : answer.subject;
   const itemsEmpty =
     // The browser build lists its own documents only (`0137` UX notes 2.1).
     !isTauri && answer.empty === "Nothing in the library yet." ? "No documents in this browser." : answer.empty;
@@ -568,7 +606,7 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
       </span>
       <BrowserHeader
         wide={wide}
-        view={view}
+        view={view === "licences" ? "guide" : view}
         onView={switchView}
         backName={back}
         onBack={goBackNow}
@@ -608,6 +646,8 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
         ) : null}
         {view === "guide" ? (
           <GuideView />
+        ) : view === "licences" ? (
+          <KeywordLicencesView />
         ) : view === "sets" ? (
           <SetsGrid
             ref={setsRef}
@@ -642,6 +682,7 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
             filterKey={JSON.stringify({ ...query, sort: undefined, own_sort: undefined })}
             version={store.version}
             current={current}
+            currentWhy={currentWhy}
             onSelect={select}
             onLoad={activate}
             onShowPages={showPages}
@@ -664,12 +705,13 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
           />
         )}
       </div>
-      {view === "guide" ? null : (
+      {standIn ? null : (
         <BrowserDetailBar
           words={shownWords}
           card={shownCard}
           isCurrent={shownWords !== null && shownWords.index === current}
           wide={wide}
+          why={shownWhy}
           onAction={action}
           onLicence={(url) => void openLicence(url).catch(() => undefined)}
         />

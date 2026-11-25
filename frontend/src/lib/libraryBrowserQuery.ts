@@ -124,7 +124,7 @@ export interface BrowserQuery {
 
 /** A place (`curvyo_ui_core::library_browser::Place`, criterion 30). */
 export interface Place {
-  view: "items" | "sets" | "guide" | "pick";
+  view: "items" | "sets" | "guide" | "licences" | "pick";
   items: BrowserQuery;
   sets: SetsChoice;
   current: number | null;

@@ -1,12 +1,15 @@
 // The library browser's filters and sort (`specs/0152-library-browser` criteria 11 to 17, UX
 // notes section 5): strips, a switch and check lists, never dropdowns or popovers; the same
-// sections in the facet column and in the Filters band. Each strip and list is one Tab stop.
+// sections in the facet column and in the Filters band. Each strip and list is one Tab stop. The
+// Items view ends with the search keywords' credit line (`specs/0153-library-keywords` UX K8).
 import { Check } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { PanelSwitch } from "@/components/ui/switch";
 import type { BrowserSort, ColourFilter } from "@/lib/libraryBrowserState";
 import { type FacetRow, facetSelect } from "@/lib/libraryBrowserQuery";
+import { openLicence } from "@/lib/onlineApi";
+import { isTauri } from "@/platform/host";
 
 const CUSTOMIZABLE_TIP = "Icons that take the colour you give the object, and templates tagged customizable";
 const COLOUR_TIP = "Templates and your own pages have no colour data";
@@ -39,6 +42,45 @@ interface FacetsProps {
   /** Clear all is offered (a filter or the search is active). */
   canClear: boolean;
   onClearAll: () => void;
+  /** Licences of the search keywords (Items view only, K8 and K9). */
+  onKeywordLicences?: () => void;
+}
+
+/** The projects whose keywords the search knows (spec `0153` criterion 10a). */
+const KEYWORD_PROJECTS: [string, string][] = [
+  ["Lucide", "https://lucide.dev"],
+  ["Tabler Icons", "https://tabler.io/icons"],
+  ["Material Design Icons", "https://pictogrammers.com/library/mdi/"],
+];
+
+/** A project's page in the system browser (the browser build: a new tab). */
+function openProject(url: string): void {
+  if (isTauri) {
+    void openLicence(url).catch(() => undefined);
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
+/** "Search keywords: Lucide, Tabler Icons, Material Design Icons · Licences" (UX notes K8). */
+function KeywordCredit({ onLicences }: { onLicences: () => void }) {
+  return (
+    <p className="mt-4 text-xs text-[var(--panel-muted-fg)]">
+      Search keywords:{" "}
+      {KEYWORD_PROJECTS.map(([name, url], n) => (
+        <span key={name}>
+          <button type="button" className="underline" onClick={() => openProject(url)}>
+            {name}
+          </button>
+          {n < KEYWORD_PROJECTS.length - 1 ? ", " : null}
+        </span>
+      ))}
+      {" · "}
+      <button type="button" className="text-[var(--editor-accent)] hover:underline" onClick={onLicences}>
+        Licences
+      </button>
+    </p>
+  );
 }
 
 function Heading({ children }: { children: string }) {
@@ -291,6 +333,7 @@ export function BrowserFacets(props: FacetsProps) {
           {props.sets ? "No categories in the sets." : "No categories in the fetched items."}
         </p>
       )}
+      {props.sets || !props.onKeywordLicences ? null : <KeywordCredit onLicences={props.onKeywordLicences} />}
     </div>
   );
 }

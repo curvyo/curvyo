@@ -25,6 +25,8 @@ export interface BrowserSession {
   scrollTop: number;
   /** The hosting guide stands in for the view (criterion 32). */
   guide: boolean;
+  /** The search keyword licences stand in for the view (`0153` UX K9). */
+  licences: boolean;
   /** Sources is a set, catalogue or folder opened from the Sets view (criterion 27). */
   narrowed: boolean;
   /** The Sets view's own search and facets (H10). */
@@ -73,6 +75,7 @@ let state: State = {
     current: new Map(),
     scrollTop: 0,
     guide: false,
+    licences: false,
     narrowed: false,
     sets: { text: "", sources: [], categories: [], colour: "all" },
     setsCurrent: null,

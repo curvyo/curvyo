@@ -14,6 +14,8 @@ interface TileProps {
   words: TileWords;
   size: number;
   current: boolean;
+  /** Why it matched the search, when not by its name (current tile only, `0153` UX K7). */
+  why: string;
   focused: boolean;
   style: React.CSSProperties;
   onPress: (index: number) => void;
@@ -27,6 +29,7 @@ export const BrowserTile = memo(function BrowserTile({
   words,
   size,
   current,
+  why,
   focused,
   style,
   onPress,
@@ -43,7 +46,7 @@ export const BrowserTile = memo(function BrowserTile({
       data-tile={words.index}
       aria-selected={current}
       aria-label={words.label}
-      aria-description={words.description}
+      aria-description={why ? `${why}. ${words.description}` : words.description}
       title={words.tooltip}
       tabIndex={focused ? 0 : -1}
       className={`absolute flex flex-col rounded-[8px] border border-[var(--tile-edge)] p-2 outline-none select-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-inset ${
