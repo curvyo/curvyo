@@ -345,3 +345,11 @@ discards it). A second member's `Home` meanwhile is `WrongState`. `admin.log` re
 confirmation as `start-confirmed`, subject the requester, detail `Home`; `jobs.log` writes the
 request as `Home: <client>`. `Jog` and `JogKeep` join the owner-only rows of the table (`JogStop`
 passes). `Confirmation` in core names what ran (`Start`, `Resume`, `Home`).
+
+## Amendment 2026-11-25: Go to point is owner-only (spec `0118`, slice 2d, Frage 380 A)
+
+Decision 7's "`0118`'s motion waits for an owner" holds for Home and Frame; `GoToPoint` is an
+owner's motion like `Jog`: a member gets `OwnerRequired`, maintenance mode `Maintenance`. There is
+no `Waiting` of a member's go to point, no `Confirms` value for it and no `curvyoctl confirm-start`
+case; under `--require-local-start` an owner's go to point waits for Enter as a start does. Details:
+`specs/0118-machine-control/adrs.md` P11.

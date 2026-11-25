@@ -185,3 +185,18 @@ on, which is why `$32=0` does not refuse it. A homed machine's frame is checked 
 before the first byte (`Outside the travel by <n> mm`, Frage 334 A). A member's frame waits for an
 owner, who confirms it with `Start { job_id: frame_id }` (`Confirms::Frame`, `admin.log` names Frame).
 Details: `specs/0118-machine-control/adrs.md` F1 to F7.
+
+## Amendment 2026-11-25: the focus point and its pulse (spec `0118`, slice 2d)
+
+Protocol 0, additive (sections 6, 7): `GoToPoint { x, y, pulse? }` (an owner's motion; `x`, `y` in
+job file coordinates within 10,000 mm, `pulse` `{ power_permille, length_ms }` left out when none),
+`State` gains `Focusing` (the move) and `Pulsing` (the pulse), and `Status` gains `target`, the
+connector's target clamped to the travel, left out otherwise; every earlier golden stays
+byte-identical. The connector owns both caps: `power_permille` 1 to 50 and `length_ms` 50 to 2,000
+are bounded types whose decode refuses anything outside (`Malformed`, nothing moves). The move is a
+GRBL jog in absolute work coordinates after `M5`/`M9`; the pulse block `G1 M3 S<s>` / `G4 P<seconds>`
+/ `M5 S0` is written in one write only after `Idle` within 0.05 mm of the target, with laser mode on
+and `s = floor(power_permille x $30 / 1000) >= 1`. Stop during the move is the jog cancel, during the
+pulse the stop of `0127` G12, as are a busy word, a pulse not ended within its length plus 1 s and
+the connector's shutdown. `jobs.log` writes `Focus point: <client>` and `Focus pulse: <client>`.
+Details: `specs/0118-machine-control/adrs.md` P1 to P12.
