@@ -2,8 +2,10 @@
 
 **Status:** Proposed by the architect 2026-11-24, revision 2 the same day with the lead's
 decisions on spec `0149` revision 3 and its UX notes revision 1, revision 3 the same day with the
-lead's decisions from the slice-1 build and spec `0149` revision 4 (all Proposal, vetoable at the
-demo). Not `needs-customer` as a whole: no new crate,
+lead's decisions from the slice-1 build and spec `0149` revision 4, revision 4 on 2026-11-25 for
+slice 2 (curved cubics, §13), revision 5 the same day for the UX notes `0149` revision 4 (§13.16),
+revision 6 the same day with the deviations accepted at the slice-2 code review (§13.17)
+(all Proposal, vetoable at the demo). Not `needs-customer` as a whole: no new crate,
 no `format_version` (a new generator kind is additive, ADR 0080 §5; the path is a parameter
 value); one new crate edge (`curvyo-generators-core → curvyo-geometry-core`, allowed by ADR 0034
 §2 and ADR 0080 §3 once a generator needs booleans); one source-breaking `0.x` contract change
@@ -16,7 +18,12 @@ and the generator returns canvas marks (§4, §5, §7, §11); a seam on a straig
 seam sits in the longest straight (§6); a kink's fillet is raised to hold two slit columns (§3,
 §4); cover and lid use `contour.rs`'s exact offset, not geometry-core's (§7); the heart's counts
 (§10); the shipped contract and `Document::create_generated_above` checked against §2 and §11
-(§12). The
+(§12). Revision 4 (slice 2): §13 decides how curved cubics are built (the outline read from the
+curve, the arc fit, runs of arcs, the neutral length, spacing along a run, flats beside corners,
+windows and the hollow on runs, the cover fallback, CPU, the removed `outline_curved`); §2, §3,
+§4, §5, §7 and §10 point to it. Revision 5: §13.16 decides the UX notes revision 4 items (a seam
+mark, bend marks per slit stretch of one tightness, the warning `cover_rounded`); §11, §13.4, §13.9,
+§13.14 and §13.15 point to it. The
 customer questions are the spec's: Frage 364 (copy, decided here as A), 365 (the source
 stays), 346 (Corner angle default 25°), 347 (answered by §4: no curve pattern is needed). Spec:
 [`0149`](../../specs/0149-path-box/specification.md) (Ready for slice 1, straight outlines; slice 2 curves). Per-part operations
@@ -142,7 +149,8 @@ nothing gained).
      - **Curves in slice 1:** a cubic outside the 0.1 mm line test of §3 is built as its chord
        (so its ends become kinks or corners) with the warning `outline_curved`. The stored
        outline stays as it is, so a build with slice 2 rebuilds it exactly. Only a file from a
-       newer build brings it here, since create refuses it. Slice 2 removes this rule.
+       newer build brings it here, since create refuses it. Slice 2 removes this rule
+       (revision 4: §13.1, §13.14).
      ui-core does not test the outline itself. Before create (and for each object the pick mode
      hovers that passes the cheap Select bar test of one closed subpath, cached until the object
      changes) it runs `generate` with the candidate outline and
@@ -155,7 +163,8 @@ nothing gained).
    - **Arc fit.** A cubic that stays within 0.1 mm of its chord is a line (spec `0149` criterion
      3). Every other cubic becomes arcs within 0.01 mm (biarcs, split at the middle until within
      tolerance); joins inside one cubic are tangent by construction. Slice 1 (straight outlines)
-     needs only the line test; `arc_fit.rs` arrives with slice 2 (§2 for a curve in slice 1).
+     needs only the line test; `arc_fit.rs` arrives with slice 2 (§2 for a curve in slice 1;
+     revision 4: the fit, tangent joins and kinks against arcs are §13.2 and §13.3).
    - **Junctions.** At each join, the turn angle δ between the incoming and outgoing tangents.
      |δ| ≤ 1° is tangent (fitting noise). 1° < |δ| ≤ `corner_angle` is a **kink**: filleted on
      the inner face with radius r = max(2 t_w, 2 g / |δ|), g the least slit gap (slit width + 1
@@ -191,7 +200,9 @@ nothing gained).
    scaled by one factor (at least 1, since only columns that fit were placed) so the last column
    lies as far from the band's end as the first from its start. So no gap falls below the
    minimum. A kink's arc holds at least two columns (§3, revision 3), except where §3's
-   short-straight cap lowers its radius. A typed spacing applies everywhere. **Reported value** (revision 2, UX notes §5,
+   short-straight cap lowers its radius (revision 4: §13.6 states this walk exactly as a column
+   count from the integral of 1 / gap along a run, which is what `wall.rs` builds for one radius).
+   A typed spacing applies everywhere. **Reported value** (revision 2, UX notes §5,
    accepted): `Generated.automatic` carries one value per key, so `slit_spacing` reports the
    smallest gap after the scaling, over every bent span of every piece: the gap the minimum
    clamp guards and the place a crack starts, so a typed value never lies denser than the
@@ -220,8 +231,9 @@ nothing gained).
    - |δ| above 150° (an interior angle below 30°, spec criterion 5): z is capped at 2 t_w and the
      warning `sharp_corner` names the two pieces and the interior angle (§11; "The corner between
      pieces 3 and 4 is very sharp: 22°.", UX notes §6); built anyway.
-   - On a bent span next to a corner the zone follows the tangent at the corner. The plate meets
-     the wall's inner face, which is outside every zone.
+   - On a bent span next to a corner the zone follows the tangent at the corner (revision 4:
+     superseded by the flat of §13.7). The plate meets the wall's inner face, which is outside
+     every zone.
 6. **Seam.** Only an outline with no corner has one (spec criterion 9). **Revision 3 (lead
    decision, Proposal; spec `0149` revision 4):** it sits at the middle of the outline's longest
    straight (ties: the straight with the least screen y, then the least x), never inside a bent
@@ -248,10 +260,12 @@ nothing gained).
    concave corner whose miter passes 4 t_w the two piece ends are joined directly, so the cover
    can cross itself (a small loop). Covered so far only by the five-point star test (radii 60 and
    24 mm, a simple cover); the remedy, once a test shows the case, is geometry-core's offset for
-   that cover without the hollow (not built).
+   that cover without the hollow (revision 4: built with slice 2, §13.9, since concave arcs
+   below t_w become ordinary input).
    An empty ring opening leaves the ring as a full plate with the warning `ring_closed`. The finger hollow sits on the lid's longest straight that holds
    the width plus 2 t_w, else centred on its longest bent span whose smallest radius is at least
-   the hollow width, else it is left out with the warning `hollow_left_out` (§11).
+   the hollow width, else it is left out with the warning `hollow_left_out` (§11; revision 4:
+   the bent-span case is §13.10, convex across the width instead of a smallest radius).
 8. **Parameters** (keys are file format; Proposal): `outline` (Path), `inner_height`,
    `corner_angle`, then the rounded box's groups and keys without its sizes, corner radius and
    `wall_slits` (thicknesses, `kerf`, plates, slits, `gap`; ADR 0082 §8), built by one shared
@@ -290,7 +304,8 @@ nothing gained).
     gap. Revision 3: a five-point star (ten corners, convex and concave): one owner per corner
     and a cover that does not cross itself; the coffin at Corner angle 90° (kinks only): every
     kink keeps at least two slit columns and the seam lies in a straight. CPU (spec criterion 11): the coffin at most 100 ms and the heart with
-    at least 400 slots at most 300 ms of thread CPU for the edit with its commit.
+    at least 400 slots at most 300 ms of thread CPU for the edit with its commit. Revision 4: the
+    slice-2 tests are §13.15.
 
 11. **Warnings and canvas marks (revision 2; contract, run time only, never stored).** The UX
     notes need generator knowledge the result does not carry: `Clamp` names one parameter, and
@@ -301,7 +316,8 @@ nothing gained).
       in the document's units and merges warnings of one id into the plural sentence ("2 corners
       are very sharp: ..."). Ids of the path box: `sharp_corner` (the two pieces, the interior
       angle), `tight_bend` (the piece, its smallest radius, the limit 2 t_w or t_w), `ring_closed`,
-      `hollow_left_out`, `smallest_size`, `outline_crosses`, `outline_curved` (slice 1). With one wall piece the
+      `hollow_left_out`, `smallest_size`, `outline_crosses`, `outline_curved` (slice 1; removed by
+      §13.14), `cover_rounded` (revision 5, §13.16). With one wall piece the
       text says "The wall" instead of "Piece 1" (no badges then, UX notes §3). Rejected:
       sentences from the generator (`Vec<String>`): core would format units it does not know.
       Placement in the UI (canvas notice slot after a build, under the field after an edit) is
@@ -310,8 +326,8 @@ nothing gained).
       on_parts: Vec<Mark> }`. `on_footprint` is in the stored outline's coordinates: `Corner
       { at, bisector, sharp }`, `Bend { start, segments: Vec<Cubic>, tight }` (one per bent span,
       kinks included; the stretch of the inner face, the band drawn on its inside, the right of
-      the clockwise walk) and `Piece { number, at, inward, length }` (the middle of the stretch a
-      piece stands on). `footprint` is the inner base's offset in the layout, so the shell draws
+      the clockwise walk; revision 5: one per slit stretch of one tightness, §13.16) and `Piece { number, at, inward, length }` (the middle of the stretch a
+      piece stands on); revision 5 adds `Seam { at, inward }` (§13.16). `footprint` is the inner base's offset in the layout, so the shell draws
       `on_footprint` on the selected box's inner base and, unshifted, on the hovered source in
       the pick mode. `on_parts` holds the badge `Piece { number, at, .. }` at each wall piece's
       middle in the frame. The Corner angle value text counts the `Corner` marks.
@@ -342,6 +358,220 @@ nothing gained).
       pattern is reused, the function lives with the other generated commands). One commit, the
       "Add path box" step; `NoSuchObject` for a missing source or a layer. No format change.
 
+13. **Curves (slice 2, revision 4, 2026-11-25; all Proposal).** Read against the slice-1 code
+    (`path_box/`, `footprint.rs`, `wall.rs`, `slit_bend.rs`, `tab_layout.rs`, `wall_plates.rs`,
+    `contour.rs`). The pipeline stays check, classify, shapes, footprint, wall and plates; it now
+    carries lines and arcs instead of a polygon.
+    1. **The outline is read from the curve.** `check` returns the normalised `ClosedPath`
+       (clockwise, `outline::reversed` when not), no longer the polygon of cubic starts.
+       Degeneracy, area and winding come from the curve: geometry-core `outline_area_mm2` gives
+       the area for the (4 t_w)² rule, the `Edit::Scale` limit (§2) and the sign; an area below
+       1e-9 mm² or a crossing (`cut_parameters`) reads as the default with `outline_crosses`. So
+       a D (one line, one cubic) and a lens of two cubics are valid, and a circle of four cubics
+       has π r², not the 2 r² of its four nodes.
+    2. **Arc fit (`arc_fit.rs`), per curved cubic of §3.** Split at its inflections, at a cusp
+       (derivative below 1e-9 mm per unit parameter; the cusp is a join classified as in §3,
+       usually a sharp corner) and where its tangent has turned by 90°, so every piece turns one
+       way by at most 90°. Each piece is a biarc with the piece's end tangents, the joint at the
+       incentre of the triangle of its two ends and the tangents' intersection. It is accepted when
+       16 samples of the piece lie within 0.01 mm of the biarc, else the piece is halved at
+       t = ½ (de Casteljau), at most 6 times (64 biarcs per piece; the fixtures assert none gets
+       there). An arc above 1e6 mm radius is emitted as a straight (numeric guard; within 0.01 mm
+       of its chord up to 280 mm). **Tangent joins are made exact:** at a join of §3 with |δ| ≤ 1°
+       both neighbours are fitted to one direction, a line's when one side is a line, else the
+       bisector; the 0.01 mm test absorbs the half degree by halving. So every join inside a run
+       is G1, the kerf offset keeps it tangent and the neutral length has no kink term there.
+       Rejected: flattening and fitting arcs to the points (more pieces, tangency not by
+       construction); flattening alone (faceted, Option C); one fit over the whole outline (loses
+       the cubic joins §3 classifies). The fit stays in `path_box/` (one user); it moves to
+       geometry-core when a second one (arc output for G-code) asks.
+    3. **A kink beside an arc** (1° < |δ| ≤ `corner_angle`, an arc on at least one side): the
+       fillet of §3, r = max(2 t_w, 2 g / |δ|), is the circle tangent to both neighbouring shapes,
+       its centre the intersection of the two shapes moved inward by r (`contour.rs`'s
+       `line_circle` and `circle_circle`, made `pub(crate)`); both are trimmed at the tangent
+       points. Where a tangent point falls outside its shape (a short fitted arc), a convex
+       neighbour's radius is at most r, or two fillets share one shape (each takes at most half of
+       it, as §3's short straight), r is lowered by bisection to the largest that fits; it may then
+       fall below §4's limit and warn `tight_bend`. Line beside line is slice 1, unchanged.
+    4. **Runs.** A bent span is a **run**: consecutive arcs and fillets with no straight, flat,
+       window or corner between. Runs, not single arcs, are the unit of slit bands (`wall.rs`
+       `bands`), windows (`tab_layout.rs`), the hollow and `Mark::Bend` (revision 5: one per slit stretch of
+       one tightness inside a run's bands, §13.16). **The path box opts in; the rounded box does not:** `Wall` gains
+       `runs: bool` and `tab_layout` a run entry beside `with_tabs`, the rounded box passes
+       `false` and keeps today's per-arc bands and windows (two callers, two behaviours, no
+       speculative flag). Without the gate the rounded box's circle would change: its seam splits
+       its one bend into two consecutive spans that today are two bands. So
+       `rounded_box_*.txt`, `path_box_default.txt` (no bend) and `path_box_20gon.txt` (one arc
+       per run) stay byte-identical, the guard of this revision. Where §3's short-straight cap
+       drops a straight (the 20-gon of 4 mm in `shape.rs`), the two fillets now share one band:
+       that output changes, on purpose.
+    5. **Neutral length, exactly.** An arc adds |θ| max(0, r ± t_w/2) (+ convex, − concave; the 0
+       guards a concave arc below t_w/2, which carries `tight_bend` anyway); a straight its length;
+       a flat or window chord its length plus t_w/2 times the signed tangent change it replaces
+       (negative on a concave stretch: `tab_layout::Layout::push` adds it unsigned today and gets
+       the sign). So a piece is its inner-face length plus t_w/2 times its signed total turn, exact
+       for the fitted face. Criterion 6's test compares it with geometry-core `PathMeasure` length
+       of the same stretch of the stored cubics plus t_w/2 times its turn, less each flat's and
+       window's chord-for-arc difference, within 0.1 mm.
+    6. **Spacing along a run** (§4's walk, stated exactly). Automatic: the wanted gap is
+       g(s) = max(0.22 r(s), least), r(s) the inner radius of the span at strip position s. A
+       run's band (§4's lead and trail applied) holds N = max(2, floor(∫ ds / g(s))) columns at
+       equal steps of that integral, the outer two half a step from the band's ends (the integral
+       is piecewise linear, its inverse exact). Every gap is then at least the least wanted gap
+       within it (N rounds down, as slice 1's floor) and never below `least`; for one radius this is `column_pitch`
+       exactly, so slice-1 output is unchanged. `slit_bend::slots` takes the column positions
+       (even pitch stays for a typed spacing). Offset: unchanged (it alternates by column index).
+       Wave: each column takes the smaller of its two gaps as period and swing, so neighbouring
+       waves keep their bridge. The reported `slit_spacing` is the smallest gap over all runs (§4).
+    7. **Flats beside a corner (supersedes §5's tangent zone).** Where a corner borders a run, the
+       run's first stretch of inner-face length f = z + t_w (z of §5 from the tangent turn) is
+       replaced by its chord, both ends on the fitted curve. The solid margin carries no slits, so
+       that wood does not bend (the reason for windows, ADR 0082 §5); with the flat the plates
+       follow what the wall does and the overlap zone is §5's parallelogram exactly.
+       Classification (corner or kink) stays on the curve's tangents, so Corner angle keeps its
+       meaning; the finger geometry (z, the reach, the tip bound, `sharp_corner` and its angle)
+       uses the turn between the flats, or a flat and a straight: the joint as cut. **Bound:** a
+       flat beside a convex stretch sharpens the corner and one beside a concave stretch flattens
+       it, by half the stretch's turn each. So f (both flats together, by bisection) is shortened
+       until the turn between the flats keeps the tangent turn's sign, is at least `corner_angle`
+       and differs from the tangent turn by at most 10°; f is also at most a third of the run and
+       its stretch turns by at most 45°. f → 0 meets all of these, so the rule always ends; where
+       shortened, the slit band still starts z + t_w from the corner. A heart tip at 145° may
+       thus be cut at up to 155° and carry `sharp_corner`, which then is true of the joint. The face moves in by
+       the sagitta f² / (8 R) beside the corner (0.5 mm for f = 9 mm, R = 20 mm). Rejected: the
+       tangent zone of revision 3 (an unslit curved margin the wood does not follow; fingers off
+       by about f² / (2 R)).
+    8. **Windows on runs** (ADR 0082 §5 per run). With fewer than 4 straight tabs, each run takes
+       round(length / 30 mm) windows, at least 1; a loop with no corner and no straight is one run
+       from the seam round the loop with at least 4, so the seam lies midway between the last and
+       the first window. Centres at (k + ½) / n of the run after the corner margins; a window is
+       the chord between the two run points at ± a from its centre, a chosen (bisection) so the
+       chord is 2 w + 2 t_w long (w the widest tab's half width); its ends may lie on different
+       arcs, which are split there (`footprint::split`). n is lowered until every slit stretch
+       between windows and to the run's ends keeps `min_band` and its bridges. Sag = the largest
+       distance of the replaced stretch from its chord; the mating test allows sag plus kerf
+       (criterion 10).
+    9. **Plates follow the arcs.** `contour.rs` offsets arcs concentrically, so inner base, ring,
+       tabbed lid and the kerf are exact on the fitted face. Cover and seat lid use §7's exact
+       offset unless the footprint holds a concave arc of r < t_w (its outward offset collapses;
+       `contour.rs` would clamp the radius silently) or the exact cover crosses itself
+       (`cut_parameters`); then both are geometry-core `offset` (Round) of the inner face by t_w,
+       without the hollow, with the warning `cover_rounded` and never `hollow_left_out` (revision 5,
+       §13.16). Fixture: a peanut, two convex lobes and a concave
+       waist below t_w.
+    10. **The hollow on a run** (§7's "else", built now). On the outer footprint's longest convex
+        run longer than the hollow width plus 2 t_w: at the run's middle the hollow's two side
+        lines (along the inward normal there, the width apart) are cut with the run's arcs
+        (`line_circle`) and the arcs between become the notch of `bend_with_hollow`, generalised
+        from the front angle to a given middle normal (the rounded box passes its front). The
+        run must be convex across the width; else the next longest; none: `hollow_left_out`.
+        Revision 7 (lead, **Proposal**, after the browser review): the unit is the longest **convex
+        sub-stretch** of the runs (a run that holds a concave notch, as the heart's single run at
+        Corner angle 90, is split at its concave arcs), and the hollow sits at that sub-stretch's
+        middle; `hollow_left_out` only when no convex sub-stretch is long enough.
+    11. **Seam:** §6 unchanged; a line cubic (or a guard straight of 13.2) is a straight; without
+        one the seam is the least-y point of the fitted arcs (`seam_at_top` already reads arcs).
+    12. **Too small a radius** is built (customer: "own fault"). `tight_bend` per piece names the
+        arc with the least r / limit (limit 2 t_w convex, t_w concave), its radius and that limit;
+        g(s) bottoms out at `least` there; nothing is clamped or refused.
+    13. **CPU.** The fit is small against the strip (a 40-cubic heart: a few hundred arcs, 16
+        samples each). Budgets in `curvyo-editor-wasm/tests/generators_cpu_time.rs`, thread CPU:
+        the heart fixture with values that lay at least 400 slots (the test asserts the count) at
+        most 300 ms for the edit with its commit (criterion 11). The pick hover and the Select bar
+        test run `generate` with `Edit::Draft` (marks and refusals need no slits): in ui-core
+        `preview` and `hover_marks` pass `Draft` while `place_from_source` builds in full, so
+        `plan()` takes the edit as an argument. At most 100 ms for the heart. In Draft the path
+        box also skips its three geometry-core plate calls (ring opening, cover crossing test,
+        cover fallback offset), so the ghost of an edit shows the ring full and the exact cover. The likely hot spot is the ring opening's boolean offset over many
+        arcs (its 0.01 mm flattening).
+    14. **Contract and format.** No `format_version`: the stored `Path` and the record are
+        unchanged, and a curved outline stored by any build is now built exactly. Removed (run
+        time, source-breaking 0.x): the warning id `outline_curved` (doc comment in
+        `curvyo-extension-core/src/extension.rs`, a CHANGELOG line), `SourceRefusal::Curved` in
+        `curvyo-ui-core/src/instance_source.rs` (public, with its sentence) and the
+        `outline_curved` arm in `instance_warnings.rs`. Tests that change with it:
+        `curvyo-generators-core/tests/path_box.rs` (a curve as its chord),
+        `curvyo-ui-core/tests/path_box_source.rs` (`SourceRefusal::Curved`),
+        `frontend/tests/generatedView.test.ts` (the sentence), and the tester's
+        `curvyo-generators-core/tests/acceptance_0149.rs` (two places) and
+        `curvyo-ui-core/tests/acceptance_0149.rs` (the sentence). Crate-internal
+        only: `path_box/arc_fit.rs`, `contour.rs` intersections `pub(crate)`, `slit_bend::slots`
+        with column positions, runs in `wall.rs` and `tab_layout.rs`, `bend_with_hollow` with a
+        middle angle. No new crate, dependency or crate edge. Revision 5 (§13.16), run time and
+        source-breaking 0.x (`Mark` is not `#[non_exhaustive]`): added `Mark::Seam`, the warning id
+        `cover_rounded` (the id list in `extension.rs`, an arm in `instance_warnings.rs`) and the
+        new meaning of `Mark::Bend` (its doc comment), drawn by `path_box_marks.rs`; one CHANGELOG
+        line with the removal above.
+    15. **Tests.** Arc fit: every fixture cubic within 0.01 mm of its arcs (64 samples, both ways),
+        joins inside a cubic and at tangent joins tangent within 1e-9 rad. Goldens
+        `path_box_heart.txt`, `path_box_circle.txt`; the slice-1 goldens byte-identical (4).
+        Classification of the heart, shield, circle and D (two pieces, two corners for the
+        heart). Piece length against `PathMeasure` (5). Spacing: N ≥ 2 per run, no gap below
+        `least`, every gap at least the least g within it, the reported value the smallest gap (6).
+        Heart corners: fingers alternate and tips within §5's bound with the flats' turn; each
+        flat z + t_w long or capped (7); a square with concave arc sides (corners between concave
+        stretches): every joint keeps its convexity and at least `corner_angle` (7). Windows on the heart and the circle: counts, the seam
+        between two windows on the circle, mating within sag plus kerf, a concave window shorter
+        on the neutral line (8, 5). The peanut: cover by the fallback, `cover_rounded` with the wall
+        thickness and no `hollow_left_out`, a cover that does not cross itself (9, 16). A seat lid on the heart carries the hollow (10). A tight
+        lobe below 2 t_w is built with `tight_bend` naming its piece (12). CPU as in 13. Marks (16): the
+        circle and an ellipse carry one `Seam` at the seam of §6, the heart and the coffin none; no
+        `Bend` overlaps a window, a flat beside a corner or the seam margin; the tight lobe's run
+        gives a tight `Bend` only over its tight arcs and touching ones of the same band share an
+        end point within 1e-9 mm; a Draft gives the same `Corner`, `Seam` and tight stretches as
+        the full build and no `cover_rounded`.
+    16. **Marks and warnings for the UX notes revision 4 (§10 items 1, 2, 3, 9; revision 5,
+        2026-11-25; contract items in `Generated.marks` and `Generated.warnings`, run time only,
+        never stored, no `format_version`).**
+        - **Seam mark (item 1): accepted.** `Mark::Seam { at: Point, inward: Vec2 }` on
+          `on_footprint`: the seam point of §6 and §13.11 on the inner face and the unit normal
+          into the box, as `Piece`. Only an outline with no corner has one; it needs the footprint
+          only, so a Draft (the hover) carries it too. Why: the maker glues the strip there and
+          must see it before the click; the classification that places it lives in core only.
+        - **Tight stretches (item 2): accepted, as one `Bend` per stretch of one tightness, no new
+          field.** A stretch is tight where its arc's radius is below its own limit (2 t_w convex,
+          t_w concave, §13.12); a band whose arcs change tightness gives consecutive `Bend` marks
+          that share their end points exactly, so the shell draws one continuous band, one stripe
+          at a join (UX item 8). Rejected: a list of tight intervals inside one `Bend` (a second
+          shape of the same fact). Why: red only where the wood may crack, with `tight` keeping
+          its one meaning.
+        - **What a band covers (item 9): accepted.** `Mark::Bend` holds the inner-face stretch
+          under a slit band (§4's lead and trail applied, §13.6), not the whole run: windows,
+          the flats beside a corner (§13.7) and the seam margin (2 t_w each side, §6) lie outside
+          it, so they carry no stripes. The stretch comes from the band extents mapped back
+          through the neutral length (§13.5, piecewise linear), not from slot placement, so a
+          Draft has it; where a Draft lays windows without §13.8's slit-driven lowering its gaps
+          differ, accepted as the UX notes §10 item 6 (b) say. Why: the stripes then show where
+          the slits are, and the bare gaps are the solid wood the plates' tabs sit on.
+        - **`cover_rounded` (item 3): accepted.** Sent instead of `hollow_left_out` when §13.9's
+          fallback builds cover and seat lid by geometry-core's round offset: `pieces` empty,
+          `value` the wall thickness as built (`ParamValue::Length`, as `smallest_size`), `limit`
+          none. The shell takes which plates it applied to and whether a hollow was dropped from
+          the record's lid and finger-hollow values, since the fallback covers every lid plate the
+          record builds and always leaves the hollow out: no field the parameters already say.
+          Not in a Draft (it skips the cover test, §13.13), so the notice comes from the full build
+          only (UX notes §6). Why: `hollow_left_out` names the wrong cause on the heart.
+        - Unaffected: the goldens hold parts only, so they stay byte-identical (§13.4); the rounded
+          box returns `Marks::default()` and no new warning.
+    17. **Deviations accepted at the slice-2 code review (revision 6, 2026-11-25, architect;
+        all Proposal, crate-internal, no contract or format change).**
+        - **Two routes in front of the footprint.** An outline of straight cubics only keeps the
+          slice-1 polygon route (`shape.rs`, `Checked.points`); an outline with any curved cubic
+          goes through `spans.rs` (`Checked.path`), against §13.1's single route. Why: the slice-1
+          goldens stay byte-identical by construction, not by numerical coincidence. Cost: a
+          fillet between two lines is built in two places; they are merged when either changes.
+        - **The hollow on a run is its own notch** (`path_box/hollow.rs`), not a generalised
+          `wall_plates::bend_with_hollow` (§13.10, §13.14): a run spans several arcs, the rounded
+          box's bend one. The rounded box keeps `bend_with_hollow`; merged when either changes.
+        - **`Wall.seam_margin`** beside `runs` (§13.4): 2 t_w for a path box without a corner
+          (§6), 0 for the rounded box. Two callers, two values.
+        - **The 90° split of §13.2 is a halving:** a piece whose end tangents turn by more than 90°
+          is halved at t = ½ like a misfit and counts towards the 6 halvings; the fit aims at
+          0.008 mm on its 16 samples so 0.01 mm holds between them.
+        - **`tight_bend` comes from the arcs under the slit bands** (`bend_marks.rs`), the same
+          source as the tight `Bend` marks, so notice and red stretch always agree. An arc that
+          lies wholly under a flat, a window or a margin is not bent and does not warn.
+
 ## Consequences
 
 - One shape tool covers any footprint; the rounded box stays the quick one with size fields and
@@ -357,7 +587,11 @@ nothing gained).
   the next step.
 - `Generated` grows by `warnings` and `marks`; the other kinds return them empty.
 - The cover's exact offset can cross itself at a concave valley narrower than 2 t_w (§7); the
-  star test guards the common case only.
+  star test guards the common case only. Revision 4: slice 2 detects it and falls back (§13.9).
+- Revision 4: curves are arcs within 0.01 mm of the drawn cubics; beside a corner on a curve the
+  wall and plates are flat for z + t_w, so the box deviates from the drawing there by f² / (8 R)
+  (§13.7). Slits along a curve follow its local radius by one rule (§13.6), and every module that
+  worked on one arc now works on a run of arcs (§13.4).
 
 ## Customer questions
 
