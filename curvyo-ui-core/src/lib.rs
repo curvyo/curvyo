@@ -343,6 +343,7 @@ mod instance_notice;
 pub mod instance_preview;
 mod instance_resize;
 pub mod instance_source;
+mod instance_view;
 pub mod instance_warnings;
 pub mod path_box_marks;
 pub use extensions::{
