@@ -1,5 +1,5 @@
 use super::*;
-use curvyo_library_core::{parse_collections, parse_search};
+use curvyo_library_core::{SetListing, parse_collections, parse_search};
 
 fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(format!(
@@ -12,7 +12,8 @@ fn fixture(name: &str) -> Vec<u8> {
 struct Held {
     catalogue: Option<Catalogue>,
     sets: Option<Vec<IconSet>>,
-    set_icons: HashMap<String, Vec<String>>,
+    set_icons: HashMap<String, SetListing>,
+    set_failures: HashMap<String, Failure>,
     search: Option<SearchView>,
     templates: HashMap<String, IndexedDocument>,
     refused: HashMap<String, Failure>,
@@ -24,6 +25,7 @@ impl Held {
             catalogue: Some(Catalogue::parse(&fixture("curvyo-catalogue.json")).unwrap()),
             sets: None,
             set_icons: HashMap::new(),
+            set_failures: HashMap::new(),
             search: None,
             templates: HashMap::new(),
             refused: HashMap::new(),
@@ -66,6 +68,7 @@ impl Held {
                 catalogue: self.catalogue.as_ref(),
                 sets: self.sets.as_deref(),
                 set_icons: &self.set_icons,
+                set_failures: &self.set_failures,
                 search: self.search.as_ref(),
                 templates: &self.templates,
                 refused: &self.refused,
@@ -231,8 +234,13 @@ fn a_refused_template_does_not_expand_and_says_why() {
 #[test]
 fn iconify_sets_open_into_a_grid_of_five() {
     let mut held = Held::iconify();
-    held.set_icons
-        .insert("mdi".into(), (0..7).map(|n| format!("icon-{n}")).collect());
+    held.set_icons.insert(
+        "mdi".into(),
+        SetListing {
+            names: (0..7).map(|n| format!("icon-{n}")).collect(),
+            ..SetListing::default()
+        },
+    );
     let mut expanded = open("s:online:https://api.iconify.design\u{1f}");
     expanded.insert("e:online:https://api.iconify.design\u{1f}mdi".into());
     let rows = online_rows(&held.view(SourceKind::Iconify, None, &expanded, "", false));

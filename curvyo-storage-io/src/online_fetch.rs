@@ -4,9 +4,9 @@
 
 use curvyo_library_core::{
     Catalogue, Failure, IconBody, IconSet, MAX_ICONIFY_BYTES, MAX_INDEX_BYTES, MAX_PICTURE_BYTES,
-    MAX_TEMPLATE_BYTES, SearchAnswer, TemplateEntry, collection_request, collections_request,
-    icons_request, parse_collection, parse_collections, parse_icons, parse_search, search_request,
-    verify,
+    MAX_TEMPLATE_BYTES, SearchAnswer, SetListing, TemplateEntry, collection_request,
+    collections_request, icons_request, parse_collections, parse_icons, parse_search,
+    parse_set_listing, search_request, verify,
 };
 
 use crate::http::Transport;
@@ -31,7 +31,7 @@ pub fn fetch_collections(transport: &dyn Transport, base: &str) -> Result<Vec<Ic
     Ok(parse_collections(&bytes)?)
 }
 
-/// The icon names of set `prefix`.
+/// The list of set `prefix`: its names, groups and aliases.
 ///
 /// # Errors
 /// [`Failure`] by decision 6; a prefix that is not a plain name is `Invalid`.
@@ -39,9 +39,9 @@ pub fn fetch_collection(
     transport: &dyn Transport,
     base: &str,
     prefix: &str,
-) -> Result<Vec<String>, Failure> {
+) -> Result<SetListing, Failure> {
     let request = collection_request(base, prefix).ok_or(Failure::Invalid)?;
-    Ok(parse_collection(
+    Ok(parse_set_listing(
         &transport.get(&request, MAX_ICONIFY_BYTES)?,
     )?)
 }

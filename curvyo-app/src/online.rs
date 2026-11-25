@@ -39,7 +39,7 @@ fn sources_of(bytes: Option<&[u8]>) -> Option<Sources> {
 }
 
 /// The sources to show and to open: a newer file lists nothing.
-fn listed_sources(app: &AppHandle) -> Sources {
+pub(crate) fn listed_sources(app: &AppHandle) -> Sources {
     read_sources(app).unwrap_or_default()
 }
 
@@ -348,7 +348,9 @@ pub(crate) async fn online_icon_import(
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn online_open_licence(app: AppHandle, url: String) -> Result<(), String> {
-    let known = app.state::<OnlineState>().knows_licence_url(&url);
+    // The hosting guide's example repository is the one address it names (`specs/0152` criterion 32).
+    let known = url == curvyo_ui_core::library_browser::EXAMPLE_REPOSITORY
+        || app.state::<OnlineState>().knows_licence_url(&url);
     if !known || host_of(&url).is_none() {
         return Err("not-found".to_owned());
     }

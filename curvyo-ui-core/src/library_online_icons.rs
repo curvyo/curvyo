@@ -142,7 +142,7 @@ fn push_set(
 ) {
     let query = view.query;
     let searching = !query.trim().is_empty();
-    let icons = source.set_icons.get(&set.prefix);
+    let icons = source.set_icons.get(&set.prefix).map(|l| &l.names);
     if !set_kept(set, icons, query) {
         return;
     }
