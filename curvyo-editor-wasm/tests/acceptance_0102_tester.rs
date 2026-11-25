@@ -894,7 +894,8 @@ fn ac28_save_as_profile_stores_the_set_and_writes_format_2() {
     // Record format 3 since `0103` (ADR 0052 §7), 4 since `0111` (ADR 0056 §7), 5 with the
     // named sets since `0113` (ADR 0060 §1).
     // Record format 6 since `0029` (ADR 0065 §3), 7 since `0150`.
-    assert_eq!(record["format_version"], 7, "any write is format 7");
+    // Record format 8 since `0118` 2d (adrs P7).
+    assert_eq!(record["format_version"], 8, "any write is format 8");
     let set = &record["fixture_sets"][0]["fixtures"];
     assert_eq!(set.as_array().unwrap().len(), 2);
     assert_eq!(record["id"], id);

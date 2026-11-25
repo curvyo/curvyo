@@ -205,6 +205,11 @@ const DOCUMENT_LEVEL_LABELS: &[&str] = &[
     "set_start_user_origin",
     "set_user_origin",
     "type_user_origin",
+    // `specs/0118` slice 2d: the profile copy's focus pulse.
+    "focus_pulse_on",
+    "focus_pulse_off",
+    "edit_pulse_power",
+    "edit_pulse_length",
 ];
 
 /// Whether a command is about the document and not about its objects: the objects only follow the

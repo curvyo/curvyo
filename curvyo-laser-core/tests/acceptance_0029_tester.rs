@@ -710,10 +710,11 @@ fn c32_profile_record_6_reads_air_assist_and_output_format_and_writes_back_byte_
     let p = read_record(&record_name(&text), &text).expect("format 6 reads");
     assert!(p.values.air_assist);
     assert_eq!(p.values.output_format, OutputFormat::Grbl);
-    // Since `specs/0150` any write is record format 7 with the default pair.
-    let seven = write_record(&p);
-    assert!(seven.starts_with("{\n  \"format_version\": 7,"));
-    assert_eq!(read_record(&record_name(&seven), &seven).unwrap(), p);
+    // Since `specs/0150` any write carries the default pair, since `0118` 2d (adrs P7) as record
+    // format 8 with the focus pulse too.
+    let eight = write_record(&p);
+    assert!(eight.starts_with("{\n  \"format_version\": 8,"));
+    assert_eq!(read_record(&record_name(&eight), &eight).unwrap(), p);
 }
 
 #[test]
@@ -736,10 +737,8 @@ fn c32_format_5_reads_air_off_grbl_and_its_new_keys_damage_it() {
     }
     let t = profile_golden("newer_format.json");
     let v: serde_json::Value = serde_json::from_str(&t).unwrap();
-    assert_eq!(
-        v["format_version"], 8,
-        "newer is now 8 (record format 7 is `0150`'s)"
-    );
+    // Format 9 is newer since `0118` 2d (adrs P8); record format 7 is `0150`'s.
+    assert_eq!(v["format_version"], 9, "newer is now 9");
     assert!(read_record(&record_name(&t), &t).is_err());
 }
 
@@ -750,7 +749,8 @@ fn c32_a_written_record_is_format_6_with_both_keys() {
     let p = read_record(&record_name(&text), &text).unwrap();
     let out = write_record(&p);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert_eq!(v["format_version"], 7, "record format 7 since `0150`");
+    // Record format 7 since `0150`, 8 since `0118` 2d (adrs P7); both keys stay.
+    assert_eq!(v["format_version"], 8);
     assert_eq!(v["air_assist"], false);
     assert_eq!(v["output_format"], "grbl");
     let at = |k: &str| out.find(&format!("\"{k}\"")).unwrap();
@@ -767,7 +767,7 @@ fn c32_project_format_48_and_the_page_registers_read() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 62);
+    assert_eq!(CURRENT_FORMAT_VERSION, 63);
     let dir =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../curvyo-document-core/tests/fixtures");
     let bytes = std::fs::read(dir.join("laser_output_v48.curvyo")).unwrap();

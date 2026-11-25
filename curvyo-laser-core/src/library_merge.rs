@@ -318,8 +318,8 @@ mod tests {
     fn an_incoming_text_from_a_newer_build_is_skipped() {
         let local = machine_text("ZQX-MACH-7731", 4);
         let newer = machine_text("ZQX-MACH-7731", 9).replacen(
-            "\"format_version\": 7",
             "\"format_version\": 8",
+            "\"format_version\": 9",
             1,
         );
         assert_eq!(
@@ -347,8 +347,8 @@ mod tests {
     #[test]
     fn a_local_text_from_a_newer_build_stays_untouched() {
         let newer_local = machine_text("ZQX-MACH-7731", 4).replacen(
-            "\"format_version\": 7",
             "\"format_version\": 8",
+            "\"format_version\": 9",
             1,
         );
         let incoming = machine_text("ZQX-MACH-7731", 9);

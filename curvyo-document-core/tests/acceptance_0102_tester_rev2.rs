@@ -110,7 +110,7 @@ fn ac39_format_40_is_the_current_format_and_the_screw_needs_no_bump() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 62);
+    assert_eq!(CURRENT_FORMAT_VERSION, 63);
 }
 
 // ---- golden fixtures_v40: one of each of the five kinds, the screw included ----------------------
@@ -250,6 +250,6 @@ fn ac31_a_format_41_file_is_refused_and_a_format_40_file_opens() {
     // 44), `0114` (format 45), `0112` (format 46) and `0113` (format 47): the control opens at 47,
     // and 48 is refused.
     assert!(unpack(42, &bytes).is_ok(), "the control: format 47 opens");
-    let future = with_format(&bytes, 63);
+    let future = with_format(&bytes, 64);
     assert!(unpack(43, &future).is_err(), "the next format is refused");
 }

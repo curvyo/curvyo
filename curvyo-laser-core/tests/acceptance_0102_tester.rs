@@ -436,7 +436,8 @@ fn ac30_any_write_writes_format_2_with_a_fixtures_array_even_when_empty() {
     let text = write_record(&p);
     let back: Value = serde_json::from_str(&text).unwrap();
     // Record format 7 since `0150`.
-    assert_eq!(back["format_version"], 7);
+    // Record format 8 since `0118` 2d (adrs P7).
+    assert_eq!(back["format_version"], 8);
     assert_eq!(
         back["fixture_sets"],
         json!([{ "id": SET_ID, "name": "Set 1", "locked": false, "fixtures": [] }]),
