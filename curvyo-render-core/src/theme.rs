@@ -383,6 +383,10 @@ pub const REFUSAL_OUTLINE: RgbaColor = RgbaColor::opaque(0xB3, 0x26, 0x1E);
 /// Its width on screen, whatever the object's own stroke width.
 pub const REFUSAL_OUTLINE_STROKE_PX: f64 = 2.0;
 
+/// The width on screen of the dashed outline of a clone whose value set has no solution
+/// (`specs/0099-sketch-pages` criterion 26), drawn in [`REFUSAL_OUTLINE`] (`--destructive`).
+pub const NO_SOLUTION_STROKE_PX: f64 = 1.5;
+
 /// `--clone-link` (`docs/design-system.md`, "Linked clone marks"): the violet of the traces of a
 /// selected linked clone and of what it follows (`specs/0049-linked-clone` criterion 60).
 pub const CLONE_LINK: RgbaColor = RgbaColor::opaque(0x7B, 0x3F, 0xD6);

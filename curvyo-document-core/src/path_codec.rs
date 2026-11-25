@@ -481,6 +481,7 @@ fn validate_object_node(tree: &LoroTree, id: loro::TreeID) -> bool {
     match crate::shape_codec::read_shape_tag_checked(&meta) {
         ShapeTag::Present(shape) if shape == "sketch" => {
             crate::sketch_codec::read(&meta).is_ok()
+                && crate::instance_codec::sketch_shape_ok(&meta)
                 && crate::style_validation::style_is_valid(&meta)
         }
         ShapeTag::Present(shape) if shape == crate::clone_codec::SHAPE_CLONE => {

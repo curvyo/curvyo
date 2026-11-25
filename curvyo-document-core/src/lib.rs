@@ -568,9 +568,24 @@ pub use sketch_page_commands::{
     CONVERT_SKETCH_PAGE_COMMIT_LABEL, DELETE_SKETCH_PAGE_COMMIT_LABEL,
     PLACE_SKETCH_CLONE_COMMIT_LABEL,
 };
+mod instance_codec;
+mod instance_commands;
+mod instance_followers;
+mod instance_value;
+mod sketch_instance;
 mod sketch_parameter_repair;
 mod sketch_read;
+pub use instance_codec::{StoredUnit, decode_number, decode_value, encode_number, encode_value};
+pub use instance_commands::{
+    CHANGE_EXPOSED_PARAMETER_COMMIT_LABEL, EXPOSE_PARAMETER_COMMIT_LABEL, InstanceError,
+    InstanceWrite, OWN_PARAMETERS_COMMIT_LABEL, RESET_PARAMETER_COMMIT_LABEL,
+    RESET_PARAMETERS_COMMIT_LABEL, UNEXPOSE_PARAMETER_COMMIT_LABEL,
+};
+pub use instance_value::{
+    ExposedKey, ExposedParam, ExposedTarget, InstanceKind, InstanceValue, ValueSet,
+};
 pub use sketch_commands::SketchEditError;
+pub use sketch_instance::InstanceSolves;
 #[cfg(test)]
 mod sketch_cache_tests;
 #[cfg(test)]

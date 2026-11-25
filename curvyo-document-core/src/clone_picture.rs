@@ -367,6 +367,10 @@ fn picture_clone(
                 .as_ref()
                 .filter(|_| image_root)
                 .map_or(root_id, |(source, _)| *source),
+            own_params: false,
+            no_solution: false,
+            own_values: crate::ValueSet::default(),
+            inherited_values: crate::ValueSet::default(),
             root_outline: Arc::new(empty),
             picture: Some(picture),
             picture_members: Some(members),

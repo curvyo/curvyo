@@ -3,12 +3,14 @@
 mod error;
 mod expression;
 mod ids;
+mod instance_values;
 mod parameters;
 mod parser;
 mod units;
 pub use error::SketchError;
 pub use expression::Expression;
 pub use ids::{ConstraintId, EntityId, ParameterId};
+pub use instance_values::{InstanceValues, dimension_expression};
 pub use parameters::{Parameter, Parameters};
 pub use units::{Angle, Dimension, Length, Position, Quantity};
 mod model;

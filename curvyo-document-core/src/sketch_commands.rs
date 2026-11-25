@@ -75,6 +75,10 @@ impl Document {
             let mut view = saved.mapped_by(placement.compose(saved.placement.inverse()?));
             view.style = crate::style_codec::read_style(&meta);
             view.resolved.style = view.style.clone();
+            view.exposed = crate::sketch_instance::exposed_of(
+                &view.graph,
+                &crate::instance_codec::read_exposed(&meta),
+            );
             Some(view)
         });
         let mut snapshot = reused.or_else(|| crate::sketch_read::read(id, &meta).ok())?;
@@ -301,12 +305,22 @@ impl Document {
         }
         let meta = self.sketch_meta(id)?;
         let opacity = crate::node_registers::read_registers(&meta).opacity;
+        // A clone that holds own values becomes a path from what it draws now (`0099` A6).
+        let followers = self.value_followers(
+            &std::collections::HashSet::from([id]),
+            &std::collections::HashSet::new(),
+        );
         self.clear_sketch_claim(id);
         crate::clone_write::unlink_meta(&meta, &path, opacity.get());
-        for key in KEYS
-            .into_iter()
-            .chain([crate::sketch_page::PAGE_KEY, crate::sketch_labels::KEY])
-        {
+        self.unlink_followers(
+            &self.loro().get_tree(crate::document::OBJECTS_TREE),
+            followers,
+        );
+        for key in KEYS.into_iter().chain([
+            crate::sketch_page::PAGE_KEY,
+            crate::sketch_labels::KEY,
+            crate::instance_codec::KEY_EXPOSED_PARAMS,
+        ]) {
             meta.delete(key)
                 .map_err(|e| SketchEditError(e.to_string()))?;
         }

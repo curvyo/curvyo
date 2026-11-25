@@ -77,7 +77,13 @@ pub fn build_clone_marks(
                 if trace == CloneTrace::CloneRing {
                     // Dashed for a clone, solid for an original (criterion 61).
                     let ring = (ring_anchors(centre, RING_DIAMETER_PX * px / 2.0), true);
-                    list.extend(trace_outline(&ring, (width, color), true, px, tolerance));
+                    list.extend(trace_outline(
+                        &ring,
+                        (width, color),
+                        true,
+                        (DASH_ON_PX, DASH_OFF_PX, px),
+                        tolerance,
+                    ));
                 } else {
                     list.extend(glyphs::ring(centre, RING_DIAMETER_PX * px, width, color));
                 }
@@ -88,10 +94,38 @@ pub fn build_clone_marks(
                     &outline,
                     (width, color),
                     dashed,
-                    px,
+                    (DASH_ON_PX, DASH_OFF_PX, px),
                     tolerance,
                 ));
             }
+        }
+    }
+    list
+}
+
+/// The dashed outline of the clones that follow a value set without solution (`0099` criterion
+/// 26, UX notes 12.4): 1.5 px `--destructive`, 4 on and 3 off, on screen only, selected or not.
+#[must_use]
+pub fn build_no_solution_outlines(
+    objects: &[ObjectSnapshot],
+    marked: &[NodeId],
+    view: ViewTransform,
+) -> DrawList {
+    let px = 1.0 / view.scale();
+    let tolerance = theme::DISPLAY_TOLERANCE_PX * px;
+    let mut list = DrawList::default();
+    for object in objects
+        .iter()
+        .filter(|object| marked.contains(&object.id()))
+    {
+        for outline in outlines_of(object) {
+            list.extend(trace_outline(
+                &outline,
+                (theme::NO_SOLUTION_STROKE_PX * px, theme::REFUSAL_OUTLINE),
+                true,
+                (4.0, 3.0, px),
+                tolerance,
+            ));
         }
     }
     list
@@ -164,7 +198,7 @@ fn trace_outline(
     (anchors, closed): &(Vec<curvyo_document_core::AnchorSnapshot>, bool),
     (width, color): (f64, RgbaColor),
     dashed: bool,
-    px: f64,
+    (on_px, off_px, px): (f64, f64, f64),
     tolerance: f64,
 ) -> DrawList {
     if !dashed {
@@ -179,7 +213,7 @@ fn trace_outline(
     ) else {
         return DrawList::default();
     };
-    match dashes(&path, DASH_ON_PX * px, DASH_OFF_PX * px, tolerance) {
+    match dashes(&path, on_px * px, off_px * px, tolerance) {
         Some(dashed) => stroke::path_stroke_of(&dashed, width, color, tolerance),
         None => stroke::path_stroke(anchors, *closed, width, color, tolerance),
     }
@@ -211,6 +245,48 @@ mod tests {
     use curvyo_document_core::{AnchorId, Document, NewAnchor, Point};
 
     use super::*;
+
+    #[test]
+    fn the_no_solution_outline_is_a_dashed_destructive_line_of_the_marked_clone_only() {
+        let d = Document::new(1);
+        let c = |k: u64, x: f64, y: f64| NewAnchor::corner(AnchorId::new(1, k), Point::new(x, y));
+        let o = d.create_path(&[c(0, 0.0, 0.0), c(1, 50.0, 0.0), c(2, 50.0, 50.0)], true);
+        let clone = d.linked_clone(&[o], &[]).unwrap()[0];
+        let objects = d.read_objects().objects;
+        let view = ViewTransform::new(4.0, Point::new(0.0, 0.0));
+        let list = build_no_solution_outlines(&objects, &[clone], view);
+        assert_ne!(list.triangles.len(), 0);
+        assert!(
+            list.triangles
+                .iter()
+                .all(|v| v.color == theme::REFUSAL_OUTLINE)
+        );
+        assert_eq!(
+            build_no_solution_outlines(&objects, &[], view)
+                .triangles
+                .len(),
+            0
+        );
+        let solid = stroke_len(&objects, clone, view);
+        assert_ne!(
+            list.triangles.len(),
+            solid,
+            "the line is broken into dashes"
+        );
+    }
+
+    fn stroke_len(objects: &[ObjectSnapshot], id: NodeId, view: ViewTransform) -> usize {
+        let px = 1.0 / view.scale();
+        let object = objects.iter().find(|o| o.id() == id).unwrap();
+        outlines_of(object)
+            .iter()
+            .map(|(anchors, closed)| {
+                stroke::path_stroke(anchors, *closed, 1.5 * px, theme::REFUSAL_OUTLINE, 0.1 * px)
+                    .triangles
+                    .len()
+            })
+            .sum()
+    }
 
     #[test]
     fn a_dashed_trace_draws_less_than_a_solid_one_and_a_casing_comes_first() {

@@ -79,6 +79,8 @@ pub struct SketchSnapshot {
     pub stale: bool,
     /// Repairable graph or numerical failure.
     pub diagnosis: Option<String>,
+    /// The values clones may set (`exposed_params`), validated against the graph, in stored order.
+    pub exposed: Vec<crate::instance_value::ExposedParam>,
 }
 
 impl SketchSnapshot {

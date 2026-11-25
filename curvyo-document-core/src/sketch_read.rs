@@ -52,6 +52,8 @@ pub(crate) fn read(id: NodeId, meta: &LoroMap) -> Result<SketchSnapshot, String>
         }
     };
     let resolved = crate::sketch_outline::outline(id, &candidate, placement, &style)?;
+    let exposed =
+        crate::sketch_instance::exposed_of(&graph, &crate::instance_codec::read_exposed(meta));
     Ok(SketchSnapshot {
         id,
         labels: crate::sketch_labels::read(meta)?
@@ -70,6 +72,7 @@ pub(crate) fn read(id: NodeId, meta: &LoroMap) -> Result<SketchSnapshot, String>
         redundant,
         stale: outdated,
         diagnosis,
+        exposed,
     })
 }
 

@@ -187,6 +187,10 @@ impl Document {
             }
             planned.push((meta, path, opacity));
         }
+        // A clone below an unlinked one that holds own values becomes a path from what it draws
+        // now, deepest first (`0099` A6); the others keep following (`0049` criterion 55).
+        let unlinked: HashSet<NodeId> = unlinks.iter().map(|unlink| unlink.id).collect();
+        let followers = self.value_followers(&unlinked, &unlinked);
         let text_plan = self
             .plan_text_unlinks(texts)
             .map_err(|_| CloneError::NotAClone)?;
@@ -203,6 +207,7 @@ impl Document {
         for (meta, path, opacity) in &planned {
             crate::clone_write::unlink_meta(meta, path, *opacity);
         }
+        self.unlink_followers(&tree, followers);
         for (meta, shown) in &text_plan {
             crate::text_clone_codec::unlink_meta(meta, shown);
         }

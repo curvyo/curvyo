@@ -182,6 +182,7 @@ pub(crate) fn validate_clone_node(meta: &LoroMap) -> bool {
     link_ok
         && flag_ok(KEY_OWN_PLACEMENT)
         && flag_ok(KEY_OWN_STYLE)
+        && crate::instance_codec::clone_shape_ok(meta)
         && (!read_overrides(meta).own_style || crate::style_validation::style_is_valid(meta))
 }
 

@@ -13,6 +13,15 @@ pub fn shown(value: f64, decimals: u8) -> String {
     }
 }
 
+/// A millimetre or degree number as a notice says it: "120 mm" or "30°".
+pub(crate) fn say_number(angle: bool, number: f64) -> String {
+    if angle {
+        format!("{}°", shown(number, 1))
+    } else {
+        format!("{} mm", shown(number, 2))
+    }
+}
+
 /// The value as the notice says it, with its unit.
 fn say(param: &Param, value: &ParamValue) -> String {
     match (param.kind, value) {
