@@ -117,7 +117,6 @@ fn refusals_say_why_and_change_nothing() {
     assert_eq!(refusal(open), SourceRefusal::NotOneOutline);
     assert_eq!(refusal(bow), SourceRefusal::Crosses);
     assert_eq!(refusal(tiny), SourceRefusal::TooSmall);
-    assert_eq!(refusal(curved), SourceRefusal::Curved);
     assert_eq!(
         refusal(bow).to_string(),
         "The outline crosses itself. Nothing was changed."
@@ -126,12 +125,9 @@ fn refusals_say_why_and_change_nothing() {
         refusal(tiny).to_string(),
         "The outline is too small for a box with 3 mm walls. Nothing was changed."
     );
-    assert!(
-        refusal(curved)
-            .to_string()
-            .starts_with("This outline has curves.")
-    );
     assert_eq!(document.own_step_count(), steps, "nothing was written");
+    // Slice 2 (ADR 0083 section 13.14): a curved outline is no longer refused; the box is built.
+    assert!(place_from_source(&document, &settings, KIND, curved).is_ok());
 }
 
 #[test]
@@ -207,4 +203,47 @@ fn replace_outline_swaps_the_stored_copy_and_leaves_the_source_alone() {
         replace_outline(&document, &settings, id, open),
         Err(SourceRefusal::NotOneOutline)
     );
+}
+
+/// An imported outline may close with a node on its start: that zero-length segment is dropped,
+/// so it is no corner (ADR 0083 section 13.1).
+#[test]
+fn a_node_repeated_on_the_start_adds_no_segment_to_the_outline() {
+    let document = Document::new(1);
+    let mut minter = AnchorIdMinter::new(5);
+    let mut anchors: Vec<NewAnchor> = [(0.0, 0.0), (60.0, 0.0), (60.0, 60.0), (0.0, 60.0)]
+        .iter()
+        .map(|&(x, y)| NewAnchor::corner(minter.mint(), Point::new(x, y)))
+        .collect();
+    anchors.push(NewAnchor::corner(minter.mint(), Point::new(0.0, 0.0)));
+    let id = document.create_path(&anchors, true);
+    let path = outline_of(&document.object(id).unwrap()).unwrap();
+    assert_eq!(path.segments.len(), 4);
+}
+
+/// The Corner angle row says how many corners it makes: "6 corners", and "no corners" for none.
+#[test]
+fn the_corner_angle_row_says_no_corners_for_zero() {
+    let document = Document::new(1);
+    let source = coffin(&document, 0.0, 0.0);
+    let settings = ExtensionSettings::default();
+    let target = place_from_source(&document, &settings, KIND, source).unwrap();
+    let state = |document: &Document| {
+        let snapshot = document.generated(target).unwrap();
+        curvyo_ui_core::instance::view(&settings, &snapshot)
+            .rows
+            .into_iter()
+            .find(|row| row.param.key == "corner_angle")
+            .and_then(|row| row.state)
+    };
+    assert_eq!(state(&document).as_deref(), Some("6 corners"));
+    curvyo_ui_core::instance::change_value(
+        &document,
+        &settings,
+        target,
+        "corner_angle",
+        &ParamValue::Angle(curvyo_extension_core::Degrees(90.0)),
+    )
+    .unwrap();
+    assert_eq!(state(&document).as_deref(), Some("no corners"));
 }

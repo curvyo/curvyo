@@ -2,12 +2,16 @@
 //! ring and lid (ADR 0083 §4 to §8).
 
 use curvyo_document_core::{Length, Point, Vec2};
-use curvyo_extension_core::{Mark, Warning};
+use curvyo_extension_core::{Mark, ParamValue, Warning};
 
+use super::bend_marks::bend_marks;
+use super::check::Checked;
 use super::corner::{Corner, End, steps};
 use super::describe::{describe, inner_length};
+use super::flats::apply as apply_flats;
 use super::plates::plates;
 use super::shape::{Shapes, Vertex, shapes, vertices};
+use super::spans::curve_shapes;
 use crate::footprint::{Footprint, Shape, Span, Tab};
 use crate::rounded_box::layout::Piece;
 use crate::slit_bend::SlitPattern;
@@ -141,25 +145,45 @@ pub(crate) struct Plan {
     pub(crate) built: Shapes,
     pub(crate) footprint: Footprint,
     pub(crate) corners: Vec<Corner>,
+    /// The seam of a loop without a corner: its point and the unit vector into the box.
+    pub(crate) seam: Option<(Point, Vec2)>,
 }
 
-fn plan(verts: &[Vertex], wall: f64, min_arc: f64) -> Plan {
-    let built = shapes(verts, wall, min_arc);
+fn plan(checked: &Checked, m: &Measures, min_arc: f64) -> Plan {
+    let wall = m.wall;
+    let mut built = if checked.curved {
+        curve_shapes(&checked.path, m.corner_degrees, (wall, min_arc))
+    } else {
+        shapes(&vertices(&checked.points, m.corner_degrees), wall, min_arc)
+    };
+    if checked.curved {
+        apply_flats(&mut built, wall, m.corner_degrees);
+    }
     let corners: Vec<Corner> = built
         .corners
         .iter()
         .map(|v| Corner::new(v.turn, wall))
         .collect();
     let z = corners.iter().map(|c| c.margin(wall)).fold(wall, f64::max);
+    let mut seam_mark = None;
     let footprint = if built.corners.is_empty() {
-        Footprint::from_loop(&built.shapes, wall, seam(&built.shapes))
+        let place = seam(&built.shapes);
+        if let Some(shape) = built.shapes.get(place.0) {
+            let (at, along) = super::describe::point_at(shape, place.1);
+            seam_mark = Some((at, Vec2::new(-along.1, along.0)));
+        }
+        Footprint::from_loop(&built.shapes, wall, place)
     } else {
-        Footprint::from_shapes(&built.shapes, wall, z)
+        let mut footprint = Footprint::from_shapes(&built.shapes, wall, z);
+        footprint.mark_pieces(&built.piece_of);
+        footprint.with_flat_turns(&built.flat_turns);
+        footprint
     };
     Plan {
         built,
         footprint,
         corners,
+        seam: seam_mark,
     }
 }
 
@@ -264,14 +288,16 @@ fn piece_footprint(
 }
 
 /// One strip per piece with its finger ends, tab slots and slits.
-fn strips(plan: &Plan, inner: &Footprint, tabs: &[Tab], m: &Measures) -> (Vec<Piece>, Vec<f64>) {
+/// The strips of the pieces with the smallest-gap candidates, the bend marks of their bands and
+/// the `tight_bend` notices.
+fn strips(plan: &Plan, inner: &Footprint, tabs: &[Tab], m: &Measures) -> Stripped {
     let (joints, height) = joints_and_height(m);
     let ranges = if plan.corners.is_empty() {
         vec![(0, inner.spans.len())]
     } else {
         split_pieces(inner, &plan.built.corners)
     };
-    let (mut pieces, mut pitches) = (Vec::new(), Vec::new());
+    let mut out = Stripped::default();
     for (number, &range) in ranges.iter().enumerate() {
         let (footprint, local) = piece_footprint(inner, range, tabs);
         let wall = Wall {
@@ -283,13 +309,42 @@ fn strips(plan: &Plan, inner: &Footprint, tabs: &[Tab], m: &Measures) -> (Vec<Pi
             draft: m.draft,
             ends: finger_ends(plan, number, height, m.wall, footprint.total()),
             local_spacing: m.local,
+            runs: true,
+            seam_margin: if plan.corners.is_empty() {
+                2.0 * m.wall
+            } else {
+                0.0
+            },
         };
-        pitches.extend(wall.pitches());
+        out.pitches.extend(wall.pitches());
         let mut piece = Piece::new(wall.contours(&local), m.wall, "wall");
         piece.number = u32::try_from(number + 1).unwrap_or(u32::MAX);
-        pieces.push(piece);
+        let stretches = bend_marks(&wall.bands(footprint.total(), height), m.wall);
+        out.marks.extend(stretches.marks);
+        // A stretch too short for two columns at the least gap gets fewer: built anyway, said so.
+        if let Some(least) = wall.short_bands().into_iter().reduce(f64::min) {
+            let mut short = warning("bend_too_short", vec![piece.number]);
+            short.value = Some(ParamValue::Length(Length::from_mm(least.max(0.0))));
+            out.warnings.push(short);
+        }
+        if let Some((radius, limit)) = stretches.tightest {
+            let mut tight = warning("tight_bend", vec![piece.number]);
+            tight.value = Some(ParamValue::Length(Length::from_mm(radius)));
+            tight.limit = Some(ParamValue::Length(Length::from_mm(limit)));
+            out.warnings.push(tight);
+        }
+        out.pieces.push(piece);
     }
-    (pieces, pitches)
+    out
+}
+
+/// What `strips` returns.
+#[derive(Default)]
+struct Stripped {
+    pieces: Vec<Piece>,
+    pitches: Vec<f64>,
+    marks: Vec<Mark>,
+    warnings: Vec<Warning>,
 }
 
 impl Built {
@@ -300,33 +355,34 @@ impl Built {
 }
 
 /// Builds the parts of the box of `points` (clockwise on screen).
-pub(crate) fn build(points: &[Point], m: &Measures) -> (Built, Footprint, Vec<Tab>) {
-    let verts = vertices(points, m.corner_degrees);
+pub(crate) fn build(checked: &Checked, m: &Measures) -> (Built, Footprint, Vec<Tab>) {
     let least = if m.pattern.kind == crate::slit_bend::SlitKind::Wave {
         (m.pattern.width.as_mm() + 1.0) / 0.88
     } else {
         m.pattern.width.as_mm() + 1.0
     };
-    let plan = plan(&verts, m.wall, 2.0 * least);
+    let plan = plan(checked, m, 2.0 * least);
     let widest = [m.base, m.ring, m.lid].into_iter().fold(0.0, f64::max);
     let spec = WindowSpec {
         half_width: widest,
         min_band: 2.0 * (m.pattern.width.as_mm() + 1.0) / 0.88,
     };
-    let (inner, tabs) = plan.footprint.with_tabs(spec);
-    let (strips, pitches) = strips(&plan, &inner, &tabs, m);
+    let (inner, tabs) = plan.footprint.with_run_tabs(spec);
+    let stripped = strips(&plan, &inner, &tabs, m);
     let mut warnings = Vec::new();
     let plates = plates(&plan, &inner, &tabs, m, &mut warnings);
-    let count = strips.len();
-    let (more, marks, badges) = describe(&plan, m, count);
+    let count = stripped.pieces.len();
+    let (more, mut marks, badges) = describe(&plan, count);
     warnings.extend(more);
+    warnings.extend(stripped.warnings);
+    marks.extend(stripped.marks);
     let built = Built {
-        strips,
+        strips: stripped.pieces,
         plates: Some(plates),
         warnings,
         marks,
         badges,
-        smallest_gap: pitches.into_iter().reduce(f64::min),
+        smallest_gap: stripped.pitches.into_iter().reduce(f64::min),
         pieces: count,
     };
     (built, inner, tabs)

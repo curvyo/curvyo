@@ -418,8 +418,10 @@ fn a_resize_scales_the_outline_and_stops_at_the_smallest_size_keeping_the_thickn
     assert!(tiny.clamps.iter().all(|c| c.key != "thickness"));
 }
 
+/// The curve half is superseded by slice 2 (ADR 0083 section 13.14): a curved cubic is built as
+/// drawn, with no `outline_curved` notice; the curves are tested in `path_box_curves.rs`.
 #[test]
-fn a_crossing_outline_reads_as_the_default_and_a_curve_as_its_chord() {
+fn a_crossing_outline_reads_as_the_default_and_a_curve_is_built_as_drawn() {
     let bow = polygon(&[(0.0, 0.0), (40.0, 40.0), (40.0, 0.0), (0.0, 40.0)]);
     let g = generate(&with_outline(bow.clone(), &[]), None);
     assert!(g.warnings.iter().any(|w| w.id == "outline_crosses"));
@@ -429,7 +431,7 @@ fn a_crossing_outline_reads_as_the_default_and_a_curve_as_its_chord() {
     curved.segments[0].c1 = Point::new(10.0, -12.0);
     curved.segments[0].c2 = Point::new(50.0, -12.0);
     let c = generate(&with_outline(curved.clone(), &[]), None);
-    assert!(c.warnings.iter().any(|w| w.id == "outline_curved"));
+    assert!(!c.warnings.iter().any(|w| w.id == "outline_curved"));
     assert_eq!(
         c.params["outline"],
         ParamValue::Path(curved).to_stored(),

@@ -33,6 +33,10 @@ migration in that extension.
   for code that builds a `GeneratorKind` or `Generated` literal or matches `ParamKind` or `ParamValue`
   exhaustively.
 
+- ADR 0083 §13.14, §13.16 (`0149` slice 2, curves): `Mark::Seam { at, inward }` and the new meaning of `Mark::Bend`
+  (one mark per stretch of one tightness under a slit band); the warning ids `cover_rounded`, `cover_offset_failed`, `fillet_failed` and `bend_too_short` are added and
+  `outline_curved` is removed. Source-breaking for code that matches `Mark` exhaustively.
+
 ## Unreleased (`specs/0026-machine-profile`)
 
 - Block kind `MachineProfile { label }`: the machine profile picker and the copy's fields, drawn

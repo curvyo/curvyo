@@ -7,13 +7,13 @@ use crate::footprint::{Footprint, Shape, Span, Tab};
 use crate::outline::polar;
 
 /// The aimed distance between two tabs.
-const TAB_PITCH: f64 = 30.0;
+pub(crate) const TAB_PITCH: f64 = 30.0;
 /// A straight must hold at least this many wall thicknesses to carry a tab.
-const MIN_TAB_STRAIGHT: f64 = 4.0;
+pub(crate) const MIN_TAB_STRAIGHT: f64 = 4.0;
 /// Fewer tabs than this on the straights, and the bends take tabs in windows.
-const MIN_STRAIGHT_TABS: usize = 4;
+pub(crate) const MIN_STRAIGHT_TABS: usize = 4;
 /// A footprint without a straight takes at least this many tabs, as far as its stretches allow.
-const MIN_CIRCLE_TABS: usize = 4;
+pub(crate) const MIN_CIRCLE_TABS: usize = 4;
 
 /// The length of a span on the inner face.
 fn inner_length(shape: &Shape) -> f64 {
@@ -145,18 +145,18 @@ impl Footprint {
 }
 
 /// The spans and tabs of the footprint with its windows, built one span at a time.
-struct Layout {
-    wall: f64,
+pub(crate) struct Layout {
+    pub(crate) wall: f64,
     margin: f64,
-    spans: Vec<Span>,
-    tabs: Vec<Tab>,
-    s0: f64,
-    /// The angle the next window's chord subtends on its circle.
-    turn: f64,
+    pub(crate) spans: Vec<Span>,
+    pub(crate) tabs: Vec<Tab>,
+    pub(crate) s0: f64,
+    /// The signed angle the next window's chord replaces (positive on a convex stretch).
+    pub(crate) turn: f64,
 }
 
 impl Layout {
-    fn new(footprint: &Footprint) -> Self {
+    pub(crate) fn new(footprint: &Footprint) -> Self {
         Self {
             wall: footprint.wall,
             margin: footprint.margin,
@@ -167,7 +167,7 @@ impl Layout {
         }
     }
 
-    fn finish(self) -> (Footprint, Vec<Tab>) {
+    pub(crate) fn finish(self) -> (Footprint, Vec<Tab>) {
         (
             Footprint {
                 spans: self.spans,
@@ -179,7 +179,7 @@ impl Layout {
     }
 
     /// A straight as it is, with its tabs moved to its new place on the strip.
-    fn keep_straight(&mut self, span: &Span, straight: &[Tab]) {
+    pub(crate) fn keep_straight(&mut self, span: &Span, straight: &[Tab]) {
         self.tabs.extend(
             straight
                 .iter()
@@ -198,10 +198,10 @@ impl Layout {
 
     /// Appends a piece of the footprint: an arc between windows or a window's chord, whose
     /// neutral length also holds the kink of half a wall thickness times the turn.
-    fn push(&mut self, shape: Shape, window: bool) {
+    pub(crate) fn push(&mut self, shape: Shape, window: bool) {
         let length = match shape {
             Shape::Bend { radius, sweep, .. } => {
-                sweep.abs() * (radius + sweep.signum() * self.wall / 2.0)
+                sweep.abs() * (radius + sweep.signum() * self.wall / 2.0).max(0.0)
             }
             Shape::Straight { from, to } => {
                 let chord = libm::hypot(to.x - from.x, to.y - from.y);
@@ -214,6 +214,7 @@ impl Layout {
             length,
             whole: None,
             window,
+            piece_start: false,
         });
         self.s0 += length;
     }
@@ -251,9 +252,9 @@ impl Layout {
             }
             let (a, b) = (polar(centre, radius, start), polar(centre, radius, end));
             let length = libm::hypot(b.x - a.x, b.y - a.y);
-            self.turn = 2.0 * half_angle;
+            self.turn = 2.0 * half_angle * direction;
             self.tabs.push(Tab {
-                s: self.s0 + f64::midpoint(length, self.wall * half_angle),
+                s: self.s0 + f64::midpoint(length, self.wall * half_angle * direction),
                 centre: Point::new(f64::midpoint(a.x, b.x), f64::midpoint(a.y, b.y)),
                 along: ((b.x - a.x) / length, (b.y - a.y) / length),
             });

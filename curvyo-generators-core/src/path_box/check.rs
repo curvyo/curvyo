@@ -1,10 +1,12 @@
-//! Reads a stored outline as the clockwise polygon the box is built from (ADR 0083 §2).
+//! Reads a stored outline as the clockwise closed path the box is built from, with its area from
+//! the curve (ADR 0083 §2, §13.1).
 
 use curvyo_document_core::{Point, Vec2};
 use curvyo_extension_core::{ClosedPath, Cubic, Warning};
-use curvyo_geometry_core::{Outline, OutlineTriple, cut_parameters};
+use curvyo_geometry_core::{Outline, OutlineTriple, cut_parameters, outline_area_mm2};
 
-use super::classify::starts;
+use super::classify::{classify, starts};
+use crate::outline::reversed;
 
 /// Two points closer than this (mm) are one.
 const SAME_POINT_MM: f64 = 1e-6;
@@ -38,12 +40,23 @@ pub(crate) fn default_outline() -> ClosedPath {
 /// What the generator builds from.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Checked {
-    /// The corner points, clockwise on screen, no two neighbours equal.
+    /// The outline, clockwise on screen (ADR 0083 §13.1).
+    pub(crate) path: ClosedPath,
+    /// Whether any cubic stays off its chord by more than the line tolerance.
+    pub(crate) curved: bool,
+    /// The corner points of an outline of straight cubics, clockwise, no two neighbours equal.
     pub(crate) points: Vec<Point>,
     /// The enclosed area (mm²).
     pub(crate) area: f64,
-    /// `outline_crosses` or `outline_curved`.
+    /// `outline_crosses`.
     pub(crate) warnings: Vec<Warning>,
+}
+
+/// The signed area the outline encloses, from the curve (geometry-core, flattened within its
+/// tolerance): positive for a clockwise walk on screen, the sign of `signed_area`.
+pub(crate) fn curve_area(path: &ClosedPath) -> f64 {
+    let anchors = triples(path);
+    outline_area_mm2(&Outline::new(&anchors, true))
 }
 
 /// One anchor per cubic start, handles relative to the node.
@@ -109,24 +122,59 @@ fn polygon_of(path: &ClosedPath) -> Vec<Point> {
     points
 }
 
-/// Checks `outline`: crossing, degenerate and curved outlines, then the polygon and its area.
+/// The outline without zero-length cubics: an import may close with a `C` onto its start before
+/// the `Z`, which must never read as a corner.
+pub(crate) fn without_zero_segments(outline: &ClosedPath) -> ClosedPath {
+    let near = |a: Point, b: Point| libm::hypot(a.x - b.x, a.y - b.y) <= SAME_POINT_MM;
+    let mut from = outline.start;
+    let mut segments = Vec::with_capacity(outline.segments.len());
+    for c in &outline.segments {
+        let zero = near(from, c.to) && near(from, c.c1) && near(from, c.c2);
+        if !zero {
+            segments.push(*c);
+        }
+        from = c.to;
+    }
+    ClosedPath {
+        start: outline.start,
+        segments,
+    }
+}
+
+/// Checks `outline`: a crossing or degenerate outline reads as the default coffin; the winding is
+/// made clockwise (ADR 0083 §13.1).
 pub(crate) fn check(outline: &ClosedPath) -> Checked {
     let mut warnings = Vec::new();
-    let mut path = outline.clone();
+    let mut path = without_zero_segments(outline);
+    let mut curved = classify(&path, 0.0).curved_cubics() > 0;
     let mut points = polygon_of(&path);
-    if points.len() < 3 || signed_area(&points).abs() < 1e-9 || crosses(&path) {
+    let degenerate = if curved {
+        curve_area(&path).abs() < 1e-9
+    } else {
+        points.len() < 3 || signed_area(&points).abs() < 1e-9
+    };
+    if degenerate || crosses(&path) {
         warnings.push(warning("outline_crosses"));
         path = default_outline();
         points = polygon_of(&path);
-    } else if super::classify::classify(&path, 0.0).curved_cubics() > 0 {
-        warnings.push(warning("outline_curved"));
+        curved = false;
     }
-    let mut area = signed_area(&points);
-    if area < 0.0 {
+    let (winding, area) = if curved {
+        {
+            let area = curve_area(&path);
+            (area, area.abs())
+        }
+    } else {
+        let area = signed_area(&points);
+        (area, area.abs())
+    };
+    if winding < 0.0 {
         points.reverse();
-        area = -area;
+        path = reversed(&path);
     }
     Checked {
+        path,
+        curved,
         points,
         area,
         warnings,
@@ -188,13 +236,67 @@ mod tests {
     }
 
     #[test]
-    fn a_curved_cubic_is_built_as_its_chord_with_a_warning() {
+    fn a_curved_cubic_is_a_valid_curved_outline_without_warning() {
         let mut path = polygon(&[(0.0, 0.0), (40.0, 0.0), (40.0, 40.0), (0.0, 40.0)]);
         path.segments[0].c1 = Point::new(10.0, -8.0);
         path.segments[0].c2 = Point::new(30.0, -8.0);
         let checked = check(&path);
-        assert_eq!(checked.warnings[0].id, "outline_curved");
-        assert_eq!(checked.points.len(), 4);
+        assert_eq!(checked.warnings, []);
+        assert!(checked.curved);
+        assert!(
+            checked.area > 1600.0,
+            "the bulge adds area: {}",
+            checked.area
+        );
+    }
+
+    #[test]
+    fn the_area_comes_from_the_curve_a_circle_of_four_cubics_has_pi_r_squared() {
+        let checked = check(&crate::path_box::fixtures::circle(30.0));
+        assert!(
+            (checked.area - std::f64::consts::PI * 900.0).abs() < 2.0,
+            "{}",
+            checked.area
+        );
+        assert_eq!(checked.warnings, []);
+    }
+
+    #[test]
+    fn a_counter_clockwise_curved_outline_is_reversed_to_clockwise() {
+        let heart = crate::path_box::fixtures::heart();
+        let flipped = crate::outline::reversed(&heart);
+        let (a, b) = (check(&heart), check(&flipped));
+        assert!((a.area - b.area).abs() < 1e-6);
+        assert!(curve_area(&a.path) > 0.0 && curve_area(&b.path) > 0.0);
+    }
+
+    #[test]
+    fn a_d_and_a_lens_are_valid_and_a_zero_area_curve_is_not() {
+        use crate::path_box::fixtures::{curve, p};
+        let d = curve(
+            p(0.0, 0.0),
+            &[
+                ((30.0, 0.0), (30.0, 40.0), (0.0, 40.0)),
+                ((0.0, 40.0), (0.0, 0.0), (0.0, 0.0)),
+            ],
+        );
+        assert_eq!(check(&d).warnings, []);
+        let lens = curve(
+            p(0.0, 0.0),
+            &[
+                ((10.0, -20.0), (30.0, -20.0), (40.0, 0.0)),
+                ((30.0, 20.0), (10.0, 20.0), (0.0, 0.0)),
+            ],
+        );
+        assert_eq!(check(&lens).warnings, []);
+        let flat = curve(
+            p(0.0, 0.0),
+            &[
+                ((10.0, 5.0), (30.0, 5.0), (40.0, 0.0)),
+                ((30.0, 5.0), (10.0, 5.0), (0.0, 0.0)),
+            ],
+        );
+        assert_eq!(check(&flat).warnings[0].id, "outline_crosses");
     }
 
     #[test]

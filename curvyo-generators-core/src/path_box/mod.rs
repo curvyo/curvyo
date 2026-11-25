@@ -1,14 +1,21 @@
 //! The path box: a laser-cut box built from any closed outline, its corners finger-jointed and its
 //! kinks slit-bent (ADR 0083, spec `0149`).
 
+mod arc_fit;
+mod bend_marks;
 mod build;
 mod check;
 mod classify;
 mod corner;
 mod describe;
+#[cfg(test)]
+mod fixtures;
+mod flats;
+mod hollow;
 mod plates;
 mod schema;
 mod shape;
+mod spans;
 
 use curvyo_document_core::{Length, Point, Vec2};
 use curvyo_extension_core::{
@@ -25,6 +32,9 @@ use build::{Measures, build};
 use check::{check, default_outline};
 
 pub(crate) use schema::groups;
+
+#[cfg(test)]
+mod tests;
 
 /// A plate part's thickness that follows the wall: stored 0 means automatic.
 const FOLLOWING: [&str; 4] = [
@@ -270,7 +280,7 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         checked.area,
         matches!(request.edit, Some(Edit::Draft)),
     );
-    let (mut built, _inner, _tabs) = build(&checked.points, &m);
+    let (mut built, _inner, _tabs) = build(&checked, &m);
     let spacing = m.kerf + v.mm("gap");
     let plates = built.plates_owned();
     let placed = place(&built.strips, plates, m.kerf, spacing);

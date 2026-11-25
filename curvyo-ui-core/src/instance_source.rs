@@ -20,11 +20,6 @@ pub enum SourceRefusal {
     /// The area is below `(4 t)^2` for the default wall thickness.
     #[error("The outline is too small for a box with 3 mm walls. Nothing was changed.")]
     TooSmall,
-    /// Slice 1 builds straight outlines only.
-    #[error(
-        "This outline has curves. Box from path builds straight outlines only so far. Nothing was changed."
-    )]
-    Curved,
     /// The kind is not available or has no source.
     #[error("Select one closed outline. Nothing was changed.")]
     UnknownKind,
@@ -45,14 +40,19 @@ pub fn outline_of(object: &ObjectSnapshot) -> Option<ClosedPath> {
         return None;
     }
     let count = anchors.len();
+    // A zero-length segment (an import that closes with a `C` onto its start) is dropped: it must
+    // never read as a corner (ADR 0083 §13.1).
+    let near = |a: Point, b: Point| (a.x - b.x).hypot(a.y - b.y) <= 1e-6;
     let segments = (0..count)
-        .map(|i| {
+        .filter_map(|i| {
             let (a, b) = (anchors[i], anchors[(i + 1) % count]);
-            Cubic {
+            let cubic = Cubic {
                 c1: Point::new(a.0.x + a.2.x, a.0.y + a.2.y),
                 c2: Point::new(b.0.x + b.1.x, b.0.y + b.1.y),
                 to: b.0,
-            }
+            };
+            let zero = near(a.0, cubic.to) && near(a.0, cubic.c1) && near(a.0, cubic.c2);
+            (!zero).then_some(cubic)
         })
         .collect();
     Some(ClosedPath {
@@ -104,6 +104,7 @@ fn plan(
     settings: &ExtensionSettings,
     kind: &str,
     source: NodeId,
+    edit: Option<curvyo_extension_core::Edit<'_>>,
 ) -> Result<Plan, SourceRefusal> {
     let found = find_kind(settings, kind).ok_or(SourceRefusal::UnknownKind)?;
     let target = found.kind.source.ok_or(SourceRefusal::UnknownKind)?;
@@ -122,7 +123,7 @@ fn plan(
         target.param.to_owned(),
         ParamValue::Path(translated(&page, -centre.0, -centre.1)).to_stored(),
     );
-    let generated = generate(&found, &params, 0, None).ok_or(SourceRefusal::UnknownKind)?;
+    let generated = generate(&found, &params, 0, edit).ok_or(SourceRefusal::UnknownKind)?;
     refuse_unbuildable(&generated)?;
     let gap = generated
         .params
@@ -165,7 +166,15 @@ pub fn preview(
     kind: &str,
     source: NodeId,
 ) -> Result<Generated, SourceRefusal> {
-    plan(document, settings, kind, source).map(|plan| plan.generated)
+    // The marks and refusals need no slits and no plate test: a draft (ADR 0083 §13.13).
+    plan(
+        document,
+        settings,
+        kind,
+        source,
+        Some(curvyo_extension_core::Edit::Draft),
+    )
+    .map(|plan| plan.generated)
 }
 
 /// Builds the box of the kind `kind` (`<extension>/<kind>`, one with a source) from `source` and
@@ -180,22 +189,19 @@ pub fn place_from_source(
     kind: &str,
     source: NodeId,
 ) -> Result<NodeId, SourceRefusal> {
-    let plan = plan(document, settings, kind, source)?;
+    let plan = plan(document, settings, kind, source, None)?;
     let record = record_of(&plan.kind, 0, &plan.generated);
     document
         .create_generated_above(&record, plan.frame, source)
         .map_err(|_| SourceRefusal::Refused)
 }
 
-/// What the generator says about the outline at the default values: a crossing or curved outline
+/// What the generator says about the outline at the default values: a crossing outline
 /// or a thickness the size rule moved is refused (ADR 0083 §2).
 fn refuse_unbuildable(generated: &Generated) -> Result<(), SourceRefusal> {
     let has = |id: &str| generated.warnings.iter().any(|w| w.id == id);
     if has("outline_crosses") {
         return Err(SourceRefusal::Crosses);
-    }
-    if has("outline_curved") {
-        return Err(SourceRefusal::Curved);
     }
     if generated
         .clamps

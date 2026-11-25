@@ -69,12 +69,25 @@ pub(crate) fn slots(band: &Band, pattern: &SlitPattern, windows: &[Window]) -> V
     let columns = (((to - from) / spacing).round() as usize).max(MIN_COLUMNS);
     #[allow(clippy::cast_precision_loss)]
     let pitch = (to - from) / columns as f64;
+    #[allow(clippy::cast_precision_loss)]
+    let xs: Vec<f64> = (0..columns)
+        .map(|column| from + pitch * (column as f64 + 0.5))
+        .collect();
+    slots_at(band, (&xs, &vec![spacing; columns]), pattern, windows)
+}
+
+/// The slots of `band` for columns at `xs`, each with the `periods` it may take (a wave slot's
+/// period and swing follow the gap to its neighbours), none within `pattern.bridge` of a window.
+pub(crate) fn slots_at(
+    band: &Band,
+    (xs, periods): (&[f64], &[f64]),
+    pattern: &SlitPattern,
+    windows: &[Window],
+) -> Vec<Slot> {
     let mut slots = Vec::new();
-    for column in 0..columns {
-        #[allow(clippy::cast_precision_loss)]
-        let x = from + pitch * (column as f64 + 0.5);
+    for (column, (&x, &period)) in xs.iter().zip(periods).enumerate() {
         let swing = if pattern.kind == SlitKind::Wave {
-            spacing / 8.0
+            period / 8.0
         } else {
             0.0
         };
@@ -89,7 +102,7 @@ pub(crate) fn slots(band: &Band, pattern: &SlitPattern, windows: &[Window]) -> V
             SlitKind::Straight => slots.push(straight(column, x, band, pattern)),
             SlitKind::Wave => {
                 let mut slot = straight(column, x, band, pattern);
-                slot.wave = Some(spacing);
+                slot.wave = Some(period);
                 slots.push(slot);
             }
             SlitKind::Offset => slots.extend(offset(column, x, band, pattern)),

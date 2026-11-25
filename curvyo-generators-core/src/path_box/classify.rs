@@ -59,7 +59,7 @@ fn is_curved(from: Point, cubic: &Cubic) -> bool {
 
 /// The direction of travel at the start (`false`) or the end (`true`) of `cubic`, which starts at
 /// `from`; the first handle that is not on the node gives it.
-fn tangent(from: Point, cubic: &Cubic, at_end: bool) -> (f64, f64) {
+pub(crate) fn tangent(from: Point, cubic: &Cubic, at_end: bool) -> (f64, f64) {
     let candidates = if at_end {
         [
             sub(cubic.to, cubic.c2),

@@ -6,8 +6,8 @@
 use curvyo_document_core::{Length, Point};
 
 use crate::contour::{Contour, Seg};
-use crate::footprint::{Footprint, Shape, Tab};
-use crate::slit_bend::{Band, SlitPattern, Slot, Window, slots};
+use crate::footprint::{Footprint, Tab};
+use crate::slit_bend::{SlitPattern, Slot, Window};
 use crate::wave_slot::wave;
 
 /// The slot a plate's tab needs: `thickness` across the strip, twice that along it, with its
@@ -60,6 +60,12 @@ pub(crate) struct Wall<'a> {
     pub(crate) ends: Option<Ends>,
     /// The spacing from each bend's radius; `None` uses `pattern.spacing` everywhere.
     pub(crate) local_spacing: Option<LocalSpacing>,
+    /// Consecutive bends are one band whose columns follow the integral of the wanted gap (the
+    /// path box, ADR 0083 §13.4); `false` keeps one band per bend (the rounded box).
+    pub(crate) runs: bool,
+    /// How far the first and last slit column keep from the cut ends of a strip without finger
+    /// ends (the seam of a path box without a corner, ADR 0083 §6); 0 for the rounded box.
+    pub(crate) seam_margin: f64,
 }
 
 /// An axis-aligned rectangle in strip coordinates.
@@ -94,9 +100,8 @@ impl Wall<'_> {
             })
             .collect();
         let mut waves: Vec<(Slot, bool)> = Vec::new();
-        for (band, radius) in self.bands(length, height) {
-            let pattern = self.pattern_for(&band, radius);
-            for slot in slots(&band, &pattern, &windows) {
+        for spec in self.bands(length, height) {
+            for slot in self.band_slots(&spec, &windows) {
                 match slot.wave {
                     Some(_) => waves.push((slot, slot.y0 <= 1e-9)),
                     None => rects.push(slot_rect(&slot)),
@@ -151,76 +156,6 @@ impl Wall<'_> {
             }
         }
         rects
-    }
-
-    /// The pattern of `band`: with local spacing, the columns are fitted by floor so no gap is
-    /// below the spacing the radius asks for (the two-column minimum aside).
-    fn pattern_for(&self, band: &Band, radius: f64) -> SlitPattern {
-        match self.local_spacing {
-            Some(local) if radius > 0.0 => SlitPattern {
-                spacing: Length::from_mm(column_pitch(
-                    band.from.as_mm(),
-                    band.to.as_mm(),
-                    (local.factor * radius).max(local.least),
-                )),
-                ..self.pattern
-            },
-            _ => self.pattern,
-        }
-    }
-
-    /// The gap between two columns of every band (the smallest of them is the reported
-    /// automatic spacing).
-    pub(crate) fn pitches(&self) -> Vec<f64> {
-        let length = self.footprint.total();
-        self.bands(length, self.height.as_mm())
-            .iter()
-            .map(|(band, radius)| self.pattern_for(band, *radius).spacing.as_mm())
-            .collect()
-    }
-
-    /// The stretches that carry slit columns, with the radius of the bend: the bent spans, or the
-    /// whole strip.
-    fn bands(&self, length: f64, height: f64) -> Vec<(Band, f64)> {
-        let bridge = self.pattern.bridge.as_mm();
-        let (lead_min, trail_min) = self.ends.as_ref().map_or((bridge, bridge), |e| {
-            (e.lead.max(bridge), e.trail.max(bridge))
-        });
-        let height = Length::from_mm(height);
-        let band = |from: f64, to: f64| Band {
-            from: Length::from_mm(from.max(lead_min)),
-            to: Length::from_mm(to.min(length - trail_min)),
-            height,
-        };
-        if self.slits_everywhere {
-            return vec![(band(0.0, length), 0.0)];
-        }
-        // A bend ends one bridge from a window; at a straight it runs on to the junction.
-        let spans = &self.footprint.spans;
-        spans
-            .iter()
-            .enumerate()
-            .filter_map(|(index, span)| match span.shape {
-                Shape::Bend { radius, .. } => Some((index, span, radius)),
-                Shape::Straight { .. } => None,
-            })
-            .map(|(index, span, radius)| {
-                let before = index.checked_sub(1).and_then(|i| spans.get(i));
-                let after = spans.get(index + 1);
-                let lead = if before.is_some_and(|s| s.window) {
-                    bridge
-                } else {
-                    0.0
-                };
-                let trail = if after.is_some_and(|s| s.window) {
-                    bridge
-                } else {
-                    0.0
-                };
-                (band(span.s0 + lead, span.s0 + span.length - trail), radius)
-            })
-            .filter(|(band, _)| band.to.as_mm() > band.from.as_mm())
-            .collect()
     }
 }
 

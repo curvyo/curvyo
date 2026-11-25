@@ -251,18 +251,22 @@ fn criterion_1_an_outline_too_small_for_three_mm_walls_is_refused_with_nothing_c
     assert_eq!(document.own_step_count(), steps, "nothing was written");
 }
 
+/// Superseded by slice 2 (spec revision 7 criterion 1, ADR 0083 section 13.14): slice 1 refused a
+/// curved outline with "This outline has curves. ..."; the refusal is gone and the box is built.
 #[test]
-fn criterion_1_a_curved_outline_is_refused_in_slice_1_with_nothing_changed() {
+fn criterion_1_a_curved_outline_is_accepted_from_slice_2_on() {
     let document = Document::new(1);
     let settings = ExtensionSettings::default();
     let mut minter = AnchorIdMinter::new(1);
     let curved = drawn_curved(&document, &mut minter);
     let steps = document.own_step_count();
-    assert_refused(
-        instance_source::place_from_source(&document, &settings, PATH_BOX, curved),
-        "This outline has curves. Box from path builds straight outlines only so far. Nothing was changed.",
+    instance_source::place_from_source(&document, &settings, PATH_BOX, curved)
+        .expect("a curved outline is built, not refused");
+    assert_eq!(
+        document.own_step_count(),
+        steps + 1,
+        "one step: Add path box"
     );
-    assert_eq!(document.own_step_count(), steps, "nothing was written");
 }
 
 // ---------- criterion 8: Replace outline ----------
@@ -292,8 +296,10 @@ fn criterion_8_replace_outline_takes_a_copy_of_the_new_outline_in_one_step_and_k
     );
 }
 
+/// Superseded by slice 2 (ADR 0083 section 13.14): a curved source was refused and the stored
+/// outline kept; a curved source now replaces the outline in one step.
 #[test]
-fn criterion_8_replace_outline_with_a_curved_source_is_refused_and_the_box_keeps_its_outline() {
+fn criterion_8_replace_outline_with_a_curved_source_replaces_the_outline_from_slice_2_on() {
     let document = Document::new(1);
     let settings = ExtensionSettings::default();
     let first = drawn_rect(&document, 0.0, 0.0, 60.0, 40.0);
@@ -302,12 +308,83 @@ fn criterion_8_replace_outline_with_a_curved_source_is_refused_and_the_box_keeps
     let mut minter = AnchorIdMinter::new(7);
     let curved = drawn_curved(&document, &mut minter);
     let steps = document.own_step_count();
-    let refused = instance_source::replace_outline(&document, &settings, target, curved);
-    assert!(refused.is_err(), "a curved outline is refused");
-    assert_eq!(document.own_step_count(), steps, "nothing was written");
-    assert_eq!(
+    instance_source::replace_outline(&document, &settings, target, curved)
+        .expect("a curved outline replaces the stored one");
+    assert_eq!(document.own_step_count(), steps + 1, "one step");
+    assert_ne!(
         stored_outline(&document, target),
         before,
-        "the stored outline is kept"
+        "the stored outline is the curved one"
+    );
+}
+
+// ---------- slice 2: curves (criteria 1 and 8 for curved outlines, the curve kept in the copy) ----------
+
+/// Whether a closed path has a cubic whose handles leave its chord (a curved edge).
+fn has_curve(path: &ClosedPath) -> bool {
+    let mut from = path.start;
+    for cubic in &path.segments {
+        let (dx, dy) = (cubic.to.x - from.x, cubic.to.y - from.y);
+        for p in [cubic.c1, cubic.c2] {
+            if (dx * (p.y - from.y) - dy * (p.x - from.x)).abs() > 1e-9 {
+                return true;
+            }
+        }
+        from = cubic.to;
+    }
+    false
+}
+
+#[test]
+fn criterion_1_slice2_a_curved_outline_is_placed_beside_its_source_with_its_curve_in_the_copy() {
+    let document = Document::new(1);
+    let settings = ExtensionSettings::default();
+    let mut minter = AnchorIdMinter::new(1);
+    let curved = drawn_curved(&document, &mut minter);
+    let outline_before = instance_source::outline_of(&document.object(curved).unwrap());
+    let made = instance_source::place_from_source(&document, &settings, PATH_BOX, curved)
+        .expect("a curved outline is built, not refused");
+    assert!(
+        has_curve(&stored_outline(&document, made)),
+        "the stored copy keeps the curved edge"
+    );
+    assert_eq!(
+        instance_source::outline_of(&document.object(curved).unwrap()),
+        outline_before,
+        "the curved source is untouched"
+    );
+    let gap = match ParamValue::from_stored(&document.generated(made).unwrap().record.params["gap"])
+        .expect("the gap is stored")
+    {
+        ParamValue::Length(length) => length.as_mm(),
+        other => panic!("the gap is a length, got {other:?}"),
+    };
+    let (source_min, source_max) = bounds_of(&document, curved);
+    let (box_min, _) = bounds_of(&document, made);
+    assert!(
+        (box_min.x - (source_max.x + gap)).abs() < 0.01,
+        "the layout starts Gap right of the curved source"
+    );
+    assert!(
+        (box_min.y - source_min.y).abs() < 0.01,
+        "the top edges are aligned"
+    );
+}
+
+#[test]
+fn criterion_8_slice2_replace_outline_with_a_curved_source_stores_the_curve() {
+    let document = Document::new(1);
+    let settings = ExtensionSettings::default();
+    let first = drawn_rect(&document, 0.0, 0.0, 60.0, 40.0);
+    let target = instance_source::place_from_source(&document, &settings, PATH_BOX, first).unwrap();
+    let mut minter = AnchorIdMinter::new(7);
+    let curved = drawn_curved(&document, &mut minter);
+    let steps = document.own_step_count();
+    instance_source::replace_outline(&document, &settings, target, curved)
+        .expect("a curved outline replaces the stored one");
+    assert_eq!(document.own_step_count(), steps + 1, "one step");
+    assert!(
+        has_curve(&stored_outline(&document, target)),
+        "the stored outline is the curved one, its curve kept"
     );
 }

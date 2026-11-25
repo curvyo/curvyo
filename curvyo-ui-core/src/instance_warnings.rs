@@ -35,13 +35,16 @@ fn number(value: f64) -> String {
     text.strip_suffix(".0").map_or(text.clone(), str::to_owned)
 }
 
-fn sharp(group: &[&Warning]) -> String {
+fn sharp(group: &[&Warning], one_piece: bool) -> String {
     if let [one] = group {
         let angle = one
             .value
             .as_ref()
             .and_then(curvyo_extension_core::ParamValue::degrees)
             .unwrap_or(0.0);
+        if one_piece {
+            return format!("The corner of the wall is very sharp: {}°.", number(angle));
+        }
         return format!(
             "The corner between pieces {} is very sharp: {}°.",
             pieces(&one.pieces),
@@ -64,27 +67,157 @@ fn pieces_list(items: &[String]) -> String {
     }
 }
 
-fn tight(group: &[&Warning]) -> String {
-    let limit = group.first().and_then(|w| mm(w, true)).unwrap_or(0.0);
-    if let [one] = group {
-        return format!(
-            "Piece {} bends to {} mm; below {} mm the wall may crack.",
+/// A bend too short for two slits at the least gap: built anyway.
+fn short(group: &[&Warning], one_piece: bool) -> String {
+    let at = |w: &Warning| number(mm(w, false).unwrap_or(0.0));
+    match group {
+        [one] if one_piece => format!(
+            "The wall has a bend too short for two slits ({} mm); it may crack there.",
+            at(one)
+        ),
+        [one] => format!(
+            "Piece {} has a bend too short for two slits ({} mm); it may crack there.",
             pieces(&one.pieces),
-            number(mm(one, false).unwrap_or(0.0)),
-            number(limit)
-        );
+            at(one)
+        ),
+        _ => {
+            let all: Vec<u32> = group.iter().flat_map(|w| w.pieces.clone()).collect();
+            format!(
+                "Pieces {} have a bend too short for two slits; they may crack there.",
+                pieces(&all)
+            )
+        }
     }
-    let all: Vec<u32> = group.iter().flat_map(|w| w.pieces.clone()).collect();
-    format!(
-        "Pieces {} bend below {} mm; the wall may crack there.",
-        pieces(&all),
-        number(limit)
-    )
+}
+
+/// One sentence per limit: convex stretches ("bends to"), concave ones ("bends inward").
+fn tight(group: &[&Warning], context: Context) -> Vec<String> {
+    let one_piece = context.one_piece;
+    let mut limits: Vec<f64> = Vec::new();
+    for w in group {
+        let limit = mm(w, true).unwrap_or(0.0);
+        if !limits.iter().any(|l| (l - limit).abs() < 1e-9) {
+            limits.push(limit);
+        }
+    }
+    limits
+        .into_iter()
+        .map(|limit| {
+            let same: Vec<&&Warning> = group
+                .iter()
+                .filter(|w| (mm(w, true).unwrap_or(0.0) - limit).abs() < 1e-9)
+                .collect();
+            // ADR 0083 section 13.12: a convex stretch's limit is twice the wall thickness, a concave
+            // one's the wall thickness itself; no other limit exists, so equality within 1e-9 mm
+            // (the limits are computed from the same thickness) names the concave kind.
+            let inward = (limit - context.wall.as_mm()).abs() < 1e-9;
+            let verb = if inward { "bends inward" } else { "bends" };
+            if let [one] = same.as_slice() {
+                let radius = number(mm(one, false).unwrap_or(0.0));
+                let subject = if one_piece {
+                    "The wall".to_owned()
+                } else {
+                    format!("Piece {}", pieces(&one.pieces))
+                };
+                let reach = if one_piece { "it" } else { "the wall" };
+                return format!(
+                    "{subject} {verb} to {radius} mm; below {} mm {reach} may crack.",
+                    number(limit)
+                );
+            }
+            let all: Vec<u32> = same.iter().flat_map(|w| w.pieces.clone()).collect();
+            let plural = if inward { "bend inward" } else { "bend" };
+            format!(
+                "Pieces {} {plural} below {} mm; the wall may crack there.",
+                pieces(&all),
+                number(limit)
+            )
+        })
+        .collect()
+}
+
+/// What the sentences need to know about the box besides its warnings (UX notes `0149` §6).
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct Context {
+    /// The box is one wall piece: the text says "The wall", never "Piece 1".
+    pub one_piece: bool,
+    /// The Lid switch.
+    pub lid: bool,
+    /// The Lid seat switch.
+    pub seat: bool,
+    /// The Finger hollow switch.
+    pub hollow: bool,
+    /// The wall thickness: a limit equal to it belongs to a concave stretch, twice it to a
+    /// convex one.
+    pub wall: curvyo_document_core::Length,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self {
+            one_piece: false,
+            lid: true,
+            seat: true,
+            hollow: true,
+            wall: curvyo_document_core::Length::from_mm(3.0),
+        }
+    }
+}
+
+impl Context {
+    /// The context of a generated object: its stored switches and whether it has badges.
+    #[must_use]
+    pub fn of(generated: &curvyo_extension_core::Generated) -> Self {
+        let on = |key: &str, default: bool| {
+            generated
+                .params
+                .get(key)
+                .and_then(curvyo_extension_core::ParamValue::from_stored)
+                .and_then(|value| value.switch())
+                .unwrap_or(default)
+        };
+        Self {
+            one_piece: generated.marks.on_parts.is_empty(),
+            lid: on("lid", true),
+            seat: on("lid_seat", true),
+            hollow: on("finger_hollow", true),
+            wall: generated
+                .params
+                .get("thickness")
+                .and_then(curvyo_extension_core::ParamValue::from_stored)
+                .and_then(|value| value.length())
+                .unwrap_or_else(|| curvyo_document_core::Length::from_mm(3.0)),
+        }
+    }
 }
 
 /// One sentence per warning id, in the order the ids first appear.
 #[must_use]
 pub fn sentences(warnings: &[Warning]) -> Vec<String> {
+    sentences_in(warnings, Context::default())
+}
+
+fn rounded(wall: f64, context: Context) -> String {
+    let what = if context.lid && context.seat {
+        "the cover and lid are rounded there"
+    } else {
+        "the cover is rounded there"
+    };
+    let hollow = if context.lid && context.seat && context.hollow {
+        ", without a finger hollow"
+    } else {
+        ""
+    };
+    format!(
+        "The notch is too narrow for the cover at {} mm walls: {what}{hollow}.",
+        number(wall)
+    )
+}
+
+/// One sentence per warning id for a box described by `context`.
+#[must_use]
+pub fn sentences_in(warnings: &[Warning], context: Context) -> Vec<String> {
     let mut ids: Vec<&str> = Vec::new();
     for warning in warnings {
         if !ids.contains(&warning.id) {
@@ -95,10 +228,18 @@ pub fn sentences(warnings: &[Warning]) -> Vec<String> {
         .map(|id| {
             let group: Vec<&Warning> = warnings.iter().filter(|w| w.id == id).collect();
             match id {
-                "sharp_corner" => sharp(&group),
-                "tight_bend" => tight(&group),
+                "sharp_corner" => sharp(&group, context.one_piece),
+                "tight_bend" => tight(&group, context).join(" "),
                 "ring_closed" => "The ring has no opening at this ring thickness.".to_owned(),
                 "ring_opening_failed" => "The ring opening could not be built.".to_owned(),
+                "cover_offset_failed" => {
+                    "The cover could not be rounded; it is built exactly and may cross itself."
+                        .to_owned()
+                }
+                "bend_too_short" => short(&group, context.one_piece),
+                "fillet_failed" => {
+                    "A slight bend could not be rounded; it is built as a sharp bend.".to_owned()
+                }
                 "hollow_left_out" => "No place for the finger hollow on this lid.".to_owned(),
                 "smallest_size" => format!(
                     "The box is at its smallest for {} mm walls.",
@@ -107,9 +248,7 @@ pub fn sentences(warnings: &[Warning]) -> Vec<String> {
                 "outline_crosses" => {
                     "The outline crosses itself; the default outline is built.".to_owned()
                 }
-                "outline_curved" => {
-                    "This outline has curves; they are built as straight edges.".to_owned()
-                }
+                "cover_rounded" => rounded(mm(group[0], false).unwrap_or(3.0), context),
                 other => other.to_owned(),
             }
         })
@@ -160,6 +299,109 @@ mod tests {
         assert_eq!(
             sentences(&[a, b]),
             ["Pieces 2 and 5 bend below 6 mm; the wall may crack there."]
+        );
+    }
+
+    #[allow(clippy::fn_params_excessive_bools)]
+    fn with_context(one_piece: bool, lid: bool, seat: bool, hollow: bool) -> Context {
+        Context {
+            one_piece,
+            lid,
+            seat,
+            hollow,
+            wall: curvyo_document_core::Length::from_mm(3.0),
+        }
+    }
+
+    #[test]
+    fn a_rounded_cover_names_what_was_built_and_the_wall_thickness() {
+        let mut w = warning("cover_rounded", &[]);
+        w.value = Some(ParamValue::Length(Length::from_mm(3.0)));
+        let said = |c| sentences_in(std::slice::from_ref(&w), c)[0].clone();
+        assert_eq!(
+            said(with_context(false, true, true, true)),
+            "The notch is too narrow for the cover at 3 mm walls: the cover and lid are rounded there, without a finger hollow."
+        );
+        for c in [
+            with_context(false, false, true, true),
+            with_context(false, true, false, true),
+        ] {
+            assert_eq!(
+                said(c),
+                "The notch is too narrow for the cover at 3 mm walls: the cover is rounded there."
+            );
+        }
+        assert_eq!(
+            said(with_context(false, true, true, false)),
+            "The notch is too narrow for the cover at 3 mm walls: the cover and lid are rounded there."
+        );
+    }
+
+    fn tight_warning(piece: u32, radius: f64, limit: f64) -> Warning {
+        let mut w = warning("tight_bend", &[piece]);
+        w.value = Some(ParamValue::Length(Length::from_mm(radius)));
+        w.limit = Some(ParamValue::Length(Length::from_mm(limit)));
+        w
+    }
+
+    #[test]
+    fn one_piece_says_the_wall() {
+        let one = with_context(true, true, true, true);
+        assert_eq!(
+            sentences_in(&[tight_warning(1, 2.5, 6.0)], one),
+            ["The wall bends to 2.5 mm; below 6 mm it may crack."]
+        );
+        let mut sharp = warning("sharp_corner", &[1, 1]);
+        sharp.value = Some(ParamValue::Angle(Degrees(22.0)));
+        assert_eq!(
+            sentences_in(&[sharp], one),
+            ["The corner of the wall is very sharp: 22°."]
+        );
+    }
+
+    #[test]
+    fn a_concave_stretch_has_its_own_sentence_and_limit() {
+        let all = [
+            tight_warning(2, 2.5, 6.0),
+            tight_warning(5, 4.0, 6.0),
+            tight_warning(3, 2.0, 3.0),
+        ];
+        assert_eq!(
+            sentences_in(&all, Context::default()),
+            [
+                "Pieces 2 and 5 bend below 6 mm; the wall may crack there. Piece 3 bends inward to 2 mm; below 3 mm the wall may crack."
+            ]
+        );
+        let two = [tight_warning(3, 2.0, 3.0), tight_warning(4, 1.0, 3.0)];
+        assert_eq!(
+            sentences_in(&two, Context::default()),
+            ["Pieces 3 and 4 bend inward below 3 mm; the wall may crack there."]
+        );
+    }
+
+    #[test]
+    fn a_bend_too_short_for_two_slits_has_its_own_sentence() {
+        let mut w = warning("bend_too_short", &[2]);
+        w.value = Some(ParamValue::Length(Length::from_mm(4.1)));
+        assert_eq!(
+            sentences(std::slice::from_ref(&w)),
+            ["Piece 2 has a bend too short for two slits (4.1 mm); it may crack there."]
+        );
+        let mut v = warning("bend_too_short", &[5]);
+        v.value = Some(ParamValue::Length(Length::from_mm(3.0)));
+        assert_eq!(
+            sentences(&[w, v]),
+            ["Pieces 2 and 5 have a bend too short for two slits; they may crack there."]
+        );
+        let mut one = warning("bend_too_short", &[1]);
+        one.value = Some(ParamValue::Length(Length::from_mm(2.0)));
+        let single = Context {
+            one_piece: true,
+            ..Context::default()
+        };
+        assert_eq!(
+            sentences_in(&[one], single),
+            ["The wall has a bend too short for two slits (2 mm); it may crack there."]
         );
     }
 }

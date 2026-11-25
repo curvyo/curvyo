@@ -177,7 +177,8 @@ pub struct Clamp {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Warning {
     /// Which warning (`sharp_corner`, `tight_bend`, `ring_closed`, `hollow_left_out`,
-    /// `smallest_size`, `outline_crosses`, `outline_curved`).
+    /// `smallest_size`, `outline_crosses`, `cover_rounded`, `cover_offset_failed`,
+    /// `fillet_failed`, `bend_too_short`).
     pub id: &'static str,
     /// The wall pieces it names, by their numbers (1 based, walk order).
     pub pieces: Vec<u32>,
@@ -200,7 +201,10 @@ pub enum Mark {
         /// Whether the interior angle is below 30 degrees.
         sharp: bool,
     },
-    /// A bent span: the stretch of the inner face as cubics, the band is drawn inside it.
+    /// A stretch of the inner face under a slit band, as cubics, the band is drawn inside it. One
+    /// mark per stretch of one tightness inside a run: consecutive marks share their end points.
+    /// Windows, the flats beside a corner and the seam margin lie outside every stretch (ADR 0083
+    /// §13.16).
     Bend {
         /// Where it starts.
         start: Point,
@@ -208,6 +212,14 @@ pub enum Mark {
         segments: Vec<Cubic>,
         /// Whether the radius is too small to bend (criterion 7).
         tight: bool,
+    },
+    /// Where the strip of an outline with no corner is glued shut: the seam point on the inner
+    /// face and the unit vector into the box.
+    Seam {
+        /// The seam point.
+        at: Point,
+        /// The unit vector from the face into the box.
+        inward: Vec2,
     },
     /// A wall piece's number badge.
     Piece {

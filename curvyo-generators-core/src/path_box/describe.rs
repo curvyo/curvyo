@@ -1,12 +1,11 @@
 //! What the shell is told about a path box: warnings, corner and bend marks and piece badges
 //! (ADR 0083 §11).
 
-use curvyo_document_core::{Length, Point, Vec2};
-use curvyo_extension_core::{Cubic, Mark, Warning};
+use curvyo_document_core::{Point, Vec2};
+use curvyo_extension_core::{Mark, Warning};
 
-use super::build::{Badge, Measures, Plan, warning};
+use super::build::{Badge, Plan, warning};
 use crate::footprint::Shape;
-use crate::outline::Builder;
 
 pub(crate) fn unit(a: Point, b: Point) -> (f64, f64) {
     let (dx, dy) = (b.x - a.x, b.y - a.y);
@@ -47,29 +46,9 @@ pub(crate) fn inner_length(shape: &Shape) -> f64 {
     }
 }
 
-fn bend_cubics(shape: &Shape) -> Option<(Point, Vec<Cubic>)> {
-    let Shape::Bend {
-        centre,
-        radius,
-        from,
-        sweep,
-    } = *shape
-    else {
-        return None;
-    };
-    let start = crate::outline::polar(centre, radius, from);
-    let mut builder = Builder::new(start);
-    builder.arc(centre, radius, from, from + sweep);
-    Some((start, builder.finish().segments))
-}
-
 /// Warnings and marks of the plan: sharp corners, tight bends, the corners' crosses, the bends'
 /// hatching and the badges of the pieces.
-pub(crate) fn describe(
-    plan: &Plan,
-    m: &Measures,
-    count: usize,
-) -> (Vec<Warning>, Vec<Mark>, Vec<Badge>) {
+pub(crate) fn describe(plan: &Plan, count: usize) -> (Vec<Warning>, Vec<Mark>, Vec<Badge>) {
     let mut warnings = Vec::new();
     let mut marks = Vec::new();
     for (k, vertex) in plan.built.corners.iter().enumerate() {
@@ -95,30 +74,11 @@ pub(crate) fn describe(
         });
     }
     marks_with_bisectors(plan, &mut marks);
-    for &(index, radius) in &plan.built.fillets {
-        let Shape::Bend { sweep, .. } = plan.built.shapes[index] else {
-            continue;
-        };
-        let limit = if sweep > 0.0 { 2.0 * m.wall } else { m.wall };
-        let tight = radius < limit - 1e-9;
-        if tight {
-            let piece = u32::try_from(plan.built.piece_of[index] + 1).unwrap_or(0);
-            let mut w = warning("tight_bend", vec![piece]);
-            w.value = Some(curvyo_extension_core::ParamValue::Length(Length::from_mm(
-                radius,
-            )));
-            w.limit = Some(curvyo_extension_core::ParamValue::Length(Length::from_mm(
-                limit,
-            )));
-            warnings.push(w);
-        }
-        if let Some((start, segments)) = bend_cubics(&plan.built.shapes[index]) {
-            marks.push(Mark::Bend {
-                start,
-                segments,
-                tight,
-            });
-        }
+    if plan.built.unrounded > 0 {
+        warnings.push(warning("fillet_failed", Vec::new()));
+    }
+    if let Some((at, inward)) = plan.seam {
+        marks.push(Mark::Seam { at, inward });
     }
     (warnings, marks, badges(plan, count))
 }
