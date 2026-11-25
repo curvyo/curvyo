@@ -74,3 +74,54 @@ is the sequence clamp, footprints, strip, plates, layout, handles. `Footprint::s
 `tab_layout.rs` (`Layout::split_bend`, `fitting_count`). A small circle takes fewer windows so that every curved
 stretch keeps two slit columns and its bridges; Wall thickness is clamped to a sixth of the smaller inner side
 so that one tab window fits (**Proposal**, dependent clamp).
+
+---
+
+# Plan for Rounded box slice 2, the curved top
+
+Implementer, 2026-11-25, branch `story/rounded-box-curved-top`. Built under `specification.md` (revision 8, criteria 11 and
+16 to 24), ADR 0082 §11 (revision 6, amended), `adrs.md` and `ux-notes.md` (revision 6, section 10). Slice 1's code is reused;
+no new crate, no dependency, no `format_version` change. Own choices are marked **(Proposal)**.
+
+## Affected crates/modules
+
+- **`curvyo-extension-core`:** `param.rs` (`ShownWhen::All` and `Any`), `CHANGELOG.md` (source-breaking 0.x).
+- **`curvyo-generators-core`:** `boxes/plate.rs` moves to crate-level `plate.rs` (a notch depth per edge, `Corner::Round`, a
+  tab edge, the finger hollow in the top edge); new `rounded_box/curved_top.rs` (strip, plates, clamps, layout, handles,
+  marks); `rounded_box/schema.rs` (`top_shape`, `end_plate_thickness`, `front_thickness`, conditions only in the rounded
+  box's own groups, the path box's manifest stays); `rounded_box/mod.rs` branches on `top_shape` first; goldens.
+- **`curvyo-ui-core`, `curvyo-editor-wasm`:** the overlay of a generated object draws marks for the rounded box in Curved
+  (ux-notes §12 item 17, **Proposal**: `Mark::Bend` per end-plate arc and the piece badges, only if it stays small).
+
+## Tasks
+
+- [x] 1. `ShownWhen::All` / `Any` evaluated by `holds`, CHANGELOG (criterion 21, ADR 0082 §7 revision 6).
+- [x] 2. `plate.rs` to crate level, behaviour-preserving: per-edge notch depth, round corner, tab edge, hollow in the top edge;
+  `box_default.txt` and every golden byte-identical (criterion 16, 18; ADR 0082 §4, §11).
+- [x] 3. Schema: `top_shape`, `end_plate_thickness`, `front_thickness`, rows hidden in Curved keep their values, the path
+  box's manifest unchanged (criteria 11, 21, 24).
+- [x] 4. `curved_top.rs` strip: footprint of three shapes, the length test, whole-arc slits, no slit on a flat, edge notches
+  for the end plates' tabs, finger end with the base (criteria 16 to 19).
+- [x] 5. `curved_top.rs` plates: end plates with profile and back-straight tabs, front with the hollow, base owning every bottom
+  corner cube; mating and occupancy tests at five thicknesses, simple polygons at kerf 0 and 0.2 (criteria 16, 18, 21, 22).
+- [x] 6. Clamps (radius range, two columns, height, hollow, kerf, thickness), switching Top shape keeps values, automatic
+  values, layout in thickness runs, handles, `Edit::Draft`, resize (criteria 20, 21, 23, 24).
+- [x] 7. Golden `rounded_box_curved.txt`, 400-slot CPU time, save and reopen without `top_shape` reads Flat (criteria 24).
+- [x] 8. Marks: `Mark::Bend` on the end plates' arcs and part badges (ux-notes §10.8, §10.9, §12 item 17).
+- [x] 9. Full gate once into files (fmt, clippy, nextest 17986 passed, doc, wasm build, tsc, npm test 1716, oxlint: green, 2026-11-25).
+
+## Own choices (Proposal)
+
+- The Wall thickness bound in Curved is the sixth of the smaller inside side only; the 0.25 times Inner height part of Flat is
+  replaced by the Inner height minimum 2 t_e + 6 t_w of criterion 20. No bound is invented for End plate, Front or Inner base
+  thickness (ADR 0082 §11 lists none; the radius range stays non-empty by the height rule).
+- The two-column radius of criterion 19 is `4 s / pi - t_w / 2` for the spacing `s` in use (a typed spacing, else the least
+  `width + 1 mm`); a typed spacing that asks for more raises Corner radius up to its upper bound, there `slots` keeps two columns.
+- The hollow's "2 t margin to the nearest finger joint" (criterion 21) is read from the front's side edge, the joint line: the
+  widest hollow (Inner width minus 2 t_e, UX notes §10.10: 114 mm) leaves 2 t_e to that edge and t_e to the finger root.
+- The overlay of marks is drawn for a rounded box whose `top_shape` is Curved, not for Flat (ux-notes §10.12); all marks are in the
+  object's frame (`Marks.footprint` zero): `Mark::Bend` on both end plates' arcs, `Mark::Piece` badges 1 to 5, the strip's badge in
+  the middle of the lid run.
+- The two end plates are one outline cut twice (the Box's side walls), not a mirror pair.
+- `tests/acceptance_0147.rs` criterion 2 listed `top_shape` among the keys slice 1 must not have; the assertion now lists only Finger
+  width and Clearance (the key arrived with this slice, criterion 11).
