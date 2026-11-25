@@ -136,7 +136,12 @@ pub(crate) fn generate(
 pub fn warning_notices(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Vec<String> {
     find_kind(settings, &snapshot.record.kind)
         .and_then(|found| generate(&found, &snapshot.record.params, snapshot.record.seed, None))
-        .map(|g| crate::instance_warnings::sentences(&g.warnings))
+        .map(|g| {
+            crate::instance_warnings::sentences_in(
+                &g.warnings,
+                crate::instance_warnings::Context::of(&g),
+            )
+        })
         .unwrap_or_default()
 }
 
@@ -250,7 +255,10 @@ pub fn plan_value(
     .ok_or(InstanceError::UnknownKind)?;
     let record = record_of(&snapshot.record.kind, snapshot.record.seed, &generated);
     let mut notices = notices(&found.kind, &generated.clamps);
-    notices.extend(crate::instance_warnings::sentences(&generated.warnings));
+    notices.extend(crate::instance_warnings::sentences_in(
+        &generated.warnings,
+        crate::instance_warnings::Context::of(&generated),
+    ));
     Ok(ValuePlan {
         snapshot,
         record,
@@ -519,8 +527,11 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
                 .map(|(_, word)| (*word).to_owned())
                 // The Corner angle says how many corners it makes (`0149` UX notes §5).
                 .or_else(|| {
-                    (param.key == "corner_angle")
-                        .then(|| format!("{corners} corner{}", if corners == 1 { "" } else { "s" }))
+                    (param.key == "corner_angle").then(|| match corners {
+                        0 => "no corners".to_owned(),
+                        1 => "1 corner".to_owned(),
+                        n => format!("{n} corners"),
+                    })
                 }),
             limit: limits
                 .iter()

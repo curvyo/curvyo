@@ -30,6 +30,11 @@ pub(crate) struct Shapes {
     pub(crate) corners: Vec<Vertex>,
     /// Every fillet with the radius it got, as `(shape index, radius)`.
     pub(crate) fillets: Vec<(usize, f64)>,
+    /// The signed tangent turn a flat replaces, per shape (0 for every shape that is not a flat;
+    /// its neutral length holds half a wall thickness times it, ADR 0083 §13.5).
+    pub(crate) flat_turns: Vec<f64>,
+    /// Kinks no fillet fitted (left as sharp bends, the notice `fillet_failed`).
+    pub(crate) unrounded: usize,
 }
 
 fn unit(a: Point, b: Point) -> (f64, f64, f64) {
@@ -137,6 +142,8 @@ pub(crate) fn shapes(verts: &[Vertex], wall: f64, min_arc: f64) -> Shapes {
         piece_of: Vec::new(),
         corners: Vec::new(),
         fillets: Vec::new(),
+        flat_turns: Vec::new(),
+        unrounded: 0,
     };
     let mut piece = 0;
     for step in 0..count {
@@ -167,6 +174,7 @@ pub(crate) fn shapes(verts: &[Vertex], wall: f64, min_arc: f64) -> Shapes {
             out.piece_of.push(piece);
         }
     }
+    out.flat_turns = vec![0.0; out.shapes.len()];
     out
 }
 

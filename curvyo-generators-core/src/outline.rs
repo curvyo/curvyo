@@ -88,6 +88,11 @@ impl Builder {
         self.current = self.start;
     }
 
+    /// The segments walked so far, with no closing segment.
+    pub(crate) fn segments(self) -> Vec<Cubic> {
+        self.segments
+    }
+
     /// The outline, closed with a straight segment when the current point is not the start.
     pub(crate) fn finish(mut self) -> ClosedPath {
         if self.current != self.start {

@@ -351,8 +351,11 @@ fn criterion_1_default_build_of_a_coffin_has_outlines_and_no_notice_or_clamp() {
     );
 }
 
+/// Superseded by slice 2 (spec revision 7 criterion 1, ADR 0083 section 13.14): a curved cubic was
+/// built as its chord with the notice `outline_curved`; it is now built as it is drawn and no
+/// notice is sent. The outline is still kept as stored.
 #[test]
-fn criterion_1_a_curved_cubic_is_built_as_its_chord_with_a_notice_and_the_outline_is_kept() {
+fn criterion_1_a_curved_cubic_is_built_with_no_notice_and_the_outline_is_kept() {
     let mut segments = polygon(&COFFIN).segments;
     segments[0] = Cubic {
         c1: Point::new(0.0, 25.0),
@@ -367,8 +370,8 @@ fn criterion_1_a_curved_cubic_is_built_as_its_chord_with_a_notice_and_the_outlin
     let generated = build(&params, None);
     assert_eq!(
         warnings(&generated, "outline_curved"),
-        1,
-        "one outline_curved notice"
+        0,
+        "no outline_curved notice from slice 2 on"
     );
     assert_eq!(
         stored_outline(&generated).flat(),
@@ -854,4 +857,882 @@ fn criterion_12_plates_lie_apart_from_the_row_and_no_two_parts_overlap() {
             );
         }
     }
+}
+
+// ============================================================================
+// Slice 2: curves (criteria 6, 7, 9, 10, 11, 13 to 16). Written before the slice-2 implementation
+// was read. The outlines are drawn here from cubics (a heart, a shield, ellipses, circles and a
+// circle with one 20 degree node), not read from fixtures. The strip model (neutral length with
+// the flat tab windows, the notch centres, the uncut-band line test) is copied from
+// `acceptance_0147.rs` (ADR 0082 sections 4 and 5), since the two crates' test files do not share
+// helpers.
+// ============================================================================
+
+use std::f64::consts::PI;
+
+fn cubic(c1: Pt, c2: Pt, to: Pt) -> Cubic {
+    Cubic {
+        c1: Point::new(c1.0, c1.1),
+        c2: Point::new(c2.0, c2.1),
+        to: Point::new(to.0, to.1),
+    }
+}
+
+/// A straight edge as a cubic with its handles on the chord.
+fn line_cubic(from: Pt, to: Pt) -> Cubic {
+    let at = |f: f64| (from.0 + (to.0 - from.0) * f, from.1 + (to.1 - from.1) * f);
+    cubic(at(1.0 / 3.0), at(2.0 / 3.0), to)
+}
+
+/// An ellipse of semi-axes `rx` and `ry` about the origin, as `segments` cubics (CCW, from (rx, 0)).
+fn ellipse_cubics(rx: f64, ry: f64, segments: usize) -> ClosedPath {
+    let theta = 2.0 * PI / segments as f64;
+    let k = 4.0 / 3.0 * (theta / 4.0).tan();
+    let point = |i: usize| {
+        let a = (i % segments) as f64 * theta;
+        (rx * a.cos(), ry * a.sin())
+    };
+    let tangent = |i: usize| {
+        let a = (i % segments) as f64 * theta;
+        (-rx * a.sin(), ry * a.cos())
+    };
+    let curves = (0..segments)
+        .map(|i| {
+            let (p0, p1) = (point(i), point(i + 1));
+            let (t0, t1) = (tangent(i), tangent(i + 1));
+            cubic(
+                (p0.0 + k * t0.0, p0.1 + k * t0.1),
+                (p1.0 - k * t1.0, p1.1 - k * t1.1),
+                p1,
+            )
+        })
+        .collect();
+    ClosedPath {
+        start: Point::new(rx, 0.0),
+        segments: curves,
+    }
+}
+
+/// A circle of four cubics with one node turned by 20 degrees (its first handle rotated).
+fn kinked_circle() -> ClosedPath {
+    let mut path = ellipse_cubics(30.0, 30.0, 4);
+    let start = path.start;
+    let (vx, vy) = (
+        path.segments[0].c1.x - start.x,
+        path.segments[0].c1.y - start.y,
+    );
+    let (s, c) = 20.0_f64.to_radians().sin_cos();
+    path.segments[0].c1 = Point::new(start.x + vx * c - vy * s, start.y + vx * s + vy * c);
+    path
+}
+
+/// A heart: two smooth lobes meeting at a notch (top, turn 100 degrees) and a tip (bottom, 120).
+fn heart() -> ClosedPath {
+    ClosedPath {
+        start: Point::new(0.0, 20.0),
+        segments: vec![
+            cubic((10.0, 32.0), (30.0, 28.0), (30.0, 10.0)),
+            cubic((30.0, -8.0), (6.0, -29.6), (0.0, -40.0)),
+            cubic((-6.0, -29.6), (-30.0, -8.0), (-30.0, 10.0)),
+            cubic((-30.0, 28.0), (-10.0, 32.0), (0.0, 20.0)),
+        ],
+    }
+}
+
+/// A shield: a flat top, two straight sides and a bottom of two cubics, tangent at every join
+/// but the two top corners (turn 90 degrees).
+fn shield() -> ClosedPath {
+    ClosedPath {
+        start: Point::new(-40.0, 60.0),
+        segments: vec![
+            line_cubic((-40.0, 60.0), (40.0, 60.0)),
+            line_cubic((40.0, 60.0), (40.0, 0.0)),
+            cubic((40.0, -22.0), (22.0, -40.0), (0.0, -40.0)),
+            cubic((-22.0, -40.0), (-40.0, -22.0), (-40.0, 0.0)),
+            line_cubic((-40.0, 0.0), (-40.0, 60.0)),
+        ],
+    }
+}
+
+/// A rectangle 100 x 60 mm whose top edge has a narrow V notch (1 mm half width, 2 mm deep, an
+/// apex angle of about 53 degrees).
+const NOTCHED: [Pt; 7] = [
+    (0.0, 0.0),
+    (100.0, 0.0),
+    (100.0, 60.0),
+    (51.0, 60.0),
+    (50.0, 58.0),
+    (49.0, 60.0),
+    (0.0, 60.0),
+];
+
+/// Points of the cubics from `start`, `steps` per cubic, each cubic's end left out.
+fn sample_from(start: Point, cubics: &[Cubic], steps: usize) -> Vec<Pt> {
+    let mut points = Vec::new();
+    let mut from = start;
+    for cubic in cubics {
+        for step in 0..steps {
+            let t = step as f64 / steps as f64;
+            let u = 1.0 - t;
+            points.push((
+                u * u * u * from.x
+                    + 3.0 * u * u * t * cubic.c1.x
+                    + 3.0 * u * t * t * cubic.c2.x
+                    + t * t * t * cubic.to.x,
+                u * u * u * from.y
+                    + 3.0 * u * u * t * cubic.c1.y
+                    + 3.0 * u * t * t * cubic.c2.y
+                    + t * t * t * cubic.to.y,
+            ));
+        }
+        from = cubic.to;
+    }
+    points
+}
+
+/// A closed outline as 256 points per cubic (for lengths and distances).
+fn sample_dense(path: &ClosedPath) -> Vec<Pt> {
+    sample_from(path.start, &path.segments, 256)
+}
+
+/// The distance from `p` to the closed polyline `poly`.
+fn distance_to_polyline(p: Pt, poly: &[Pt]) -> f64 {
+    let n = poly.len();
+    (0..n)
+        .map(|i| {
+            let (a, b) = (poly[i], poly[(i + 1) % n]);
+            let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+            let len2 = dx * dx + dy * dy;
+            let t = if len2 == 0.0 {
+                0.0
+            } else {
+                (((p.0 - a.0) * dx + (p.1 - a.1) * dy) / len2).clamp(0.0, 1.0)
+            };
+            (p.0 - a.0 - t * dx).hypot(p.1 - a.1 - t * dy)
+        })
+        .fold(f64::MAX, f64::min)
+}
+
+/// Stored values for a curved outline: wall height 30 mm, wall thickness 3 mm, the rest default.
+fn curve_params(path: &ClosedPath) -> StoredParams {
+    stored_with(path, &[("inner_height", mm(30.0)), ("thickness", mm(3.0))])
+}
+
+/// A value the generator used: the automatic one, or the typed one (as `0147` uses it).
+fn used(generated: &Generated, key: &str) -> f64 {
+    generated
+        .automatic
+        .iter()
+        .find(|(k, _)| *k == key)
+        .and_then(|(_, value)| value.clone().length())
+        .map_or_else(
+            || length_of(generated, key),
+            curvyo_document_core::Length::as_mm,
+        )
+}
+
+/// The strip height the wall must have: inside height plus the cover and the lid plate.
+fn wall_height(generated: &Generated) -> f64 {
+    length_of(generated, "inner_height")
+        + used(generated, "cover_thickness")
+        + used(generated, "lid_thickness")
+}
+
+fn part_width(part: &Part) -> f64 {
+    let (x0, _, x1, _) = bbox(&part_points(part));
+    x1 - x0
+}
+
+fn part_height(part: &Part) -> f64 {
+    let (_, y0, _, y1) = bbox(&part_points(part));
+    y1 - y0
+}
+
+/// The widest part: the wall strip of an outline without corners (plates are narrower).
+fn widest_part(generated: &Generated) -> &Part {
+    generated
+        .parts
+        .iter()
+        .max_by(|a, b| part_width(a).total_cmp(&part_width(b)))
+        .expect("the box has parts")
+}
+
+/// The wall pieces: the parts with a piece badge inside their bounding box.
+fn wall_parts(generated: &Generated) -> Vec<&Part> {
+    let badges: Vec<Pt> = piece_badges(generated)
+        .into_iter()
+        .map(|(_, at)| at)
+        .collect();
+    generated
+        .parts
+        .iter()
+        .filter(|part| {
+            let (x0, y0, x1, y1) = bbox(&part_points(part));
+            badges
+                .iter()
+                .any(|&(x, y)| x >= x0 && x <= x1 && y >= y0 && y <= y1)
+        })
+        .collect()
+}
+
+fn auto_spacing(generated: &Generated) -> f64 {
+    generated
+        .automatic
+        .iter()
+        .find(|(key, _)| *key == "slit_spacing")
+        .and_then(|(_, value)| value.clone().length())
+        .expect("slit spacing is reported as automatic")
+        .as_mm()
+}
+
+fn value_mm(value: Option<ParamValue>) -> Option<f64> {
+    value
+        .and_then(|v| v.length())
+        .map(curvyo_document_core::Length::as_mm)
+}
+
+fn assert_no_overlap(generated: &Generated) {
+    let boxes: Vec<(f64, f64, f64, f64)> = generated
+        .parts
+        .iter()
+        .map(|part| bbox(&part_points(part)))
+        .collect();
+    for (i, a) in boxes.iter().enumerate() {
+        for b in boxes.iter().skip(i + 1) {
+            let overlap_x = a.2.min(b.2) - a.0.max(b.0);
+            let overlap_y = a.3.min(b.3) - a.1.max(b.1);
+            assert!(
+                overlap_x <= 1e-6 || overlap_y <= 1e-6,
+                "two parts overlap: {a:?} and {b:?}"
+            );
+        }
+    }
+}
+
+/// Every wall piece is the wall height (inside height plus cover and lid) within 0.5 mm.
+fn assert_pieces_at_wall_height(generated: &Generated) {
+    let height = wall_height(generated);
+    let pieces = wall_parts(generated);
+    assert_eq!(
+        pieces.len(),
+        piece_badges(generated).len(),
+        "every badge sits on a wall piece"
+    );
+    for part in pieces {
+        assert!(
+            (part_height(part) - height).abs() <= 0.5,
+            "a wall piece is {} mm high, the wall height is {height} mm",
+            part_height(part)
+        );
+    }
+}
+
+/// The strip in its own frame, as `0147` maps it: `u` along the long axis from its minimum, `v`
+/// across the wall (`v = 0` the base edge, `v = height` the ring edge).
+struct Strip {
+    paths: Vec<Vec<Pt>>,
+    length: f64,
+    height: f64,
+}
+
+fn strip_of_part(part: &Part, height: f64) -> Strip {
+    let paths: Vec<Vec<Pt>> = part.paths.iter().map(sample).collect();
+    let flat: Vec<Pt> = paths.iter().flatten().copied().collect();
+    let (x0, y0, x1, y1) = bbox(&flat);
+    let along_x = (x1 - x0 - height).abs() > (y1 - y0 - height).abs();
+    let mapped = paths
+        .iter()
+        .map(|path| {
+            path.iter()
+                .map(|&(x, y)| {
+                    if along_x {
+                        (x - x0, y - y0)
+                    } else {
+                        (y - y0, x - x0)
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    Strip {
+        paths: mapped,
+        length: if along_x { x1 - x0 } else { y1 - y0 },
+        height: if along_x { y1 - y0 } else { x1 - x0 },
+    }
+}
+
+/// The neutral line of a rounded box (ADR 0082 section 4), copied from `0147`.
+fn neutral_length(w: f64, d: f64, r: f64, t: f64) -> f64 {
+    2.0 * (w - 2.0 * r) + 2.0 * (d - 2.0 * r) + PI * (2.0 * r + t)
+}
+
+/// The expected length with `windows` flat tab windows on bent spans (copied from `0147`, criterion
+/// 3): `neutral - N (r theta - l)`, `l = 2 t_p + 2 t_w`, `theta = 2 asin(l / (2 r))`.
+fn expected_strip_length(w: f64, d: f64, r: f64, t_w: f64, t_p: f64, windows: usize) -> f64 {
+    let neutral = neutral_length(w, d, r, t_w);
+    if windows == 0 {
+        return neutral;
+    }
+    let l = 2.0 * t_p + 2.0 * t_w;
+    let theta = 2.0 * (l / (2.0 * r)).asin();
+    let per_window = r * theta - l;
+    neutral - f64::from(u32::try_from(windows).unwrap()) * per_window
+}
+
+/// The centres `u` of the tab notches at one edge of the strip (copied from `0147`): flat runs at
+/// the notch bottom `v = level`, each of the length of a tab (`2 t_p`), counted once per run.
+fn notch_centres(strip: &Strip, level: f64, t_p: f64) -> Vec<f64> {
+    let mut centres = Vec::new();
+    for path in &strip.paths {
+        let mut run: Vec<f64> = Vec::new();
+        let close = |run: &mut Vec<f64>, centres: &mut Vec<f64>| {
+            if run.len() >= 2 {
+                let lo = run.iter().copied().fold(f64::INFINITY, f64::min);
+                let hi = run.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                if hi - lo > 1.5 * t_p && hi - lo <= 2.0 * t_p + 0.01 {
+                    centres.push(f64::midpoint(lo, hi));
+                }
+            }
+            run.clear();
+        };
+        for &(u, v) in path {
+            if (v - level).abs() < 1e-3 {
+                run.push(u);
+            } else {
+                close(&mut run, &mut centres);
+            }
+        }
+        close(&mut run, &mut centres);
+    }
+    centres
+}
+
+/// The bent runs of a strip (copied from the idea of `0147`'s windows): the length minus the
+/// margin at both ends (the solid seam or joint margin, `2 t`) and minus each window of half
+/// length `half` around a tab centre.
+fn bent_runs(length: f64, centres: &[f64], half: f64, margin: f64) -> Vec<(f64, f64)> {
+    let mut cuts: Vec<(f64, f64)> = centres.iter().map(|&c| (c - half, c + half)).collect();
+    cuts.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut runs = Vec::new();
+    let mut cursor = margin;
+    for (a, b) in cuts {
+        if a > cursor {
+            runs.push((cursor, a.min(length - margin)));
+        }
+        cursor = cursor.max(b);
+    }
+    if cursor < length - margin {
+        runs.push((cursor, length - margin));
+    }
+    runs.retain(|&(a, b)| b > a);
+    runs
+}
+
+/// Whether the horizontal line `v` crosses an edge of the strip with `u` inside `[a, b]` (copied
+/// from `0147`: a slot or an edge notch cuts the line there).
+fn line_is_cut(strip: &Strip, v: f64, a: f64, b: f64) -> bool {
+    for path in &strip.paths {
+        let n = path.len();
+        for i in 0..n {
+            let (u0, v0) = path[i];
+            let (u1, v1) = path[(i + 1) % n];
+            if (v0 - v) * (v1 - v) < 0.0 {
+                let s = (v - v0) / (v1 - v0);
+                let u = u0 + s * (u1 - u0);
+                if u >= a && u <= b {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// The number of uncut height lines across the given bent runs (copied from `0147`), and the first.
+fn uncut_bands(strip: &Strip, runs: &[(f64, f64)]) -> (usize, Option<(f64, f64)>) {
+    let mut failures = 0;
+    let mut first = None;
+    let mut v = 0.05;
+    while v < strip.height - 0.05 {
+        for &(a, b) in runs {
+            if !line_is_cut(strip, v, a, b) {
+                failures += 1;
+                first.get_or_insert((v, a));
+            }
+        }
+        v += 0.1;
+    }
+    (failures, first)
+}
+
+/// Half the length of a tab window: `l / 2` with `l = 2 t_p + 2 t_w`.
+fn half_window(t_p: f64, t_w: f64) -> f64 {
+    t_p + t_w
+}
+
+/// The wall thickness and the plate thickness of a wall.
+fn wall_context(generated: &Generated) -> (f64, f64) {
+    (
+        length_of(generated, "thickness"),
+        used(generated, "plate_thickness"),
+    )
+}
+
+// ---------- criterion 13: heart, shield, ellipse and circle build ----------
+
+#[test]
+fn criterion_13_a_heart_builds_with_two_joints_two_pieces_and_two_bent_spans() {
+    let generated = build(&curve_params(&heart()), None);
+    assert!(
+        !generated.parts.is_empty(),
+        "the heart is built, no refusal"
+    );
+    assert_eq!(
+        warnings(&generated, "outline_curved"),
+        0,
+        "no curve refusal"
+    );
+    assert_eq!(
+        corner_marks(&generated).len(),
+        2,
+        "the notch and the tip are joints"
+    );
+    assert_eq!(
+        piece_badges(&generated).len(),
+        2,
+        "two wall pieces, one per side of the heart"
+    );
+    assert!(bend_marks(&generated).len() >= 2, "two bent spans");
+    assert_pieces_at_wall_height(&generated);
+    assert_no_overlap(&generated);
+}
+
+#[test]
+fn criterion_13_a_shield_builds_as_two_pieces_between_two_corners() {
+    let generated = build(&curve_params(&shield()), None);
+    assert!(
+        !generated.parts.is_empty(),
+        "the shield is built, no refusal"
+    );
+    assert_eq!(
+        corner_marks(&generated).len(),
+        2,
+        "the two top corners are joints, the sides meet the bottom tangentially"
+    );
+    assert_eq!(
+        piece_badges(&generated).len(),
+        2,
+        "the flat top and the piece through the sides and the bottom"
+    );
+    assert!(
+        !bend_marks(&generated).is_empty(),
+        "the bottom is a bent span"
+    );
+    assert_pieces_at_wall_height(&generated);
+    assert_no_overlap(&generated);
+}
+
+#[test]
+fn criterion_13_an_ellipse_and_a_circle_build_as_one_strip_with_no_corner() {
+    for outline in [ellipse_cubics(40.0, 25.0, 4), ellipse_cubics(30.0, 30.0, 4)] {
+        let generated = build(&curve_params(&outline), None);
+        assert!(!generated.parts.is_empty(), "built, no refusal");
+        assert!(corner_marks(&generated).is_empty(), "no corner");
+        assert!(
+            piece_badges(&generated).is_empty(),
+            "one strip: no piece badge"
+        );
+        assert!(!bend_marks(&generated).is_empty(), "the strip is bent");
+        assert!(
+            (part_height(widest_part(&generated)) - wall_height(&generated)).abs() <= 0.5,
+            "the strip is the inside height plus cover and lid, within 0.5 mm"
+        );
+        assert_no_overlap(&generated);
+    }
+}
+
+// ---------- criterion 14: the arc fit and the junctions ----------
+
+#[test]
+fn criterion_14_every_bent_span_lies_within_0_01_mm_of_its_drawn_curve() {
+    for path in [
+        heart(),
+        shield(),
+        ellipse_cubics(40.0, 25.0, 4),
+        ellipse_cubics(30.0, 30.0, 4),
+    ] {
+        let generated = build(&curve_params(&path), None);
+        let dense = sample_dense(&path);
+        let mut checked = 0;
+        for mark in &generated.marks.on_footprint {
+            if let Mark::Bend {
+                start, segments, ..
+            } = mark
+            {
+                for point in sample_from(*start, segments, 32) {
+                    let off = distance_to_polyline(point, &dense);
+                    assert!(
+                        off <= 0.011,
+                        "a bent span point is {off:.4} mm off the drawn curve"
+                    );
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 0, "the bent spans are marked and sampled");
+    }
+}
+
+#[test]
+fn criterion_14_a_circle_of_four_cubics_and_one_of_eight_give_the_same_strip_and_slit_count() {
+    let four = build(&curve_params(&ellipse_cubics(30.0, 30.0, 4)), None);
+    let eight = build(&curve_params(&ellipse_cubics(30.0, 30.0, 8)), None);
+    let (a, b) = (widest_part(&four), widest_part(&eight));
+    assert!(
+        (part_width(a) - part_width(b)).abs() <= 0.1,
+        "the strip lengths agree within 0.1 mm: {} and {}",
+        part_width(a),
+        part_width(b)
+    );
+    assert_eq!(
+        a.paths.len(),
+        b.paths.len(),
+        "the same number of slit paths in the strip"
+    );
+    assert!(corner_marks(&four).is_empty() && corner_marks(&eight).is_empty());
+}
+
+// ---------- criterion 6: the strip length and the slit spacing ----------
+
+#[test]
+fn criterion_6_a_circle_strip_is_its_neutral_line_less_the_flat_tab_windows() {
+    // ADR 0082 section 4 as `0147` criterion 3: each flat tab window on the bent run replaces its
+    // arc by its chord; the windows are the tab notches of the base row.
+    let circle = ellipse_cubics(30.0, 30.0, 4);
+    let generated = build(&curve_params(&circle), None);
+    let (t_w, t_p) = wall_context(&generated);
+    let strip = strip_of_part(widest_part(&generated), wall_height(&generated));
+    let windows = notch_centres(&strip, t_w, t_p).len();
+    let expected = expected_strip_length(60.0, 60.0, 30.0, t_w, t_p, windows);
+    assert!(
+        (strip.length - expected).abs() <= 0.1,
+        "the strip is {:.3} mm, expected {expected:.3} mm with {windows} windows",
+        strip.length
+    );
+}
+
+#[test]
+fn criterion_6_the_reported_slit_spacing_is_the_smallest_gap_within_the_automatic_bound() {
+    // The reported value is the smallest gap used (spec revision 7, criterion 2). Columns sit at
+    // equal steps with N = max(2, floor(integral ds / g)), so a gap is L / N >= g, slightly above
+    // g = 0.22 r; N is not observable, so the upper bound is taken as twice the bound.
+    for radius in [15.0, 60.0] {
+        let generated = build(&curve_params(&ellipse_cubics(radius, radius, 4)), None);
+        let reported = auto_spacing(&generated);
+        let slit_width = used(&generated, "slit_width");
+        let bound = (0.22 * radius).max(slit_width + 1.0);
+        // Short stretches between windows still carry 2 columns, so the smallest gap may be well
+        // below 0.22 r; only the gap rule is hard (final ruling).
+        assert!(
+            reported >= slit_width + 1.0 - 1e-6,
+            "radius {radius}: reported {reported:.3} mm is below the slit width plus 1 mm"
+        );
+        assert!(
+            reported <= 2.0 * bound + 1e-6,
+            "radius {radius}: reported {reported:.3} mm is above twice the bound {bound:.3} mm"
+        );
+    }
+}
+
+// ---------- criterion 7: a radius below 2 t is built with a notice ----------
+
+#[test]
+fn criterion_7_a_radius_below_twice_the_wall_is_built_with_a_tight_bend_notice_and_no_clamp() {
+    // An ellipse 120 x 16 mm: its ends have a radius of 16 squared over 120, about 1.07 mm.
+    let thin = ellipse_cubics(60.0, 8.0, 4);
+    let generated = build(&curve_params(&thin), None);
+    assert!(!generated.parts.is_empty(), "built anyway, no refusal");
+    assert!(
+        warnings(&generated, "tight_bend") >= 1,
+        "a tight_bend notice"
+    );
+    let notice = generated
+        .warnings
+        .iter()
+        .find(|w| w.id == "tight_bend")
+        .expect("the notice");
+    let radius = value_mm(notice.value.clone()).expect("the notice carries the radius");
+    assert!(
+        (radius - 64.0 / 60.0).abs() <= 0.05,
+        "the smallest radius is about 1.07 mm, got {radius:.3}"
+    );
+    let limit = value_mm(notice.limit.clone()).expect("the notice carries the limit");
+    assert!((limit - 6.0).abs() <= 1e-6, "the limit is 2 t = 6 mm");
+    assert!(
+        clamped(&generated, "thickness").is_none(),
+        "no value clamped"
+    );
+    assert_eq!(
+        stored_outline(&generated).flat(),
+        thin.flat(),
+        "the path is not changed"
+    );
+    let round = build(&curve_params(&ellipse_cubics(30.0, 30.0, 4)), None);
+    assert_eq!(
+        warnings(&round, "tight_bend"),
+        0,
+        "a circle of 30 mm has no tight bend"
+    );
+}
+
+// ---------- criterion 9: the seam of a smooth outline ----------
+
+#[test]
+fn criterion_9_a_circle_or_ellipse_has_one_strip_and_its_seam_at_the_least_y_point() {
+    for (outline, expected_y) in [
+        (ellipse_cubics(30.0, 30.0, 4), -30.0),
+        (ellipse_cubics(40.0, 25.0, 4), -25.0),
+        (ellipse_cubics(25.0, 40.0, 4), -40.0),
+    ] {
+        let generated = build(&curve_params(&outline), None);
+        let seams: Vec<Point> = generated
+            .marks
+            .on_footprint
+            .iter()
+            .chain(generated.marks.on_parts.iter())
+            .filter_map(|mark| match mark {
+                Mark::Seam { at, .. } => Some(*at),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(seams.len(), 1, "one seam mark");
+        assert!(
+            seams[0].x.abs() <= 0.01 && (seams[0].y - expected_y).abs() <= 0.01,
+            "the seam at ({}, {}), expected (0, {expected_y})",
+            seams[0].x,
+            seams[0].y
+        );
+        assert!(piece_badges(&generated).is_empty(), "one strip");
+    }
+}
+
+#[test]
+fn criterion_9_no_slit_lies_within_2_t_of_the_seam_on_a_circle_or_an_ellipse() {
+    for outline in [
+        ellipse_cubics(30.0, 30.0, 4),
+        ellipse_cubics(40.0, 25.0, 4),
+        ellipse_cubics(25.0, 40.0, 4),
+    ] {
+        let generated = build(&curve_params(&outline), None);
+        let t = length_of(&generated, "thickness");
+        let strip = strip_of_part(widest_part(&generated), wall_height(&generated));
+        // The seam is the butt at both ends of the strip (u = 0 and u = length); an interior
+        // point of any outline (a slot, an edge notch) within 2 t of either end is a slit there.
+        let mut hits = Vec::new();
+        for path in &strip.paths {
+            for &(u, v) in path {
+                let interior = v > 0.01 && v < strip.height - 0.01;
+                let near = (u > 1e-3 && u < 2.0 * t)
+                    || (u > strip.length - 2.0 * t && u < strip.length - 1e-3);
+                if interior && near {
+                    hits.push((u, v));
+                }
+            }
+        }
+        assert!(
+            hits.is_empty(),
+            "slit points within 2 t of the seam: {hits:?}"
+        );
+    }
+}
+
+#[test]
+fn criterion_9_6_no_uncut_band_across_a_bent_run_of_the_circle() {
+    // The circle is one bent run; the seam margin (2 t at both butt ends) and the tab windows are
+    // the only places without a slit (ADR 0083 section 6, ADR 0082 section 5).
+    let generated = build(&curve_params(&ellipse_cubics(30.0, 30.0, 4)), None);
+    let (t_w, t_p) = wall_context(&generated);
+    let strip = strip_of_part(widest_part(&generated), wall_height(&generated));
+    let centres = notch_centres(&strip, t_w, t_p);
+    let runs = bent_runs(strip.length, &centres, half_window(t_p, t_w), 2.0 * t_w);
+    assert!(!runs.is_empty(), "the circle has bent runs");
+    let (failures, first) = uncut_bands(&strip, &runs);
+    assert_eq!(
+        failures, 0,
+        "an uncut band across a bent run, first at {first:?}"
+    );
+}
+
+#[test]
+fn criterion_6_no_uncut_band_across_a_bent_piece_of_the_heart() {
+    // Every heart wall piece is one lobe, bent from one corner to the next; its ends carry the
+    // solid margin of 2 t and its tab windows are the notches of the base row.
+    let generated = build(&curve_params(&heart()), None);
+    let (t_w, t_p) = wall_context(&generated);
+    let height = wall_height(&generated);
+    let pieces = wall_parts(&generated);
+    assert_eq!(pieces.len(), 2, "two lobes");
+    for part in pieces {
+        let strip = strip_of_part(part, height);
+        let centres = notch_centres(&strip, t_w, t_p);
+        let runs = bent_runs(strip.length, &centres, half_window(t_p, t_w), 2.0 * t_w);
+        let (failures, first) = uncut_bands(&strip, &runs);
+        assert_eq!(
+            failures, 0,
+            "an uncut band across a heart lobe, first at {first:?}"
+        );
+    }
+}
+
+// ---------- criterion 10: the plates follow the outline; the hollow on the lid ----------
+
+#[test]
+fn criterion_10_a_circle_cover_and_base_follow_the_outline_offset_by_the_wall() {
+    let generated = build(&curve_params(&ellipse_cubics(30.0, 30.0, 4)), None);
+    let strip_width = part_width(widest_part(&generated));
+    let plates: Vec<&Part> = generated
+        .parts
+        .iter()
+        .filter(|part| part_width(part) < 0.5 * strip_width)
+        .collect();
+    assert!(plates.len() >= 2, "an inner base and a cover at least");
+    let base_area = PI * 30.0 * 30.0;
+    let cover_area = PI * 33.0 * 33.0;
+    let close = |a: f64, b: f64| (a - b).abs() <= 0.05 * b;
+    assert!(
+        plates.iter().any(|p| close(outer_area(p), base_area)),
+        "a plate of the outline's area {base_area:.1} mm2"
+    );
+    assert!(
+        plates.iter().any(|p| close(outer_area(p), cover_area)),
+        "a plate of the outline offset outward by the wall, {cover_area:.1} mm2"
+    );
+    assert_eq!(
+        warnings(&generated, "hollow_left_out"),
+        0,
+        "the hollow is placed on the circle"
+    );
+}
+
+#[test]
+fn criterion_10_the_default_heart_keeps_its_exact_cover_and_its_finger_hollow() {
+    // Spec revision 8 (32fc30e2): the default heart's notch (about 100 degrees) is not narrow.
+    let generated = build(&curve_params(&heart()), None);
+    assert_eq!(
+        warnings(&generated, "hollow_left_out"),
+        0,
+        "the heart gets the hollow on its longest convex curve"
+    );
+    assert_eq!(
+        warnings(&generated, "cover_rounded"),
+        0,
+        "the heart's cover is the exact offset"
+    );
+}
+
+// ---------- criterion 11: the heart's edit budget (thread CPU time) ----------
+
+#[cfg(target_os = "linux")]
+#[test]
+fn criterion_11_a_heart_edit_regenerates_within_300_ms_of_thread_cpu() {
+    let base = build(&curve_params(&heart()), None);
+    let started = thread_ticks();
+    let changed = build(&base.params, Some(Edit::Param("inner_height")));
+    let ended = thread_ticks();
+    assert!(!changed.parts.is_empty(), "the regeneration has parts");
+    if let (Some(start), Some(end)) = (started, ended) {
+        // Clock ticks are 10 ms each: anything under 300 ms reads as at most 30 ticks.
+        assert!(
+            (end - start) * 10 < 300 + 10,
+            "the regeneration took {} ms of thread CPU",
+            (end - start) * 10
+        );
+    }
+}
+
+// ---------- criterion 15: Corner angle on curved outlines ----------
+
+#[test]
+fn criterion_15_the_heart_keeps_its_two_joints_at_corner_angles_5_25_and_90() {
+    for angle in [5.0, 25.0, 90.0] {
+        let generated = build(
+            &stored_with(
+                &heart(),
+                &[
+                    ("inner_height", mm(30.0)),
+                    ("thickness", mm(3.0)),
+                    ("corner_angle", deg(angle)),
+                ],
+            ),
+            None,
+        );
+        assert_eq!(
+            corner_marks(&generated).len(),
+            2,
+            "the notch and the tip are joints at Corner angle {angle}"
+        );
+        assert!(
+            bend_marks(&generated).len() >= 2,
+            "the lobes are bent spans at Corner angle {angle}"
+        );
+    }
+}
+
+#[test]
+fn criterion_15_a_node_turning_by_20_degrees_is_a_corner_at_5_and_a_kink_at_25_and_90() {
+    let outline = kinked_circle();
+    let at = |angle: f64| {
+        build(
+            &stored_with(
+                &outline,
+                &[
+                    ("inner_height", mm(30.0)),
+                    ("thickness", mm(3.0)),
+                    ("corner_angle", deg(angle)),
+                ],
+            ),
+            None,
+        )
+    };
+    let five = at(5.0);
+    assert_eq!(
+        corner_marks(&five).len(),
+        1,
+        "a 20 degree turn is a corner at 5 degrees"
+    );
+    for angle in [25.0, 90.0] {
+        let generated = at(angle);
+        assert!(
+            corner_marks(&generated).is_empty(),
+            "no corner at {angle} degrees"
+        );
+        assert!(
+            !bend_marks(&generated).is_empty(),
+            "a kink, built as a bent span, at {angle}"
+        );
+    }
+}
+
+// ---------- criterion 16: the narrow V notch falls back to a rounded cover ----------
+
+#[test]
+fn criterion_16_a_narrow_v_notch_gives_the_cover_notice_and_no_finger_hollow() {
+    let outline = polygon(&NOTCHED);
+    let generated = build(&stored_with(&outline, &[("thickness", mm(3.0))]), None);
+    assert!(!generated.parts.is_empty(), "built anyway, no refusal");
+    assert_eq!(
+        warnings(&generated, "cover_rounded"),
+        1,
+        "the cover is rounded at the notch"
+    );
+    assert_eq!(
+        warnings(&generated, "hollow_left_out"),
+        0,
+        "the rounded cover carries no finger hollow notice"
+    );
+    assert_eq!(
+        stored_outline(&generated).flat(),
+        outline.flat(),
+        "the path is not changed"
+    );
 }

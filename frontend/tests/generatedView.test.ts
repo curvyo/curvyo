@@ -260,7 +260,7 @@ test("the slider's end is the live limit when it is lower than the track's end",
 });
 
 test("a refusal shows in the refusal look for 8 s, a warning as a status for 5 s (0149 UX §1.2, §6)", () => {
-  assert.deepEqual(canvasNoticeLook("This outline has curves. Box from path builds straight outlines only so far. Nothing was changed."), {
+  assert.deepEqual(canvasNoticeLook("The outline crosses itself. Nothing was changed."), {
     kind: "alert",
     ms: 8000,
   });

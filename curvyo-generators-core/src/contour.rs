@@ -386,7 +386,12 @@ fn intersect(a: &Seg, b: &Seg, near: Point) -> Option<Point> {
     })
 }
 
-fn line_line(first: Point, first_end: Point, second: Point, second_end: Point) -> Option<Point> {
+pub(crate) fn line_line(
+    first: Point,
+    first_end: Point,
+    second: Point,
+    second_end: Point,
+) -> Option<Point> {
     let (ux, uy) = (first_end.x - first.x, first_end.y - first.y);
     let (vx, vy) = (second_end.x - second.x, second_end.y - second.y);
     let det = ux * vy - uy * vx;
@@ -397,7 +402,7 @@ fn line_line(first: Point, first_end: Point, second: Point, second_end: Point) -
     Some(Point::new(first.x + along * ux, first.y + along * uy))
 }
 
-fn line_circle(from: Point, to: Point, centre: Point, radius: f64) -> Vec<Point> {
+pub(crate) fn line_circle(from: Point, to: Point, centre: Point, radius: f64) -> Vec<Point> {
     let (dx, dy) = (to.x - from.x, to.y - from.y);
     let (fx, fy) = (from.x - centre.x, from.y - centre.y);
     let quad = dx * dx + dy * dy;
@@ -417,7 +422,7 @@ fn line_circle(from: Point, to: Point, centre: Point, radius: f64) -> Vec<Point>
     .collect()
 }
 
-fn circle_circle(c1: Point, r1: f64, c2: Point, r2: f64) -> Vec<Point> {
+pub(crate) fn circle_circle(c1: Point, r1: f64, c2: Point, r2: f64) -> Vec<Point> {
     let (dx, dy) = (c2.x - c1.x, c2.y - c1.y);
     let d = libm::hypot(dx, dy);
     if d < 1e-12 || d > r1 + r2 || d < (r1 - r2).abs() {

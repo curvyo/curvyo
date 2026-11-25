@@ -40,6 +40,9 @@ pub(crate) struct Span {
     pub(crate) whole: Option<Whole>,
     /// A flat window on a bend: the chord a tab stands on, with no slit column (ADR 0082 §5).
     pub(crate) window: bool,
+    /// A wall piece of a path box starts at this span, at a corner: runs of bends and windows
+    /// stop here (ADR 0083 §13.4).
+    pub(crate) piece_start: bool,
 }
 
 /// A straight as the maker sees it, possibly split by the seam.
@@ -216,6 +219,7 @@ impl Footprint {
                 length,
                 whole,
                 window: false,
+                piece_start: false,
             });
             s0 += length;
         }
@@ -246,6 +250,7 @@ impl Footprint {
                         seam: false,
                     }),
                     window: false,
+                    piece_start: false,
                 };
                 s0 += length;
                 span
@@ -258,6 +263,29 @@ impl Footprint {
         }
     }
 
+    /// Marks the spans a wall piece starts at: `piece_of[i]` is the piece of span `i` (a footprint
+    /// from `from_shapes`, one span per shape).
+    pub(crate) fn mark_pieces(&mut self, piece_of: &[usize]) {
+        for (index, span) in self.spans.iter_mut().enumerate() {
+            span.piece_start = index == 0 || piece_of.get(index) != piece_of.get(index - 1);
+        }
+    }
+
+    /// Makes the spans with a non-zero entry of `turns` flats: a flat is a chord that replaces a
+    /// stretch turning by that much (signed), so its neutral length holds half a wall thickness
+    /// times the turn and it carries no tab (ADR 0083 §13.5, §13.7).
+    pub(crate) fn with_flat_turns(&mut self, turns: &[f64]) {
+        let mut s0 = 0.0;
+        for (span, &turn) in self.spans.iter_mut().zip(turns) {
+            if turn != 0.0 {
+                span.whole = None;
+                span.length += self.wall / 2.0 * turn;
+            }
+            span.s0 = s0;
+            s0 += span.length;
+        }
+    }
+
     /// The strip's length on the neutral line.
     pub(crate) fn total(&self) -> f64 {
         self.spans.iter().map(|span| span.length).sum()
@@ -267,7 +295,9 @@ impl Footprint {
 pub(crate) fn neutral_length(shape: &Shape, wall: f64) -> f64 {
     match *shape {
         Shape::Straight { .. } => straight_length(shape),
-        Shape::Bend { radius, sweep, .. } => sweep.abs() * (radius + sweep.signum() * wall / 2.0),
+        Shape::Bend { radius, sweep, .. } => {
+            sweep.abs() * (radius + sweep.signum() * wall / 2.0).max(0.0)
+        }
     }
 }
 
@@ -355,7 +385,7 @@ fn back_middle(pieces: &[Piece], size: (f64, f64)) -> (usize, f64) {
 }
 
 /// The shape cut `at` along it into the part before and the part after (`None` at either end).
-fn split(shape: &Shape, at: f64) -> (Shape, Option<Shape>) {
+pub(crate) fn split(shape: &Shape, at: f64) -> (Shape, Option<Shape>) {
     match *shape {
         Shape::Straight { from, to } => {
             let length = straight_length(shape);

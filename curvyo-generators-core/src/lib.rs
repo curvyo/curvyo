@@ -18,10 +18,13 @@ mod outline;
 mod path_box;
 mod rounded_box;
 mod schema;
+mod shape_ops;
 mod slit_bend;
 mod tab_layout;
+mod tab_runs;
 mod values;
 mod wall;
+mod wall_bands;
 mod wall_plates;
 mod wave_slot;
 

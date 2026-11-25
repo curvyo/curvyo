@@ -1,6 +1,6 @@
 //! The overlay of a path box as strokes (ADR 0083 §11, UX notes `0149` §3): a cross at every
-//! corner, a striped band on every bent span and the piece numbers on discs, each a
-//! stripe and disc in page mm.
+//! corner, a striped band on every bent stretch, a tick at the seam and the piece numbers on
+//! discs, each a stripe and disc in page mm.
 
 use curvyo_document_core::Point;
 use curvyo_extension_core::{Mark, Marks};
@@ -17,6 +17,8 @@ const DISC_PX: f64 = 16.0;
 const RING_PX: f64 = 12.0;
 const BADGE_OFFSET_PX: f64 = 12.0;
 const ARM_PX: f64 = 4.0;
+/// The seam tick, in pixels long.
+const TICK_PX: f64 = 10.0;
 
 /// The look of a piece of the overlay; the shell turns it into a colour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -220,6 +222,37 @@ fn corner(
     }
 }
 
+/// A tick across the footprint line at the seam, 10 px long, centred on it.
+fn seam(
+    at: Point,
+    inward: curvyo_document_core::Vec2,
+    pixel: f64,
+    map: &dyn Fn(Point) -> Point,
+    out: &mut Overlay,
+) {
+    let half = TICK_PX * pixel / 2.0;
+    let toward = Point::new(inward.x, inward.y);
+    out.lines.push((
+        map(add(at, toward, -half)),
+        map(add(at, toward, half)),
+        Tone::Accent,
+    ));
+}
+
+/// The badges on the wall pieces of the layout.
+fn part_badges(marks: &[Mark], map: &dyn Fn(Point) -> Point, pixel: f64, out: &mut Overlay) {
+    let mut placed: Vec<Point> = Vec::new();
+    for mark in marks {
+        if let Mark::Piece { number, at, .. } = mark {
+            let place = map(*at);
+            if !collides(&placed, place, pixel) {
+                placed.push(place);
+                badge(*number, place, pixel, out);
+            }
+        }
+    }
+}
+
 /// The overlay of `marks`. `on_base` maps the marks on the footprint to the page, `on_part` the
 /// marks on the wall pieces; `pixel` is the size of a screen pixel in page mm; `badges` is off
 /// for the outline the pointer hovers.
@@ -248,6 +281,7 @@ pub fn overlay(
                 let tone = if *tight { Tone::Warning } else { Tone::Stripe };
                 stripes(*start, segments, pixel, tone, on_base, &mut out);
             }
+            Mark::Seam { at, inward } => seam(*at, *inward, pixel, on_base, &mut out),
             Mark::Piece {
                 number,
                 at,
@@ -267,15 +301,8 @@ pub fn overlay(
             Mark::Piece { .. } => {}
         }
     }
-    let mut on_parts: Vec<Point> = Vec::new();
-    for mark in marks.on_parts.iter().filter(|_| badges) {
-        if let Mark::Piece { number, at, .. } = mark {
-            let place = on_part(*at);
-            if !collides(&on_parts, place, pixel) {
-                on_parts.push(place);
-                badge(*number, place, pixel, &mut out);
-            }
-        }
+    if badges {
+        part_badges(&marks.on_parts, on_part, pixel, &mut out);
     }
     out
 }

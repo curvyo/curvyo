@@ -319,6 +319,8 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         draft: matches!(request.edit, Some(Edit::Draft)),
         ends: None,
         local_spacing: None,
+        runs: false,
+        seam_margin: 0.0,
     };
     let strip = Piece::new(wall.contours(&tabs), s.wall, "strip");
 
