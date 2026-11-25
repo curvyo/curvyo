@@ -151,7 +151,7 @@ impl Session {
         constraint: &Constraint,
     ) -> Option<(DimensionItem, PendingRecord)> {
         let expression = constraint.relation.expression()?;
-        let (geometry, span) = super::dimension_geometry::dimension_geometry(
+        let (geometry, span) = curvyo_ui_core::sketch_dimension_geometry::dimension_geometry(
             solution,
             &constraint.relation,
             snapshot.placement,

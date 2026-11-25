@@ -9,7 +9,6 @@ mod commands;
 mod construction_preview;
 mod creation;
 mod cursor;
-mod dimension_geometry;
 mod dimension_placement;
 mod drag;
 mod draw;

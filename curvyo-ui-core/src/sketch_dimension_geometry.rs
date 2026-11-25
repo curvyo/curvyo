@@ -1,7 +1,7 @@
 //! The geometry each sketch dimension measures, in document coordinates.
+use crate::DimensionGeometry;
 use curvyo_document_core::{Affine, Point, Vec2};
 use curvyo_sketch_core::{Entity, EntityId, Relation, Sketch};
-use curvyo_ui_core::DimensionGeometry;
 
 fn point(solution: &Sketch, id: &EntityId, placement: Affine) -> Option<Point> {
     let p = solution.point(id).ok()?;
@@ -52,7 +52,8 @@ fn line(solution: &Sketch, id: &EntityId, placement: Affine) -> Option<(Point, P
 
 /// The geometry a dimension measures, in document coordinates, and its size for the
 /// small-span rule; `None` for relations that are not dimensions.
-pub(super) fn dimension_geometry(
+#[must_use]
+pub fn dimension_geometry(
     solution: &Sketch,
     relation: &Relation,
     placement: Affine,
