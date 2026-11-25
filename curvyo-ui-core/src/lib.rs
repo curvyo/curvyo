@@ -355,6 +355,8 @@ mod instance_notice;
 pub mod instance_preview;
 mod instance_resize;
 pub mod instance_sketch;
+pub mod instance_sketch_handles;
+mod instance_sketch_view;
 pub mod instance_source;
 mod instance_view;
 pub mod instance_warnings;

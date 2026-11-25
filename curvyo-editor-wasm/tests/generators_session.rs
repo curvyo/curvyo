@@ -515,10 +515,10 @@ fn the_rim_knob_drags_the_rim_width_with_one_named_step() {
     let steps = s.history_len();
     s.pointer_hover(rim.at, false, false);
     s.pointer_down(rim.at, false);
-    let to = Point::new(
-        rim.at.x + rim.direction.x * 2.0,
-        rim.at.y + rim.direction.y * 2.0,
-    );
+    let curvyo_ui_core::instance_handles::KnobMotion::Along { direction, .. } = rim.motion else {
+        panic!("a line knob")
+    };
+    let to = Point::new(rim.at.x + direction.x * 2.0, rim.at.y + direction.y * 2.0);
     s.pointer_hover(to, false, false);
     assert_eq!(s.history_len(), steps, "nothing is written during the drag");
     assert!(
@@ -631,12 +631,10 @@ fn the_corner_radius_knob_reads_r_and_says_full_round_at_the_limit() {
     s.pointer_hover(knob.at, false, false);
     s.pointer_down(knob.at, false);
     // A little along the diagonal: still a plain radius.
-    let step = |mm: f64| {
-        Point::new(
-            knob.at.x + knob.direction.x * mm,
-            knob.at.y + knob.direction.y * mm,
-        )
+    let curvyo_ui_core::instance_handles::KnobMotion::Along { direction, .. } = knob.motion else {
+        panic!("a line knob")
     };
+    let step = |mm: f64| Point::new(knob.at.x + direction.x * mm, knob.at.y + direction.y * mm);
     s.pointer_hover(step(2.0), false, false);
     let text = s.live_readout().unwrap().text;
     assert!(text.starts_with("r 19."), "{text}");

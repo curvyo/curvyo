@@ -98,7 +98,7 @@ fn rows_follow_the_exposed_list_with_the_value_a_clone_shows_and_where_it_comes_
         shown.rows[1].track_log,
         "no limits: a log track from 0 to 4 x the value"
     );
-    change(&d, &[a], "p:width", 80.0, &none()).unwrap();
+    change(&d, &[a], "p:width", 80.0, false, &none()).unwrap();
     let chained = view(&d, &[b], &[]).unwrap();
     assert_eq!(chained.state, "original", "B holds nothing itself");
     assert_eq!(chained.rows[0].origin, "inherited");
@@ -113,13 +113,13 @@ fn rows_follow_the_exposed_list_with_the_value_a_clone_shows_and_where_it_comes_
 #[test]
 fn a_typed_value_reaches_the_limit_and_says_so() {
     let (d, _, a, _) = setup();
-    let changed = change(&d, &[a], "p:width", 150.0, &none()).unwrap();
+    let changed = change(&d, &[a], "p:width", 150.0, false, &none()).unwrap();
     assert!(changed.written);
     assert_eq!(changed.notices, ["width set to 100 mm, the maximum."]);
     assert!((span(&d, a) - 100.0).abs() < 1e-6);
-    let low = change(&d, &[a], "p:width", 5.0, &none()).unwrap();
+    let low = change(&d, &[a], "p:width", 5.0, false, &none()).unwrap();
     assert_eq!(low.notices, ["width set to 20 mm, the minimum."]);
-    let same = change(&d, &[a], "p:width", 20.0, &none()).unwrap();
+    let same = change(&d, &[a], "p:width", 20.0, false, &none()).unwrap();
     assert!(!same.written, "an equal value writes nothing");
 }
 
@@ -127,7 +127,7 @@ fn a_typed_value_reaches_the_limit_and_says_so() {
 fn a_plan_shows_the_clone_without_writing() {
     let (d, _, a, _) = setup();
     let steps = d.history_len();
-    let planned = plan(&d, a, "p:width", 90.0).unwrap();
+    let planned = plan(&d, a, "p:width", 90.0, false).unwrap();
     let preview = planned.preview.unwrap();
     let xs: Vec<f64> = preview.resolved.anchors.iter().map(|p| p.point.x).collect();
     assert!(((xs[1] - xs[0]).abs() - 90.0).abs() < 1e-6);
@@ -143,7 +143,7 @@ fn own_writes_the_shown_values_so_nothing_moves_and_originals_drops_them() {
     let own = view(&d, &[a], &[]).unwrap();
     assert_eq!(own.state, "own");
     assert!(own.rows.iter().all(|row| row.origin == "own"));
-    change(&d, &[a], "p:width", 80.0, &none()).unwrap();
+    change(&d, &[a], "p:width", 80.0, false, &none()).unwrap();
     assert!(reset(&d, &[a], None).unwrap());
     assert!((span(&d, a) - 60.0).abs() < 1e-6);
     assert_eq!(view(&d, &[a], &[]).unwrap().state, "original");
@@ -156,8 +156,8 @@ fn own_writes_the_shown_values_so_nothing_moves_and_originals_drops_them() {
 #[test]
 fn back_drops_only_this_clones_value_in_a_chain() {
     let (d, _, a, b) = setup();
-    change(&d, &[a], "p:width", 80.0, &none()).unwrap();
-    change(&d, &[b], "p:width", 40.0, &none()).unwrap();
+    change(&d, &[a], "p:width", 80.0, false, &none()).unwrap();
+    change(&d, &[b], "p:width", 40.0, false, &none()).unwrap();
     assert!((span(&d, b) - 40.0).abs() < 1e-6);
     reset(&d, &[b], Some("p:width")).unwrap();
     assert!(

@@ -43,7 +43,10 @@ impl Session {
         if let Some(legend) = self.gesture_readout() {
             return Some(legend);
         }
-        if let Some(readout) = self.generator_knob_readout() {
+        if let Some(readout) = self
+            .generator_knob_readout()
+            .or_else(|| self.sketch_knob_readout())
+        {
             return Some(readout);
         }
         if self.select.move_in_flight() {

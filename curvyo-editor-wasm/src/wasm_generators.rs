@@ -92,8 +92,15 @@ impl WasmSession {
     }
 
     /// A value stepped into the field `key`, shown without writing; JSON `{notices, no_solution}`.
-    pub fn preview_sketch_instance_value(&mut self, key: &str, number: f64) -> String {
-        self.session.preview_sketch_instance_value(key, number)
+    /// `only_this` (Shift at the gesture's start on a linked value) changes it alone.
+    pub fn preview_sketch_instance_value(
+        &mut self,
+        key: &str,
+        number: f64,
+        only_this: bool,
+    ) -> String {
+        self.session
+            .preview_sketch_instance_value(key, number, only_this)
     }
 
     /// Drops the preview of a stepped field.
@@ -102,8 +109,10 @@ impl WasmSession {
     }
 
     /// A value typed or stepped into the field `key`; JSON `{written, notices}` or `{error}`.
-    pub fn set_sketch_instance_value(&mut self, key: &str, number: f64) -> String {
-        self.session.set_sketch_instance_value(key, number)
+    /// `only_this` as for `preview_sketch_instance_value`; a typed value passes `false`.
+    pub fn set_sketch_instance_value(&mut self, key: &str, number: f64, only_this: bool) -> String {
+        self.session
+            .set_sketch_instance_value(key, number, only_this)
     }
 
     /// Back to the sketch's value of `key`, or Original's for an empty `key`; one step.
@@ -129,5 +138,43 @@ impl WasmSession {
     /// Limits and name of the exposed `key`; empty on success, else the refusal sentence.
     pub fn sketch_exposed_limits(&mut self, key: &str, min: &str, max: &str, name: &str) -> String {
         self.session.sketch_exposed_limits(key, min, max, name)
+    }
+
+    /// Links the exposed values `a` and `b`; empty on success, else the refusal sentence.
+    pub fn sketch_link(&mut self, a: &str, b: &str) -> String {
+        self.session.sketch_link(a, b)
+    }
+
+    /// Takes the exposed `key` out of its link group; empty on success, else the refusal.
+    pub fn sketch_unlink(&mut self, key: &str) -> String {
+        self.session.sketch_unlink(key)
+    }
+
+    /// The open entry chip of a sketch-clone knob as JSON, empty while none is open.
+    #[must_use]
+    pub fn sketch_knob_entry_json(&self) -> String {
+        self.session.sketch_knob_entry_json()
+    }
+
+    /// Enter in a knob's entry chip; JSON `{written, notices}` or `{error}`.
+    pub fn commit_sketch_knob_entry(&mut self, text: &str) -> String {
+        self.session.commit_sketch_knob_entry(text)
+    }
+
+    /// Escape or a blur in a knob's entry chip: nothing is written.
+    pub fn cancel_sketch_knob_entry(&mut self) {
+        self.session.cancel_sketch_knob_entry();
+    }
+
+    /// Whether a sketch-clone knob is held (the Parameters row follows each move).
+    #[must_use]
+    pub fn sketch_knob_dragging(&self) -> bool {
+        self.session.sketch_knob_dragging()
+    }
+
+    /// The readout chip's glyph during a sketch-clone knob drag: `link`, `unlink` or empty.
+    #[must_use]
+    pub fn sketch_knob_chip_glyph(&self) -> String {
+        self.session.sketch_knob_chip_glyph().to_owned()
     }
 }

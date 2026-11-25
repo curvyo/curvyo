@@ -153,6 +153,8 @@ mod pen;
 mod place_on;
 mod row_drag;
 mod sketch_instance;
+mod sketch_instance_handles;
+mod sketch_knob_entry;
 mod sketch_moves;
 mod sketch_use;
 mod spiro_cache;
@@ -742,6 +744,8 @@ pub struct Session {
     generators: generators::GeneratorsState,
     /// The preview of a Parameters field being stepped (`sketch_instance.rs`, `specs/0099`).
     instances: sketch_instance::InstanceState,
+    /// The knobs of a selected sketch clone (`sketch_instance_handles.rs`, `specs/0099`).
+    sketch_knobs: sketch_instance_handles::SketchKnobs,
 }
 
 impl Session {
@@ -872,6 +876,7 @@ impl Session {
             test_grid: test_grid::TestGridTool::default(),
             generators: generators::GeneratorsState::default(),
             instances: sketch_instance::InstanceState::default(),
+            sketch_knobs: sketch_instance_handles::SketchKnobs::default(),
         }
     }
 
@@ -997,6 +1002,7 @@ impl Session {
             test_grid: test_grid::TestGridTool::default(),
             generators: generators::GeneratorsState::default(),
             instances: sketch_instance::InstanceState::default(),
+            sketch_knobs: sketch_instance_handles::SketchKnobs::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -1536,6 +1542,11 @@ impl Session {
             let Some(point) = sanitized_point(point) else {
                 return DoubleClickHint::None;
             };
+            // A knob of a selected sketch clone opens its entry chip and wins over Select original
+            // (`0099` criterion 25).
+            if this.tool == Tool::Select && this.sketch_knob_open_entry(point) {
+                return DoubleClickHint::None;
+            }
             if this.workbench() == Workbench::Sketch {
                 // A drawing object over the sketch page opens its own page (`specs/0106`
                 // criterion 16).

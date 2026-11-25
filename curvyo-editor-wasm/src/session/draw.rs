@@ -299,6 +299,7 @@ impl Session {
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
         list.extend(self.bend_preview_list(view, &objects));
         list.extend(self.generators_preview_overlay(view));
+        list.extend(self.instance_preview_overlay(view));
         list.extend(Self::no_solution_overlay(&artwork_objects, view));
         list.extend(self.path_box_marks_list(view));
         // The Node tool draws the nodes and handles of its editing set only (customer 2026-10-26).
@@ -362,6 +363,7 @@ impl Session {
         list.extend(self.test_grid_draw_list(view));
         list.extend(self.generators_draw_list(view));
         list.extend(self.generator_knobs_draw_list());
+        list.extend(self.sketch_knobs_draw_list());
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
         // the blue preview, whose white casing would otherwise cover it where the two coincide
         // (an unrotated object), and below the selection box and the handles.
