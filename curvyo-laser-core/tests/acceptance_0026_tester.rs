@@ -428,7 +428,8 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
     assert!(!text.ends_with("\n\n"));
     assert!(
         // Record format 7 since `specs/0150`.
-        text.starts_with("{\n  \"format_version\": 7,\n  \"id\": "),
+        // Record format 8 since `specs/0118` 2d (adrs P7).
+        text.starts_with("{\n  \"format_version\": 8,\n  \"id\": "),
         "{text}"
     );
     let order = [
@@ -449,6 +450,10 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
         // The default pair of record format 7 (`0150`).
         "\"default_power_pct\"",
         "\"default_speed_mm_min\"",
+        // The focus pulse of record format 8 (`0118` 2d, adrs P7).
+        "\"focus_pulse\"",
+        "\"focus_pulse_power_permille\"",
+        "\"focus_pulse_length_ms\"",
         "\"connection\"",
         // `fixture_sets` replaces `fixtures` in record format 5 (`0113`, ADR 0060 §1).
         "\"fixture_sets\"",
@@ -548,6 +553,10 @@ fn ac6_the_copy_holds_id_and_copied_values_and_no_connection_or_work_area() {
             // The default pair of `0150`.
             "default_power_pct",
             "default_speed_mm_min",
+            // The focus pulse of `0118` 2d (adrs P7).
+            "focus_pulse",
+            "focus_pulse_length_ms",
+            "focus_pulse_power_permille",
             "id",
             "laser_mode",
             "max_feed_mm_per_min",
@@ -1000,7 +1009,8 @@ fn ac13_a_newer_record_is_skipped_with_its_own_count() {
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
         // Format 7 is current since `0150`; 8 is newer.
-        m.insert("format_version".into(), json!(8));
+        // Format 8 is current since `0118` 2d (adrs P7); 9 is newer.
+        m.insert("format_version".into(), json!(9));
         m.insert("new_thing".into(), json!(true));
     });
     assert_eq!(
@@ -1108,7 +1118,8 @@ fn ac13_a_skipped_newer_record_is_never_overwritten_by_save_as_profile() {
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
         // Format 7 is current since `0150`; 8 is newer.
-        m.insert("format_version".into(), json!(8));
+        // Format 8 is current since `0118` 2d (adrs P7); 9 is newer.
+        m.insert("format_version".into(), json!(9));
     });
     let mut lib = MachineProfiles::load(&[(record_file_name(&p.id), newer)]);
     let write = lib.add(p.clone());
@@ -1180,6 +1191,10 @@ fn ac15_a_record_holds_no_project_content() {
             "default_speed_mm_min",
             // The fixture sets of record format 5 (`0113`, ADR 0060): the bed, not project content.
             "fixture_sets",
+            // The focus pulse of record format 8 (`0118` 2d): the machine's.
+            "focus_pulse",
+            "focus_pulse_length_ms",
+            "focus_pulse_power_permille",
             "format_version",
             "id",
             "kind",

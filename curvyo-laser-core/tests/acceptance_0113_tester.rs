@@ -112,7 +112,8 @@ fn ac10_a_format_5_record_reads_its_named_sets_and_writes_back_equal() {
     assert_eq!(again, p, "round trip");
     let v: serde_json::Value = serde_json::from_str(&write_record(&p)).unwrap();
     // Any write is record format 7 since `0150`.
-    assert_eq!(v["format_version"], 7);
+    // Any write is record format 8 since `0118` 2d (adrs P7).
+    assert_eq!(v["format_version"], 8);
     assert!(v.get("fixtures").is_none());
     assert!(
         !write_record(&p).contains("on_page"),

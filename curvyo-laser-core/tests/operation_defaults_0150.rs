@@ -116,7 +116,13 @@ fn record_format_7_round_trips_byte_for_byte() {
     assert_eq!(profile.values.defaults, pair(12.5, 1500));
     assert!(profile.values.air_assist);
     assert_eq!(profile.values.output_format, OutputFormat::Grbl);
-    assert_eq!(write_record(&profile), text);
+    // Since `0118` 2d (adrs P7) a write is record format 8 with the focus pulse's defaults.
+    let eight = text.replacen("\"format_version\": 7", "\"format_version\": 8", 1).replacen(
+        "  \"connection\"",
+        "  \"focus_pulse\": false,\n  \"focus_pulse_power_permille\": 10,\n  \"focus_pulse_length_ms\": 300,\n  \"connection\"",
+        1,
+    );
+    assert_eq!(write_record(&profile), eight);
     let generic = read_record(
         "0f0e0d0c-0b0a-4908-8706-050403020100.json",
         &golden("generic_laser_copy.json"),
@@ -132,7 +138,7 @@ fn record_formats_5_and_6_read_the_built_in_pair_and_are_not_rewritten() {
         let profile = read(name).unwrap();
         assert_eq!(profile.values.defaults, DefaultNumbers::BUILT_IN, "{name}");
         assert_eq!(golden(name), before, "{name}: nothing written on read");
-        assert!(write_record(&profile).starts_with("{\n  \"format_version\": 7,"));
+        assert!(write_record(&profile).starts_with("{\n  \"format_version\": 8,"));
     }
 }
 

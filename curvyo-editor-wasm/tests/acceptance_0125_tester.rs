@@ -446,7 +446,7 @@ fn s10_s12_accepted_send_is_one_step_lasered_stays_and_a_second_send_adds_no_ste
 fn s16_the_format_version_stays_49() {
     // No bump by `0125`; 50 is `specs/0123-raster-engraving` (ADR 0069 §10).
     // Superseded by 0135 slice 1 (2026-11-19): 51 is `specs/0135-image-optimisation` (ADR 0072 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 62);
+    assert_eq!(CURRENT_FORMAT_VERSION, 63);
 }
 
 // ---- S6, S9, S11, S17, S19 against the fake connector --------------------------------------
@@ -729,6 +729,7 @@ fn s11_connection_dropped_and_a_fresh_read_fails_commits_nothing_and_keeps_the_w
         machine_position: None,
         work_offset: None,
         frame_id: None,
+        target: None,
     };
     let r = curvyo_connector_io::send_tracked::observe_shared(&watch, &ready);
     assert_eq!(r, Some(Resolution::Accepted));

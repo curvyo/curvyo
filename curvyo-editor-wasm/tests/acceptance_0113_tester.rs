@@ -747,7 +747,8 @@ fn ac10_save_as_profile_writes_sets_without_on_page_or_job_fixtures() {
     let (_, record) = saved_profile(&mut s);
     let r: Value = serde_json::from_str(&record).unwrap();
     // Record format 6 since `0029` (ADR 0065 §3), 7 since `0150`.
-    assert_eq!(r["format_version"], 7);
+    // Record format 8 since `0118` 2d (adrs P7).
+    assert_eq!(r["format_version"], 8);
     let sets_ = r["fixture_sets"].as_array().unwrap();
     assert_eq!(sets_.len(), 2);
     assert_eq!(sets_[0]["name"], "Set 1");

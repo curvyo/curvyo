@@ -302,13 +302,13 @@ fn c22_a_format_4_record_reads_the_capability_and_writes_back_byte_for_byte() {
         read_record(&file_name_of(&text), &text).unwrap_err(),
         RecordError::Older
     );
-    // Superseded by `0029` (ADR 0065 §3) and `0150`: the format 6 record reads, and writes as
-    // record format 7, which reads back equal.
+    // Superseded by `0029` (ADR 0065 §3), `0150` and `0118` 2d (adrs P7): the format 6 record
+    // reads, and writes as record format 8, which reads back equal.
     let text = profile_fixture("format6_air_assist.json");
     let p = read_record(&file_name_of(&text), &text).unwrap();
     assert!(p.values.motorised_z);
-    let seven = write_record(&p);
-    assert_eq!(read_record(&file_name_of(&seven), &seven).unwrap(), p);
+    let eight = write_record(&p);
+    assert_eq!(read_record(&file_name_of(&eight), &eight).unwrap(), p);
 }
 
 #[test]
@@ -333,7 +333,8 @@ fn c22_an_older_record_reads_off_and_a_write_upgrades_to_4() {
     p.id = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f".to_owned();
     let written: Value = serde_json::from_str(&write_record(&p)).unwrap();
     // Record format 7 since `0150`.
-    assert_eq!(written["format_version"], 7);
+    // Record format 8 since `0118` 2d (adrs P7).
+    assert_eq!(written["format_version"], 8);
     assert_eq!(written["motorised_z"], false, "always written");
 }
 
@@ -349,7 +350,8 @@ fn c22_the_key_in_a_format_3_record_damages_it_and_format_5_is_newer() {
     let text = profile_fixture("newer_format.json");
     let v: Value = serde_json::from_str(&text).unwrap();
     // Format 8 is newer since `0150`.
-    assert_eq!(v["format_version"], 8);
+    // Format 9 is newer since `0118` 2d (adrs P8).
+    assert_eq!(v["format_version"], 9);
     assert_eq!(
         read_record(&file_name_of(&text), &text).unwrap_err(),
         RecordError::Newer

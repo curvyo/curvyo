@@ -716,7 +716,18 @@ impl DocumentVersion {
 /// 61 would draw every clone with the sketch's own values and cut the wrong part, so this build's
 /// files are refused there by version; a file of 61 opens unchanged. Goldens:
 /// `sketch_instances_v62.curvyo`, `sketch_instances_damaged_v62.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 62;
+///
+/// Version 63 (`specs/0118-machine-control` slice 2d, `adrs.md` P7, P8): a manufacturing's
+/// profile copy `mfg_profile` may hold `focus_pulse` (a boolean), `focus_pulse_power_permille`
+/// (1 to 50) and `focus_pulse_length_ms` (50 to 2,000); the labels `focus_pulse_on` / `_off`,
+/// `edit_pulse_power` and `edit_pulse_length` are steps. A build that stops at 62 rewrites the
+/// whole `mfg_profile` map from its type on a field edit and would drop the three keys silently,
+/// so this build's files are refused there by version (ADR 0065 §4). No migration: a file of 62
+/// or lower opens with the defaults (off, 1 %, 300 ms), unchanged. Damage: a key of the wrong
+/// type or out of range reads its default (a damaged switch reads off) and counts one value;
+/// nothing is repaired on read. Goldens: `focus_pulse_v63.curvyo`,
+/// `focus_pulse_damaged_v63.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 63;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
