@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use curvyo_library_core::Licence;
 
+/// The keyword file the browser's search takes (spec `0153`), re-exported for the page's host.
+pub use curvyo_library_core::Keywords;
+
 pub use crate::library_browser_guide::{
     EXAMPLE_REPOSITORY, Guide, PUBLIC_ONLY_TEXT, hosting_guide,
 };
@@ -22,12 +25,14 @@ pub use crate::library_browser_query::{
 pub use crate::library_browser_sets::{SetsAnswer, SetsGroup, SetsState};
 pub use crate::library_browser_sets_text::CardWords;
 pub use crate::library_browser_text::TileWords;
+pub use crate::library_browser_why::{WhyWords, why_words};
 
 /// What one tile is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ItemKind {
     /// An icon of a loaded Iconify set or of the Enter results.
+    #[default]
     Icon,
     /// A template of a catalogue.
     Template,
@@ -69,8 +74,8 @@ pub struct BrowseSource {
     pub author: String,
 }
 
-/// One tile.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// One tile (`Default` is an icon without a name, so a test can name only what it needs).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BrowseItem {
     /// What it is.
     pub kind: ItemKind,

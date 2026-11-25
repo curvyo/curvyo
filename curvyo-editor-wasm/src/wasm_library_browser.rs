@@ -1,10 +1,14 @@
 //! The library browser's `wasm-bindgen` surface (`specs/0152-library-browser`, ADR 0086 decision
 //! 5): the list is set once per fetch, and a keystroke is one synchronous `query` here, never an
-//! IPC round trip. JSON texts, numbers and `Uint32Array`s only (ADR 0001 §5).
+//! IPC round trip. JSON texts, numbers and `Uint32Array`s only (ADR 0001 §5). The keyword file
+//! of `specs/0153-library-keywords` arrives once as bytes and is kept across lists (ADR 0087
+//! decision 5).
+
+use std::sync::Arc;
 
 use curvyo_ui_core::library_browser::{
-    Answer, BrowseList, BrowseState, Browser, LocalView, Place, PlaceHistory, SetsState, back_name,
-    hosting_guide, narrowed_to, restored, select_rows,
+    Answer, BrowseList, BrowseState, Browser, Keywords, LocalView, Place, PlaceHistory, SetsState,
+    back_name, hosting_guide, narrowed_to, restored, select_rows,
 };
 use curvyo_ui_core::library_online::OnlineView;
 use wasm_bindgen::prelude::*;
@@ -44,11 +48,33 @@ impl WasmLibraryBrowser {
     pub fn set_items(&mut self, json: &str) -> bool {
         match serde_json::from_str::<BrowseList>(json) {
             Ok(list) => {
-                self.browser = Browser::new(list);
+                self.browser = Browser::with_keywords(list, self.browser.keywords().cloned());
                 true
             }
             Err(_) => false,
         }
+    }
+
+    /// Takes the fetched keyword file (gzip or plain); `false` when it does not decode, and the
+    /// search goes on without keywords. On success the index is rebuilt once; the page re-runs
+    /// its query.
+    pub fn set_keywords(&mut self, bytes: &[u8]) -> bool {
+        match Keywords::decode(bytes) {
+            Ok(keywords) => {
+                self.browser.set_keywords(Arc::new(keywords));
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    /// Why item `item` matched the search `text` as JSON `{line, all}` (spec `0153` criterion
+    /// 14), asked for the one item the detail bar shows; empty when its name matched or nothing.
+    pub fn why(&mut self, item: u32, text: &str) -> String {
+        self.browser
+            .why(item, text)
+            .and_then(|words| serde_json::to_string(&words).ok())
+            .unwrap_or_default()
     }
 
     /// The answer for the state JSON (`BrowseState`), without its order (see [`Self::order`]).

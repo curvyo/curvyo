@@ -4,6 +4,7 @@
 //! never wall time (`CLAUDE.md` §5); asserted in an optimised build, a smoke test in a debug one.
 //! A second test runs 31,722 distinct hyphenated names with aliases (iconmind's size), so the
 //! dictionary is as large as a real set's. `cpu_time_of` divides by `CURVYO_BUDGET_FACTOR`.
+//! A third test adds the shipped keyword file of `specs/0153-library-keywords` (criteria 4, 5).
 //! Run: `cargo test --release -p curvyo-editor-wasm --test library_browser_budget -- --nocapture`.
 
 #![cfg(unix)]
@@ -283,6 +284,78 @@ fn a_keystroke_over_31722_distinct_names_stays_within_100_ms() {
     }
     if !cfg!(debug_assertions) {
         assert!(build <= BUILD, "building the index took {build:?}");
+        assert!(worst <= KEYSTROKE, "the slowest keystroke took {worst:?}");
+    }
+}
+
+/// The shipped keyword file (`specs/0153-library-keywords` criteria 4 and 5).
+fn keyword_file() -> Vec<u8> {
+    std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../frontend/public/library/keywords.bin.gz"),
+    )
+    .unwrap()
+}
+
+/// 50,000 icons in the sets `lucide`, `tabler`, `mdi` and `ph`: every other one has a real name
+/// ("search", "heart"), so the keyword file adds its words to 25,000 items.
+fn keyword_list() -> BrowseList {
+    let mut list = list();
+    for (s, source) in list.sources.iter_mut().enumerate() {
+        source.prefix = ["lucide", "tabler", "mdi", "ph"][s].into();
+    }
+    for (n, item) in list.items.iter_mut().enumerate() {
+        if n % 2 == 0 {
+            item.name = WORDS[(n / 2) % WORDS.len()].into();
+        }
+    }
+    list
+}
+
+/// Spec `0153` criterion 4: decoding within 100 ms; criterion 5: with the file, 50,000 items and
+/// four typed words with related words, a keystroke within 100 ms; the rebuild within the
+/// `set_items` budget of ADR 0086 decision 10 (ADR 0087 decision 5).
+#[test]
+fn a_keystroke_with_keywords_and_four_related_words_stays_within_100_ms() {
+    use curvyo_ui_core::library_browser::Keywords;
+    let bytes = keyword_file();
+    let (keywords, decode) = cpu_time_of(|| Keywords::decode(&bytes).unwrap());
+    println!("decode: {decode:?}");
+    let keywords = std::sync::Arc::new(keywords);
+    let mut browser = Browser::new(keyword_list());
+    let ((), rebuild) = cpu_time_of(|| browser.set_keywords(std::sync::Arc::clone(&keywords)));
+    println!("rebuild with keywords: {rebuild:?}");
+    let mut worst = Duration::ZERO;
+    for text in [
+        "magnifier trash bin cog",
+        "search delete settings heart",
+        "find remove gear love",
+        "magnif garb prefer favo",
+    ] {
+        let mut typed = String::new();
+        for key in text.chars() {
+            typed.push(key);
+            let state = BrowseState {
+                text: typed.clone(),
+                sort: Sort::Best,
+                ..BrowseState::default()
+            };
+            let (answer, took) = cpu_time_of(|| browser.query(&state));
+            worst = worst.max(took);
+            if key == ' ' || typed.len() == text.len() {
+                println!("{typed:?}: {} in {took:?}", answer.count);
+            }
+        }
+    }
+    let one = BrowseState {
+        text: "magnifier".into(),
+        sort: Sort::Best,
+        ..BrowseState::default()
+    };
+    assert!(browser.query(&one).count > 0, "related words match");
+    if !cfg!(debug_assertions) {
+        assert!(decode <= KEYSTROKE, "decoding took {decode:?}");
+        assert!(rebuild <= BUILD, "the rebuild took {rebuild:?}");
         assert!(worst <= KEYSTROKE, "the slowest keystroke took {worst:?}");
     }
 }
