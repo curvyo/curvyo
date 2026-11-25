@@ -19,7 +19,7 @@ assigned in the order the folders are created** and a row sits in the group of
 its state, so inside a group the numbers can be out of order (the order the
 lead starts the waiting ones is in "Proposed build order" below).
 
-The next free number is 0151; the next free Frage is 370 (the number history is in
+The next free number is 0152; the next free Frage is 371 (the number history is in
 "State of the list" below).
 
 Columns: **No.** = folder number. **MVP slice** = the label the same feature
@@ -96,6 +96,7 @@ own entry when the customer schedules it.
 
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
 |---|---|---|---|---|---|---|
+| 0151 | `generator-ui-polish` | Idea, reserved 2026-11-25: make the generator UI (Generators bar, Generator block, Box from path pick mode, canvas marks of the rounded box and the path box) look and feel great; the customer after PR #481: functional now, the UI needs another pass. Scope comes from the UX engineer's review of the shipped `0141`, `0147` and `0149`. | Idea | Should | - | - |
 | 0027 | `manufacturing-roles` | Assign a cut or engrave role to geometry (by layer) within one file. **Superseded by 0101 `laser-operations`** (concept A of `0063`, 2026-11-05); PR #269 was closed unmerged (Frage 152 A), its geometry rules, look tokens and tests move into 0101. The number stays as a placeholder and is not reused. | Superseded by 0101 | Must | R-MFG-002 | 14 |
 | 0104 | `page-kind-change` | Dropped (customer, 2026-11-11: "Kind change ist nicht nötig, komplett streichen. Die Seite bleibt vom Typ so wie sie angelegt wurde"). A page keeps the kind it was created with; only Sketch to Drawing by Convert to paths (`0099`) exists. | Dropped | - | R-MFG-012 | - |
 | 0039 | `layers` | Layers with per-layer visibility and lock, to separate cut, engrave and reference geometry; the second half of the old slice `layers-and-grouping` (the first half is `0023-groups`). Number assigned 2026-10-10 when 0023 was given to groups. **Superseded the same day by [0050](0050-layers-and-objects-panel/)**, which delivers layers together with the customer's layers and objects panel; the number stays as a placeholder and is not reused. | Superseded by 0050 | Must | R-EDIT-009 | 10 |
