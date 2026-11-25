@@ -1,6 +1,6 @@
 # Template library over the network: browse and load templates from sources on the net that I added
 
-Status: Ready (2026-11-24; research and decisions of 2026-11-19 applied; `adrs.md` and `ux-notes.md` exist; ADR 0085 is Proposed, `needs-customer`, accepted with the slice PR; depends on `0137`, which is built first; Fragen 334 A and 340 B answered 2026-11-24)
+Status: Done (PR #478; Ready 2026-11-24; ADR 0085 accepted with PR #478; Fragen 334 A and 340 B answered 2026-11-24)
 Priority: Could
 Origin: Customer (2026-11-19, translated): a template library like the document library, but loadable over the network; (first wish: "we must also build offering templates over the network", moved out of scope on 2026-11-19, see Out of scope); maybe connect svgrepo.com, fontrepo.com, 1001fonts etc. legally: "check licences, terms and APIs". Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
