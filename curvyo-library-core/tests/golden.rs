@@ -167,3 +167,89 @@ fn a_search_answer_keeps_valid_results_and_the_sets_info() {
     assert_eq!(answer.sets[1].licence.as_ref().unwrap().name, "MIT");
     assert_eq!(parse_search(b"{\"total\": 0}"), Err(IconifyError::Invalid));
 }
+
+// Spec `0152` (ADR 0086 decision 1): the answers recorded from `api.iconify.design` on
+// 2026-11-25, trimmed to four sets and two groups; the icon answer untrimmed.
+
+#[test]
+fn live_sets_carry_their_category_and_palette() {
+    let sets =
+        curvyo_library_core::parse_collections(&fixture("iconify_live_collections.json")).unwrap();
+    let pick = |p: &str| sets.iter().find(|s| s.prefix == p).unwrap();
+    let material = pick("material-symbols");
+    assert_eq!(material.category.as_deref(), Some("Material"));
+    assert_eq!(material.palette, Some(false));
+    assert_eq!(material.total, 15806);
+    assert_eq!(material.samples.len(), 3, "six samples, three kept");
+    let noto = pick("noto");
+    assert_eq!(noto.category.as_deref(), Some("Emoji"));
+    assert_eq!(noto.palette, Some(true));
+    let hidden = pick("whh");
+    assert_eq!(
+        hidden.category, None,
+        "a hidden set has no category: Uncategorised"
+    );
+    assert_eq!(hidden.palette, Some(false));
+    assert_eq!(pick("tabler").licence.as_ref().unwrap().spdx, "MIT");
+}
+
+#[test]
+fn a_live_set_list_keeps_groups_and_resolved_aliases() {
+    let listing =
+        curvyo_library_core::parse_set_listing(&fixture("iconify_live_collection.json")).unwrap();
+    assert_eq!(
+        listing.names,
+        [
+            "activity-zone",
+            "activity-zone-outline",
+            "airwave",
+            "360",
+            "360-rounded",
+            "add-home"
+        ]
+    );
+    assert_eq!(listing.groups, ["Home", "Maps"]);
+    assert_eq!(listing.groups_of(0).collect::<Vec<_>>(), ["Home"]);
+    assert_eq!(listing.groups_of(4).collect::<Vec<_>>(), ["Maps"]);
+    // An alias of a hidden name and one of a name the list does not hold are dropped.
+    assert_eq!(
+        listing.aliases,
+        [
+            ("360-outline".to_owned(), "360".to_owned()),
+            ("360-outline-rounded".to_owned(), "360-rounded".to_owned()),
+            ("360-outline-sharp".to_owned(), "360".to_owned()),
+            (
+                "activity-zone-rounded".to_owned(),
+                "activity-zone".to_owned()
+            ),
+        ]
+    );
+    assert_eq!(
+        listing.aliases_by_name()[3],
+        ["360-outline", "360-outline-sharp"]
+    );
+    assert!(
+        !listing.names.iter().any(|n| n == "astrophotography-off"),
+        "hidden names are not listed"
+    );
+    assert_eq!(
+        parse_collection(&fixture("iconify_live_collection.json")).unwrap(),
+        listing.names
+    );
+}
+
+#[test]
+fn live_colour_bodies_have_fixed_colours_and_draw_as_tiles() {
+    use curvyo_library_core::{Rgb8, has_fixed_colour, icon_tile_svg};
+    let icons = parse_icons(&fixture("iconify_live_noto_icons.json")).unwrap();
+    assert_eq!(icons.len(), 2);
+    for icon in &icons {
+        assert!(has_fixed_colour(&icon.body), "{}", icon.name);
+        assert_eq!((icon.width, icon.height), (128.0, 128.0));
+    }
+    let sun = icons.iter().find(|i| i.name == "sun-with-face").unwrap();
+    assert!(sun.body.contains("radialGradient"));
+    let svg = icon_tile_svg(sun, Rgb8(0, 0, 0));
+    assert!(svg.starts_with("<svg color=\"#000000\""), "{svg}");
+    assert!(svg.contains("viewBox=\"0 0 128 128\""));
+}

@@ -1,8 +1,8 @@
 //! The Iconify-compatible API (ADR 0085 decision 5, `specs/0138` criteria 2, 7 and 10): the
 //! request builders, the parsers of the four answers and the local SVG of an icon. Nothing here
-//! sends or reads anything; the host does.
+//! sends or reads anything; the host does. The set list of `/collection` is `iconify_listing`.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
@@ -36,6 +36,12 @@ pub struct IconSet {
     pub licence: Option<Licence>,
     /// Up to three sample icon names.
     pub samples: Vec<String>,
+    /// The set's category ("Material", "Logos"); `None` means "Uncategorised" (ADR 0086
+    /// decision 1).
+    pub category: Option<String>,
+    /// `true` when the icons carry their own colours, `false` when they are drawn in the current
+    /// colour; `None` when the source does not say (never guessed).
+    pub palette: Option<bool>,
 }
 
 /// An icon by set and name.
@@ -79,7 +85,7 @@ pub struct IconBody {
     pub v_flip: bool,
 }
 
-fn name_ok(text: &str) -> bool {
+pub(crate) fn name_ok(text: &str) -> bool {
     !text.is_empty()
         && text.len() <= 80
         && text
@@ -144,7 +150,7 @@ pub fn search_request(base: &str, words: &str) -> Request {
     )
 }
 
-fn limit(bytes: &[u8]) -> Result<(), IconifyError> {
+pub(crate) fn limit(bytes: &[u8]) -> Result<(), IconifyError> {
     if bytes.len() > MAX_ICONIFY_BYTES {
         Err(IconifyError::TooLarge)
     } else {
@@ -182,6 +188,10 @@ struct WireSet {
     license: Option<WireLicence>,
     #[serde(default)]
     samples: Vec<String>,
+    #[serde(default)]
+    category: Option<String>,
+    #[serde(default)]
+    palette: Option<bool>,
 }
 
 fn set_of(prefix: &str, wire: WireSet) -> IconSet {
@@ -210,6 +220,11 @@ fn set_of(prefix: &str, wire: WireSet) -> IconSet {
             .filter(|s| name_ok(s))
             .take(3)
             .collect(),
+        category: wire
+            .category
+            .map(|c| c.trim().to_owned())
+            .filter(|c| !c.is_empty()),
+        palette: wire.palette,
     }
 }
 
@@ -232,32 +247,13 @@ pub fn parse_collections(bytes: &[u8]) -> Result<Vec<IconSet>, IconifyError> {
         .collect())
 }
 
-/// The icon names of `/collection`, each once, in the order the set lists them.
+/// The icon names of `/collection`, each once, in the order the set lists them: the names of
+/// [`crate::parse_set_listing`].
 ///
 /// # Errors
 /// [`IconifyError`] for an answer that is not a set's list or is over the limit.
 pub fn parse_collection(bytes: &[u8]) -> Result<Vec<String>, IconifyError> {
-    #[derive(Deserialize)]
-    struct Wire {
-        #[serde(default)]
-        uncategorized: Vec<String>,
-        #[serde(default)]
-        categories: BTreeMap<String, Vec<String>>,
-        #[serde(default)]
-        prefix: Option<String>,
-    }
-    limit(bytes)?;
-    let wire: Wire = serde_json::from_slice(bytes).map_err(|_| IconifyError::Invalid)?;
-    if wire.prefix.is_none() && wire.uncategorized.is_empty() && wire.categories.is_empty() {
-        return Err(IconifyError::Invalid);
-    }
-    let mut seen = HashSet::new();
-    Ok(wire
-        .uncategorized
-        .into_iter()
-        .chain(wire.categories.into_values().flatten())
-        .filter(|name| name_ok(name) && seen.insert(name.clone()))
-        .collect())
+    crate::iconify_listing::parse_set_listing(bytes).map(|listing| listing.names)
 }
 
 #[derive(Deserialize, Clone, Default)]

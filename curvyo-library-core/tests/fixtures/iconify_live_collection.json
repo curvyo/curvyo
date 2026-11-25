@@ -1,0 +1,37 @@
+{
+ "prefix": "material-symbols",
+ "total": 15806,
+ "title": "Material Symbols",
+ "categories": {
+  "Home": [
+   "activity-zone",
+   "activity-zone-outline",
+   "airwave"
+  ],
+  "Maps": [
+   "360",
+   "360-rounded",
+   "add-home"
+  ]
+ },
+ "hidden": [
+  "astrophotography-off",
+  "account-circle-full"
+ ],
+ "aliases": {
+  "360-outline": "360",
+  "360-outline-rounded": "360-rounded",
+  "360-outline-sharp": "360",
+  "astrophotography-off-sharp": "astrophotography-off",
+  "activity-zone-rounded": "activity-zone",
+  "add-home-outline-sharp": "add-home-outline"
+ },
+ "suffixes": {
+  "": "Regular",
+  "rounded": "Rounded",
+  "sharp": "Sharp",
+  "outline": "Outline",
+  "outline-rounded": "Outline Rounded",
+  "outline-sharp": "Outline Sharp"
+ }
+}
