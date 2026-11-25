@@ -4,10 +4,11 @@
 use std::collections::VecDeque;
 use std::time::Duration;
 
-use curvyo_connector_core::{ControllerCommand, ControllerInfo, Event, Job};
+use curvyo_connector_core::{ControllerCommand, ControllerInfo, Event, Job, TravelBox};
 
 use crate::controller::{Advance, Controller};
 use crate::grbl::Timing;
+use crate::grbl::focus::PulseRun;
 use crate::grbl::home::Owed;
 use crate::grbl::identify::{Failure, Identify, Outcome};
 use crate::grbl::jog::Jog;
@@ -57,6 +58,8 @@ pub struct GrblController {
     pub(super) mpos: Option<[f64; 3]>,
     /// The machine position and offset the job machine was last told.
     pub(super) told: (Option<[f64; 3]>, Option<[f64; 3]>),
+    /// The travel box the job machine was last told.
+    pub(super) told_travel: Option<TravelBox>,
     pub(super) word: Option<String>,
     pub(super) alarmed: bool,
     pub(super) alarm_code: Option<u16>,
@@ -81,6 +84,8 @@ pub struct GrblController {
     pub(super) home_mpos: Option<[f64; 2]>,
     /// A homing ended and the next report shows where the head stands.
     pub(super) home_pending: bool,
+    /// The go to point's pulse block GRBL runs (`specs/0118` 2d).
+    pub(super) pulse: Option<PulseRun>,
     /// A restart from a line moves to the work X and Y of its line (`specs/0118` 2e).
     pub(super) entering: Option<[f64; 2]>,
     /// A restart that waits for its `$$` answer before the first byte (`specs/0118` 38).
@@ -115,6 +120,7 @@ impl GrblController {
             position: None,
             mpos: None,
             told: (None, None),
+            told_travel: None,
             word: None,
             alarmed: false,
             alarm_code: None,
@@ -130,6 +136,7 @@ impl GrblController {
             spindle_off: false,
             home_mpos: None,
             home_pending: false,
+            pulse: None,
             entering: None,
             recheck: None,
         }
@@ -146,6 +153,7 @@ impl GrblController {
         self.stream = None;
         self.stop = None;
         self.jog = None;
+        self.pulse = None;
         self.entering = None;
         self.recheck = None;
     }
@@ -242,6 +250,7 @@ impl GrblController {
             || self.alarmed
             || self.home_in_flight()
             || self.jogging()
+            || self.pulsing()
         {
             self.timing.poll_fast
         } else {
@@ -383,10 +392,20 @@ impl GrblController {
                 matches!(stream.hold, Hold::Requested(_)),
             ),
             None if self.home_in_flight() => (false, true, false),
-            // A jog that did not settle: hold, then reset, as for a stream.
-            None if self.jogging() => (false, false, false),
+            // The pulse block or a jog that did not settle: hold, then reset, as for a stream.
+            None if self.pulsing() || self.jogging() => (false, false, false),
             None => return,
         };
+        self.start_stop((held, homing, hold_sent), failure, at);
+    }
+
+    /// The stop of G12 from what GRBL holds: `(held, homing, hold_sent)` as [`Stop::start`].
+    pub(super) fn start_stop(
+        &mut self,
+        (held, homing, hold_sent): (bool, bool, bool),
+        failure: Option<String>,
+        at: Duration,
+    ) {
         let limits = (self.timing.hold, self.timing.banner);
         self.stop = Some(Stop::start(
             held,
@@ -443,6 +462,8 @@ impl Controller for GrblController {
             ControllerCommand::Jog { .. }
             | ControllerCommand::JogHold { .. }
             | ControllerCommand::JogCancel => self.jog_command(command, at),
+            ControllerCommand::GoTo { target, feed } => self.go_to(*target, feed.0, at),
+            ControllerCommand::Pulse { power, length } => self.pulse(*power, *length),
         }
         std::mem::take(&mut self.events)
     }

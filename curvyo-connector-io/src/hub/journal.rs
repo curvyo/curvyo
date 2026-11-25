@@ -253,8 +253,11 @@ impl Hub {
         if after != State::AwaitingLocalStart {
             return;
         }
-        // A waiting Home or frame carries no job (`specs/0118` M5, 2b).
+        // A waiting Home, frame or go to point carries no job (`specs/0118` M5, 2b, 2d).
         let job = match status {
+            Message::Status {
+                target: Some(_), ..
+            } => "Focus point",
             Message::Status {
                 frame_id: Some(_), ..
             } => "Frame",

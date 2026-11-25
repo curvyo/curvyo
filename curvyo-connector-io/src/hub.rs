@@ -1,6 +1,7 @@
 //! The state shared by all connections of one connector, under one lock: the job machine, its
 //! controller, the mode, the pairing code, the paired clients and the fan-out of status messages.
 
+mod exit;
 mod journal;
 mod link;
 mod motion;
@@ -361,36 +362,24 @@ impl Hub {
         self.lock().notices = channel().0;
     }
 
-    /// Stops a running or paused job as a client's Stop would (G16, A19); the job's name if one
-    /// ran. A paused job whose resume waits for an owner counts as paused.
-    pub fn stop_for_exit(&self, now: Instant) -> Option<String> {
-        let mut inner = self.lock();
-        let paused = inner.machine.waits_for_resume();
-        if !paused && !matches!(inner.machine.state(), State::Running | State::Paused) {
-            return None;
-        }
-        let name = inner.job_name.clone();
-        // The job is written as interrupted at its line, then the list stays as it is.
-        inner.sync_store(self.at(now), true);
-        inner.store.flush();
-        inner.frozen = true;
-        self.apply(
-            &mut inner,
-            Event::Message(Message::Stop, Peer::host()),
-            now,
-            &mut Vec::new(),
-        );
-        Some(name)
-    }
-
     /// The press of the start button on the connector's host; the job's name if it started.
     pub fn local_start(&self, now: Instant) -> Option<String> {
         let mut inner = self.lock();
         if inner.machine.state() != State::AwaitingLocalStart {
             return None;
         }
-        let homing = matches!(inner.machine.status(), Message::Status { job: None, .. });
-        let name = if homing {
+        let status = inner.machine.status();
+        let point = matches!(
+            status,
+            Message::Status {
+                target: Some(_),
+                ..
+            }
+        );
+        let homing = matches!(status, Message::Status { job: None, .. });
+        let name = if point {
+            "Focus point".to_owned()
+        } else if homing {
             "Home".to_owned()
         } else {
             inner.job_name.clone()
@@ -430,6 +419,9 @@ impl Hub {
                         .held_job()
                         .map(|j| j.name.clone())
                         .unwrap_or_default();
+                }
+                if matches!(command, ControllerCommand::Pulse { .. }) {
+                    self.log_pulse(inner);
                 }
                 let is_frame = matches!(command, ControllerCommand::Frame { .. });
                 if is_frame {

@@ -27,6 +27,7 @@ use crate::connector_link::{
     CommandAnswer, FileSendError, LinkError, OTHER_TEXT, PairAnswer, PairingView, SendAnswer,
     TestAnswer, effective_role, owner_label,
 };
+use crate::connector_point::PointRequest;
 use crate::connector_send::{PendingSends, report_resolution, send_pending};
 use crate::device_keys::{OpenStore, StoreProblem};
 
@@ -419,6 +420,7 @@ fn command_message(
     status: &Message,
     list: Option<&Message>,
     jog: Option<JogRequest>,
+    point: Option<PointRequest>,
 ) -> Option<Message> {
     Some(match command {
         "start" => Message::Start {
@@ -433,6 +435,8 @@ fn command_message(
         "home" => Message::Home,
         // One step of the jog pad (`specs/0118` 16); a held press has its own commands.
         "jog" => jog?.message(false),
+        // A press of the Focus point mode (`specs/0118` 34, adrs P10); owners only.
+        "go_to_point" => point?.message()?,
         // The owner confirms a member's waiting frame with the frame's id (`specs/0118` 2b, F5).
         "confirm_frame" => Message::Start {
             job_id: frame_id(status)?,
@@ -441,7 +445,7 @@ fn command_message(
     })
 }
 
-/// Start, pause, resume, stop, unlock or home, over a fresh connection (Q15, Q16; `0127` G14;
+/// Start, pause, resume, stop, unlock, home or go to point, over a fresh connection (Q15, Q16; `0127` G14;
 /// `0118`).
 #[tauri::command(async)]
 #[allow(clippy::needless_pass_by_value)]
@@ -452,6 +456,7 @@ pub(crate) fn connector_command(
     address: String,
     command: String,
     jog: Option<JogRequest>,
+    point: Option<PointRequest>,
 ) -> CommandAnswer {
     let record = match load_record(&app, &open, &profile_id) {
         Ok(record) => record,
@@ -467,8 +472,8 @@ pub(crate) fn connector_command(
         Ok(opened) => opened,
         Err(e) => return CommandAnswer::Failed { error: e.into() },
     };
-    let Some(message) = command_message(&command, &status, connection.job_list.as_ref(), jog)
-    else {
+    let list = connection.job_list.as_ref();
+    let Some(message) = command_message(&command, &status, list, jog, point) else {
         return CommandAnswer::WrongState;
     };
     match connection.command(&message, job_state(&status)) {
@@ -811,6 +816,7 @@ mod tests {
             machine_position: None,
             work_offset: None,
             frame_id: None,
+            target: None,
         }
     }
 
@@ -845,7 +851,7 @@ mod tests {
         };
         let idle = status(JobState::Idle, None);
         assert_eq!(
-            command_message("jog", &idle, None, Some(request)),
+            command_message("jog", &idle, None, Some(request), None),
             Some(Message::Jog {
                 axis: JogAxis::Y,
                 direction: JogDirection::Minus,
@@ -853,7 +859,7 @@ mod tests {
                 hold: false,
             })
         );
-        assert_eq!(command_message("jog", &idle, None, None), None);
+        assert_eq!(command_message("jog", &idle, None, None, None), None);
         // The request's words are the wire's: closed sets, never a number.
         let parsed: JogRequest =
             serde_json::from_str(r#"{"axis":"X","direction":"Plus","step":"0.1"}"#).unwrap();
@@ -873,21 +879,27 @@ mod tests {
             JobState::Running,
         ] {
             assert_eq!(
-                command_message("home", &status(state, None), None, None),
+                command_message("home", &status(state, None), None, None, None),
                 Some(Message::Home)
             );
         }
         let id = Uuid::nil();
         assert_eq!(
-            command_message("start", &status(JobState::Ready, Some(id)), None, None),
+            command_message(
+                "start",
+                &status(JobState::Ready, Some(id)),
+                None,
+                None,
+                None
+            ),
             Some(Message::Start { job_id: id })
         );
         assert_eq!(
-            command_message("start", &status(JobState::Idle, None), None, None),
+            command_message("start", &status(JobState::Idle, None), None, None, None),
             None
         );
         assert_eq!(
-            command_message("reboot", &status(JobState::Idle, None), None, None),
+            command_message("reboot", &status(JobState::Idle, None), None, None, None),
             None
         );
     }

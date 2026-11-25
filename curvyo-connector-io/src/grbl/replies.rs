@@ -70,6 +70,11 @@ impl GrblController {
                 offset: told.1.map(|o| o.map(Millimetres)),
             });
         }
+        let travel = self.travel_box();
+        if travel != self.told_travel {
+            self.told_travel = travel;
+            self.events.push(Event::Travel(travel));
+        }
     }
 
     fn update_position(&mut self, report: &Report) {
@@ -124,6 +129,10 @@ impl GrblController {
         }
         if let Some(stop) = self.stop.as_mut() {
             stop.on_report(report, at, &mut self.out);
+            return;
+        }
+        self.pulse_report(&report.state, at);
+        if self.stop.is_some() {
             return;
         }
         if self.buffer_disagrees(report) {
@@ -200,6 +209,7 @@ impl GrblController {
             match owed {
                 Owed::Home => self.on_home_answer(code),
                 Owed::Jog(_) => self.on_jog_answer(code, at),
+                Owed::Pulse { last, .. } => self.on_pulse_answer(code, last, at),
                 Owed::Settings => self.on_settings_answer(code, at),
                 Owed::Line(_) => {}
             }
@@ -272,6 +282,7 @@ impl GrblController {
             return;
         }
         self.jog = None;
+        self.pulse = None;
         let _waiting = self.recheck.take();
         if self.stream.take().is_some() {
             // Every unsent line is discarded; the reset switches the spindle off (G13).
@@ -305,8 +316,9 @@ impl GrblController {
                 detail,
             });
         } else {
-            // A reset nobody here asked for: the position is not trusted, a jog is over.
+            // A reset nobody here asked for: the position is not trusted, a jog or pulse is over.
             self.jog = None;
+            self.pulse = None;
             self.events.push(Event::ControllerReset);
         }
     }
@@ -316,6 +328,7 @@ impl GrblController {
             return;
         };
         self.jog = None;
+        self.pulse = None;
         self.spindle_off = true;
         self.out.extend_from_slice(b"M5\nM9\n");
         self.owed.extend([Owed::Line(3), Owed::Line(3)]);

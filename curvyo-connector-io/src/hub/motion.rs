@@ -1,5 +1,6 @@
-//! How the hub takes the motion commands Home and Jog: the dead-man clock before each jog
-//! message, the answers, and the log lines (`specs/0118` criteria 12, 18; adrs M8, J4, J7).
+//! How the hub takes the motion commands Home, Jog and Go to point: the dead-man clock before each
+//! jog message, the answers, and the log lines (`specs/0118` criteria 12, 18, 35 c; adrs M8, J4,
+//! J7, P9).
 
 use std::time::Instant;
 
@@ -57,6 +58,40 @@ impl Hub {
             direct.push(inner.machine.status());
         }
         direct
+    }
+
+    /// `GoToPoint` from the client `peer` (`specs/0118` 2d, adrs P9): one `jobs.log` line
+    /// `Focus point: <client>` and one terminal line when the connector takes it (the pulse writes
+    /// its own line when its block goes out); the answers for that client alone, the status when
+    /// there is no other answer.
+    pub fn go_to_point(&self, message: Message, peer: &Peer, now: Instant) -> Vec<Message> {
+        let mut inner = self.lock();
+        self.turn(&mut inner, &[], now);
+        let at = self.at(now);
+        self.apply(&mut inner, Event::Clock(at), now, &mut Vec::new());
+        let before = inner.machine.state();
+        let mut direct = Vec::new();
+        let event = Event::Message(message, peer.clone());
+        self.apply(&mut inner, event, now, &mut direct);
+        let after = inner.machine.state();
+        if after != before && matches!(after, State::Focusing | State::AwaitingLocalStart) {
+            let client = peer.name.as_str();
+            let _ = inner.notices.send(format!("Focus point sent by {client}"));
+            let result = LogResult::FocusPoint(client.to_owned());
+            self.append_job_line(&inner, "", &result, &LogPeople::default());
+        }
+        if direct.is_empty() {
+            direct.push(inner.machine.status());
+        }
+        direct
+    }
+
+    /// The go to point's pulse block went to the controller: one `jobs.log` line `Focus pulse:
+    /// <client>` (`specs/0118` 35 c), so the move and the laser emission are logged apart.
+    pub(super) fn log_pulse(&self, inner: &super::Inner) {
+        let client = inner.machine.focus_client().unwrap_or_default().to_owned();
+        let result = LogResult::FocusPulse(client);
+        self.append_job_line(inner, "", &result, &LogPeople::default());
     }
 
     /// One `jobs.log` line and one terminal line per run of one client's jogs; any other

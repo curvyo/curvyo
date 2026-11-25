@@ -103,6 +103,7 @@ mod tests {
             machine_position: None,
             work_offset: None,
             frame_id: None,
+            target: None,
         }
     }
 

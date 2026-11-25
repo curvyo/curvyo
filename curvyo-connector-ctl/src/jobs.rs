@@ -71,6 +71,8 @@ fn state_words(s: &Seen<'_>) -> String {
         State::Homing => "Homing".to_owned(),
         State::Jogging => "Jogging".to_owned(),
         State::Framing => "Framing".to_owned(),
+        State::Focusing => "Focus point".to_owned(),
+        State::Pulsing => "Pulse".to_owned(),
         State::Running => format!(
             "Running, line {} / {}, {}",
             number(line),

@@ -355,10 +355,17 @@ impl RunningServer {
         self.hub.local_start(Instant::now())
     }
 
-    /// Stops a running or paused job before the program exits (G16); its name if one ran.
+    /// Stops a running or paused job or a go to point before the program exits (G16); the job's
+    /// name, or "Focus point".
     #[must_use]
     pub fn stop_for_exit(&self) -> Option<String> {
         self.hub.stop_for_exit(Instant::now())
+    }
+
+    /// After [`RunningServer::stop_for_exit`] named something: waits until the controller
+    /// confirmed the stop (at most G12's limits), so its reset goes out before the port closes.
+    pub fn await_exit_stop(&self) {
+        self.hub.await_exit_stop();
     }
 
     /// The job state.

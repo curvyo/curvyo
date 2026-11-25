@@ -1,4 +1,4 @@
-//! How a connection relays the motion commands Home and Jog to the hub (`specs/0118`).
+//! How a connection relays the motion commands Home, Jog and Go to point to the hub (`specs/0118`).
 
 use std::time::Instant;
 
@@ -7,7 +7,7 @@ use curvyo_connector_core::{Message, Peer};
 use super::{Session, Socket, send};
 
 impl Session {
-    /// `Home`, `Jog`, `JogKeep` or `JogStop` from the logged-in `peer`. A connection that started
+    /// `Home`, `Jog`, `JogKeep`, `JogStop` or `GoToPoint` from the logged-in `peer`. A connection that started
     /// a hold remembers it, so closing it ends the hold at once (criterion 18).
     pub(super) fn on_motion(
         &mut self,
@@ -16,9 +16,10 @@ impl Session {
         peer: &Peer,
         now: Instant,
     ) -> bool {
-        let is_home = message == Message::Home;
+        let is_home = matches!(message, Message::Home | Message::GoToPoint { .. });
         let answers = match message {
             Message::Home => self.hub.home(peer, now),
+            point @ Message::GoToPoint { .. } => self.hub.go_to_point(point, peer, now),
             other => {
                 match other {
                     Message::Jog { hold, .. } => self.holding |= hold,

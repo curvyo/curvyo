@@ -3,6 +3,7 @@
 
 pub mod controller;
 pub mod flow;
+pub mod focus;
 mod frame;
 mod hold;
 pub mod home;
