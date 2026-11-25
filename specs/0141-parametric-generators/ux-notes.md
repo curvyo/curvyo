@@ -292,9 +292,7 @@ different Teeth a typed value gives each gear its own module.
    third-party only (section 2).
 3. **Architect (`adrs.md`): answered** in ADR 0080 §2 and §5 (schema elements; an unknown record survives a
    save).
-4. **For `0099`:** its revision UX notes can point to sections 4 and 9 instead of a second design. This
-   reads criterion 24's "a value field each" as the Params field, not the panel `ValueField` (no drag in
-   the field; the drag is the canvas handle). The product owner of `0099` confirms or vetoes (still open).
+4. **For `0099`:** void since the revision of 2026-11-25: both parametric instances use the panel `ValueField` (§15), see `0099` UX notes §12.
 5. **Spec lines outside UX notes:** Status and "Still open before Ready" are updated (Ready).
 6. **To go into `docs/design-system.md` when Done:** the Generators tool and bar, the Generator block, the
    schema element table, the clamp notice texts, the instance handle row.

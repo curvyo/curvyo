@@ -138,3 +138,52 @@ No new global chord. The pointer drag has exactly one keyboard route: the Place 
 ## 11. Review checklist for the implementer
 
 Row at 244px: the longest state ("Fully constrained · 120 × 80 mm") truncates its tail, never the glyph or word; trash aligns across kinds; drag out and back into the list switches mode in the same frame and Escape leaves the list order unchanged; badge never over the ghost's own centre cross and never off-viewport; refusal over a sketch page, empty-sketch refusal and a release over a panel all add no history step; focus lands on the canvas after drop, Place clone on, Select clones, Select original and Convert; the list of Place clone on has no sketch pages and scrolls at 7 or more rows; contrast of the 40 % ghost on `--canvas-bg` stays at least 3:1 (check, else 50 %); press table of section 6 covered by a test per row; screen reader reads the row state, the trash consequence and the Convert result.
+
+## 12. Revision 2026-11-19: sketch instances (criteria 23 to 31)
+
+ux-engineer, 2026-11-25. Checked against criteria 23 to 31 (Frage 274 A), `adrs.md` (ADR 0080 §6, §7), `specs/0141-parametric-generators/ux-notes.md` §6, §9 and **§15** (revision 2: the Generator block's numbers are the panel `ValueField`, built in `GeneratorBlock.tsx`), `curvyo-ui-core/src/instance*.rs`, `CloneBlock.tsx` (the `extraRow` slot), `SketchParameters.tsx`, `0066` UX notes §3 (entry box), `docs/design-system.md` (rows "Value field", "Parameter handle", "Arc handle layout", "Live preview outline", "Live transform readout", "Vector dimension look", "Clone override" of `0135`, "Action notice", "Hidden, not disabled", "Inline delete confirm"). One look for both parametric instances: what 0141 says for a generated object holds for a sketch clone unless named here. No hint labels, no success notice, no new token. Everything not a criterion is **(Proposal)**.
+
+### 12.1 Expose on the sketch page (criterion 23)
+
+- **Parameter row** (Parameters tab): a 28px `PanelSwitch` row **Expose** after the value line, off by default. Shown for Length, Angle and Count parameters; not for Scalar (U3). On: two fields appear under it, side by side (118px each, 8px apart, the `SketchField` look, label inside "Min" / "Max", unit of the kind); empty means unlimited and reads "None" muted (a state word). Off: the fields leave the tree and the limits (and a dimension's name) are not kept; Undo brings them back (U1). One step "Expose parameter" / "Stop exposing parameter"; a name or limit change "Change exposed parameter" (U2).
+- **Driving dimension** (Sketches tab row): the same switch and Min/Max, plus a **Name** field above them (prefilled "Distance 1", "Radius 1", "Diameter 1", "Angle 1", numbered per kind in list order; the name is the clone field's label; must be unique among exposed names, else `--field-invalid` with "Name in use" in the row). A reference dimension has no switch (hidden): it drives nothing.
+- **Entry box** (`0066` §3): row 2 gets a checkbox **Expose** after Reference, the same look (`tabindex="-1"`, click only); Reference checked hides it. The keyboard route is the Sketches row's switch. Accessible names "Expose Width", "Expose Distance 1".
+- **Mark on the sketch page.** An exposed dimension's text pill starts with a 6px hollow circle in its text colour (the Parameter handle silhouette, `aria-hidden`; the dimension's accessible name adds ", exposed"). It says which values clones may change, so it is a state, not a hint.
+- **Stop exposing / Remove while clones hold own values.** Undoable, so no arm on the switch: its tooltip and accessible description name the consequence ("3 clones go back to the sketch's value"); own values are dropped (criterion 27) and come back with Undo. The row's Remove × is a row delete and gets the Inline delete confirm (customer rule) only while clones hold own values: armed name "Press again to remove Width. 3 clones lose their own value."; otherwise it removes at once as built.
+
+### 12.2 The Parameters override row and the value fields (criterion 24)
+
+- **Place.** The clone block's `extraRow` slot (between Placement and Style, where an image clone's Adjustments sits). In the tree only while the selected clones' sketch exposes at least one parameter. Label "Parameters" 12px muted, the 244 x 28px two-segment pill **Original's / Own**, `role="radiogroup"`, one Tab stop (the 0057 look). State: Own when any parameter has an own value; mixed selection: no segment pressed, hidden "Mixed".
+- **Segments.** Original's drops every own value of the selection (one step "Back to the sketch's values"); there is no separate "all" button. Own writes the current values as own values for every exposed parameter, so nothing moves (one step "Own parameter values").
+- **Fields.** Directly under the pill, 8px apart, one **`ValueField`** per exposed parameter (0141 §15.1, §15.2: drag in the field, click, type, arrows with Shift x10 and Ctrl x0.1, one commit per gesture, `SliderTip`). Order: the Parameters list, then exposed dimensions in Sketches order. Label = the exposed name; unit mm, ° (degrees, also for a parameter the sketch shows in rad), none for Count; Count steps 1 (Shift 10, Ctrl nothing). A value that follows the original is drawn **muted** (the "automatic" look) and its `aria-valuetext` ends ", sketch's value"; an own value is full strength. The first edit while Original's makes the row Own in the same step (the `0135` rule). Step "Change parameter" (ADR 0080 §7).
+- **Per-parameter Back.** The `ValueField` reset slot, shown only for an own value; it and Ctrl+Backspace remove the own value. Name and tooltip "Back to the sketch's value" (depth 1) / "Back to the original's value" (a chain, 12.6). Step "Back to the sketch's value".
+- **Track.** A `ValueField` needs a track; a sketch parameter has only Min/Max (ADR 0080 §6). Rule: with both limits the track spans them; else a length runs log from Min (or 0) to 4 x the sketch's value (at least 10 mm), overshoot up to Max or unbounded; an angle linear 0 to 360° (or its limits); a count linear 0 to max(10, 2 x value), to 200. Typed values reach the limits; beyond them they are clamped with the 0141 §6 notice ("Width set to 120 mm, the maximum.").
+- **Several clones** of one sketch: one list, Mixed where values differ, a typed value writes all. Clones of different sketches: the Parameters row shows the mixed state and no fields.
+
+### 12.3 Handles on the canvas (criterion 25)
+
+- **Which.** Only one selected clone, its box at least 72px on screen, as 0141 §9 (glyph, 12px hit, collisions, not during a transform drag). A **length, radius or diameter**: an exposed dimension's knob sits at its anchor (distance: the dimension line's second arrowhead end; radius and diameter: the point where the leader meets the circle), dragged along the dimension's direction; a diameter changes by twice the radial move. An exposed **named parameter** has a knob only when exactly one driving dimension's expression is that bare name; a formula or several uses: field only. **Angle**: the knob on its arc by "Arc handle layout", readout "<name> 30.0°", Shift snaps whole degrees. **Count**: field only.
+- **Frame.** Anchor and direction follow the clone's matrix (rotated, mirrored, scaled). The value is in the sketch's units: on a 50 % clone a 10 mm pointer move changes a length by 20 mm; readout, field and limits show the parameter value, never the on-page size.
+- **Drag.** Hover and drag draw the dimension's own extension lines and arrowheads in `--dim-guide`, no text; readout chip "Width 82.0 mm", "... max" / "... min" at a limit; Shift snaps to whole mm; preview blue new, black old; Escape restores and writes nothing; release = one step "Change parameter", the row turns Own. A double-click on a knob opens the numeric entry chip (one field, the name); elsewhere on the clone a double-click stays Select original (criterion 13), the knob wins the hit. Knobs are not focusable; the field of the same name is their keyboard route.
+
+### 12.4 No solution (criterion 26)
+
+- **Canvas.** The clone draws the last values that solved, saved with the clone (Frage 372 A; without them its original's shape, else the sketch's), in its own style: the same after reopen, on every device, and what is cut (U4). Over it, screen-space only and never exported or cut, a 1.5px dashed `--destructive` outline (4 on, 3 off), shown selected or not: one look for "not as asked" on any page.
+- **Panel.** Under the Parameters pill a state line: `TriangleAlert` 12px, "No solution for these values", 12px `--toolbar-icon` at full opacity, linked by `aria-describedby` from every field; announced once, politely, when it appears. Fields keep the values typed, no `aria-invalid` (permit over refuse). Status bar left: "Linked clone · Page 2 · no solution".
+- **Drag into it.** The knob follows the pointer, the preview holds the last solvable geometry, the readout adds " · no solution"; the release still commits.
+
+### 12.5 Sketch edits, Convert, Unlink (criteria 27, 29)
+
+- A sketch edit updates every clone in that frame with its own values kept, no notice. Convert to paths and Unlink clone use the clone's own values (criterion 29); in the no-solution state they take the saved fallback, as the canvas showed it.
+
+### 12.6 Chains (criterion 28)
+
+- A clone of a clone shows the value it gets (its own, else the nearest own value up the chain, else the sketch's) and draws an inherited value muted. Its reset says "Back to the original's value" and gives the upstream value. Original's on a chained clone drops only this clone's own values.
+
+### 12.7 Accessibility and keys
+
+- Tab order in the clone block: Placement, Parameters pill, the fields, Style. Fields: the Value field's own semantics, names "<clone name> <parameter>" ("Bracket clone width: 82 mm"). No new key or chord; Ctrl+Backspace is the Value field's own. Contrast: tokens only (`--destructive` 6.5:1 on white; check the dark theme).
+
+### 12.8 Rows for `docs/design-system.md` when Done
+
+"Expose switch and limits" (parameter and dimension rows, entry box checkbox, exposed-dimension mark); "Parameters override" beside `0135`'s Clone override row (pill, muted inherited values, reset name, track rule for unbounded parameters); "Parameter handle" amended for sketch instances (anchor, matrix, diameter x2, bare-name rule); "No solution outline" (dashed `--destructive`, screen only) and its state line; the 0141 §14 item 4 reading (Params field) is void: both instances use the Value field.
