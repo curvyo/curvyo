@@ -57,9 +57,9 @@ impl Hub {
     /// A frame went to the controller: one `jobs.log` line `Frame: <client>` and one terminal
     /// line, never a result line (`specs/0118` 2b, adrs F6).
     pub(super) fn log_frame(&self, inner: &Inner, client: &str) {
-        let _ = inner.notices.send(format!("Frame sent by {client}"));
         let result = LogResult::Frame(client.to_owned());
         self.append_job_line(inner, "", &result, &LogPeople::default());
+        let _ = inner.notices.send(format!("Frame sent by {client}"));
     }
 
     /// The refusal of a submitted job: its log line and, for the settings refusals, its own
@@ -164,9 +164,10 @@ impl Hub {
                 confirmation.requested_by
             )
         };
-        let _ = inner.notices.send(line);
+        // The admin line first, so whoever reacts to the terminal line finds it in the file.
         let event = Self::confirmed_event(confirmation, &name);
         self.append_admin(inner, owner, &event);
+        let _ = inner.notices.send(line);
     }
 
     fn confirmed_event(confirmation: &Confirmation, name: &str) -> AdminEvent {
