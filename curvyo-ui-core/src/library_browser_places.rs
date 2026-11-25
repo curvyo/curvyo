@@ -22,6 +22,8 @@ pub enum PlaceView {
     Sets,
     /// The hosting guide.
     Guide,
+    /// The search keyword licences (spec `0153` UX notes K9).
+    Licences,
     /// The Page preview of Pick elements….
     Pick,
 }
@@ -97,6 +99,7 @@ pub fn back_name(list: &BrowseList, place: &Place) -> String {
     let short = match place.view {
         PlaceView::Sets => "Sets".to_owned(),
         PlaceView::Guide => "Host your own library".to_owned(),
+        PlaceView::Licences => "Search keyword licences".to_owned(),
         PlaceView::Pick => "the page".to_owned(),
         PlaceView::Items => items_name(list, &place.items),
     };

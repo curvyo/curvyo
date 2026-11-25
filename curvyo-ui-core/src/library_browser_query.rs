@@ -3,21 +3,21 @@
 //! list held for the session.
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use curvyo_library_core::{
-    Scratch, SearchIndex, WEIGHT_ALIAS, WEIGHT_CATEGORY, WEIGHT_NAME, WEIGHT_SOURCE, WEIGHT_TAG,
-    fold,
-};
+use curvyo_library_core::{Keywords, Scratch, SearchIndex, fold};
 
 use crate::library_browser::{BrowseList, CardKind, ItemKind};
+use crate::library_browser_index::build_index;
 use crate::library_browser_sets::{SetsAnswer, SetsState, SetsTables};
 use crate::library_browser_sets_text::{CardWords, card_words};
 use crate::library_browser_tables::{categories_of, orders_of, source_rows};
 use crate::library_browser_text::{
     TileWords, browse_subject, narrowed_subject, nothing_matches_text, tile_words,
 };
+use crate::library_browser_why::{WhyWords, why_words};
 
 /// The Sort control (criterion 17).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -134,6 +134,8 @@ pub struct Browser {
     rows: Vec<(String, String, bool)>,
     /// Per list source: its row, and the "My documents" row for a local one.
     row_of_source: Vec<(usize, Option<usize>)>,
+    /// The keyword file, kept for the session (spec `0153` criterion 4).
+    keywords: Option<Arc<Keywords>>,
 }
 
 pub(crate) fn id(index: usize) -> u32 {
@@ -145,27 +147,14 @@ impl Browser {
     /// The browser over `list`: the index, categories and orders are built once.
     #[must_use]
     pub fn new(list: BrowseList) -> Self {
+        Self::with_keywords(list, None)
+    }
+
+    /// The browser over `list` with the session's keyword file, if it has arrived.
+    #[must_use]
+    pub fn with_keywords(list: BrowseList, keywords: Option<Arc<Keywords>>) -> Self {
         let (categories, item_categories) = categories_of(&list);
-        let mut index = SearchIndex::new();
-        for (n, item) in list.items.iter().enumerate() {
-            let source = &list.sources[item.source as usize];
-            let mut fields: Vec<(&str, u8)> = vec![(&item.name, WEIGHT_NAME)];
-            fields.extend(item.aliases.iter().map(|a| (a.as_str(), WEIGHT_ALIAS)));
-            fields.extend(item.tags.iter().map(|t| (t.as_str(), WEIGHT_TAG)));
-            fields.extend(
-                item_categories[n]
-                    .iter()
-                    .filter_map(|c| categories.get(usize::from(*c)))
-                    .filter(|(key, _)| !key.is_empty())
-                    .map(|(_, label)| (label.as_str(), WEIGHT_CATEGORY)),
-            );
-            fields.push((&source.label, WEIGHT_SOURCE));
-            fields.extend(item.page_names.iter().map(|p| (p.as_str(), WEIGHT_SOURCE)));
-            if let Some(parent) = item.parent.and_then(|p| list.items.get(p as usize)) {
-                fields.push((&parent.name, WEIGHT_SOURCE));
-            }
-            index.push(&fields);
-        }
+        let index = build_index(&list, &categories, &item_categories, keywords.as_deref());
         let sets = SetsTables::new(&list);
         let palette = list
             .items
@@ -191,7 +180,34 @@ impl Browser {
             orders,
             rows,
             row_of_source,
+            keywords,
         }
+    }
+
+    /// The keyword file arrived: kept for the session, the index rebuilt once (ADR 0087
+    /// decision 5); the next query uses it.
+    pub fn set_keywords(&mut self, keywords: Arc<Keywords>) {
+        self.index = build_index(
+            &self.list,
+            &self.categories,
+            &self.item_categories,
+            Some(&keywords),
+        );
+        self.keywords = Some(keywords);
+    }
+
+    /// The keyword file, once it has arrived: a new list keeps it (ADR 0087 decision 5).
+    #[must_use]
+    pub fn keywords(&self) -> Option<&Arc<Keywords>> {
+        self.keywords.as_ref()
+    }
+
+    /// Why item `index` matched the search `text`, when a typed word matched it only through a
+    /// keyword, a category or a related word (spec `0153` criterion 14); asked for the one item
+    /// the detail bar shows, outside the keystroke pass.
+    pub fn why(&mut self, index: u32, text: &str) -> Option<WhyWords> {
+        let reasons = self.index.explain(text, index, &mut self.scratch);
+        why_words(&reasons)
     }
 
     /// The list.
