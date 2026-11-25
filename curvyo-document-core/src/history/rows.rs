@@ -202,6 +202,9 @@ const DOCUMENT_LEVEL_LABELS: &[&str] = &[
     "set_start_machine_origin",
     "set_start_head_position",
     "set_start_home_then_origin",
+    "set_start_user_origin",
+    "set_user_origin",
+    "type_user_origin",
 ];
 
 /// Whether a command is about the document and not about its objects: the objects only follow the

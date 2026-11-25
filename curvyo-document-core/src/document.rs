@@ -699,7 +699,14 @@ impl DocumentVersion {
 /// where it is evaluated) and `seed` (a whole number of 32 bits, absent = 0). A build that stops
 /// at 59 would draw the vertices unmoved, so this build's files are refused there by version; a
 /// file of 59 opens unchanged. Golden: `randomized_v60.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 60;
+///
+/// Version 61 (`specs/0118-machine-control` slice 2c, `adrs.md` O1 to O3): a laser page's
+/// manufacturing may hold the register `x.curvyo.laser.user_origin_um` (`[x, y]`, two integers in
+/// µm of the job file's coordinates, each within ±10,000,000) and `x.curvyo.laser.start` gains the
+/// spelling `"user_origin"`. A build that stops at 60 would read that Start as damaged, so this
+/// build's files are refused there by version; a file of 60 opens unchanged. Goldens:
+/// `user_origin_v61.curvyo`, `user_origin_damaged_v61.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 61;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
