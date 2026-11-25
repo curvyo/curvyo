@@ -11,7 +11,7 @@ use super::{Entry, Item};
 use crate::assembly::check_whole;
 
 /// The stored form of the current job.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StoredCurrent {
     /// The job.
     #[serde(flatten)]
@@ -23,7 +23,7 @@ pub struct StoredCurrent {
 }
 
 /// `jobs/list.json`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct StoredList {
     /// The format of this file.
     pub format: u32,
@@ -131,6 +131,7 @@ mod tests {
                 sent_by: "Phone".into(),
                 run_next_by: None,
                 interrupted_at: None,
+                stop: None,
             },
             Arc::from(text),
         )

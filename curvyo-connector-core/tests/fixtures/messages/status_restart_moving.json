@@ -1,0 +1,1 @@
+{"type":"Status","state":{"name":"Running"},"job":{"job_id":"67e55044-10b1-426f-9247-bb680e5fe0c8","line":1233,"lines":4000,"elapsed_ms":1500,"from_line":1234,"entering":true},"position":[12.5,0.0,0.0],"alarm":null,"homed":true,"machine_position":[-387.5,-300.0,0.0],"work_offset":[-400.0,-300.0,0.0]}

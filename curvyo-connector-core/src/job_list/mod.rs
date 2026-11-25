@@ -15,14 +15,30 @@ pub use stored::{Dropped, Restored, STORED_FORMAT, StoredCurrent, StoredList, re
 
 use crate::machine::Peer;
 use crate::message::ListEntry;
+use crate::millimetres::Millimetres;
 
 /// The most jobs the list holds, waiting, interrupted and in flight together.
 pub const MAX_ENTRIES: usize = 20;
 /// The most bytes the list holds in those jobs together.
 pub const MAX_BYTES: u64 = 256 * 1024 * 1024;
 
+/// Where a started job stood when it was interrupted (`specs/0118` 39, adrs R2).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StopPoint {
+    /// The machine's last machine position.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub machine_position: Option<[Millimetres; 3]>,
+    /// The controller's last work coordinate offset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work_offset: Option<[Millimetres; 3]>,
+    /// The first job line of the run: 1 for a whole run, n for a restarted one.
+    pub run_from: u32,
+    /// The line was written at the stop itself, not up to a second before it (a crash).
+    pub exact: bool,
+}
+
 /// One job of the list as the connector stores it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Entry {
     /// The job.
     pub job_id: Uuid,
@@ -42,6 +58,9 @@ pub struct Entry {
     /// The line it had reached when the connector stopped.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interrupted_at: Option<u32>,
+    /// Where it stood then; `None` for a job that never started and in a slice-1 `list.json`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop: Option<StopPoint>,
 }
 
 impl Entry {
@@ -57,6 +76,9 @@ impl Entry {
             position,
             run_next: self.run_next_by.is_some(),
             interrupted_at: self.interrupted_at,
+            restart_line: None,
+            restart_cause: None,
+            line_approximate: false,
         }
     }
 }
@@ -233,6 +255,7 @@ mod tests {
                 sent_by: "Phone".into(),
                 run_next_by: None,
                 interrupted_at: interrupted,
+                stop: None,
             },
             text: Arc::from("G0\n"),
         }

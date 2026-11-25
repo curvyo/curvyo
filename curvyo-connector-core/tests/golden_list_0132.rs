@@ -17,6 +17,9 @@ fn entry(n: u128, name: &str, position: u32) -> ListEntry {
         position,
         run_next: false,
         interrupted_at: None,
+        restart_line: None,
+        restart_cause: None,
+        line_approximate: false,
     }
 }
 

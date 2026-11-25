@@ -109,6 +109,7 @@ impl Machine {
                         started_by: None,
                         confirmed_by: None,
                     },
+                    from_line: None,
                 });
                 out.messages.push(Message::JobAccepted {
                     job_id,

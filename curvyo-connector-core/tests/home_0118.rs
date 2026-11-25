@@ -77,6 +77,8 @@ fn ready_progress() -> Option<Progress> {
         line: 0,
         lines: 6,
         elapsed_ms: 0,
+        from_line: None,
+        entering: false,
     })
 }
 

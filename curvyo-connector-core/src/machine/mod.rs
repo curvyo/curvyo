@@ -6,8 +6,11 @@ mod controls;
 mod event;
 mod frame;
 mod home;
+mod interrupt;
 mod jog;
 mod list;
+mod restart;
+mod store;
 
 pub use confirm::{Confirmation, Confirms, Peer, People, StartRule};
 pub use event::{ControllerCommand, Event};
@@ -25,6 +28,7 @@ use crate::millimetres::Millimetres;
 use frame::FrameRun;
 use jog::JogRun;
 use list::Transfer;
+use restart::Plan;
 
 /// Settings of the machine.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -59,6 +63,8 @@ enum Waiting {
     Home,
     /// A member's frame (`specs/0118` 2b, adrs F5); the frame is in its own slot.
     Frame,
+    /// A restart from a line (`specs/0118` 2e, adrs R8).
+    Restart,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +75,8 @@ struct Held {
     line: u32,
     elapsed_ms: u64,
     people: People,
+    /// A restart from a line: the line it began at.
+    from_line: Option<u32>,
 }
 
 /// The state of one connector and the one job it holds.
@@ -124,6 +132,18 @@ pub struct Machine {
     note: Option<String>,
     /// The last `JobList` pushed.
     last_list: Option<Message>,
+    /// GRBL's planner blocks, for the restart line (`specs/0118` 39).
+    planner: u32,
+    /// The restart each interrupted entry offers.
+    plans: Vec<Plan>,
+    /// A restart that has not reached its line: the entry it returns to the list.
+    back: Option<crate::job_list::Item>,
+    /// The restart moves the head to its line.
+    entering: bool,
+    /// Counts the breaks of trust in the position (reset, alarm, loss, reconnect).
+    breaks: u64,
+    /// Entries a Stop interrupted, with the break count then (`specs/0118` adrs R4, Frage 390 C).
+    unbroken: Vec<(Uuid, u64)>,
 }
 
 /// Controller states in which no job may start (`specs/0127` G4): the door, check mode, sleep.
@@ -162,6 +182,12 @@ impl Machine {
             transfers: Vec::new(),
             note: None,
             last_list: None,
+            planner: crate::restart::PLANNER_BLOCKS,
+            plans: Vec::new(),
+            back: None,
+            entering: false,
+            breaks: 0,
+            unbroken: Vec::new(),
         }
     }
 
@@ -228,6 +254,8 @@ impl Machine {
                 line: h.line,
                 lines: h.lines,
                 elapsed_ms: h.elapsed_ms,
+                from_line: h.from_line,
+                entering: self.entering,
             });
         Message::Status {
             state: self.state,
@@ -249,6 +277,10 @@ impl Machine {
     /// Applies one event.
     pub fn handle(&mut self, event: Event) -> Output {
         let mut out = Output::default();
+        if self.before_line(&event, &mut out) {
+            self.announce_list(&mut out);
+            return out;
+        }
         match event {
             Event::Message(message, peer) => self.on_message(message, &peer, &mut out),
             Event::ClientDisconnected => {
@@ -260,6 +292,12 @@ impl Machine {
             Event::Clock(now) => self.on_clock(now, &mut out),
             Event::TransferAbandoned { job_id } => self.abandon(job_id, &mut out),
             Event::RunNext { job_id } => self.run_next(job_id, &mut out),
+            Event::Planner { blocks } => {
+                if blocks > 0 && blocks != self.planner {
+                    self.planner = blocks;
+                    self.plan_all();
+                }
+            }
             other => self.on_controller(other, &mut out),
         }
         self.announce_list(&mut out);
@@ -354,6 +392,9 @@ impl Machine {
                 text,
             } => self.chunk(job_id, index, &text, out),
             Message::Start { job_id } => self.start(job_id, peer, out),
+            Message::RestartFromLine { job_id, line } => {
+                self.restart_from_line(job_id, line, peer, out);
+            }
             Message::Pause | Message::Resume | Message::Stop => self.control(&message, out),
             // Outside `Alarm` nothing is written; the caller answers with the status (G33).
             Message::Unlock if self.state == State::Alarm => {

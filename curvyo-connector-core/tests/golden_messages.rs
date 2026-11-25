@@ -50,6 +50,8 @@ fn progress(line: u32, elapsed_ms: u64) -> Progress {
         line,
         lines: 6,
         elapsed_ms,
+        from_line: None,
+        entering: false,
     }
 }
 

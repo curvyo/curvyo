@@ -121,6 +121,14 @@ pub enum Event {
         /// The work coordinate offset.
         offset: Option<[Millimetres; 3]>,
     },
+    /// The controller's planner holds this many blocks (GRBL `$I`, `[OPT:V,15,128]`).
+    Planner {
+        /// The blocks.
+        blocks: u32,
+    },
+    /// A restart from a line: the head stands at the start of its line, the job's own lines
+    /// run from now on (`specs/0118` 2e, adrs R9).
+    EntryReached,
     /// The controller cannot hold now (a job's `$H` runs) and holds at its first safe moment;
     /// `Running` keeps the pause pending until `Held` (`specs/0133` P3).
     PauseDeferred,
@@ -133,6 +141,21 @@ pub enum ControllerCommand {
     Start {
         /// The job.
         job_id: Uuid,
+    },
+    /// Stream the held job from `from_line`: the `entry` lines first (they take the head there
+    /// with the laser off and set the state of the line), then the job's lines from `from_line`;
+    /// `target` is the work position the travel ends at, for the travel check.
+    StartAt {
+        /// The job.
+        job_id: Uuid,
+        /// The first job line.
+        from_line: u32,
+        /// The lines before it.
+        entry: Vec<String>,
+        /// The work X and Y the travel moves to.
+        target: [Millimetres; 2],
+        /// The controller has been homed since it was identified.
+        homed: bool,
     },
     /// Hold the stream.
     Pause,

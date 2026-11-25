@@ -1,16 +1,12 @@
 //! How the job machine keeps the job list: arrival while a job is held, the list messages, the
-//! chain and what the state directory stores (`specs/0132`).
-
-use std::sync::Arc;
+//! chain (`specs/0132`).
 
 use uuid::Uuid;
 
 use super::{BUSY_WORDS, Event, Held, Machine, Output, Peer, People};
 use crate::admin::Role;
 use crate::assembly::{Assembly, ChunkError, Job};
-use crate::job_list::{
-    Action, Chain, End, Entry, Item, STORED_FORMAT, StoredCurrent, StoredList, may, next,
-};
+use crate::job_list::{Action, Chain, End, Entry, Item, may, next};
 use crate::message::{ErrorCode, JobKind, Message, RejectReason, State};
 
 /// A job whose chunks arrive while another job is held.
@@ -45,20 +41,44 @@ pub enum ListLog {
         /// The new value.
         on: bool,
     },
+    /// An owner restarted an interrupted job from a line (`specs/0132` criterion 13).
+    Restarted {
+        /// The job.
+        job_id: Uuid,
+        /// Its name.
+        name: String,
+        /// The line.
+        line: u32,
+        /// The owner.
+        by: String,
+    },
+    /// A restart ended before its line: the job is back in the list, nothing burned, no result.
+    RestartReturned {
+        /// The job.
+        job_id: Uuid,
+        /// Its name.
+        name: String,
+        /// The line.
+        line: u32,
+    },
 }
 
 impl Machine {
     /// The `JobList` message for the current state.
     #[must_use]
     pub fn job_list(&self) -> Message {
+        // A stopped job that the list keeps as interrupted shows there, not twice.
         let current = self
             .held
             .as_ref()
             .filter(|_| !matches!(self.state, State::Receiving))
+            .filter(|h| self.list.get(h.job.job_id).is_none())
             .map(|h| entry_of(h).shown(0));
+        let mut waiting = self.list.shown();
+        self.decorate(&mut waiting);
         Message::JobList {
             current,
-            waiting: self.list.shown(),
+            waiting,
             note: self.note.clone(),
         }
     }
@@ -165,6 +185,7 @@ impl Machine {
                     sent_by: transfer.sender,
                     run_next_by: None,
                     interrupted_at: None,
+                    stop: None,
                 };
                 let position = self.list.push(Item {
                     entry,
@@ -321,6 +342,7 @@ impl Machine {
                 started_by: None,
                 confirmed_by: None,
             },
+            from_line: None,
         });
         self.set(State::Ready, out);
         true
@@ -383,53 +405,6 @@ impl Machine {
         self.start(job_id, &by, out);
     }
 
-    /// The list as `jobs/list.json` keeps it.
-    #[must_use]
-    pub fn stored(&self) -> StoredList {
-        let current = self
-            .held
-            .as_ref()
-            .filter(|_| {
-                matches!(
-                    self.state,
-                    State::Ready
-                        | State::AwaitingLocalStart
-                        | State::Homing
-                        | State::Jogging
-                        | State::Running
-                        | State::Paused
-                )
-            })
-            .map(|h| StoredCurrent {
-                entry: entry_of(h),
-                started: matches!(self.state, State::Running | State::Paused)
-                    || self.waits_for_resume(),
-                line: h.line,
-            });
-        StoredList {
-            format: STORED_FORMAT,
-            current,
-            waiting: self.list.items().iter().map(|i| i.entry.clone()).collect(),
-        }
-    }
-
-    /// The texts `jobs/` keeps: the current job's and every listed job's.
-    #[must_use]
-    pub fn stored_texts(&self) -> Vec<(Uuid, Arc<str>)> {
-        let stored_current = self.stored().current.is_some();
-        let current = self
-            .held
-            .iter()
-            .filter(|_| stored_current)
-            .map(|h| (h.job.job_id, Arc::clone(&h.job.text)));
-        let waiting = self
-            .list
-            .items()
-            .iter()
-            .map(|i| (i.entry.job_id, Arc::clone(&i.text)));
-        current.chain(waiting).collect()
-    }
-
     /// Takes every listed job out (a machine that is rebuilt hands them on).
     pub fn take_list(&mut self) -> Vec<Item> {
         std::mem::take(&mut self.list).into_items()
@@ -440,6 +415,7 @@ impl Machine {
         for item in items {
             self.list.push(item);
         }
+        self.plan_all();
         self.last_list = Some(self.job_list());
     }
 
@@ -458,8 +434,9 @@ impl Machine {
     /// Arrival of a job for the list, or its refusal: the cases of `submit` that do not make the
     /// job current.
     pub(super) fn becomes_current(&self) -> bool {
+        // An interrupted entry stands outside the order: a new job still becomes current.
         matches!(self.state, State::Idle | State::Done { .. })
-            && self.list.is_empty()
+            && self.list.first_waiting().is_none()
             && self.transfers.is_empty()
             && self.assembly.is_none()
     }
@@ -469,7 +446,7 @@ fn count_lines(text: &str) -> u32 {
     u32::try_from(text.lines().count()).unwrap_or(u32::MAX)
 }
 
-fn entry_of(held: &Held) -> Entry {
+pub(super) fn entry_of(held: &Held) -> Entry {
     Entry {
         job_id: held.job.job_id,
         name: held.job.name.clone(),
@@ -479,5 +456,6 @@ fn entry_of(held: &Held) -> Entry {
         sent_by: held.people.sent_by.clone(),
         run_next_by: None,
         interrupted_at: None,
+        stop: None,
     }
 }

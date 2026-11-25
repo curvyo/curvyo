@@ -715,6 +715,8 @@ fn s11_connection_dropped_and_a_fresh_read_fails_commits_nothing_and_keeps_the_w
             line: 0,
             lines: 3,
             elapsed_ms: 0,
+            from_line: None,
+            entering: false,
         }),
         position: None,
         alarm: None,

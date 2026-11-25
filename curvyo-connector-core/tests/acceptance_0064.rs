@@ -435,6 +435,8 @@ fn p3_status_with_job_and_position_round_trips() {
             line: 7,
             lines: 40,
             elapsed_ms: 1234,
+            from_line: None,
+            entering: false,
         }),
         position: Some([Millimetres(1.5), Millimetres(-2.25), Millimetres(0.0)]),
         alarm: None,

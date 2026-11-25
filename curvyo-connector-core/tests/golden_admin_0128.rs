@@ -175,6 +175,8 @@ fn all() -> Vec<(&'static str, Message)> {
                     line: 0,
                     lines: 6,
                     elapsed_ms: 0,
+                    from_line: None,
+                    entering: false,
                 }),
                 position: None,
                 alarm: None,

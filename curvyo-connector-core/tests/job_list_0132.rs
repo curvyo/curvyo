@@ -433,7 +433,8 @@ fn stop_ends_only_the_current_job_and_the_list_keeps_the_rest() {
             result: JobResult::Stopped
         }
     );
-    assert_eq!(rig.waiting(), [(2, 1), (3, 2)]);
+    // Frage 390 C (customer 2026-11-25): the stopped job stays listed as interrupted, first.
+    assert_eq!(rig.waiting(), [(1, 0), (2, 1), (3, 2)]);
     // A Ready job that is stopped is discarded; the list stays.
     let mut rig = Rig::new(StartRule::Immediate);
     rig.send(1, TEXT, &owner());
@@ -652,7 +653,9 @@ fn chain_table_end_x_flag_x_rule() {
             assert_eq!(rig.waiting(), [(3, 1)], "{label}");
             assert_eq!(rig.m.held_job().unwrap().job_id, id(2), "{label}");
         } else {
-            assert_eq!(rig.waiting().len(), 2, "{label}");
+            // An interrupted entry (Frage 390 C: Stop, alarm, loss) stands outside the order.
+            let waiting = rig.waiting().iter().filter(|(_, p)| *p > 0).count();
+            assert_eq!(waiting, 2, "{label}");
             assert!(
                 rig.flags().iter().all(|f| !f),
                 "{label}: flags cleared or never set"
@@ -740,6 +743,7 @@ fn restored_jobs_wait_in_order_nothing_starts_and_an_interrupted_job_cannot_be_s
             sent_by: "Phone".into(),
             run_next_by: None,
             interrupted_at: interrupted,
+            stop: None,
         },
         text: Arc::from(TEXT),
     };
