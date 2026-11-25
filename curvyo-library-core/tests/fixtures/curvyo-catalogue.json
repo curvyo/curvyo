@@ -1,0 +1,67 @@
+{
+  "catalogue_format": 1,
+  "name": "Curvyo templates",
+  "templates": [
+    {
+      "path": "boxes/finger-box",
+      "name": "Finger box",
+      "author": "Jane Doe",
+      "tags": ["box", "laser"],
+      "licence": {"spdx": "CC0-1.0", "name": "CC0 1.0", "url": "https://creativecommons.org/publicdomain/zero/1.0/"},
+      "fonts": [{"family": "Inter", "style": "Regular", "spdx": "OFL-1.1"}],
+      "size": 3,
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "thumbnail_sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "format_version": 58
+    },
+    {
+      "path": "signs/name-plate",
+      "name": "Name plate",
+      "author": "Max Mustermann",
+      "tags": ["sign"],
+      "licence": {"spdx": "CC-BY-4.0", "name": "CC BY 4.0", "url": "https://creativecommons.org/licenses/by/4.0/"},
+      "credit": "Name plate by Max Mustermann, CC BY 4.0",
+      "fonts": [{"family": "Mystery Sans", "style": "Bold", "spdx": ""}],
+      "size": 2048,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "format_version": 59
+    },
+    {
+      "path": "misc/no-licence",
+      "name": "No licence stated",
+      "size": 10,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000002"
+    },
+    {
+      "path": "../escape",
+      "name": "Breaks the path rule",
+      "size": 1,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000003"
+    },
+    {
+      "path": "signs/by-without-credit",
+      "name": "CC BY without credit",
+      "licence": {"spdx": "CC-BY-4.0", "name": "CC BY 4.0", "url": ""},
+      "size": 1,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000004"
+    },
+    {
+      "path": "signs/bad-hash",
+      "name": "Bad hash",
+      "size": 1,
+      "sha256": "XYZ"
+    },
+    {
+      "path": "boxes/finger-box",
+      "name": "Duplicate path",
+      "size": 1,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000005"
+    },
+    {
+      "path": "big/huge",
+      "name": "Huge",
+      "size": 99999999999,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000006"
+    }
+  ]
+}

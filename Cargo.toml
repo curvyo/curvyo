@@ -16,6 +16,7 @@ members = [
     "curvyo-image-core",
     "curvyo-imageai-core",
     "curvyo-ui-core",
+    "curvyo-library-core",
     "curvyo-crypto-core",
     "curvyo-sync-core",
     "curvyo-sync-server",

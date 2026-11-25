@@ -19,8 +19,10 @@ mod font_files;
 mod font_subfolders;
 mod font_sync_files;
 mod fonts;
+mod http;
 mod library_folders;
 mod library_sources;
+mod online_fetch;
 mod recent_workspaces;
 mod recovery_copies;
 mod room_keys;
@@ -54,6 +56,7 @@ pub use font_sync_files::{SyncedFont, SyncedWrite, write_synced_font};
 pub use fonts::{
     FolderFonts, FontFace, FontSource, MAX_FONT_FILE_BYTES, list_font_folder, list_system_fonts,
 };
+pub use http::{HttpError, Transport, UreqTransport};
 pub use library_folders::{
     AddFolderRefusal, LIBRARY_FOLDERS_FILE, LIBRARY_FOLDERS_FORMAT, LibraryFolders,
     LibraryFoldersError,
@@ -61,6 +64,10 @@ pub use library_folders::{
 pub use library_sources::{
     LibraryMembers, MAX_SOURCE_DOCUMENTS, ScannedDocument, SourceError, library_read,
     read_library_members, read_page_picture, scan_library_source,
+};
+pub use online_fetch::{
+    fetch_catalogue, fetch_collection, fetch_collections, fetch_icons, fetch_search,
+    fetch_template, fetch_thumbnail,
 };
 pub use recent_workspaces::{
     MAX_RECENT_WORKSPACES, RECENT_WORKSPACES_FILE, RECENT_WORKSPACES_FORMAT, RecentWorkspace,

@@ -45,6 +45,18 @@ zip.workspace = true
 # 10): one pure reader in the document crate for the desktop and the browser build.
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 
+# The online library's GETs (ADR 0085 decision 2): blocking, https only, rustls on the already
+# locked `ring` provider (the roots come from `rustls-native-certs` below). MIT OR Apache-2.0.
+ureq = { version = "3", default-features = false, features = ["rustls-no-provider"] }
+# The operating system's trust roots, handed to `ureq` as its root certificates (no bundled list):
+# MIT OR Apache-2.0 OR ISC; new in `Cargo.lock` with this crate (its `openssl-probe` and
+# `rustls-pki-types` are small; the latter was locked).
+rustls-native-certs = "0.8"
+# The `ring` provider `ureq` runs on; `rustls` and `ring` are locked by `curvyo-connector-io`.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+# The sources file text, the guarded requests and the answers of the online library (ADR 0085 §8).
+curvyo-library-core = { path = "../curvyo-library-core", version = "0.1.0" }
+
 [dev-dependencies]
 tempfile = "3"
 # Thread CPU time of the workspace scan budget (`specs/0095-workspace` criterion 5).

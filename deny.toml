@@ -118,6 +118,11 @@ name = "curvyo-render-core"
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-editor-wasm"
 
+# ADR 0085: the online library protocols crate.
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-library-core"
+
 # ADR 0031: the sealing and keyring crate.
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
