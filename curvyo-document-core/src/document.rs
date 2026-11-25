@@ -706,7 +706,17 @@ impl DocumentVersion {
 /// spelling `"user_origin"`. A build that stops at 60 would read that Start as damaged, so this
 /// build's files are refused there by version; a file of 60 opens unchanged. Goldens:
 /// `user_origin_v61.curvyo`, `user_origin_damaged_v61.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 61;
+///
+/// Version 62 (`specs/0099-sketch-pages` revision 2026-11-19, `adrs.md` A2, A3, A5): a sketch may
+/// carry the register `exposed_params` (one list value of `{ key, name?, min?, max? }`, key
+/// `p:<ParameterId>` or `d:<ConstraintId>`), a clone the registers `instance_params` and
+/// `instance_fallback` (one map value each, key to `{"mm": n}` or `{"deg": n}`). Only a wrong
+/// register shape refuses the file; an entry or value that does not decode is ignored and kept,
+/// a stored value outside its limits is clamped at read and not rewritten. A build that stops at
+/// 61 would draw every clone with the sketch's own values and cut the wrong part, so this build's
+/// files are refused there by version; a file of 61 opens unchanged. Goldens:
+/// `sketch_instances_v62.curvyo`, `sketch_instances_damaged_v62.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 62;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -742,6 +752,8 @@ pub struct Document {
     pub(crate) sketch_cache: std::cell::RefCell<
         std::collections::HashMap<crate::NodeId, (DocumentVersion, crate::SketchSnapshot)>,
     >,
+    /// The solves of sketch instances, keyed by content (`specs/0099-sketch-pages` A4).
+    pub(crate) instance_solves: crate::InstanceSolves,
     pub(crate) loro: LoroDoc,
     /// The commit path's session state (`crate::history`).
     pub(crate) commit_state: crate::history::CommitState,
@@ -865,6 +877,7 @@ impl Document {
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
             sketch_cache: std::cell::RefCell::default(),
+            instance_solves: crate::InstanceSolves::default(),
             assets: std::cell::RefCell::default(),
             share: std::cell::RefCell::default(),
             legacy_share: std::cell::Cell::default(),
@@ -937,6 +950,7 @@ impl Document {
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
             sketch_cache: std::cell::RefCell::default(),
+            instance_solves: crate::InstanceSolves::default(),
             assets: std::cell::RefCell::default(),
             share: std::cell::RefCell::default(),
             legacy_share: std::cell::Cell::default(),
@@ -1048,6 +1062,33 @@ impl Document {
 }
 
 impl Document {
+    /// Puts the raw instance registers of the sketch or clone `id` into its entry.
+    fn add_instance_json(&self, id: crate::path_model::NodeId, object: &mut ObjectJson) {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let Ok(meta) = tree.get_meta(crate::paths::tree_id_of(id)) else {
+            return;
+        };
+        let raw = |key: &str| {
+            let map = crate::instance_codec::read_values_raw(&meta, key);
+            (!map.is_empty()).then_some(serde_json::Value::Object(map))
+        };
+        match object {
+            ObjectJson::Sketch { exposed_params, .. } => {
+                let items = crate::instance_codec::read_exposed_raw(&meta);
+                *exposed_params = (!items.is_empty()).then_some(serde_json::Value::Array(items));
+            }
+            ObjectJson::Clone {
+                instance_params,
+                instance_fallback,
+                ..
+            } => {
+                *instance_params = raw(crate::instance_codec::KEY_INSTANCE_PARAMS);
+                *instance_fallback = raw(crate::instance_codec::KEY_INSTANCE_FALLBACK);
+            }
+            _ => {}
+        }
+    }
+
     /// The `document.json` entries of the children of `parent` (`None` is the document root), in
     /// z-order; a group nests its own children.
     fn json_children(&self, parent: Option<crate::path_model::NodeId>) -> Vec<NodeJson> {
@@ -1073,10 +1114,14 @@ impl Document {
                         own_style: overrides.own_style,
                         own_adjustments: overrides.own_adjustments,
                         style,
+                        instance_params: None,
+                        instance_fallback: None,
                     }
                 } else {
                     ObjectJson::from(self.object(id)?)
                 };
+                let mut object = object;
+                self.add_instance_json(id, &mut object);
                 let mut registers = self
                     .node_registers(id)
                     .map(RegistersJson::from)
@@ -1183,6 +1228,9 @@ enum ObjectJson {
         graph: curvyo_sketch_core::Sketch,
         placement: crate::Affine,
         style: crate::Style,
+        /// The `exposed_params` list as stored (`specs/0099-sketch-pages` criterion 30).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        exposed_params: Option<serde_json::Value>,
     },
     /// A group (`specs/0023-groups`): no geometry and no style, only its children in z-order.
     Group {
@@ -1228,6 +1276,12 @@ enum ObjectJson {
         own_adjustments: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<crate::style_model::Style>,
+        /// The `instance_params` map as stored (`specs/0099-sketch-pages` criterion 30).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        instance_params: Option<serde_json::Value>,
+        /// The `instance_fallback` map as stored.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        instance_fallback: Option<serde_json::Value>,
     },
     /// A text object (`specs/0074-text-objects`, ADR 0020 §1): string, font reference, size and
     /// placement `[a, b, c, d, e, f]`; never outlines.
@@ -1349,6 +1403,7 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 graph: sketch.graph,
                 placement: sketch.placement,
                 style: sketch.style,
+                exposed_params: None,
             },
             ObjectSnapshot::RegistrationMark(mark) => Self::RegistrationMark {
                 id: mark.id,
@@ -1398,6 +1453,8 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 own_style: clone.chain.own_style,
                 own_adjustments: clone.chain.own_adjustments,
                 style: clone.chain.own_style.then_some(clone.resolved.style),
+                instance_params: None,
+                instance_fallback: None,
             },
             ObjectSnapshot::Primitive(primitive) => {
                 let id = primitive.id;

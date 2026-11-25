@@ -563,6 +563,7 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "arc_unknown_kind_damaged_v16.curvyo",
     ];
     let explicitly_damaged = [
+        "sketch_instances_damaged_v62.curvyo",
         "sketch_checkpoint_invalid_v28.curvyo",
         "sketch_record_invalid_v28.curvyo",
         "sketch_page_claim_invalid_v28.curvyo",

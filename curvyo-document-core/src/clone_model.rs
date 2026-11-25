@@ -38,6 +38,7 @@ pub(crate) fn outline_transforms() -> usize {
 }
 
 /// The link of a resolved clone and where its chain ends.
+#[allow(clippy::struct_excessive_bools)] // independent override flags, read by name
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CloneChain {
     /// The object it follows directly: a path, a compound path or another clone.
@@ -64,6 +65,17 @@ pub struct CloneChain {
     /// The node its adjustment registers are read from (ADR 0072 §2): itself with own
     /// adjustments, else the nearest clone on its chain with them, else the root.
     pub adjust_source: NodeId,
+    /// Whether the clone itself holds own parameter values of its sketch (`0099` criterion 24).
+    pub own_params: bool,
+    /// Whether the value set it follows has no solution (`0099` criterion 26): it draws its saved
+    /// fallback, else what its original draws, else the sketch's own geometry.
+    pub no_solution: bool,
+    /// The own values it holds, clamped, only those its sketch still exposes.
+    #[serde(skip)]
+    pub own_values: crate::ValueSet,
+    /// The values it inherits from its original's chain (the nearest own value up the chain).
+    #[serde(skip)]
+    pub inherited_values: crate::ValueSet,
     /// The root's own snapshot as read, unmapped, one allocation shared by every clone of that
     /// root, so the renderer can tessellate it once (`adrs.md` decision 3, criterion 44).
     /// Invariant: [`CloneSnapshot::resolved`]'s anchors are this outline's under `composed`.

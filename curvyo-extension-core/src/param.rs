@@ -10,8 +10,6 @@ use serde_json::{Map, Value};
 pub type StoredParams = Map<String, Value>;
 
 /// The JSON key of a stored length: a number of millimetres tagged with its unit.
-const MM: &str = "mm";
-const DEG: &str = "deg";
 const COUNT: &str = "count";
 const ON: &str = "on";
 const CHOICE: &str = "choice";
@@ -204,9 +202,19 @@ impl ParamValue {
     #[must_use]
     pub fn to_stored(&self) -> Value {
         let (key, value) = match self {
-            Self::Length(length) => (MM, Value::from(length.as_mm())),
+            Self::Length(length) => {
+                return curvyo_document_core::encode_number(
+                    curvyo_document_core::StoredUnit::Millimetres,
+                    length.as_mm(),
+                );
+            }
+            Self::Angle(degrees) => {
+                return curvyo_document_core::encode_number(
+                    curvyo_document_core::StoredUnit::Degrees,
+                    degrees.0,
+                );
+            }
             Self::Count(count) => (COUNT, Value::from(*count)),
-            Self::Angle(degrees) => (DEG, Value::from(degrees.0)),
             Self::Switch(on) => (ON, Value::from(*on)),
             Self::Choice(id) => (CHOICE, Value::from(id.as_str())),
             Self::Path(path) => (PATH, Value::from(path.flat())),
@@ -220,6 +228,14 @@ impl ParamValue {
     /// finite.
     #[must_use]
     pub fn from_stored(value: &Value) -> Option<Self> {
+        if let Some((unit, number)) = curvyo_document_core::decode_number(value) {
+            return Some(match unit {
+                curvyo_document_core::StoredUnit::Millimetres => {
+                    Self::Length(Length::from_mm(number))
+                }
+                curvyo_document_core::StoredUnit::Degrees => Self::Angle(Degrees(number)),
+            });
+        }
         let Value::Object(map) = value else {
             return None;
         };
@@ -227,10 +243,7 @@ impl ParamValue {
             return None;
         }
         let (key, inner) = map.iter().next()?;
-        let finite = || inner.as_f64().filter(|number| number.is_finite());
         match key.as_str() {
-            MM => Some(Self::Length(Length::from_mm(finite()?))),
-            DEG => Some(Self::Angle(Degrees(finite()?))),
             COUNT => Some(Self::Count(u32::try_from(inner.as_u64()?).ok()?)),
             ON => Some(Self::Switch(inner.as_bool()?)),
             CHOICE => Some(Self::Choice(inner.as_str()?.to_owned())),

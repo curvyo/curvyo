@@ -79,3 +79,55 @@ impl WasmSession {
         self.session.take_generated_notice()
     }
 }
+
+/// The Parameters override of clones of a sketch and Expose (`specs/0099-sketch-pages` criteria 23
+/// and 24): strings, numbers and flags only; every method passes straight to `Session`
+/// (`session/sketch_instance.rs`).
+#[wasm_bindgen]
+impl WasmSession {
+    /// The Parameters row of the selected clones as JSON, or `null`.
+    #[must_use]
+    pub fn sketch_instance_json(&self) -> String {
+        self.session.sketch_instance_json()
+    }
+
+    /// A value stepped into the field `key`, shown without writing; JSON `{notices, no_solution}`.
+    pub fn preview_sketch_instance_value(&mut self, key: &str, number: f64) -> String {
+        self.session.preview_sketch_instance_value(key, number)
+    }
+
+    /// Drops the preview of a stepped field.
+    pub fn cancel_sketch_instance_preview(&mut self) {
+        self.session.cancel_sketch_instance_preview();
+    }
+
+    /// A value typed or stepped into the field `key`; JSON `{written, notices}` or `{error}`.
+    pub fn set_sketch_instance_value(&mut self, key: &str, number: f64) -> String {
+        self.session.set_sketch_instance_value(key, number)
+    }
+
+    /// Back to the sketch's value of `key`, or Original's for an empty `key`; one step.
+    pub fn reset_sketch_instance(&mut self, key: &str) -> bool {
+        self.session.reset_sketch_instance(key)
+    }
+
+    /// Own: every value shown becomes the clones' own; one step.
+    pub fn own_sketch_instance(&mut self) -> bool {
+        self.session.own_sketch_instance()
+    }
+
+    /// Exposes `key` of the active sketch; empty on success, else the refusal sentence.
+    pub fn sketch_expose(&mut self, key: &str, name: &str) -> String {
+        self.session.sketch_expose(key, name)
+    }
+
+    /// Stops exposing `key`; empty on success, else the refusal sentence.
+    pub fn sketch_unexpose(&mut self, key: &str) -> String {
+        self.session.sketch_unexpose(key)
+    }
+
+    /// Limits and name of the exposed `key`; empty on success, else the refusal sentence.
+    pub fn sketch_exposed_limits(&mut self, key: &str, min: &str, max: &str, name: &str) -> String {
+        self.session.sketch_exposed_limits(key, min, max, name)
+    }
+}

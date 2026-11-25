@@ -30,6 +30,8 @@ fn keys_replaced_by_unlink() -> impl Iterator<Item = &'static str> {
         KEY_CLONE_LINK,
         crate::clone_codec::KEY_OWN_PLACEMENT,
         crate::clone_codec::KEY_OWN_STYLE,
+        crate::instance_codec::KEY_INSTANCE_PARAMS,
+        crate::instance_codec::KEY_INSTANCE_FALLBACK,
         crate::node_registers::KEY_OPACITY,
         KEY_ANCHORS,
         KEY_CLOSED,

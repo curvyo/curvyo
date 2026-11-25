@@ -8,7 +8,7 @@ use loro::{LoroMap, LoroTree, TreeID};
 use crate::clone_codec::{is_clone_meta, read_clone_link};
 use crate::clone_model::CloneSnapshot;
 use crate::clone_picture::Structure;
-use crate::clone_read::{ObjectRead, RawLeaf, RawOverrides, resolve, resolve_in};
+use crate::clone_read::{ObjectRead, RawLeaf, RawOverrides, resolve_in_with, resolve_with};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{leaf_exists, read_path_snapshot};
 use crate::path_model::NodeId;
@@ -22,7 +22,10 @@ impl Document {
     #[must_use]
     pub fn read_objects(&self) -> ObjectRead {
         let (leaves, structure) = self.raw_leaves_with_structure();
-        resolve_in(leaves, Some(&structure)).into_read()
+        self.instance_solves.begin_read();
+        let read = resolve_in_with(leaves, Some(&structure), &self.instance_solves).into_read();
+        self.instance_solves.sweep();
+        read
     }
 
     /// Every leaf as stored, in stacking order, with the containers and registers a clone of a
@@ -134,6 +137,14 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
                     own_adjustments: overrides
                         .own_adjustments
                         .then(|| crate::image_adjust_codec::read_adjustments(meta)),
+                    params: crate::instance_codec::read_values(
+                        meta,
+                        crate::instance_codec::KEY_INSTANCE_PARAMS,
+                    ),
+                    fallback: crate::instance_codec::read_values(
+                        meta,
+                        crate::instance_codec::KEY_INSTANCE_FALLBACK,
+                    ),
                 },
             )
         });
@@ -191,8 +202,13 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
 /// The clone `id` resolved by collecting the leaves of its own chain and handing them to the one
 /// resolver, or `None` when it is an orphan. O(depth). The caller has checked that `id` is a live
 /// clone leaf.
+///
+/// It has no document to keep the solves of a clone's own sketch values in: such a clone solves
+/// afresh. A reader that has the document uses [`Document::read_clone`].
 pub(crate) fn read_one_clone(tree: &LoroTree, id: NodeId) -> Option<CloneSnapshot> {
-    read_clone_with(tree, id, |leaf| raw_leaf(tree, leaf))
+    read_clone_with(tree, id, &crate::InstanceSolves::default(), |leaf| {
+        raw_leaf(tree, leaf)
+    })
 }
 
 impl Document {
@@ -205,7 +221,9 @@ impl Document {
                 _ => None,
             };
         }
-        read_one_clone(&tree, id)
+        read_clone_with(&tree, id, &self.instance_solves, |leaf| {
+            raw_leaf(&tree, leaf)
+        })
     }
 
     pub(crate) fn read_cached_clone(&self, id: NodeId) -> Option<CloneSnapshot> {
@@ -213,7 +231,7 @@ impl Document {
         if chain_ends_at_picture(&tree, id) {
             return self.read_clone(id);
         }
-        read_clone_with(&tree, id, |leaf| {
+        read_clone_with(&tree, id, &self.instance_solves, |leaf| {
             self.sketch(NodeId::from_parts(leaf.peer, leaf.counter))
                 .map(|sketch| RawLeaf::Sketch(Box::new(sketch)))
                 .or_else(|| raw_leaf(&tree, leaf))
@@ -224,6 +242,7 @@ impl Document {
 fn read_clone_with(
     tree: &LoroTree,
     id: NodeId,
+    solves: &crate::InstanceSolves,
     read: impl Fn(TreeID) -> Option<RawLeaf>,
 ) -> Option<CloneSnapshot> {
     let mut seen = HashSet::new();
@@ -247,7 +266,7 @@ fn read_clone_with(
             None => break,
         }
     }
-    match resolve(chain).leaves.into_iter().next()?? {
+    match resolve_with(chain, solves).leaves.into_iter().next()?? {
         ObjectSnapshot::Clone(clone) => Some(clone),
         _ => None,
     }

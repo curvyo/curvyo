@@ -20,9 +20,7 @@ use crate::extensions::{ExtensionSettings, generate_object, manifests};
 use crate::instance_notice::notices;
 pub use crate::instance_notice::{clamp_notice, shown};
 pub use crate::instance_resize::{ResizeView, resize_view};
-pub use crate::instance_view::{
-    InstanceView, RowView, value_from_json, value_from_number, view,
-};
+pub use crate::instance_view::{InstanceView, RowView, value_from_json, value_from_number, view};
 
 /// Why an instance command did nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -196,6 +194,50 @@ pub fn place(
     document
         .create_generated_seeded(&record, frame)
         .map_err(|_| InstanceError::Refused)
+}
+
+/// The object an instance command acts on: the clone of a sketch with its own values (`0099`), or
+/// a generated object (`0141`). The two arms share the field, the clamp notice and the preview;
+/// each has its own storage (`adrs.md` A7).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstanceSource {
+    /// A linked clone of a sketch.
+    Sketch {
+        /// The clone.
+        clone: NodeId,
+    },
+    /// A generated object.
+    Generated {
+        /// The object.
+        node: NodeId,
+    },
+}
+
+/// Sets the parameter `key` of `source` to `value` in one commit "Change parameter": for a
+/// generated object the key of its schema, for a sketch clone the exposed key (`p:...` or `d:...`)
+/// with a length in millimetres or an angle in degrees.
+///
+/// # Errors
+/// As [`change_value`] for a generated object; for a sketch clone
+/// [`InstanceError::NoSuchObject`], [`InstanceError::WrongValue`] or [`InstanceError::Refused`].
+pub fn change_parameter(
+    document: &Document,
+    settings: &ExtensionSettings,
+    source: InstanceSource,
+    key: &str,
+    value: &ParamValue,
+) -> Result<Changed, InstanceError> {
+    match source {
+        InstanceSource::Generated { node } => change_value(document, settings, node, key, value),
+        InstanceSource::Sketch { clone } => {
+            let number = match value {
+                ParamValue::Length(length) => length.as_mm(),
+                ParamValue::Angle(degrees) => degrees.0,
+                _ => return Err(InstanceError::WrongValue),
+            };
+            crate::instance_sketch::change(document, &[clone], key, number, &[])
+        }
+    }
 }
 
 /// What a parameter edit changed.

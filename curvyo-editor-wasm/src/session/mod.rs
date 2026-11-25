@@ -152,6 +152,7 @@ mod pattern_tests;
 mod pen;
 mod place_on;
 mod row_drag;
+mod sketch_instance;
 mod sketch_moves;
 mod sketch_use;
 mod spiro_cache;
@@ -739,6 +740,8 @@ pub struct Session {
     test_grid: test_grid::TestGridTool,
     /// The Generators tool (`generators.rs`, `specs/0141`).
     generators: generators::GeneratorsState,
+    /// The preview of a Parameters field being stepped (`sketch_instance.rs`, `specs/0099`).
+    instances: sketch_instance::InstanceState,
 }
 
 impl Session {
@@ -868,6 +871,7 @@ impl Session {
             library: library_sync::LibrarySyncState::default(),
             test_grid: test_grid::TestGridTool::default(),
             generators: generators::GeneratorsState::default(),
+            instances: sketch_instance::InstanceState::default(),
         }
     }
 
@@ -992,6 +996,7 @@ impl Session {
             library: library_sync::LibrarySyncState::default(),
             test_grid: test_grid::TestGridTool::default(),
             generators: generators::GeneratorsState::default(),
+            instances: sketch_instance::InstanceState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();

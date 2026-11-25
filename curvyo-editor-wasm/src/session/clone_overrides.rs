@@ -14,7 +14,7 @@ fn clones_word(count: usize) -> String {
 
 impl Session {
     /// The selected clones, when the selection holds only clones (the clone block's targets).
-    fn block_clones(&self) -> Vec<NodeId> {
+    pub(super) fn block_clones(&self) -> Vec<NodeId> {
         let read = self.object_read();
         let ids = self.selection.ids();
         if ids.is_empty()

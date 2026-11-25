@@ -168,6 +168,13 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // their kind (`gk`) and parameter (`gp`) as fields for a kind-specific row text.
     ("add_generated", "Add generated object"),
     ("change_parameter", "Change parameter"),
+    // `specs/0099-sketch-pages` revision 2026-11-19 (sketch instances), criteria 23, 24.
+    ("expose_parameter", "Expose parameter"),
+    ("unexpose_parameter", "Stop exposing parameter"),
+    ("change_exposed_parameter", "Change exposed parameter"),
+    ("reset_parameter", "Back to the sketch's value"),
+    ("reset_parameters", "Back to the sketch's values"),
+    ("own_parameters", "Own parameter values"),
     ("convert_generated", "Convert to paths"),
     ("create_star", "Draw star"),
     // `specs/0074-text-objects` criteria 7 and 13.

@@ -301,7 +301,7 @@ fn the_golden_reads_back_every_operation_switch_membership_and_cuts_last() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 61);
+    assert_eq!(CURRENT_FORMAT_VERSION, 62);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let lists = all_operations(&opened);

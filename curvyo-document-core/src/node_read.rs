@@ -7,7 +7,7 @@
 
 use loro::{LoroTree, TreeID};
 
-use crate::clone_read::{RawLeaf, resolve_in};
+use crate::clone_read::{RawLeaf, resolve_in_with};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::group_tree::{children_of, is_group_node, is_layer_node, node_id};
 use crate::node_registers::{NodeRegisters, read_registers};
@@ -259,7 +259,9 @@ impl Document {
                 .map(|w| w.node)
                 .collect(),
         };
-        let mut leaves = resolve_in(raws, Some(&structure)).leaves;
+        self.instance_solves.begin_read();
+        let mut leaves = resolve_in_with(raws, Some(&structure), &self.instance_solves).leaves;
+        self.instance_solves.sweep();
         walked
             .into_iter()
             .filter_map(|w| w.read(&mut leaves, &own))

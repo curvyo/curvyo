@@ -238,6 +238,14 @@ pub const FREE_STEPS: &[&str] = &[
 /// The edit commands of criterion 9 that have a label today. Any label in none of the three lists
 /// is an edit as well (Proposal: unknown future commands default to guarded).
 pub const EDIT_STEPS: &[&str] = &[
+    // `specs/0099-sketch-pages` revision 2026-11-19: Expose on the sketch and the Parameters row of
+    // a clone change what the selected objects are.
+    "expose_parameter",
+    "unexpose_parameter",
+    "change_exposed_parameter",
+    "reset_parameter",
+    "reset_parameters",
+    "own_parameters",
     // `specs/0121-print-and-cut`: Size and Line width of the selected marks object.
     "registration_mark_size",
     "convert_sketch_to_path",

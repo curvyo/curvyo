@@ -11,6 +11,65 @@ use crate::clone_write::unlink_meta;
 use crate::document::Document;
 use crate::path_model::{AnchorId, NodeId, PathSnapshot};
 
+impl Document {
+    /// The fixes that turn the clones holding own values below a removed (`gone`) or unlinked
+    /// node of `fixes` into paths.
+    fn value_follower_fixes(&self, gone: &HashSet<NodeId>, fixes: &[Fix]) -> Vec<Fix> {
+        let mut changed = gone.clone();
+        let mut handled: HashSet<NodeId> = HashSet::new();
+        for fix in fixes {
+            match fix {
+                Fix::Unlink(id, ..) => {
+                    changed.insert(*id);
+                    handled.insert(*id);
+                }
+                Fix::Copy(read) => {
+                    changed.insert(read.id());
+                    handled.insert(read.id());
+                }
+                Fix::Repoint(id, _) => {
+                    handled.insert(*id);
+                }
+            }
+        }
+        self.value_followers(&changed, &handled)
+            .into_iter()
+            .map(|follower| Fix::Unlink(follower.clone, follower.path, follower.opacity))
+            .collect()
+    }
+}
+
+/// The next original above `(origin, matrix)` that the removal leaves, the matrix composed over the
+/// links skipped, and whether a skipped clone held own sketch values.
+fn surviving_original(
+    links: &crate::clone_transform::CloneLinks,
+    gone: &HashSet<NodeId>,
+    all: &crate::clone_read::ObjectRead,
+    (origin, matrix): (NodeId, crate::affine::Affine),
+) -> (NodeId, crate::affine::Affine, bool) {
+    let (mut node, mut composed) = (origin, matrix);
+    let mut skipped_values = false;
+    for _ in 0..links.len() {
+        match links.get(&node) {
+            Some(&(next, m)) if gone.contains(&node) => {
+                skipped_values |= holds_values(all, node);
+                composed = composed.compose(m);
+                node = next;
+            }
+            _ => break,
+        }
+    }
+    (node, composed, skipped_values)
+}
+
+/// Whether the clone `node` of `read` holds own sketch values.
+fn holds_values(read: &crate::clone_read::ObjectRead, node: NodeId) -> bool {
+    matches!(
+        read.get(node),
+        Some(crate::primitive_model::ObjectSnapshot::Clone(clone)) if clone.chain.own_params
+    )
+}
+
 /// What one repair did, for the notice of criterion 31.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CloneRepair {
@@ -59,6 +118,7 @@ impl Document {
         }
         let mut fixes = Vec::new();
         let mut unlinked: Vec<TreeID> = Vec::new();
+        let all = self.read_objects();
         for clone in self.object_ids() {
             let Some(&(origin, matrix)) = links.get(&clone) else {
                 continue;
@@ -66,17 +126,16 @@ impl Document {
             if gone.contains(&clone) || !gone.contains(&origin) {
                 continue;
             }
-            let (mut node, mut composed) = (origin, matrix);
-            for _ in 0..links.len() {
-                match links.get(&node) {
-                    Some(&(next, m)) if gone.contains(&node) => {
-                        composed = composed.compose(m);
-                        node = next;
-                    }
-                    _ => break,
+            let (node, composed, skipped_values) =
+                surviving_original(&links, &gone, &all, (origin, matrix));
+            if !gone.contains(&node) && skipped_values {
+                // The removed clone gave this one values it would lose (`0099` A6).
+                if let Some(read) = self.read_clone(clone) {
+                    unlinked.push(crate::paths::tree_id_of(clone));
+                    let opacity = crate::clone_write::source_opacity(tree, &read);
+                    fixes.push(Fix::Unlink(clone, *read.resolved, opacity));
                 }
-            }
-            if !gone.contains(&node) {
+            } else if !gone.contains(&node) {
                 fixes.push(Fix::Repoint(
                     clone,
                     CloneLink {
@@ -95,6 +154,14 @@ impl Document {
                     fixes.push(Fix::Unlink(clone, *read.resolved, opacity));
                 }
             }
+        }
+        // A clone that holds own values below a removed or unlinked node becomes a path too, from
+        // what it draws now, deepest first (`0099` A6).
+        for fix in self.value_follower_fixes(&gone, &fixes) {
+            if let Fix::Unlink(id, ..) = &fix {
+                unlinked.push(crate::paths::tree_id_of(*id));
+            }
+            fixes.push(fix);
         }
         // A clone that stops being a clone (unlinked or copied) loses its members' keys in the
         // same step; its own key keeps its node id (ADR 0046 §2 (c)).

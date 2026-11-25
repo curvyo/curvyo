@@ -437,8 +437,11 @@ impl<'a> Tree<'a> {
         let origin = *self.index.get(&chain.origin)?;
         let m = Affine::new(chain.matrix.to_array());
         let origin_node = &self.nodes[origin];
+        // A clone that holds own sketch values draws another shape than its original: a path
+        // (`0099` criterion 29).
         let fits = !chain.own_placement
             && !chain.own_style
+            && !chain.own_params
             && chain.depth <= MAX_USE_CHAIN
             && is_isometry(m)
             && written[origin]

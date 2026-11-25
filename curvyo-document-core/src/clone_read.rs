@@ -50,6 +50,10 @@ pub(crate) struct RawOverrides {
     pub(crate) own_style: Option<Style>,
     /// Its own adjustments when it has the `own_adjustments` marker (ADR 0072 §2).
     pub(crate) own_adjustments: Option<crate::image_adjust_model::ImageAdjustments>,
+    /// Its own values of the sketch it follows (`instance_params`, `0099` criterion 24).
+    pub(crate) params: crate::ValueSet,
+    /// The last value set that solved (`instance_fallback`, `0099` criterion 26).
+    pub(crate) fallback: crate::ValueSet,
 }
 
 impl RawLeaf {
@@ -88,6 +92,8 @@ impl RawLeaf {
                         })
                         .unwrap_or_default()
                 }),
+                params: clone.chain.own_values.clone(),
+                fallback: crate::ValueSet::default(),
             },
         )
     }
@@ -219,6 +225,57 @@ pub(crate) struct Sources {
     pub(crate) style: Option<usize>,
     /// The adjustment source A(c).
     pub(crate) adjust: Option<usize>,
+    /// The value set the clone follows (`0099` criterion 28): its original's overlaid by its own,
+    /// an index into the read's [`Sets`]; 0 is the empty set.
+    pub(crate) values: u32,
+    /// The set its original follows.
+    pub(crate) inherited: u32,
+    /// The set of its own values that its sketch still exposes, clamped.
+    pub(crate) own: u32,
+    /// The set it would follow with its saved fallback in place of its own values.
+    pub(crate) fallback: Option<u32>,
+}
+
+/// The value sets of one read, each distinct set once: clones with equal sets share the index, so
+/// they share the solve and the outline (`0099` A4).
+#[derive(Debug)]
+pub(crate) struct Sets {
+    list: Vec<crate::ValueSet>,
+    index: HashMap<crate::ValueSet, u32>,
+}
+
+impl Sets {
+    fn new() -> Self {
+        let empty = crate::ValueSet::default();
+        Self {
+            index: HashMap::from([(empty.clone(), 0)]),
+            list: vec![empty],
+        }
+    }
+
+    fn intern(&mut self, set: crate::ValueSet) -> u32 {
+        if let Some(&found) = self.index.get(&set) {
+            return found;
+        }
+        // invariant: a read never holds 2^32 distinct value sets.
+        #[allow(clippy::cast_possible_truncation)]
+        let at = self.list.len() as u32;
+        self.index.insert(set.clone(), at);
+        self.list.push(set);
+        at
+    }
+
+    fn get(&self, at: u32) -> &crate::ValueSet {
+        &self.list[at as usize]
+    }
+}
+
+/// What a clone with a sketch root draws: the set whose solve it shows and whether that is not the
+/// set it follows.
+#[derive(Debug, Clone, Copy)]
+struct Draw {
+    set: u32,
+    no_solution: bool,
 }
 
 /// Resolves every clone of `leaves` (stacking order) without the tree around them: a clone of a
@@ -227,11 +284,25 @@ pub(crate) fn resolve(leaves: Vec<RawLeaf>) -> Resolution {
     resolve_in(leaves, None)
 }
 
+/// [`resolve`] with the solves of the document's sketch instances.
+pub(crate) fn resolve_with(leaves: Vec<RawLeaf>, solves: &crate::InstanceSolves) -> Resolution {
+    resolve_in_with(leaves, None, solves)
+}
+
 /// Resolves every clone of `leaves` (stacking order); with `structure`, the containers of the
 /// leaves, a clone of a group draws the group's drawn subtree (ADR 0045 §2). No recursion: a
 /// chain or ring of any length costs one stack entry per clone. Whether a clone is an orphan
 /// depends only on the leaves, not on the order of the walk.
 pub(crate) fn resolve_in(leaves: Vec<RawLeaf>, structure: Option<&Structure>) -> Resolution {
+    resolve_in_with(leaves, structure, &crate::InstanceSolves::default())
+}
+
+/// [`resolve_in`] with the solves of the document's sketch instances kept between reads.
+pub(crate) fn resolve_in_with(
+    leaves: Vec<RawLeaf>,
+    structure: Option<&Structure>,
+    solves: &crate::InstanceSolves,
+) -> Resolution {
     let index: HashMap<NodeId, usize> = leaves
         .iter()
         .enumerate()
@@ -255,12 +326,13 @@ pub(crate) fn resolve_in(leaves: Vec<RawLeaf>, structure: Option<&Structure>) ->
         .collect();
     let empty = Structure::default();
     let structure = structure.unwrap_or(&empty);
+    let mut sets = Sets::new();
     for start in 0..leaves.len() {
         if matches!(states[start], State::Pending) {
-            walk(start, &leaves, &index, structure, &mut states);
+            walk(start, &leaves, &index, structure, &mut states, &mut sets);
         }
     }
-    assemble(leaves, &states, &index, structure)
+    assemble(leaves, &states, &index, structure, &sets, solves)
 }
 
 /// Follows the chain from the clone at `start` until it meets a root, a resolved clone or a dead
@@ -271,6 +343,7 @@ fn walk(
     index: &HashMap<NodeId, usize>,
     structure: &Structure,
     states: &mut [State],
+    sets: &mut Sets,
 ) {
     let mut stack = vec![start];
     states[start] = State::OnStack;
@@ -311,6 +384,26 @@ fn walk(
                 return None;
             };
             let own = link.matrix.compose(composed);
+            let (own_set, effective, fallback) = match root {
+                RootRef::Leaf(at) => match &leaves[at] {
+                    RawLeaf::Sketch(sketch) => {
+                        let kept =
+                            crate::sketch_instance::filtered(&sketch.exposed, &overrides.params);
+                        let inherited = sets.get(source.values).clone();
+                        let fallback = (!overrides.fallback.is_empty()).then(|| {
+                            let kept_fallback = crate::sketch_instance::filtered(
+                                &sketch.exposed,
+                                &overrides.fallback,
+                            );
+                            sets.intern(inherited.overlaid(&kept_fallback))
+                        });
+                        let effective = sets.intern(inherited.overlaid(&kept));
+                        (sets.intern(kept), effective, fallback)
+                    }
+                    _ => (0, 0, None),
+                },
+                RootRef::Group(_) => (0, 0, None),
+            };
             let source = Sources {
                 style: if overrides.own_style.is_some() {
                     Some(clone)
@@ -322,6 +415,10 @@ fn walk(
                 } else {
                     source.adjust
                 },
+                values: effective,
+                inherited: source.values,
+                own: own_set,
+                fallback,
             };
             own.is_finite().then_some((root, depth + 1, own, source))
         });
@@ -339,6 +436,8 @@ fn walk(
 fn outline_clones(
     leaves: &[RawLeaf],
     states: &[State],
+    sets: &Sets,
+    solves: &crate::InstanceSolves,
 ) -> (
     Vec<Option<CloneSnapshot>>,
     Vec<Pending>,
@@ -346,17 +445,26 @@ fn outline_clones(
 ) {
     let mut clones: Vec<Option<CloneSnapshot>> = vec![None; leaves.len()];
     let mut by_depth: Vec<(usize, usize)> = Vec::new();
-    let mut shared: HashMap<usize, std::sync::Arc<PathSnapshot>> = HashMap::new();
+    let mut shared: HashMap<(usize, u32), std::sync::Arc<PathSnapshot>> = HashMap::new();
     let mut pictures: Vec<Pending> = Vec::new();
-    let failed = refine_sketch_roots(leaves, states, &mut shared);
+    let draws = draw_sets(leaves, states, sets, solves);
+    let failed = refine_sketch_roots(leaves, states, &draws, sets, solves, &mut shared);
     for (i, (leaf, state)) in leaves.iter().zip(states).enumerate() {
         let (RawLeaf::Clone(id, link, overrides), State::Resolved(root, depth, composed, source)) =
             (leaf, *state)
         else {
             continue;
         };
+        let draw = draws[i].unwrap_or(Draw {
+            set: 0,
+            no_solution: false,
+        });
         let root = match root {
-            RootRef::Leaf(root) if root_path_of(&leaves[root], &mut shared, root).is_some() => root,
+            RootRef::Leaf(root)
+                if root_path_of(&leaves[root], &mut shared, (root, 0)).is_some() =>
+            {
+                root
+            }
             RootRef::Leaf(_) | RootRef::Group(_) => {
                 let adjustments = source.adjust.and_then(|s| match &leaves[s] {
                     RawLeaf::Clone(source_id, _, raw) => raw
@@ -379,8 +487,8 @@ fn outline_clones(
                 continue;
             }
         };
-        if !failed.contains(&root)
-            && let Some(root_outline) = shared.get(&root).cloned()
+        if !failed.contains(&(root, draw.set))
+            && let Some(root_outline) = shared.get(&(root, draw.set)).cloned()
         {
             let root_path = &*root_outline;
             let (style_source, style) = match source.style.map(|s| &leaves[s]) {
@@ -407,6 +515,10 @@ fn outline_clones(
                     style_source,
                     own_adjustments: false,
                     adjust_source: root_path.id,
+                    own_params: source.own != 0,
+                    no_solution: draw.no_solution,
+                    own_values: sets.get(source.own).clone(),
+                    inherited_values: sets.get(source.inherited).clone(),
                     root_outline,
                     picture: None,
                     picture_members: None,
@@ -424,6 +536,75 @@ fn outline_clones(
     (clones, pictures, by_depth)
 }
 
+/// What each clone of a sketch root draws (`0099` criterion 26, `adrs.md` A5): the set it follows
+/// when that solves; else its saved fallback when that solves; else, with no own values, what its
+/// original draws; else the sketch's own geometry. Decided in depth order, so an original is
+/// decided before its clones.
+fn draw_sets(
+    leaves: &[RawLeaf],
+    states: &[State],
+    sets: &Sets,
+    solves: &crate::InstanceSolves,
+) -> Vec<Option<Draw>> {
+    let mut draws: Vec<Option<Draw>> = vec![None; leaves.len()];
+    let index: HashMap<NodeId, usize> = leaves
+        .iter()
+        .enumerate()
+        .filter(|(_, leaf)| matches!(leaf, RawLeaf::Clone(..)))
+        .map(|(i, leaf)| (leaf.id(), i))
+        .collect();
+    let mut order: Vec<(usize, usize)> = states
+        .iter()
+        .enumerate()
+        .filter_map(|(i, state)| match state {
+            State::Resolved(RootRef::Leaf(root), depth, _, _)
+                if matches!(leaves[*root], RawLeaf::Sketch(_)) =>
+            {
+                Some((*depth, i))
+            }
+            _ => None,
+        })
+        .collect();
+    order.sort_unstable();
+    for (_, i) in order {
+        let (RawLeaf::Clone(_, link, _), State::Resolved(RootRef::Leaf(root), _, _, source)) =
+            (&leaves[i], states[i])
+        else {
+            continue;
+        };
+        let RawLeaf::Sketch(sketch) = &leaves[root] else {
+            continue;
+        };
+        let solves_set = |set: u32| set == 0 || solves.solved(sketch, sets.get(set)).is_ok();
+        let draw = if solves_set(source.values) {
+            Draw {
+                set: source.values,
+                no_solution: false,
+            }
+        } else if let Some(fallback) = source.fallback.filter(|&set| solves_set(set)) {
+            Draw {
+                set: fallback,
+                no_solution: true,
+            }
+        } else if source.own == 0
+            && let Some(&origin) = index.get(&link.origin)
+            && let Some(origin_draw) = draws[origin]
+        {
+            Draw {
+                set: origin_draw.set,
+                no_solution: true,
+            }
+        } else {
+            Draw {
+                set: 0,
+                no_solution: true,
+            }
+        };
+        draws[i] = Some(draw);
+    }
+    draws
+}
+
 /// Builds the result from the resolved states, in input order. Each resolved clone's outline is
 /// mapped once; a clone whose mapped outline is not finite is an orphan, and so is every clone
 /// behind it (decided in depth order, so each original is decided before its clones).
@@ -432,8 +613,10 @@ fn assemble(
     states: &[State],
     index: &HashMap<NodeId, usize>,
     structure: &Structure,
+    sets: &Sets,
+    solves: &crate::InstanceSolves,
 ) -> Resolution {
-    let (mut clones, pictures, mut by_depth) = outline_clones(&leaves, states);
+    let (mut clones, pictures, mut by_depth) = outline_clones(&leaves, states, sets, solves);
     by_depth.sort_unstable();
     for (_, i) in by_depth {
         let RawLeaf::Clone(_, link, _) = &leaves[i] else {
@@ -597,6 +780,7 @@ pub(crate) mod tests_support {
                 own_placement,
                 own_style: Some(style),
                 own_adjustments: None,
+                ..RawOverrides::default()
             },
         )
     }
@@ -875,11 +1059,11 @@ mod tests {
 
 /// The outline of an outline root (ADR 0045 §1), shared by every clone of it: a path's, a
 /// sketch's (refined once, [`refine_sketch_roots`]) or a primitive's drawn outline. `None` for a
-/// picture root.
+/// picture root. The key is the root's index and the value set the clone draws (0: none).
 fn root_path_of(
     leaf: &RawLeaf,
-    shared: &mut HashMap<usize, std::sync::Arc<PathSnapshot>>,
-    at: usize,
+    shared: &mut HashMap<(usize, u32), std::sync::Arc<PathSnapshot>>,
+    at: (usize, u32),
 ) -> Option<()> {
     let path = match leaf {
         RawLeaf::Path(path) => path.clone(),
@@ -893,31 +1077,47 @@ fn root_path_of(
     Some(())
 }
 
-/// Refines one analytic root for the most magnified chain, independently of visibility.
+/// Refines one analytic root, and each value set clones draw of it, for the most magnified chain,
+/// independently of visibility. Returns the `(root, set)` pairs that have no drawable outline.
 fn refine_sketch_roots(
     leaves: &[RawLeaf],
     states: &[State],
-    shared: &mut HashMap<usize, std::sync::Arc<PathSnapshot>>,
-) -> HashSet<usize> {
-    let mut stretches: HashMap<usize, f64> = HashMap::new();
-    for state in states {
+    draws: &[Option<Draw>],
+    sets: &Sets,
+    solves: &crate::InstanceSolves,
+    shared: &mut HashMap<(usize, u32), std::sync::Arc<PathSnapshot>>,
+) -> HashSet<(usize, u32)> {
+    let mut stretches: HashMap<(usize, u32), f64> = HashMap::new();
+    for (i, state) in states.iter().enumerate() {
         if let State::Resolved(RootRef::Leaf(root), _, map, _) = state
             && matches!(leaves[*root], RawLeaf::Sketch(_))
         {
+            let set = draws[i].map_or(0, |draw| draw.set);
             // Frobenius norm conservatively bounds linear stretch. Placement's norm is
             // applied separately in outline_scaled, so no transform is baked twice.
             let stretch = (map.a * map.a + map.b * map.b + map.c * map.c + map.d * map.d).sqrt();
             stretches
-                .entry(*root)
+                .entry((*root, set))
                 .and_modify(|value| *value = value.max(stretch))
                 .or_insert(stretch);
         }
     }
     let mut failed = HashSet::new();
-    for (root, stretch) in stretches {
+    for ((root, set), stretch) in stretches {
         let RawLeaf::Sketch(sketch) = &leaves[root] else {
             continue;
         };
+        if set != 0 {
+            match solves.outline(sketch, sets.get(set), stretch) {
+                Some(outline) => {
+                    shared.insert((root, set), outline);
+                }
+                None => {
+                    failed.insert((root, set));
+                }
+            }
+            continue;
+        }
         match crate::sketch_outline::outline_scaled(
             sketch.id,
             &sketch.solution,
@@ -926,10 +1126,10 @@ fn refine_sketch_roots(
             stretch,
         ) {
             Ok(outline) => {
-                shared.insert(root, std::sync::Arc::new(outline));
+                shared.insert((root, 0), std::sync::Arc::new(outline));
             }
             Err(_) => {
-                failed.insert(root);
+                failed.insert((root, 0));
             }
         }
     }
