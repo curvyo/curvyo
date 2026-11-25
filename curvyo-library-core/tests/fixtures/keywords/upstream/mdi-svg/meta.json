@@ -1,0 +1,509 @@
+[
+  {
+    "id": "CBFA6722-0EE6-49B4-B5C2-0B177A5523C2",
+    "baseIconId": "CBFA6722-0EE6-49B4-B5C2-0B177A5523C2",
+    "name": "ab-testing",
+    "codepoint": "F01C9",
+    "aliases": [],
+    "tags": [
+      "Developer / Languages"
+    ],
+    "styles": [],
+    "author": "Michael Richins",
+    "version": "4.0.96",
+    "deprecated": false
+  },
+  {
+    "id": "48E9C474-C544-4868-9966-C3A8D7808FCA",
+    "baseIconId": "E76EC23F-AB71-49B3-9173-841544527A20",
+    "name": "account-search",
+    "codepoint": "F0016",
+    "aliases": [
+      "user-search",
+      "person-search"
+    ],
+    "tags": [
+      "Account / User"
+    ],
+    "styles": [
+      "search"
+    ],
+    "author": "GreenTurtwig",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "C21995A9-094F-4EA8-9127-BA0506B240A6",
+    "baseIconId": "C21995A9-094F-4EA8-9127-BA0506B240A6",
+    "name": "arrow-left",
+    "codepoint": "F004D",
+    "aliases": [
+      "arrow-back"
+    ],
+    "tags": [
+      "Arrow"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "05F25B05-A6D6-4863-8B21-6969E10329CF",
+    "baseIconId": "05F25B05-A6D6-4863-8B21-6969E10329CF",
+    "name": "arrow-right",
+    "codepoint": "F0054",
+    "aliases": [
+      "arrow-forward"
+    ],
+    "tags": [
+      "Arrow"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "2AAC06E6-8ABD-418B-B9A4-8554B62D7C04",
+    "baseIconId": "2AAC06E6-8ABD-418B-B9A4-8554B62D7C04",
+    "name": "backspace",
+    "codepoint": "F006E",
+    "aliases": [
+      "erase",
+      "clear"
+    ],
+    "tags": [],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "45fea174-07db-11e4-bf19-842b2b6cfe1b",
+    "baseIconId": "45fea174-07db-11e4-bf19-842b2b6cfe1b",
+    "name": "bell",
+    "codepoint": "F009A",
+    "aliases": [
+      "notifications"
+    ],
+    "tags": [
+      "Notification",
+      "Home Automation",
+      "Music"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "59803983-F6CE-4D40-B83C-36D42C9464A9",
+    "baseIconId": "59803983-F6CE-4D40-B83C-36D42C9464A9",
+    "name": "circle",
+    "codepoint": "F0765",
+    "aliases": [
+      "lens"
+    ],
+    "tags": [
+      "Shape"
+    ],
+    "styles": [],
+    "author": "Austin Andrews",
+    "version": "1.9.32",
+    "deprecated": false
+  },
+  {
+    "id": "E4A14909-3821-4DB1-A739-4DA464ABEEB7",
+    "baseIconId": "E4A14909-3821-4DB1-A739-4DA464ABEEB7",
+    "name": "cog",
+    "codepoint": "F0493",
+    "aliases": [
+      "settings",
+      "gear"
+    ],
+    "tags": [
+      "Settings"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "D29B92ED-BC81-44F0-8031-2E48A90ABAD8",
+    "baseIconId": "E4A14909-3821-4DB1-A739-4DA464ABEEB7",
+    "name": "cog-outline",
+    "codepoint": "F08BB",
+    "aliases": [
+      "gear-outline",
+      "settings-outline"
+    ],
+    "tags": [
+      "Settings"
+    ],
+    "styles": [
+      "outline"
+    ],
+    "author": "Google",
+    "version": "2.2.43",
+    "deprecated": false
+  },
+  {
+    "id": "71CD492D-A1E8-4A7A-961A-51DA30952BAD",
+    "baseIconId": "71CD492D-A1E8-4A7A-961A-51DA30952BAD",
+    "name": "delete",
+    "codepoint": "F01B4",
+    "aliases": [
+      "trash",
+      "bin",
+      "rubbish",
+      "garbage",
+      "rubbish-bin",
+      "trash-can",
+      "garbage-can"
+    ],
+    "tags": [],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "E39FB607-9058-4C00-840C-AF666F372071",
+    "baseIconId": "71CD492D-A1E8-4A7A-961A-51DA30952BAD",
+    "name": "delete-empty",
+    "codepoint": "F06CC",
+    "aliases": [
+      "trash-empty",
+      "bin-empty",
+      "rubbish-empty",
+      "rubbish-bin-empty",
+      "trash-can-empty",
+      "garbage-empty",
+      "garbage-can-empty"
+    ],
+    "tags": [],
+    "styles": [],
+    "author": "Austin Andrews",
+    "version": "1.8.36",
+    "deprecated": false
+  },
+  {
+    "id": "59ADF7EF-9F3E-4957-A789-95788D13B9E4",
+    "baseIconId": "71CD492D-A1E8-4A7A-961A-51DA30952BAD",
+    "name": "delete-outline",
+    "codepoint": "F09E7",
+    "aliases": [
+      "garbage-outline",
+      "bin-outline",
+      "rubbish-outline",
+      "garbage-can-outline",
+      "rubbish-bin-outline",
+      "trash-outline",
+      "trash-can-outline"
+    ],
+    "tags": [],
+    "styles": [],
+    "author": "Google",
+    "version": "2.5.94",
+    "deprecated": false
+  },
+  {
+    "id": "758CA292-BBF5-4C08-BCBD-88B7A84C8BC6",
+    "baseIconId": "758CA292-BBF5-4C08-BCBD-88B7A84C8BC6",
+    "name": "eraser",
+    "codepoint": "F01FE",
+    "aliases": [],
+    "tags": [],
+    "styles": [],
+    "author": "Austin Andrews",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "8FA2DBB9-E874-4CBB-A466-2691223D0FEF",
+    "baseIconId": "BFF59001-B52D-47E6-A217-C9095F81C3B8",
+    "name": "file-search",
+    "codepoint": "F0C7C",
+    "aliases": [],
+    "tags": [
+      "Files / Folders"
+    ],
+    "styles": [
+      "search"
+    ],
+    "author": "Michael Richins",
+    "version": "3.2.89",
+    "deprecated": false
+  },
+  {
+    "id": "8F02F34C-2C77-43BF-BF20-5EDCA4C37A85",
+    "baseIconId": "9D8C1CEE-19BE-4B0B-85CC-DEB829F9F045",
+    "name": "folder-search",
+    "codepoint": "F0968",
+    "aliases": [],
+    "tags": [
+      "Files / Folders"
+    ],
+    "styles": [],
+    "author": "GreenTurtwig",
+    "version": "2.4.85",
+    "deprecated": false
+  },
+  {
+    "id": "32B56DB2-B6BF-4B54-AD0C-9444106B1C1D",
+    "baseIconId": "32B56DB2-B6BF-4B54-AD0C-9444106B1C1D",
+    "name": "heart",
+    "codepoint": "F02D1",
+    "aliases": [
+      "favorite",
+      "favourite"
+    ],
+    "tags": [
+      "Shape",
+      "Gaming / RPG",
+      "Medical / Hospital"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "9BCD22D2-7304-4BB3-9C41-3431ED13542A",
+    "baseIconId": "32B56DB2-B6BF-4B54-AD0C-9444106B1C1D",
+    "name": "heart-outline",
+    "codepoint": "F02D5",
+    "aliases": [
+      "favorite-border",
+      "favourite-border",
+      "favorite-outline",
+      "favourite-outline"
+    ],
+    "tags": [
+      "Shape",
+      "Gaming / RPG",
+      "Medical / Hospital"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "5D085274-15B9-42EC-8CCE-2F94C5EC039C",
+    "baseIconId": "5D085274-15B9-42EC-8CCE-2F94C5EC039C",
+    "name": "home",
+    "codepoint": "F02DC",
+    "aliases": [
+      "house"
+    ],
+    "tags": [
+      "Home Automation",
+      "Places"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "D711AFDE-2B8D-4932-82AC-A04E7B2810AE",
+    "baseIconId": "D711AFDE-2B8D-4932-82AC-A04E7B2810AE",
+    "name": "lock",
+    "codepoint": "F033E",
+    "aliases": [
+      "https",
+      "password",
+      "secure",
+      "protected",
+      "encryption"
+    ],
+    "tags": [
+      "Lock",
+      "Home Automation",
+      "Automotive"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "C2889545-7F08-4AE1-9142-ECF9B79957E1",
+    "baseIconId": "C2889545-7F08-4AE1-9142-ECF9B79957E1",
+    "name": "magnify",
+    "codepoint": "F0349",
+    "aliases": [
+      "search"
+    ],
+    "tags": [
+      "Geographic Information System"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "36D3966F-BFA2-407B-BF36-D21FBA930930",
+    "baseIconId": "C2889545-7F08-4AE1-9142-ECF9B79957E1",
+    "name": "magnify-minus",
+    "codepoint": "F034A",
+    "aliases": [
+      "zoom-out",
+      "search-minus"
+    ],
+    "tags": [],
+    "styles": [],
+    "author": "Austin Andrews",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "798F7C9D-2EC7-47EF-8729-845B4E2DDD16",
+    "baseIconId": "C2889545-7F08-4AE1-9142-ECF9B79957E1",
+    "name": "magnify-plus",
+    "codepoint": "F034B",
+    "aliases": [
+      "zoom-in",
+      "magnify-add",
+      "search-plus",
+      "search-add"
+    ],
+    "tags": [],
+    "styles": [],
+    "author": "Austin Andrews",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "DF9ACF3F-5AF0-4F55-845C-569018942B95",
+    "baseIconId": "C2889545-7F08-4AE1-9142-ECF9B79957E1",
+    "name": "magnify-scan",
+    "codepoint": "F1276",
+    "aliases": [],
+    "tags": [],
+    "styles": [],
+    "author": "Sascha Wohlgemuth",
+    "version": "4.7.95",
+    "deprecated": false
+  },
+  {
+    "id": "5659F8EC-377D-41D2-AB3A-52DC40815DC7",
+    "baseIconId": "5659F8EC-377D-41D2-AB3A-52DC40815DC7",
+    "name": "square",
+    "codepoint": "F0764",
+    "aliases": [],
+    "tags": [
+      "Shape"
+    ],
+    "styles": [],
+    "author": "Austin Andrews",
+    "version": "1.9.32",
+    "deprecated": false
+  },
+  {
+    "id": "53D81A11-D8FF-46F4-A0CB-B7F668BA720D",
+    "baseIconId": "53D81A11-D8FF-46F4-A0CB-B7F668BA720D",
+    "name": "star",
+    "codepoint": "F04CE",
+    "aliases": [
+      "grade",
+      "star-rate",
+      "favorite"
+    ],
+    "tags": [
+      "Shape"
+    ],
+    "styles": [],
+    "author": "Google",
+    "version": "1.5.54",
+    "deprecated": false
+  },
+  {
+    "id": "1F513D40-444E-475D-9C1F-E5A95CE61A02",
+    "baseIconId": "1F513D40-444E-475D-9C1F-E5A95CE61A02",
+    "name": "sun-compass",
+    "codepoint": "F19A5",
+    "aliases": [
+      "sun-azimuth",
+      "solar-compass",
+      "solar-asimuth"
+    ],
+    "tags": [
+      "Weather",
+      "Home Automation",
+      "Navigation"
+    ],
+    "styles": [],
+    "author": "Michael Irigoyen",
+    "version": "6.5.95",
+    "deprecated": false
+  },
+  {
+    "id": "3C1714C4-ACE1-45F2-ADE8-D90DD2E9742C",
+    "baseIconId": "3C1714C4-ACE1-45F2-ADE8-D90DD2E9742C",
+    "name": "text-search",
+    "codepoint": "F13B8",
+    "aliases": [
+      "notes-search"
+    ],
+    "tags": [],
+    "styles": [],
+    "author": "Austin Andrews",
+    "version": "5.1.45",
+    "deprecated": false
+  },
+  {
+    "id": "260712C5-252B-484C-B5A7-33827BBC5487",
+    "baseIconId": "260712C5-252B-484C-B5A7-33827BBC5487",
+    "name": "trash-can",
+    "codepoint": "F0A79",
+    "aliases": [
+      "delete",
+      "rubbish-bin",
+      "trashcan",
+      "garbage-can"
+    ],
+    "tags": [],
+    "styles": [],
+    "author": "GreenTurtwig",
+    "version": "2.6.95",
+    "deprecated": false
+  },
+  {
+    "id": "A586B5B1-1D48-4BC8-B31C-F8E93DC8CD49",
+    "baseIconId": "260712C5-252B-484C-B5A7-33827BBC5487",
+    "name": "trash-can-outline",
+    "codepoint": "F0A7A",
+    "aliases": [
+      "delete-outline",
+      "rubbish-bin-outline",
+      "trashcan-outline",
+      "garbage-can-outline"
+    ],
+    "tags": [],
+    "styles": [
+      "outline"
+    ],
+    "author": "GreenTurtwig",
+    "version": "2.6.95",
+    "deprecated": false
+  },
+  {
+    "id": "D280F50D-92FC-4DA2-BBAD-CE93140E6FEA",
+    "baseIconId": "D280F50D-92FC-4DA2-BBAD-CE93140E6FEA",
+    "name": "zodiac-leo",
+    "codepoint": "F0A82",
+    "aliases": [
+      "horoscope-leo"
+    ],
+    "tags": [],
+    "styles": [],
+    "author": "Michael Richins",
+    "version": "2.6.95",
+    "deprecated": false
+  }
+]

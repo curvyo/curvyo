@@ -1,0 +1,42 @@
+# The samples of the three upstream files (spec 0153 criterion 7a), pinned like tools/library-keywords/pins.toml.
+
+[[source]]
+prefix = "lucide"
+project = "Lucide"
+package = "lucide-static"
+version = "1.80.0"
+reader = "lucide"
+file = "lucide-static/tags.json"
+sha256 = "95a468e3d3f01f61c2e5a7a1651ec67ea532a25f70ae3bac3c35280b81b556dd"
+licence = "ISC"
+url = "https://lucide.dev"
+licence_file = "lucide-static/LICENSE"
+licence_sha256 = "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+
+[[source]]
+prefix = "tabler"
+project = "Tabler Icons"
+package = "@tabler/icons"
+version = "3.52.0"
+reader = "tabler"
+file = "tabler-icons/icons.json"
+sha256 = "e778c543b3d31ab0f965480de2801d7af7194550a0cab9c20a3fd2e32db3f09f"
+licence = "MIT"
+url = "https://tabler.io/icons"
+licence_file = "tabler-icons/LICENSE"
+licence_sha256 = "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db"
+# Iconify names Tabler's filled style `<name>-filled`.
+variants = ["filled"]
+
+[[source]]
+prefix = "mdi"
+project = "Material Design Icons"
+package = "@mdi/svg"
+version = "7.4.47"
+reader = "mdi"
+file = "mdi-svg/meta.json"
+sha256 = "4d23391862374928e0cf760662c6cbe28df0789be7c14c328de6363688a59fa8"
+licence = "MIT"
+url = "https://pictogrammers.com/library/mdi/"
+licence_file = "mdi-svg/LICENSE"
+licence_sha256 = "f3bc8715bad84b26396bb42d2abd11f919cf58163be158eab79ecbaabf84cdf2"

@@ -1,0 +1,45 @@
+# The pinned upstream files of the search keywords (spec 0153 criterion 6, ADR 0087 decision 1).
+# Raising a version: fetch the new tarball (README.md), edit `version` and both SHA-256 here,
+# re-run generate.py, and quote its printed counts and size in a `chore/` PR.
+# `file` and `licence_file` are relative to the upstream folder given to generate.py.
+
+[[source]]
+prefix = "lucide"
+project = "Lucide"
+package = "lucide-static"
+version = "1.80.0"
+reader = "lucide"
+file = "lucide-static/tags.json"
+sha256 = "dd90d3217798ba2ad50f75d5c4bad9f195ac65a64468ef13aeab7a3591e7485b"
+licence = "ISC"
+url = "https://lucide.dev"
+licence_file = "lucide-static/LICENSE"
+licence_sha256 = "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+
+[[source]]
+prefix = "tabler"
+project = "Tabler Icons"
+package = "@tabler/icons"
+version = "3.52.0"
+reader = "tabler"
+file = "tabler-icons/icons.json"
+sha256 = "35e6bc84a8b95fca74e2d56979ddf8974a51015e4f96da8aec42030b9cb1d200"
+licence = "MIT"
+url = "https://tabler.io/icons"
+licence_file = "tabler-icons/LICENSE"
+licence_sha256 = "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db"
+# Iconify names Tabler's filled style `<name>-filled`.
+variants = ["filled"]
+
+[[source]]
+prefix = "mdi"
+project = "Material Design Icons"
+package = "@mdi/svg"
+version = "7.4.47"
+reader = "mdi"
+file = "mdi-svg/meta.json"
+sha256 = "ed9d7c7a5ca3ce7dee023fb6c1d62715dbec5b27503d268cbc10b9c8894ef3e8"
+licence = "MIT"
+url = "https://pictogrammers.com/library/mdi/"
+licence_file = "mdi-svg/LICENSE"
+licence_sha256 = "f3bc8715bad84b26396bb42d2abd11f919cf58163be158eab79ecbaabf84cdf2"

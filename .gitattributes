@@ -26,6 +26,7 @@ frontend/public/fonts/**/*.txt -text
 *.woff2 binary
 *.wasm binary
 *.zip binary
+*.gz binary
 *.pdf binary
 *.curvyo binary
 *.onnx binary
