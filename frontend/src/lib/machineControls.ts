@@ -18,6 +18,7 @@ import {
   refusalText,
   waitingText,
 } from "./connectorText.ts";
+import { type ListEntry } from "./jobList.ts";
 import { withName } from "./sendLine.ts";
 
 /** What Home shows: whether a press does something, the busy look, and the tooltip's second line.
@@ -106,6 +107,24 @@ export function jogCause(entry: LinkEntry, own: boolean): string | null {
   }
   const word = controllerWord(status);
   return word !== null ? `Controller state: ${word}` : null;
+}
+
+/** Why Restart from line is greyed, the first cause that applies (`specs/0118` W68); `null` when a
+ * press opens the confirm. The app adds only what the connector cannot know (the connection and
+ * the status read) and its own words for a wait; every other cause is the connector's, sent with
+ * the row, so the app greys with the rule the connector refuses with. */
+export function restartCause(entry: LinkEntry, row: ListEntry): string | null {
+  const status = entry.status;
+  if (entry.lost) return "Connection lost";
+  if (status === null || status === undefined) {
+    if (entry.reading || entry.readError === null) return "Testing";
+    return errorLine(entry.readError).text;
+  }
+  if (status.state.name === "NoController") return status.detail ?? "No controller";
+  const cause = row.restart_cause ?? null;
+  const fromText = cause !== null && (cause.startsWith("Cannot rebuild") || cause === "Starts at the head position");
+  if (!fromText && status.state.name === "AwaitingLocalStart") return waitingText(status, entry.session);
+  return cause;
 }
 
 /** Why Set origin here is greyed, the first cause that applies (`specs/0118` W40); `null` when a
@@ -226,6 +245,10 @@ export function controlsLine(entry: LinkEntry, own: OwnPress = NO_PRESS): Contro
   const held = entry.held !== null && (entry.held.jobId === null || entry.held.jobId === id) ? entry.held : null;
   if (entry.discarded && (status.state.name === "Idle" || ((entry.discarded === "Home" || entry.discarded === "Frame") && status.state.name === "Ready"))) {
     return { ...pressed({ text: `Not started: ${entry.discarded}`, failure: false }), muted: true };
+  }
+  // Another app's restart ended before its line: muted, it answers no press here (`specs/0118` W74).
+  if (status.state.name === "Idle" && status.detail?.startsWith("Not started: Restart from line") === true) {
+    return entry.stoppedHere ? null : { ...pressed({ text: status.detail, failure: false }), muted: true };
   }
   const line = jobStateLine(status, held, entry.session);
   if (line === null) return null;

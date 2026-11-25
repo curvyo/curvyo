@@ -1,9 +1,10 @@
-import { ArrowDown, ArrowUp, CircleAlert, GripVertical, LoaderCircle, SkipForward, Trash2, TriangleAlert } from "lucide-react";
-import { type KeyboardEvent, type PointerEvent as ReactPointer, useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, CircleAlert, GripVertical, ListRestart, LoaderCircle, SkipForward, Trash2, TriangleAlert } from "lucide-react";
+import { type KeyboardEvent, type PointerEvent as ReactPointer, useEffect, useId, useRef, useState } from "react";
 
 import { ARMED_DESTRUCTIVE_BUTTON, GLYPH, ICON_BUTTON, SMALL } from "@/components/workbench/machineStyles";
 import { SymbolButton } from "@/components/workbench/SymbolButton";
 import { Tooltip } from "@/components/ui/tooltip";
+import { RestartConfirm } from "@/components/panel/RestartConfirm";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
 import { type MachineControlsModel } from "@/hooks/useMachineControls";
 import {
@@ -11,21 +12,28 @@ import {
   type ListEntry,
   addedAnnouncement,
   armHolds,
+  confirmHolds,
   countsLine,
   dragDecision,
   dropGap,
   dropPlace,
   focusAfterRemoval,
+  tabStop,
   interruptedLine,
   keepSelection,
   moveCause,
   movedAnnouncement,
   moveTo,
   ordered,
+  restartAt,
+  restartLabel,
+  restartName,
   rights,
   rowText,
   showsSendingRow,
 } from "@/lib/jobList";
+import { restartCause } from "@/lib/machineControls";
+import { ignoredKey } from "@/lib/sendArm";
 
 // The pressed toggle keeps its ground under the pointer: the hover ground would hide it.
 const ON_BUTTON = ICON_BUTTON.replace(
@@ -47,6 +55,7 @@ export function JobList({ model }: { model: MachineControlsModel }) {
   const rows = list?.waiting ?? [];
   const order = ordered(list);
   const [selected, setSelected] = useState<string | null>(null);
+  const [focusedRow, setFocusedRow] = useState<string | null>(null);
   const before = useRef(list);
   const arm = useDeleteArm();
   const pending = useRef(false);
@@ -60,6 +69,19 @@ export function JobList({ model }: { model: MachineControlsModel }) {
   const removal = useRef<{ id: string; before: ListEntry[]; focused: boolean } | null>(null);
   // This app's send has been under way since the last list: that list is its result.
   const sent = useRef(false);
+  // The open restart confirm and the line it names; the restart waiting for its answer (W69, W71).
+  const [confirm, setConfirm] = useState<{ id: string; line: number } | null>(null);
+  const [restarting, setRestarting] = useState<string | null>(null);
+  const focusRestart = (id: string) =>
+    requestAnimationFrame(() => box.current?.querySelector<HTMLElement>(`[data-row="${id}"] [data-restart]`)?.focus());
+  useEffect(() => {
+    if (confirm === null) return;
+    const row = (list?.waiting ?? []).find((e) => e.job_id === confirm.id);
+    if (!confirmHolds(row, confirm.line, row === undefined ? null : restartCause(entry, row))) {
+      setConfirm(null);
+      focusRestart(confirm.id);
+    }
+  }, [list, entry.status, entry.lost]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (entry.sendingName !== null) sent.current = true;
   }, [entry.sendingName]);
@@ -111,6 +133,29 @@ export function JobList({ model }: { model: MachineControlsModel }) {
       press({ kind: "remove", jobId: row.job_id });
       return "";
     });
+
+  const cancelRestart = () => {
+    if (confirm === null) return;
+    const id = confirm.id;
+    setConfirm(null);
+    focusRestart(id);
+  };
+  const confirmRestart = (row: ListEntry) => {
+    // The press reads the last status again: a cause that applies by now sends nothing (W69).
+    if (restartCause(entry, row) !== null || pending.current) return cancelRestart();
+    setConfirm(null);
+    setRestarting(row.job_id);
+    pending.current = true;
+    void listPress({ kind: "restart", jobId: row.job_id, line: restartAt(row) }).then((kind) => {
+      pending.current = false;
+      setRestarting(null);
+      // Accepted, the head moves next: the focus goes to Stop (W72); refused, it stays on Restart.
+      if (kind === "done") {
+        document.querySelector<HTMLElement>('[role="toolbar"][aria-label="Machine"] button[aria-label="Stop"]')?.focus();
+      } else focusRestart(row.job_id);
+    });
+  };
+  const confirmRow = confirm === null ? undefined : rows.find((e) => e.job_id === confirm.id);
 
   const rowKeys = (event: KeyboardEvent, row: ListEntry, at: number) => {
     const can = rights(owner, me, row);
@@ -214,7 +259,7 @@ export function JobList({ model }: { model: MachineControlsModel }) {
   };
 
   const first = order.length > 0 ? order[0].job_id : null;
-  const tabTarget = selected ?? first ?? rows[0]?.job_id ?? null;
+  const tabTarget = tabStop(rows, selected, first, focusedRow);
   const upCause = moveCause(order, selected, "up");
   const downCause = moveCause(order, selected, "down");
   return (
@@ -244,8 +289,17 @@ export function JobList({ model }: { model: MachineControlsModel }) {
           <span>The list changed</span>
         </p>
       ) : null}
-      <div ref={box} role="grid" aria-label="Job list" className="relative flex max-h-[164px] flex-col overflow-y-auto overflow-x-hidden">
+      {confirmRow !== undefined ? (
+        <RestartConfirm key={confirmRow.job_id} row={confirmRow} onCancel={cancelRestart} onConfirm={() => confirmRestart(confirmRow)} />
+      ) : null}
+      <div
+        ref={box}
+        role="grid"
+        aria-label="Job list"
+        className={`relative flex flex-col overflow-y-auto overflow-x-hidden ${confirmRow !== undefined ? "max-h-[80px]" : "max-h-[164px]"}`}
+      >
         {rows.map((row, at) => {
+          if (row.job_id === confirmRow?.job_id) return null;
           const can = rights(owner, me, row);
           const interrupted = row.interrupted_at != null;
           const isSelected = !interrupted && row.job_id === selected;
@@ -262,11 +316,17 @@ export function JobList({ model }: { model: MachineControlsModel }) {
               {...(interrupted ? {} : { "data-order": index })}
               {...{ [ARM_ZONE]: row.job_id }}
               tabIndex={row.job_id === tabTarget ? 0 : -1}
+              onFocus={() => setFocusedRow(row.job_id)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setFocusedRow(null);
+              }}
               onKeyDown={(event) => rowKeys(event, row, at)}
               onPointerDown={(event) => {
                 if ((event.target as Element).closest("button") === null && !interrupted) setSelected(row.job_id);
               }}
-              className={`relative flex h-10 shrink-0 items-center gap-1 pl-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-11 ${
+              className={`relative flex shrink-0 items-center gap-1 pl-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+                interrupted ? "h-14 pointer-coarse:h-[60px]" : "h-10 pointer-coarse:h-11"
+              } ${
                 armed ? "bg-[var(--destructive-soft)]" : isSelected ? "bg-[var(--value-fill)]" : "hover:bg-[var(--editor-accent-hover)]"
               }`}
             >
@@ -287,14 +347,22 @@ export function JobList({ model }: { model: MachineControlsModel }) {
               ) : null}
               <div className={`flex min-w-0 flex-1 flex-col text-xs leading-[14px] ${owner ? "max-w-[160px]" : ""}`}>
                 <RowName name={row.name} />
-                <span className="flex items-center gap-1 truncate text-[var(--panel-muted-fg)]">
-                  {interrupted ? <CircleAlert {...SMALL} className="shrink-0 text-[var(--destructive)]" /> : null}
-                  <span className={interrupted ? "truncate text-[var(--destructive)]" : "truncate"}>
-                    {interrupted ? interruptedLine(row, me) : countsLine(row, me)}
+                {interrupted ? (
+                  <span className="flex items-center gap-1 truncate">
+                    <CircleAlert {...SMALL} className="shrink-0 text-[var(--destructive)]" />
+                    <span className="truncate text-[var(--destructive)]">{interruptedLine(row)}</span>
                   </span>
-                </span>
+                ) : null}
+                <span className="truncate text-[var(--panel-muted-fg)]">{countsLine(row, me)}</span>
               </div>
-              {!interrupted && can.flag ? (
+              {can.restart ? (
+                <RestartButton
+                  row={row}
+                  cause={restartCause(entry, row)}
+                  busy={restarting === row.job_id}
+                  onPress={() => setConfirm({ id: row.job_id, line: restartAt(row) })}
+                />
+              ) : !interrupted && can.flag ? (
                 <Tooltip side="top" content="Run next automatically">
                   <button
                     type="button"
@@ -358,6 +426,50 @@ export function JobList({ model }: { model: MachineControlsModel }) {
         {added}
       </p>
     </div>
+  );
+}
+
+/** Restart from line in the interrupted row (`specs/0118` W67, W68, W71): greyed in place with its
+ * cause, busy until the connector's answer. */
+function RestartButton({ row, cause, busy, onPress }: { row: ListEntry; cause: string | null; busy: boolean; onPress: () => void }) {
+  const label = restartLabel(row);
+  const enabled = cause === null && !busy;
+  const causeId = useId();
+  const tip =
+    cause === null ? (
+      label
+    ) : (
+      <>
+        <div>{label}</div>
+        <div className="text-muted-foreground">{cause}</div>
+      </>
+    );
+  return (
+    <Tooltip side="top" content={tip}>
+      <button
+        type="button"
+        tabIndex={-1}
+        data-restart
+        aria-label={restartName(row)}
+        aria-disabled={!enabled || undefined}
+        aria-busy={busy || undefined}
+        aria-describedby={cause === null ? undefined : causeId}
+        className={`${ICON_BUTTON} aria-disabled:opacity-40 aria-disabled:hover:bg-transparent`}
+        onKeyDown={(event) => {
+          if (ignoredKey(event.key, event.repeat)) event.preventDefault();
+        }}
+        onClick={() => {
+          if (enabled) onPress();
+        }}
+      >
+        {busy ? <LoaderCircle {...GLYPH} className="animate-spin" /> : <ListRestart {...GLYPH} />}
+        {cause === null ? null : (
+          <span id={causeId} className="sr-only">
+            {cause}
+          </span>
+        )}
+      </button>
+    </Tooltip>
   );
 }
 
