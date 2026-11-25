@@ -64,6 +64,9 @@ curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
 # opens a document.
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 curvyo-ui-core = { path = "../curvyo-ui-core", version = "0.1.0" }
+# The online library's sources, catalogue and Iconify protocols (`specs/0138`, ADR 0085): the host
+# sends the requests this crate builds and keeps the answers for the session.
+curvyo-library-core = { path = "../curvyo-library-core", version = "0.1.0" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # An SVG's preview reads the file through the importer of Import SVG and its hostile-input limits

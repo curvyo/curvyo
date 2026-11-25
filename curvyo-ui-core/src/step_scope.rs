@@ -191,6 +191,9 @@ pub const FREE_STEPS: &[&str] = &[
     // `specs/0137-document-library`: an import adds new objects (and a page) only.
     "import_page",
     "import_elements",
+    // `specs/0138-template-library`: loading a template and importing an icon add new objects only.
+    "load_online_template",
+    "import_icon",
     "create_path",
     "create_rect",
     "create_ellipse",

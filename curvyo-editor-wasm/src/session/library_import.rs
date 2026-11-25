@@ -21,6 +21,16 @@ pub struct LibraryImport {
     pub notice: Option<String>,
 }
 
+/// What an online import adds to an import (`specs/0138`): the step's own label and whether the
+/// fonts of the source stay out (criterion 9).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ImportOptions<'a> {
+    /// The step's label, instead of the library import's own (`import_icon`).
+    pub label: Option<&'a str>,
+    /// Leave the source's embedded font files behind.
+    pub without_fonts: bool,
+}
+
 /// What a read-only source session offers the preview pane.
 impl Session {
     /// The top-level objects of `page` in paint order: the page's members by the membership read
@@ -62,12 +72,38 @@ impl Session {
         came_from: &CameFrom,
         drop: Option<(f64, f64)>,
     ) -> Result<LibraryImport, String> {
+        self.import_with(
+            source,
+            roots,
+            page,
+            came_from,
+            drop,
+            ImportOptions::default(),
+        )
+    }
+
+    /// [`Session::import_from_library`] with the options of an online item.
+    ///
+    /// # Errors
+    /// The sentence to show when nothing was imported.
+    pub fn import_with(
+        &mut self,
+        source: &Self,
+        roots: &[NodeId],
+        page: Option<&str>,
+        came_from: &CameFrom,
+        drop: Option<(f64, f64)>,
+        options: ImportOptions<'_>,
+    ) -> Result<LibraryImport, String> {
         let drop = drop.map(|(x, y)| self.view().screen_to_document(x, y));
         let roots = page.map_or_else(|| roots.to_vec(), |page| source.page_top_level(page));
-        let fragment = source
+        let mut fragment = source
             .document
             .extract_fragment_placing(&roots, page, &source.library_placed_members())
             .map_err(|error| error.to_string())?;
+        if options.without_fonts {
+            fragment = fragment.without_fonts();
+        }
         let anchors: Vec<_> = (0..fragment.anchor_count())
             .map(|_| self.minter.mint())
             .collect();
@@ -84,14 +120,67 @@ impl Session {
                 offset: Vec2::new(at.x - centre.x, at.y - centre.y),
             }
         };
-        let report = self
-            .document
-            .insert_fragment(&fragment, target, came_from, &anchors)
-            .map_err(|error| match error {
-                ImportError::SketchPage => SKETCH_PAGE_REFUSAL_TEXT.to_owned(),
-                other => other.to_string(),
-            })?;
+        let insert =
+            |document: &Document| document.insert_fragment(&fragment, target, came_from, &anchors);
+        // An online icon is its own step by name; nested, the outer label is the step's.
+        let report = match options.label {
+            Some(label) => self.document.batch(label, insert),
+            None => insert(&self.document),
+        }
+        .map_err(|error| match error {
+            ImportError::SketchPage => SKETCH_PAGE_REFUSAL_TEXT.to_owned(),
+            other => other.to_string(),
+        })?;
         Ok(self.after_import(&report))
+    }
+
+    /// Loads every page of the read-only `source` as new pages after the last page, one step
+    /// "Load template" (`specs/0138` criterion 3); the first loaded page becomes active.
+    ///
+    /// # Errors
+    /// The sentence to show when nothing was imported.
+    pub fn load_online_template(
+        &mut self,
+        source: &Self,
+        came_from: &CameFrom,
+        without_fonts: bool,
+    ) -> Result<LibraryImport, String> {
+        let mut fragments = Vec::new();
+        for page in source.document.pages() {
+            let roots = source.page_top_level(&page.id);
+            let mut fragment = source
+                .document
+                .extract_fragment_placing(&roots, Some(&page.id), &source.library_placed_members())
+                .map_err(|error| error.to_string())?;
+            if without_fonts {
+                fragment = fragment.without_fonts();
+            }
+            let anchors: Vec<_> = (0..fragment.anchor_count())
+                .map(|_| self.minter.mint())
+                .collect();
+            fragments.push((fragment, anchors));
+        }
+        let pages: Vec<(
+            &curvyo_document_core::Fragment,
+            &[curvyo_document_core::AnchorId],
+        )> = fragments.iter().map(|(f, a)| (f, a.as_slice())).collect();
+        let reports = self
+            .document
+            .insert_fragment_pages(&pages, came_from)
+            .map_err(|error| error.to_string())?;
+        let mut done = LibraryImport {
+            page: None,
+            notice: None,
+        };
+        let mut notices = Vec::new();
+        for report in reports.iter().rev() {
+            // The first loaded page is the one left active (UX F3), so it is activated last.
+            let one = self.after_import(report);
+            notices.extend(one.notice);
+            done.page = one.page;
+        }
+        done.notice = (!notices.is_empty()).then(|| notices.join(" "));
+        Ok(done)
     }
 
     /// Selects the copies, activates an imported page and words the notice.
@@ -173,8 +262,23 @@ fn came_from_json(records: &[Option<CameFrom>], _now: i64, offset_minutes: i32) 
         )),
         "open": open,
         "record": first,
+        // The licence line of an online item (UX notes 9): "CC BY 4.0 · Jane Doe".
+        "online": first.and_then(|r| r.online.as_ref()).map(|o| serde_json::json!({
+            "licence": if o.licence.is_empty() { curvyo_ui_core::library_online::LICENCE_UNKNOWN } else { &o.licence },
+            "licence_url": o.licence_url,
+            "author": o.author,
+        })),
     })
     .to_string()
+}
+
+impl Session {
+    /// The credits of this document's objects as JSON (`specs/0138` criterion 4, UX notes 9):
+    /// `[{"text", "licence", "licence_url", "address"}]`, identical ones once.
+    #[must_use]
+    pub fn credits_json(&self) -> String {
+        serde_json::to_string(&self.document.credits()).unwrap_or_default()
+    }
 }
 
 /// The top-level object `leaf` belongs to: its ancestor whose parent is a layer or the root.
@@ -228,6 +332,7 @@ mod tests {
             page_id: "first".into(),
             item: None,
             at: UnixMillis::new(0),
+            online: None,
         }
     }
 

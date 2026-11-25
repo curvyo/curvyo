@@ -19,6 +19,13 @@ const FIELD_PAGE: &str = "page";
 const FIELD_PAGE_ID: &str = "page_id";
 const FIELD_ITEM: &str = "item";
 const FIELD_AT: &str = "at";
+const FIELD_ADDRESS: &str = "address";
+const FIELD_LICENCE: &str = "licence";
+const FIELD_AUTHOR: &str = "author";
+const FIELD_CREDIT: &str = "credit";
+const FIELD_SPDX: &str = "spdx";
+const FIELD_NAME: &str = "name";
+const FIELD_URL: &str = "url";
 
 /// A moment as Unix milliseconds in UTC. The caller reads the clock; this crate has none.
 #[derive(
@@ -41,6 +48,29 @@ impl UnixMillis {
     }
 }
 
+/// What an online template or icon adds to the Came from record (ADR 0085 decision 7,
+/// `specs/0138` criteria 3 and 4): its address, licence, author and the credit text.
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct OnlineOrigin {
+    /// The template's URL, or `<api base>#<prefix>:<name>` for an icon.
+    pub address: String,
+    /// The licence's SPDX identifier, empty when unknown.
+    #[serde(default)]
+    pub spdx: String,
+    /// The licence's name, empty when unknown.
+    #[serde(default)]
+    pub licence: String,
+    /// The licence text's address.
+    #[serde(default)]
+    pub licence_url: String,
+    /// The author.
+    #[serde(default)]
+    pub author: String,
+    /// The credit text, when the licence needs one.
+    #[serde(default)]
+    pub credit: Option<String>,
+}
+
 /// Where an imported page or object came from (ADR 0084 §7).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct CameFrom {
@@ -55,6 +85,9 @@ pub struct CameFrom {
     pub item: Option<String>,
     /// When the import was made.
     pub at: UnixMillis,
+    /// Where it came from on the network and under which licence, for an online item.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub online: Option<OnlineOrigin>,
 }
 
 impl CameFrom {
@@ -74,6 +107,30 @@ impl CameFrom {
             map.insert(FIELD_ITEM.to_owned(), LoroValue::from(item.as_str()));
         }
         map.insert(FIELD_AT.to_owned(), LoroValue::I64(self.at.get()));
+        if let Some(online) = &self.online {
+            map.insert(
+                FIELD_ADDRESS.to_owned(),
+                LoroValue::from(online.address.as_str()),
+            );
+            let mut licence = std::collections::HashMap::new();
+            licence.insert(FIELD_SPDX.to_owned(), LoroValue::from(online.spdx.as_str()));
+            licence.insert(
+                FIELD_NAME.to_owned(),
+                LoroValue::from(online.licence.as_str()),
+            );
+            licence.insert(
+                FIELD_URL.to_owned(),
+                LoroValue::from(online.licence_url.as_str()),
+            );
+            map.insert(FIELD_LICENCE.to_owned(), LoroValue::from(licence));
+            map.insert(
+                FIELD_AUTHOR.to_owned(),
+                LoroValue::from(online.author.as_str()),
+            );
+            if let Some(credit) = &online.credit {
+                map.insert(FIELD_CREDIT.to_owned(), LoroValue::from(credit.as_str()));
+            }
+        }
         LoroValue::from(map)
     }
 
@@ -96,12 +153,33 @@ impl CameFrom {
             Some(LoroValue::I64(millis)) => UnixMillis::new(*millis),
             _ => return None,
         };
+        // The online keys are read tolerantly: a record without an address is a local one, and a
+        // wrong-typed licence part reads as unknown rather than refusing the record.
+        let online = text(FIELD_ADDRESS).map(|address| {
+            let licence = match map.get(FIELD_LICENCE) {
+                Some(LoroValue::Map(licence)) => Some(licence),
+                _ => None,
+            };
+            let part = |field: &str| match licence.and_then(|l| l.get(field)) {
+                Some(LoroValue::String(text)) => text.to_string(),
+                _ => String::new(),
+            };
+            OnlineOrigin {
+                address,
+                spdx: part(FIELD_SPDX),
+                licence: part(FIELD_NAME),
+                licence_url: part(FIELD_URL),
+                author: text(FIELD_AUTHOR).unwrap_or_default(),
+                credit: text(FIELD_CREDIT),
+            }
+        });
         Some(Self {
             document: text(FIELD_DOCUMENT)?,
             page: text(FIELD_PAGE)?,
             page_id: text(FIELD_PAGE_ID)?,
             item,
             at,
+            online,
         })
     }
 
@@ -193,7 +271,35 @@ mod tests {
             page_id: "7-3".into(),
             item: Some("Handle".into()),
             at: UnixMillis::new(1_764_000_000_000),
+            online: None,
         }
+    }
+
+    #[test]
+    fn the_online_keys_round_trip_and_read_tolerantly() {
+        let online = CameFrom {
+            online: Some(OnlineOrigin {
+                address: "https://example.org/cat/a/template.curvyo".into(),
+                spdx: "CC-BY-4.0".into(),
+                licence: "CC BY 4.0".into(),
+                licence_url: "https://creativecommons.org/licenses/by/4.0/".into(),
+                author: "Jane Doe".into(),
+                credit: Some("Box by Jane Doe, CC BY 4.0".into()),
+            }),
+            ..record()
+        };
+        assert_eq!(CameFrom::of_value(&online.to_value()), Some(online.clone()));
+        let LoroValue::Map(map) = online.to_value() else {
+            panic!("a map")
+        };
+        let mut wrong = (*map).clone();
+        wrong.insert(FIELD_LICENCE.into(), LoroValue::I64(3));
+        let read = CameFrom::of_value(&LoroValue::from(wrong))
+            .unwrap()
+            .online
+            .unwrap();
+        assert_eq!(read.licence, "");
+        assert_eq!(read.address, "https://example.org/cat/a/template.curvyo");
     }
 
     #[test]

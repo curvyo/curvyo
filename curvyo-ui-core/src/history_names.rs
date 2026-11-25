@@ -196,6 +196,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0137-document-library` criteria 4 and 5.
     ("import_page", "Import page"),
     ("import_elements", "Import elements"),
+    // `specs/0138-template-library` criterion 3 (UX F3, F5).
+    ("load_online_template", "Load template"),
+    ("import_icon", "Import icon"),
     // `specs/0042-history-branches` criteria 10 and 22; the row adds the version's id.
     ("go_to_version", "Go to version"),
     ("clone_version", "Clone version"),

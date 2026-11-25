@@ -38,6 +38,7 @@ fn record(document: &str, page: &str, page_id: &str) -> CameFrom {
         page_id: page_id.to_owned(),
         item: None,
         at: UnixMillis::new(1_700_000_000_000),
+        online: None,
     }
 }
 

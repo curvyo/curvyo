@@ -13,7 +13,7 @@ use curvyo_ui_core::library_index_text::{SourceReason, document_error_text};
 use curvyo_ui_core::library_tree::{LibrarySource, SourceKind, TreeView, library_rows};
 use wasm_bindgen::prelude::*;
 
-use crate::session::{PreviewView, Session};
+use crate::session::{ImportOptions, PreviewView, Session};
 use crate::wasm_api::WasmSession;
 use crate::wasm_thumbnail::WasmThumbnail;
 
@@ -61,6 +61,23 @@ impl WasmLibrarySource {
                 };
                 JsValue::from_str(document_error_text(state).unwrap_or_default())
             })
+    }
+
+    /// Opens an icon's SVG text as a read-only source (`specs/0138` criterion 3): the same SVG
+    /// reader and limits as Import SVG, its drawing on the first page.
+    ///
+    /// # Errors
+    /// A `JsValue` string when the text gives no drawing.
+    pub fn open_svg(svg: &str, peer: u64) -> Result<WasmLibrarySource, JsValue> {
+        let mut session = Session::open_file(peer, svg.as_bytes(), "icon.svg")
+            .map_err(|error| JsValue::from_str(&error))?;
+        session.continue_open_svg(true);
+        session.resize_viewport(800.0, 600.0);
+        Ok(Self {
+            session,
+            size: (800.0, 600.0),
+            view: PreviewView::default(),
+        })
     }
 
     /// Sets the pane's size (CSS pixels), zoom over the fit and pan (CSS pixels).
@@ -220,24 +237,49 @@ impl WasmSession {
         let Ok(record) = serde_json::from_str::<CameFromWire>(came_from) else {
             return serde_json::json!({ "error": "the record is not readable" }).to_string();
         };
-        let record = CameFrom {
-            document: record.document,
-            page: record.page,
-            page_id: record.page_id,
-            item: None,
-            at: curvyo_document_core::UnixMillis::new(record.at),
+        let options = ImportOptions {
+            label: (record.step.as_deref() == Some("icon"))
+                .then_some(curvyo_document_core::IMPORT_ICON_COMMIT_LABEL),
+            without_fonts: record.without_fonts,
         };
+        let record = record.into_record();
         let drop = has_drop.then_some((drop_x, drop_y));
-        match self.session.import_from_library(
+        match self.session.import_with(
             &source.session,
             &ids_of(roots),
             page.as_deref(),
             &record,
             drop,
+            options,
         ) {
             Ok(done) => serde_json::to_string(&done).unwrap_or_default(),
             Err(text) => serde_json::json!({ "error": text }).to_string(),
         }
+    }
+
+    /// Loads every page of `source` as new pages after the last page in one step (`specs/0138`
+    /// criterion 3); `came_from` is the record as JSON with the online keys. Returns `{"page",
+    /// "notice"}` or `{"error"}` as JSON.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn load_online_template(&mut self, source: &WasmLibrarySource, came_from: &str) -> String {
+        let Ok(record) = serde_json::from_str::<CameFromWire>(came_from) else {
+            return serde_json::json!({ "error": "the record is not readable" }).to_string();
+        };
+        let without_fonts = record.without_fonts;
+        let record = record.into_record();
+        match self
+            .session
+            .load_online_template(&source.session, &record, without_fonts)
+        {
+            Ok(done) => serde_json::to_string(&done).unwrap_or_default(),
+            Err(text) => serde_json::json!({ "error": text }).to_string(),
+        }
+    }
+
+    /// The credits of the document's objects as JSON (`specs/0138` criterion 4).
+    #[must_use]
+    pub fn credits_json(&self) -> String {
+        self.session.credits_json()
     }
 
     /// Sets the page's clock (Unix ms, local offset in minutes) for the Came from lines of the
@@ -263,12 +305,33 @@ impl WasmSession {
     }
 }
 
+/// The record as the page sends it: the Came from fields, the online keys of an online item and
+/// how the import is run (`step` `icon`, fonts left out).
 #[derive(serde::Deserialize)]
 struct CameFromWire {
     document: String,
     page: String,
     page_id: String,
     at: i64,
+    #[serde(default)]
+    online: Option<curvyo_document_core::OnlineOrigin>,
+    #[serde(default)]
+    without_fonts: bool,
+    #[serde(default)]
+    step: Option<String>,
+}
+
+impl CameFromWire {
+    fn into_record(self) -> CameFrom {
+        CameFrom {
+            document: self.document,
+            page: self.page,
+            page_id: self.page_id,
+            item: None,
+            at: curvyo_document_core::UnixMillis::new(self.at),
+            online: self.online,
+        }
+    }
 }
 
 /// Joins `thumbnail` and the page pictures into packed container `bytes` (the browser's save,
@@ -430,6 +493,7 @@ impl WasmLibraryIndex {
             page_id: wire.page_id,
             item: None,
             at: curvyo_document_core::UnixMillis::new(wire.at),
+            online: None,
         };
         self.index
             .source_of(&record)
@@ -471,4 +535,18 @@ pub fn library_no_match_text(query: &str) -> String {
 #[must_use]
 pub fn library_remove_armed_text(name: &str) -> String {
     curvyo_ui_core::library_index_text::remove_armed_text(name)
+}
+
+/// What Add sends, under the Address field of the Add source form (`specs/0138` UX F6).
+#[wasm_bindgen]
+#[must_use]
+pub fn library_online_add_sent_text(iconify: bool) -> String {
+    curvyo_ui_core::library_online::add_sent_text(iconify).to_owned()
+}
+
+/// The announcement after Enter in the search: "Searching 2 Iconify sources".
+#[wasm_bindgen]
+#[must_use]
+pub fn library_online_searching_text(sources: usize) -> String {
+    curvyo_ui_core::library_online::searching_text(sources)
 }

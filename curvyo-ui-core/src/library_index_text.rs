@@ -305,8 +305,10 @@ pub fn came_from_selection_text(records: &[Option<CameFrom>]) -> Option<(String,
         documents.dedup();
         return Some((format!("From {} documents", documents.len().max(2)), false));
     }
+    // Open source is not offered for an online item: the catalogue is not a document (UX Q17).
+    let openable = with.iter().all(|r| r.online.is_none());
     if with.len() == records.len() {
-        Some((came_from_text(first), true))
+        Some((came_from_text(first), openable))
     } else {
         Some((
             format!(
@@ -316,7 +318,7 @@ pub fn came_from_selection_text(records: &[Option<CameFrom>]) -> Option<(String,
                 first.document,
                 first.page
             ),
-            true,
+            openable,
         ))
     }
 }
@@ -345,6 +347,7 @@ mod tests {
             page_id: page_id.into(),
             item: None,
             at: UnixMillis::new(0),
+            online: None,
         }
     }
 

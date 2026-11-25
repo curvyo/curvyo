@@ -43,6 +43,8 @@ mod materials;
 mod menu;
 #[cfg(target_os = "linux")]
 mod native_file_lists;
+mod online;
+mod online_state;
 #[cfg(target_os = "linux")]
 mod preview_fonts;
 #[cfg(target_os = "linux")]
@@ -92,6 +94,19 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         library::library_remove_folder,
         library::library_find_source,
         library::library_open_path,
+        online::online_add,
+        online::online_add_ready,
+        online::online_remove,
+        online::online_open,
+        online::online_add_cancel,
+        online::online_search_begin,
+        online::online_search_source,
+        online::online_thumbnail,
+        online::online_icons,
+        online::online_load,
+        online::online_template_origin,
+        online::online_icon_import,
+        online::online_open_licence,
         project::quit_app,
         recovery::recovery_list,
         recovery::recovery_begin,
@@ -214,6 +229,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .manage(library::LibraryState::default())
+        .manage(online::OnlineState::default())
         .manage(workspace_shared::ShareCache::default())
         .manage(device_keys::OpenStore::default())
         .manage(connector::ConnectorState::default())

@@ -35,6 +35,7 @@ import { PrintAndCutSection } from "@/components/panel/PrintAndCutSection";
 import { RegistrationMarksBlock } from "@/components/panel/RegistrationMarksBlock";
 import type { PrintAndCutApi } from "@/hooks/usePrintAndCut";
 import { DocumentSection } from "@/components/panel/DocumentSection";
+import { CreditsBlock } from "@/components/panel/CreditsBlock";
 import { ExportSvgSection } from "@/components/panel/ExportSvgSection";
 import { FileTab } from "@/components/panel/FileTab";
 import { WorkspaceSection } from "@/components/panel/WorkspaceSection";
@@ -558,6 +559,7 @@ export function PropertiesPanel({
                 tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}
                 onReturnFocus={returnFocus}
                 exportSvg={<ExportSvgSection project={project} onReturnFocus={returnFocus} />}
+                credits={<CreditsBlock getSession={getSession} revision={editor.syncRevision} />}
                 extensions={<ExtensionsGroup workbenches={workbenches} />}
                 workspace={
                   // The browser holds synced workspaces only (`specs/0096-own-devices-sync`

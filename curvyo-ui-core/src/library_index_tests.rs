@@ -77,6 +77,7 @@ fn open_source_finds_the_page_id_and_prefers_the_same_name() {
         page_id: "1-1".into(),
         item: None,
         at: UnixMillis::new(0),
+        online: None,
     };
     assert_eq!(index.source_of(&record).unwrap().source, "ws");
     let renamed = CameFrom {

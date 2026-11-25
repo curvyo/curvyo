@@ -16,10 +16,37 @@ import {
 } from "@/platform/browserWorkspaces";
 import { invoke, isTauri } from "@/platform/host";
 
+/** One icon cell of an Iconify row (`curvyo_ui_core::library_online::IconCell`). */
+export interface IconCell {
+  prefix: string;
+  name: string;
+  label: string;
+  tooltip: string;
+}
+
+/** What an online row adds (`curvyo_ui_core::library_online::OnlineExtra`); every word is Rust's. */
+export interface OnlineExtra {
+  glyph: string;
+  host: string;
+  state: string;
+  refresh: boolean;
+  status: string;
+  author: string;
+  licence: string;
+  licence_url: string;
+  size: string;
+  font_note: string;
+  thumbnail: boolean;
+  loadable: boolean;
+  cells: IconCell[];
+  samples: IconCell[];
+}
+
 /** One row of the tree, as `curvyo_ui_core::library_tree::LibraryRow` serialises it. */
 export interface LibraryRow {
   key: string;
-  kind: "heading" | "source" | "folder" | "document" | "page";
+  kind: "heading" | "source" | "folder" | "document" | "page" | "ready" | "template" | "set" | "icons" | "status";
+  online?: OnlineExtra;
   level: number;
   name: string;
   line: string;
@@ -100,6 +127,8 @@ export async function libraryRows(query: string, expanded: readonly string[], di
     return [];
   }
   const place = dirty ? openLibraryPlace() : null;
+  // The Online group is the desktop build's (ADR 0085 decision 2, `0138` UX notes 2): the browser's
+  // tab has no Online group, so its empty state stays "No documents in this browser.".
   return JSON.parse(
     browserIndex.rows(query, JSON.stringify(expanded), now, offset, place ? JSON.stringify(place) : ""),
   ) as LibraryRow[];

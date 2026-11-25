@@ -18,6 +18,7 @@ fn rec(document: &str, item: Option<&str>) -> CameFrom {
         page_id: "first".to_owned(),
         item: item.map(str::to_owned),
         at: UnixMillis::new(1_700_000_000_000),
+        online: None,
     }
 }
 

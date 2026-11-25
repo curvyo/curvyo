@@ -57,3 +57,34 @@ not part of this slice.
    PO aligns the wording or raises a question.
 9. The `curvyo/templates` repository (files, index script, CI check) must exist before the ready
    entry works; that is lead work outside this checkout.
+
+## Build notes (implementer, 2026-11-24)
+
+Where the build differs from or settles a point of ADR 0085; the architect confirms or amends.
+
+1. **Crate edges.** `curvyo-ui-core → curvyo-library-core` (the Online rows format catalogue
+   entries, sets and failures) and `curvyo-storage-io → curvyo-library-core`; `curvyo-editor-wasm`
+   needs no edge (it reads the rows' words through `curvyo-ui-core`).
+2. **Hash check in the host.** `library-core::verify` runs in `curvyo-storage-io` (`fetch_template`)
+   before the bytes are returned or read; the wasm never sees an unchecked template. The result is
+   the same as decision 4, one step earlier.
+3. **Fonts.** The rule is the index's: a template whose index lists a font with a licence outside
+   the allow list of `library-core::font_licence_is_known` (or none) leaves all embedded font files
+   behind (`Fragment::without_fonts`); the `fsType` check of ADR 0047 §7 is not repeated here.
+4. **Roots.** `ureq` 3 runs on `rustls-no-provider` (the locked `ring`) and is given the operating
+   system's roots from `rustls-native-certs` as `RootCerts::Specific`, read on the first request; no
+   bundled root list, no `deny.toml` exception.
+5. **Came from words.** `document` holds the source's name and `page` the template's name (or
+   "Set › icon"), so the existing line "From {document} › {page}" reads "From Curvyo catalogue › Box";
+   the licence and author are the extra keys. Open source is not offered for an online item.
+6. **Ready entry.** Add on the ready Curvyo catalogue sends nothing (UX notes 2: it joins the list
+   and is not opened); the first request is the expand. Adding any other address sends the one
+   validating request.
+7. **Browser.** The Online group shows one line "Not available in the browser. Use the desktop app."
+   and sends nothing (`invoke` has no `online_*` command there).
+8. **Steps.** "Load template" is one step (`load_online_template`; `load_template` already names
+   the document template of `0019`), "Import icon" one step (`import_icon`) through the SVG reader.
+
+**Architect review, 2026-11-24.** Build notes 1 to 6 are accepted and written into ADR 0085
+(decisions 1, 2, 4, 7 and 8); note 3 relies on the catalogue's index script refusing a template
+that embeds a font it does not list, which joins the `curvyo/templates` task of note 9 above.
