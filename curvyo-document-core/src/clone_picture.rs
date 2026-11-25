@@ -371,6 +371,8 @@ fn picture_clone(
             no_solution: false,
             own_values: crate::ValueSet::default(),
             inherited_values: crate::ValueSet::default(),
+            unlinked: crate::KeySet::default(),
+            fallback_values: crate::ValueSet::default(),
             root_outline: Arc::new(empty),
             picture: Some(picture),
             picture_members: Some(members),

@@ -2977,12 +2977,3 @@ at the demo. The rectangle keeps its corner radii (Frage 326, answered B). A rou
 exports as a path with the shadow (Inkscape has no live equivalent, so `d` is the outline) and
 imports back live from the seventh shadow number. **Resolution:** none planned; a squircle would be its own
 spec.
-
-## A move preview of a sketch clone without a solution may draw its original (`0099` revision slice 1, 2026-11-25)
-
-`RawLeaf::of_clone` rebuilds a clone for the move preview with an empty `instance_fallback`, so while
-a clone whose own values have no solution is dragged, the preview may draw its original's shape
-instead of the saved last valid shape; the committed frame draws the fallback again.
-
-**Resolution:** carry the fallback into the preview leaf with slice 2 (canvas handles), which touches
-the same preview path.

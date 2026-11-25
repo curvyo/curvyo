@@ -76,6 +76,13 @@ pub struct CloneChain {
     /// The values it inherits from its original's chain (the nearest own value up the chain).
     #[serde(skip)]
     pub inherited_values: crate::ValueSet,
+    /// The keys it holds unlinked from their link group itself (never inherited, `0099`
+    /// criterion 36): only own values in a group of two or more.
+    #[serde(skip)]
+    pub unlinked: crate::KeySet,
+    /// Its saved fallback (`instance_fallback`), filtered and clamped like its own values.
+    #[serde(skip)]
+    pub fallback_values: crate::ValueSet,
     /// The root's own snapshot as read, unmapped, one allocation shared by every clone of that
     /// root, so the renderer can tessellate it once (`adrs.md` decision 3, criterion 44).
     /// Invariant: [`CloneSnapshot::resolved`]'s anchors are this outline's under `composed`.

@@ -145,6 +145,7 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
                         meta,
                         crate::instance_codec::KEY_INSTANCE_FALLBACK,
                     ),
+                    unlinked: crate::instance_codec::read_unlinked(meta),
                 },
             )
         });

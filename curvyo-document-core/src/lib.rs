@@ -572,6 +572,8 @@ pub use sketch_page_commands::{
 mod instance_codec;
 mod instance_commands;
 mod instance_followers;
+mod instance_link_commands;
+mod instance_links;
 mod instance_value;
 mod sketch_instance;
 mod sketch_parameter_repair;
@@ -579,11 +581,13 @@ mod sketch_read;
 pub use instance_codec::{StoredUnit, decode_number, decode_value, encode_number, encode_value};
 pub use instance_commands::{
     CHANGE_EXPOSED_PARAMETER_COMMIT_LABEL, EXPOSE_PARAMETER_COMMIT_LABEL, InstanceError,
-    InstanceWrite, OWN_PARAMETERS_COMMIT_LABEL, RESET_PARAMETER_COMMIT_LABEL,
-    RESET_PARAMETERS_COMMIT_LABEL, UNEXPOSE_PARAMETER_COMMIT_LABEL,
+    InstanceWrite, LINK_PARAMETERS_COMMIT_LABEL, OWN_PARAMETERS_COMMIT_LABEL,
+    RESET_PARAMETER_COMMIT_LABEL, RESET_PARAMETERS_COMMIT_LABEL, UNEXPOSE_PARAMETER_COMMIT_LABEL,
+    UNLINK_PARAMETERS_COMMIT_LABEL,
 };
+pub use instance_links::{Held, LinkedChange, linked_change, linked_reset};
 pub use instance_value::{
-    ExposedKey, ExposedParam, ExposedTarget, InstanceKind, InstanceValue, ValueSet,
+    ExposedKey, ExposedParam, ExposedTarget, InstanceKind, InstanceValue, KeySet, ValueSet,
 };
 pub use sketch_commands::SketchEditError;
 pub use sketch_instance::InstanceSolves;

@@ -10,7 +10,7 @@ use crate::affine::{Affine, MATRIX_ENTRY_LIMIT};
 use crate::clone_codec::{
     CloneLink, KEY_CLONE_LINK, is_clone_meta, read_clone_link, write_clone_link,
 };
-use crate::clone_read::{RawLeaf, resolve};
+use crate::clone_read::RawLeaf;
 use crate::clone_transform::CloneLinks;
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{self, KEY_ANCHORS, KEY_CLOSED, KEY_ROTATION};
@@ -32,6 +32,7 @@ fn keys_replaced_by_unlink() -> impl Iterator<Item = &'static str> {
         crate::clone_codec::KEY_OWN_STYLE,
         crate::instance_codec::KEY_INSTANCE_PARAMS,
         crate::instance_codec::KEY_INSTANCE_FALLBACK,
+        crate::instance_codec::KEY_INSTANCE_UNLINKED,
         crate::node_registers::KEY_OPACITY,
         KEY_ANCHORS,
         KEY_CLOSED,
@@ -247,7 +248,11 @@ impl Document {
                 }
             })
             .collect();
-        for object in resolve(leaves).leaves.iter().flatten() {
+        for object in crate::clone_read::resolve_with(leaves, &self.instance_solves)
+            .leaves
+            .iter()
+            .flatten()
+        {
             if let ObjectSnapshot::Clone(clone) = object
                 && affected.contains(&clone.id())
                 && !clone_within_limits(clone)

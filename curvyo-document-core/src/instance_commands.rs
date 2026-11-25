@@ -7,7 +7,8 @@ use crate::document::{Document, OBJECTS_TREE};
 use crate::instance_codec::{
     self, ExposedEntry, KEY_INSTANCE_FALLBACK, KEY_INSTANCE_PARAMS, decode_entry,
 };
-use crate::instance_value::{ExposedKey, ExposedParam, InstanceValue, ValueSet};
+use crate::instance_link_commands::{group_partners, set_link};
+use crate::instance_value::{ExposedKey, ExposedParam, InstanceValue, KeySet, ValueSet};
 use crate::path_model::NodeId;
 use crate::paths::tree_id_of;
 use crate::primitive_model::ObjectSnapshot;
@@ -24,6 +25,10 @@ pub const RESET_PARAMETER_COMMIT_LABEL: &str = "reset_parameter";
 pub const RESET_PARAMETERS_COMMIT_LABEL: &str = "reset_parameters";
 /// The label of writing every current value as an own value.
 pub const OWN_PARAMETERS_COMMIT_LABEL: &str = "own_parameters";
+/// The label of [`Document::link_exposed`].
+pub const LINK_PARAMETERS_COMMIT_LABEL: &str = "link_parameters";
+/// The label of [`Document::unlink_exposed`].
+pub const UNLINK_PARAMETERS_COMMIT_LABEL: &str = "unlink_parameters";
 
 /// Why an instance command did nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -44,6 +49,10 @@ pub enum InstanceError {
     /// Another exposed value has this name, or the name is not 1 to 64 characters.
     #[error("the name is in use or invalid")]
     BadName,
+    /// The two values are not both exposed, are of different kinds, are one value or are in one
+    /// group already; or the value is in no group.
+    #[error("these values cannot be linked")]
+    NotLinkable,
 }
 
 /// What one clone gets written by [`Document::write_instance_values`].
@@ -55,6 +64,8 @@ pub struct InstanceWrite {
     pub own: ValueSet,
     /// The last value set a drag step solved, saved as the fallback when `own` has no solution.
     pub last_solvable: Option<ValueSet>,
+    /// The keys it holds unlinked afterwards; only those with an own value are written.
+    pub unlinked: KeySet,
 }
 
 impl Document {
@@ -91,6 +102,7 @@ impl Document {
                 name: name.map(str::to_owned),
                 min: None,
                 max: None,
+                link: None,
             }],
         );
         if target.is_empty() {
@@ -110,6 +122,7 @@ impl Document {
                 name: stored_name,
                 min: None,
                 max: None,
+                link: None,
             }
             .to_json(),
         );
@@ -128,7 +141,7 @@ impl Document {
         sketch: NodeId,
         key: &ExposedKey,
     ) -> Result<(), InstanceError> {
-        self.sketch(sketch).ok_or(InstanceError::NoSuchSketch)?;
+        let snapshot = self.sketch(sketch).ok_or(InstanceError::NoSuchSketch)?;
         let meta = self
             .sketch_meta(sketch)
             .map_err(|_| InstanceError::NoSuchSketch)?;
@@ -138,7 +151,15 @@ impl Document {
         if items.len() == before {
             return Err(InstanceError::NotExposed);
         }
+        // Criterion 35: it leaves its group; a group left with one member is dissolved.
+        let mut unmarked = vec![key.clone()];
+        let partners = group_partners(&snapshot.exposed, key);
+        if let [last] = &partners[..] {
+            set_link(&mut items, last, None);
+            unmarked.push(last.clone());
+        }
         instance_codec::write_exposed_raw(&meta, &items);
+        self.drop_marks(sketch, &unmarked);
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let followers: Vec<NodeId> = self
             .read_objects()
@@ -207,7 +228,8 @@ impl Document {
         }
         entry.min = min.filter(|n| n.is_finite()).map(value);
         entry.max = max.filter(|n| n.is_finite()).map(value);
-        items[at] = entry.to_json();
+        let raw = items[at].as_object().cloned().unwrap_or_default();
+        items[at] = entry.merged_into(raw);
         instance_codec::write_exposed_raw(&meta, &items);
         self.commit_with_label(CHANGE_EXPOSED_PARAMETER_COMMIT_LABEL);
         Ok(())
@@ -250,13 +272,16 @@ impl Document {
                 let kept = instance_codec::read_values(&meta, KEY_INSTANCE_FALLBACK);
                 (!kept.is_empty()).then_some(kept)
             };
-            plan.push((write.clone, write.own.clone(), fallback));
+            let mut marks = write.unlinked.clone();
+            marks.retain(|key| write.own.get(key).is_some());
+            plan.push((write.clone, write.own.clone(), fallback, marks));
         }
-        for (clone, own, fallback) in plan {
+        for (clone, own, fallback, marks) in plan {
             let meta = tree
                 .get_meta(tree_id_of(clone))
                 .map_err(|_| InstanceError::NoSuchClone)?;
             instance_codec::write_values(&meta, KEY_INSTANCE_PARAMS, &own);
+            instance_codec::write_unlinked(&meta, &marks);
             match fallback {
                 Some(set) if !own.is_empty() => {
                     instance_codec::write_values(&meta, KEY_INSTANCE_FALLBACK, &set);
@@ -308,6 +333,38 @@ impl Document {
         let mut shown = CloneSnapshot::new(id, chain);
         shown.resolved.style = clone.resolved.style.clone();
         Some(shown)
+    }
+
+    /// The sketch solved for the clone `id`: with its committed values (`own` `None`; a set
+    /// without solution gives its saved fallback's solve, else `None`) or with `own` as its own
+    /// values (a drag step), through the same cache entry [`Document::instance_preview`] fills, so
+    /// knobs at rest and during a drag cost no second solve. An empty set is the sketch's own
+    /// solution. `None` when the clone follows no sketch or the set has no solution.
+    #[must_use]
+    pub fn instance_solution(
+        &self,
+        id: NodeId,
+        own: Option<&ValueSet>,
+    ) -> Option<std::sync::Arc<curvyo_sketch_core::Sketch>> {
+        let (clone, sketch) = self.sketch_clone(id)?;
+        let inherited = &clone.chain.inherited_values;
+        let set = match own {
+            Some(own) => {
+                inherited.overlaid(&crate::sketch_instance::filtered(&sketch.exposed, own))
+            }
+            None => inherited.overlaid(&clone.chain.own_values),
+        };
+        if set.is_empty() {
+            return Some(std::sync::Arc::new(sketch.solution.clone()));
+        }
+        match self.instance_solves.solved(&sketch, &set) {
+            Ok(solved) => Some(solved),
+            Err(_) if own.is_none() && !clone.chain.fallback_values.is_empty() => self
+                .instance_solves
+                .solved(&sketch, &inherited.overlaid(&clone.chain.fallback_values))
+                .ok(),
+            Err(_) => None,
+        }
     }
 
     /// The exposed values of the sketch `id`, in stored order.

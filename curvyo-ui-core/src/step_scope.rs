@@ -251,6 +251,8 @@ pub const EDIT_STEPS: &[&str] = &[
     "reset_parameter",
     "reset_parameters",
     "own_parameters",
+    "link_parameters",
+    "unlink_parameters",
     // `specs/0121-print-and-cut`: Size and Line width of the selected marks object.
     "registration_mark_size",
     "convert_sketch_to_path",
