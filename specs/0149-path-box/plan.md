@@ -80,3 +80,59 @@ placement, not the function).
 - The badges are strokes in the drag-ghost look, not 0121's digit table (it holds digits 1 to 4 only and is
   private to document-core); no new draw-list primitive was needed.
 - The finger hollow on a bent span stays out of slice 1; `hollow_left_out` says so (decision of the lead).
+
+# Plan for Path box, slice 2 (curves)
+
+Implementer, 2026-11-25, same branch `story/path-box-curves`. Built under `specification.md` (revision 7), `adrs.md`
+(revision 5), ADR 0083 revision 5 §13 and `ux-notes.md` (revision 4). Section numbers below are ADR 0083 §13.n.
+No new crate, no new dependency, no `format_version` change (if one turns out to be needed: stop and report).
+Own choices are marked **(Proposal)**.
+
+## Affected files (§13.14)
+
+- **`curvyo-generators-core`:** new `path_box/arc_fit.rs` (biarcs), `path_box/spans.rs` (the outline as lines and arcs
+  with fillets, replaces the polygon route of `shape.rs`), `path_box/flats.rs` (flats beside corners), `path_box/hollow.rs`
+  (hollow on a run); changed `check.rs` (curve, area, winding), `classify.rs` (nodes and cusps), `build.rs`, `describe.rs`,
+  `plates.rs`, `mod.rs`; shared `wall.rs` (runs behind `Wall.runs`, integral spacing), `slit_bend.rs` (`slots` with column
+  positions), `tab_layout.rs` (windows on runs, signed flat term), `contour.rs` (`line_circle`, `circle_circle` `pub(crate)`),
+  `wall_plates.rs` (`bend_with_hollow` with a middle normal). Goldens `tests/fixtures/path_box_{heart,shield,ellipse,circle}.txt`;
+  `rounded_box_*.txt`, `path_box_default.txt`, `path_box_20gon.txt` stay byte-identical (the guard of §13.4; only the 4 mm 20-gon unit test of `shape.rs` changes on purpose).
+- **`curvyo-extension-core`:** `Mark::Seam`, doc of `Mark::Bend`, warning id list (`cover_rounded`, `outline_curved` out), CHANGELOG.
+- **`curvyo-ui-core`:** `instance_source.rs` (`SourceRefusal::Curved` out), `instance_warnings.rs` (arms), `preview` and
+  `hover_marks` build with `Edit::Draft`.
+- **`curvyo-editor-wasm`, `frontend`:** CPU tests, `path_box_marks.rs` (seam, bend), `generatedView.test.ts` sentence.
+- **Tester-owned** `curvyo-generators-core/tests/acceptance_0149.rs` and `curvyo-ui-core/tests/acceptance_0149.rs`: only what slice 2
+  supersedes is adapted, each marked "Superseded by".
+
+## Tasks (criteria in brackets, test first, one commit each)
+
+- [x] 1. `arc_fit.rs`: biarcs within 0.01 mm, splits at inflections, cusps and 90 degrees, halving, exact G1 joins, 1e6 mm guard (14).
+- [x] 2. `check.rs` reads the curve: area by geometry-core, winding, degenerate and crossing; D and lens valid (1, 13).
+- [x] 3. `classify.rs`: corners at nodes and cusps only, tangent at 1 degree or less; `spans.rs`: lines, arcs, fillets beside arcs (3, 14, 15).
+- [x] 4. Runs in `wall.rs`, `slit_bend::slots` with columns at equal steps of the integral of 1/g, `tab_layout` windows on runs, exact signed neutral length (6, 9, 14).
+- [x] 5. `flats.rs`: flats beside corners with the bounds of 13.7, joint as cut, `sharp_corner` from the cut turn (6, 5).
+- [x] 6. Plates on exact arcs, ring and cover test through geometry-core, fallback and `cover_rounded` (10, 16).
+- [x] 7. Hollow on the lid's longest convex run (10, 16).
+- [x] 8. `Mark::Seam`, `Mark::Bend` per stretch of one tightness, `tight_bend` from the arcs (7, 9, 12).
+- [x] 9. Remove `outline_curved`, `SourceRefusal::Curved`; hover and Select bar in Draft; adapt superseded tests (1, 11). Open: the `cover_rounded` sentence has no variants for Lid or Finger hollow off, and "The wall" / "bends inward" (UX notes 6) are not worded.
+- [x] 10. Goldens heart, shield, ellipse, circle; classification and piece counts; CPU budgets (13, 14, 15, 11). Open: the mating tests of `0147` on heart and shield (16).
+- [ ] 11. Full gate once.
+
+## Validation
+
+Arc fit within 0.01 mm sampled both ways, tangency within 1e-9 rad; piece length against geometry-core `PathMeasure` within 0.1 mm;
+spacing (N at least 2, no gap below `least`, the reported value the smallest gap); mating tests on heart and shield; peanut fallback;
+CPU: heart edit at most 300 ms with at least 400 slots, Draft hover at most 100 ms (thread CPU); the slice-1 goldens byte-identical.
+
+## Own choices of slice 2 (Proposal)
+
+- The arc fit aims at 0.008 mm on its 16 samples so the 0.01 mm of the ADR holds between them.
+- A kink's fillet takes its tangent points across several fitted arcs of one tangent chain (a fillet
+  next to a 5 mm fitted arc would otherwise get a tiny radius); each side may use half a chain that a
+  second kink shares (ADR 0083 13.3).
+- Outlines of straight cubics only keep the slice-1 route (`shape.rs`) so the goldens stay byte-identical;
+  every outline with a curved cubic goes through `spans.rs`.
+- The fallback cover is the geometry-core round offset as a polyline of four chords per offset cubic.
+- The golden heart has a notch of about 100 degrees: a narrower V (53 degrees) crosses itself in the exact
+  cover with 3 mm walls and takes the fallback, as criterion 16 says it should.
+- `Span.piece_start` marks where a wall piece starts so runs and windows stop at a corner.

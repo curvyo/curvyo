@@ -2,7 +2,8 @@
 
 Status: Proposed (architect, 2026-11-24), revision 2 the same day with the lead's decisions and
 the UX notes revision 1, revision 3 the same day with the lead's decisions from the slice-1 build
-(spec revision 4). One new ADR (0083, Proposed, revision 3, no questions of its own); it
+(spec revision 4), revision 4 on 2026-11-25 for slice 2 (curves, ADR 0083 §13), revision 5 the same day for the UX notes revision 4
+(ADR 0083 §13.16). One new ADR (0083, Proposed, revision 5, no questions of its own); it
 builds on ADR 0082 revision 3. Decisions marked **(Proposal)** are the architect's and
 vetoable at the demo.
 
@@ -36,7 +37,16 @@ vetoable at the demo.
     valley narrower than 2 t (criterion 10; revision 3);
   - the shipped contract (`Path`, `Source`, `warnings`, `marks`) and the new public
     `Document::create_generated_above` checked against the ADR (§12; revision 3);
-  - tests and CPU budgets (criteria 3, 4, 6, 11).
+  - tests and CPU budgets (criteria 3, 4, 6, 11);
+  - slice 2, curves (§13, revision 4): the outline's area, winding and degeneracy from the curve;
+    biarcs within 0.01 mm with exact tangent joins; fillets of kinks beside arcs; runs of arcs as
+    the unit of slit bands, windows, the hollow and bend marks; the neutral length exact with
+    signed flat and window terms; slit columns from the integral of 1 / gap; flats of z + t beside
+    a corner on a curve; the cover's fallback to geometry-core; the hover in Draft; the removed
+    `outline_curved` (criteria 1, 3, 6, 7, 9 to 11);
+  - revision 5 (§13.16, UX notes §10 items 1, 2, 3, 9): `Mark::Seam`, `Mark::Bend` per slit
+    stretch of one tightness (windows, flats and the seam margin left out), the warning
+    `cover_rounded` in place of `hollow_left_out` on the cover fallback (criteria 7, 9, 16).
 - [ADR 0082](../../docs/adr/0082-generator-plate-joints-corner-rule-and-rounded-box.md)
   revision 3: the corner rule (§1), kerf with miter joins (§2), the shared `footprint.rs`,
   `wall.rs`, `wall_plates.rs`, `slit_bend.rs` (§4, §6), tabs and flat windows (§5), automatic
@@ -77,6 +87,27 @@ vetoable at the demo.
    span, ring opening and crossing test by geometry-core; the heart's four curved cubics merge
    into two bent spans. `Mark::Piece.length` is to become a `Length` before the PR.
 
+9. 2026-11-25, revision 4: **Slice 2 (curves)** (architect, Proposal; ADR 0083 §13): no
+   `format_version` and no new crate, dependency or edge; the only contract change is the removal
+   of `outline_curved` and `SourceRefusal::Curved` (source-breaking 0.x, run time). Runs of arcs
+   are opt-in for the path box, so the rounded box's goldens and the slice-1 goldens stay
+   byte-identical; flats beside a corner are bounded so a joint never flips or drops below the
+   Corner angle. A flat of
+   z + t replaces the curve beside each corner, so the box deviates from the drawing there by
+   f² / (8 R) (0.5 mm at R = 20 mm); vetoable at the demo.
+10. 2026-11-25, revision 5: **Marks and warnings for the UX notes revision 4** (architect,
+   Proposal; ADR 0083 §13.16): all four items accepted. `Mark::Seam { at, inward }` on an outline
+   with no corner; `Mark::Bend` is the stretch under a slit band, split where its tightness
+   changes, so only the tight part is red and windows, flats and the seam margin stay bare;
+   `cover_rounded` (the wall thickness as value; plates and hollow read from the parameters)
+   replaces `hollow_left_out` on the cover fallback. Run time only, no `format_version`;
+   source-breaking 0.x (`Mark` is exhaustive), one CHANGELOG line.
+11. 2026-11-25, revision 6: **Slice-2 code review** (architect, Proposal; ADR 0083 §13.17):
+   accepted as built: straight-only outlines keep the slice-1 polygon route, the hollow on a run
+   is its own notch beside the rounded box's, `Wall.seam_margin` beside `runs`, the 90° split
+   as a halving, and `tight_bend` read from the arcs under the slit bands (so it matches the red
+   stretches). Crate-internal, no contract or format change.
+
 ## Spec issues (for the product owner)
 
 1. Frage 367 falls away: the wall piece is slit flat, as on the rounded box, so slice 2 needs no
@@ -93,3 +124,9 @@ vetoable at the demo.
    `Source.command`; the segment is a pick mode and the Select bar holds the command (UX notes §1).
 6. Criteria 5 and 7 (revision 2): the notices name pieces, as the spec revision 3 already does;
    with one wall piece the sentence says "The wall" (ADR 0083 §11).
+7. Slice 2 (ADR 0083 §13): criterion 1 loses the curved-outline refusal; criterion 6's "span's
+   length on the neutral line" is the inner-face length plus t/2 times the signed turn, with the
+   flats beside corners (§13.5, §13.7); criterion 10's hollow on a curve sits at the middle of the
+   lid's longest convex curved stretch that holds it (§13.10); criterion 11 gains the hover budget
+   (the heart at most 100 ms in the pick mode, §13.13); criterion 3's "a point of a curve" is a
+   cusp (§13.2).
