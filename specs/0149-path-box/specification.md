@@ -1,6 +1,6 @@
 # Path box: turn any closed path (a heart, a shield, a coffin) into a laser-cut box, as a generator
 
-Status: Slice 1 Done (PR #476); slice 2 Ready (revision 7, 2026-11-25, aligned to ADR 0083 §13; the architect and the UX engineer revise `adrs.md`, ADR 0083 and `ux-notes.md` for it in parallel; before it: `adrs.md` (ADR 0083, Proposed, the architect may still revise it) and `ux-notes.md` revision 1 exist; Fragen 364 to 366 open, all with defaults A (Frage 367 fell away); the UX questions are decided as Proposals (kinks built in slice 1, layout beside the source); slice 2 (curves) is Ready on slice 1's code and does not need `0148`)
+Status: Done (slice 1 PR #476, slice 2 PR #481) (revision 7, 2026-11-25, aligned to ADR 0083 §13; the architect and the UX engineer revise `adrs.md`, ADR 0083 and `ux-notes.md` for it in parallel; before it: `adrs.md` (ADR 0083, Proposed, the architect may still revise it) and `ux-notes.md` revision 1 exist; Fragen 364 to 366 open, all with defaults A (Frage 367 fell away); the UX questions are decided as Proposals (kinks built in slice 1, layout beside the source); slice 2 (curves) is Ready on slice 1's code and does not need `0148`)
 Priority: Could
 Origin: Customer (2026-11-24, translated, an idea added to `0147`): "turn ANY path into a box": a heart, a shield, a coffin. The corners of the path become finger joints, the curves are always slit-bent; "if the radius is too small: own fault, we just do it". Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
