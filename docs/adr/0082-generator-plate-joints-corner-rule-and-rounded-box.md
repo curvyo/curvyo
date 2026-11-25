@@ -5,7 +5,10 @@ answers (Frage 349 B, 355 C, 360 B, 361 A, 362 B; spec `0147` revision 3), revis
 day with the lead's decisions on the UX notes revision 3 (spec `0147` revision 5), revision 4 the
 same day from the architect review of `story/generators-flex-box` (§6 at least two columns per
 bend, §7 `Param.track`), revision 5 the same day from the second review of that branch (§7
-`Edit::Draft`, `Generated.states`, `Bound::DependentMinimumFor`). **§10 is
+`Edit::Draft`, `Generated.states`, `Bound::DependentMinimumFor`), revision 6 on 2026-11-25 for spec
+`0147` slice 2, the curved top (§11; `ShownWhen::All` and `Any` join the contract change of §7;
+no `format_version` change; `plate.rs` lands at crate level as §4 says), amended the same day to
+spec `0147` revision 7 (a thickness field per plate, Frage 355 C; part order; clamps). **§10 is
 `needs-customer`** (file format: per-part operations change `format_version`; Frage 363
 ROUND-DETACH of spec `0147`, default A: not in slice 1, built as slice 3). The rest needs no customer decision: no new crate or
 dependency, and the new kind is additive (ADR 0080 §5); one source-breaking `0.x` contract change
@@ -35,7 +38,11 @@ side, so a square box with full corners is an exact circle; where there is no st
 sits on a short flat spot of the curve. Slits come as Straight, Offset or Wave, and more patterns
 can be added one at a time. All parts cut with the box's one operation. In a later slice, Detach
 part gives one part its own operation while it stays part of the live box; for that the file
-format changes once, so older Curvyo versions will not open such a file.
+format changes once, so older Curvyo versions will not open such a file. With a curved top, the
+wall strip runs from the lid's front edge over the top, round a slit hinge at the back and down
+the back; two end plates carry the side profile, and the base and the front are finger-jointed
+like the Box. Each plate has its own thickness field, following the wall thickness until you
+type one. The lid is the strip's front part and lifts on the hinge.
 
 ## Context
 
@@ -158,10 +165,11 @@ moves with the box and keeps its layout place):
      width)` for tab-and-slot joints.
    - `plate.rs` (from `boxes/plate.rs`): the walk round a plate whose four edges carry run lists
      and whose corners are `Owned`, `Open`, `Notched` or `Round(radius)`. A tab is a run of
-     negative inset; a strip edge concatenates several spans.
+     negative inset; a strip edge concatenates several spans. (Revision 6: slice 1 kept it in
+     `boxes/`; it moves with the curved top, its second user, with a notch depth per edge, §11.)
    - `contour.rs`: a closed contour of lines and arcs, the kerf offset of rule 2, and the
-     conversion to a `ClosedPath` through `outline::Builder`. It replaces `plate.rs` `offset()`
-     and `simplify()`.
+     conversion to a `ClosedPath` through `outline::Builder`. It replaces `plate.rs` `offset()`;
+     the walk's own node `simplify()` (repeated and collinear points) stays in `plate.rs`.
    - `slit_bend.rs`: the slit pattern as pure geometry (§6).
    - `footprint.rs` (revision 2): the plan outline of a wall, a closed loop of lines and arcs on
      the wall's inner face with each junction marked tangent or corner (turn angle). It gives the
@@ -271,14 +279,9 @@ moves with the box and keeps its layout place):
      becomes a rounded rectangle; a smaller one is clamped to min(w, d) / 2 (Dependent, the
      notice on release) and so stays full round. One rule for every radius; scaling r with the
      box at full round would be a special case that the stored value cannot show.
-   - **Curved top** (criterion 11, a second slice; Proposal). The same parts in the elevation
-     plane. The two end plates (inner plate, optional cover) carry the profile: depth x height,
-     back-top corner rounded with the corner radius (Frage 353 A). The strip runs from the lid's
-     free front edge over the top, round the back arc (the slit hinge) and down the back. Inner
-     end plates hold it with tabs on the back straight only. The base and the front are Box-style
-     finger-jointed plates (`plate.rs`, rule 1), and the end plates' and front's top edges are the
-     lid seat. The footprint corners are square in that mode: a strip cannot bend about two axes.
-     A rounded footprint with a curved top is two strips in one generator, later.
+   - **Curved top** (criterion 11, slice 2): §11 (revision 6). The end plates carry the profile,
+     the strip runs over the top and round the back hinge, the base and the front are Box plates,
+     the footprint corners are square.
 6. **The slit pattern, `slit_bend.rs`** (pure; reused by ADR 0083 and `0148`).
    - Input: a `Band { origin, along: Vec2, length, width, keep_clear: Vec<Window> }`, a straight
      region of a flat part with the bend axis across it, and `SlitPattern { kind, slit_width,
@@ -353,6 +356,9 @@ moves with the box and keeps its layout place):
        serialises that one variant as a map (`{"dependent_minimum_for": ...}`); the front end reads
        no `Bound`, the sentence is built in `curvyo-ui-core`.
      - No `format_version` change: none of the three is written to a document or the history.
+   - Revision 6 (the curved top, §11): `ShownWhen` gains `All` and `Any` over `&'static
+     [ShownWhen]`, so a row can hang on a switch and a choice at once. Run time only, no
+     `format_version` change, no TS change (ui-core evaluates the conditions).
    - Automatic rules (Frage 350 A): spacing `0.22 r`; slit width `kerf + 0.3 mm`, so the drawn slot
      is 0.3 mm. Spec `0147` asks for kerf + 0.1 mm, but a closed slot is drawn at its width minus
      the kerf, so the drawn slot would be only 0.1 mm wide. Each extra thickness: `thickness`.
@@ -361,9 +367,10 @@ moves with the box and keeps its layout place):
 8. **Parameters of the rounded box** (keys are file format, ADR 0034 §5; Proposal against spec
    `0147` criterion 2):
    - Sizes: `inner_width`, `inner_depth`, `inner_height`, `corner_radius`.
-   - Thicknesses (Frage 355 C): `thickness` (wall strip), `plate_thickness` (inner base),
-     `cover_thickness` (base cover), `ring_thickness` (seat ring), `lid_thickness` (lid, seat or
-     tabbed); the last four automatic, following `thickness`.
+   - Thicknesses (Frage 355 C): `thickness` (wall strip), `plate_thickness` (inner base; the base
+     in Curved), `cover_thickness` (base cover), `ring_thickness` (seat ring), `lid_thickness` (lid,
+     seat or tabbed), `end_plate_thickness` and `front_thickness` (Curved only, §11; revision 6);
+     all but the first automatic, following `thickness`.
    - Cut: `kerf`.
    - Plates: `base_inset` (default 0), `base_cover` (Switch, on), `lid` (Switch, on),
      `lid_seat` (Switch, on: ring and loose lid; off: tabbed lid; ring width derived 2 t_r, no
@@ -372,8 +379,9 @@ moves with the box and keeps its layout place):
      `slit_width`, `slit_spacing`, `slit_rows` (the last three automatic; `slit_rows` shown when
      `slit_pattern` is `offset`, `ShownWhen::Is`, answers the UX notes §10 item 12).
    - Layout: `gap`.
-   - Later: `top_shape` (`flat` | `curved`, slice 2).
-   - Finger width and clearance are derived (2 t_w, 0).
+   - Top: `top_shape` (`flat` | `curved`, slice 2, §11; revision 6).
+   - Finger width and clearance are derived (2 t_w, 0; in Curved 2 times the thinner part of each
+     joint, §11).
 9. **Tests.**
    - **Box:**
      - Every plate outline is a simple polygon (no repeated vertex, no self-intersection) at kerf
@@ -411,7 +419,7 @@ moves with the box and keeps its layout place):
       and stable across regenerations: rounded box `strip`, `base`, `cover`, `ring`, `lid`; Box
       `bottom`, `front`, `back`, `left`, `right`, `lid`; gear `gear`; path box (ADR 0083)
       `wall-1` to `wall-n` in walk order from the outline's start, then the rounded box's plate
-      keys. The record gains `part_keys`, a list of strings parallel to `parts`, written whole
+      keys; rounded box with a curved top (§11) `strip`, `left`, `right`, `front`, `base`. The record gains `part_keys`, a list of strings parallel to `parts`, written whole
       with them. Damage: not a list of strings, a length other than the parts', a duplicate.
       Absent (an older file) reads as no keys: the object cannot detach until its next edit writes
       them.
@@ -451,6 +459,178 @@ moves with the box and keeps its layout place):
     - **Fallback** if the customer declines the format change at slice 3 (Frage 363 C): Option A,
       no record or key change, criterion 15 reads "after Object to path".
 
+11. **The curved top (spec `0147` slice 2, criteria 11 and 16 to 24, Frage 353 A; revision 6,
+    2026-11-25, amended the same day: a thickness field per plate, Frage 355 C, and the part
+    order, the rest and the clamps of spec `0147` revision 7).** Everything here is a Proposal of
+    the architect unless a Frage is named.
+    - **Parameter.** `top_shape`, a Choice `flat` (default) | `curved`, in the Size group after
+      `corner_radius`. The option ids are file format (ADR 0034 §5); an unknown id reads Flat, as
+      an unknown slit kind does (§6). In Curved the corner radius r is the hinge radius (Frage 353
+      A, one radius field) and the footprint corners are square (a strip cannot bend about two
+      axes; a rounded footprint with a curved top is two strips, later).
+    - **Thicknesses (Frage 355 C: every part its own field).** t_w the strip (`thickness`, "Wall
+      thickness"); t_e the end plates (`end_plate_thickness`, new, "End plate thickness"); t_f the
+      front (`front_thickness`, new, "Front thickness"); t_b the base (`plate_thickness`, the
+      existing "Inner base thickness", the same role as in Flat: the base plate, so no key gets a
+      second meaning). The two new keys are automatic Lengths as the four of §5: a stored 0
+      follows `thickness`, shown muted, typing keeps the value. They are shown with `Is {
+      top_shape, curved }` in the rounded box's own `groups()` and hidden, kept, in Flat.
+    - **Geometry.** Elevation plane: x across the width, y from the front to the back, z up. w, d,
+      h are the clear inside (the front's inner face at y = 0, the base's top face at z = 0, the
+      end plates' inner faces at x = 0 and w). Outer size W = w + 2 t_e, D = d + t_f + t_w, H = h +
+      t_b + t_w. Parts in layout and numbering order (spec criterion 16): 1 strip, 2 and 3 end
+      plates (left, right; one outline cut twice, as the Box's side walls),
+      4 front, 5 base. The cut file holds the end plate's outline twice; the second is turned
+      over at assembly.
+    - **Where the strip lives** (the option the lead asked for):
+      - **A. Its own module `rounded_box/curved_top.rs` (chosen):** a profile footprint of three
+        shapes fed into the shared `footprint.rs` and `wall.rs`. Nothing in `footprint.rs`,
+        `wall.rs`, `wall_bands.rs` or `slit_bend.rs` changes.
+      - B. Through `path_box/`: its input is a closed outline read by classify and arc fit, and its
+        pieces are walls of one thickness meeting at corners of any angle. The strip is an open
+        chain that ends on a plate of another thickness, so we would fake an outline and bypass
+        most of the module. Rejected.
+      - C. A crate-level module: one user (§5 of `CLAUDE.md`). Rejected.
+      - `tab_runs.rs`, `straight_tabs`, `path_box/corner.rs` and `path_box/flats.rs` are not used:
+        no windows, the tab margins differ at the two ends of the back straight (below), and the
+        only strip-to-plate finger joint is the 90-degree Box joint.
+    - **The strip.** `Footprint::from_shapes([top straight, quarter bend of radius r, back
+      straight], t_w, 2 t_w)`, no seam. Width W, so the end plates' outer faces are flush with its
+      edges (spec criterion 16). The inner face starts at the front's outer face (y = -t_f, z = h),
+      runs back to y = d - r, bends round the centre (d - r, h - r) and runs down to the base's
+      underside (z = -t_b). Length `L = (d - r + t_f) + pi/2 (r + t_w/2) + (h - r + t_b)`. `Wall`
+      with `height` = W (across the strip is across the box), two `Joint`s (t_e, inset 0,
+      `from_top` true and false: edge notches), `runs: false`, `local_spacing: None` (spacing 0.22
+      r, criterion 4), `ends: Some`: the start a plain end (one step), the end the finger joint
+      with the base (below).
+    - **Slits** on the bend only: one band over the whole arc, at least two columns, bridges t_w
+      (§6), the criterion 4 tests. No slit on the flats; the slots and the hollow lie on the
+      straights at least 2 t_w from the arc, which is the gap rule of spec criterion 19 (see
+      `adrs.md` spec issue 16 on its "arc's two ends"). `wall_slits` does not apply: the top
+      straight is the lid, the back straight holds the tabs.
+    - **The lid is the strip's free front part**, the top straight. Its front edge is free and
+      flush with the front's outer face. It is held only through the hinge: the top straight
+      carries no slot, no tab and no slit. **It rests on the seat** (Frage 371 A): the top edges of
+      the end plates and the front, all at z = h, under its inner face over the full width W; no
+      stop and no catch in slice 2. **Opening unbends the hinge**: closed, the strip is bent its
+      full 90 degrees; with the lid upright the hinge is straight, and laid back it bends the other
+      way by at most 90 degrees. So the closed state holds the bending, and any springback lifts
+      the lid off the seat. Slit hinges in plywood are limp, the lid's weight should hold it; tabs
+      on the seat would only guide, not hold. Springback is checked at the demo; a catch or a
+      magnet pocket is a later entry (Frage 371 B, C). There is no separate lid part.
+    - **End plates (the profile):** d + t_f by h + t_b; the back-top corner is a quarter arc of
+      radius r (the strip's inner face), the front-top corner is open.
+      - Back edge: tabs (width 2 t_e, length t_w, flush outside) on the back straight only, `n =
+        max(1, round(length / 30 mm))`, placed by `curved_top.rs` itself: at least 2 t_w below
+        the arc (spec criterion 18) and t_b + 2 t_w above the strip's end (2 t_w clear of the
+        base). The strip's slots for them are edge notches of depth t_e.
+      - Bottom and front edges: Box finger joints with the base (notch depth t_b) and the front
+        (notch depth t_f), in the Box's roles (the base owns the bottom corner cubes; the front
+        owns the end pieces of the vertical joint). Top straight and arc plain: the seat and the
+        hinge.
+    - **Front and base** are the Box's uncapped front wall and its bottom (`plate.rs`, rule 1).
+      The front is W by h + t_b: sides fingered to the end plates (notch depth t_e) and owning the
+      end pieces, bottom fingered to the base (notch depth t_b), top plain (the seat) with the
+      finger hollow. The base is W by D, all corners owned, four fingered edges: left and right to
+      the end plates (notch depth t_e), front to the front (t_f), back to the strip's end (t_w).
+      Its back edge is what spec criterion 18 calls tabs into slots of the strip's back run: the
+      strip ends flush with the base's underside, so those slots are the notches of the strip's
+      end, one finger joint seen from either side.
+    - **The two three-plate corners** (base, end plate, strip end at the back; base, end plate,
+      front at the front), where the `0141` single-point bug could return. The base owns every
+      bottom corner cube: t_e by t_w by t_b at the back, t_e by t_f by t_b at the front. The
+      strip's end is the Box back wall's bottom edge: the zones over the end plates' thickness are
+      notched, the fingers between are split by `fingers.rs` with the base keeping the even
+      pieces. The end plates' tab notches stay out of the strip's bottom finger zone (the t_b + 2
+      t_w margin above).
+    - **`plate.rs` lands at crate level now, as §4 says**: moved from `boxes/`, with a notch depth
+      per edge (the mating part's thickness, the Box corner rule: t_e, t_f, t_w or t_b as listed
+      above; a corner square takes the depths of its two edges), `Corner::Round(radius)`, a tab
+      edge (runs of negative inset, §4) and the finger hollow on an edge (the `wall_plates.rs`
+      `Hollow`). The walk emits `contour.rs` lines and arcs; its node `simplify()` stays (it drops
+      repeated and collinear points, which keeps the Box's output byte-identical). The move is
+      behaviour-preserving for the Box: `box_default.txt` stays byte-identical.
+    - **Finger width** on each finger joint of Curved: 2 times the thinner of its two parts (spec
+      criterion 18; `finger_count`); odd count, clearance 0 (§8).
+    - **Which rows apply in Curved** (the UX notes may rename, not re-key):
+      - Apply: the three sizes, `corner_radius` (hinge), `top_shape`, `thickness` (strip),
+        `end_plate_thickness`, `front_thickness`, `plate_thickness` (the base), `kerf`,
+        `slit_pattern`, `slit_width`, `slit_spacing`, `slit_rows`, `finger_hollow`,
+        `hollow_width`, `hollow_depth` (the U notch centred in the front's top edge, under the
+        lid's front edge, so a finger reaches under the lid; spec issue 14 in `adrs.md`), `gap`.
+      - Hidden and ignored, their stored values kept and saved back unread: `wall_slits`,
+        `base_inset`, `base_cover`, `cover_thickness`, `lid`, `lid_seat`, `ring_thickness`,
+        `lid_thickness`. Hidden in Flat: `end_plate_thickness`, `front_thickness`.
+    - **Hidden rows need a contract change** (source-breaking `0.x` in `curvyo-extension-core`,
+      CHANGELOG). Today's `ShownWhen` cannot say "Lid on and Top shape Flat". It gains `All {
+      conditions: &'static [ShownWhen] }` and `Any { conditions: &'static [ShownWhen] }`, both
+      evaluated by `holds`. The rounded box adds `Is { top_shape, flat }` to its flat-only rows,
+      `Is { top_shape, curved }` to the two new thickness rows, and to the hollow rows `Any
+      [today's condition, Is { top_shape, curved }]` (the switch) or `Any [today's condition, All
+      [Is { top_shape, curved }, On { finger_hollow }]]` (width and depth), **in its own
+      `groups()`**. The path box reuses `base()` and `lid()` and has no `top_shape`, and a
+      condition on a missing key is false, so its rows and its manifest stay unchanged. The front
+      end does not read `shown_when` (ui-core evaluates it), so no TS change. No `format_version`
+      change: the manifest is run time only.
+    - **Clamps in Curved** (Dependent, permit over refuse; spec criterion 20):
+      - r ≥ 2 t_w, and at least the radius whose arc holds two slit columns
+        at the least spacing (clamped up, never warned; a typed spacing never raises r, build
+        review 2026-11-25). Upper bounds: r ≤ d - 2 t_w (the lid keeps a flat run over
+        the front) and r ≤ h - 2 t_e - 4 t_w (the back straight, h + t_b - r long, holds one tab
+        of 2 t_e with its two margins). A typed slit spacing that the arc cannot hold twice is clamped
+        down, to half the arc's
+        neutral length, pi/8 (2 r + t_w), with the notice naming Spacing (review 2026-11-25: the
+        wall's two-column floor alone would cut a closer pitch than the field shows).
+      - h ≥ 2 t_e + 6 t_w and d ≥ 4 t_w (the latter always holds by t_w ≤ min(w, d) / 6, which
+        stays), so the range of r is never empty. The Wall thickness bound in Curved is that
+        sixth only: Flat's part from the Inner height is replaced by this height minimum. End
+        plate, Front and Inner base thickness have no bound beyond their field range; the radius
+        bounds and the height minimum keep every part closed (review 2026-11-25, the
+        implementer's Proposals accepted).
+      - Hollow width ≤ min(w - 2 t_e, h) (clear of the front's side fingers; a U notch is at least half its width deep, so the width is also capped at h, browser review 2026-11-25), hollow depth ≤ h / 2. The
+        margin this leaves is 2 t_e to the front's side edge and t_e to the finger root
+        (`adrs.md` spec issue 17).
+      - kerf ≤ min(t_w, t_e, t_f, t_b) / 2. No "full round" state.
+      - Switching Top shape re-clamps the values both modes show (the Flat bound on r is min(w,
+        d) / 2), with the notice.
+    - **Layout, handles, edits.** The strip in the first row; the end plates, the front and the
+      base in the second, in number order, in runs of equal thickness as Flat (`layout.rs`; with
+      all four plate thicknesses equal this is spec criterion 23's order). Width and depth handles
+      on the base, height on the front, the Corner radius knob at the middle of the left end
+      plate's arc along the inward diagonal (UX notes §10.7). `Edit::Draft`: the strip as the
+      plain L by W rectangle, the plates as they are. `Edit::Scale` changes the three inner sizes;
+      r and the thicknesses stay, clamped.
+    - **Format.** No `format_version` change: `top_shape`, `end_plate_thickness` and
+      `front_thickness` are data, the parts are closed outlines as in slice 1. A slice-1 file has
+      none of the three keys: it reads Flat, and the two thicknesses read 0, following Wall
+      thickness. A build without this slice draws a stored curved box unchanged; its first
+      parameter edit regenerates it Flat and drops the keys (`Values::read` builds the map from
+      the schema). That is a visible change of shape the maker sees before cutting, not a silently
+      wrong cut, which is why it needs no bump (unlike §10). Part keys for slice 3 (§10), in part
+      order: `strip`, `left`, `right`, `front`, `base`.
+    - **Flat stays byte-identical.** `generate` branches on `top_shape` before any Flat code, and
+      the only shared change is the `plate.rs` move. No golden is re-blessed:
+      `rounded_box_default.txt`, `rounded_box_circle.txt`, `rounded_box_wave.txt`,
+      `box_default.txt`, every `path_box_*.txt` and `gear_default.txt` stay byte for byte.
+    - **Tests.**
+      - The strip's length against the independent sum above, within 0.1 mm, at the defaults and
+        three other radii; the arc is exactly 90 degrees.
+      - The uncut-band test on the bend.
+      - No slot, tab or slit on the top straight.
+      - Tab centres on the back straight meet the slot centres within the kerf.
+      - Occupancy (as the Box's §9 test) at four distinct thicknesses t_w, t_e, t_f, t_b and at
+        all four equal: the strip's end and the base's back edge, and every base, front and
+        end-plate edge, give each piece and corner cube to exactly one part; every pair mates
+        (tab, slot, finger and gap centres agree, engaged edges on one line within the kerf).
+      - Every outline is a simple polygon at kerf 0 and 0.2, both three-plate corners included.
+      - The end plate's arc has radius r and its back edge lies on the strip's inner face, within
+        the kerf; the lid's inner face and the three top edges coincide within the kerf.
+      - The hollow lies inside the front and leaves it in one piece.
+      - An unknown `top_shape` id reads Flat; a file without the two new keys follows Wall
+        thickness.
+      - The rows shown per mode (ui-core), and the path box's manifest unchanged.
+      - Golden `rounded_box_curved.txt`.
+
 ## Consequences
 
 - The default rounded box (120 x 80 x 50, r 15, t 3) has about 50 slots. 400 slots are about
@@ -467,6 +647,10 @@ moves with the box and keeps its layout place):
   contract. A box from any closed path (ADR 0083) reuses `footprint.rs`, `wall.rs` and
   `wall_plates.rs` with a footprint built from the path.
 - A plate on a circle is a polygon-like curve with short flats at its tabs (the window sag).
+- The curved top (§11) adds a module and two `ShownWhen` variants, no new joint code: its strip
+  is the shared wall on a three-shape profile, its plates are the Box's `plate.rs`. The hinge is
+  bent tightest when closed, so it springs towards open: with no catch in slice 2 the lid rests
+  on the seat by its weight; a catch is a later entry if the demo shows springback.
 
 ## Customer questions
 
