@@ -109,4 +109,287 @@ Architect, 2026-11-06. Slice 2 of `0063` (concept A). Frage 157 A and 158 A assu
   (26, 31); one `curvyo-ui-core/src/instance.rs` for the schema, the edit (`change_parameter`), the
   preview memo, the handles (25) and Convert to paths / Unlink with own values (29). Its own
   `format_version` bump and goldens when the revision lands (30). The 16 ms budget of criterion 31
-  stands. Still missing before Ready: UX notes for Expose and the handles.
+  stands. Still missing before Ready: UX notes for Expose and the handles. (Keys, entry shape and
+  the move of `ParamValue` amended by the addendum of 2026-11-25, A2, A3.)
+
+## Addendum 2026-11-25: making the instance revision buildable (criteria 23 to 31)
+
+Architect, 2026-11-25. Read against main at `CURRENT_FORMAT_VERSION` 60, ADR 0080 §2, §6, §7, §9
+and its notes, the generator arm on main (`curvyo-ui-core/src/instance*.rs`,
+`curvyo-editor-wasm/src/session/generators*.rs`), the sketch read (`sketch_read.rs`,
+`sketch_commands.rs`, `sketch_codec.rs`), the clone read (`clone_read.rs`, `clone_codec.rs`,
+`clone_repair.rs`), `svg_export.rs` `as_use` and UX notes §12 (2026-11-25). The code is the record
+where it differs from ADR 0080; the differences are listed in A1 and noted in ADR 0080 (note
+2026-11-25). Everything not fixed by a criterion or an accepted ADR is **(Proposal)**.
+
+### A1. What main has and what ADR 0080 assumed
+
+- `enum InstanceSource` does **not** exist. Every function of `curvyo-ui-core/src/instance.rs`
+  takes a generated `NodeId`; `instance_source.rs` is the ADR 0083 box-from-outline code (a
+  different "source"). `instance.rs` is 569 lines (over the §5 limit).
+- `ParamValue` and its codec are still in `curvyo-extension-core`, which depends on
+  document-core; the read pass cannot use them. `ParamValue::Path(ClosedPath)` (ADR 0083) would
+  drag the contract's path types into document-core if the type moved as ADR 0080 §2 said.
+- `Param` holds `&'static str` key, label and tooltip; a sketch's names are runtime strings.
+- A driving dimension is a `Constraint` with `value: Expression`, keyed by `ConstraintId`; ADR
+  0080 §6 keys values by `ParameterId` only. Both id types are free strings and can collide.
+- Count parameters (`0066` AC53, revision 6) are a Draft; sketch-core has `Scalar`, `Length`,
+  `Angle` only.
+
+### A2. Keys: tagged keys, one namespace (Proposal)
+
+An exposed value is named by an `ExposedKey`, stored as one string: `p:<ParameterId>` for a named
+parameter, `d:<ConstraintId>` for a driving dimension. Rejected: (B) promoting a dimension to a
+parameter on Expose: it writes a parameter the maker did not make, its name must be an identifier
+(UX 12.1 prefills "Distance 1"), and Stop exposing leaves it behind; (C) two maps, one per id
+type: two codecs, two orders, and the shared value block needs one key anyway.
+
+- A named parameter may be exposed whatever its expression (literal or formula); an own value
+  replaces its expression by a literal for that clone, so formulas that use it follow (a
+  `hole_spacing = width - 2 * margin` follows an own `width`). Its default is the evaluated value.
+- A driving dimension may be exposed whatever its expression; an own value replaces that
+  constraint's expression by a literal. A reference dimension cannot be exposed.
+- Precedence: parameter literals first, then the parameters are evaluated, then dimension
+  literals. An own `d:` value therefore wins over an own `p:` value the dimension's formula uses.
+- Kinds this revision: Length (distance, length, radius, diameter, horizontal and vertical
+  distance, ellipse radius) and Angle (angle, axis angle, sweep). Count arrives with `0066`
+  revision 6 (its own codec arm `{"count": n}` and `ParamKind::Count`, already in extension-core).
+  **Scalar is not exposable** in this revision (spec lists length, angle, count; it would need a
+  new value encoding and `ParamKind`): see PO finding 2 and UX mismatch U3.
+
+### A3. Data model and codec (`format_version` 61)
+
+One value type in document-core, `InstanceValue { Length(Length), Angle(Angle) }` (unit
+newtypes; `Angle` in radians in memory). Its stored encoding is ADR 0080 §2's one-key map,
+`{"mm": n}` or `{"deg": n}`, owned by document-core's new `instance_codec.rs`. Extension-core's
+`ParamValue::to_stored` / `from_stored` call that codec for their `mm` and `deg` arms, so there is
+one encoding; `ParamValue` itself stays in extension-core (amends ADR 0080 §2). Equality of two
+value sets compares the **stored** numbers (f64 bits of mm or deg), never radians, so a
+deg-to-rad round trip cannot split one set into two.
+
+Sketch node (`shape = "sketch"`), one new register, an LWW **list value** written whole:
+
+```text
+exposed_params : [ { "key": "p:width",  "min": {"mm": 20}, "max": {"mm": 200} },
+                   { "key": "d:c7", "name": "Radius 1" } ]
+  key   "p:<id>" or "d:<id>", the id non-empty; unique in the list
+  name  only on "d:" entries: 1 to 64 characters, no control character (the clone's field label)
+  min, max  optional one-key values of the key's unit; absent = unlimited
+```
+
+Clone node (`shape = "clone"`), two new registers, LWW **map values** written whole (never
+containers, like `clone_link`):
+
+```text
+instance_params   : { "p:width": {"mm": 82}, "d:c7": {"mm": 6.5} }   own values; absent or {} = none
+instance_fallback : { "p:width": {"mm": 150} }  the last value set that solved; present only
+                                                 while instance_params has no solution (A5)
+```
+
+Read and damage rules (ADR 0033 §3, ADR 0072 §5, ADR 0080 §4 precedent: refuse only a wrong
+register shape, never a value):
+
+- **Refuses the file (Damaged):** `exposed_params` present on a sketch and not a list value;
+  `instance_params` or `instance_fallback` present on a clone node and not a map value (a
+  container, a string, a number). The shape is checked on every sketch node in the `sketch` arm
+  of `path_codec::validate_object_node` (beside `sketch_codec::read`) and on every clone node in
+  `clone_codec::validate_clone_node`, whatever the clone's root.
+- **Ignored at read, kept, never rewritten on read:** an entry or bound that does not decode (not
+  a map, key not `p:`/`d:`, a name of the wrong shape on a `d:` entry, a bound that is not one
+  finite one-key value within ±1e7, `min > max`); a duplicate key (the first wins); an entry
+  whose parameter or dimension is gone, is a reference dimension, or whose unit does not match
+  the bound (that bound is unlimited); a clone value whose key is not exposed now, whose unit
+  does not match the key's kind, or that does not decode (the key reads as absent: the value up
+  the chain or the sketch's). A stored own value outside the current limits is **clamped at
+  read** and not rewritten (permit over refuse).
+- **Residue (ADR 0015 §4):** `exposed_params` on any node that is not a sketch and the two clone
+  registers on any node that is not a clone: not validated, never read. On a clone whose root is
+  not a sketch the two registers are shape-checked (above) and ignored.
+- Names: uniqueness among exposed names is the writer's rule (UX 12.1 "Name in use"); a merge
+  that duplicates one is not damage.
+
+`format_version` **61** (next free after 60; renumberable at rebase: ADR 0082 §10 `part_keys`
+also claims "the next"). A build that stops at 60 would draw every clone with the sketch's values
+and cut the wrong part, so it refuses 61 by version; a file of 60 opens unchanged. The
+`CURRENT_FORMAT_VERSION` doc comment gets the paragraph. Goldens in
+`curvyo-document-core/tests/fixtures/`: `sketch_instances_v61.curvyo` (a sketch exposing one
+parameter with limits and one dimension with a name; clones: none own, one own, a chain whose
+second clone has its own second value, one with no solution and a fallback);
+`sketch_instances_damaged_v61.curvyo` (an `instance_params` container); a residue case as a unit
+test (stale keys, wrong unit, out of limits: opens, reads as stated, saves back equal).
+
+### A4. Where solving happens, and the cache (criteria 26, 31)
+
+- **Substitution** is pure sketch-core: `Sketch::with_values(&self, &InstanceValues) -> Result<Sketch,
+  SketchError>` in a new `curvyo-sketch-core/src/instance_values.rs` ("Replaces exposed parameter
+  and dimension values of a graph by literals"), A2 precedence.
+- **Solve** in document-core's read pass (ADR 0080 §6), new `curvyo-document-core/src/sketch_instance.rs`
+  ("Solves a sketch with one value set and memoises the result"). Seed: always the sketch's own
+  solved candidate (`SketchSnapshot::solution`), never an earlier drag step, so a preview, the
+  committed read, a reopen and every peer give the same geometry. Mode `SolveMode::Edit` unless
+  the first plan task measures one solve of the `tests/sketch_pages_budget.rs` 100-entity
+  workload above 4 ms thread CPU; then a `SolveMode::Values` (no rank analysis, residuals still
+  validated) is added in the same slice with the number in the PR.
+- **Cache** `Document::instance_solves: RefCell<InstanceSolves>` keyed by **content**, not by
+  document version, in two levels: per sketch `NodeId` one entry holding the sketch's `graph`
+  **and** `checkpoint` (the seed depends on both, as `Document::sketch()` compares them),
+  compared once per read, and inside it per canonical value set `Result<Arc<Sketch>,
+  NoSolution>` plus `Arc<PathSnapshot>` per refinement stretch. A changed graph or checkpoint
+  clears that sketch's sets (never hash the graph into each set's key). After each full read only the keys that read used, plus the one preview key,
+  are kept. A commit of one clone's value therefore re-solves at most that one set (the release
+  reuses the last drag step's entry: zero solves).
+- **Read pass.** `RawOverrides` gains the decoded own values. `walk` carries the effective set
+  (origin's set overlaid by the clone's own, nearest own wins per key: criterion 28) as an index
+  into a per-read interner. `refine_sketch_roots` refines per `(root, set)` and
+  `outline_clones` hands every clone of one `(root, set)` the **same** `Arc<PathSnapshot>` as
+  `root_outline`, so `SharedOutlines` (render-core), the visibility hulls (`clone_marks.rs`) and
+  `gradient_box` keep sharing per set by `Arc::as_ptr`; the invariant "resolved = root_outline
+  under composed" holds per set. An empty effective set is the sketch's own outline (no solve).
+  `resolve_in` and `read_one_clone` are free functions: they take `&InstanceSolves` as a
+  parameter (tests pass a fresh one).
+- `CloneChain` gains `own_params: bool` (the clone itself holds own values) and
+  `no_solution: bool`.
+- **Drag step (31).** A field drag (slice 1) or knob drag (slice 2) writes nothing: the session
+  asks `Document::instance_outline(clone, &values)` (same cache), keeps it in its one preview
+  slot and draws it as the blue overlay over the memoised black artwork (the `overlay` route of
+  `generators.rs`); the 199 other clones are not touched. CPU test
+  `curvyo-editor-wasm/tests/sketch_instances_cpu_time.rs` (`mod cpu_time;`): 200 clones of the
+  100-entity sketch, each with a distinct own value; per drag step the session's preview call and
+  the canvas view of that frame at most 16 ms thread CPU; a test-build solve counter asserts one
+  solve per step and none on release; the other clones' `root_outline` pointers are unchanged.
+  The file open (200 solves) and the release commit's full read are not budgeted; the PR states
+  the measured open time.
+
+### A5. No solution (criterion 26)
+
+The sketch keeps its last valid state in its checkpoint, so a clone's fallback must also come from
+the file, not from session memory (otherwise what is cut depends on which device opens the file).
+**(Proposal, Frage-ready, default A.)** A: the writer stores `instance_fallback`, the last value
+set that solved (the last solvable drag step, or the stored set before a typed edit, or the
+existing fallback), whenever it commits a set with no solution, and removes it when it commits one
+that solves. A clone whose effective set has no solution draws, with `no_solution` set: its own
+`instance_fallback` solved, if present and solvable; else, when it holds no own values, exactly
+what its origin draws (recursively, so a plain clone of a failed clone matches it, and its `<use>`
+export stays true); else the sketch's own geometry. B: nothing stored; the same rule without the
+first step (simpler, but the part jumps back to the original's shape, which is not "its last
+valid geometry"). The golden holds a chain: a failed clone with a fallback and a plain clone of it. Separate registers are safe under
+LWW: a fallback paired with a solvable set is never read, a set without its fallback falls to the
+upstream rule, deterministic on every peer.
+
+### A6. Sketch edits, chains, Convert, Unlink, export (criteria 27 to 29)
+
+- **Sketch edits (27).** Clones follow through the cache (the graph changed, its entries are
+  cleared). Rename follows: keys are ids. A deleted parameter or dimension makes its key residue;
+  Undo brings it back with the values.
+- **Expose commands** (document-core `instance_commands.rs`, one commit each): `expose_parameter`
+  (writes the list), `unexpose_parameter` (removes the entry **and** the key from every clone's
+  `instance_params` and `instance_fallback` in the same commit, so a later Expose starts clean),
+  `parameter_limits` (limits and a dimension's name). Clone side: `change_parameter` (exists, ADR
+  0080 §7; subject field `gp` = the key), `reset_parameter`, `reset_parameters`, `own_parameters`.
+  Row texts per UX 12.1, 12.2; the `0020` criterion 41 label guard gets the six new keys.
+- **Chains (28):** A4 `walk`. "Back" removes only this clone's key.
+- **Unlink (29):** writes `clone.resolved` (already the per-set geometry, including the A5
+  fallback) and removes `instance_params` and `instance_fallback` with `own_placement` and
+  `own_style`.
+- **One follower rule** for Unlink (29), Delete sketch page (16, 17) and Convert to paths on the
+  sketch page (15) **(Proposal)**: after the command a clone's chain may end in a path, where own
+  values are residue, so a clone that **holds own values** below the changed node would jump. In
+  the same commit each such clone is unlinked into a path from its `resolved`, deepest first;
+  every clone without own values keeps following its nearest original, which now draws what it
+  drew before, so nothing jumps and no more links are lost than needed. Checked against
+  `clone_repair.rs` `repair_clones_of_removed`: it fixes only clones whose direct origin is
+  removed (unlinked from `read.resolved`, correct), and leaves their followers linked, so Delete
+  needs the rule too. Convert also removes `exposed_params` with the sketch keys.
+- **Export, output, hit test, membership** read `resolved`: no change. `svg_export.rs` `as_use`
+  adds `!chain.own_params`: a clone with own values is a path, never a `<use>`; a clone with no
+  own values of such a clone may stay a `<use>` of it (same values). Golden
+  `curvyo-ui-core/tests/fixtures/export_sketch_instance.svg`.
+
+### A7. ui-core and session: what the Sketch arm adds, what stays shared
+
+- `instance.rs` splits first (behaviour-preserving, in the same branch): the block view
+  (`RowView`, `InstanceView`, `view`, `value_from_number`, `value_from_json`) moves to
+  `instance_view.rs`. `instance.rs` then holds `pub enum InstanceSource { Sketch { clone: NodeId },
+  Generated { node: NodeId } }` and the dispatching `change_parameter(source, key, value)`;
+  generator-only functions (place, resize, convert, records) keep their `NodeId` signatures.
+- New `instance_sketch.rs` (the sketch-clone arm): rows from the exposed list and the clone's
+  effective values (own / inherited from depth n / sketch's), clamp to limits with the shared
+  `clamp_notice`, plan through `Document::instance_outline`, the commits of A6. Its row type
+  carries owned strings (`key`, `name`) and the shared `ParamKind` and `ParamValue`; `Param` is
+  not used for sketch rows (its `&'static str` stays).
+- **Shared:** `ParamKind` and `ParamValue` (field kind, bounds, value), the one encoding, the clamp
+  notice, the `ValueField` (both blocks, UX 12.2), the knob drag math (`dragged_mm`, Shift whole
+  mm), the session's one preview slot (`generators.rs` `Preview` gains the `InstanceSource` and
+  holds the outline to draw, not a generator record), the overlay drawing, the label
+  `change_parameter`. **Not shared:** the generator's record, seed, resize and Convert; the
+  sketch's exposed list, fallback and chain.
+- **Slice 2 handles** (`instance_handles.rs` sketch arm, anchor geometry in a new
+  `instance_sketch_handles.rs`): a knob for an exposed `d:` length, and for a `p:` key only when
+  exactly one driving dimension's expression is that bare reference (UX 12.3); anchor and
+  direction from the solved instance under `composed`, rate 1 (2 for a diameter), divided by the
+  composed scale so the value is in sketch units. Angle needs a turning knob: `Knob` gets
+  `motion: KnobMotion { Along { direction, rate }, Around { centre } }` (the generator's knobs
+  become `Along`).
+
+### A8. Slices (Proposal)
+
+1. **Expose, values, Params row** (criteria 23, 24, 26, 27, 28, 29, 30, 31 for the field drag):
+   format 61 with goldens, codec, cache and read pass, Expose UI on the sketch page, the Parameters
+   override row with `ValueField`s, no-solution look and fallback, Convert / Unlink / export
+   rules, the CPU test with the field drag. The customer can expose a value and type or drag it
+   per clone: one PR.
+2. **Canvas handles** (criteria 25 and 31 re-run with a knob drag): knobs, `KnobMotion`, readout,
+   Shift snap, Escape, double-click entry chip. Commits on the same branch and its own PR when
+   slice 1 is accepted, or the same PR if both land before the demo.
+
+### A9. Risks
+
+- One solve per distinct set: 200 distinct sets cost 200 solves at open and after any sketch edit
+  (every entry is cleared); measured and stated in the PR, a background solve is a later change.
+- Seeding from the sketch's solution, a large value change can land on another branch (a tangent
+  side, a flipped triangle) than an incremental drag would; preview and commit agree, so the
+  maker sees it. Pinned by one test.
+- The raw read already re-solves each sketch on every full read (`object_read.rs`, no cache);
+  unchanged here, but the instance cache must not depend on it being cheap.
+- `instance.rs` split and the `Preview` generalisation touch merged generator code; the 0141
+  tests are the safety net.
+- `format_version` 61 races with ADR 0082 §10; renumber at rebase, goldens renamed with it.
+
+### A10. Findings for the product owner (spec text)
+
+1. Criterion 23: "stores the parameter's name, its unit kind and its limits" → stores which value
+   (by id) and its limits; the name and kind are read from the parameter (a rename follows, 27); an
+   exposed dimension stores its own name (UX 12.1).
+2. Criteria 23, 25: Count depends on `0066` revision 6 (Draft); until then length and angle only.
+   Scalar is not in the criteria (UX 12.1 proposes it): add it or leave it out (default out).
+3. Criterion 26: "keeps its last valid geometry" needs the file rule of A5 (Frage-ready, default
+   A: the last solvable values are saved with the clone).
+4. Criteria 15, 16, 17 with 26 to 29: Convert to paths and Delete on the sketch page turn every
+   clone that holds own values into its own path in the same step (A6); add one sentence each.
+5. Criterion 29: Unlink of a clone also turns the clones below it that hold own values into paths
+   (A6); the others follow the new path.
+6. Criterion 29 / `0024` criterion 59: a clone with own values is exported as a path, never as a
+   `<use>`.
+7. Criterion 27: Stop exposing drops every clone's own value for it in the same step (Undo
+   restores); a deleted parameter or dimension does the same by read.
+8. Criterion 30: the change is three registers (`exposed_params`, `instance_params`,
+   `instance_fallback`); "its clone matrix and override flags as of 0057" are unchanged. The
+   Links "Format" line needs a revision entry: 61.
+9. Criterion 24 "and one for all": UX 12.2 folds it into the Original's segment; align the text.
+10. Criterion 31 budgets the drag step only; say that file open and the release commit are
+    measured, not budgeted.
+
+### A11. Against UX notes §12 (as of 2026-11-25)
+
+- U1, 12.1 "Off: the fields leave the tree, their values kept and back when on again": Stop
+  exposing removes the entry, so limits and a dimension's name are not in the file while off;
+  they come back by Undo, and the shell may keep them as view memory until the selection changes.
+  Storing an "off" entry would be a further format element for a convenience (rejected).
+- U2, 12.1 a dimension's Name edit has no step name; it shares the key `parameter_limits`
+  (wording for the UX notes, e.g. "Change exposed parameter").
+- U3, 12.1 Scalar exposure is not in this model (A2); the UX notes keep it only if the PO adds it.
+- U4, 12.4: the "last valid geometry" of the canvas and of the cut is A5's stored fallback, so it
+  is the same after a reopen and on every device; with A5 option B the dashed clone shows the
+  original's shape instead.
+- Everything else of §12 (Own writes all current values, Original's drops all, per-key Back,
+  muted inherited values, bare-name knob rule, value in sketch units) fits A2 to A7 as written.

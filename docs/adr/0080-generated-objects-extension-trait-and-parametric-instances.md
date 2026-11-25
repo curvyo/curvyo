@@ -205,6 +205,19 @@ one. Box and Gear are that second one. Three facts shape the design:
 > Convert to paths rewrites per-part membership keys (ADR 0082 §10, `needs-customer`, the next
 > `format_version`).
 
+> **Note 2026-11-25 (`specs/0099-sketch-pages/adrs.md`, addendum A1 to A7).** The sketch side
+> differs from §2, §6 and §9 as follows. §2: `ParamValue` stays in extension-core; only the
+> numeric one-key encodings (`mm`, `deg`; `count` with `0066` revision 6) move to document-core's
+> `instance_codec.rs` with `InstanceValue`, and `ParamValue` calls them. §6: values are keyed by a
+> tagged `ExposedKey` (`p:<ParameterId>`, `d:<ConstraintId>`), so a driving dimension can be
+> exposed; an exposed entry is `{ key, name (dimensions only), min, max }`; a clone also holds
+> `instance_fallback` (the last value set that solved, Proposal); the solve cache is keyed by
+> content, not by document version. §6 and §9: `InstanceSource` was not built with `0141`; it
+> lands with `0099`'s first slice in `instance.rs`, after the block view moves to
+> `instance_view.rs`; sketch rows use their own row type with owned strings (`Param` keeps
+> `&'static str`), sharing `ParamKind`, `ParamValue`, the clamp notice, the knob math and the
+> session's one preview slot. `format_version` 61 (renumberable).
+
 ## Consequences
 
 - Every committed parameter edit stores the whole outline: about 1,200 cubics, some 60 KB, for a
