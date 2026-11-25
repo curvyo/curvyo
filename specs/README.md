@@ -19,7 +19,7 @@ assigned in the order the folders are created** and a row sits in the group of
 its state, so inside a group the numbers can be out of order (the order the
 lead starts the waiting ones is in "Proposed build order" below).
 
-The next free number is 0152; the next free Frage is 373 (the number history is in
+The next free number is 0153; the next free Frage is 377 (the number history is in
 "State of the list" below).
 
 Columns: **No.** = folder number. **MVP slice** = the label the same feature
@@ -221,6 +221,7 @@ prioritises them.
 | [0137](0137-document-library/) | `document-library` | Browse all documents and pages of the maker's workspaces and import a page, or chosen elements of a page, as a plain copy with a "Came from" reference; no live link (`0100` is live). Customer idea 2026-11-19; Fragen 268 to 270 answered (open and recent workspaces plus added folders; copies only; no refresh). | Done (PR #470; ADR 0084; format 58; Frage 341 C: desktop and browser) | Should | R-ASSET-006 | - |
 | [0145](0145-shape-spiro-handles/) | `shape-spiro-handles` | A Rounded handle (Inkscape's tangent factor) on polygon and star, then rectangle and ellipse, that can be dragged past its normal range into loops and petals; stays a live shape, `format_version` bump, Randomized and live Inkscape import as options. Also the polygon/star rounding handle of 2026-10-20. Customer request 2026-11-20; Frage 326 answered B 2026-11-24 (Rounded on the ellipse only, the rectangle keeps its radii); Fragen 324, 325 and 308 to 311 open (defaults A). | Slice 1 Done (PR #461, polygon and star); slice 2 (ellipse only, `format_version` 57) Done (PR #464), Frage 326 answered B; slice 3 (Randomized, polygon and star, `format_version` 60) Done (PR #475), Fragen 308 and 369 at default A; golden Inkscape fixtures hand-computed until the customer exports them | Should | R-EDIT-057 | - |
 | [0138](0138-template-library/) | `template-library` | Templates loaded over the network from sources the maker adds, licence shown per item, sources are a Curvyo Git catalogue, Iconify and any Iconify-compatible API or Git catalogue the maker adds; offering templates is out of scope (Later: whoever offers hosts their own service; paid catalogues maybe later); research on svgrepo.com, fontrepo.com, 1001fonts.com in the spec (none connected). Customer idea 2026-11-19; Fragen 271 to 273 answered. | Done (PR #478; ADR 0085; Fragen 334 A GitHub raw, 340 B Enter searches Iconify) | Could | R-ASSET-007, R-ASSET-008 | - |
+| [0152](0152-library-browser/) | `library-browser` | A big library browser pane beside the drawing (the side pane of the font preview): big previews of every item the Library tab lists (local pages, catalogue templates, Iconify icons), filters (source, category, monochrome vs. colour, customizable), sort, and fuzzy local full-text search over names, aliases, tags and categories of what is fetched (no request while typing; Enter still searches Iconify, Frage 340 B). Customer request 2026-11-25; Fragen 371 to 374 built at default A; revision 2026-11-25 after the customer test of PR #483 (two views Items/Sets, place history, click replaces and Shift+click adds, no Load buttons, hosting guide); Fragen 375 (synonyms) and 376 (token) open; ADR 0086 Proposed, UX notes in. | Done (PR #483) | Should | R-ASSET-004, R-ASSET-007 | - |
 
 ## State of the list
 

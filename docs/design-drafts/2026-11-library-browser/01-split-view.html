@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>01 · Library browser, split view</title><link rel="stylesheet" href="../2026-11-library/kit.css"><link rel="stylesheet" href="browser.css"></head><body><div class="sheet">
+<h1>01 · Library browser in Split view: Items and Sets, Back, facet selection (0152 UX notes sections 0.1 to 0.5, 2 to 6, 8, 9)</h1>
+<p class="lead">Real tokens. The canvas area's one side pane at 35 % (here 340 px, the narrow layout under 640 px): header row 1 the Items | Sets switch, search, Full view, Close; row 2 Filters, Size (Items only), subject line with Back at its start; the tile grid on the canvas ground; the detail bar at the bottom. The Library tab on the right keeps its tree; its search row gains Browse (pressed). Dashed outline = new or changed control. Fragen 371 to 373 at A, 374 at A. Rework after the customer test of 2026-11-25: two views, Back, a press replaces and Shift+press adds in the facet lists, no Load buttons.</p>
+<div class="cols">
+<figure><figcaption>A · Items view, opened from the Library tab, Size 96<span>The Items view. arrow-left is current: the detail bar shows it with no button (a double-click, Enter or a drag loads; the button column stays reserved); heart is hovered. Tiles from 96 px carry the name and the meta line, licence chip first. Mono icons in ink, colour icons in their colours, a template thumbnail with its page count chip, the maker's own document (no licence chip).</span></figcaption>
+<div class="win"><div class="area" style="width:880px;height:600px"><div class="drawing"><div class="rail"></div><div class="pg" style="left:110px;top:50px;width:300px;height:420px"></div><svg style="position:absolute;left:200px;top:160px" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#3A3A3F" stroke-width=".6"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></div><div id="a"></div></div>
+<div class="pnl"><div class="hdr">Library <span class="s">214 documents</span></div><div style="display:flex;gap:4px;margin-bottom:8px"><div class="search" style="flex:1;margin:0"><i data-g="search"></i><span class="ph">Search library</span></div><span class="ib on new"><i data-g="grid"></i></span></div><div class="tree"><div class="hd">Workspaces</div><div class="r h32"><span class="chev"><i data-g="chr" data-s="14"></i></span><i data-g="folder"></i><span class="nm" style="font-weight:600">Box job</span><span class="cnt">14</span></div><div class="hd">Online</div><div class="r h32"><span class="chev"><i data-g="chd" data-s="14"></i></span><i data-g="globe"></i><span class="nm">api.iconify.design</span><span class="cnt">220</span></div><div class="r h44" style="padding-left:12px"><span class="chev"><i data-g="chr" data-s="14"></i></span><span class="th d" style="background:#fff"><i data-g="heart" data-s="14"></i></span><div class="tx" style="margin-left:4px"><span class="nm">Lucide</span><span class="sb"><span class="link">ISC</span> · Lucide Contributors · 1,540 icons</span></div></div><div class="r h32"><span class="chev"><i data-g="chr" data-s="14"></i></span><i data-g="git"></i><span class="nm">Curvyo catalogue</span><span class="cnt">12</span></div></div><div class="foot"><span class="btn w118"><i data-g="folderplus"></i>Add folder...</span><span class="btn w118"><i data-g="plus"></i>Add source...</span></div></div>
+<div class="strip"><b></b><hr><b></b><b></b><b></b><b></b><b></b><b></b><b class="on"><i data-g="lib"></i></b><b></b><b></b><b></b><b></b></div></div>
+<p class="ann">Tooltip on a tile (not drawn): "arrow-left" / "Lucide · ISC · Lucide Contributors · monochrome". Accessible name "arrow-left, Lucide, ISC, monochrome". A drag from a tile onto the drawing is the tab row's drag: the outline ghost at 24 mm and the Copy badge.</p></figure>
+
+<figure><figcaption>B · Sets view<span>A press on Sets. One card per set, loaded or not, grouped by source, A to Z inside a group (loaded sets are not put first). Lucide is current (detail bar: samples, facts "· Loaded", no button); Phosphor is loading after a double-click; the state slot says Loaded. Back "Back to Items" because the switch is a change of place. No Size slider in this view; the last row is Host your own library….</span></figcaption><div id="b"></div></figure>
+
+<figure><figcaption>C · Lucide opened, then Back<span>A double-click on the Lucide card: the Items view narrowed to Lucide alone (Sources = Lucide, search empty, other facets reset), "Filters 1", subject "Lucide · 1,540 items". Back "Back to Sets" (Alt+Left, the mouse back button, or Escape, because the place was left by opening) returns to B exactly: scroll, current card, facets.</span></figcaption><div id="c"></div></figure>
+
+<figure><figcaption>D · Filters band: press replaces, Shift+press adds<span>A press on Arrows selected only Arrows; Shift+press on Weather added it (OR inside the section). A press on Arrows now would select Arrows alone again; a press on the only selected row clears the section. Keys: arrows move the focus only, Space selects only the row, Shift+Space adds or removes it.</span></figcaption><div id="d"></div></figure>
+
+<figure><figcaption>E · Size 48, after Enter<span>Under 96 px a tile is its preview alone. The pointer hovers sun-with-rays, so the detail bar shows it without buttons. The Enter outcome sits in the subject line (Enter searches online in the Items view only).</span></figcaption><div id="e"></div></figure>
+</div></div>
+<script src="browser.js"></script>
+<script>
+const srcs = [{n:"My documents",k:"214"},{n:"Curvyo catalogue",k:"12"},{n:"Lucide",k:"1,540"},{n:"Tabler Icons",k:"5,880"},{n:"Noto Emoji",k:"3,710"}];
+const area = (h) => `<div class="area" style="width:340px;height:600px">${h}</div>`;
+document.getElementById("a").innerHTML = pane({w:340,S:96,subj:"11,356 items",
+  items:[{...I.al,st:"cur"},I.alc,I.csun,{...I.heart,st:"hov"},I.tbox,I.dlid,I.cheart,I.home],
+  item:I.al});
+document.getElementById("b").innerHTML = area(pane({w:340,view:"sets",back:"Back to Items",subj:"287 sets · 3 loaded",
+  groups:[
+    {head:"My documents · 2 folders",cards:[{glyph:"folder",name:"Box job",meta:"14 documents · 38 pages"}]},
+    {head:"api.iconify.design · 280 sets · 3 loaded",cards:[{...SETS.fe},{...SETS.lu,st:"cur"},SETS.mdi,{...SETS.ph,busy:true}]}],
+  item:SETS.lu}));
+document.getElementById("c").innerHTML = area(pane({w:340,S:96,active:1,back:"Back to Sets",subj:"Lucide · 1,540 items",
+  items:[{...I.al,st:"cur"},I.ar,I.bell,I.clr,I.cof,I.heart,I.leaf,I.mus],item:I.al}));
+document.getElementById("d").innerHTML = area(pane({w:340,S:96,subj:"412 of 11,356 items",band:true,active:2,clear:true,
+  sources:srcs,
+  cats:[{n:"Animals",k:"212"},{n:"Arrows",k:"318",on:true},{n:"Emoji",k:"3,710"},{n:"Weather",k:"96",on:true}],
+  items:[{...I.al,st:"cur"},I.ar,I.alc,I.sun],item:I.al}));
+document.getElementById("e").innerHTML = area(pane({w:340,S:48,q:"sun",online:true,subj:'24 of 11,356 items · "sun": 48 icons',
+  items:[I.sun,{...I.csun,st:"hov"},{...I.ccs,st:"cur"},I.moon,I.umb,I.cl,I.clr,I.crain,I.leaf,I.cleaf,I.star,I.cam,I.gift,I.key,I.mus,I.cof,I.home,I.bell,I.heart,I.logo],
+  item:I.csun,hoverOnly:true}));
+finish();
+</script>
+<script src="../2026-11-library/kit.js"></script></body></html>
