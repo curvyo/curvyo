@@ -31,6 +31,17 @@ pub(crate) const WALL_SLITS: &[ChoiceOption] = &[
     },
 ];
 
+pub(crate) const TOP_SHAPE: &[ChoiceOption] = &[
+    ChoiceOption {
+        id: "flat",
+        label: "Flat",
+    },
+    ChoiceOption {
+        id: "curved",
+        label: "Curved",
+    },
+];
+
 pub(crate) const INNER: (f64, f64) = (10.0, 2000.0);
 const THICKNESS: (f64, f64) = (0.1, 50.0);
 
@@ -68,6 +79,7 @@ fn size() -> ParamGroup {
                 100.0,
                 Log,
             ),
+            choice("top_shape", "Top shape", TOP_SHAPE, "flat"),
         ],
     }
 }
@@ -172,19 +184,24 @@ pub(crate) fn base() -> ParamGroup {
     }
 }
 
+/// The Lid rows' conditions, which the curved top's rows build on.
+const LID_ON: ShownWhen = ShownWhen::On { key: "lid" };
+const SEATED: ShownWhen = ShownWhen::AllOn {
+    keys: &["lid", "lid_seat"],
+};
+const HOLLOW_ON: ShownWhen = ShownWhen::AllOn {
+    keys: &["lid", "lid_seat", "finger_hollow"],
+};
+
 pub(crate) fn lid() -> ParamGroup {
-    let on = |key| ShownWhen::On { key };
-    let seated = ShownWhen::AllOn {
-        keys: &["lid", "lid_seat"],
-    };
     ParamGroup {
         label: "Lid",
         params: vec![
             switch_on("lid", "Lid"),
-            when(following("lid_thickness", "Lid thickness"), on("lid")),
-            when(switch_on("lid_seat", "Lid seat"), on("lid")),
-            when(following("ring_thickness", "Ring thickness"), seated),
-            when(switch_on("finger_hollow", "Finger hollow"), seated),
+            when(following("lid_thickness", "Lid thickness"), LID_ON),
+            when(switch_on("lid_seat", "Lid seat"), LID_ON),
+            when(following("ring_thickness", "Ring thickness"), SEATED),
+            when(switch_on("finger_hollow", "Finger hollow"), SEATED),
             when(
                 tracked(
                     length("hollow_width", "Hollow width", (5.0, 200.0), 16.0, (1.0, 2)),
@@ -192,9 +209,7 @@ pub(crate) fn lid() -> ParamGroup {
                     60.0,
                     Linear,
                 ),
-                ShownWhen::AllOn {
-                    keys: &["lid", "lid_seat", "finger_hollow"],
-                },
+                HOLLOW_ON,
             ),
             when(
                 tracked(
@@ -203,12 +218,69 @@ pub(crate) fn lid() -> ParamGroup {
                     30.0,
                     Linear,
                 ),
-                ShownWhen::AllOn {
-                    keys: &["lid", "lid_seat", "finger_hollow"],
-                },
+                HOLLOW_ON,
             ),
         ],
     }
+}
+
+/// The rounded box's Material: Wall thickness, then the two plates only the curved top has.
+fn rounded_material() -> ParamGroup {
+    let mut group = material();
+    let mut extra = vec![
+        when(
+            following("end_plate_thickness", "End plate thickness"),
+            CURVED,
+        ),
+        when(following("front_thickness", "Front thickness"), CURVED),
+    ];
+    group.params.splice(1..1, extra.drain(..));
+    group
+}
+
+const FLAT: ShownWhen = ShownWhen::Is {
+    key: "top_shape",
+    choice: "flat",
+};
+const CURVED: ShownWhen = ShownWhen::Is {
+    key: "top_shape",
+    choice: "curved",
+};
+const FLAT_COVER: ShownWhen = ShownWhen::All {
+    conditions: &[ShownWhen::On { key: "base_cover" }, FLAT],
+};
+const FLAT_LID: ShownWhen = ShownWhen::All {
+    conditions: &[LID_ON, FLAT],
+};
+const FLAT_RING: ShownWhen = ShownWhen::All {
+    conditions: &[SEATED, FLAT],
+};
+const HOLLOW_SWITCH: ShownWhen = ShownWhen::Any {
+    conditions: &[SEATED, CURVED],
+};
+const HOLLOW_SIZE: ShownWhen = ShownWhen::Any {
+    conditions: &[
+        HOLLOW_ON,
+        ShownWhen::All {
+            conditions: &[
+                CURVED,
+                ShownWhen::On {
+                    key: "finger_hollow",
+                },
+            ],
+        },
+    ],
+};
+
+/// `group` with the conditions of the curved top on the rows `rules` name (ADR 0082 §11): only the
+/// rounded box's groups carry them, so the path box's manifest does not change.
+fn conditioned(mut group: ParamGroup, rules: &[(&str, ShownWhen)]) -> ParamGroup {
+    for param in &mut group.params {
+        if let Some((_, condition)) = rules.iter().find(|(key, _)| *key == param.key) {
+            param.shown_when = Some(*condition);
+        }
+    }
+    group
 }
 
 pub(crate) fn layout() -> ParamGroup {
@@ -224,5 +296,30 @@ pub(crate) fn layout() -> ParamGroup {
 }
 
 pub(crate) fn groups() -> Vec<ParamGroup> {
-    vec![size(), material(), slits(true), base(), lid(), layout()]
+    vec![
+        size(),
+        rounded_material(),
+        conditioned(slits(true), &[("wall_slits", FLAT)]),
+        conditioned(
+            base(),
+            &[
+                ("base_inset", FLAT),
+                ("base_cover", FLAT),
+                ("cover_thickness", FLAT_COVER),
+            ],
+        ),
+        conditioned(
+            lid(),
+            &[
+                ("lid", FLAT),
+                ("lid_thickness", FLAT_LID),
+                ("lid_seat", FLAT_LID),
+                ("ring_thickness", FLAT_RING),
+                ("finger_hollow", HOLLOW_SWITCH),
+                ("hollow_width", HOLLOW_SIZE),
+                ("hollow_depth", HOLLOW_SIZE),
+            ],
+        ),
+        layout(),
+    ]
 }

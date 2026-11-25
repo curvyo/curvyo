@@ -25,6 +25,10 @@ migration in that extension.
   (a minimum that a choice sets, "the least the Wave pattern allows"). Source-breaking for code that builds
   a `Generated` literal or matches `Bound` or `Edit` exhaustively.
 
+- ADR 0082 §7 revision 6 (`0147` slice 2, the curved top): `ShownWhen::All { conditions }` and `ShownWhen::Any { conditions }` over
+  `&'static [ShownWhen]`, so a row can hang on a switch and a choice at once (Lid on and Top shape Flat). Run time only, never
+  stored. Source-breaking for code that matches `ShownWhen` exhaustively.
+
 - ADR 0083 §2, §11 (`0149` path box): `ParamKind::Path` and `ParamValue::Path(ClosedPath)`, stored
   `{"path": [x0, y0, c1x, c1y, c2x, c2y, x, y, ...]}` (shape check: 2 to 2,000 cubics, finite, within
   1e7 mm); `ClosedPath::{flat, from_flat}`; `GeneratorKind.source: Option<Source>` with

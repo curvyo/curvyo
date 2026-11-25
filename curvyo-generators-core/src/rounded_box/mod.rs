@@ -1,6 +1,7 @@
 //! The rounded box: a box with rounded corners whose wall is one slit strip that bends round the
 //! corners, with an inner base, a cover, a seat ring and a lid (ADR 0082 §5, spec `0147`).
 
+mod curved_top;
 pub(crate) mod layout;
 pub(crate) mod schema;
 
@@ -271,6 +272,9 @@ fn plates(
 pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
     let schema = params();
     let mut v = Values::read(&schema, &edited(request));
+    if v.choice("top_shape") == "curved" {
+        return curved_top::generate(request, v);
+    }
     let s = clamp(&mut v);
     let (lid_on, seat) = (v.switch("lid"), v.switch("lid_seat"));
     let strip_height = s.inset

@@ -498,7 +498,14 @@ impl Session {
                 .params()
                 .find(|p| p.key == key)
                 .map_or(key, |p| p.label);
-            format!("{label}: {field}")
+            // Reset of a thickness that follows the wall (a stored 0) says so.
+            let follows =
+                key.ends_with("_thickness") && typed.length().is_some_and(|l| l.as_mm() == 0.0);
+            if follows {
+                format!("{label}: {field} follows wall thickness")
+            } else {
+                format!("{label}: {field}")
+            }
         });
         let outcome = self.recording_named_guarded(name, |this| {
             Some(instance::change_value(
@@ -616,8 +623,7 @@ impl Session {
             _ => None,
         };
         if let Some(snapshot) = selected
-            && instance::find_kind(&self.manufacturing.extensions, &snapshot.record.kind)
-                .is_some_and(|found| found.kind.source.is_some())
+            && instance::draws_marks(&self.manufacturing.extensions, &snapshot)
             && let Some(marks) = instance::marks_of(&self.manufacturing.extensions, &snapshot)
         {
             let (frame, shift) = (snapshot.frame, marks.footprint);

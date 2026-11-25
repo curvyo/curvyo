@@ -499,8 +499,8 @@ fn criterion_2_declared_parameters_have_the_spec_labels_and_defaults() {
     assert!(
         !params
             .iter()
-            .any(|p| matches!(p.key, "finger_width" | "clearance" | "top_shape")),
-        "no Finger width, Clearance (derived) and no Top shape (slice 2) in slice 1"
+            .any(|p| matches!(p.key, "finger_width" | "clearance")),
+        "no Finger width and no Clearance (derived); Top shape arrived with slice 2"
     );
 }
 
@@ -1269,4 +1269,941 @@ fn the_rounded_box_does_not_change_the_gear_or_box_kinds() {
             .expect("answers at its defaults");
         assert!(!generated.parts.is_empty(), "{kind} still has outlines");
     }
+}
+
+// ---------- slice 2: the curved top (criteria 11 and 16 to 24, ADR 0082 §11) ----------
+//
+// Black-box, as the rest of this file: manifest, stored parameters and outlines. The strip is read
+// in its own flat frame: `u` from the free front edge (the lid) to the base end, `v` across the
+// width. The orientation is found from the outline (the lid is the plain end), not assumed.
+
+/// The sizes and thicknesses of a curved box: inside `w`, `d`, `h`, corner radius `r`, wall `t`,
+/// end plate `te`, front `tf`, base `tb` (the inner base thickness).
+#[derive(Clone, Copy, Debug)]
+struct Dims {
+    w: f64,
+    d: f64,
+    h: f64,
+    r: f64,
+    t: f64,
+    te: f64,
+    tf: f64,
+    tb: f64,
+}
+
+/// The spec's curved box: 120 x 80 x 50 inside, corner radius 15, every thickness 3 mm.
+const SLICE2: Dims = Dims {
+    w: 120.0,
+    d: 80.0,
+    h: 50.0,
+    r: 15.0,
+    t: 3.0,
+    te: 3.0,
+    tf: 3.0,
+    tb: 3.0,
+};
+
+impl Dims {
+    /// The strip's flat width: the inside width plus both end plates (their faces flush with it).
+    fn width(self) -> f64 {
+        self.w + 2.0 * self.te
+    }
+
+    /// The lid run on the neutral line: from the front's outer face to the arc (criterion 17).
+    fn front_run(self) -> f64 {
+        self.d - self.r + self.tf
+    }
+
+    /// The quarter arc on the neutral line, `pi/2 (r + t/2)` (criterion 17).
+    fn arc(self) -> f64 {
+        PI / 2.0 * (self.r + self.t / 2.0)
+    }
+
+    /// The back run: from the arc's end down to the base's underside (criterion 17).
+    fn back_run(self) -> f64 {
+        self.h - self.r + self.tb
+    }
+
+    /// The strip's length on the neutral line (criterion 17).
+    fn length(self) -> f64 {
+        self.front_run() + self.arc() + self.back_run()
+    }
+}
+
+/// A curved box: the stored values of `dm` plus `extra` (which win), `top_shape` curved.
+fn curved_box(dm: Dims, extra: &[(&str, Value)]) -> Generated {
+    let mut all: Vec<(&str, Value)> = vec![
+        ("top_shape", choice("curved")),
+        ("end_plate_thickness", mm(dm.te)),
+        ("front_thickness", mm(dm.tf)),
+        ("plate_thickness", mm(dm.tb)),
+    ];
+    all.extend(extra.iter().cloned());
+    generate_with(&stored_at(dm.w, dm.d, dm.h, dm.r, dm.t, &all), None)
+}
+
+/// A flat plate in its own frame: the outlines as sampled points and their bounding box.
+struct Plate {
+    paths: Vec<Vec<Pt>>,
+    bbox: (f64, f64, f64, f64),
+}
+
+fn plate_of(generated: &Generated, index: usize) -> Plate {
+    let paths: Vec<Vec<Pt>> = generated.parts[index].paths.iter().map(sample).collect();
+    let flat: Vec<Pt> = paths.iter().flatten().copied().collect();
+    Plate {
+        bbox: all_points(&flat),
+        paths,
+    }
+}
+
+impl Plate {
+    fn extent_x(&self) -> f64 {
+        self.bbox.2 - self.bbox.0
+    }
+
+    fn extent_y(&self) -> f64 {
+        self.bbox.3 - self.bbox.1
+    }
+
+    fn min_of(&self, is_x: bool) -> f64 {
+        if is_x { self.bbox.0 } else { self.bbox.1 }
+    }
+
+    fn max_of(&self, is_x: bool) -> f64 {
+        if is_x { self.bbox.2 } else { self.bbox.3 }
+    }
+
+    /// Whether the axis whose extent is `extent` is x (a plate may come out turned or mirrored).
+    fn axis_is_x(&self, extent: f64) -> bool {
+        if (self.extent_x() - extent).abs() <= 0.1 {
+            true
+        } else if (self.extent_y() - extent).abs() <= 0.1 {
+            false
+        } else {
+            panic!(
+                "no side of {:.3} x {:.3} is {:.3}",
+                self.extent_x(),
+                self.extent_y(),
+                extent
+            )
+        }
+    }
+}
+
+/// The runs of outline points on the line where the coordinate on `axis_is_x` equals `level`,
+/// each as the range of the other coordinate.
+fn runs_on(paths: &[Vec<Pt>], axis_is_x: bool, level: f64) -> Vec<(f64, f64)> {
+    let mut runs = Vec::new();
+    for path in paths {
+        let mut run: Option<(f64, f64)> = None;
+        for &(x, y) in path {
+            let (c, o) = if axis_is_x { (x, y) } else { (y, x) };
+            if (c - level).abs() < 1e-3 {
+                run = Some(match run {
+                    Some((lo, hi)) => (lo.min(o), hi.max(o)),
+                    None => (o, o),
+                });
+            } else if let Some(finished) = run.take() {
+                runs.push(finished);
+            }
+        }
+        runs.extend(run);
+    }
+    runs
+}
+
+/// Whether a run of `width` (to the sampling) lies on the line `level` of the given axis.
+fn has_run_of_width(plate: &Plate, axis_is_x: bool, level: f64, width: f64) -> bool {
+    runs_on(&plate.paths, axis_is_x, level)
+        .iter()
+        .any(|&(lo, hi)| (hi - lo - width).abs() <= 1.0)
+}
+
+/// The outline points with `u` in `[lo, hi]` that lie inside the strip's width: slot and notch walls.
+fn cut_pts(paths: &[Vec<Pt>], lo: f64, hi: f64, width: f64) -> Vec<Pt> {
+    paths
+        .iter()
+        .flatten()
+        .copied()
+        .filter(|&(u, v)| (lo..=hi).contains(&u) && v > 0.05 && v < width - 0.05)
+        .collect()
+}
+
+/// The strip in its own frame, with the lid at `u = 0`.
+struct Frame {
+    strip: Strip,
+    lid: f64,
+    arc: f64,
+}
+
+/// The strip's frame. The flat outline may come out mirrored or turned: the lid is the end whose
+/// first straight run carries no cut, so `u` is flipped when the front window holds one.
+fn frame_of(generated: &Generated, dm: Dims) -> Frame {
+    let raw: Vec<Vec<Pt>> = generated.parts[0].paths.iter().map(sample).collect();
+    let flat: Vec<Pt> = raw.iter().flatten().copied().collect();
+    let (x0, y0, x1, y1) = all_points(&flat);
+    let (ex, ey) = (x1 - x0, y1 - y0);
+    let (length, width) = (dm.length(), dm.width());
+    let along_x = if (ex - length).abs() <= 0.1 && (ey - width).abs() <= 0.1 {
+        true
+    } else if (ey - length).abs() <= 0.1 && (ex - width).abs() <= 0.1 {
+        false
+    } else {
+        panic!("the strip's flat extents are {ex:.3} x {ey:.3}, not {length:.3} x {width:.3}")
+    };
+    let map = |flip: bool| -> Vec<Vec<Pt>> {
+        raw.iter()
+            .map(|path| {
+                path.iter()
+                    .map(|&(x, y)| {
+                        let (u, v) = if along_x {
+                            (x - x0, y - y0)
+                        } else {
+                            (y - y0, x - x0)
+                        };
+                        (if flip { length - u } else { u }, v)
+                    })
+                    .collect()
+            })
+            .collect()
+    };
+    let plain = map(false);
+    let front_cuts = cut_pts(&plain, 0.5, dm.front_run() - 0.5, width).len();
+    let paths = if front_cuts > 0 { map(true) } else { plain };
+    Frame {
+        strip: Strip {
+            paths,
+            length,
+            height: width,
+        },
+        lid: dm.front_run(),
+        arc: dm.arc(),
+    }
+}
+
+/// The slit columns among cut points: `(first u, last u)` of each group of points less than `gap`
+/// apart in `u`.
+fn columns(points: &[Pt], gap: f64) -> Vec<(f64, f64)> {
+    let mut us: Vec<f64> = points.iter().map(|p| p.0).collect();
+    us.sort_by(f64::total_cmp);
+    let mut groups: Vec<(f64, f64)> = Vec::new();
+    for u in us {
+        match groups.last_mut() {
+            Some(group) if u - group.1 <= gap => group.1 = u,
+            _ => groups.push((u, u)),
+        }
+    }
+    groups
+}
+
+/// Whether two lists of positions agree pairwise within `tolerance`, in any order.
+fn same_positions(a: &[f64], b: &[f64], tolerance: f64) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut a = a.to_vec();
+    let mut b = b.to_vec();
+    a.sort_by(f64::total_cmp);
+    b.sort_by(f64::total_cmp);
+    a.iter().zip(&b).all(|(x, y)| (x - y).abs() <= tolerance)
+}
+
+/// Criteria 17 and 19 on the strip: its length on the neutral line, a plain lid (no slot, notch or
+/// slit on the top straight), a back straight with end plate notches of depth `te` only, and no
+/// uncut band across the arc.
+fn check_strip_and_back(generated: &Generated, dm: Dims) -> Frame {
+    let f = frame_of(generated, dm);
+    assert_close(
+        f.strip.length,
+        dm.length(),
+        0.1,
+        "the strip length on the neutral line",
+    );
+    let lid = cut_pts(&f.strip.paths, 0.5, f.lid - 0.5, f.strip.height);
+    assert!(
+        lid.is_empty(),
+        "the top straight (the lid) carries no slot, notch or slit: {lid:?}"
+    );
+    let back = cut_pts(
+        &f.strip.paths,
+        f.lid + f.arc + 0.5,
+        f.strip.length - dm.tb - 2.0 * dm.t - 0.5,
+        f.strip.height,
+    );
+    let notch_only = back
+        .iter()
+        .all(|&(_, v)| v <= dm.te + 0.05 || v >= f.strip.height - dm.te - 0.05);
+    assert!(
+        notch_only,
+        "the back straight holds only the end plate notches of depth te: {:?}",
+        back.iter()
+            .filter(|p| !(p.1 <= dm.te + 0.05 || p.1 >= f.strip.height - dm.te - 0.05))
+            .take(12)
+            .collect::<Vec<_>>()
+    );
+    let (failures, first) = uncut_bands(&f.strip, &[(f.lid, f.lid + f.arc)]);
+    assert_eq!(
+        failures, 0,
+        "no uncut band across the arc; first at {first:?}"
+    );
+    f
+}
+
+/// The boxes the mating and length checks run on: the defaults, and two sets of five-ish
+/// thicknesses with other radii.
+fn curved_cases() -> [Dims; 4] {
+    [
+        SLICE2,
+        Dims {
+            te: 4.0,
+            tf: 5.0,
+            tb: 6.0,
+            ..SLICE2
+        },
+        Dims {
+            w: 150.0,
+            d: 100.0,
+            h: 60.0,
+            r: 12.0,
+            t: 2.5,
+            te: 3.5,
+            tf: 4.5,
+            tb: 5.5,
+        },
+        Dims {
+            r: 25.0,
+            tf: 4.0,
+            ..SLICE2
+        },
+    ]
+}
+
+fn assert_extents(plate: &Plate, expected: (f64, f64), what: &str) {
+    let (a, b) = (plate.extent_x(), plate.extent_y());
+    assert_close(a.min(b), expected.0, 0.1, &format!("{what}: short side"));
+    assert_close(a.max(b), expected.1, 0.1, &format!("{what}: long side"));
+}
+
+// ---------- criterion 11: the curved top is a choice, and it is a curved box ----------
+
+#[test]
+fn s2_criterion_11_top_shape_is_a_choice_flat_by_default_with_a_curved_option() {
+    let kind = rounded_kind();
+    let params: Vec<&Param> = kind.groups.iter().flat_map(|g| g.params.iter()).collect();
+    let find = |key: &str| -> &Param {
+        params
+            .iter()
+            .copied()
+            .find(|p| p.key == key)
+            .unwrap_or_else(|| panic!("the parameter {key} is declared"))
+    };
+    let top = find("top_shape");
+    assert_eq!(top.label, "Top shape");
+    match &top.kind {
+        ParamKind::Choice { options } => assert_eq!(
+            options.iter().map(|o| o.id).collect::<Vec<_>>(),
+            ["flat", "curved"]
+        ),
+        other => panic!("top_shape is a choice, got {other:?}"),
+    }
+    assert!(
+        matches!(&top.default, ParamValue::Choice(c) if c == "flat"),
+        "Top shape defaults to Flat"
+    );
+    for (key, label) in [
+        ("end_plate_thickness", "End plate thickness"),
+        ("front_thickness", "Front thickness"),
+        ("plate_thickness", "Inner base thickness"),
+    ] {
+        assert_eq!(find(key).label, label, "{key} carries its label");
+    }
+}
+
+#[test]
+fn s2_criterion_11_curved_top_gives_five_parts_that_differ_from_flat() {
+    let flat_points = |g: &Generated| -> Vec<Vec<Pt>> { g.parts.iter().map(part_points).collect() };
+    let curved = curved_box(SLICE2, &[]);
+    let flat = boxed(&[]);
+    assert_eq!(curved.parts.len(), 5, "strip, left, right, front, base");
+    assert_ne!(
+        flat_points(&curved),
+        flat_points(&flat),
+        "a curved top is not the flat box"
+    );
+}
+
+// ---------- criterion 16: five parts in numbering order, with their sizes ----------
+
+#[test]
+fn s2_criterion_16_five_parts_strip_then_end_plates_front_and_base_with_their_sizes() {
+    let dm = SLICE2;
+    let g = curved_box(dm, &[]);
+    assert_eq!(g.parts.len(), 5);
+    // Strip: the flat outline is the length on the neutral line by the width (criterion 17).
+    assert_extents(
+        &plate_of(&g, 0),
+        (dm.width().min(dm.length()), dm.width().max(dm.length())),
+        "1 strip",
+    );
+    // End plates: height `h + tb`, depth `d + tf` plus the back tabs of `t` (ADR 0082 §11).
+    for index in [1, 2] {
+        assert_extents(
+            &plate_of(&g, index),
+            (dm.h + dm.tb, dm.d + dm.tf + dm.t),
+            "end plate",
+        );
+    }
+    // Front: the inside width plus the end plates, by its height and the base's thickness.
+    assert_extents(&plate_of(&g, 3), (dm.h + dm.tb, dm.width()), "4 front");
+    // Base: the width by the depth from the front's outer face to the strip's outer face.
+    assert_extents(
+        &plate_of(&g, 4),
+        (dm.d + dm.tf + dm.t, dm.width()),
+        "5 base",
+    );
+}
+
+// ---------- criteria 17 and 19: the strip, the lid, the arc ----------
+
+#[test]
+fn s2_criterion_17_strip_length_is_the_profile_edges_on_the_neutral_line() {
+    for dm in curved_cases() {
+        let g = curved_box(dm, &[]);
+        check_strip_and_back(&g, dm);
+    }
+    // The defaults with the thickness fields left out (automatic, following the wall).
+    let g = generate_with(
+        &stored_at(
+            120.0,
+            80.0,
+            50.0,
+            15.0,
+            3.0,
+            &[("top_shape", choice("curved"))],
+        ),
+        None,
+    );
+    check_strip_and_back(&g, SLICE2);
+}
+
+#[test]
+fn s2_criterion_19_arc_is_slit_across_at_kerf_plus_point_three_and_pitch_point_two_two_r() {
+    for pattern in ["straight", "offset", "wave"] {
+        let g = curved_box(SLICE2, &[("slit_pattern", choice(pattern))]);
+        let f = check_strip_and_back(&g, SLICE2);
+        let arc = cut_pts(
+            &f.strip.paths,
+            f.lid - 0.01,
+            f.lid + f.arc + 0.01,
+            f.strip.height,
+        );
+        assert!(
+            columns(&arc, 0.6).len() >= 2,
+            "{pattern}: the arc keeps at least two slit columns"
+        );
+    }
+    // Straight at the defaults: the slot width and the pitch are the automatic values.
+    let g = curved_box(SLICE2, &[]);
+    let f = frame_of(&g, SLICE2);
+    let cols = columns(
+        &cut_pts(
+            &f.strip.paths,
+            f.lid - 0.01,
+            f.lid + f.arc + 0.01,
+            f.strip.height,
+        ),
+        0.6,
+    );
+    assert!(cols.len() >= 2, "the arc has slit columns");
+    for &(a, b) in &cols {
+        assert_close(
+            b - a,
+            0.3,
+            0.02,
+            "a slot is kerf plus 0.3 mm (0.3 at kerf 0)",
+        );
+    }
+    for pair in cols.windows(2) {
+        let pitch = f64::midpoint(pair[1].0, pair[1].1) - f64::midpoint(pair[0].0, pair[0].1);
+        assert_close(
+            pitch,
+            0.22 * SLICE2.r,
+            0.1,
+            "the automatic spacing is 0.22 r",
+        );
+    }
+}
+
+#[test]
+fn s2_criterion_19_all_round_wall_slits_is_not_offered_so_the_back_stays_solid() {
+    // Wall slits has no meaning on a curved top: the stored value is kept, the back straight
+    // still carries only the end plate notches (check_strip_and_back).
+    let g = curved_box(SLICE2, &[("wall_slits", choice("all"))]);
+    check_strip_and_back(&g, SLICE2);
+}
+
+// ---------- criterion 18: the joints ----------
+
+#[test]
+fn s2_criterion_18_end_plate_tabs_meet_the_strip_notches_of_the_back_straight_only() {
+    for dm in curved_cases() {
+        let g = curved_box(dm, &[]);
+        let f = check_strip_and_back(&g, dm);
+        let back_start = f.lid + f.arc;
+        let mut sides: Vec<Vec<f64>> = Vec::new();
+        for level in [dm.te, f.strip.height - dm.te] {
+            let centres = notch_centres(&f.strip, level, dm.te);
+            for &u in &centres {
+                assert!(
+                    u - dm.te >= back_start + 2.0 * dm.t - 0.2,
+                    "a notch at u {u:.2} sits closer than 2 t_w to the arc"
+                );
+            }
+            sides.push(centres.iter().map(|u| f.strip.length - u).collect());
+        }
+        assert!(!sides[0].is_empty(), "the back straight has notches");
+        for index in [1, 2] {
+            let plate = plate_of(&g, index);
+            let h_is_x = plate.axis_is_x(dm.h + dm.tb);
+            let d_is_x = !h_is_x;
+            // The tabs stand t_w beyond the back edge: the side whose tips are all one tab wide
+            // (2 t_e); the front edge's finger tips are another width at these sizes. (The first
+            // version looked for a long back edge one t_w in, which a tall tab leaves in pieces
+            // shorter than 10 mm at radius 25.)
+            let tab_wide = |level: f64| {
+                let runs = runs_on(&plate.paths, d_is_x, level);
+                !runs.is_empty()
+                    && runs
+                        .iter()
+                        .all(|&(lo, hi)| (hi - lo - 2.0 * dm.te).abs() < 0.05)
+            };
+            let tab_level = if tab_wide(plate.max_of(d_is_x)) {
+                plate.max_of(d_is_x)
+            } else {
+                plate.min_of(d_is_x)
+            };
+            let tips: Vec<f64> = runs_on(&plate.paths, d_is_x, tab_level)
+                .iter()
+                .map(|&(lo, hi)| f64::midpoint(lo, hi))
+                .collect();
+            assert!(
+                !tips.is_empty(),
+                "end plate {index} has tabs at its back edge"
+            );
+            let (hmin, hmax) = (plate.min_of(h_is_x), plate.max_of(h_is_x));
+            let from_bottom: Vec<f64> = tips.iter().map(|c| c - hmin).collect();
+            let from_top: Vec<f64> = tips.iter().map(|c| hmax - c).collect();
+            let mates = sides.iter().any(|side| {
+                same_positions(side, &from_bottom, 0.25) || same_positions(side, &from_top, 0.25)
+            });
+            assert!(
+                mates,
+                "end plate {index}: its tab centres {from_bottom:.2?} meet no notch row {sides:.2?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn s2_criterion_18_base_and_front_fingers_are_as_deep_as_the_mating_plate_and_twice_the_thinner() {
+    let dm = Dims {
+        te: 4.0,
+        tf: 5.0,
+        tb: 6.0,
+        ..SLICE2
+    };
+    let g = curved_box(dm, &[("finger_hollow", sw(false))]);
+    // Base (5): left and right to the end plates (depth te), front to the front (depth tf).
+    let base = plate_of(&g, 4);
+    let w_is_x = base.axis_is_x(dm.width());
+    assert!(
+        has_run_of_width(
+            &base,
+            w_is_x,
+            base.min_of(w_is_x) + dm.te,
+            2.0 * dm.tb.min(dm.te)
+        ) && has_run_of_width(
+            &base,
+            w_is_x,
+            base.max_of(w_is_x) - dm.te,
+            2.0 * dm.tb.min(dm.te)
+        ),
+        "the base's sides carry fingers of depth te and width 2 min(tb, te)"
+    );
+    assert!(
+        has_run_of_width(
+            &base,
+            !w_is_x,
+            base.min_of(!w_is_x) + dm.tf,
+            2.0 * dm.tb.min(dm.tf)
+        ) || has_run_of_width(
+            &base,
+            !w_is_x,
+            base.max_of(!w_is_x) - dm.tf,
+            2.0 * dm.tb.min(dm.tf)
+        ),
+        "the base's front carries fingers of depth tf and width 2 min(tb, tf)"
+    );
+    // Front (4): sides to the end plates (depth te), bottom to the base (depth tb).
+    let front = plate_of(&g, 3);
+    let fw_is_x = front.axis_is_x(dm.width());
+    assert!(
+        has_run_of_width(
+            &front,
+            fw_is_x,
+            front.min_of(fw_is_x) + dm.te,
+            2.0 * dm.tf.min(dm.te)
+        ) && has_run_of_width(
+            &front,
+            fw_is_x,
+            front.max_of(fw_is_x) - dm.te,
+            2.0 * dm.tf.min(dm.te)
+        ),
+        "the front's sides carry fingers of depth te and width 2 min(tf, te)"
+    );
+    assert!(
+        has_run_of_width(
+            &front,
+            !fw_is_x,
+            front.min_of(!fw_is_x) + dm.tb,
+            2.0 * dm.tf.min(dm.tb)
+        ) || has_run_of_width(
+            &front,
+            !fw_is_x,
+            front.max_of(!fw_is_x) - dm.tb,
+            2.0 * dm.tf.min(dm.tb)
+        ),
+        "the front's bottom carries fingers of depth tb and width 2 min(tf, tb)"
+    );
+    // End plate (2): bottom to the base (depth tb), front edge to the front (depth tf).
+    let end = plate_of(&g, 1);
+    let eh_is_x = end.axis_is_x(dm.h + dm.tb);
+    assert!(
+        has_run_of_width(
+            &end,
+            eh_is_x,
+            end.min_of(eh_is_x) + dm.tb,
+            2.0 * dm.te.min(dm.tb)
+        ) || has_run_of_width(
+            &end,
+            eh_is_x,
+            end.max_of(eh_is_x) - dm.tb,
+            2.0 * dm.te.min(dm.tb)
+        ),
+        "the end plate's bottom carries fingers of depth tb"
+    );
+    assert!(
+        has_run_of_width(
+            &end,
+            !eh_is_x,
+            end.min_of(!eh_is_x) + dm.tf,
+            2.0 * dm.te.min(dm.tf)
+        ) || has_run_of_width(
+            &end,
+            !eh_is_x,
+            end.max_of(!eh_is_x) - dm.tf,
+            2.0 * dm.te.min(dm.tf)
+        ),
+        "the end plate's front edge carries fingers of depth tf"
+    );
+}
+
+// ---------- criterion 20: the corner radius clamp ----------
+
+#[test]
+fn s2_criterion_20_corner_radius_is_clamped_to_the_most_the_box_allows_and_to_two_walls() {
+    // The most is min(d - 2t, h - 2 te - 4 tw): 74 and 32 at the defaults.
+    let g = curved_box(Dims { r: 40.0, ..SLICE2 }, &[]);
+    assert_close(
+        length_of(&g, "corner_radius"),
+        32.0,
+        1e-9,
+        "the most at the defaults",
+    );
+    assert!(clamped(&g, "corner_radius"), "the clamp is reported");
+    // A thicker end plate takes its own 2 te from the height: 50 - 8 - 12 = 30.
+    let g = curved_box(
+        Dims {
+            r: 40.0,
+            te: 4.0,
+            ..SLICE2
+        },
+        &[],
+    );
+    assert_close(
+        length_of(&g, "corner_radius"),
+        30.0,
+        1e-9,
+        "the most with te 4",
+    );
+    // A shorter box: 30 - 6 - 12 = 12.
+    let g = curved_box(
+        Dims {
+            r: 20.0,
+            h: 30.0,
+            ..SLICE2
+        },
+        &[],
+    );
+    assert_close(
+        length_of(&g, "corner_radius"),
+        12.0,
+        1e-9,
+        "the most in a 30 mm high box",
+    );
+    // The lower bound is two walls.
+    let g = curved_box(Dims { r: 2.0, ..SLICE2 }, &[]);
+    assert_close(
+        length_of(&g, "corner_radius"),
+        6.0,
+        1e-9,
+        "the least is 2 t_w",
+    );
+    assert!(clamped(&g, "corner_radius"));
+    // Inside the range nothing is clamped.
+    let g = curved_box(SLICE2, &[]);
+    assert_close(length_of(&g, "corner_radius"), 15.0, 1e-9, "15 mm is kept");
+    assert!(!clamped(&g, "corner_radius"));
+}
+
+// ---------- criterion 21: the rows that do not apply keep their values; the thicknesses ----------
+
+#[test]
+fn s2_criterion_21_hidden_values_are_saved_back_unread_and_the_thickness_fields_follow_the_wall() {
+    let kept = [
+        ("lid", sw(false)),
+        ("lid_seat", sw(false)),
+        ("base_cover", sw(false)),
+        ("wall_slits", choice("all")),
+        ("base_inset", mm(4.0)),
+        ("ring_thickness", mm(2.5)),
+        ("cover_thickness", mm(2.5)),
+        ("lid_thickness", mm(2.5)),
+    ];
+    let g = curved_box(SLICE2, &kept);
+    for (key, value) in &kept {
+        assert_eq!(
+            g.params.get(*key),
+            Some(value),
+            "{key} is saved back unread"
+        );
+    }
+    assert_eq!(g.parts.len(), 5, "the hidden switches add no part");
+    // A stored 0 follows the wall and is shown muted.
+    let g = curved_box(
+        SLICE2,
+        &[
+            ("end_plate_thickness", mm(0.0)),
+            ("front_thickness", mm(0.0)),
+            ("plate_thickness", mm(0.0)),
+        ],
+    );
+    for key in ["end_plate_thickness", "front_thickness", "plate_thickness"] {
+        assert!(is_automatic(&g, key), "{key} is automatic at 0");
+        assert_close(used_length(&g, key), 3.0, 1e-9, key);
+    }
+    // A typed value overrides the wall.
+    let g = curved_box(SLICE2, &[("front_thickness", mm(4.0))]);
+    assert!(
+        !is_automatic(&g, "front_thickness"),
+        "a typed front thickness is not automatic"
+    );
+    assert_close(
+        length_of(&g, "front_thickness"),
+        4.0,
+        1e-9,
+        "front thickness 4",
+    );
+}
+
+#[test]
+fn s2_criterion_21_finger_hollow_is_a_u_notch_in_the_front_top_edge_one_piece_with_margin() {
+    let dm = SLICE2;
+    let g = curved_box(
+        dm,
+        &[
+            ("finger_hollow", sw(true)),
+            ("hollow_width", mm(20.0)),
+            ("hollow_depth", mm(10.0)),
+        ],
+    );
+    let front = plate_of(&g, 3);
+    assert_eq!(g.parts[3].paths.len(), 1, "the front stays in one piece");
+    let w_is_x = front.axis_is_x(dm.width());
+    let h_is_x = !w_is_x;
+    // The top edge is the high or the low end of the height. Measure the notch by depth, so a U
+    // with a flat bottom and a rounded one both count: the points 0.5 to 10.5 mm down from the top,
+    // clear of the side fingers (depth te), span the hollow's width and reach 10 mm deep.
+    let mut found: Option<(f64, f64, f64)> = None;
+    for top in [front.max_of(h_is_x), front.min_of(h_is_x)] {
+        let sign = if top == front.max_of(h_is_x) {
+            -1.0
+        } else {
+            1.0
+        };
+        let inside: Vec<Pt> = front
+            .paths
+            .iter()
+            .flatten()
+            .copied()
+            .filter(|&(x, y)| {
+                let (w, h) = if w_is_x { (x, y) } else { (y, x) };
+                let depth = sign * (h - top);
+                depth > 0.5
+                    && depth < 10.5
+                    && w > front.min_of(w_is_x) + dm.te + 0.5
+                    && w < front.max_of(w_is_x) - dm.te - 0.5
+            })
+            .map(|(x, y)| if w_is_x { (x, y) } else { (y, x) })
+            .collect();
+        if inside.is_empty() {
+            continue;
+        }
+        let lo = inside.iter().map(|p| p.0).fold(f64::INFINITY, f64::min);
+        let hi = inside.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
+        let deepest = inside
+            .iter()
+            .map(|p| sign * (p.1 - top))
+            .fold(0.0_f64, f64::max);
+        if (deepest - 10.0).abs() <= 0.2 {
+            found = Some((lo, hi, deepest));
+        }
+    }
+    let (lo, hi, _) = found.expect("a hollow 10 mm deep in the front's top edge");
+    assert!(
+        (hi - lo - 20.0).abs() <= 0.6,
+        "the hollow is 20 mm wide: {:.2}",
+        hi - lo
+    );
+    let centre_across = f64::midpoint(front.min_of(w_is_x), front.max_of(w_is_x));
+    assert_close(
+        f64::midpoint(lo, hi),
+        centre_across,
+        0.2,
+        "the hollow is centred across the width",
+    );
+    // Revision 9 (spec 0147): the hollow stays within Inner width minus 2 times the End plate
+    // thickness, measured from the front's side edges (where the side fingers of depth te sit).
+    let inner_span = dm.w - 2.0 * dm.te;
+    assert!(
+        hi - lo <= inner_span + 0.2,
+        "the hollow is at most the inner width less 2 te ({inner_span} mm): {:.2}",
+        hi - lo
+    );
+    let left_from_edge = lo - (front.min_of(w_is_x) + dm.te);
+    let right_from_edge = (front.max_of(w_is_x) - dm.te) - hi;
+    assert!(
+        left_from_edge >= -0.2 && right_from_edge >= -0.2,
+        "the hollow lies between the side edges: {left_from_edge:.2}, {right_from_edge:.2}"
+    );
+}
+
+#[test]
+fn criterion_19_typed_slit_spacing_the_arc_cannot_hold_twice_is_clamped_with_a_notice() {
+    // The arc at r 15 holds about 26 mm: at most pi/8 (2r + t_w) = 12.95 mm per slit spacing
+    // (architect review, revision 9). A typed 20 mm must be clamped, not kept.
+    let g = curved_box(SLICE2, &[("slit_spacing", mm(20.0))]);
+    assert!(
+        clamped(&g, "slit_spacing"),
+        "the spacing is clamped with a notice"
+    );
+    assert_close(
+        length_of(&g, "slit_spacing"),
+        PI / 8.0 * (2.0 * SLICE2.r + SLICE2.t),
+        0.05,
+        "the clamp value pi/8 (2r + t_w)",
+    );
+}
+
+// ---------- criterion 23: the flat layout ----------
+
+#[test]
+fn s2_criterion_23_flat_layout_keeps_all_five_parts_apart_by_the_gap_in_order() {
+    let g = curved_box(SLICE2, &[("gap", mm(5.0))]);
+    let boxes: Vec<(f64, f64, f64, f64)> = (0..5).map(|i| part_bbox(&g.parts[i])).collect();
+    for i in 0..5 {
+        for j in (i + 1)..5 {
+            let (a, b) = (boxes[i], boxes[j]);
+            let sep_x = (b.0 - a.2).max(a.0 - b.2);
+            let sep_y = (b.1 - a.3).max(a.1 - b.3);
+            assert!(
+                sep_x.max(sep_y) >= 5.0 - 0.1,
+                "parts {} and {} are {:.2} apart, less than the gap",
+                i + 1,
+                j + 1,
+                sep_x.max(sep_y)
+            );
+        }
+    }
+    // The plates in their row: left, right, front, base in order along one axis.
+    let in_x = (1..4).all(|i| boxes[i].0 < boxes[i + 1].0);
+    let in_y = (1..4).all(|i| boxes[i].1 < boxes[i + 1].1);
+    assert!(
+        in_x || in_y,
+        "left, right, front and base follow each other in one row"
+    );
+}
+
+// ---------- criterion 24: a box of about 400 slots, the regeneration cost, the file ----------
+
+#[test]
+fn s2_criterion_24_a_curved_box_of_about_400_slots_regenerates_within_100_ms_of_thread_cpu() {
+    let dm = Dims {
+        w: 200.0,
+        d: 900.0,
+        h: 450.0,
+        r: 400.0,
+        ..SLICE2
+    };
+    let extra = [("slit_spacing", mm(1.5))];
+    let _warm = curved_box(dm, &extra);
+    let mut best = u64::MAX;
+    let mut last = None;
+    for _ in 0..3 {
+        let before = thread_ticks().expect("the thread CPU clock is readable");
+        let generated = curved_box(dm, &extra);
+        let after = thread_ticks().expect("the thread CPU clock is readable");
+        best = best.min(after - before);
+        last = Some(generated);
+    }
+    let g = last.expect("three runs");
+    let f = frame_of(&g, dm);
+    let arc = cut_pts(
+        &f.strip.paths,
+        f.lid - 0.01,
+        f.lid + f.arc + 0.01,
+        f.strip.height,
+    );
+    let slots = columns(&arc, 0.6).len();
+    eprintln!("slice 2 timing: {slots} slit columns on the arc, best run {best} clock ticks");
+    assert!(slots >= 400, "the box carries about 400 slots: {slots}");
+    let took = budget_factor::scaled(std::time::Duration::from_millis(best * 10));
+    assert!(
+        took <= std::time::Duration::from_millis(100),
+        "regeneration took {} ms of thread CPU (scaled by the CI factor: {took:?})",
+        best * 10
+    );
+}
+
+// ---------- criterion 8 and 24: an older file opens as Flat; regeneration is stable ----------
+
+#[test]
+fn s2_criterion_24_a_file_without_top_shape_opens_as_flat_and_regenerates_identically() {
+    let points = |g: &Generated| -> Vec<Vec<Pt>> { g.parts.iter().map(part_points).collect() };
+    let absent = generate_with(&stored(&[]), None);
+    let explicit_flat = generate_with(&stored(&[("top_shape", choice("flat"))]), None);
+    assert_eq!(
+        points(&absent),
+        points(&explicit_flat),
+        "no top_shape reads as Flat"
+    );
+    let first = curved_box(SLICE2, &[]);
+    let second = curved_box(SLICE2, &[]);
+    assert_eq!(
+        points(&first),
+        points(&second),
+        "the curved box regenerates identically"
+    );
+    assert_eq!(first.params.get("top_shape"), Some(&choice("curved")));
 }
