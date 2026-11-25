@@ -134,6 +134,11 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("air_assist_on", "Air assist on"),
     ("air_assist_off", "Air assist off"),
     ("use_machine_size", "Use machine size"),
+    // `specs/0118` slice 2d, ux-notes W60.
+    ("focus_pulse_on", "Edit focus pulse"),
+    ("focus_pulse_off", "Edit focus pulse"),
+    ("edit_pulse_power", "Edit pulse power"),
+    ("edit_pulse_length", "Edit pulse length"),
     ("set_fixture_material", "Pick fixture material"),
     ("set_start_machine_origin", "Start: Machine origin"),
     ("set_start_head_position", "Start: Head position"),
@@ -642,6 +647,10 @@ mod tests {
             (dc::AIR_ASSIST_ON_COMMIT_LABEL, "Air assist on"),
             (dc::AIR_ASSIST_OFF_COMMIT_LABEL, "Air assist off"),
             (dc::USE_MACHINE_SIZE_COMMIT_LABEL, "Use machine size"),
+            (dc::FOCUS_PULSE_ON_COMMIT_LABEL, "Edit focus pulse"),
+            (dc::FOCUS_PULSE_OFF_COMMIT_LABEL, "Edit focus pulse"),
+            (dc::EDIT_PULSE_POWER_COMMIT_LABEL, "Edit pulse power"),
+            (dc::EDIT_PULSE_LENGTH_COMMIT_LABEL, "Edit pulse length"),
         ] {
             assert_eq!(operation_name(label), name, "{label}");
             assert!(

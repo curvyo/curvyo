@@ -59,6 +59,15 @@ pub const AIR_ASSIST_ON_COMMIT_LABEL: &str = "air_assist_on";
 /// The label of the copy's Air assist switched off (`specs/0029` criterion 25).
 pub const AIR_ASSIST_OFF_COMMIT_LABEL: &str = "air_assist_off";
 
+/// The label of the copy's focus pulse switched on (`specs/0118` 35 a).
+pub const FOCUS_PULSE_ON_COMMIT_LABEL: &str = "focus_pulse_on";
+/// The label of the copy's focus pulse switched off (`specs/0118` 35 a).
+pub const FOCUS_PULSE_OFF_COMMIT_LABEL: &str = "focus_pulse_off";
+/// The label of an edit of the copy's pulse power (`specs/0118` 35 a).
+pub const EDIT_PULSE_POWER_COMMIT_LABEL: &str = "edit_pulse_power";
+/// The label of an edit of the copy's pulse length (`specs/0118` 35 a).
+pub const EDIT_PULSE_LENGTH_COMMIT_LABEL: &str = "edit_pulse_length";
+
 /// The label of the copy and page taking the size the controller reports (`specs/0131`).
 pub const USE_MACHINE_SIZE_COMMIT_LABEL: &str = "use_machine_size";
 
@@ -97,6 +106,15 @@ pub enum ProfileChange {
     },
     /// Use machine size: the work area the controller reports (`specs/0131`).
     UseMachineSize,
+    /// The Focus pulse switch, to `on` (`specs/0118` 35 a).
+    FocusPulse {
+        /// The new state.
+        on: bool,
+    },
+    /// The Pulse power field.
+    EditPulsePower,
+    /// The Pulse length field.
+    EditPulseLength,
 }
 
 impl ProfileChange {
@@ -119,6 +137,10 @@ impl ProfileChange {
             Self::AirAssist { on: true } => AIR_ASSIST_ON_COMMIT_LABEL,
             Self::AirAssist { on: false } => AIR_ASSIST_OFF_COMMIT_LABEL,
             Self::UseMachineSize => USE_MACHINE_SIZE_COMMIT_LABEL,
+            Self::FocusPulse { on: true } => FOCUS_PULSE_ON_COMMIT_LABEL,
+            Self::FocusPulse { on: false } => FOCUS_PULSE_OFF_COMMIT_LABEL,
+            Self::EditPulsePower => EDIT_PULSE_POWER_COMMIT_LABEL,
+            Self::EditPulseLength => EDIT_PULSE_LENGTH_COMMIT_LABEL,
         }
     }
 }

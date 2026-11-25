@@ -534,8 +534,8 @@ fn damaged_and_newer_texts_are_skipped_with_a_notice() {
     for text in [
         "{ not json".to_owned(),
         machine_text(P1, "ZQX-MACH-7731", 9).replacen(
-            "\"format_version\": 7",
             "\"format_version\": 8",
+            "\"format_version\": 9",
             1,
         ),
     ] {

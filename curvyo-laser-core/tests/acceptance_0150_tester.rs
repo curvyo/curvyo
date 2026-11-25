@@ -143,7 +143,8 @@ fn c2_raising_max_feed_leaves_the_default_speed_alone() {
 fn c3_the_record_is_written_as_format_7_with_the_pair() {
     let text = write_record(&MachineProfile::generic_laser());
     let v: Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(v["format_version"], 7);
+    // Record format 8 since `0118` 2d (adrs P7); the pair stays.
+    assert_eq!(v["format_version"], 8);
     assert_eq!(v["default_power_pct"], json!(10.0));
     assert_eq!(v["default_speed_mm_min"], json!(1_000));
 }
@@ -215,6 +216,15 @@ fn generic_text_without_defaults() -> Value {
     let mut v = generic_text();
     v.as_object_mut().unwrap().remove("default_power_pct");
     v.as_object_mut().unwrap().remove("default_speed_mm_min");
+    // Since `0118` 2d (adrs P7) a write is record format 8 with the focus pulse, which a format 5
+    // or 6 record must not hold.
+    for key in [
+        "focus_pulse",
+        "focus_pulse_power_permille",
+        "focus_pulse_length_ms",
+    ] {
+        v.as_object_mut().unwrap().remove(key);
+    }
     v
 }
 

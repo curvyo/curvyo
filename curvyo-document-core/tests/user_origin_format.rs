@@ -352,6 +352,6 @@ fn c29_damaged_points_are_kept_as_stored_and_saved_back_unchanged() {
 
 #[test]
 fn the_format_is_61() {
-    // Format 61 since `specs/0118-machine-control` slice 2c (`adrs.md` O3).
-    assert_eq!(CURRENT_FORMAT_VERSION, 61);
+    // Format 61 since `specs/0118-machine-control` slice 2c (`adrs.md` O3), 62 since slice 2d (P8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 62);
 }

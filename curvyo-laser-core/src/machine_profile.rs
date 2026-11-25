@@ -171,6 +171,26 @@ bounded_integer!(
     /// The serial baud rate of the controller.
     BaudRate(u32), 1, 4_000_000, 115_200
 );
+bounded_integer!(
+    /// The focus pulse's power in per mille of the max power: 1 to 50 (0.1 to 5 %), default 1 %
+    /// (`specs/0118` 35 a, Frage 370 A).
+    PulsePermille(u16), 1, 50, 10
+);
+bounded_integer!(
+    /// The focus pulse's length in milliseconds: 50 to 2,000, default 300 (Frage 371 A).
+    PulseMs(u16), 50, 2_000, 300
+);
+
+/// The low-power pulse the Focus point mode fires on arrival (`specs/0118` 35 a, adrs P7).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FocusPulse {
+    /// Whether it fires; off in a new profile (Frage 369 B).
+    pub on: bool,
+    /// Its power.
+    pub power: PulsePermille,
+    /// Its length.
+    pub length: PulseMs,
+}
 
 /// The power and speed an operation takes when no material gives it numbers (`specs/0150`
 /// criterion 1): the profile's Default power and Default speed. The speed never lies above the
@@ -242,6 +262,8 @@ pub struct ProfileValues {
     pub output_format: OutputFormat,
     /// The numbers a new or numberless operation takes (`specs/0150` criterion 1).
     pub defaults: DefaultNumbers,
+    /// The Focus point mode's pulse (record format 8, `specs/0118` 35 a).
+    pub focus_pulse: FocusPulse,
 }
 
 impl Default for ProfileValues {
@@ -256,6 +278,7 @@ impl Default for ProfileValues {
             air_assist: false,
             output_format: OutputFormat::Grbl,
             defaults: DefaultNumbers::BUILT_IN,
+            focus_pulse: FocusPulse::default(),
         }
     }
 }

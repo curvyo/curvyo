@@ -1,7 +1,8 @@
-//! The machine profile record goldens of `tests/fixtures/machine_profiles/`: record format 6 with
-//! air assist and the output format reads and writes as format 7 with the built-in default pair
-//! (`specs/0150`, tested in `operation_defaults_0150.rs`), format 5 with named fixture sets reads
-//! (air assist off, GRBL) and writes as format 7, every damage case is damaged,
+//! The machine profile record goldens of `tests/fixtures/machine_profiles/`: record format 8 with
+//! the focus pulse reads and writes back byte for byte, format 7 with the default pair
+//! (`specs/0150`, tested in `operation_defaults_0150.rs`) and format 6 with air assist and the
+//! output format read (the pulse's defaults) and write as format 8, format 5 with named fixture
+//! sets reads (air assist off, GRBL) and writes as format 8, every damage case is damaged,
 //! a newer record is newer, and every record of formats 1 to 4 is skipped as older
 //! (`specs/0113-fixture-sets-and-pins` criteria 10, 39 to 41; ADR 0060 §1 to §4, §9;
 //! `specs/0029-laser-job-preview-and-output` criteria 25, 32, 39; ADR 0065 §3, §6).
@@ -12,9 +13,9 @@ use std::path::PathBuf;
 
 use curvyo_document_core::JobRole;
 use curvyo_laser_core::{
-    MAX_RECORD_BYTES, MAX_RECORD_FIXTURES, MAX_RECORD_JOBS, MAX_RECORD_SETS, MAX_RECORD_SLOTS,
-    MAX_RECORD_TARGETS, MachineProfiles, OutputFormat, RecordError, read_record, record_file_name,
-    write_record,
+    FocusPulse, MAX_RECORD_BYTES, MAX_RECORD_FIXTURES, MAX_RECORD_JOBS, MAX_RECORD_SETS,
+    MAX_RECORD_SLOTS, MAX_RECORD_TARGETS, MachineProfiles, OutputFormat, PulseMs, PulsePermille,
+    RecordError, read_record, record_file_name, write_record,
 };
 
 const ID: &str = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f";
@@ -30,9 +31,13 @@ fn read(name: &str) -> Result<curvyo_laser_core::MachineProfile, RecordError> {
     read_record(&record_file_name(ID), &golden(name))
 }
 
-/// The format 7 text a format 5 or 6 golden writes: the version, the two keys of ADR 0065 §3
-/// (off and GRBL) when absent, and the built-in default pair (`specs/0150`) before `connection`.
-fn as_format_7(old: &str) -> String {
+/// The three focus pulse keys of record format 8 at their defaults (`specs/0118` adrs P7).
+const FOCUS_KEYS: &str = "  \"focus_pulse\": false,\n  \"focus_pulse_power_permille\": 10,\n  \"focus_pulse_length_ms\": 300,\n";
+
+/// The format 8 text a format 5, 6 or 7 golden writes: the version, the two keys of ADR 0065 §3
+/// (off and GRBL) and the built-in default pair (`specs/0150`) when absent, and the focus pulse's
+/// defaults before `connection`.
+fn as_format_8(old: &str) -> String {
     let at = old.find("  \"connection\"").unwrap();
     let (head, tail) = old.split_at(at);
     let output = if head.contains("\"air_assist\"") {
@@ -40,32 +45,37 @@ fn as_format_7(old: &str) -> String {
     } else {
         "  \"air_assist\": false,\n  \"output_format\": \"grbl\",\n"
     };
+    let pair = if head.contains("\"default_power_pct\"") {
+        ""
+    } else {
+        "  \"default_power_pct\": 10.0,\n  \"default_speed_mm_min\": 1000,\n"
+    };
     let head = head
-        .replacen("\"format_version\": 5", "\"format_version\": 7", 1)
-        .replacen("\"format_version\": 6", "\"format_version\": 7", 1);
-    format!(
-        "{head}{output}  \"default_power_pct\": 10.0,\n  \"default_speed_mm_min\": 1000,\n{tail}"
-    )
+        .replacen("\"format_version\": 5", "\"format_version\": 8", 1)
+        .replacen("\"format_version\": 6", "\"format_version\": 8", 1)
+        .replacen("\"format_version\": 7", "\"format_version\": 8", 1);
+    format!("{head}{output}{pair}{FOCUS_KEYS}{tail}")
 }
 
 #[test]
-fn format_6_air_assist_and_output_format_read_and_write_back_byte_for_byte() {
+fn format_6_air_assist_and_output_format_read_and_write_as_format_8() {
     let text = golden("format6_air_assist.json");
     let profile = read("format6_air_assist.json").unwrap();
     assert!(profile.values.air_assist);
     assert_eq!(profile.values.output_format, OutputFormat::Grbl);
+    assert_eq!(profile.values.focus_pulse, FocusPulse::default());
     assert_eq!(
         write_record(&profile),
-        as_format_7(&text),
-        "any write upgrades to 7"
+        as_format_8(&text),
+        "any write upgrades to 8"
     );
     let five = read("format5_fixture_sets.json").unwrap();
     assert!(!five.values.air_assist, "format 5 reads air assist off");
     assert_eq!(five.values.output_format, OutputFormat::Grbl);
     assert_eq!(
         write_record(&five),
-        as_format_7(&golden("format5_fixture_sets.json")),
-        "any write upgrades to 7"
+        as_format_8(&golden("format5_fixture_sets.json")),
+        "any write upgrades to 8"
     );
 }
 
@@ -75,9 +85,25 @@ fn either_new_key_in_format_5_and_an_unknown_output_format_damage_the_record() {
         "format5_air_assist_key.json",
         "format5_output_format_key.json",
         "format6_unknown_output_format.json",
+        "format6_focus_pulse_key.json",
     ] {
         assert_eq!(read(case), Err(RecordError::Damaged), "{case}");
     }
+}
+
+#[test]
+fn format_8_with_the_focus_pulse_reads_and_writes_back_byte_for_byte() {
+    let text = golden("format8_focus_pulse.json");
+    let profile = read("format8_focus_pulse.json").unwrap();
+    assert_eq!(
+        profile.values.focus_pulse,
+        FocusPulse {
+            on: true,
+            power: PulsePermille::new(25).unwrap(),
+            length: PulseMs::new(500).unwrap(),
+        }
+    );
+    assert_eq!(write_record(&profile), text);
 }
 
 #[test]
@@ -108,7 +134,7 @@ fn format_5_sets_read_in_order_and_write_back_byte_for_byte() {
     assert_eq!(pin.params["diameter_mm"], 6.0);
     assert_eq!(pin.jobs[1].role, Some(JobRole::Diameters));
     assert!(profile.values.motorised_z);
-    assert_eq!(write_record(&profile), as_format_7(&text));
+    assert_eq!(write_record(&profile), as_format_8(&text));
     assert!(!text.contains("on_page") && !text.contains("output") && !text.contains("active"));
     // 2026-11-16 (ADR 0060 §1 amended): ids everywhere, a locked set and a locked fixture.
     assert!(profile.fixture_sets[1].locked && !profile.fixture_sets[0].locked);
@@ -151,7 +177,7 @@ fn the_maximal_sets_read_and_fit_the_record_limit() {
             MAX_RECORD_TARGETS
         )
     );
-    assert_eq!(write_record(&profile), as_format_7(&text));
+    assert_eq!(write_record(&profile), as_format_8(&text));
     let one_more = text.replacen(
         "\"targets\": [\n",
         "\"targets\": [\n            \"clamp\",\n",
@@ -283,7 +309,7 @@ fn a_duplicated_built_in_reads_as_a_user_profile() {
     assert!(!profile.is_builtin());
     assert_eq!(
         write_record(&profile),
-        text,
-        "format 7 writes back byte for byte"
+        as_format_8(&text),
+        "format 7 writes as format 8 with the pulse's defaults"
     );
 }
