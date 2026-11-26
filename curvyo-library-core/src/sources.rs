@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{RequestError, SourcesError};
-use crate::request::{SourceKind, base_address};
+use crate::request::{SourceKind, base_address, is_ready};
 
 /// The file's name in the app data folder.
 pub const SOURCES_FILE: &str = "online-sources.toml";
@@ -27,6 +27,10 @@ pub struct SourceEntry {
     pub name: String,
     /// When it was added, Unix milliseconds.
     pub added: Millis,
+    /// Whether the key store holds an access token for this source (ADR 0090 decision 4); the
+    /// token itself is never in this file. Only a user-added Git catalogue may have one.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub token: bool,
 }
 
 impl SourceEntry {
@@ -45,6 +49,10 @@ pub enum AddRefusal {
     /// The address is already in the list.
     AlreadyIn,
 }
+
+/// A token was asked for a source that cannot have one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TokenRefusal;
 
 #[derive(Serialize, Deserialize)]
 struct Wire {
@@ -118,10 +126,29 @@ impl Sources {
             address,
             name: name.to_owned(),
             added,
+            token: false,
         };
         let key = entry.key();
         self.entries.push(entry);
         Ok(key)
+    }
+
+    /// Sets whether the source with `key` has a token in the key store. Only a Git catalogue
+    /// that is not the ready entry may have one (ADR 0090 decision 4); `false` always works.
+    ///
+    /// # Errors
+    /// [`TokenRefusal`] when the source is missing, not a Git catalogue, or the ready entry.
+    pub fn set_token(&mut self, key: &str, token: bool) -> Result<(), TokenRefusal> {
+        let entry = self
+            .entries
+            .iter_mut()
+            .find(|entry| entry.key() == key)
+            .ok_or(TokenRefusal)?;
+        if token && (entry.kind != SourceKind::Git || is_ready(&entry.address)) {
+            return Err(TokenRefusal);
+        }
+        entry.token = token;
+        Ok(())
     }
 
     /// Removes the source with `key`; whether it was there.
@@ -189,6 +216,40 @@ mod tests {
             Err(AddRefusal::Address(RequestError::NotHttps))
         );
         assert_eq!(sources.entries().len(), 1);
+    }
+
+    #[test]
+    fn the_token_flag_round_trips_defaults_false_and_is_never_a_secret() {
+        let mut sources = Sources::default();
+        let git = sources
+            .add(SourceKind::Git, "https://example.org/cat", "Cat", Millis(1))
+            .unwrap();
+        let icons = sources
+            .add(
+                SourceKind::Iconify,
+                "https://api.iconify.design",
+                "I",
+                Millis(2),
+            )
+            .unwrap();
+        let ready = sources
+            .add(SourceKind::Git, crate::READY_ADDRESS, "Ready", Millis(3))
+            .unwrap();
+        assert!(!sources.to_text().contains("token"), "false is not written");
+        sources.set_token(&git, true).unwrap();
+        assert_eq!(sources.set_token(&icons, true), Err(TokenRefusal));
+        assert_eq!(sources.set_token(&ready, true), Err(TokenRefusal));
+        assert_eq!(sources.set_token("online:nope", true), Err(TokenRefusal));
+        let text = sources.to_text();
+        assert!(text.contains("token = true"));
+        let again = Sources::parse(&text).unwrap();
+        assert!(again.find(&git).unwrap().token);
+        assert!(!again.find(&icons).unwrap().token);
+        // An older file without the field reads as a source without a token.
+        let old = "format = 1\n[[source]]\nkind = \"git\"\naddress = \"https://e.org/\"\nname = \"E\"\nadded = 1\n";
+        assert!(!Sources::parse(old).unwrap().entries()[0].token);
+        sources.set_token(&git, false).unwrap();
+        assert!(!sources.find(&git).unwrap().token);
     }
 
     #[test]

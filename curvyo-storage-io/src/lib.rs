@@ -8,6 +8,7 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod catalogue_token;
 mod container_thumbnail;
 mod credentials;
 mod devices;
@@ -34,6 +35,9 @@ mod workspace_documents;
 mod workspace_ended;
 mod workspace_share_files;
 
+pub use catalogue_token::{
+    AccessToken, TokenError, forget_token, load_token, save_token, token_label,
+};
 pub use container_thumbnail::{ThumbnailError, with_thumbnail};
 pub use credentials::{CredentialError, CredentialStore, KEY_FILE, credential_slot};
 pub use devices::{
@@ -56,7 +60,7 @@ pub use font_sync_files::{SyncedFont, SyncedWrite, write_synced_font};
 pub use fonts::{
     FolderFonts, FontFace, FontSource, MAX_FONT_FILE_BYTES, list_font_folder, list_system_fonts,
 };
-pub use http::{HttpError, Transport, UreqTransport};
+pub use http::{Authorized, HttpError, Transport, UreqTransport};
 pub use library_folders::{
     AddFolderRefusal, LIBRARY_FOLDERS_FILE, LIBRARY_FOLDERS_FORMAT, LibraryFolders,
     LibraryFoldersError,
