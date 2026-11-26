@@ -41,6 +41,13 @@ migration in that extension.
   (one mark per stretch of one tightness under a slit band); the warning ids `cover_rounded`, `cover_offset_failed`, `fillet_failed` and `bend_too_short` are added and
   `outline_curved` is removed. Source-breaking for code that matches `Mark` exhaustively.
 
+- ADR 0082 §10 (`0147` slice 3, Detach part): `Part` gains `key: Cow<'static, str>`, a stable key unique within one
+  result, so an operation can hold `member.<node>#<key>` for one part: 1 to 15 characters of `a-z`, `0-9` and `-`; the host
+  refuses a generation whose keys break that or repeat. A gear `gear`, a Box `bottom`, `front`, `back`, `left`, `right`,
+  `lid`, a rounded box `strip`, `base`, `cover`, `ring`, `lid` (and in Curved `left`, `right`, `front`), a path box
+  `wall-<n>` first. Source-breaking for code that builds a `Part` literal. The host stores the keys beside the parts
+  (`format_version` 65).
+
 ## Unreleased (`specs/0026-machine-profile`)
 
 - Block kind `MachineProfile { label }`: the machine profile picker and the copy's fields, drawn
@@ -56,8 +63,3 @@ migration in that extension.
 - Parameter kinds `Length { min, max }` and `Display` (a value the host shows, not edited).
 - Stored encoding of a length: `{"mm": <number>}`.
 - `FixtureDrawing`: open line segments in page-local millimetres with one line width.
-
-- ADR 0082 §10 (`0147` slice 3, Detach part): `Part` gains `key: Cow<'static, str>`, a stable key unique within one result, so an
-  operation can hold `member.<node>#<key>` for one part. A gear `gear`, a Box `bottom`, `front`, `back`, `left`, `right`, `lid`, a rounded
-  box `strip`, `base`, `cover`, `ring`, `lid` (and in Curved `left`, `right`, `front`), a path box `wall-<n>` first. Source-breaking for
-  code that builds a `Part` literal. The host stores the keys beside the parts (`format_version` 65).
