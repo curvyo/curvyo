@@ -118,6 +118,8 @@ pub mod library_online_text;
 pub mod library_text;
 pub mod library_tree;
 mod page_tree_rows;
+pub mod slot_drop_text;
+mod uniform_map;
 pub use page_tree_rows::{FixtureTreeRow, PageTree, PlacedPageRow};
 mod layer_text;
 mod linked_clone;
@@ -701,6 +703,7 @@ pub use transform_math::{
     stroke_or_radius_factor,
 };
 pub use undo_stack::{SelectionSnapshot, Target as UndoTarget, UndoStack};
+pub use uniform_map::map_uniform;
 pub use units::{SelectedUnit, Units};
 pub use value_scale::{FieldShown, Grid, ValueField, ValueScale};
 /// The Trace tool's settings schema (criterion 6), passed through for the host.

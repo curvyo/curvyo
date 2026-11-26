@@ -201,6 +201,11 @@ pub const FREE_STEPS: &[&str] = &[
     // `specs/0137-document-library`: an import adds new objects (and a page) only.
     "import_page",
     "import_elements",
+    // `specs/0154-library-into-slots` (ADR 0088 decision 5): a copy put into a slot, a fill, and
+    // the replace that removes a slot's content first.
+    "put_into_slot",
+    "replace_slot_content",
+    "fill_slots",
     // `specs/0138-template-library`: loading a template and importing an icon add new objects only.
     "load_online_template",
     "import_icon",
@@ -243,6 +248,9 @@ pub const FREE_STEPS: &[&str] = &[
 /// The edit commands of criterion 9 that have a label today. Any label in none of the three lists
 /// is an edit as well (Proposal: unknown future commands default to guarded).
 pub const EDIT_STEPS: &[&str] = &[
+    // `specs/0154-library-into-slots`: the fit written to a fragment's private copy (a scale and
+    // a turn of what it holds), never a step of the open document.
+    "uniform_map",
     // `specs/0099-sketch-pages` revision 2026-11-19: Expose on the sketch and the Parameters row of
     // a clone change what the selected objects are.
     "expose_parameter",
