@@ -1,6 +1,6 @@
 # ADRs for the generator joint options
 
-Status: Draft (architect, 2026-11-25; ADR 0087 written 2026-11-26), written beside the PO's first draft of `specification.md`,
+Status: Accepted 2026-11-26 (Fragen 381 to 385 answered; architect, 2026-11-25; ADR 0089 written 2026-11-26), written beside the PO's first draft of `specification.md`,
 so criteria are named by topic, not by number. Read against `curvyo-generators-core` at `e0fc2ebe`
 (`tab_layout.rs`, `tab_runs.rs`, `wall.rs`, `wall_bands.rs`, `slit_bend.rs`, `footprint.rs`,
 `wall_plates.rs`, `fingers.rs`, `rounded_box/`, `path_box/`, `boxes/`) and the golden
@@ -8,7 +8,7 @@ so criteria are named by topic, not by number. Read against `curvyo-generators-c
 vetoable at the demo. Customer questions carry a KURZ-ID only; the PO assigns their numbers
 (381 to 384 are reserved).
 
-- [ADR 0087](../../docs/adr/0087-generator-joint-options-tabs-on-the-curve-and-joint-layout.md)
+- [ADR 0089](../../docs/adr/0089-generator-joint-options-tabs-on-the-curve-and-joint-layout.md)
   (new, Proposed 2026-11-26): decides this feature. Decision 1 tighter windows (A0, decided,
   Frage 385 A), decision 2 option `bend_tabs` with `Param.initial` (A1, Frage 381 default A),
   decision 3 the shared `joint_layout.rs` and its keys (Part B, Fragen 382 to 384 default A,
@@ -130,10 +130,10 @@ vetoable at the demo. Customer questions carry a KURZ-ID only; the PO assigns th
    Part B for finger joints (Box, curved-top plates). Each slice is visible in the demo.
 3. 2026-11-26: **A0 decided** (customer, Frage 385 JOINT-WINDOW A): the band starts at the
    window's end, its outer column at half a slit width (plus a Wave's swing), only at ends that
-   meet a window (ADR 0087 decision 1).
+   meet a window (ADR 0089 decision 1).
 4. 2026-11-26: **The Box's leftover `joint` Choice is removed in the B-tabs slice** (lead,
-   Proposal; ADR 0087 decision 4, as ADR 0082 §3 decided).
-5. 2026-11-26: **For the PO** (ADR 0087 Consequences): criterion 2 tab sides parallel to the
+   Proposal; ADR 0089 decision 4, as ADR 0082 §3 decided).
+5. 2026-11-26: **For the PO** (ADR 0089 Consequences): criterion 2 tab sides parallel to the
    normal, clipped columns keep t_w; criterion 3 "off" means slice 1's window output; criterion 5
-   bound as ADR 0087 decision 2; criterion 6 no row on the curved top; Frage 385 recorded; a Frage number for JOINT-COUNT. Slices named
+   bound as ADR 0089 decision 2; criterion 6 no row on the curved top; Frage 385 recorded; a Frage number for JOINT-COUNT. Slices named
    by content: A0, A1, B tabs, B fingers.

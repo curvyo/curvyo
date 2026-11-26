@@ -1,6 +1,6 @@
-# ADR 0087: Generator joint options: tabs on the curve and joint layout
+# ADR 0089: Generator joint options: tabs on the curve and joint layout
 
-**Status:** Proposed 2026-11-26 by the architect. Slice 1 (decision 1, tighter windows) is
+**Status:** Accepted 2026-11-26: the customer answered Frage 385 A, 381 A, 382 A, 383 A, 384 C (Centred plus a Spread slider, decision 3 amendment). Proposed 2026-11-26 by the architect. Slice 1 (decision 1, tighter windows) is
 decided: the customer answered Frage 385 (JOINT-WINDOW) with A on 2026-11-26. Decision 2 follows
 Frage 381 (JOINT-BEND) at its default A, decision 3 follows Fragen 382 to 384 at their defaults
 A; all three are open. Not `needs-customer` by topic (no crate, no dependency, no
@@ -188,6 +188,17 @@ Findings.
 - `Param.initial` is available to the next option that must leave stored objects alone.
 - Slicing (Proposal): A0, A1, B for tabs (rounded box, path box, curved-top back tabs, and the
   `joint` removal), B for fingers (Box, curved-top plates). Each is visible in the demo.
+
+## Amendment 2026-11-26 (lead, after the customer's answers)
+
+- Frage 381 A: decision 2 holds as written (`Param.initial`; an old file reads `window`). The customer
+  said old files do not matter (pre-release); a missing key reading `curve` too was weighed and left out
+  for now (Proposal): it needs no contract field but changes every stored circle box on its next edit and
+  every existing circle golden and window test.
+- Frage 384 C: decision 3 gains the Choice-adjacent number `joint_spread` (0 to 100 %, default 0, shown
+  with Centred at Count 2 or more). Each centre is the linear blend of its Centred place and its Even
+  place, so margins and non-overlap hold; 100 % is Even, 0 % the Centred layout above (Proposal).
+- Frage 383 A: one layout per box; Frage 382 A: size along the edge only.
 
 ## Customer questions
 
