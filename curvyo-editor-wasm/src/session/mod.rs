@@ -99,6 +99,8 @@ mod layers_panel_tests;
 mod layers_tests;
 mod layers_toolbar;
 mod library_import;
+#[cfg(test)]
+mod param_copy_tests;
 // Used by the wasm32 build's library surface only.
 #[allow(unused_imports)]
 pub use library_import::ImportOptions;

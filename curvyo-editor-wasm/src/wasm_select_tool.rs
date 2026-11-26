@@ -218,19 +218,23 @@ impl WasmSession {
     /// `unified-object-editing`; 11 of `edit-interaction-polish`).
     /// `last_edited` is the index of the field edited last. `third` is the text of a third
     /// field: a laser stop's S chip (`specs/0102-laser-fixtures` criterion 23); absent otherwise.
+    /// `as_copy` is the Copy check of a parameter chip: the value goes to a selected copy
+    /// (`specs/0073-parameter-handle-clone` criterion 11).
     pub fn commit_transform_entry(
         &mut self,
         first: &str,
         second: &str,
         last_edited: u32,
         third: Option<String>,
+        as_copy: bool,
     ) -> String {
         let last = usize::try_from(last_edited).unwrap_or(0);
         let third = third.unwrap_or_default();
-        crate::wasm_move_entry::outcome_code(
-            self.session
-                .commit_transform_entry_fields(&[first, second, third.as_str()], last),
-        )
+        crate::wasm_move_entry::outcome_code(self.session.commit_transform_entry_fields(
+            &[first, second, third.as_str()],
+            last,
+            as_copy,
+        ))
     }
 
     /// Closes the numeric entry without writing (criterion 20): Escape, a

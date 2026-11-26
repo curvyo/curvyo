@@ -61,7 +61,7 @@ pub(super) fn chip(s: &mut Session, id: NodeId, key: char, texts: &[&str]) -> En
             },
         );
     }
-    s.commit_transform_entry_fields(texts, 0)
+    s.commit_transform_entry_fields(texts, 0, false)
 }
 
 /// The stored parameter `key` of the fixture `id`.

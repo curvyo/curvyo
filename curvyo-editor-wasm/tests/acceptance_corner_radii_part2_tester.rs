@@ -322,14 +322,23 @@ fn switch_and_shift_make_four_equal_or_one_corner_for_every_corner() {
 
 #[test]
 fn shift_pressed_or_released_mid_drag_changes_nothing() {
-    // Linked, press without Shift, Shift down for the rest of the drag.
+    // Linked, press without Shift, Shift down for the rest of the drag: since `0073` (Frage 387,
+    // Shift is the copy key) that writes a copy; its linkage is still the press's, all four.
     let mut f = fx([5.0, 0.0, 12.0, 3.0]);
     let from = f.press(0, false);
     f.s.modifiers_changed(true, false, false);
     let to = along(from, 0, 6.0);
     f.s.pointer_hover(to, true, false);
     f.s.pointer_up(to, true, false);
-    let a = stored_of(&f.s);
+    assert_eq!(stored_of(&f.s), [5.0, 0.0, 12.0, 3.0], "the original stays");
+    let d = doc_of(&f.s);
+    let ObjectSnapshot::Primitive(copy) = d.object(d.object_ids()[1]).unwrap() else {
+        panic!("a primitive copy");
+    };
+    let Shape::Rect { corner_radii, .. } = copy.shape else {
+        panic!("a rectangle");
+    };
+    let a = arr(corner_radii);
     assert!(a.iter().all(|v| *v == a[0]), "{a:?}");
     // Linked, press with Shift (one corner), Shift released mid-drag.
     let mut f = fx([5.0, 0.0, 12.0, 3.0]);

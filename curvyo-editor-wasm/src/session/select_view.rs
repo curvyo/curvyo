@@ -353,10 +353,17 @@ impl Session {
                         && (params_visible || !matches!(handle, EditHandle::Param(_)))
                 })
                 .collect();
+        // In a copy drag the box and the other knobs stay on the original; the dragged knob and
+        // the Rounded guide show the copy's value (`specs/0073` criterion 5).
+        let copy = self.param_copy_knob(tolerances, side_rotate, dragging);
         let mut param_guides = Vec::new();
         let handles = drawn
             .into_iter()
             .map(|(handle, position)| {
+                let position = match &copy {
+                    Some((_, knob)) if dragging == Some(handle) => *knob,
+                    _ => position,
+                };
                 let active = highlighted == Some(handle) || hovered == Some(handle);
                 if let (EditHandle::Param(ParamHandle::CornerRadius(corner)), true) =
                     (handle, active)
@@ -379,8 +386,9 @@ impl Session {
                 }
             })
             .collect();
+        let guided = copy.as_ref().map_or(object, |(copy, _)| copy);
         let param_ticks =
-            self.rounded_guide(object, &box_, highlighted.or(hovered), &mut param_guides);
+            self.rounded_guide(guided, &box_, highlighted.or(hovered), &mut param_guides);
         let live_pivot = self.select.live_pivot(self.held.shift);
         // Criterion 55: Shift held, nothing running, the pointer on a handle:
         // the marker previews the point that handle would use.
@@ -402,6 +410,33 @@ impl Session {
             param_ticks,
             device_pixel_ratio: self.device_pixel_ratio,
         }
+    }
+
+    /// The copy a parameter handle copy drag would write now, and where its dragged knob sits on
+    /// it; `None` outside a copy drag.
+    fn param_copy_knob(
+        &self,
+        tolerances: curvyo_ui_core::TransformHandleTolerances,
+        side_rotate: bool,
+        dragging: Option<EditHandle>,
+    ) -> Option<(ObjectSnapshot, Point)> {
+        if !self.select.param_copy_in_flight() {
+            return None;
+        }
+        let dragging = dragging?;
+        let copy =
+            self.select
+                .live_transform(self.pointer_position?, self.held.shift, self.held.ctrl)?;
+        let knob = SelectTool::transform_handles(
+            std::slice::from_ref(&copy),
+            &self.selection,
+            tolerances,
+            side_rotate,
+        )
+        .into_iter()
+        .find(|(handle, _)| *handle == dragging)?
+        .1;
+        Some((copy, knob))
     }
 
     /// The Rounded handle's guide and ticks while it is hovered or dragged (`ux-notes.md`

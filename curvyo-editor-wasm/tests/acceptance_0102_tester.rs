@@ -134,7 +134,7 @@ fn chip(s: &mut Session, id: NodeId, k: &str, texts: &[&str]) -> EntryOutcome {
         };
         return s.commit_move_entry(texts[0], texts[1], mode);
     }
-    s.commit_transform_entry_fields(texts, 0)
+    s.commit_transform_entry_fields(texts, 0, false)
 }
 
 /// What a screen reader says of the fixture `id` selected, with its sizes.

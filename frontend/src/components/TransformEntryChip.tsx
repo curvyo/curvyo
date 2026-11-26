@@ -2,6 +2,7 @@ import { CircleAlert, Link2 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import type { TransformEntryState } from "@/hooks/useEditorSession";
+import { entryHasCopyCheck } from "@/lib/paramEntryCopy";
 import { placeEntryChip, placeMoveChip } from "@/lib/readoutPlacement";
 
 /** The tool rail's clearance from the canvas's left edge, px (`App.tsx`'s
@@ -38,8 +39,15 @@ interface TransformEntryChipProps {
    * returns to. */
   containerRef: React.RefObject<HTMLDivElement | null>;
   /** Enter: `"committed"`, `"unchanged"` or `"invalid:<field>:<reason>"`. `third` is the third
-   * field of a laser stop's S chip. */
-  onCommit: (first: string, second: string, lastEdited: number, third?: string) => string;
+   * field of a laser stop's S chip; `asCopy` the state of a parameter chip's Copy check
+   * (`specs/0073-parameter-handle-clone` criterion 11). */
+  onCommit: (
+    first: string,
+    second: string,
+    lastEdited: number,
+    third: string | undefined,
+    asCopy: boolean,
+  ) => string;
   onCancel: () => void;
   onLinked: (field: number, text: string) => string | undefined;
   /** The note line for the typed texts while a size is negative ("Mirrored left to right"),
@@ -75,6 +83,10 @@ export function TransformEntryChip({
   const [texts, setTexts] = useState<string[]>(() => entry.fields.map((f) => f.prefill));
   const [lastEdited, setLastEdited] = useState(0);
   const [invalid, setInvalid] = useState<{ field: number; reason: Reason } | null>(null);
+  // The Copy check of a parameter chip: unset on every open, the chip remounts per entry.
+  const hasCopy = entryHasCopyCheck(entry.kind);
+  const [copy, setCopy] = useState(false);
+  const copyRef = useRef<HTMLInputElement>(null);
   const [sizes, setSizes] = useState({
     chip: { width: 0, height: 0 },
     canvas: { width: Number.POSITIVE_INFINITY, height: Number.POSITIVE_INFINITY },
@@ -141,7 +153,7 @@ export function TransformEntryChip({
   };
 
   const submit = () => {
-    const outcome = onCommit(texts[0] ?? "", texts[1] ?? "", lastEdited, texts[2]);
+    const outcome = onCommit(texts[0] ?? "", texts[1] ?? "", lastEdited, texts[2], hasCopy && copy);
     if (outcome.startsWith("invalid:")) {
       const [, field, reason] = outcome.split(":");
       setInvalid({ field: Number(field), reason: asReason(reason) });
@@ -159,6 +171,10 @@ export function TransformEntryChip({
       event.preventDefault();
       onCancel();
       returnFocusToCanvas();
+    } else if (event.key === "Tab" && hasCopy) {
+      // Field, Copy, back to the field (criterion 18).
+      event.preventDefault();
+      copyRef.current?.focus();
     } else if (event.key === "Tab") {
       event.preventDefault();
       const editable = entry.fields
@@ -184,6 +200,20 @@ export function TransformEntryChip({
       }
     }
     setTexts(next);
+  };
+
+  const onCopyKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submit();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      onCancel();
+      returnFocusToCanvas();
+    } else if (event.key === "Tab") {
+      event.preventDefault();
+      selectField(Math.max(entry.fields.findIndex((f) => f.editable), 0));
+    }
   };
 
   // Cancel on a blur that leaves the chip (a press elsewhere, a tool switch,
@@ -327,6 +357,22 @@ export function TransformEntryChip({
         <div aria-hidden className="mt-1.5 px-1 text-xs opacity-70">
           {entry.scope}
         </div>
+      )}
+      {hasCopy && (
+        // The Copy check of the Move entry chip, the chip's last row (`0073` UX notes V3).
+        <label className="mt-1.5 flex h-6 cursor-pointer items-center gap-1.5 px-1 text-xs">
+          <input
+            ref={copyRef}
+            type="checkbox"
+            checked={copy}
+            aria-label="Copy"
+            onChange={(event) => setCopy(event.target.checked)}
+            onKeyDown={onCopyKeyDown}
+            onBlur={onBlur}
+            className="size-3.5 cursor-pointer accent-[var(--editor-accent)]"
+          />
+          <span aria-hidden>Copy</span>
+        </label>
       )}
       {/* Always mounted so the polite live region announces a change; empty
           it has no height. The message sits outside the field row (the chip

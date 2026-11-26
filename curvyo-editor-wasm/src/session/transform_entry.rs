@@ -305,15 +305,18 @@ impl Session {
         second: &str,
         last_edited: usize,
     ) -> EntryOutcome {
-        self.commit_transform_entry_fields(&[first, second], last_edited)
+        self.commit_transform_entry_fields(&[first, second], last_edited, false)
     }
 
     /// [`Session::commit_transform_entry`] with every field's text: a laser fixture's S chip of
-    /// a stop has three (`specs/0102-laser-fixtures` criterion 23).
+    /// a stop has three (`specs/0102-laser-fixtures` criterion 23). `as_copy` is the Copy check
+    /// of a parameter chip: the value goes to a copy, which is then selected
+    /// (`specs/0073-parameter-handle-clone` criterion 11); the other chips have no check.
     pub fn commit_transform_entry_fields(
         &mut self,
         texts: &[&str],
         last_edited: usize,
+        as_copy: bool,
     ) -> EntryOutcome {
         if let Some(outcome) = self.commit_fixture_entry(texts, false) {
             return outcome;
@@ -359,9 +362,14 @@ impl Session {
             }
             let mirror = this.transform_entry_mirror_line(first, second, last_edited);
             let entry_handle = this.select.entry_handle();
-            let outcome = this
-                .select
-                .commit_entry(&this.document, [first, second], last_edited);
+            let as_copy = as_copy && this.open_param_entry().is_some();
+            let outcome = if as_copy {
+                this.select
+                    .commit_param_entry_as_copy(&this.document, &mut this.selection, first)
+            } else {
+                this.select
+                    .commit_entry(&this.document, [first, second], last_edited)
+            };
             if outcome == EntryOutcome::Committed {
                 this.transform_notice = curvyo_ui_core::zero_recovery_notice(recovery);
                 // A typed negative size is announced with its mirror (`0056` UX notes).
@@ -373,7 +381,13 @@ impl Session {
             }
             if outcome == EntryOutcome::Committed
                 && let Some((entry, anchor)) = notice
-                && let Some(object) = this.document.object(entry.object().id())
+                // After a copy the notice shows the copy's value (`0073` criterion 11).
+                && let Some(id) = if as_copy {
+                    this.selection.ids().first().copied()
+                } else {
+                    Some(entry.object().id())
+                }
+                && let Some(object) = this.document.object(id)
                 && let EditHandle::Param(param) = entry.handle()
                 && let Some(text) = param_readout(
                     &object,
