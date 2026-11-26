@@ -88,14 +88,12 @@ export function clampField(
   return { value, notice: null };
 }
 
-/** The notice after a refusal (criteria 4, 14, 17 and 22), or `null` for a result that is no
+/** The notice after a refusal (criteria 4, 17 and 22), or `null` for a result that is no
  * refusal. */
 export function bridgeRefusalText(result: BridgeResult): string | null {
   switch (result.kind) {
     case "one_page":
       return `Bridge works on one laser page. ${NOTHING_CHANGED}`;
-    case "assigned_parent":
-      return `Bridge: the group or layer already has an operation. ${NOTHING_CHANGED}`;
     case "nothing_to_join":
       return `Bridge: nothing to join. ${NOTHING_CHANGED}`;
     case "too_many_bridges":

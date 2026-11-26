@@ -15,8 +15,15 @@ The lead updates `specification.md` and `ux-notes.md`; this plan already follows
   criterion 3's chip and preview are not built.
 - **Frage 398 C (changed):** Reach as specified plus a **Join all** switch in the Select bar: on,
   every piece is joined regardless of Reach (the kernel reads Reach as unbounded).
-- Fragen 396 A, 397 A, 403 A and 404 B unchanged (404 B: refused when the result would stand
-  under a group or layer that holds an assignment).
+- Fragen 396 A and 397 A unchanged.
+- **Frage 404 A (changed, follow-up of 2026-11-26):** no refusal under a group or layer that holds
+  an operation; the Bridges inherit it by the nearest rule like any leaf (`0101` criterion 12).
+- **Frage 403 (changed):** column B does not scroll; the rail wraps by itself on small windows.
+  The rail is as before apart from the Bridge button.
+- **Criterion 15 (lead decision, Proposal):** meant with a non-dot middle piece. A dot is attached
+  to its nearest non-dot (rule 7a) and never forms a path between two letters, so a dot between
+  two letters joins one of them and the other stays apart (`tests/acceptance_0156.rs`,
+  `c15_as_written_a_dot_in_the_middle_joins_one_letter_only`).
 
 ## Affected crates/modules
 
@@ -52,8 +59,9 @@ The lead updates `specification.md` and `ux-notes.md`; this plan already follows
   the given operations on the Outline, one commit (AC 11, 14, 20, 26).
 - [x] 5. `fuse_plan.rs` and session: laser-page gate (AC 1, 2), one-page and placement refusal
   (AC 4), operands as Weld reads them with texts converted in the step (AC 6), effective
-  assignment of the bottom-most operand on the Outline, Bridges none, refusal under an assigned
-  group or layer (AC 14, Frage 404 B), result selected (AC 11), one undo step "Bridge", run-twice
+  assignment of the bottom-most operand on the Outline, Bridges none of their own and inheriting
+  an enclosing group's or layer's operation (AC 14, Frage 404 A), result selected (AC 11), one
+  undo step "Bridge", run-twice
   determinism (AC 18), save and reopen (AC 20), CPU budget 60 pieces / 3000 nodes / 300 ms
   (AC 19).
 - [x] 6. Frontend: Bridge on the Boolean card after Weld, laser pages only, absent elsewhere
@@ -90,8 +98,10 @@ The lead updates `specification.md` and `ux-notes.md`; this plan already follows
    order); `adrs.md` decision 5 had the Connectors above.
 5. **Criterion 4.** A leaf off the laser page is refused before the edit guard, so the maker sees
    "Bridge works on one laser page" instead of the generic move-only refusal.
-6. **Criteria 10 and 25** are covered with geometric stand-ins (a u with two discs, a B with two
-   counters), not with a font file; the tester's font fixtures are still to come.
+6. **Criteria 10 and 25** are covered with geometric stand-ins in the kernel and with Source Sans 3
+   Regular (OFL, already shipped in `frontend/public/fonts/source-sans-3/` with its licence) in
+   `curvyo-editor-wasm/tests/fuse_fonts.rs`; the font is read from there, not copied into a
+   `tests/fixtures/` folder.
 7. **Limit notice** shows under the Bridge group of the Select bar for 3 s in the status look (the
    chip it was written for is gone).
 8. The design-system rows of `ux-notes.md` §10 are not added (the chip row no longer applies);

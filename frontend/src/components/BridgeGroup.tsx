@@ -194,7 +194,7 @@ export function BridgeGroup({ ready, onBridge, onReturnFocus }: BridgeGroupProps
   };
   const stencil = settings.mode === "stencil";
   return (
-    <div role="group" aria-label="Bridge" className="relative flex flex-wrap content-start items-center gap-x-3 py-1">
+    <div role="group" aria-label="Bridge" className="relative flex flex-wrap content-start items-center gap-x-2 py-1">
       <ModePill mode={settings.mode} onChange={(mode) => setBridgeSettings({ mode })} />
       <NumberField
         label="Width"

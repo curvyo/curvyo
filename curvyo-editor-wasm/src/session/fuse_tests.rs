@@ -6,6 +6,8 @@
 use curvyo_document_core::{Direction, NodeId, Point, RectBounds, unpack};
 use curvyo_ui_core::{FuseMode, FuseSettings};
 
+use curvyo_laser_core::operations::{ChainScope, OperationList};
+
 use super::fuse::{FuseAvailability, FuseOutcome, FuseSessionRefusal};
 use super::{Session, Tool};
 
@@ -109,10 +111,11 @@ fn a_leaf_off_the_laser_page_refuses() {
     );
 }
 
-/// Criterion 14: the Outline carries the bottom operand's operation, the Bridges none; under an
-/// assigned layer Bridge is refused (Frage 404 B).
+/// Criterion 14: the Outline carries the bottom operand's operation, the Bridges none of their
+/// own; under an assigned layer Bridge runs and the Bridges inherit the layer's operation by the
+/// nearest rule (Frage 404 A).
 #[test]
-fn the_outline_takes_the_operation_and_an_assigned_group_refuses() {
+fn the_outline_takes_the_operation_and_the_bridges_inherit_the_layer() {
     let (mut s, a, b) = laser_with_bars(310_005);
     s.selection.set(&[a]);
     let cut = s.add_test_operation("cut").unwrap();
@@ -155,10 +158,25 @@ fn the_outline_takes_the_operation_and_an_assigned_group_refuses() {
     let (a, b) = bars(&mut s);
     s.set_tool(Tool::Select);
     s.selection.set(&[a, b]);
-    assert_eq!(
-        s.apply_fuse(LETTERING),
-        FuseOutcome::Refused(FuseSessionRefusal::AssignedParent)
+    assert_eq!(s.apply_fuse(LETTERING), FuseOutcome::Applied { bridges: 1 });
+    let group = s.selection.ids()[0];
+    let parts = s.document.children(Some(group))[0];
+    let bridge = s.document.children(Some(parts))[0];
+    let active = s.active_operations().unwrap();
+    let layer_cut = active.operations[0].id;
+    assert!(
+        active.operations[0]
+            .members
+            .iter()
+            .all(|m| m != &vec![bridge]),
+        "the Bridge has no assignment of its own"
     );
+    let list = OperationList::new(&active.operations, active.cuts_last);
+    let inherited = list
+        .nearest(&s.document.key_chain(&[bridge]), ChainScope::Whole)
+        .unwrap();
+    assert_eq!(inherited.target, vec![layer]);
+    assert_eq!(active.operations[inherited.operations[0]].id, layer_cut);
 }
 
 /// Criteria 18 and 20: two runs give the same bytes; save and reopen keeps the group.

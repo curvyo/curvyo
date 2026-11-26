@@ -17,7 +17,7 @@ fn count(n: usize) -> u32 {
 }
 
 /// What `apply_fuse` did. `kind` is `"ignored"`, `"applied"` (`count` bridges) or a refusal:
-/// `"one_page"`, `"assigned_parent"`, `"nothing_to_join"`, `"too_many_bridges"`, `"no_islands"`,
+/// `"one_page"`, `"nothing_to_join"`, `"too_many_bridges"`, `"no_islands"`,
 /// `"extended_path"`, `"no_area"`, `"out_of_range"` (`count` of the `of` selected objects are to
 /// blame), `"missing_fonts"`, `"fonts_loading"` or `"single_line_texts"` (`count` texts).
 #[wasm_bindgen]
@@ -43,9 +43,6 @@ impl From<FuseOutcome> for FuseResultView {
             FuseOutcome::Ignored => view("ignored", 0, 0),
             FuseOutcome::Applied { bridges } => view("applied", bridges, 0),
             FuseOutcome::Refused(FuseSessionRefusal::OnePage) => view("one_page", 0, 0),
-            FuseOutcome::Refused(FuseSessionRefusal::AssignedParent) => {
-                view("assigned_parent", 0, 0)
-            }
             FuseOutcome::Refused(FuseSessionRefusal::Plan(refusal)) => match refusal {
                 FuseRefusal::NothingToJoin => view("nothing_to_join", 0, 0),
                 FuseRefusal::TooManyBridges => view("too_many_bridges", 0, 0),

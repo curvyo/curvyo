@@ -3,8 +3,6 @@
 //! one group "Bridged lettering" or "Bridged stencil" in one commit labelled `fuse`, written by
 //! `Document::replace_with_group`; the result is selected alone.
 
-use std::collections::HashSet;
-
 use curvyo_document_core::{NewGroup, NodeId};
 use curvyo_laser_core::operations::{ChainScope, OperationList};
 use curvyo_ui_core::{
@@ -30,9 +28,6 @@ pub enum FuseAvailability {
 pub enum FuseSessionRefusal {
     /// The selection holds leaves off the active laser page, or a placement (criterion 4).
     OnePage,
-    /// The result would stand under a group or layer that holds an operation (criterion 14,
-    /// Frage 404 B).
-    AssignedParent,
     /// The plan refused.
     Plan(FuseRefusal),
 }
@@ -102,33 +97,20 @@ impl Session {
         })
     }
 
-    /// The effective assignment of `leaf` by the nearest rule (criterion 14), as operation ids,
-    /// and whether a node above `place` holds any assignment (Frage 404 B).
-    fn fuse_assignments(&self, leaf: NodeId, place: NodeId) -> (Vec<NodeId>, bool) {
+    /// The effective assignment of `leaf` by the nearest rule (criterion 14), as operation ids.
+    /// The Bridges get none of their own and inherit what encloses the result (Frage 404 A).
+    fn fuse_operations(&self, leaf: NodeId) -> Vec<NodeId> {
         let Some(active) = self.active_operations() else {
-            return (Vec::new(), false);
+            return Vec::new();
         };
         let list = OperationList::new(&active.operations, active.cuts_last);
-        let operations = list
-            .nearest(&self.document.key_chain(&[leaf]), ChainScope::Whole)
+        list.nearest(&self.document.key_chain(&[leaf]), ChainScope::Whole)
             .map(|a| {
                 let mut at = a.operations;
                 at.sort_unstable();
                 at.into_iter().map(|k| active.operations[k].id).collect()
             })
-            .unwrap_or_default();
-        let assigned: HashSet<NodeId> = active
-            .operations
-            .iter()
-            .flat_map(|op| op.members.iter().filter(|m| m.len() == 1).map(|m| m[0]))
-            .collect();
-        let above = self
-            .document
-            .node_chain(place)
-            .into_iter()
-            .skip(1)
-            .any(|node| assigned.contains(&node));
-        (operations, above)
+            .unwrap_or_default()
     }
 
     /// Bridges the selected objects with `settings` in one commit labelled `fuse`. The tool stays
@@ -166,10 +148,7 @@ impl Session {
                 return FuseOutcome::Refused(FuseSessionRefusal::Plan(refusal));
             }
         };
-        let (operations, assigned_above) = self.fuse_assignments(plan.bottom, plan.place);
-        if assigned_above {
-            return FuseOutcome::Refused(FuseSessionRefusal::AssignedParent);
-        }
+        let operations = self.fuse_operations(plan.bottom);
         let written = self.document.replace_with_group(
             &plan.removed,
             plan.place,

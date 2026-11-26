@@ -55,13 +55,10 @@ test("criterion 5: typed values are clamped with the limit notice; a non-number 
   assert.equal(clampField(WIDTH_RANGE, "Width", Number.NaN, " mm"), null);
 });
 
-test("criteria 4, 14, 17 and 22: the refusals read as the spec writes them", () => {
+test("criteria 4, 17 and 22: the refusals read as the spec writes them", () => {
   const refusal = (kind: string) => bridgeRefusalText({ kind, count: 0, of: 0 });
   assert.equal(refusal("one_page"), "Bridge works on one laser page. Nothing was changed.");
-  assert.equal(
-    refusal("assigned_parent"),
-    "Bridge: the group or layer already has an operation. Nothing was changed.",
-  );
+  assert.equal(refusal("assigned_parent"), null, "Frage 404 A: no refusal under an operation");
   assert.equal(refusal("nothing_to_join"), "Bridge: nothing to join. Nothing was changed.");
   assert.equal(
     refusal("too_many_bridges"),

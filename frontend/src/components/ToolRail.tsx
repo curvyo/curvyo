@@ -336,10 +336,8 @@ export function ToolRail({
           </div>
           <ImportCard primary={MAC ? "Cmd" : "Ctrl"} onImport={onImport} />
         </div>
-        {/* Column B: the Path card and, 8px below it, the Boolean card. In a window too short for
-            both, the Path card stays and the Boolean card scrolls (`0156` criterion 2, Frage 403
-            A); a focused button is scrolled into view by the browser. */}
-        <div className="flex min-h-0 w-12 flex-col gap-2">
+        {/* Column B: the Path card and, 8px below it, the Boolean card. */}
+        <div className="flex w-12 flex-col gap-2">
           {moveOnly ? null : (
             <>
               <PathCommands
@@ -347,13 +345,11 @@ export function ToolRail({
                 selectTool={tool === "select"}
                 onReturnFocus={onReturnFocus}
               />
-              <div className="pointer-events-auto min-h-0 overflow-y-auto [scrollbar-width:thin]">
-                <BooleanCommands
-                  commands={commands.booleans}
-                  selectTool={tool === "select"}
-                  onReturnFocus={onReturnFocus}
-                />
-              </div>
+              <BooleanCommands
+                commands={commands.booleans}
+                selectTool={tool === "select"}
+                onReturnFocus={onReturnFocus}
+              />
             </>
           )}
         </div>
