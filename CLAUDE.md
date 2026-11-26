@@ -130,6 +130,8 @@ cd frontend && npm run build:wasm && npx tsc -b --noEmit && npm test && npx oxli
 - Never push to `main`, never force-push shared branches.
 - Branches `story/<slug>`, `fix/<slug>`, `chore/<slug>`; Conventional Commits, scope = crate.
 - 1-5 self-contained commits per PR; rebase-merge (`docs/guides/git-workflow.md`).
+- **Every PR description ends with an "Origin" line**: `Origin: <hostname> · <branch> · <date>` (`hostname`; in a
+  cloud session its session id), so parallel sessions on the same repo can be told apart. Commits stay as they are.
 - `chore/` and `fix/` PRs merge without asking once CI is green; `story/` PRs wait for the customer.
 - Code navigation: ProjectAtlas MCP (`projectatlas init` once, `scan` after a pull or switch;
   see `docs/playbooks/atlas.md`).
