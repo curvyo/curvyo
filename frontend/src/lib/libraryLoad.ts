@@ -334,7 +334,7 @@ export function slotDragOf(ctx: LoadContext, resolve: () => Promise<ResolvedSlot
       return got?.source ?? null;
     },
     multiPage: () => (read.pages ?? 1) > 1 || (got !== null && got.source.whole && got.source.reader.page_count() > 1),
-    onSlot: (cue, alt) => {
+    onSlot: (cue, alt, ctrl) => {
       used = true;
       void start().then((value) => {
         if (!value) {
@@ -347,7 +347,7 @@ export function slotDragOf(ctx: LoadContext, resolve: () => Promise<ResolvedSlot
           fillSlotsOf(ctx, value.source, cue.holder, alt);
         } else if (cue.slot) {
           // The put owns the reader now: a filled slot's Replace still needs it.
-          putIntoSlot(ctx, value.source, cue.slot, alt, false, value.done);
+          putIntoSlot(ctx, value.source, cue.slot, alt, false, value.done, ctrl && cue.kind === "slot");
           return;
         }
         value.done();

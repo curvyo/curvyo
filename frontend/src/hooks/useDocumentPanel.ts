@@ -213,6 +213,8 @@ interface EditorHandle {
   refreshCursor: () => void;
   /** The canvas: the row drag's coordinates, and focus after a drop (`specs/0099` criterion 8). */
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /** The canvas notice slot (the fit notice of a page placed into a slot, `specs/0154`). */
+  showHistoryNotice: (text: string, ms?: number, source?: "canvas" | "panel", kind?: "status" | "alert") => void;
 }
 
 /**
@@ -335,6 +337,7 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
       refresh();
       editor.containerRef.current?.focus({ preventScroll: true });
     },
+    (text, kind) => editor.showHistoryNotice(text, kind === "alert" ? 8000 : 3000, "canvas", kind),
   );
   const pageAction: DocumentPanelApi["pageAction"] = (
     action,

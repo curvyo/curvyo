@@ -269,12 +269,12 @@ export function PagesBlock({
                     }
                   });
                 }}
-                onPointerUp={() => {
+                onPointerUp={(e) => {
                   const d = drag.current;
                   if (d?.placing && d.moved && !d.inList) {
                     drag.current = null;
                     setDragTarget(null);
-                    rowDrag.drop();
+                    rowDrag.drop(e.ctrlKey || e.metaKey, e.altKey);
                     return;
                   }
                   if (d?.moved && d.inList) reorder(page, d.target);
