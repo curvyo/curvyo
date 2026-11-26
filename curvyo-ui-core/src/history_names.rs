@@ -218,6 +218,12 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0137-document-library` criteria 4 and 5.
     ("import_page", "Import page"),
     ("import_elements", "Import elements"),
+    // `specs/0154-library-into-slots` criteria 4, 7 and 8 (ADR 0088 decision 5).
+    ("put_into_slot", "Put into slot"),
+    ("replace_slot_content", "Replace slot content"),
+    ("fill_slots", "Fill slots"),
+    // The fit written to a fragment's private copy before the insert; never a step of its own.
+    ("uniform_map", "Fit into slot"),
     // `specs/0138-template-library` criterion 3 (UX F3, F5).
     ("load_online_template", "Load template"),
     ("import_icon", "Import icon"),
