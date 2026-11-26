@@ -23,10 +23,29 @@ use crate::units::{Angle, Point, Vec2};
 /// would write it as a JSON number and silently lose precision for any
 /// non-Rust reader. `counter` is a plain `i32`, always within that range,
 /// and is left as a number.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeId {
     pub(crate) peer: u64,
     pub(crate) counter: i32,
+    /// The key of one part of a generated object (`member.<node>#<part>`, ADR 0082 §10), `None`
+    /// for the node itself. Only operation memberships and the leaf index carry it; it names no
+    /// tree node and is never a document id.
+    pub(crate) part: Option<crate::part_key::PartKey>,
+}
+
+impl std::fmt::Debug for NodeId {
+    /// `NodeId { peer, counter }`, with `part` only for a part's target (tests compare this text
+    /// with the tree id's).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut shown = f.debug_struct("NodeId");
+        shown
+            .field("peer", &self.peer)
+            .field("counter", &self.counter);
+        if let Some(part) = self.part {
+            shown.field("part", &part);
+        }
+        shown.finish()
+    }
 }
 
 impl NodeId {
@@ -34,6 +53,7 @@ impl NodeId {
     pub const NONE: Self = Self {
         peer: 0,
         counter: 0,
+        part: None,
     };
 
     /// Builds a [`NodeId`] from the `(peer, counter)` pair Loro's own
@@ -41,7 +61,34 @@ impl NodeId {
     /// and from `loro::TreeID`, which never crosses this crate's public
     /// API (ADR 0004 §3).
     pub(crate) const fn from_parts(peer: u64, counter: i32) -> Self {
-        Self { peer, counter }
+        Self {
+            peer,
+            counter,
+            part: None,
+        }
+    }
+
+    /// This node's part `key` (ADR 0082 §10): the target an operation holds as
+    /// `member.<node>#<key>`. `None` when `key` is not a valid part key (1 to 15 characters of
+    /// `a-z`, `0-9` and `-`).
+    #[must_use]
+    pub fn with_part(self, key: &str) -> Option<Self> {
+        Some(Self {
+            part: Some(crate::part_key::PartKey::new(key)?),
+            ..self
+        })
+    }
+
+    /// The part key this id names, `None` for a node itself.
+    #[must_use]
+    pub const fn part(self) -> Option<crate::PartKey> {
+        self.part
+    }
+
+    /// The node itself: this id without its part.
+    #[must_use]
+    pub const fn node(self) -> Self {
+        Self { part: None, ..self }
     }
 
     /// The 13-character id the History tab shows in full (a tooltip): the base-36 form of the
@@ -66,6 +113,8 @@ impl NodeId {
 struct NodeIdWire {
     peer: String,
     counter: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    part: Option<String>,
 }
 
 impl Serialize for NodeId {
@@ -73,6 +122,7 @@ impl Serialize for NodeId {
         NodeIdWire {
             peer: self.peer.to_string(),
             counter: self.counter,
+            part: self.part.map(|part| part.as_str().to_owned()),
         }
         .serialize(serializer)
     }
@@ -82,9 +132,17 @@ impl<'de> Deserialize<'de> for NodeId {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let wire = NodeIdWire::deserialize(deserializer)?;
         let peer = wire.peer.parse().map_err(serde::de::Error::custom)?;
+        let part = match wire.part {
+            None => None,
+            Some(key) => Some(
+                crate::part_key::PartKey::new(&key)
+                    .ok_or_else(|| serde::de::Error::custom("not a part key"))?,
+            ),
+        };
         Ok(Self {
             peer,
             counter: wire.counter,
+            part,
         })
     }
 }

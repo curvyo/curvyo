@@ -78,7 +78,13 @@ fn walk(
                 if !cut.is_some_and(|h| {
                     bend_with_hollow(&mut contour, (centre, radius), (from, sweep), h)
                 }) {
-                    contour.arc(centre, radius, from, sweep);
+                    bend(
+                        &mut contour,
+                        span,
+                        (centre, radius, from, sweep),
+                        tabs,
+                        (half_width, protrusion),
+                    );
                 }
             }
             Shape::Straight { from, to } => {
@@ -200,4 +206,63 @@ fn bend_with_hollow(
     contour.line_to(second_in, second);
     contour.arc(centre, radius, west, from + sweep - west);
     true
+}
+
+/// A bend with the tabs that stand on its arc (ADR 0089 decision 2): each tab is a rectangle on
+/// the arc's normal at its centre, its root on the arc and its tip on the concentric arc one
+/// `protrusion` further out (flush with the outside of the wall).
+fn bend(
+    contour: &mut Contour,
+    span: &Span,
+    (centre, radius, from, sweep): (Point, f64, f64, f64),
+    tabs: &[Tab],
+    (half_width, protrusion): (f64, f64),
+) {
+    let dir = sweep.signum();
+    let mut stood: Vec<f64> = tabs
+        .iter()
+        .filter(|tab| tab.s >= span.s0 - 1e-9 && tab.s <= span.s0 + span.length + 1e-9)
+        .filter(|tab| {
+            let (dx, dy) = (tab.centre.x - centre.x, tab.centre.y - centre.y);
+            (libm::hypot(dx, dy) - radius).abs() < 1e-6
+        })
+        .map(|tab| libm::atan2(tab.centre.y - centre.y, tab.centre.x - centre.x))
+        // Along the walk from `from`, within one turn.
+        .map(|angle| (dir * (angle - from)).rem_euclid(std::f64::consts::TAU))
+        .collect();
+    stood.sort_by(f64::total_cmp);
+    let tip_radius = radius + dir * protrusion;
+    let root = libm::asin((half_width / radius).min(1.0));
+    let tip = libm::asin((half_width / tip_radius).min(1.0));
+    // The point at lateral offset `lateral` from the tab's centre line, on a circle of `r`.
+    let at = |angle: f64, r: f64, lateral: f64| {
+        let (n, t) = (
+            (libm::cos(angle), libm::sin(angle)),
+            (-dir * libm::sin(angle), dir * libm::cos(angle)),
+        );
+        let depth = libm::sqrt((r * r - lateral * lateral).max(0.0));
+        Point::new(
+            centre.x + n.0 * depth + t.0 * lateral,
+            centre.y + n.1 * depth + t.1 * lateral,
+        )
+    };
+    let mut cursor = from;
+    for walked in stood {
+        let angle = from + dir * walked;
+        let start = angle - dir * root;
+        contour.arc(centre, radius, cursor, start - cursor);
+        let (root_a, root_b) = (
+            at(angle, radius, -half_width),
+            at(angle, radius, half_width),
+        );
+        let (tip_a, tip_b) = (
+            at(angle, tip_radius, -half_width),
+            at(angle, tip_radius, half_width),
+        );
+        contour.line_to(root_a, tip_a);
+        contour.arc(centre, tip_radius, angle - dir * tip, dir * 2.0 * tip);
+        contour.line_to(tip_b, root_b);
+        cursor = angle + dir * root;
+    }
+    contour.arc(centre, radius, cursor, from + sweep - cursor);
 }

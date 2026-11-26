@@ -31,6 +31,9 @@ pub(in crate::session) struct IndexedLeaf {
 pub(in crate::session) enum LeafSource {
     /// An item of the output page, in document space.
     Own(usize),
+    /// Some parts of the generated object at `at`, as a bit set over the record's parts (bit `i`
+    /// is part `i`): the rest of a box with detached parts, or one detached part (ADR 0082 §10).
+    GeneratedParts { at: usize, parts: u64 },
     /// The leaf at `member` in the picture of the clone at `clone` (a clone of a group, text or
     /// image, or of such a clone), by its place: the ids of a picture can repeat (a clone inside
     /// a cloned group draws its original's ids).
@@ -56,7 +59,39 @@ pub(in crate::session) enum LeafSource {
 struct Entry {
     read: Arc<DocumentRead>,
     manufacturing: NodeId,
+    /// The part keys that have their own operations, which decide how a generated object splits.
+    detached: Detached,
     leaves: Arc<[IndexedLeaf]>,
+}
+
+/// The detached parts of the output page's generated objects: part keys by node, sorted so two
+/// reads of the same operations compare equal.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(in crate::session) struct Detached(Vec<(NodeId, curvyo_document_core::PartKey)>);
+
+impl Detached {
+    /// The part keys of the operations' memberships (`member.<node>#<part>`).
+    fn of(operations: &[curvyo_document_core::OperationSnapshot]) -> Self {
+        let mut keys: Vec<(NodeId, curvyo_document_core::PartKey)> = operations
+            .iter()
+            .flat_map(|op| op.members.iter())
+            .filter_map(|path| match path.as_slice() {
+                [only] => Some((only.node(), only.part()?)),
+                _ => None,
+            })
+            .collect();
+        keys.sort_by_key(|(node, part)| (node.full_id(), part.as_str().to_owned()));
+        keys.dedup();
+        Self(keys)
+    }
+
+    fn of_node(&self, node: NodeId) -> Vec<curvyo_document_core::PartKey> {
+        self.0
+            .iter()
+            .filter(|(n, _)| *n == node)
+            .map(|(_, part)| *part)
+            .collect()
+    }
 }
 
 /// The leaf index cache of the session: valid while the drawing read and the laser page are the
@@ -73,16 +108,24 @@ impl Session {
     ) -> Arc<[IndexedLeaf]> {
         let read = self.document_read();
         let cache = &self.operations.leaves.0;
+        let detached = Detached::of(
+            &self
+                .document
+                .operations(manufacturing.id)
+                .unwrap_or_default(),
+        );
         if let Some(entry) = cache.borrow().as_ref()
             && Arc::ptr_eq(&entry.read, &read)
             && entry.manufacturing == manufacturing.id
+            && entry.detached == detached
         {
             return Arc::clone(&entry.leaves);
         }
-        let leaves: Arc<[IndexedLeaf]> = build_leaves(self, &read, manufacturing).into();
+        let leaves: Arc<[IndexedLeaf]> = build_leaves(self, &read, manufacturing, &detached).into();
         *cache.borrow_mut() = Some(Entry {
             read,
             manufacturing: manufacturing.id,
+            detached,
             leaves: Arc::clone(&leaves),
         });
         leaves
@@ -107,6 +150,7 @@ fn build_leaves(
     session: &Session,
     read: &DocumentRead,
     manufacturing: &ManufacturingSnapshot,
+    detached: &Detached,
 ) -> Vec<IndexedLeaf> {
     let Some(page) = manufacturing.page.as_ref() else {
         return Vec::new();
@@ -149,7 +193,7 @@ fn build_leaves(
             out.extend(own_picture_leaves(session, object, at, &visible));
             continue;
         }
-        out.push(own_leaf(session, object, at, &visible));
+        out.extend(own_leaves(session, object, at, &visible, detached));
     }
     out.extend(placed_leaves(
         session,
@@ -180,6 +224,90 @@ fn own_picture_leaves(
         |_| Some((chain.clone(), hidden)),
         |member| LeafSource::CloneMember { clone: at, member },
     )
+}
+
+/// The leaves of the page's own item `object`, at `at` in the drawing read: one, or for a
+/// generated object with detached parts (ADR 0082 §10) the rest of the box (the nearest rule's
+/// chain `[N]`) and one leaf per detached part (chain `[N#P]`, then `[N]`, the groups above).
+fn own_leaves(
+    session: &Session,
+    object: &ObjectSnapshot,
+    at: usize,
+    visible: &HashSet<NodeId>,
+    detached: &Detached,
+) -> Vec<IndexedLeaf> {
+    let keys = detached.of_node(object.id());
+    let split = (!keys.is_empty())
+        .then(|| session.document.generated(object.id()))
+        .flatten()
+        .and_then(|snapshot| split_parts(&snapshot, &keys))
+        .filter(|(_, parts)| !parts.is_empty());
+    let Some((rest, parts)) = split else {
+        return vec![own_leaf(session, object, at, visible)];
+    };
+    let whole = own_leaf(session, object, at, visible);
+    let snapshot = session.document.generated(object.id());
+    let counts = |mask: u64| {
+        snapshot.as_ref().map_or((1, 0), |snapshot| {
+            let closed = snapshot
+                .record
+                .parts
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| mask >> i & 1 == 1)
+                .map(|(_, part)| part.len())
+                .sum();
+            (closed, 0)
+        })
+    };
+    let leaf = |chain: Vec<Vec<NodeId>>, mask: u64| {
+        let (closed, open) = counts(mask);
+        IndexedLeaf {
+            chain,
+            hidden: whole.hidden,
+            shape: LeafShape::Outlines { closed, open },
+            source: LeafSource::GeneratedParts { at, parts: mask },
+        }
+    };
+    let mut out = Vec::new();
+    if rest != 0 {
+        out.push(leaf(whole.chain.clone(), rest));
+    }
+    for (key, mask) in parts {
+        let Some(own) = object.id().with_part(key.as_str()) else {
+            continue;
+        };
+        let mut chain = vec![vec![own]];
+        chain.extend(whole.chain.iter().cloned());
+        out.push(leaf(chain, mask));
+    }
+    out
+}
+
+/// The most parts a bit set tells apart.
+pub(in crate::session) const MAX_SPLIT_PARTS: usize = 64;
+
+/// The parts of `snapshot` split by the detached `keys` that exist in the record: the bit set of
+/// the parts that stay with the box and, in record order, each detached key with its bit. `None`
+/// for a record of more than [`MAX_SPLIT_PARTS`] parts: the box then stays one leaf, so no part
+/// leaves the job (Detach refuses such a box).
+fn split_parts(
+    snapshot: &curvyo_document_core::GeneratedSnapshot,
+    keys: &[curvyo_document_core::PartKey],
+) -> Option<(u64, Vec<(curvyo_document_core::PartKey, u64)>)> {
+    if snapshot.record.part_keys.len() > MAX_SPLIT_PARTS {
+        return None;
+    }
+    let mut rest = 0_u64;
+    let mut parts = Vec::new();
+    for (index, key) in snapshot.record.part_keys.iter().enumerate() {
+        let bit = 1_u64 << index;
+        match keys.iter().find(|k| k.as_str() == key.as_str()) {
+            Some(found) => parts.push((*found, bit)),
+            None => rest |= bit,
+        }
+    }
+    Some((rest, parts))
 }
 
 /// The leaf of the page's own item `object`, at `at` in the drawing read.
@@ -376,4 +504,41 @@ fn path_counts(path: &PathSnapshot) -> (usize, usize) {
             if sub.closed { (c + 1, o) } else { (c, o + 1) }
         },
     )
+}
+
+#[cfg(test)]
+mod split_tests {
+    use super::{MAX_SPLIT_PARTS, split_parts};
+    use curvyo_document_core::{Affine, GeneratedRecord, GeneratedSnapshot, NodeId, PartKey};
+
+    fn snapshot(count: usize) -> GeneratedSnapshot {
+        let square = vec![
+            0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 4.0, 0.0, 4.0, 0.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 0.0,
+            4.0, 0.0, 4.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0,
+        ];
+        GeneratedSnapshot {
+            id: NodeId::NONE,
+            record: GeneratedRecord {
+                kind: "curvyo.generators/rounded-box".into(),
+                seed: 1,
+                params: serde_json::Map::new(),
+                parts: vec![vec![square]; count],
+                part_keys: (0..count).map(|i| format!("wall-{i}")).collect(),
+            },
+            frame: Affine::IDENTITY,
+        }
+    }
+
+    #[test]
+    fn a_box_of_up_to_64_parts_splits_and_a_bigger_one_stays_whole() {
+        let key = |i: usize| PartKey::new(&format!("wall-{i}")).unwrap();
+        let (rest, parts) = split_parts(&snapshot(MAX_SPLIT_PARTS), &[key(63)]).unwrap();
+        assert_eq!(parts, vec![(key(63), 1 << 63)]);
+        assert_eq!(rest, u64::MAX >> 1);
+        assert_eq!(
+            split_parts(&snapshot(MAX_SPLIT_PARTS + 1), &[key(64)]),
+            None,
+            "part 64 would have no bit: the box stays one leaf"
+        );
+    }
 }

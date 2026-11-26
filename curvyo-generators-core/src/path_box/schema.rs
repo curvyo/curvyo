@@ -6,7 +6,7 @@ use curvyo_extension_core::{Param, ParamGroup, ParamKind, ParamValue};
 
 use super::check::default_outline;
 use crate::rounded_box::schema::{INNER, base, layout, lid, material, slits};
-use crate::schema::{angle, length, tracked};
+use crate::schema::{CENTRED, advanced, angle, length, tracked};
 
 /// The outline row: stored, never drawn.
 fn outline() -> Param {
@@ -18,6 +18,7 @@ fn outline() -> Param {
         default: ParamValue::Path(default_outline()),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -44,5 +45,13 @@ fn size() -> ParamGroup {
 
 /// Every group of the path box, in order.
 pub(crate) fn groups() -> Vec<ParamGroup> {
-    vec![size(), material(), slits(false), base(), lid(), layout()]
+    vec![
+        size(),
+        material(),
+        slits(false),
+        base(),
+        lid(),
+        layout(),
+        advanced(None, CENTRED),
+    ]
 }

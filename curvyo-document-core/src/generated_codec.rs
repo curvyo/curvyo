@@ -9,6 +9,8 @@
 //!     seed           : 0 ..= 4294967295
 //!     params         : { key: { "mm": n } | { "deg": n } | { "count": n } | { "on": b } | { "choice": "id" } | { "path": [x0, y0, c1x, c1y, c2x, c2y, x, y, ...] } }
 //!     parts          : [ part, ... ]   one part per piece (a gear one, a box one per plate)
+//!     part_keys      : [ "key", ... ]  (format 65) the part keys, parallel to `parts`, written whole
+//!                      with them; absent in an older file (no key, nothing to detach yet)
 //!       part         : [ subpath, ... ]   the outline and its holes
 //!       subpath      : [x0, y0, c1x, c1y, c2x, c2y, x, y, ...]   a start point, then cubics
 //!   generated_frame  : [a, b, c, d, e, f]   rotation, mirror and translation only
@@ -22,7 +24,8 @@
 //!
 //! Damage (refused at open): `generated` not a map; a `kind` that is not `<id>/<kind>`; a seed
 //! outside `u32`; `params` not a map; no part or an empty part; a subpath that is not `2 + 6n`
-//! finite numbers within ±1e7 (n at least 1); a frame that is not six finite numbers or holds
+//! finite numbers within ±1e7 (n at least 1); `part_keys` that is not a list of valid, distinct
+//! key strings as long as `parts` (ADR 0082 §10); a frame that is not six finite numbers or holds
 //! scale or shear beyond 1e-9.
 
 use std::collections::HashMap;
@@ -64,6 +67,30 @@ pub struct GeneratedRecord {
     pub params: serde_json::Map<String, Value>,
     /// Parts, each a list of subpaths of `2 + 6n` numbers (start, then `c1 c2 to` per cubic).
     pub parts: Vec<Vec<Vec<f64>>>,
+    /// The key of each part, parallel to `parts` (ADR 0082 §10), unique; empty for a record
+    /// written before format 65, which cannot detach a part until its next edit writes them.
+    pub part_keys: Vec<String>,
+}
+
+impl GeneratedRecord {
+    /// The index of the part with key `key`, `None` when there is no such part.
+    #[must_use]
+    pub fn part_index(&self, key: &str) -> Option<usize> {
+        self.part_keys.iter().position(|k| k == key)
+    }
+
+    /// Whether the keys follow the rules: none, or one valid key per part, all distinct.
+    #[must_use]
+    pub(crate) fn keys_are_valid(&self) -> bool {
+        self.part_keys.is_empty()
+            || (self.part_keys.len() == self.parts.len()
+                && self.part_keys.iter().all(|k| crate::part_key::is_valid(k))
+                && self
+                    .part_keys
+                    .iter()
+                    .enumerate()
+                    .all(|(at, key)| !self.part_keys[..at].contains(key)))
+    }
 }
 
 /// A generated object as stored: its record and frame.
@@ -187,6 +214,14 @@ fn record_value(record: &GeneratedRecord) -> LoroValue {
         json_to_loro(&Value::Object(record.params.clone())),
     );
     map.insert("parts".to_owned(), LoroValue::List(parts.into()));
+    if !record.part_keys.is_empty() {
+        let keys: Vec<LoroValue> = record
+            .part_keys
+            .iter()
+            .map(|key| LoroValue::String(key.as_str().into()))
+            .collect();
+        map.insert("part_keys".to_owned(), LoroValue::List(keys.into()));
+    }
     LoroValue::Map(map.into())
 }
 
@@ -310,12 +345,27 @@ pub(crate) fn read_record(meta: &LoroMap) -> Option<GeneratedRecord> {
         return None;
     }
     let parts = parts.iter().map(part_from).collect::<Option<Vec<_>>>()?;
-    Some(GeneratedRecord {
+    let part_keys = match map.get("part_keys") {
+        None => Vec::new(),
+        Some(LoroValue::List(keys)) => keys
+            .iter()
+            .map(|key| match key {
+                LoroValue::String(text) => Some(text.to_string()),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()?,
+        Some(_) => return None,
+    };
+    let record = GeneratedRecord {
         kind,
         seed,
         params,
         parts,
-    })
+        part_keys,
+    };
+    // An empty list is a list that is not as long as the parts: damage, not "absent".
+    let listed = matches!(map.get("part_keys"), Some(LoroValue::List(_)));
+    (record.keys_are_valid() && (!listed || !record.part_keys.is_empty())).then_some(record)
 }
 
 /// The snapshot of the generated node `id`, `None` when a register cannot be read.
@@ -368,6 +418,7 @@ mod tests {
             seed: 7,
             params,
             parts: vec![vec![square()]],
+            part_keys: vec!["gear".into()],
         }
     }
 

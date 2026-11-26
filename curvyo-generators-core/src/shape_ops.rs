@@ -120,6 +120,17 @@ impl Chain {
         point_at(&self.shapes[index], u - self.starts[index])
     }
 
+    /// The shape that holds distance `u` and the distance where it starts.
+    pub(crate) fn locate(&self, u: f64) -> Option<(Shape, f64)> {
+        let u = u.clamp(0.0, self.total);
+        let index = self
+            .starts
+            .partition_point(|start| *start <= u)
+            .saturating_sub(1)
+            .min(self.shapes.len().checked_sub(1)?);
+        Some((self.shapes[index], self.starts[index]))
+    }
+
     /// The shapes between the distances `a` and `b`.
     pub(crate) fn part(&self, a: f64, b: f64) -> Vec<Shape> {
         self.shapes

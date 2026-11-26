@@ -102,6 +102,7 @@ pub(crate) fn place(strips: &[Piece], plates: Vec<Piece>, kerf: f64, spacing: f6
             let offset = (x - b.0, y - b.1);
             placed.push(Placed {
                 part: Part {
+                    key: part_key(piece.role, piece.number),
                     paths: piece
                         .contours
                         .iter()
@@ -123,6 +124,15 @@ pub(crate) fn place(strips: &[Piece], plates: Vec<Piece>, kerf: f64, spacing: f6
         y += height(row_pieces) + spacing;
     }
     placed
+}
+
+/// The part key of a piece: its role, a wall piece of a path box `wall-<n>` (ADR 0082 §10).
+fn part_key(role: &'static str, number: u32) -> std::borrow::Cow<'static, str> {
+    if role == "wall" {
+        format!("wall-{number}").into()
+    } else {
+        role.into()
+    }
 }
 
 /// The number of gaps between `count` neighbours, as a factor.

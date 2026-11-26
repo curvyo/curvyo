@@ -106,6 +106,7 @@ fn a_file_with_an_unknown_generator_opens_as_stored_and_says_so_once() {
                 seed: 1,
                 params: serde_json::Map::new(),
                 parts: vec![vec![square]],
+                part_keys: Vec::new(),
             },
             Affine::IDENTITY,
         )
@@ -317,6 +318,7 @@ fn an_unknown_generator_refuses_a_resize_with_its_own_wording() {
                 seed: 1,
                 params: serde_json::Map::new(),
                 parts: vec![vec![square]],
+                part_keys: Vec::new(),
             },
             Affine::IDENTITY,
         )

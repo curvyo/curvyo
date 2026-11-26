@@ -1,20 +1,9 @@
 //! The box's parameter groups (UX notes of `0141` §5).
 
-use curvyo_extension_core::{ChoiceOption, ParamGroup, ShownWhen};
+use curvyo_extension_core::{ChoiceOption, ParamGroup};
 
-use crate::schema::{choice, length, tracked, when};
+use crate::schema::{CENTRED, advanced, choice, length, tracked};
 use curvyo_extension_core::Curve::{Linear, Log};
-
-pub(crate) const JOINT: &[ChoiceOption] = &[
-    ChoiceOption {
-        id: "fingers",
-        label: "Fingers",
-    },
-    ChoiceOption {
-        id: "none",
-        label: "None",
-    },
-];
 
 pub(crate) const LID: &[ChoiceOption] = &[
     ChoiceOption {
@@ -77,33 +66,12 @@ pub(crate) fn groups() -> Vec<ParamGroup> {
         },
         ParamGroup {
             label: "Joints",
-            params: vec![
-                choice("joint", "Joint", JOINT, "fingers"),
-                when(
-                    tracked(
-                        length("finger_width", "Finger width", (0.5, 200.0), 6.0, (0.5, 2)),
-                        0.5,
-                        50.0,
-                        Log,
-                    ),
-                    ShownWhen::Is {
-                        key: "joint",
-                        choice: "fingers",
-                    },
-                ),
-                when(
-                    tracked(
-                        length("clearance", "Clearance", (0.0, 2.0), 0.0, (0.01, 3)),
-                        0.0,
-                        0.5,
-                        Linear,
-                    ),
-                    ShownWhen::Is {
-                        key: "joint",
-                        choice: "fingers",
-                    },
-                ),
-            ],
+            params: vec![tracked(
+                length("clearance", "Clearance", (0.0, 2.0), 0.0, (0.01, 3)),
+                0.0,
+                0.5,
+                Linear,
+            )],
         },
         ParamGroup {
             label: "Lid",
@@ -118,5 +86,23 @@ pub(crate) fn groups() -> Vec<ParamGroup> {
                 Linear,
             )],
         },
+        joint_layout(),
     ]
+}
+
+/// The Advanced group of the tabs' layout with Finger width as its Joint size (spec `0155`
+/// criterion 25): the key stays `finger_width`, shown once under its new name.
+fn joint_layout() -> ParamGroup {
+    let mut group = advanced(None, CENTRED);
+    for param in &mut group.params {
+        if param.key == "joint_width" {
+            *param = tracked(
+                length("finger_width", "Joint size", (0.5, 200.0), 6.0, (0.5, 2)),
+                0.5,
+                50.0,
+                Log,
+            );
+        }
+    }
+    group
 }

@@ -9,7 +9,7 @@ use crate::manufacturing_codec::{KEY_PROCESS, is_manufacturing_node, string};
 use crate::node_registers::{KEY_NAME, clean_name};
 use crate::operation_codec::{
     CUTS_LAST_FIELD, KEY_OP_KIND, KEY_OP_MARGIN, KEY_OP_OUTPUT, KEY_OP_SHOW, OperationSnapshot,
-    SHAPE_OPERATION, member_key, path_is_live, read_operation,
+    SHAPE_OPERATION, member_key_of, path_is_live, read_operation,
 };
 use crate::path_codec::node_exists;
 use crate::path_model::NodeId;
@@ -220,7 +220,7 @@ impl Document {
                 );
             }
             for member in members {
-                meta.insert(&member_key(&tree_path(member)), true).unwrap();
+                meta.insert(&member_key_of(member), true).unwrap();
                 self.member_keys_may_exist.set(true);
             }
         }
@@ -345,7 +345,7 @@ impl Document {
         }
         let mut changed = false;
         for target in targets {
-            let key = member_key(&tree_path(target));
+            let key = member_key_of(target);
             let present = meta.get(&key).is_some();
             let written = match (member, present) {
                 (true, false) => {

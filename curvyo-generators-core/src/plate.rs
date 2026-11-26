@@ -11,7 +11,7 @@ use curvyo_document_core::Point;
 use curvyo_extension_core::ClosedPath;
 
 use crate::contour::Contour;
-use crate::fingers::is_notched;
+use crate::fingers::{Split, is_notched};
 use crate::wall_plates::Hollow;
 
 /// How a corner of the plate is treated.
@@ -29,13 +29,29 @@ pub(crate) enum Corner {
 
 /// The notch pattern of one joint edge: a strip of `segments` equal pieces from `from` to `to`
 /// along the edge, the pieces with index parity `solid_parity` kept and the others notched.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) struct Fingers {
     pub(crate) from: f64,
     pub(crate) to: f64,
     pub(crate) segments: u32,
+    /// The width of each piece when they are not equal (spec `0155` criterion 26); empty for
+    /// `segments` equal pieces.
+    pub(crate) widths: Vec<f64>,
     /// Whether pieces 0, 2, 4 ... are the plate's own (true) or the notches (false).
     pub(crate) even_solid: bool,
+}
+
+impl Fingers {
+    /// The strip from `from` to `to` cut into the pieces of `split`.
+    pub(crate) fn new(from: f64, to: f64, split: &Split, even_solid: bool) -> Self {
+        Self {
+            from,
+            to,
+            segments: split.segments,
+            widths: split.widths.clone(),
+            even_solid,
+        }
+    }
 }
 
 /// One edge: plain, a finger strip or tabs. The pattern runs in the physical direction of the edge
@@ -102,18 +118,26 @@ impl Plate {
                 runs.retain(|run| run.1 - run.0 > 1e-12);
                 return runs;
             }
-            Edge::Fingered(fingers) => *fingers,
+            Edge::Fingered(fingers) => fingers,
         };
         let mut runs: Vec<Run> = vec![(lo, fingers.from, 0.0)];
         let step = (fingers.to - fingers.from) / f64::from(fingers.segments);
         let widen = self.clearance / 4.0;
+        let mut at = fingers.from;
         for index in 0..fingers.segments {
             let notched = is_notched(index, fingers.even_solid);
             let a = fingers.from + step * f64::from(index);
+            let (a, b) = if let Some(width) = fingers.widths.get(index as usize) {
+                let start = at;
+                at += width;
+                (start, at)
+            } else {
+                (a, a + step)
+            };
             let b = if index + 1 == fingers.segments {
                 fingers.to
             } else {
-                a + step
+                b
             };
             if notched {
                 let a = if index == 0 { a } else { a - widen };

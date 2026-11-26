@@ -49,6 +49,7 @@ fn record(kind: &str) -> GeneratedRecord {
             ],
             vec![line_square(30.0, 0.0, 5.0)],
         ],
+        part_keys: Vec::new(),
     }
 }
 

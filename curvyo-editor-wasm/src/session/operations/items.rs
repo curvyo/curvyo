@@ -28,7 +28,9 @@ pub struct ItemLists {
 /// The id a count button selects for a leaf: the first node of its chain. A clone member selects
 /// its clone, a placed page's inner row its source object.
 fn select_id(leaf: &IndexedLeaf) -> Option<NodeId> {
-    leaf.chain.first().and_then(|path| path.first().copied())
+    leaf.chain
+        .first()
+        .and_then(|path| path.first().map(|id| id.node()))
 }
 
 /// A list of ids, each once.

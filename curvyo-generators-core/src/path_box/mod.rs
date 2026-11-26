@@ -23,6 +23,7 @@ use curvyo_extension_core::{
     StoredParams, Warning,
 };
 
+use crate::joint_layout;
 use crate::rounded_box::layout::{Placed, place};
 use crate::rounded_box::{own, slit_values_for};
 use crate::slit_bend::SlitKind;
@@ -159,6 +160,9 @@ fn measures(v: &mut Values<'_>, area: f64, draft: bool) -> Measures {
         v.limit_mm("base_inset", wall, f64::MAX);
     }
     let kerf = v.mm("kerf");
+    if own(v, "joint_width").is_some() {
+        v.limit_mm("joint_width", joint_layout::least_width(kerf), f64::MAX);
+    }
     let strip_height = v.mm("base_inset") + base + height + top_part(lid_on, seat, ring, lid);
     let (pattern, _) = slit_values_for(v, (wall, kerf, 2.0 * wall), strip_height);
     let least = if pattern.kind == SlitKind::Wave {
@@ -187,6 +191,8 @@ fn measures(v: &mut Values<'_>, area: f64, draft: bool) -> Measures {
             least,
         }),
         draft,
+        curve: v.choice("bend_tabs") == "curve",
+        joints: joint_layout::Joints::read(v, "joint_width"),
     }
 }
 
@@ -281,11 +287,18 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         matches!(request.edit, Some(Edit::Draft)),
     );
     let (mut built, _inner, _tabs) = build(&checked, &m);
+    joint_layout::apply(&mut v, &built.fitted.limits, "joint_width");
     let spacing = m.kerf + v.mm("gap");
     let plates = built.plates_owned();
     let placed = place(&built.strips, plates, m.kerf, spacing);
     let marks = marks(&built, &placed);
-    let automatic = used_values(&v, &m, built.smallest_gap);
+    let mut automatic = used_values(&v, &m, built.smallest_gap);
+    let widest = [m.base, m.ring, m.lid].into_iter().fold(0.0, f64::max);
+    automatic.extend(joint_layout::used(
+        &v,
+        &built.fitted,
+        ("joint_width", 2.0 * widest),
+    ));
     let mut warnings = checked.warnings;
     warnings.extend(built.warnings);
     warnings.extend(resized);

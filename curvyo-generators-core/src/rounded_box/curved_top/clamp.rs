@@ -7,6 +7,7 @@ use curvyo_document_core::Length;
 use curvyo_extension_core::ParamValue;
 
 use super::Sizes;
+use crate::joint_layout::{self, Joints};
 use crate::rounded_box::{own, slit_values_for};
 use crate::slit_bend::{SlitKind, SlitPattern};
 use crate::values::Values;
@@ -42,18 +43,51 @@ pub(super) fn clamp(v: &mut Values<'_>) -> Sizes {
         limits.push(("hollow_width", mm(widest)));
         limits.push(("hollow_depth", mm(deepest)));
     }
+    let radius = v.mm("corner_radius");
+    let joints = joints(v, (width, depth, height), (wall, end, front, base), radius);
     Sizes {
         width,
         depth,
         height,
-        radius: v.mm("corner_radius"),
+        radius,
         wall,
         end,
         front,
         base,
         kerf: v.mm("kerf"),
         limits,
+        joints,
+        used_count: 0,
     }
+}
+
+/// The joint layout fitted to the tightest finger joint and end-plate tab run, with notices.
+fn joints(
+    v: &mut Values<'_>,
+    (width, depth, height): (f64, f64, f64),
+    (wall, end, front, base): (f64, f64, f64, f64),
+    radius: f64,
+) -> Joints {
+    if own(v, "joint_width").is_some() {
+        v.limit_mm(
+            "joint_width",
+            joint_layout::least_width(v.mm("kerf")),
+            f64::MAX,
+        );
+    }
+    // The widest automatic finger of the four joints, and the spans they run along.
+    let auto = 2.0
+        * [front.min(end), base.min(end), base.min(wall)]
+            .into_iter()
+            .fold(front.min(base), f64::max);
+    let tabs = height - radius - 4.0 * wall;
+    let fitted = joint_layout::fit_fingers(
+        &[height, width, depth, tabs],
+        auto,
+        Joints::read(v, "joint_width"),
+    );
+    joint_layout::apply(v, &fitted.limits, "joint_width");
+    fitted.joints
 }
 
 /// The slit values over the arc. The arc keeps two columns: a radius too small for two columns at

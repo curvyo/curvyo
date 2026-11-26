@@ -735,7 +735,16 @@ impl DocumentVersion {
 /// not couple the linked values on edit and its limit edit would strip the `link` fields, so this
 /// build's files are refused there by version; a file of 63 or lower opens unchanged. Goldens:
 /// `sketch_instance_links_v64.curvyo`, `sketch_instance_links_damaged_v64.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 64;
+/// Version 65 (`specs/0147-rounded-box` slice 3, ADR 0082 §10, customer Frage 370 A): the record of a
+/// generated object may carry `part_keys` (one key per part, written whole with `parts`), and an
+/// operation may hold `member.<node>#<part key>`, the own operations of a detached part (Detach
+/// part). A build that stops at 64 would read such a key as a dangling or unreadable one and cut
+/// the part with the box's operation, which is wrong laser output, so this build's files are
+/// refused there by version; a file of 64 or lower opens unchanged and gets its keys at its next
+/// parameter edit. Damage: `part_keys` that is not a list of valid distinct key strings as long as
+/// `parts` refuses the file; a part key of an operation that does not read is kept and never
+/// touched. Goldens: `generated_part_ops_v65.curvyo`, `generated_part_keys_damaged_v65.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 65;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

@@ -3,7 +3,10 @@
 use curvyo_extension_core::Curve::{Linear, Log};
 use curvyo_extension_core::{ChoiceOption, ParamGroup, ShownWhen};
 
-use crate::schema::{automatic, choice, count, length, switch_on, tracked, when};
+use crate::schema::{
+    CENTRED as CENTRED_PATTERN, advanced, automatic, choice, count, initial, length, switch_on,
+    tracked, when,
+};
 
 pub(crate) const PATTERN: &[ChoiceOption] = &[
     ChoiceOption {
@@ -28,6 +31,18 @@ pub(crate) const WALL_SLITS: &[ChoiceOption] = &[
     ChoiceOption {
         id: "all",
         label: "All round",
+    },
+];
+
+/// How a tab on a bend meets the wall's slits (ADR 0089 decision 2).
+pub(crate) const BEND_TABS: &[ChoiceOption] = &[
+    ChoiceOption {
+        id: "window",
+        label: "Flat window",
+    },
+    ChoiceOption {
+        id: "curve",
+        label: "Curve",
     },
 ];
 
@@ -110,6 +125,10 @@ pub(crate) fn slits(wall_slits: bool) -> ParamGroup {
         params: vec![
             choice("slit_pattern", "Slit pattern", PATTERN, "straight"),
             choice("wall_slits", "Wall slits", WALL_SLITS, "corners"),
+            initial(
+                choice("bend_tabs", "Bend through tabs", BEND_TABS, "window"),
+                "curve",
+            ),
             tracked(
                 automatic(length(
                     "slit_width",
@@ -299,7 +318,7 @@ pub(crate) fn groups() -> Vec<ParamGroup> {
     vec![
         size(),
         rounded_material(),
-        conditioned(slits(true), &[("wall_slits", FLAT)]),
+        conditioned(slits(true), &[("wall_slits", FLAT), ("bend_tabs", FLAT)]),
         conditioned(
             base(),
             &[
@@ -321,5 +340,6 @@ pub(crate) fn groups() -> Vec<ParamGroup> {
             ],
         ),
         layout(),
+        advanced(None, CENTRED_PATTERN),
     ]
 }

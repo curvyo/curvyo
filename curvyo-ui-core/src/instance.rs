@@ -20,7 +20,9 @@ use crate::extensions::{ExtensionSettings, generate_object, manifests};
 use crate::instance_notice::notices;
 pub use crate::instance_notice::{clamp_notice, shown};
 pub use crate::instance_resize::{ResizeView, resize_view};
-pub use crate::instance_view::{InstanceView, RowView, value_from_json, value_from_number, view};
+pub use crate::instance_view::{
+    InstanceView, PartView, RowView, part_name, value_from_json, value_from_number, view,
+};
 
 /// Why an instance command did nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -110,6 +112,7 @@ pub(crate) fn record_of(kind: &str, seed: u32, generated: &Generated) -> Generat
                     .collect()
             })
             .collect(),
+        part_keys: generated.parts.iter().map(|p| p.key.to_string()).collect(),
     }
 }
 
@@ -128,6 +131,16 @@ pub(crate) fn generate(
             edit,
         },
     )
+}
+
+/// The part keys a fresh generation of `snapshot` has, in part order: what a record written before
+/// format 65 gets in the Detach part step (ADR 0082 §10). Empty for an unknown kind.
+#[must_use]
+pub fn part_keys(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Vec<String> {
+    find_kind(settings, &snapshot.record.kind)
+        .and_then(|found| generate(&found, &snapshot.record.params, snapshot.record.seed, None))
+        .map(|generated| generated.parts.iter().map(|p| p.key.to_string()).collect())
+        .unwrap_or_default()
 }
 
 /// The warning sentences of the generated object `snapshot`, empty for an unknown kind.

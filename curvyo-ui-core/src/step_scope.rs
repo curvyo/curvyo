@@ -128,6 +128,10 @@ pub const FREE_STEPS: &[&str] = &[
     "add_operation",
     "assign_to_operation",
     "remove_from_operation",
+    // `specs/0147-rounded-box` criterion 15: Detach part copies the box's operations and keys a
+    // part on the copies; Attach part removes the keys. No object is written.
+    "detach_part",
+    "attach_part",
     "rename_operation",
     "set_operation_show",
     "set_operation_output",

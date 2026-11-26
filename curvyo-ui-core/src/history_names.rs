@@ -82,6 +82,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // assignment after its operation ("Assign to Cut 1").
     ("add_operation", "Add operation"),
     ("assign_to_operation", "Assign to operation"),
+    ("detach_part", "Detach part"),
+    ("attach_part", "Attach part"),
     ("remove_from_operation", "Remove from operation"),
     ("rename_operation", "Rename operation"),
     ("set_operation_show", "Show or hide operation"),

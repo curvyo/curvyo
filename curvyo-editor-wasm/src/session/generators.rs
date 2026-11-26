@@ -38,6 +38,7 @@ struct Preview {
 }
 
 mod handles;
+mod parts;
 
 /// The Generators tool's state.
 #[derive(Debug, Default)]
@@ -460,8 +461,13 @@ impl Session {
         if let Some(preview) = self.generators.preview.as_ref().filter(|p| p.id == id) {
             snapshot.record = preview.record.clone();
         }
-        serde_json::to_string(&instance::view(&self.manufacturing.extensions, &snapshot))
-            .unwrap_or_else(|_| "null".to_owned())
+        let view = instance::view(&self.manufacturing.extensions, &snapshot);
+        let rows = self.parts_rows(id, &view.parts);
+        let Ok(mut value) = serde_json::to_value(&view) else {
+            return "null".to_owned();
+        };
+        value["parts"] = Value::Array(rows);
+        value.to_string()
     }
 
     /// A value typed or stepped into the row `key` of the block, as JSON text (`12.5`, `true` or

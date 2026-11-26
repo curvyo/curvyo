@@ -7,8 +7,9 @@ use curvyo_document_core::{Length, Point};
 
 use super::{Sizes, plane};
 use crate::contour::Contour;
-use crate::fingers::{finger_count, is_notched};
+use crate::fingers::is_notched;
 use crate::footprint::{Footprint, Shape, Tab};
+use crate::joint_layout;
 use crate::slit_bend::SlitPattern;
 use crate::wall::{Ends, Joint, Step, Wall};
 
@@ -45,7 +46,11 @@ pub(super) fn back_start(s: &Sizes) -> f64 {
 pub(super) fn tab_centres(s: &Sizes) -> Vec<f64> {
     let (from, to) = (s.radius + 2.0 * s.wall, s.height - 2.0 * s.wall);
     let length = to - from;
-    let fits = (length / (2.0 * s.end + 2.0 * s.wall)).floor().max(1.0);
+    let half = s.joints.half(s.end);
+    if let Some(places) = joint_layout::places(length, 2.0 * half, &s.joints) {
+        return places.into_iter().map(|u| from + u).collect();
+    }
+    let fits = (length / (2.0 * half + 2.0 * s.wall)).floor().max(1.0);
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let count = ((length / TAB_PITCH).round().max(1.0).min(fits)) as u32;
     (0..count)
@@ -58,14 +63,20 @@ pub(super) fn tab_centres(s: &Sizes) -> Vec<f64> {
 /// corner cubes), between them the strip keeps the odd pieces.
 pub(super) fn end_steps(s: &Sizes, length: f64) -> Vec<Step> {
     let width = s.outer_width();
-    let count = finger_count(s.width, 2.0 * s.base.min(s.wall));
-    let step = s.width / f64::from(count);
+    let split = joint_layout::finger_split(s.width, 2.0 * s.base.min(s.wall), &s.joints);
+    let step = s.width / f64::from(split.segments);
     let (cut, full) = (length - s.base, length);
     let mut spans = vec![(0.0, s.end, cut)];
-    for index in 0..count {
-        let y0 = s.end + step * f64::from(index);
+    let mut at = s.end;
+    for index in 0..split.segments {
         let x = if is_notched(index, false) { cut } else { full };
-        spans.push((y0, y0 + step, x));
+        if let Some(piece) = split.widths.get(index as usize) {
+            spans.push((at, at + piece, x));
+            at += piece;
+        } else {
+            let y0 = s.end + step * f64::from(index);
+            spans.push((y0, y0 + step, x));
+        }
     }
     spans.push((width - s.end, width, cut));
     let mut steps: Vec<Step> = Vec::new();
@@ -97,6 +108,7 @@ pub(super) fn strip(s: &Sizes, pattern: SlitPattern, draft: bool) -> Vec<Contour
         .collect();
     let joint = |from_top| Joint {
         thickness: Length::from_mm(s.end),
+        half_width: Length::from_mm(s.joints.half(s.end)),
         inset: Length::from_mm(0.0),
         from_top,
     };

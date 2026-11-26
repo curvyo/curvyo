@@ -13,6 +13,7 @@ mod contour;
 mod fingers;
 mod footprint;
 mod gear;
+mod joint_layout;
 mod manifest;
 mod outline;
 mod path_box;

@@ -34,6 +34,8 @@ fn sizes((wall, end, front, base): (f64, f64, f64, f64)) -> Sizes {
         base,
         kerf: 0.0,
         limits: Vec::new(),
+        joints: crate::joint_layout::AUTO,
+        used_count: 0,
     }
 }
 
@@ -49,7 +51,7 @@ fn pattern(s: &Sizes) -> SlitPattern {
 
 fn fingers(plate: &Plate, edge: usize) -> Fingers {
     match &plate.edges[edge] {
-        Edge::Fingered(f) => *f,
+        Edge::Fingered(f) => f.clone(),
         other => panic!("edge {edge} is not fingered: {other:?}"),
     }
 }

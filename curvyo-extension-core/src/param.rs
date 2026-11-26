@@ -36,6 +36,10 @@ pub struct Param {
     /// The span of the slider track a number is drawn on (UX notes of `0141` §15.3); `None` = the
     /// whole range, linear.
     pub track: Option<Track>,
+    /// The value a **new** object is written with when it differs from `default` (ADR 0089
+    /// decision 2): a stored object without the key still reads `default`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial: Option<ParamValue>,
 }
 
 /// How a slider maps its position to a value.
@@ -406,7 +410,10 @@ impl Param {
     pub fn defaults(params: &[Self]) -> StoredParams {
         params
             .iter()
-            .map(|param| (param.key.to_owned(), param.default.to_stored()))
+            .map(|param| {
+                let value = param.initial.as_ref().unwrap_or(&param.default);
+                (param.key.to_owned(), value.to_stored())
+            })
             .collect()
     }
 }
@@ -430,6 +437,7 @@ mod tests {
             default: ParamValue::Length(Length::from_mm(10.0)),
             shown_when: None,
             track: None,
+            initial: None,
         }
     }
 
@@ -444,6 +452,7 @@ mod tests {
                 default: ParamValue::Switch(true),
                 shown_when: None,
                 track: None,
+                initial: None,
             },
             Param {
                 key: "b",
@@ -453,6 +462,7 @@ mod tests {
                 default: ParamValue::Switch(true),
                 shown_when: None,
                 track: None,
+                initial: None,
             },
         ];
         let both = ShownWhen::AllOn { keys: &["a", "b"] };
@@ -472,6 +482,7 @@ mod tests {
             default: ParamValue::Switch(on),
             shown_when: None,
             track: None,
+            initial: None,
         };
         let schema = [switch("a", true), switch("b", false)];
         let (a, b) = (ShownWhen::On { key: "a" }, ShownWhen::On { key: "b" });
@@ -592,6 +603,7 @@ mod tests {
             default: ParamValue::Count(24),
             shown_when: None,
             track: None,
+            initial: None,
         };
         assert_eq!(
             count.accept(ParamValue::Count(3)),
@@ -624,6 +636,7 @@ mod tests {
             default: ParamValue::Choice("solid".into()),
             shown_when: None,
             track: None,
+            initial: None,
         };
         assert_eq!(choice.accept(ParamValue::Choice("lattice".into())), None);
         assert!(
@@ -661,6 +674,7 @@ mod tests {
             default: ParamValue::Path(square(10.0)),
             shown_when: None,
             track: None,
+            initial: None,
         }
     }
 
