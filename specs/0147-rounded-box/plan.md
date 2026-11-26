@@ -125,3 +125,53 @@ no new crate, no dependency, no `format_version` change. Own choices are marked 
 - The two end plates are one outline cut twice (the Box's side walls), not a mirror pair.
 - `tests/acceptance_0147.rs` criterion 2 listed `top_shape` among the keys slice 1 must not have; the assertion now lists only Finger
   width and Clearance (the key arrived with this slice, criterion 11).
+
+---
+
+# Plan for Rounded box slice 3, Detach part
+
+Implementer, 2026-11-26, branch `story/rounded-box-detach-part`. Built under `specification.md` (criterion 15; the customer accepted
+slice 3 with the format change, Frage 370 A, 2026-11-25), ADR 0082 §10 (Option C: part keys, `member.<node>#<part>`), `adrs.md` item 7
+and `ux-notes.md` §9. No new crate, no dependency. `format_version` 64 to 65. Own choices are marked **(Proposal)**.
+
+## Affected crates/modules
+
+- **`curvyo-extension-core`:** `Part.key` (contract, 0.x, CHANGELOG). **`curvyo-generators-core`:** every generator names its parts
+  (rounded box by role: `strip`, `base`, `cover`, `ring`, `lid`, and in Curved `left`, `right`, `front`; Box `bottom`, `front`, `back`,
+  `left`, `right`, `lid`; gear `gear`; path box `wall-<n>` then the rounded box's keys).
+- **`curvyo-document-core`:** `NodeId` gains a part tag (none = the node itself, else a `u16` into an interned table of key texts; never stored, never in
+  `document.json`); `GeneratedRecord.part_keys` (written whole with `parts`, damage: wrong length or duplicate); membership key
+  `member.<node>#<part>` read, kept when the part is missing, swept with its node; `detach_part` / `attach_part` as one commit each;
+  `convert_generated` rewrites `N#P` to the new path; `CURRENT_FORMAT_VERSION` 65 with goldens `generated_part_ops_v65.curvyo` and
+  `generated_part_keys_damaged_v65.curvyo`.
+- **`curvyo-ui-core`:** record keys from the generator result, step names "Detach part" / "Attach part", the Parts rows of the block.
+- **`curvyo-editor-wasm`, `frontend`:** the leaf index splits a box with a detached part into the rest and one leaf per detached part
+  (geometry from the record), Detach / Attach commands, the Parts group in the Generator block (muted operation name, text button).
+- `curvyo-laser-core`: no change; the nearest rule already looks up a chain of `Vec<NodeId>` keys and `N#P` is one more key.
+
+## Tasks
+
+- [x] 1. `Part.key` and keys in every generator; unique within one result, stable across regenerations (criterion 15; ADR 0082 §10).
+- [x] 2. `NodeId` part tag; membership key `#` form: read, write, liveness, sweep, a missing part keeps its key (15, ADR 0082 §10 Lifecycle).
+- [x] 3. Record `part_keys` + damage rules; `detach_part` (copy of the box's operations, "<operation> · <part>", right after it, one
+  step) and `attach_part` (one step); `convert_generated` rewrite; tests first, golden files (15).
+- [x] 4. `format_version` 65: constant, doc comment, version numbers in tests, goldens, test that a 65 file is refused by a reader
+  limited to 64 and that a file of 64 opens unchanged (15, ADR 0033 §7).
+- [x] 5. ui-core: record keys, step labels and names, Parts rows (15).
+- [x] 6. Leaf index and job input: rest leaf plus one leaf per detached part; geometry from the record; chain `[N#P]`, `[N]`, groups
+  above; test that the lid runs with its own operation, a thickness change regenerates it, a move moves it, save and reopen keeps both (15).
+- [x] 7. Session commands, wasm bindings, frontend Parts group (text button Detach / Attach).
+- [x] 8. Docs: spec status, ADR 0082 status of §10, technical debt, ux-notes §9.
+- [x] 9. Full gate once into files (see the PR; 2026-11-26).
+
+## Own choices (Proposal)
+
+- Detach copies **every** operation of the box's nearest assignment (usually one), each named "<operation> · <part>" and placed right
+  after its original; the copies carry the part key and nothing else changes in the job.
+- A part tag is a `u16` into an interned table of key texts (a 32-bit hash was the first idea; the table keeps the key text for writing
+  and compares exactly; ids stay 16 bytes), recorded in `docs/technical-debt.md`.
+- The rest of a box with detached parts is one leaf (the box's key `[N]`) with the geometry of its remaining parts; with every part
+  detached it has no leaf. Without a detached part nothing changes: one leaf per box, counts and goldens stay.
+- Detach is offered for a box whose record already carries part keys; an older file gets them at its next parameter edit (ADR 0082 §10).
+  The Parts rows are shown from the generated result, so they appear at once; Detach on a record without keys writes them in the same step.
+- Hover of a Parts row on the canvas and the part's context-menu entry are left out (ux-notes §9: "unless the customer asks").

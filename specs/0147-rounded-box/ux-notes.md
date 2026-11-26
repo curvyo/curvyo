@@ -245,10 +245,16 @@ generator names each anchor (`0141` section 4, Handle anchor):
   the block's Convert to paths button comes in a later slice).
 - Unknown kind: as `0141` section 12.
 
-## 9. Detach part (criterion 15, slice 3; not built in slice 1)
+## 9. Detach part (criterion 15, slice 3; built 2026-11-26)
 
-Slice 1 has no trace of it (section 7). When slice 3 is Ready, these notes get a revision; the
-direction, so slice 1 leaves room **(Proposal, to confirm when slice 3 is Ready)**:
+Slice 1 has no trace of it (section 7). Slice 3 builds the direction below **(Proposal, vetoable at the
+demo)**. As built: the **Parts** group is last in the Generator block, one row per part the rounded box
+shows (Strip, Cover, Lid, Inner base, Ring; in Curved Strip, Left and Right end plate, Front, Inner base,
+in the generator's layout order), each with the operation name(s) muted and a text button **Detach** or
+**Attach**. Detach is disabled while the box runs with no operation (the canvas notice says "Assign the box
+to an operation first. Nothing was changed."). Detach copies every operation of the box's nearest assignment,
+named "<operation> · <part>". Not built, as the notes allow: the row's hover look on the canvas and the part's
+context-menu entry.
 
 - **Where.** A **Parts** group last in the Generator block, after Layout: one row per shown part
   (Strip, Inner base, Cover, Ring, Lid), the part's name and its operation's name muted ("Cut 3 mm"), and
