@@ -332,9 +332,12 @@ fn read_lasers(
             )?;
             let source = read_source(&set.source)?;
             if let SetSource::Test(id) = source {
+                // A source naming no test at all is a deleted test (its id stays reserved,
+                // criterion 25 of 0112); a test that exists must fit the set.
                 let fits = tests
                     .iter()
-                    .any(|t| t.id == id && t.machine.id == machine.id && t.recipe.kind() == kind);
+                    .filter(|t| t.id == id)
+                    .all(|t| t.machine.id == machine.id && t.recipe.kind() == kind);
                 if !fits {
                     return Err(damaged(format!(
                         "The {} set of {} names no fitting test.",
