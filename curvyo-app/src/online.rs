@@ -11,11 +11,30 @@ use curvyo_library_core::{
     Failure, Millis, READY_ADDRESS, SOURCES_FILE, SourceKind, Sources, SourcesError, host_of,
     icon_svg, search_words,
 };
-use curvyo_ui_core::library_online::{load_failure_text, sources_newer_text};
+use curvyo_storage_io::{AccessToken, CredentialStore, credential_slot};
+use curvyo_ui_core::library_online::{
+    Refusal, RefusalField, load_failure_text, sources_newer_text, token_text_refusal,
+};
 use curvyo_ui_core::library_tree::LibraryRow;
 
 pub(crate) use crate::online_state::OnlineState;
 use crate::online_state::{AddStop, IconImport, TemplateOrigin};
+use crate::online_token::{Keys, under_token};
+
+/// Points the access tokens at this system's key store, under this installation's slot.
+pub(crate) fn use_system_key_store(app: &AppHandle) {
+    let Ok(dir) = app.path().app_data_dir() else {
+        return;
+    };
+    let Ok(slot) = credential_slot(&dir) else {
+        return;
+    };
+    let opened = slot.clone();
+    app.state::<OnlineState>().use_keys(Keys::new(
+        slot,
+        Box::new(move || CredentialStore::keychain(&opened)),
+    ));
+}
 
 fn sources_file(app: &AppHandle) -> Option<PathBuf> {
     crate::library::data_file(app, SOURCES_FILE)
@@ -86,8 +105,8 @@ pub(crate) fn template_bytes(
 pub(crate) enum AddSourceAnswer {
     /// The source is in the list under this key.
     Added { key: String },
-    /// Not added, with the sentence under the Address field.
-    Refused { text: String },
+    /// Not added, with the sentence and the field it is shown under.
+    Refused { field: RefusalField, text: String },
     /// Cancelled while the check ran; nothing was listed.
     Cancelled,
 }
@@ -99,21 +118,38 @@ pub(crate) async fn online_add(
     app: AppHandle,
     kind: SourceKind,
     address: String,
+    token: Option<String>,
 ) -> AddSourceAnswer {
-    tauri::async_runtime::spawn_blocking(move || add_source(&app, kind, &address))
+    tauri::async_runtime::spawn_blocking(move || add_source(&app, kind, &address, token.as_deref()))
         .await
         .unwrap_or(AddSourceAnswer::Refused {
+            field: RefusalField::Address,
             text: "The server did not answer.".to_owned(),
         })
 }
 
-fn add_source(app: &AppHandle, kind: SourceKind, address: &str) -> AddSourceAnswer {
+fn add_source(
+    app: &AppHandle,
+    kind: SourceKind,
+    address: &str,
+    token_text: Option<&str>,
+) -> AddSourceAnswer {
     // A newer list is never overwritten: Add is refused before anything is sent.
     let Some(mut sources) = read_sources(app) else {
         return AddSourceAnswer::Refused {
+            field: RefusalField::Address,
             text: sources_newer_text().to_owned(),
         };
     };
+    // Empty is no token; any other text must be a token before anything is sent (criterion 3).
+    let mut token = None;
+    if let Some(text) = token_text.filter(|text| !text.trim().is_empty()) {
+        let Ok(parsed) = AccessToken::parse(text) else {
+            let Refusal { field, text } = under_token(token_text_refusal());
+            return AddSourceAnswer::Refused { field, text };
+        };
+        token = Some(parsed);
+    }
     let state = app.state::<OnlineState>();
     let started = state.add_generation();
     let wanted = || state.add_generation() == started;
@@ -122,6 +158,7 @@ fn add_source(app: &AppHandle, kind: SourceKind, address: &str) -> AddSourceAnsw
         &mut sources,
         kind,
         address,
+        token.as_ref(),
         now_millis(),
         &wanted,
     ) {
@@ -129,7 +166,7 @@ fn add_source(app: &AppHandle, kind: SourceKind, address: &str) -> AddSourceAnsw
             write_sources(app, &sources);
             AddSourceAnswer::Added { key }
         }
-        Err(AddStop::Refused(text)) => AddSourceAnswer::Refused { text },
+        Err(AddStop::Refused(Refusal { field, text })) => AddSourceAnswer::Refused { field, text },
         Err(AddStop::Cancelled) => AddSourceAnswer::Cancelled,
     }
 }
@@ -142,18 +179,100 @@ pub(crate) fn online_add_cancel(app: AppHandle) {
     app.state::<OnlineState>().cancel_add();
 }
 
-/// Remove: the source leaves the list and its fetched data the session.
+/// What Remove and Remove token report: the sentence of a newer sources file (nothing was
+/// changed), and the line for the Online group when the key store would not delete the token
+/// (criterion 7).
+#[derive(Debug, Default, Serialize)]
+pub(crate) struct TokenCleanup {
+    refusal: Option<String>,
+    key_store: Option<String>,
+}
+
+fn newer() -> TokenCleanup {
+    TokenCleanup {
+        refusal: Some(sources_newer_text().to_owned()),
+        key_store: None,
+    }
+}
+
+/// Remove: the source leaves the list (file first) and then its token the key store; its fetched
+/// data leaves the session.
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn online_remove(app: AppHandle, key: String) -> Option<String> {
+pub(crate) fn online_remove(app: AppHandle, key: String) -> TokenCleanup {
     let Some(mut sources) = read_sources(&app) else {
-        return Some(sources_newer_text().to_owned());
+        return newer();
     };
+    let state = app.state::<OnlineState>();
+    let token_of = sources
+        .find(&key)
+        .filter(|entry| entry.token)
+        .map(|entry| entry.address.clone());
     if sources.remove(&key) {
         write_sources(&app, &sources);
-        app.state::<OnlineState>().forget(&key);
+        state.forget(&key);
     }
-    None
+    TokenCleanup {
+        refusal: None,
+        key_store: token_of.and_then(|address| state.delete_token(&address)),
+    }
+}
+
+/// What Change token, Add token and Remove token answer.
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum TokenAnswer {
+    /// The token is checked and kept (or forgotten); nothing else to show.
+    Done,
+    /// Nothing was changed, with the sentence under the token field.
+    Refused { field: RefusalField, text: String },
+}
+
+/// Change token, Add token (criteria 5, 6): one GET of the index with the new token; only on
+/// success it is kept and the source is marked private.
+#[tauri::command]
+pub(crate) async fn online_set_token(app: AppHandle, key: String, token: String) -> TokenAnswer {
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(mut sources) = read_sources(&app) else {
+            return TokenAnswer::Refused {
+                field: RefusalField::Token,
+                text: sources_newer_text().to_owned(),
+            };
+        };
+        let state = app.state::<OnlineState>();
+        match state.set_token(&state.transport, &mut sources, &key, &token) {
+            Ok(()) => {
+                write_sources(&app, &sources);
+                TokenAnswer::Done
+            }
+            Err(Refusal { field, text }) => TokenAnswer::Refused { field, text },
+        }
+    })
+    .await
+    .unwrap_or(TokenAnswer::Refused {
+        field: RefusalField::Token,
+        text: "The server did not answer.".to_owned(),
+    })
+}
+
+/// Remove token (criterion 6): the flag is cleared and written first, then the key store entry
+/// is deleted; the source stays as a public one.
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn online_forget_token(app: AppHandle, key: String) -> TokenCleanup {
+    let Some(mut sources) = read_sources(&app) else {
+        return newer();
+    };
+    let Some(address) = sources.find(&key).map(|entry| entry.address.clone()) else {
+        return TokenCleanup::default();
+    };
+    if sources.set_token(&key, false).is_ok() {
+        write_sources(&app, &sources);
+    }
+    TokenCleanup {
+        refusal: None,
+        key_store: app.state::<OnlineState>().delete_token(&address),
+    }
 }
 
 /// Which part of a source the page opened.
@@ -360,7 +479,7 @@ pub(crate) fn online_open_licence(app: AppHandle, url: String) -> Result<(), Str
 /// Add on the ready Curvyo catalogue's entry (criterion 1): it joins the list and sends nothing.
 #[tauri::command]
 pub(crate) async fn online_add_ready(app: AppHandle) -> AddSourceAnswer {
-    online_add(app, SourceKind::Git, READY_ADDRESS.to_owned()).await
+    online_add(app, SourceKind::Git, READY_ADDRESS.to_owned(), None).await
 }
 
 #[cfg(test)]

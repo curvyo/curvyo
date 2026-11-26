@@ -4,12 +4,14 @@
 import {
   ChevronDown,
   ChevronRight,
+  CircleAlert,
   FileText,
   Folder,
   FolderPlus,
   Globe,
   Import,
   LayoutGrid,
+  Lock,
   Plus,
   Search,
   TriangleAlert,
@@ -18,6 +20,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddSourceForm } from "@/components/panel/AddSourceForm";
+import { TokenForm } from "@/components/panel/TokenForm";
+import { tokenWords } from "@/lib/tokenWords";
 import {
   OnlineRowContent,
   OnlineSourceCells,
@@ -192,6 +196,10 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
   const [armed, setArmed] = useState<string | null>(null);
   const [refusal, setRefusal] = useState("");
   const [addingSource, setAddingSource] = useState(false);
+  // The source whose access token form is open: one inline form at a time (`specs/0156` UX T8).
+  const [tokenFor, setTokenFor] = useState<{ source: string; name: string; hasToken: boolean } | null>(null);
+  // The key store could not delete a removed source's token: a persistent line (UX T12).
+  const [keyStoreLine, setKeyStoreLine] = useState("");
   const [refreshing, setRefreshing] = useState<ReadonlySet<string>>(new Set());
   const [announce, setAnnounce] = useState("");
   const searchTicket = useRef(0);
@@ -452,7 +460,12 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     if (isOnlineSource(row.source)) {
       forgetOnlineIcons(row.source);
       // A newer sources file is left alone: the refusal is the tab's alert line, as Add folder's.
-      setRefusal((await removeOnlineSource(row.source)) ?? "");
+      const cleanup = await removeOnlineSource(row.source);
+      setRefusal(cleanup.refusal ?? "");
+      setKeyStoreLine(cleanup.key_store ?? "");
+      if (tokenFor?.source === row.source) {
+        setTokenFor(null);
+      }
       refreshNow.current();
       return;
     }
@@ -528,6 +541,10 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
       });
     },
     refresh: refreshSource,
+    token: (row) => {
+      setAddingSource(false);
+      setTokenFor({ source: row.source, name: row.name, hasToken: row.online?.token.private === true });
+    },
     remove: (row) => void remove(row),
     load: (row) => void loadTemplate(row),
     licence: (url) => void openLicence(url).catch(() => undefined),
@@ -607,7 +624,8 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
 
   const tooltipOf = (row: LibraryRow, index: number) => {
     if (row.kind === "source" && row.online?.host) {
-      return `${row.name}\n${row.online.host}`;
+      const lines = `${row.name}\n${row.online.host}`;
+      return row.online.token.private ? `${lines}\n${tokenWords().private_tooltip}` : lines;
     }
     // A refused template's reason is cut in the narrow column; the tooltip says it whole.
     if (row.kind === "template" && row.unreadable) {
@@ -701,6 +719,12 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
         </button>
       </Tooltip>
       </div>
+      {isTauri && keyStoreLine ? (
+        <p className="library-refusal library-keystore-line" role="alert">
+          <CircleAlert size={14} aria-hidden="true" style={{ color: "var(--destructive)" }} />
+          {keyStoreLine}
+        </p>
+      ) : null}
       <div
         className="library-tree"
         role="treegrid"
@@ -813,6 +837,9 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
                       <span className={row.open ? "library-name library-open" : "library-name"}>
                         <Highlighted name={row.name} matched={row.matched} />
                         {row.chip ? <span className="library-chip">{row.chip}</span> : null}
+                        {row.kind === "source" && row.online?.token.private ? (
+                          <Lock size={12} strokeWidth={1.5} aria-hidden="true" className="library-lock" />
+                        ) : null}
                       </span>
                       {row.kind === "document" || row.kind === "page" || row.unreadable ? (
                         <span className="library-line">{row.line}</span>
@@ -878,6 +905,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
         <AddSourceForm
           onAdded={(key) => {
             setAddingSource(false);
+            setKeyStoreLine("");
             // The new source is opened and focused: its list was fetched by the check that added it.
             focusWhenListed.current = `s:${key}\u001f`;
             setExpanded((now) => [...new Set([...now, `s:${key}\u001f`])]);
@@ -889,6 +917,25 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
           }}
         />
       ) : null}
+      {isTauri && tokenFor ? (
+        <TokenForm
+          key={tokenFor.source}
+          source={tokenFor.source}
+          name={tokenFor.name}
+          hasToken={tokenFor.hasToken}
+          onDone={(cleanup) => {
+            focusWhenListed.current = `s:${tokenFor.source}\u001f`;
+            setKeyStoreLine(cleanup?.key_store ?? "");
+            setTokenFor(null);
+            refreshNow.current();
+          }}
+          onCancel={() => {
+            focusWhenListed.current = `s:${tokenFor.source}\u001f`;
+            setTokenFor(null);
+            refreshNow.current();
+          }}
+        />
+      ) : null}
       {isTauri ? (
         <div className="library-footer">
           <div className="library-footer-buttons">
@@ -896,8 +943,16 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
               <FolderPlus size={16} aria-hidden="true" />
               Add folder...
             </button>
-            {addingSource ? null : (
-              <button type="button" ref={addSourceRef} className="library-add" onClick={() => setAddingSource(true)}>
+            {addingSource || tokenFor ? null : (
+              <button
+                type="button"
+                ref={addSourceRef}
+                className="library-add"
+                onClick={() => {
+                  setTokenFor(null);
+                  setAddingSource(true);
+                }}
+              >
                 <Plus size={16} aria-hidden="true" />
                 Add source...
               </button>

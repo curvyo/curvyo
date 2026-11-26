@@ -37,6 +37,9 @@ export interface BrowserAnswer {
 export interface SetsGroup {
   key: string;
   heading: string;
+  /** The group's name alone; the Lock follows it when `private`. */
+  name: string;
+  private: boolean;
   cards: number[];
 }
 
@@ -178,7 +181,8 @@ export interface Guide {
   example_url: string;
   fields: [string, string][];
   rules: string[];
-  private: string;
+  private_title: string;
+  private_steps: string[];
 }
 
 /** The hosting guide's words, shipped with the app. */

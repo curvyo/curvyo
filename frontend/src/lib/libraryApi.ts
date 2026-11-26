@@ -30,6 +30,8 @@ export interface OnlineExtra {
   host: string;
   state: string;
   refresh: boolean;
+  /** The Lock mark and the token action (`specs/0156` criteria 4, 5, 13). */
+  token: { private: boolean; action: string; attention: boolean };
   status: string;
   author: string;
   licence: string;

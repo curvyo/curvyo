@@ -11,6 +11,7 @@ import {
   Globe,
   GitBranch,
   Import,
+  KeyRound,
   LoaderCircle,
   Plus,
   RefreshCw,
@@ -90,6 +91,8 @@ export interface OnlineHandlers {
   addReady: () => void;
   /** Refresh of a source row. */
   refresh: (row: LibraryRow) => void;
+  /** Change token or Add token of a source row: opens the token form. */
+  token: (row: LibraryRow) => void;
   /** Remove of a source row (armed first). */
   remove: (row: LibraryRow) => void;
   /** Load of a template row. */
@@ -356,6 +359,21 @@ export function OnlineSourceCells({ row, handlers: h }: { row: LibraryRow; handl
       >
         <RefreshCw size={16} className={running ? "motion-safe:animate-spin" : undefined} />
       </button>
+      {extra.token.action ? (
+        <button
+          type="button"
+          className={`library-action${extra.token.attention ? " library-action-shown" : ""}`}
+          aria-label={`${extra.token.action} ${row.name}`}
+          title={extra.token.action}
+          tabIndex={-1}
+          onClick={(event) => {
+            event.stopPropagation();
+            h.token(row);
+          }}
+        >
+          <KeyRound size={16} />
+        </button>
+      ) : null}
       <button
         type="button"
         className={h.armed === row.key ? "library-action library-armed" : "library-action"}

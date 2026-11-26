@@ -5,11 +5,24 @@
 import { createIconBatcher } from "@/lib/iconBatch";
 import { invoke } from "@/platform/host";
 
-/** The sentence under the Address field, or the key of the added source. */
+/** The field a refusal is shown under (`specs/0156` UX notes T1). */
+export type RefusalField = "address" | "token";
+
+/** The refusal and its field, or the key of the added source. */
 export type AddSourceAnswer =
   | { kind: "added"; key: string }
-  | { kind: "refused"; text: string }
+  | { kind: "refused"; field: RefusalField; text: string }
   | { kind: "cancelled" };
+
+/** What Remove and Remove token report: a newer sources file's sentence (nothing changed), and the
+ * line for the Online group when the key store would not delete the token. */
+export interface TokenCleanup {
+  refusal: string | null;
+  key_store: string | null;
+}
+
+/** What Change token and Add token answer. */
+export type TokenAnswer = { kind: "done" } | { kind: "refused"; field: RefusalField; text: string };
 
 /** The Came from keys of an online item, as `curvyo_document_core::OnlineOrigin`. */
 export interface OnlineOrigin {
@@ -39,9 +52,24 @@ export interface IconImport {
 /** What Load answered. */
 export type LoadAnswer = ({ kind: "ready" } & TemplateOrigin) | { kind: "refused"; text: string };
 
-/** Add source: the host checks the address with one request. */
-export function addOnlineSource(kind: "git" | "iconify", address: string): Promise<AddSourceAnswer> {
-  return invoke<AddSourceAnswer>("online_add", { kind, address });
+/** Add source: the host checks the address with one request, carrying `token` when there is one
+ * (the text goes to the host and nowhere else; the host keeps it in the system key store). */
+export function addOnlineSource(
+  kind: "git" | "iconify",
+  address: string,
+  token: string | null,
+): Promise<AddSourceAnswer> {
+  return invoke<AddSourceAnswer>("online_add", { kind, address, token });
+}
+
+/** Change token or Add token: one request with the new token; kept only on success. */
+export function setOnlineToken(key: string, token: string): Promise<TokenAnswer> {
+  return invoke<TokenAnswer>("online_set_token", { key, token });
+}
+
+/** Remove token: the source stays as a public one. */
+export function forgetOnlineToken(key: string): Promise<TokenCleanup> {
+  return invoke<TokenCleanup>("online_forget_token", { key });
 }
 
 /** Add on the ready Curvyo catalogue's entry: it joins the list and sends nothing. */
@@ -49,10 +77,9 @@ export function addReadySource(): Promise<AddSourceAnswer> {
   return invoke<AddSourceAnswer>("online_add_ready");
 }
 
-/** Remove a source from the list; its fetched data leaves the session. The sentence when the list
- * was made by a newer Curvyo and is left alone, else null. */
-export function removeOnlineSource(key: string): Promise<string | null> {
-  return invoke<string | null>("online_remove", { key });
+/** Remove a source from the list; its fetched data leaves the session and its token the key store. */
+export function removeOnlineSource(key: string): Promise<TokenCleanup> {
+  return invoke<TokenCleanup>("online_remove", { key });
 }
 
 /** Expanding a source, Refresh. */
