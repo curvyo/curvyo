@@ -2,10 +2,10 @@
 //! per distinct text in the included sans, and the laid-out cells and labels at the grid's place.
 
 use curvyo_document_core::{
-    Affine, CornerRadii, DrawingText, FontKind, FontRef, GridItems, Length, NewGridCell,
-    NewGridLabel, Point, RectBounds, Shape, Style, TextChars, TextLayoutValues, Vec2,
+    Affine, DrawingText, FontKind, FontRef, GridItems, Length, NewGridCell, NewGridLabel, Point,
+    Style, TextChars, TextLayoutValues, Vec2,
 };
-use curvyo_laser_core::grids::{Recipe, TEXT_MM, TestLayout, cell_style, layout};
+use curvyo_laser_core::grids::{Recipe, TEXT_MM, TestLayout, cell_shape, cell_style, layout};
 
 use super::super::Session;
 use super::GridObject;
@@ -96,14 +96,11 @@ pub(in crate::session) fn grid_items(
                 )
             });
             NewGridCell {
-                shape: Shape::Rect {
-                    bounds: RectBounds {
-                        origin: Point::new(at.x + place.min.x, at.y + place.min.y),
-                        width: place.side,
-                        height: place.side,
-                    },
-                    corner_radii: CornerRadii::uniform(Length::from_mm(0.0)),
-                },
+                shape: cell_shape(
+                    &recipe.test,
+                    Point::new(at.x + place.min.x, at.y + place.min.y),
+                    place.side,
+                ),
                 style: cell_style(&recipe.test),
                 tag,
                 image,

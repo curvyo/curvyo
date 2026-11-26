@@ -109,7 +109,10 @@ fn judged_test() -> TestRecord {
             set: None,
         }),
         lasered: Some(1_800_000_000_000),
-        best: Some(CellIndex { column: 2, row: 1 }),
+        marks: curvyo_laser_core::library::Marks {
+            best: Some(CellIndex { column: 2, row: 1 }),
+            ..Default::default()
+        },
         note: "ZQX-NOTE-7731".to_owned(),
         photo: None,
     }
@@ -566,7 +569,7 @@ fn c3_c5_c15_first_sync_arrives_without_input_with_the_same_values() {
         .first()
         .unwrap();
     assert_eq!(
-        judged.best,
+        judged.marks.best,
         Some(CellIndex { column: 2, row: 1 }),
         "the judged test travelled"
     );

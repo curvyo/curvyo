@@ -34,7 +34,7 @@ fn test_id(text: &str) -> TestId {
 #[test]
 fn the_format_is_3() {
     // Superseded by 0135 slice 1 (2026-11-19): format 4 (ADR 0072 §6).
-    assert_eq!(RECORD_FORMAT_VERSION, 4);
+    assert_eq!(RECORD_FORMAT_VERSION, 5);
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn an_image_test_keeps_its_dither_and_sources_the_image_set_byte_for_byte() {
     // Superseded by 0135 slice 1 (2026-11-19): written back as format 4.
     assert_eq!(
         write_record(&material),
-        text.replacen("\"format_version\": 3,", "\"format_version\": 4,", 1)
+        text.replacen("\"format_version\": 3,", "\"format_version\": 5,", 1)
     );
     let image = material.test(test_id("9GR4D")).unwrap();
     assert_eq!(image.recipe.kind(), SetKind::Image);
@@ -91,7 +91,7 @@ fn a_format_2_record_reads_as_is_and_is_written_as_format_3() {
     // Superseded by 0135 slice 1 (2026-11-19): as format 4.
     assert_eq!(
         written,
-        text.replacen("\"format_version\": 2,", "\"format_version\": 4,", 1)
+        text.replacen("\"format_version\": 2,", "\"format_version\": 5,", 1)
     );
     assert_eq!(read(&written).unwrap(), material);
 }
@@ -135,7 +135,7 @@ fn an_image_set_needs_an_interval_and_a_format_2_record_holds_none() {
     // Superseded by 0135 slice 1 (2026-11-19): written back as format 4.
     assert_eq!(
         write_record(&material),
-        three.replacen("\"format_version\": 3,", "\"format_version\": 4,", 1),
+        three.replacen("\"format_version\": 3,", "\"format_version\": 5,", 1),
         "byte for byte"
     );
     let set = material.lasers[0]

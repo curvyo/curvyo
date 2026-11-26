@@ -180,8 +180,8 @@ fn criterion_24_one_tap_makes_the_best_cell_and_the_set() {
     let id = recipe_of(&s, group).id.to_string();
     s.unfold_material(Some(&birch));
     s.open_material_test(Some(&id));
-    s.judge_test(&birch, &id, 2, 1, &random(3)).unwrap();
-    assert_eq!(undo_label(&mut s), "Choose best cell");
+    s.mark_pick(&birch, &id, "best", 2, 1, &random(3)).unwrap();
+    assert_eq!(undo_label(&mut s), "Mark pick");
     let laser = s.active_profile_id().unwrap();
     let m = s.materials().find(&birch).unwrap();
     let set = m
@@ -189,13 +189,20 @@ fn criterion_24_one_tap_makes_the_best_cell_and_the_set() {
         .unwrap();
     assert_eq!(set.numbers.settings.power.percent(), 60.0);
     let detail = s.materials_view().unwrap().unfolded.unwrap().test.unwrap();
-    assert_eq!(detail.best.unwrap().column, 2);
-    assert!(detail.set_line.unwrap().starts_with("Cut set of "));
+    assert_eq!(detail.picks[0].cell.column, 2);
+    assert!(
+        detail.picks[0]
+            .line
+            .as_deref()
+            .unwrap()
+            .starts_with("Best: Cut set of ")
+    );
     assert!(detail.place.on_page);
+    s.mark_pick(&birch, &id, "best", 2, 1, &random(4)).unwrap();
     assert_eq!(
-        s.judge_test(&birch, &id, 2, 1, &random(4)),
-        Err("Nothing changed.".to_owned()),
-        "a tap on the best cell (G14)"
+        undo_label(&mut s),
+        "Unmark pick",
+        "a tap on the best cell unmarks it"
     );
 }
 
@@ -287,13 +294,13 @@ fn the_journal_counts_photo_bytes_and_drops_the_oldest_past_its_limit() {
 }
 
 #[test]
-fn a_material_record_over_512_kib_is_refused_with_its_notice() {
+fn a_material_record_over_640_kib_is_refused_with_its_notice() {
     let mut s = laser_with_fonts();
     let id = s.add_material("Birch", 3.0, &random(1)).unwrap();
     let mut change = super::LibraryChange::default();
     let refused = s.change_record(&mut change, &id, |m| {
         m.name = "Birch".to_owned();
-        for i in 0..5_000 {
+        for i in 0..8_000 {
             m.history.push(curvyo_laser_core::library::HistoryEntry {
                 id: format!("{i:0>36}"),
                 date: 1,
@@ -306,7 +313,7 @@ fn a_material_record_over_512_kib_is_refused_with_its_notice() {
     });
     assert_eq!(
         refused,
-        Err("Could not save Birch: it is over 512 KiB.".to_owned())
+        Err("Could not save Birch: it is over 640 KiB.".to_owned())
     );
     assert!(s.materials().text(&id).unwrap().len() < MAX_RECORD_TEXT);
     assert!(matches!(s.materials().reads()[0], MaterialRead::Loaded(_)));
@@ -382,5 +389,168 @@ fn raster_an_image_operation_follows_the_image_set_and_names_a_missing_one() {
         stored(&s)["main"]["power_pct"],
         40.0,
         "the stored numbers stay"
+    );
+}
+
+/// `specs/0146` criteria 2, 3, 7, 9: a Fastest mark writes its pick set without a history entry,
+/// shows its line and the folded line under the set, and a second tap unmarks it ("Unmark pick");
+/// the pick set goes with the mark.
+#[test]
+fn criteria_2_3_7_9_marking_fastest_and_unmarking_it() {
+    let (mut s, birch, group) = birch_grid();
+    let id = recipe_of(&s, group).id.to_string();
+    s.unfold_material(Some(&birch));
+    s.open_material_test(Some(&id));
+    s.mark_pick(&birch, &id, "best", 2, 1, &random(3)).unwrap();
+    s.mark_pick(&birch, &id, "fastest", 3, 3, &random(4))
+        .unwrap();
+    assert_eq!(undo_label(&mut s), "Mark pick");
+    let laser = s.active_profile_id().unwrap();
+    let m = s.materials().find(&birch).unwrap();
+    assert_eq!(m.history.len(), 1, "a pick other than Best writes no entry");
+    let kind = curvyo_laser_core::settings::SetKind::Cut;
+    let fastest = m
+        .pick_set(&laser, kind, curvyo_laser_core::settings::PickKind::Fastest)
+        .unwrap();
+    assert_eq!(fastest.numbers.settings.power.percent(), 80.0);
+    let body = s.materials_view().unwrap().unfolded.unwrap();
+    let picks = &body.test.as_ref().unwrap().picks;
+    assert_eq!(
+        picks.iter().map(|p| p.pick).collect::<Vec<_>>(),
+        ["best", "fastest"]
+    );
+    assert!(
+        picks[1]
+            .line
+            .as_deref()
+            .unwrap()
+            .starts_with("Fastest: 80 %, ")
+    );
+    let other = &body.lasers[0].sets[0].other_picks;
+    assert_eq!(
+        (other[0].pick, other[0].source.as_str()),
+        ("fastest", format!("Test {id}").as_str())
+    );
+    s.mark_pick(&birch, &id, "fastest", 3, 3, &random(5))
+        .unwrap();
+    assert_eq!(undo_label(&mut s), "Unmark pick");
+    let m = s.materials().find(&birch).unwrap();
+    assert!(
+        m.pick_set(&laser, kind, curvyo_laser_core::settings::PickKind::Fastest)
+            .is_none()
+    );
+    let body = s.materials_view().unwrap().unfolded.unwrap();
+    assert_eq!(body.lasers[0].sets[0].other_picks, []);
+    assert_eq!(body.test.unwrap().picks.len(), 1);
+    assert!(
+        s.mark_pick(&birch, &id, "cleanest", 0, 0, &random(6))
+            .is_err()
+    );
+}
+
+fn stored_of(s: &Session, op: curvyo_document_core::NodeId) -> serde_json::Value {
+    s.document
+        .operations(s.active_manufacturing().unwrap().id)
+        .unwrap()
+        .into_iter()
+        .find(|o| o.id == op)
+        .unwrap()
+        .settings
+        .unwrap()
+}
+
+/// `specs/0146` criteria 13 to 15: Use pick links an operation to a pick in one step "Use pick",
+/// the link follows a re-judged pick, a typed number keeps pick and link, a press on the pressed
+/// pick clears the typed number, an operation stored without a pick follows Best, and a pick the
+/// material lacks is skipped with a notice of at most 70 characters.
+#[test]
+fn criteria_13_to_15_an_operation_follows_the_pick_it_was_given() {
+    let (mut s, birch, group) = birch_grid();
+    let test = recipe_of(&s, group).id.to_string();
+    s.mark_pick(&birch, &test, "best", 2, 1, &random(3))
+        .unwrap();
+    s.mark_pick(&birch, &test, "fastest", 3, 3, &random(4))
+        .unwrap();
+    let cut = s.add_test_operation("cut").unwrap();
+    assert!(s.use_material_on(&[cut], &birch));
+    assert!(
+        stored_of(&s, cut)["material"].get("pick").is_none(),
+        "Best is never written"
+    );
+    assert_eq!(stored_of(&s, cut)["main"]["power_pct"], 60.0);
+    let steps = s.undo_len();
+    assert!(s.use_pick_on(&[cut], "fastest"));
+    assert_eq!(s.undo_len(), steps + 1);
+    assert_eq!(undo_label(&mut s), "Use pick");
+    let _ = s.redo();
+    assert_eq!(stored_of(&s, cut)["material"]["pick"], "fastest");
+    assert_eq!(stored_of(&s, cut)["main"]["power_pct"], 80.0);
+    // Criterion 14: re-judging the pick moves the linked operation in the same step.
+    s.mark_pick(&birch, &test, "fastest", 0, 0, &random(5))
+        .unwrap();
+    assert_eq!(stored_of(&s, cut)["main"]["power_pct"], 20.0);
+    // A typed number keeps the link and the pick; the same pick pressed again clears it.
+    assert_eq!(
+        s.edit_operation_setting(cut, "main", "power", 70.0),
+        Ok(true)
+    );
+    assert_eq!(stored_of(&s, cut)["material"]["pick"], "fastest");
+    assert_eq!(stored_of(&s, cut)["overrides"]["main"]["power_pct"], 70.0);
+    assert!(s.use_pick_on(&[cut], "fastest"));
+    assert!(stored_of(&s, cut).get("overrides").is_none());
+    // Criterion 15: a pick the material lacks changes nothing and says so.
+    assert!(!s.use_pick_on(&[cut], "deepest"));
+    assert_eq!(
+        s.operations_notice().as_deref(),
+        Some("Cut 1 skipped: Birch 3 mm has no Deepest set.")
+    );
+    assert_eq!(stored_of(&s, cut)["material"]["pick"], "fastest");
+    // Several rows: the one that can follow does, the other is named, the notice stays short.
+    let other = s.add_test_operation("cut").unwrap();
+    assert!(s.use_material_on(&[other], &birch));
+    s.mark_pick(&birch, &test, "fastest", 0, 0, &random(6))
+        .unwrap();
+    assert!(s.use_pick_on(&[other, cut], "best"));
+    assert!(stored_of(&s, cut)["material"].get("pick").is_none());
+    assert!(
+        s.operations_notice()
+            .is_none_or(|n| n.chars().count() <= 70)
+    );
+}
+
+/// Criterion 16: a derived cell operation of a test grid has no pick pick.
+#[test]
+fn criterion_16_a_derived_cell_row_takes_no_pick() {
+    let (mut s, birch, group) = birch_grid();
+    let derived = s.grid_object(group).unwrap().derived[0];
+    assert!(!s.use_pick_on(&[derived], "best"));
+    let _ = birch;
+}
+
+/// Criterion 8: the selected grid reports its marked cells for the canvas, a deselected one none.
+#[test]
+fn criterion_8_the_selected_grid_reports_its_picks_for_the_canvas() {
+    let (mut s, birch, group) = birch_grid();
+    let test = recipe_of(&s, group).id.to_string();
+    assert!(s.pick_marks().is_empty(), "no pick, nothing to draw");
+    s.mark_pick(&birch, &test, "best", 2, 1, &random(3))
+        .unwrap();
+    s.mark_pick(&birch, &test, "fastest", 2, 1, &random(4))
+        .unwrap();
+    s.mark_pick(&birch, &test, "deepest", 0, 0, &random(5))
+        .unwrap();
+    let marks = s.pick_marks();
+    assert_eq!(marks.len(), 2);
+    let kinds: Vec<Vec<&str>> = marks.iter().map(|m| m.kinds.clone()).collect();
+    assert!(kinds.contains(&vec!["best", "fastest"]) && kinds.contains(&vec!["deepest"]));
+    assert!(
+        marks
+            .iter()
+            .all(|m| m.width > 0.0 && (m.pitch - m.width - m.gap).abs() < 1e-9)
+    );
+    s.selection.clear();
+    assert!(
+        s.pick_marks().is_empty(),
+        "it disappears when the grid is not selected"
     );
 }

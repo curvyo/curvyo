@@ -1,0 +1,159 @@
+{
+  "form_open": false,
+  "load_notices": [],
+  "next_name": "Material 1",
+  "page_laser": {
+    "id": "generic-laser",
+    "name": "Generic laser"
+  },
+  "rows": [
+    {
+      "id": "03030303-0303-4303-8303-030303030303",
+      "line": "1 laser · 1 set · 1 test",
+      "name": "Birch 3 mm",
+      "state": "loaded",
+      "tests": 1,
+      "thickness_mm": 3.0
+    }
+  ],
+  "unfolded": {
+    "id": "03030303-0303-4303-8303-030303030303",
+    "laser_pick_open": false,
+    "lasers": [
+      {
+        "laser": {
+          "id": "generic-laser",
+          "name": "Generic laser"
+        },
+        "missing": [
+          "score",
+          "engrave",
+          "image"
+        ],
+        "open": true,
+        "sets": [
+          {
+            "interval_mm": null,
+            "kind": "cut",
+            "numbers": {
+              "passes": 1,
+              "power_pct": 60.0,
+              "speed_mm_min": 1950
+            },
+            "other_picks": [
+              {
+                "label": "Second best",
+                "numbers": "40 %, 1950 mm/min, 1 ×",
+                "pick": "second_best",
+                "source": "Test M8W1O"
+              },
+              {
+                "label": "Fastest",
+                "numbers": "80 %, 4650 mm/min, 1 ×",
+                "pick": "fastest",
+                "source": "Test M8W1O"
+              },
+              {
+                "label": "Deepest",
+                "numbers": "80 %, 4650 mm/min, 1 ×",
+                "pick": "deepest",
+                "source": "Test M8W1O"
+              }
+            ],
+            "source": "Test M8W1O"
+          }
+        ],
+        "this_page": true
+      }
+    ],
+    "name": "Birch 3 mm",
+    "other_lasers": [],
+    "test": {
+      "axes_line": "Power 20–100 % × Speed 600–6000 mm/min · 1 × · cell 10 mm · 12 Nov 2025",
+      "columns": {
+        "title": "Power %",
+        "unit": " %",
+        "values": [
+          "20",
+          "40",
+          "60",
+          "80",
+          "100"
+        ]
+      },
+      "head": "Cut · Generic laser",
+      "id": "M8W1O",
+      "kind": "cut",
+      "note": "",
+      "photo": null,
+      "picks": [
+        {
+          "cell": {
+            "column": 2,
+            "row": 1
+          },
+          "label": "Best",
+          "line": "Best: Cut set of Generic laser: 60 %, 1950 mm/min, 1 ×",
+          "pick": "best",
+          "set_from": null
+        },
+        {
+          "cell": {
+            "column": 1,
+            "row": 1
+          },
+          "label": "Second best",
+          "line": "Second best: 40 %, 1950 mm/min, 1 ×",
+          "pick": "second_best",
+          "set_from": null
+        },
+        {
+          "cell": {
+            "column": 3,
+            "row": 3
+          },
+          "label": "Fastest",
+          "line": "Fastest: 80 %, 4650 mm/min, 1 ×",
+          "pick": "fastest",
+          "set_from": null
+        },
+        {
+          "cell": {
+            "column": 3,
+            "row": 3
+          },
+          "label": "Deepest",
+          "line": "Deepest: 80 %, 4650 mm/min, 1 ×",
+          "pick": "deepest",
+          "set_from": null
+        }
+      ],
+      "place": {
+        "label": "Select on page",
+        "on_page": true
+      },
+      "rows": {
+        "title": "mm/min",
+        "unit": " mm/min",
+        "values": [
+          "600",
+          "1950",
+          "3300",
+          "4650",
+          "6000"
+        ]
+      },
+      "state_line": "Not lasered · on Laser 1"
+    },
+    "tests": [
+      {
+        "id": "M8W1O",
+        "kind": "cut",
+        "lasered": false,
+        "line": "Not lasered · Laser 1",
+        "photo": false
+      }
+    ],
+    "thickness_mm": 3.0
+  }
+}

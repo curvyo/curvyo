@@ -338,7 +338,7 @@ fn source_issues(op: NodeId, source: &NumbersSource, issues: &mut Vec<Issue>) {
     match source {
         NumbersSource::Stored {
             material,
-            reason: StoredReason::NoSet(kind),
+            reason: StoredReason::NoSet(kind, _),
             ..
         } => issues.push(issue(
             Cause::NoSetForLaser {

@@ -230,3 +230,45 @@ fn an_interval_out_of_place_or_range_is_damage() {
         Some(SettingsDamage::BadInterval)
     );
 }
+
+/// `specs/0146` criterion 17 (ADR 0090 decision 7): `pick` is stored for the three picks after
+/// Best and absent for Best; `"best"`, an unknown word and a number are a bad link, and a link
+/// without the key follows Best.
+#[test]
+fn the_link_stores_a_pick_but_never_best() {
+    let link = |pick: Option<Value>| {
+        let mut material = json!({"id": "m1", "name": "Birch", "modified": 7});
+        if let Some(pick) = pick {
+            material["pick"] = pick;
+        }
+        json!({"main": {"power_pct": 60.0, "speed_mm_min": 3000, "passes": 1},
+               "material": material})
+    };
+    for pick in [PickKind::SecondBest, PickKind::Fastest, PickKind::Deepest] {
+        let value = link(Some(json!(pick.as_str())));
+        let SettingsRead::Stored(stored) = read_settings(
+            Some(&value),
+            OperationKind::Cut,
+            crate::DefaultNumbers::BUILT_IN,
+        ) else {
+            panic!("{pick:?} reads");
+        };
+        assert_eq!(stored.material.as_ref().unwrap().pick, pick);
+        assert_eq!(stored.to_value(), value, "written back unchanged");
+    }
+    let SettingsRead::Stored(best) = read_settings(
+        Some(&link(None)),
+        OperationKind::Cut,
+        crate::DefaultNumbers::BUILT_IN,
+    ) else {
+        panic!("reads");
+    };
+    assert_eq!(best.material.as_ref().unwrap().pick, PickKind::Best);
+    assert_eq!(best.to_value(), link(None), "Best is never written");
+    for bad in [json!("best"), json!("cleanest"), json!(3)] {
+        assert_eq!(
+            damage(&link(Some(bad)), OperationKind::Cut),
+            Some(SettingsDamage::BadLink)
+        );
+    }
+}

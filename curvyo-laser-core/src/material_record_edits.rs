@@ -2,8 +2,8 @@
 //! (ADR 0058 §2, §3; `specs/0112` criteria 17 to 26).
 
 use crate::material::{
-    CellIndex, MAX_HISTORY_ENTRIES, MAX_MATERIAL_NAME_CHARS, MachineTie, SetKind, SetNumbers,
-    Thickness, next_modified,
+    CellIndex, MAX_HISTORY_ENTRIES, MAX_MATERIAL_NAME_CHARS, MachineTie, PickKind, SetKind,
+    SetNumbers, Thickness, next_modified,
 };
 use crate::material_record::{
     HistoryEntry, HistoryEvent, LaserSets, MAX_LASERS, MAX_NOTE_CHARS, MAX_TESTS, Material,
@@ -88,6 +88,42 @@ impl Material {
         });
     }
 
+    /// The index of the laser's entry, added when it has none (criterion 21).
+    fn laser_index(&mut self, machine: &MachineTie) -> Result<usize, RecordRefusal> {
+        match self.lasers.iter().position(|l| l.machine.id == machine.id) {
+            Some(index) => Ok(index),
+            None if self.lasers.len() >= MAX_LASERS => Err(RecordRefusal::TooManyLasers),
+            None => {
+                self.lasers.push(LaserSets {
+                    machine: machine.clone(),
+                    sets: std::collections::BTreeMap::new(),
+                    picks: std::collections::BTreeMap::new(),
+                });
+                Ok(self.lasers.len() - 1)
+            }
+        }
+    }
+
+    /// Writes `set` as the laser's pick set of `kind` (Second best, Fastest or Deepest). It is no
+    /// history entry (ADR 0090 decision 2); the caller raises `modified`.
+    fn write_pick_set(
+        &mut self,
+        machine: &MachineTie,
+        kind: SetKind,
+        pick: PickKind,
+        set: Set,
+    ) -> Result<(), RecordRefusal> {
+        if set.numbers.interval.is_some() != kind.has_interval() {
+            return Err(RecordRefusal::WrongNumbers);
+        }
+        if self.pick_set(&machine.id, kind, pick) == Some(&set) {
+            return Err(RecordRefusal::Unchanged);
+        }
+        let index = self.laser_index(machine)?;
+        self.lasers[index].picks.insert((kind, pick), set);
+        Ok(())
+    }
+
     /// Writes `set` as the laser's set of `kind`, adding the laser when it has no sets yet
     /// (criterion 21), and appends a `set` entry; the caller raises `modified`.
     fn write_set(
@@ -104,17 +140,7 @@ impl Material {
             return Err(RecordRefusal::Unchanged);
         }
         self.room_for_entry()?;
-        let index = match self.lasers.iter().position(|l| l.machine.id == machine.id) {
-            Some(index) => index,
-            None if self.lasers.len() >= MAX_LASERS => return Err(RecordRefusal::TooManyLasers),
-            None => {
-                self.lasers.push(LaserSets {
-                    machine: machine.clone(),
-                    sets: std::collections::BTreeMap::new(),
-                });
-                self.lasers.len() - 1
-            }
-        };
+        let index = self.laser_index(machine)?;
         let event = HistoryEvent::Set {
             numbers: set.numbers,
             source: set.source.clone(),
@@ -217,9 +243,13 @@ impl Material {
                 }
                 old.recipe = test.recipe;
                 old.machine = test.machine;
-                old.best = old
-                    .best
-                    .filter(|cell| old.recipe.has_cell(cell.column, cell.row));
+                for pick in PickKind::ALL {
+                    let kept = old
+                        .marks
+                        .get(pick)
+                        .filter(|cell| old.recipe.has_cell(cell.column, cell.row));
+                    old.marks.put(pick, kept);
+                }
             }
             None if self.tests.len() >= MAX_TESTS => return Err(RecordRefusal::TooManyTests),
             None => self.tests.push(test),
@@ -255,9 +285,11 @@ impl Material {
             .ok_or(RecordRefusal::UnknownTest)
     }
 
-    /// Judging (criterion 24): `cell` becomes the test's best cell, and its numbers (the two
-    /// axis values over the shared values) the set of the recipe's kind for the test's laser,
-    /// source the test, with a `set` entry. A tap on the best cell changes nothing (G14).
+    /// Judging (criterion 24; `specs/0146` criterion 2): `cell` becomes the test's cell for
+    /// `pick`, and its numbers (the two axis values over the shared values) the laser's set of
+    /// the recipe's kind for Best (with a `set` entry), else the laser's pick set (no entry),
+    /// source the test. A tap on the pick's cell changes nothing (G14); the session sends it to
+    /// [`Self::unmark`].
     ///
     /// # Errors
     /// No such test or cell, no change, 16 lasers or 500 entries.
@@ -265,13 +297,14 @@ impl Material {
         &mut self,
         id: TestId,
         cell: CellIndex,
+        pick: PickKind,
         stamp: Stamp<'_>,
     ) -> Result<(), RecordRefusal> {
         let test = &self.tests[self.test_index(id)?];
         if !test.recipe.has_cell(cell.column, cell.row) {
             return Err(RecordRefusal::NoCell);
         }
-        if test.best == Some(cell) {
+        if test.marks.get(pick) == Some(cell) {
             return Err(RecordRefusal::Unchanged);
         }
         let (machine, kind) = (test.machine.clone(), test.recipe.kind());
@@ -279,12 +312,56 @@ impl Material {
             numbers: test.recipe.cell_values(cell.column, cell.row),
             source: SetSource::Test(id),
         };
-        match self.write_set(&machine, kind, set, stamp) {
+        let written = match pick {
+            PickKind::Best => self.write_set(&machine, kind, set, stamp),
+            _ => self.write_pick_set(&machine, kind, pick, set),
+        };
+        match written {
             Ok(()) | Err(RecordRefusal::Unchanged) => {}
             Err(other) => return Err(other),
         }
         let index = self.test_index(id)?;
-        self.tests[index].best = Some(cell);
+        self.tests[index].marks.put(pick, Some(cell));
+        self.touch(stamp.now);
+        Ok(())
+    }
+
+    /// Unmarking (`specs/0146` criterion 3): the test's cell for `pick` goes. The set is touched
+    /// only when its source is this test: a pick set goes with the mark, Best's set stays with
+    /// its numbers and turns Typed (a `set` entry, Proposal). A set taken from another test of
+    /// the laser and kind stays as it is.
+    ///
+    /// # Errors
+    /// No such test, no mark of that pick, or 500 entries.
+    pub fn unmark(
+        &mut self,
+        id: TestId,
+        pick: PickKind,
+        stamp: Stamp<'_>,
+    ) -> Result<(), RecordRefusal> {
+        let index = self.test_index(id)?;
+        let test = &self.tests[index];
+        if test.marks.get(pick).is_none() {
+            return Err(RecordRefusal::Unchanged);
+        }
+        let (machine, kind) = (test.machine.clone(), test.recipe.kind());
+        let ours = |set: Option<&Set>| set.is_some_and(|s| s.source == SetSource::Test(id));
+        if pick == PickKind::Best {
+            if let Some(set) = self.set_for(&machine.id, kind).filter(|s| ours(Some(s))) {
+                let typed = Set {
+                    numbers: set.numbers,
+                    source: SetSource::Typed,
+                };
+                self.write_set(&machine, kind, typed, stamp)?;
+            }
+        } else if ours(self.pick_set(&machine.id, kind, pick)) {
+            for laser in &mut self.lasers {
+                if laser.machine.id == machine.id {
+                    laser.picks.remove(&(kind, pick));
+                }
+            }
+        }
+        self.tests[index].marks.put(pick, None);
         self.touch(stamp.now);
         Ok(())
     }

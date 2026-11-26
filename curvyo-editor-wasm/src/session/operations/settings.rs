@@ -5,9 +5,9 @@
 use curvyo_document_core::{NodeId, OperationSnapshot, SettingsStep, SettingsWrite};
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    Field, Passes, PowerPercent, Role, SettingsDamage, SettingsRead, SettingsState, StoredSettings,
-    TypedNumber, edit_number, read_options, read_settings, reset_to_material, resolve,
-    use_material, use_own_numbers,
+    Field, Passes, PickKind, PowerPercent, Role, SettingsDamage, SettingsRead, SettingsState,
+    StoredSettings, TypedNumber, edit_number, read_options, read_settings, reset_to_material,
+    resolve, use_material, use_own_numbers, use_pick,
 };
 use curvyo_laser_core::{DefaultNumbers, FeedRate};
 
@@ -162,6 +162,44 @@ impl Session {
         }
         self.operations.notice = skip_notice(&skipped, &found.name);
         self.write_settings_step(SettingsStep::UseMaterial, &writes)
+    }
+
+    /// The pick pick (`specs/0146` criteria 13, 14, 15): each operation of `ids` that points to a
+    /// material follows its pick `pick`, the numbers as the material has them now and typed
+    /// numbers cleared, also for the pick it already follows; one step "Use pick". An operation
+    /// whose material lacks that pick for this laser is skipped and named in the notice. Whether
+    /// anything was written.
+    pub fn use_pick_on(&mut self, ids: &[NodeId], pick: &str) -> bool {
+        self.operations.notice = None;
+        let Some(pick) = PickKind::parse(pick) else {
+            return false;
+        };
+        let profile = self.active_profile_id().unwrap_or_default();
+        let mut writes = Vec::new();
+        let mut skipped: Vec<(String, &'static str)> = Vec::new();
+        let mut material_name = String::new();
+        for target in ids.iter().filter_map(|&id| self.settings_target(id)) {
+            let SettingsRead::Stored(stored) = &target.read else {
+                continue;
+            };
+            let Some(link) = &stored.material else {
+                continue;
+            };
+            let found = self.materials.library().find(&link.id);
+            if let Some(Ok(next)) =
+                found.map(|m| use_pick(m, &profile, target.kind, pick, &target.read))
+            {
+                writes.push(SettingsWrite {
+                    operation: target.id,
+                    value: plain(&next),
+                });
+            } else {
+                link.name.clone_into(&mut material_name);
+                skipped.push((target.name, pick.label()));
+            }
+        }
+        self.operations.notice = skip_notice(&skipped, &material_name);
+        self.write_settings_step(SettingsStep::UsePick, &writes)
     }
 
     /// "Own numbers" (or "No material") in the pick (criterion 25): the link and typed numbers of

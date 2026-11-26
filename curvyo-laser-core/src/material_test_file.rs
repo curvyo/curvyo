@@ -5,9 +5,8 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::material::CellIndex;
-use crate::material::SetKind;
-use crate::material_record::{MAX_NOTE_CHARS, PhotoKind, TestRecord};
+use crate::material::{CellIndex, PickKind, SetKind};
+use crate::material_record::{MAX_NOTE_CHARS, Marks, PhotoKind, TestRecord};
 use crate::material_record_file::{
     MachineJson, RecordFileError, damaged, machine_json, read_machine,
 };
@@ -25,12 +24,18 @@ pub(crate) struct TestJson {
     lasered: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     best: Option<CellJson>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    second_best: Option<CellJson>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fastest: Option<CellJson>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    deepest: Option<CellJson>,
     note: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     photo: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 #[serde(deny_unknown_fields)]
 struct CellJson {
     column: u64,
@@ -62,22 +67,7 @@ pub(crate) fn read_tests(
             .filter(|recipe| version > 2 || recipe.kind() != SetKind::Image)
             .filter(|recipe| version > 3 || recipe.picture() == PictureSource::Ramp)
             .ok_or_else(|| damaged(format!("The recipe of test {id} is not valid.")))?;
-        let best = match test.best {
-            None => None,
-            Some(cell) => {
-                let index = |n: u64| u8::try_from(n).ok();
-                match (index(cell.column), index(cell.row)) {
-                    (Some(column), Some(row)) if recipe.has_cell(column, row) => {
-                        Some(CellIndex { column, row })
-                    }
-                    _ => {
-                        return Err(damaged(format!(
-                            "The best cell of test {id} is outside its grid."
-                        )));
-                    }
-                }
-            }
-        };
+        let marks = read_marks(&test, id, &recipe, version)?;
         if test.note.chars().count() > MAX_NOTE_CHARS {
             return Err(damaged(format!(
                 "The note of test {id} has more than 500 characters."
@@ -96,12 +86,50 @@ pub(crate) fn read_tests(
             machine: read_machine(test.machine)?,
             recipe,
             lasered: test.lasered,
-            best,
+            marks,
             note: test.note,
             photo,
         });
     }
     Ok(out)
+}
+
+/// The marks of a test: each inside the recipe's counts; the three picks after Best exist from
+/// format 5 only (ADR 0090 decision 5).
+fn read_marks(
+    test: &TestJson,
+    id: TestId,
+    recipe: &crate::test_recipe::TestRecipe,
+    version: u64,
+) -> Result<Marks, RecordFileError> {
+    let mut marks = Marks::default();
+    for (pick, cell) in [
+        (PickKind::Best, test.best),
+        (PickKind::SecondBest, test.second_best),
+        (PickKind::Fastest, test.fastest),
+        (PickKind::Deepest, test.deepest),
+    ] {
+        let Some(cell) = cell else { continue };
+        if pick != PickKind::Best && version < 5 {
+            return Err(damaged(format!(
+                "A format-{version} record marks a {} cell.",
+                pick.label().to_lowercase()
+            )));
+        }
+        let index = |n: u64| u8::try_from(n).ok();
+        match (index(cell.column), index(cell.row)) {
+            (Some(column), Some(row)) if recipe.has_cell(column, row) => {
+                marks.put(pick, Some(CellIndex { column, row }));
+            }
+            _ => {
+                return Err(damaged(format!(
+                    "The {} cell of test {id} is outside its grid.",
+                    pick.label().to_lowercase()
+                )));
+            }
+        }
+    }
+    Ok(marks)
 }
 
 pub(crate) fn test_json(test: &TestRecord) -> TestJson {
@@ -111,11 +139,18 @@ pub(crate) fn test_json(test: &TestRecord) -> TestJson {
         machine: machine_json(&test.machine),
         recipe: recipe_json(&test.recipe),
         lasered: test.lasered,
-        best: test.best.map(|cell| CellJson {
-            column: u64::from(cell.column),
-            row: u64::from(cell.row),
-        }),
+        best: cell_json(test.marks.best),
+        second_best: cell_json(test.marks.second_best),
+        fastest: cell_json(test.marks.fastest),
+        deepest: cell_json(test.marks.deepest),
         note: test.note.clone(),
         photo: test.photo.map(|p| p.as_str().to_owned()),
     }
+}
+
+fn cell_json(cell: Option<CellIndex>) -> Option<CellJson> {
+    cell.map(|cell| CellJson {
+        column: u64::from(cell.column),
+        row: u64::from(cell.row),
+    })
 }

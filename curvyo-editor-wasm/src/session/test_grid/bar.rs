@@ -65,7 +65,7 @@ impl Session {
             machine,
             recipe: recipe.test.clone(),
             lasered: None,
-            best: None,
+            marks: curvyo_laser_core::library::Marks::default(),
             note: String::new(),
             photo: None,
         };
@@ -80,7 +80,7 @@ impl Session {
         {
             self.change_record(change, old, |m| m.take_test(id, now).map(|_| ()))?;
             record.created = test.created;
-            record.best = test.best;
+            record.marks = test.marks;
             record.note = test.note;
             record.photo = test.photo;
         }

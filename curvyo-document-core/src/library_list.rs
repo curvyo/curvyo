@@ -30,7 +30,7 @@ pub(crate) const LIBRARY_LIST_BASE_VERSION: i64 = 1;
 pub const MAX_MACHINE_TEXT_BYTES: usize = 128 * 1024;
 /// The largest material record text an entry holds: the material record reader's limit
 /// (`curvyo-laser-core`'s `MAX_RECORD_TEXT`, plan P2).
-pub const MAX_MATERIAL_TEXT_BYTES: usize = 512 * 1024;
+pub const MAX_MATERIAL_TEXT_BYTES: usize = 640 * 1024;
 
 pub(crate) const ROOT: &str = "library";
 const MACHINES: &str = "machines";

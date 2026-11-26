@@ -13,6 +13,9 @@ use crate::path_model::NodeId;
 
 /// The label of a material pick (criteria 25, 27).
 pub const USE_MATERIAL_COMMIT_LABEL: &str = "use_material";
+/// The label of a pick pick: the operation follows another pick of its material
+/// (`specs/0146` criterion 13).
+pub const USE_PICK_COMMIT_LABEL: &str = "use_pick";
 /// The label of a typed number (criterion 24).
 pub const EDIT_OPERATION_SETTINGS_COMMIT_LABEL: &str = "edit_operation_settings";
 /// The label of Reset to material (criterion 24).
@@ -31,7 +34,10 @@ pub const ADD_MATERIAL_COMMIT_LABEL: &str = "add_material";
 pub const ADD_MATERIAL_SET_COMMIT_LABEL: &str = "add_material_set";
 /// The label of deleting a set (`specs/0112` UX G11).
 pub const DELETE_MATERIAL_SET_COMMIT_LABEL: &str = "delete_material_set";
-/// The label of tapping the best cell of a test (`specs/0112` criterion 24).
+/// The label of taking a pick off a test's cell (`specs/0146` criterion 3).
+pub const UNMARK_PICK_COMMIT_LABEL: &str = "unmark_pick";
+/// The label of marking a cell of a test with a pick kind (`specs/0112` criterion 24, `0146`
+/// criterion 2); the key kept from the best cell.
 pub const JUDGE_TEST_COMMIT_LABEL: &str = "judge_test";
 /// The label of a test's note (`specs/0112` criterion 26).
 pub const EDIT_TEST_NOTE_COMMIT_LABEL: &str = "edit_test_note";
@@ -53,6 +59,8 @@ pub(crate) const KEY_MATERIAL_EDIT: &str = "x.curvyo.laser.material_edit";
 pub enum SettingsStep {
     /// Use material.
     UseMaterial,
+    /// Use pick.
+    UsePick,
     /// Edit settings.
     EditSettings,
     /// Reset to material.
@@ -65,6 +73,7 @@ impl SettingsStep {
     const fn label(self) -> &'static str {
         match self {
             Self::UseMaterial => USE_MATERIAL_COMMIT_LABEL,
+            Self::UsePick => USE_PICK_COMMIT_LABEL,
             Self::EditSettings => EDIT_OPERATION_SETTINGS_COMMIT_LABEL,
             Self::ResetToMaterial => RESET_TO_MATERIAL_COMMIT_LABEL,
             Self::UseOwnNumbers => USE_OWN_NUMBERS_COMMIT_LABEL,
@@ -87,8 +96,10 @@ pub enum MaterialStep {
     AddSet,
     /// Delete set.
     DeleteSet,
-    /// Choose best cell.
+    /// Mark pick.
     JudgeTest,
+    /// Unmark pick.
+    UnmarkPick,
     /// Edit note.
     EditTestNote,
     /// Add photo.
@@ -111,6 +122,7 @@ impl MaterialStep {
             Self::AddSet => ADD_MATERIAL_SET_COMMIT_LABEL,
             Self::DeleteSet => DELETE_MATERIAL_SET_COMMIT_LABEL,
             Self::JudgeTest => JUDGE_TEST_COMMIT_LABEL,
+            Self::UnmarkPick => UNMARK_PICK_COMMIT_LABEL,
             Self::EditTestNote => EDIT_TEST_NOTE_COMMIT_LABEL,
             Self::SetTestPhoto => SET_TEST_PHOTO_COMMIT_LABEL,
             Self::CropTestPhoto => CROP_TEST_PHOTO_COMMIT_LABEL,

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::material::{CellIndex, MachineTie, SetKind, SetNumbers, Thickness};
+use crate::material::{CellIndex, MachineTie, PickKind, SetKind, SetNumbers, Thickness};
 use crate::test_id::TestId;
 use crate::test_recipe::TestRecipe;
 
@@ -41,6 +41,9 @@ pub struct LaserSets {
     pub machine: MachineTie,
     /// At most one set per kind.
     pub sets: BTreeMap<SetKind, Set>,
+    /// The pick sets of Second best, Fastest and Deepest per kind (ADR 0090 decision 2); Best is
+    /// the entry in `sets`. Their source is always a test.
+    pub picks: BTreeMap<(SetKind, PickKind), Set>,
 }
 
 /// The image kind of a test's photo, also its file's extension.
@@ -71,6 +74,61 @@ impl PhotoKind {
     }
 }
 
+/// The cells a test carries per pick, each inside the recipe's counts; one cell may carry several
+/// picks, each pick sits on at most one cell (Frage 312 A).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Marks {
+    /// The best cell.
+    pub best: Option<CellIndex>,
+    /// The second best cell.
+    pub second_best: Option<CellIndex>,
+    /// The fastest cell.
+    pub fastest: Option<CellIndex>,
+    /// The deepest cell.
+    pub deepest: Option<CellIndex>,
+}
+
+impl Marks {
+    /// The cell carrying `pick`.
+    #[must_use]
+    pub const fn get(&self, pick: PickKind) -> Option<CellIndex> {
+        match pick {
+            PickKind::Best => self.best,
+            PickKind::SecondBest => self.second_best,
+            PickKind::Fastest => self.fastest,
+            PickKind::Deepest => self.deepest,
+        }
+    }
+
+    /// Puts `pick` on `cell`, or takes it off.
+    pub const fn put(&mut self, pick: PickKind, cell: Option<CellIndex>) {
+        match pick {
+            PickKind::Best => self.best = cell,
+            PickKind::SecondBest => self.second_best = cell,
+            PickKind::Fastest => self.fastest = cell,
+            PickKind::Deepest => self.deepest = cell,
+        }
+    }
+
+    /// The picks `cell` carries, in display order.
+    #[must_use]
+    pub fn kinds_of(&self, cell: CellIndex) -> Vec<PickKind> {
+        PickKind::ALL
+            .into_iter()
+            .filter(|pick| self.get(*pick) == Some(cell))
+            .collect()
+    }
+
+    /// Whether no pick is marked.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.best.is_none()
+            && self.second_best.is_none()
+            && self.fastest.is_none()
+            && self.deepest.is_none()
+    }
+}
+
 /// One test of a material (criterion 22).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TestRecord {
@@ -84,8 +142,8 @@ pub struct TestRecord {
     pub recipe: TestRecipe,
     /// When it was lasered, `None` for Not lasered.
     pub lasered: Option<u64>,
-    /// The best cell, inside the recipe's counts.
-    pub best: Option<CellIndex>,
+    /// The marked cells, inside the recipe's counts.
+    pub marks: Marks,
     /// At most 500 characters, empty for none.
     pub note: String,
     /// The photo next to the record.
@@ -145,6 +203,16 @@ impl Material {
     #[must_use]
     pub fn laser(&self, profile_id: &str) -> Option<&LaserSets> {
         self.lasers.iter().find(|l| l.machine.id == profile_id)
+    }
+
+    /// The set `pick` of `kind` for the laser `profile_id`: Best is [`Self::set_for`], the others
+    /// the laser's `picks` entry (ADR 0090 decision 8).
+    #[must_use]
+    pub fn pick_set(&self, profile_id: &str, kind: SetKind, pick: PickKind) -> Option<&Set> {
+        match pick {
+            PickKind::Best => self.set_for(profile_id, kind),
+            _ => self.laser(profile_id)?.picks.get(&(kind, pick)),
+        }
     }
 
     /// The set of `kind` for the laser `profile_id` (ADR 0058 §7: what a linked operation on a

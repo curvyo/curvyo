@@ -266,6 +266,54 @@ impl SetKind {
     }
 }
 
+/// The four picks a maker marks on a test (`specs/0146`, ADR 0090 decision 1), in display order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PickKind {
+    /// The main choice; its set is the laser's set of the kind.
+    Best,
+    /// The fallback choice.
+    SecondBest,
+    /// The fastest cell that still looks right.
+    Fastest,
+    /// The deepest or darkest cell.
+    Deepest,
+}
+
+impl PickKind {
+    /// The four picks in display order.
+    pub const ALL: [Self; 4] = [Self::Best, Self::SecondBest, Self::Fastest, Self::Deepest];
+    /// The three picks whose sets live in a laser entry's `picks`.
+    pub const OTHERS: [Self; 3] = [Self::SecondBest, Self::Fastest, Self::Deepest];
+
+    /// The stored text (a published file key).
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Best => "best",
+            Self::SecondBest => "second_best",
+            Self::Fastest => "fastest",
+            Self::Deepest => "deepest",
+        }
+    }
+
+    /// The pick a stored text names.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|pick| pick.as_str() == text)
+    }
+
+    /// The word shown in the UI ("Second best").
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Best => "Best",
+            Self::SecondBest => "Second best",
+            Self::Fastest => "Fastest",
+            Self::Deepest => "Deepest",
+        }
+    }
+}
+
 /// Power, speed and passes of one kind (spec "Words": Settings).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Settings {

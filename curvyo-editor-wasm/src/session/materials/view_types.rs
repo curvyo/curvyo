@@ -162,6 +162,40 @@ pub struct SetView {
     pub interval_mm: Option<f64>,
     /// "Test K7Q2M" or "Typed".
     pub source: String,
+    /// The other picks of the kind (Second best, Fastest, Deepest), read only (`specs/0146`
+    /// criterion 9).
+    pub other_picks: Vec<OtherPickView>,
+}
+
+/// One pick set under a laser's set of its kind.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct OtherPickView {
+    /// The stored pick name: `second_best`, `fastest` or `deepest`.
+    pub pick: &'static str,
+    /// The word.
+    pub label: &'static str,
+    /// "50 %, 1800 mm/min, 1 ×" (Engrave and Image also ", 0.10 mm").
+    pub numbers: String,
+    /// "Test K7Q2M".
+    pub source: String,
+}
+
+/// One marked pick of an open test (`specs/0146` criteria 6, 7).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PickView {
+    /// The stored pick name: `best`, `second_best`, `fastest` or `deepest`.
+    pub pick: &'static str,
+    /// The word.
+    pub label: &'static str,
+    /// The cell.
+    pub cell: CellView,
+    /// The line under the table: "Best: Cut set of Diode 20 W: 60 %, 1950 mm/min, 1 ×" or
+    /// "Second best: 50 %, 1800 mm/min, 1 ×", `None` when the laser holds no set from this test
+    /// for the pick and no set at all.
+    pub line: Option<String>,
+    /// The id of the other test the laser's set of this pick came from, when it did not come
+    /// from this one.
+    pub set_from: Option<String>,
 }
 
 /// One test row (UX 8.1).
@@ -226,10 +260,8 @@ pub struct TestDetailView {
     pub columns: AxisView,
     /// The rows.
     pub rows: AxisView,
-    /// The best cell.
-    pub best: Option<CellView>,
-    /// "Cut set of Diode 20 W: 60 %, 1950 mm/min, 1 ×", `None` without a best cell.
-    pub set_line: Option<String>,
+    /// The marked picks in the order Best, Second best, Fastest, Deepest.
+    pub picks: Vec<PickView>,
     /// The note.
     pub note: String,
     /// The photo's file name, `None` without a photo.

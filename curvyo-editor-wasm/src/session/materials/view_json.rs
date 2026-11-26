@@ -6,14 +6,15 @@ use curvyo_laser_core::grids::{Param, Side, TestId};
 use curvyo_laser_core::library::{
     LaserSets, MAX_MATERIALS, Material, MaterialRead, Set, SetSource, TestRecord, photo_file_name,
 };
-use curvyo_laser_core::settings::SetKind;
+use curvyo_laser_core::settings::{PickKind, SetKind};
 use std::fmt::Write as _;
 
 use super::super::Session;
 
 use super::view_types::{
     AxisView, CellView, LaserBlockView, LaserView, MaterialBodyView, MaterialRowView,
-    MaterialsView, PlaceView, SetKindView, SetView, TestDetailView, TestRowView,
+    MaterialsView, OtherPickView, PickView, PlaceView, SetKindView, SetView, TestDetailView,
+    TestRowView,
 };
 
 /// The set rows of a laser in the tab's order, Image last (`specs/0123` Frage 270 B).
@@ -85,8 +86,9 @@ fn source_text(set: &Set) -> String {
     }
 }
 
-fn set_view(kind: SetKind, set: &Set) -> SetView {
+fn set_view(kind: SetKind, set: &Set, laser: &LaserSets) -> SetView {
     SetView {
+        other_picks: other_picks(kind, laser),
         kind: kind.into(),
         numbers: set.numbers.settings.into(),
         interval_mm: set
@@ -95,6 +97,21 @@ fn set_view(kind: SetKind, set: &Set) -> SetView {
             .map(curvyo_laser_core::settings::Interval::mm),
         source: source_text(set),
     }
+}
+
+/// The Second best, Fastest and Deepest sets of `kind` the laser holds, in that order.
+fn other_picks(kind: SetKind, laser: &LaserSets) -> Vec<OtherPickView> {
+    PickKind::OTHERS
+        .into_iter()
+        .filter_map(|pick| {
+            laser.picks.get(&(kind, pick)).map(|set| OtherPickView {
+                pick: pick.as_str(),
+                label: pick.label(),
+                numbers: numbers_text(set),
+                source: source_text(set),
+            })
+        })
+        .collect()
 }
 
 /// "60 %, 1950 mm/min, 1 ×" (and ", 0.08 mm" with an interval).
@@ -199,19 +216,37 @@ impl Session {
             None => format!("Not lasered · {on}"),
         };
         let kind = test.recipe.kind();
-        let set_line = test.best.and(
-            material
-                .set_for(&test.machine.id, kind)
-                .filter(|set| set.source == SetSource::Test(test.id))
-                .map(|set| {
-                    format!(
-                        "{} set of {}: {}",
+        let picks = PickKind::ALL
+            .into_iter()
+            .filter_map(|pick| {
+                let cell = test.marks.get(pick)?;
+                let set = material.pick_set(&test.machine.id, kind, pick);
+                let from = match set.map(|set| &set.source) {
+                    Some(SetSource::Test(id)) if *id != test.id => Some(id.to_string()),
+                    _ => None,
+                };
+                let ours = set.filter(|set| set.source == SetSource::Test(test.id));
+                let line = ours.map(|set| match pick {
+                    PickKind::Best => format!(
+                        "Best: {} set of {}: {}",
                         kind.label(),
                         test.machine.name,
                         numbers_text(set)
-                    )
-                }),
-        );
+                    ),
+                    _ => format!("{}: {}", pick.label(), numbers_text(set)),
+                });
+                Some(PickView {
+                    pick: pick.as_str(),
+                    label: pick.label(),
+                    cell: CellView {
+                        column: cell.column,
+                        row: cell.row,
+                    },
+                    line,
+                    set_from: from,
+                })
+            })
+            .collect();
         let page_name = self.active_page().name;
         TestDetailView {
             id: test.id.to_string(),
@@ -221,11 +256,7 @@ impl Session {
             axes_line: axes_line(test),
             columns: axis_view(test, Side::Columns),
             rows: axis_view(test, Side::Rows),
-            best: test.best.map(|c| CellView {
-                column: c.column,
-                row: c.row,
-            }),
-            set_line,
+            picks,
             note: test.note.clone(),
             photo: test
                 .photo
@@ -256,7 +287,7 @@ impl Session {
             },
             sets: KINDS
                 .into_iter()
-                .filter_map(|kind| laser.sets.get(&kind).map(|set| set_view(kind, set)))
+                .filter_map(|kind| laser.sets.get(&kind).map(|set| set_view(kind, set, laser)))
                 .collect(),
             missing: KINDS
                 .into_iter()
@@ -276,6 +307,7 @@ impl Session {
                 lasers.push(LaserSets {
                     machine: laser.clone(),
                     sets: std::collections::BTreeMap::new(),
+                    picks: std::collections::BTreeMap::new(),
                 });
             }
         }
@@ -415,7 +447,7 @@ mod raster_tests {
             },
             recipe,
             lasered: None,
-            best: None,
+            marks: curvyo_laser_core::library::Marks::default(),
             note: String::new(),
             photo: None,
         };

@@ -38,6 +38,8 @@
         "needs": "engrave",
         "options": null,
         "over_feed": null,
+        "pick": "best",
+        "picks": [],
         "reason": null,
         "reset": false,
         "sets": [],

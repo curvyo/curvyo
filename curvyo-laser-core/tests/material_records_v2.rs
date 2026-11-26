@@ -32,7 +32,7 @@ fn read(name: &str) -> Result<curvyo_laser_core::library::Material, RecordFileEr
 /// The text a format-2 record is written back as: the same, at format 3 (`specs/0123` Frage 237
 /// A; no migration, the version is the only change). Superseded by 0135 slice 1 (2026-11-19): at format 4 (ADR 0072 §6).
 fn as_format3(text: &str) -> String {
-    text.replacen("\"format_version\": 2,", "\"format_version\": 4,", 1)
+    text.replacen("\"format_version\": 2,", "\"format_version\": 5,", 1)
 }
 
 fn test_id(text: &str) -> TestId {
@@ -53,7 +53,7 @@ fn the_full_record_reads_and_writes_back_byte_for_byte() {
     assert_eq!(material.set_for("generic-laser", SetKind::Cut), None);
     assert_eq!(material.set_count(), 3);
     let lasered = material.test(test_id("7K2QX")).unwrap();
-    assert_eq!(lasered.best, Some(CellIndex { column: 2, row: 1 }));
+    assert_eq!(lasered.marks.best, Some(CellIndex { column: 2, row: 1 }));
     assert_eq!(lasered.photo, Some(PhotoKind::Jpg));
     assert!(lasered.lasered.is_some());
     assert_eq!(lasered.note, "Clean edge at 60 %.");
@@ -144,13 +144,13 @@ fn a_newer_record_is_newer_and_a_format_1_record_is_skipped_as_older() {
 }
 
 #[test]
-fn a_record_over_512_kib_or_with_another_id_is_damaged() {
+fn a_record_over_640_kib_or_with_another_id_is_damaged() {
     let mut big = fixture("format2_one_laser.json");
     big.push_str(&" ".repeat(MAX_RECORD_TEXT));
     assert_eq!(
         read_record(&file_name(), &big),
         Err(RecordFileError::Damaged(
-            "The file is over 512 KiB.".to_owned()
+            "The file is over 640 KiB.".to_owned()
         ))
     );
     assert_eq!(

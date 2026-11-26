@@ -1,4 +1,4 @@
-//! Reads and writes one material record file of format 4 (ADR 0058 §2, §6; ADR 0069 §8; ADR 0072
+//! Reads and writes one material record file of format 5 (ADR 0058 §2, §6; ADR 0069 §8; ADR 0072
 //! §6).
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -15,6 +15,7 @@ use crate::material_record::{
     HistoryEntry, HistoryEvent, LaserSets, MAX_LASERS, MAX_TESTS, Material, MaterialRead, Set,
     SetSource, TestRecord,
 };
+use crate::material_record_picks::{PicksJson, picks_json, read_picks, source_fits};
 use crate::material_test_file::{TestJson, read_tests, test_json};
 use crate::record_envelope::is_machine_id;
 use crate::record_envelope::{EnvelopeError, is_record_id, open, pretty, record_id};
@@ -27,11 +28,17 @@ use crate::test_id::TestId;
 /// Format 4 (`specs/0135` criterion 51, ADR 0072 §6) lets an Image test's recipe carry `picture`
 /// `"selected"` and an axis on `strength`; a record of format 2 or 3 reads as is and is written
 /// back as format 4 at its next save, one holding either is damaged.
-pub const RECORD_FORMAT_VERSION: u64 = 4;
+///
+/// Format 5 (`specs/0146`, ADR 0090 decision 2) lets a test carry the marks `second_best`,
+/// `fastest` and `deepest` beside `best`, and a laser entry the `picks` sets after `sets`; a
+/// record of format 2 to 4 reads as is and is written back as format 5 at its next save, one
+/// holding either is damaged.
+pub const RECORD_FORMAT_VERSION: u64 = 5;
 /// The oldest record format this build reads; format 1 is skipped as older.
 const OLDEST_READ_FORMAT: u64 = 2;
-/// The largest record text that is read or written (ADR 0058 §6).
-pub const MAX_RECORD_TEXT: usize = 512 * 1024;
+/// The largest record text that is read or written (ADR 0058 §6, 640 KiB since ADR 0090
+/// decision 6).
+pub const MAX_RECORD_TEXT: usize = 640 * 1024;
 /// The only machine family a material is for.
 const KIND_LASER: &str = "laser";
 
@@ -75,6 +82,8 @@ pub(crate) struct MachineJson {
 struct LaserJson {
     machine: MachineJson,
     sets: SetsJson,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    picks: Option<PicksJson>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -92,23 +101,23 @@ struct SetsJson {
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct SetJson {
-    power_pct: f64,
-    speed_mm_min: u64,
-    passes: u64,
+pub(crate) struct SetJson {
+    pub(crate) power_pct: f64,
+    pub(crate) speed_mm_min: u64,
+    pub(crate) passes: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    interval_mm: Option<f64>,
-    source: Value,
+    pub(crate) interval_mm: Option<f64>,
+    pub(crate) source: Value,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct NumbersJson {
-    power_pct: f64,
-    speed_mm_min: u64,
-    passes: u64,
+pub(crate) struct NumbersJson {
+    pub(crate) power_pct: f64,
+    pub(crate) speed_mm_min: u64,
+    pub(crate) passes: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    interval_mm: Option<f64>,
+    pub(crate) interval_mm: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -151,7 +160,9 @@ pub fn read_record(file_name: &str, text: &str) -> Result<Material, RecordFileEr
     let (value, version) =
         open(text, MAX_RECORD_TEXT, 1, RECORD_FORMAT_VERSION).map_err(|error| match error {
             EnvelopeError::Newer => RecordFileError::Newer,
-            EnvelopeError::TooLarge => damaged("The file is over 512 KiB."),
+            EnvelopeError::TooLarge => {
+                damaged(format!("The file is over {} KiB.", MAX_RECORD_TEXT / 1024))
+            }
             EnvelopeError::NotJson | EnvelopeError::BadVersion => {
                 damaged("The file is not a material record.")
             }
@@ -237,7 +248,10 @@ pub(crate) fn read_machine(machine: MachineJson) -> Result<MachineTie, RecordFil
     })
 }
 
-fn read_numbers(kind: SetKind, set: &NumbersJson) -> Result<SetNumbers, RecordFileError> {
+pub(crate) fn read_numbers(
+    kind: SetKind,
+    set: &NumbersJson,
+) -> Result<SetNumbers, RecordFileError> {
     let (power, speed, passes) = (set.power_pct, set.speed_mm_min, set.passes);
     let settings = Settings {
         power: PowerPercent::from_percent(power)
@@ -284,7 +298,7 @@ fn image_in_format_2(kind: SetKind, version: u64) -> Result<(), RecordFileError>
     Ok(())
 }
 
-fn read_source(value: &Value) -> Result<SetSource, RecordFileError> {
+pub(crate) fn read_source(value: &Value) -> Result<SetSource, RecordFileError> {
     match value {
         Value::String(text) if text == "typed" => Ok(SetSource::Typed),
         Value::Object(map) if map.len() == 1 => map
@@ -334,10 +348,7 @@ fn read_lasers(
             if let SetSource::Test(id) = source {
                 // A source naming no test at all is a deleted test (its id stays reserved,
                 // criterion 25 of 0112); a test that exists must fit the set.
-                let fits = tests
-                    .iter()
-                    .filter(|t| t.id == id)
-                    .all(|t| t.machine.id == machine.id && t.recipe.kind() == kind);
+                let fits = source_fits(tests, id, &machine, kind);
                 if !fits {
                     return Err(damaged(format!(
                         "The {} set of {} names no fitting test.",
@@ -348,7 +359,12 @@ fn read_lasers(
             }
             sets.insert(kind, Set { numbers, source });
         }
-        out.push(LaserSets { machine, sets });
+        let picks = read_picks(laser.picks, &machine, tests, version)?;
+        out.push(LaserSets {
+            machine,
+            sets,
+            picks,
+        });
     }
     Ok(out)
 }
@@ -393,7 +409,7 @@ pub(crate) fn machine_json(machine: &MachineTie) -> MachineJson {
     }
 }
 
-fn numbers_json(numbers: &SetNumbers) -> NumbersJson {
+pub(crate) fn numbers_json(numbers: &SetNumbers) -> NumbersJson {
     NumbersJson {
         power_pct: numbers.settings.power.percent(),
         speed_mm_min: u64::from(numbers.settings.speed),
@@ -402,7 +418,7 @@ fn numbers_json(numbers: &SetNumbers) -> NumbersJson {
     }
 }
 
-fn source_json(source: &SetSource) -> Value {
+pub(crate) fn source_json(source: &SetSource) -> Value {
     match source {
         SetSource::Test(id) => json!({ "test": id.as_str() }),
         SetSource::Typed => json!("typed"),
@@ -444,6 +460,7 @@ pub fn write_record(material: &Material) -> String {
                     engrave: set(laser, SetKind::Engrave),
                     image: set(laser, SetKind::Image),
                 },
+                picks: picks_json(&laser.picks),
             })
             .collect(),
         tests: material.tests.iter().map(test_json).collect(),

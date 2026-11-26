@@ -98,11 +98,11 @@ fn write_text(path: &Path, text: &str) -> Result<(), String> {
     curvyo_storage_io::write_atomic(path, text.as_bytes()).map_err(|e| e.to_string())
 }
 
-/// Writes a record's text; one over the reader's 512 KiB is refused, so every record written here
+/// Writes a record's text; one over the reader's limit (640 KiB) is refused, so every record written here
 /// lists again (ADR 0058 §6).
 fn write_record_text(path: &Path, text: &str) -> Result<(), String> {
     if text.len() > MAX_RECORD_TEXT {
-        return Err("it is over 512 KiB".to_owned());
+        return Err(format!("it is over {} KiB", MAX_RECORD_TEXT / 1024));
     }
     write_text(path, text)
 }
@@ -145,7 +145,7 @@ pub(crate) fn list_materials(app: AppHandle) -> Result<Vec<RecordText>, String> 
 }
 
 /// Replaces the record `id` with `text`, atomically; the folder is made at the first write. A text
-/// over 512 KiB is refused.
+/// over 640 KiB is refused.
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn write_material(app: AppHandle, id: String, text: String) -> Result<(), String> {
@@ -293,7 +293,7 @@ mod tests {
         let big = "x".repeat(curvyo_laser_core::library::MAX_RECORD_TEXT + 1);
         assert_eq!(
             write_record_text(&path, &big),
-            Err("it is over 512 KiB".to_owned())
+            Err("it is over 640 KiB".to_owned())
         );
         assert_eq!(read_text(&path).unwrap(), None, "nothing written");
         let fits = "x".repeat(curvyo_laser_core::library::MAX_RECORD_TEXT);

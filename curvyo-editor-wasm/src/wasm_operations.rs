@@ -176,6 +176,14 @@ impl WasmSession {
         }
     }
 
+    /// The pick pick for the operations `ids` (`specs/0146` criterion 13): each follows the pick
+    /// `pick` (`best`, `second_best`, `fastest`, `deepest`) of its linked material. Whether
+    /// anything was written; the skip notice comes with [`WasmSession::operations_notice`].
+    pub fn pick_operation_pick(&mut self, ids: &str, pick: &str) -> bool {
+        let ids = nodes(ids);
+        self.session.use_pick_on(&ids, pick)
+    }
+
     /// Types `value` into the `field` (`power`, `speed`, `passes`) of the `role` set (`main`,
     /// `outline`) of operation `id` (criterion 24). The chip, empty when taken.
     pub fn edit_operation_setting(

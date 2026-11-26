@@ -3,6 +3,7 @@
 //! value and the loaded library.
 
 use crate::machine_profile::FeedRate;
+use crate::material::PickKind;
 use crate::material::{Interval, SetKind, Settings};
 use crate::material_record::{Material, MaterialRead, no_laser_set_text};
 use crate::operation_kind::OperationKind;
@@ -63,7 +64,7 @@ pub enum StoredReason {
     /// The record is of format 1, not converted in this build (plan Part F).
     Older,
     /// The record has no set of this kind for the page's laser (ADR 0058 §7).
-    NoSet(SetKind),
+    NoSet(SetKind, PickKind),
 }
 
 impl StoredReason {
@@ -71,7 +72,11 @@ impl StoredReason {
     #[must_use]
     pub fn text(self) -> String {
         match self {
-            Self::NoSet(kind) => no_laser_set_text(kind),
+            Self::NoSet(kind, PickKind::Best) => no_laser_set_text(kind),
+            Self::NoSet(_, pick) => format!(
+                "Material has no {} set for this laser, using stored numbers.",
+                pick.label()
+            ),
             Self::Missing | Self::Damaged | Self::Newer | Self::Older => {
                 "Material not found, using stored numbers".to_owned()
             }
@@ -166,10 +171,11 @@ fn material_run(
     material: &Material,
     profile_id: &str,
     kind: OperationKind,
+    pick: PickKind,
     interval: Option<Interval>,
 ) -> Result<(RunSettings, Option<SetKind>), SetKind> {
     let needed = main_set(kind);
-    let set = material.set_for(profile_id, needed).ok_or(needed)?;
+    let set = material.pick_set(profile_id, needed, pick).ok_or(needed)?;
     let main = set.numbers.settings;
     if kind != OperationKind::EngraveOutline {
         return Ok((
@@ -182,7 +188,7 @@ fn material_run(
         ));
     }
     let (outline, from) = material
-        .set_for(profile_id, SetKind::Score)
+        .pick_set(profile_id, SetKind::Score, pick)
         .map_or((main, SetKind::Engrave), |score| {
             (score.numbers.settings, SetKind::Score)
         });
@@ -202,13 +208,14 @@ fn linked_interval(
     material: &Material,
     profile_id: &str,
     kind: OperationKind,
+    pick: PickKind,
     kept: Option<Interval>,
 ) -> Option<Interval> {
     if kept.is_some() || !kind.has_interval() {
         return kept;
     }
     material
-        .set_for(profile_id, main_set(kind))
+        .pick_set(profile_id, main_set(kind), pick)
         .and_then(|set| set.numbers.interval)
 }
 
@@ -235,9 +242,25 @@ pub fn use_material(
     kind: OperationKind,
     previous: &SettingsRead,
 ) -> Result<StoredSettings, SetKind> {
+    use_pick(material, profile_id, kind, PickKind::Best, previous)
+}
+
+/// The value Use pick writes: [`use_material`] for the pick `pick` of the material, the link
+/// keeping that pick and no typed numbers, also when `pick` is the one already linked
+/// (`specs/0146` criteria 13, 14). The interval is the stored one, else the pick's.
+///
+/// # Errors
+/// The missing set kind: the material has no such pick set for that laser.
+pub fn use_pick(
+    material: &Material,
+    profile_id: &str,
+    kind: OperationKind,
+    pick: PickKind,
+    previous: &SettingsRead,
+) -> Result<StoredSettings, SetKind> {
     let kept = kept_interval(previous);
-    let (run, outline_from) = material_run(material, profile_id, kind, kept)?;
-    let interval = linked_interval(material, profile_id, kind, kept);
+    let (run, outline_from) = material_run(material, profile_id, kind, pick, kept)?;
+    let interval = linked_interval(material, profile_id, kind, pick, kept);
     Ok(StoredSettings {
         main: run.main,
         interval,
@@ -247,6 +270,7 @@ pub fn use_material(
             name: material.name.clone(),
             outline_from,
             modified: material.modified,
+            pick,
         }),
         overrides: Overrides::default(),
     })
@@ -268,8 +292,8 @@ fn live_material<'a>(
         Some(MaterialRead::Older { .. }) => return Err(StoredReason::Older),
         Some(MaterialRead::Loaded(material)) => material,
     };
-    let (run, from) =
-        material_run(material, profile_id, kind, interval).map_err(StoredReason::NoSet)?;
+    let (run, from) = material_run(material, profile_id, kind, link.pick, interval)
+        .map_err(|missing| StoredReason::NoSet(missing, link.pick))?;
     Ok((material, run, from))
 }
 
@@ -359,7 +383,7 @@ pub fn refresh(
     if guard && material.modified <= link.modified {
         return None;
     }
-    let interval = linked_interval(material, profile_id, kind, stored.interval);
+    let interval = linked_interval(material, profile_id, kind, link.pick, stored.interval);
     let same = stored.main == numbers.main
         && stored.stored_set(kind, Role::Outline) == numbers.outline
         && stored.interval == interval
@@ -377,6 +401,7 @@ pub fn refresh(
             name: material.name.clone(),
             outline_from,
             modified: material.modified,
+            pick: link.pick,
         }),
         overrides: stored.overrides,
     })

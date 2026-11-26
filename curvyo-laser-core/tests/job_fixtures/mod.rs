@@ -456,6 +456,7 @@ pub fn material(id: &str, name: &str, sets: &[(SetKind, f64, u32, u8)]) -> Mater
                 name: "Diode 10 W".to_owned(),
             },
             sets,
+            picks: std::collections::BTreeMap::default(),
         }],
         tests: Vec::new(),
         history: Vec::new(),

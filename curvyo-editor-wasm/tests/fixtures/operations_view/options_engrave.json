@@ -55,6 +55,8 @@
           "z_offset_mm": 1.5
         },
         "over_feed": null,
+        "pick": "best",
+        "picks": [],
         "reason": null,
         "reset": false,
         "sets": [

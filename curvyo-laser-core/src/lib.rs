@@ -74,6 +74,7 @@ mod material_preferences;
 mod material_record;
 mod material_record_edits;
 mod material_record_file;
+mod material_record_picks;
 mod material_retired;
 mod material_store;
 mod material_test_file;
@@ -212,7 +213,7 @@ pub mod job {
 pub mod settings {
     pub use crate::material::{
         CellIndex, Interval, MAX_HISTORY_ENTRIES, MAX_MATERIAL_NAME_CHARS, MachineTie, Passes,
-        PowerPercent, SetKind, SetNumbers, Settings, Thickness, next_modified,
+        PickKind, PowerPercent, SetKind, SetNumbers, Settings, Thickness, next_modified,
     };
     pub use crate::operation_image_options::{Dither, ImageEdit, ImageField, ImageSettings};
     pub use crate::operation_options::{
@@ -226,14 +227,14 @@ pub mod settings {
     pub use crate::operation_settings_edit::{TypedNumber, edit_interval, edit_number};
     pub use crate::operation_settings_rule::{
         RunSettings, SettingsState, StoredReason, main_set, refresh, reset_to_material, resolve,
-        use_material, use_own_numbers,
+        use_material, use_own_numbers, use_pick,
     };
 }
 
 /// The test grid object of `specs/0112-test-grid-and-materials`: test ids, the recipe, its layout
 /// and the derived operations it resolves into (ADR 0057).
 pub mod grids {
-    pub use crate::test_cell_fill::{cell_gradient, cell_style};
+    pub use crate::test_cell_fill::{cell_gradient, cell_shape, cell_style};
     pub use crate::test_grid_choice::{
         GRID_CHOICE_FORMAT_VERSION, read_test_grid_choice, remember_test_grid,
         write_test_grid_choice,
@@ -262,9 +263,9 @@ pub mod library {
     };
     pub use crate::material_preferences::{read_order, write_order};
     pub use crate::material_record::{
-        HistoryEntry, HistoryEvent, LaserSets, MAX_LASERS, MAX_NOTE_CHARS, MAX_TESTS, Material,
-        MaterialRead, PhotoKind, Set, SetSource, TestRecord, live_test_ids, no_laser_set_text,
-        photo_file_name,
+        HistoryEntry, HistoryEvent, LaserSets, MAX_LASERS, MAX_NOTE_CHARS, MAX_TESTS, Marks,
+        Material, MaterialRead, PhotoKind, Set, SetSource, TestRecord, live_test_ids,
+        no_laser_set_text, photo_file_name,
     };
     pub use crate::material_record_edits::{RecordRefusal, Stamp};
     pub use crate::material_record_file::{

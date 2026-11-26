@@ -166,16 +166,22 @@ impl WasmSession {
         self.session.open_material_test(some(test));
     }
 
-    /// A tap on a cell of the judge table; `random` holds 16 bytes.
-    pub fn judge_test(
+    /// A tap on a cell of the pick table with the pick kind `pick` (`best`, `second_best`,
+    /// `fastest` or `deepest`) pressed: marks the cell, or unmarks it when it carries the pick;
+    /// `random` holds 16 bytes.
+    pub fn mark_pick(
         &mut self,
         material: &str,
         test: &str,
+        pick: &str,
         column: u8,
         row: u8,
         random: &[u8],
     ) -> String {
-        text_of(self.session.judge_test(material, test, column, row, random))
+        text_of(
+            self.session
+                .mark_pick(material, test, pick, column, row, random),
+        )
     }
 
     /// Leaving the Note field.

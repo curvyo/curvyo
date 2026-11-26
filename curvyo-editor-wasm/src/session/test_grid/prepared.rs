@@ -128,6 +128,7 @@ impl Session {
                 name: material.name.clone(),
                 outline_from: None,
                 modified: material.modified,
+                pick: curvyo_laser_core::settings::PickKind::Best,
             },
             numbers: set.numbers,
         })

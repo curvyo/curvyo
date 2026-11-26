@@ -83,7 +83,26 @@
           }
         ],
         "state": "live",
-        "z_offset_shown": false
+        "z_offset_shown": false,
+        "pick": "best",
+        "picks": [
+          {
+            "pick": "best",
+            "available": true
+          },
+          {
+            "pick": "second_best",
+            "available": false
+          },
+          {
+            "pick": "fastest",
+            "available": false
+          },
+          {
+            "pick": "deepest",
+            "available": false
+          }
+        ]
       },
       "source": null
     },
@@ -122,7 +141,9 @@
           }
         ],
         "state": "own",
-        "z_offset_shown": false
+        "z_offset_shown": false,
+        "pick": "best",
+        "picks": []
       },
       "source": null
     },
@@ -163,7 +184,26 @@
           }
         ],
         "state": "live",
-        "z_offset_shown": false
+        "z_offset_shown": false,
+        "pick": "best",
+        "picks": [
+          {
+            "pick": "best",
+            "available": true
+          },
+          {
+            "pick": "second_best",
+            "available": false
+          },
+          {
+            "pick": "fastest",
+            "available": false
+          },
+          {
+            "pick": "deepest",
+            "available": false
+          }
+        ]
       },
       "source": null
     }

@@ -10,8 +10,8 @@ use curvyo_laser_core::grids::{GridPart, Recipe};
 use curvyo_laser_core::library::MaterialRead;
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    Field, Interval, OperationOptions, Role, SetKind, Settings, SettingsRead, SettingsState,
-    hatches, main_set, read_options, resolve, scans,
+    Field, Interval, OperationOptions, PickKind, Role, SetKind, Settings, SettingsRead,
+    SettingsState, hatches, main_set, read_options, resolve, scans,
 };
 use serde::Serialize;
 
@@ -109,6 +109,19 @@ pub struct DisabledPickView {
     pub reason: String,
 }
 
+/// One of the four picks the operation can follow (`specs/0146` criteria 13, 15).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PickChoiceView {
+    /// The stored name: `best`, `second_best`, `fastest` or `deepest`.
+    pub pick: &'static str,
+    /// The word.
+    pub label: &'static str,
+    /// Whether the linked material has this pick's set for the page's laser.
+    pub available: bool,
+    /// "No Fastest set for this laser" while it has not.
+    pub reason: Option<String>,
+}
+
 /// One row's Settings block (UX notes §8).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SettingsView {
@@ -126,6 +139,10 @@ pub struct SettingsView {
     pub sets: Vec<SetView>,
     /// Whether "Reset to material" shows (a typed number exists).
     pub reset: bool,
+    /// The pick the link follows, `best` while no `pick` is stored.
+    pub pick: &'static str,
+    /// The four picks in order with their availability; empty while the operation has no link.
+    pub picks: Vec<PickChoiceView>,
     /// The set kind this operation takes from a material.
     pub needs: SetKindView,
     /// The pick's materials this operation cannot take.
@@ -407,6 +424,9 @@ pub(super) fn settings_view(
         }
         _ => Vec::new(),
     };
+    let picks = link.map_or_else(Vec::new, |link| {
+        pick_choices(session, link.id.as_str(), kind, page)
+    });
     let sets = set_views(&state, kind, &overridden);
     let over_feed = over_feed_text(&state, page.max_feed);
     Some(SettingsView {
@@ -420,6 +440,8 @@ pub(super) fn settings_view(
         over_feed,
         sets,
         reset: !overridden.is_empty(),
+        pick: link.map_or(PickKind::Best, |link| link.pick).as_str(),
+        picks,
         needs: needs_view,
         disabled,
         interval_mm: interval_view(&state),
@@ -429,6 +451,31 @@ pub(super) fn settings_view(
         }),
         z_offset_shown: page.motorised_z,
     })
+}
+
+/// The four picks of the material `id` for an operation of kind `kind` on the page's laser: each
+/// available when the material holds that pick's main set (`specs/0146` criterion 15).
+fn pick_choices(
+    session: &Session,
+    id: &str,
+    kind: OperationKind,
+    page: &PageFacts,
+) -> Vec<PickChoiceView> {
+    let material = session.materials().find(id);
+    PickKind::ALL
+        .into_iter()
+        .map(|pick| {
+            let available = material
+                .and_then(|m| m.pick_set(&page.profile, main_set(kind), pick))
+                .is_some();
+            PickChoiceView {
+                pick: pick.as_str(),
+                label: pick.label(),
+                available,
+                reason: (!available).then(|| format!("No {} set for this laser", pick.label())),
+            }
+        })
+        .collect()
 }
 
 /// The test id and material name of each grid the derived rows of one view name, read once per
