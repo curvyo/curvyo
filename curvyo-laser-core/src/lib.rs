@@ -280,7 +280,9 @@ pub mod library {
     };
 }
 
-pub use fixture_fit::{FitMatch, fit_slot};
+pub use fixture_fit::{
+    FIT_TOLERANCE, FitMatch, FitMode, SlotFit, fit_into_slot, fit_slot, slot_fit_matrix,
+};
 pub use fixture_grid::{
     GridCounts, MAX_GRID_CENTRES, MAX_GRID_COUNT, centres, clamp_count, mark_range, spacing_range,
 };
