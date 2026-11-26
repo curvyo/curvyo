@@ -13,8 +13,6 @@ use crate::library_browser_text::grouped;
 
 /// The example repository (`curvyo/templates`).
 pub const EXAMPLE_REPOSITORY: &str = "https://github.com/curvyo/templates";
-/// The line of Frage 376 B: no token, public repositories only.
-pub const PUBLIC_ONLY_TEXT: &str = "The repository must be public.";
 
 /// The guide's text, in the order the page shows it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -35,8 +33,10 @@ pub struct Guide {
     pub fields: Vec<(String, String)>,
     /// The limits and the other rules, one line each.
     pub rules: Vec<String>,
-    /// "The repository must be public." (Frage 376 B).
-    pub private: String,
+    /// "Private repositories": the heading of the token steps (desktop build only, UX notes T13).
+    pub private_title: String,
+    /// The token steps in plain sentences, numbered by the page (`specs/0156` criterion 16).
+    pub private_steps: Vec<String>,
 }
 
 fn mib(bytes: u64) -> String {
@@ -130,7 +130,14 @@ pub fn hosting_guide() -> Guide {
             "An entry that breaks a rule is left out; the others are listed.".to_owned(),
             "A file whose size or SHA-256 differs from its entry is not loaded.".to_owned(),
         ],
-        private: PUBLIC_ONLY_TEXT.to_owned(),
+        private_title: "Private repositories".to_owned(),
+        private_steps: vec![
+            "At the host, create a read-only token for that one repository; on GitHub: Settings, Developer settings, Fine-grained tokens, only that repository, Contents: Read-only, and an expiry.".to_owned(),
+            "In Curvyo: Library tab, Add source…, Git catalogue, enter the address, and paste the token into Access token.".to_owned(),
+            "The token is kept in your system's key store and sent only to the catalogue's own address; it is never written to online-sources.toml or shown again.".to_owned(),
+            "To change or remove it later, press the key action of the source in the Library tab.".to_owned(),
+            "A token that has expired reads \"The token was refused.\"; make a new one and use Change token….".to_owned(),
+        ],
     }
 }
 
@@ -150,11 +157,24 @@ mod tests {
     }
 
     #[test]
-    fn the_guide_states_the_limits_of_this_build_and_public_only() {
+    fn the_guide_states_the_limits_of_this_build_and_the_private_steps() {
         let guide = hosting_guide();
         assert!(guide.rules[0].contains("4 MiB") && guide.rules[0].contains("10,000"));
         assert!(guide.rules[1].contains("64 MiB"));
-        assert_eq!(guide.private, "The repository must be public.");
+        assert_eq!(guide.private_title, "Private repositories");
+        assert_eq!(guide.private_steps.len(), 5);
+        let all = guide.private_steps.join(" ");
+        for word in [
+            "Contents: Read-only",
+            "expiry",
+            "Access token",
+            "key store",
+            "online-sources.toml",
+            "Change token",
+        ] {
+            assert!(all.contains(word), "{word}");
+        }
+        assert!(!all.contains("must be public"));
         assert!(guide.example_url.ends_with("curvyo/templates"));
         assert!(
             !guide.steps.iter().any(|s| s.contains("script")),

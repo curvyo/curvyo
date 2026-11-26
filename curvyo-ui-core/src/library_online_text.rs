@@ -61,6 +61,9 @@ pub fn failure_text(kind: SourceKind, failure: Failure) -> String {
         Failure::Mismatch => "The index does not match its hash.".to_owned(),
         Failure::TooLarge => "The answer is too large.".to_owned(),
         Failure::Redirect => "The server sent the request elsewhere.".to_owned(),
+        Failure::TokenUnreadable => {
+            "The saved token could not be read from the key store.".to_owned()
+        }
     }
 }
 
@@ -72,9 +75,11 @@ pub fn add_failure_text(kind: SourceKind, failure: Failure) -> String {
         Failure::NotFound | Failure::Invalid | Failure::Newer => {
             failure_text(kind, Failure::NotFound)
         }
-        Failure::Status(_) | Failure::Redirect | Failure::TooLarge | Failure::Mismatch => {
-            "The server did not answer.".to_owned()
-        }
+        Failure::Status(_)
+        | Failure::Redirect
+        | Failure::TooLarge
+        | Failure::Mismatch
+        | Failure::TokenUnreadable => "The server did not answer.".to_owned(),
     }
 }
 
@@ -122,6 +127,7 @@ pub fn load_failure_text(name: &str, failure: Failure) -> String {
         Failure::TooLarge => "too large.".to_owned(),
         Failure::Status(code) => format!("the server answered {code}."),
         Failure::NotFound | Failure::Invalid | Failure::Redirect => "damaged.".to_owned(),
+        Failure::TokenUnreadable => "the saved token could not be read.".to_owned(),
     };
     format!("{name} cannot be loaded: {why} Nothing was changed.")
 }
@@ -135,6 +141,9 @@ pub(crate) fn refused_line(failure: Failure) -> String {
         Failure::Status(code) => format!("The server answered {code}."),
         Failure::NotFound | Failure::Invalid | Failure::Redirect => {
             "Cannot be loaded: damaged.".to_owned()
+        }
+        Failure::TokenUnreadable => {
+            "The saved token could not be read from the key store.".to_owned()
         }
     }
 }

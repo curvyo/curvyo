@@ -37,6 +37,10 @@ pub struct SetsGroup {
     pub key: String,
     /// "api.iconify.design · 280 sets · 4 loaded".
     pub heading: String,
+    /// The group's name alone, so the Lock can follow it (`specs/0156` criterion 4).
+    pub name: String,
+    /// The source has an access token: the Lock mark after the name.
+    pub private: bool,
     /// Its cards shown, in order.
     pub cards: Vec<u32>,
 }
@@ -152,6 +156,8 @@ impl SetsTables {
                 shown.push(SetsGroup {
                     key: group.key.clone(),
                     heading: group_heading(&group.label, &all),
+                    name: group.label.clone(),
+                    private: group.private,
                     cards,
                 });
             }

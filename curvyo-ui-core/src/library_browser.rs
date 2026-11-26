@@ -12,9 +12,7 @@ use curvyo_library_core::Licence;
 /// The keyword file the browser's search takes (spec `0153`), re-exported for the page's host.
 pub use curvyo_library_core::Keywords;
 
-pub use crate::library_browser_guide::{
-    EXAMPLE_REPOSITORY, Guide, PUBLIC_ONLY_TEXT, hosting_guide,
-};
+pub use crate::library_browser_guide::{EXAMPLE_REPOSITORY, Guide, hosting_guide};
 pub use crate::library_browser_items::{LocalView, browse_list};
 pub use crate::library_browser_places::{
     Place, PlaceHistory, PlaceView, back_name, narrowed_to, restored, select_rows,
@@ -231,6 +229,9 @@ pub struct BrowseGroup {
     pub label: String,
     /// The order: My documents, the Curvyo catalogue, Git catalogues, Iconify sources.
     pub rank: u8,
+    /// The source has an access token: the Lock mark after the name (`specs/0156` criterion 4).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub private: bool,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]

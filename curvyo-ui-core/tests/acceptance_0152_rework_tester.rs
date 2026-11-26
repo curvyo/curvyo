@@ -8,8 +8,8 @@
 use curvyo_library_core::Catalogue;
 use curvyo_ui_core::library_browser::{
     BrowseCard, BrowseGroup, BrowseItem, BrowseList, BrowseSource, BrowseState, Browser, CardKind,
-    ColourFilter, EXAMPLE_REPOSITORY, ItemKind, PUBLIC_ONLY_TEXT, Place, PlaceHistory, PlaceView,
-    SetsState, Sort, back_name, hosting_guide, narrowed_to, restored, select_rows,
+    ColourFilter, EXAMPLE_REPOSITORY, ItemKind, Place, PlaceHistory, PlaceView, SetsState, Sort,
+    back_name, hosting_guide, narrowed_to, restored, select_rows,
 };
 
 /// The spec's Back history limit (criterion 30).
@@ -108,11 +108,13 @@ fn list() -> BrowseList {
                 key: "iconify".to_owned(),
                 label: "api.iconify.design".to_owned(),
                 rank: 1,
+                private: false,
             },
             BrowseGroup {
                 key: "git".to_owned(),
                 label: "Git catalogues".to_owned(),
                 rank: 2,
+                private: false,
             },
         ],
         cards: vec![
@@ -519,13 +521,22 @@ fn criterion_32_the_guide_does_not_name_an_index_script_that_does_not_exist() {
 }
 
 #[test]
-fn criterion_33_the_public_only_text_is_the_one_the_form_and_the_guide_show() {
-    assert_eq!(PUBLIC_ONLY_TEXT, "The repository must be public.");
+fn criterion_33_the_guide_explains_the_access_token_and_no_longer_says_public_only() {
+    // Changed with `0156` criteria 15 and 16: the line "The repository must be public." is gone.
+    let guide = hosting_guide();
+    assert_eq!(guide.private_title, "Private repositories");
     assert!(
-        hosting_guide().private.contains(PUBLIC_ONLY_TEXT),
-        "the guide says it: {:?}",
-        hosting_guide().private
+        guide
+            .private_steps
+            .iter()
+            .any(|s| s.contains("Access token"))
     );
+    let all = format!(
+        "{} {}",
+        guide.steps.join(" "),
+        guide.private_steps.join(" ")
+    );
+    assert!(!all.contains("must be public"), "{all}");
 }
 
 // Criterion 7, 8, 10 and 23 in the browser: a press selects and loads nothing; a page of a
