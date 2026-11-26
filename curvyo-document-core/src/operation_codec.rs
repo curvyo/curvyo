@@ -225,6 +225,7 @@ pub(crate) fn read_operation(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> O
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PartKey;
 
     #[test]
     fn a_path_key_reads_back_and_the_separator_never_occurs_in_an_id() {
@@ -246,7 +247,7 @@ mod tests {
         let text = key.strip_prefix(MEMBER_PREFIX).unwrap();
         assert_eq!(
             decode_member(text),
-            Some((vec![TreeID::new(7, 3)], Some("lid")))
+            Some((vec![TreeID::new(7, 3)], PartKey::new("lid")))
         );
         assert_eq!(decode_path(text), Some(vec![TreeID::new(7, 3)]));
         assert_eq!(
