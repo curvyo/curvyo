@@ -13,6 +13,7 @@ import type {
   SettingsRole,
   SetView,
 } from "./operationSettingsView.ts";
+import type { PickKind } from "./picks.ts";
 
 /** The set kind word of a material kind. */
 export const SET_WORDS: Record<SetKind, string> = { cut: "Cut", score: "Score", engrave: "Engrave", image: "Image" };
@@ -142,4 +143,23 @@ export function canEditMaterial(settings: OperationSettings, pick: readonly Pick
 /** Whether a pick entry is disabled for the single selected operation, with its words. */
 export function disabledReason(settings: OperationSettings | null, id: string): string | null {
   return settings?.disabled.find((entry) => entry.id === id)?.reason ?? null;
+}
+
+/**
+ * The pick pick of the selected rows (`specs/0146` criteria 13, 15): the pressed pick (`null`
+ * while the linked operations follow different ones) and whether each pick can be pressed (some
+ * linked operation's material has its set). Rows without a link are not counted; `null` when no
+ * row is linked, then no pick pick shows.
+ */
+export function pickChoices(
+  rows: readonly { settings: OperationSettings | null }[],
+): { value: PickKind | null; available: (kind: PickKind) => boolean } | null {
+  const linked = rows.flatMap((row) => (row.settings !== null && row.settings.material !== null ? [row.settings] : []));
+  if (linked.length === 0) return null;
+  const first = linked[0]?.pick ?? "best";
+  const same = linked.every((settings) => settings.pick === first);
+  return {
+    value: same ? first : null,
+    available: (kind) => linked.some((settings) => settings.picks.find((choice) => choice.pick === kind)?.available === true),
+  };
 }

@@ -1,6 +1,6 @@
 // The material writes a session hands out, performed through a host double (`specs/0112-test-
 // grid-and-materials` criteria 17, 25, 27, 31, ADR 0058 §4, §5): photo bytes are taken by handle
-// and travel as bytes, the retired file is written, a record over 512 KiB is refused before the
+// and travel as bytes, the retired file is written, a record over 640 KiB is refused before the
 // host, a refused photo keeps the record and names its own reason, a missing photo is "missing".
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -81,14 +81,14 @@ test("photo bytes the session no longer holds are a refused photo, not an empty 
   assert.deepEqual(calls.map((call) => call.command), ["write_material"]);
 });
 
-test("a record over 512 KiB is refused before the host and named", async () => {
+test("a record over 640 KiB is refused before the host and named", async () => {
   const { invoke, calls } = host();
   const text = JSON.stringify({ name: "Birch", pad: "x".repeat(MAX_RECORD_TEXT) });
-  assert.equal(recordTextRefusal(text), "it is over 512 KiB");
-  assert.equal(recordTextRefusal("é".repeat(MAX_RECORD_TEXT / 2)), null, "exactly 512 KiB in UTF-8");
-  assert.equal(recordTextRefusal("é".repeat(MAX_RECORD_TEXT / 2) + "x"), "it is over 512 KiB");
+  assert.equal(recordTextRefusal(text), "it is over 640 KiB");
+  assert.equal(recordTextRefusal("é".repeat(MAX_RECORD_TEXT / 2)), null, "exactly 640 KiB in UTF-8");
+  assert.equal(recordTextRefusal("é".repeat(MAX_RECORD_TEXT / 2) + "x"), "it is over 640 KiB");
   const result = await runMaterialWrites([{ op: "write", id: "a", text }], invoke, () => new Uint8Array(), []);
-  assert.deepEqual(result, { record: { reason: "it is over 512 KiB", name: "Birch" }, photo: null });
+  assert.deepEqual(result, { record: { reason: "it is over 640 KiB", name: "Birch" }, photo: null });
   assert.deepEqual(calls, []);
 });
 

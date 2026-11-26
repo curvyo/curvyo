@@ -74,7 +74,7 @@ export interface MaterialWriteFailure {
   photo: boolean;
 }
 
-/** Performs the session's pending writes in order. A failed record write (also one over 512 KiB,
+/** Performs the session's pending writes in order. A failed record write (also one over 640 KiB,
  * refused before the host) reloads the library from storage into the session, so it shows what is
  * kept, and returns the host's reason with the material's name; `resync` redraws. A failed photo
  * keeps the record and returns its reason with `photo` set. A preference or retired file failing

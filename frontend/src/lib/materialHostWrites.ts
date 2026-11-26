@@ -8,11 +8,11 @@ import { type MaterialWrite, failedWriteName } from "./materialWrites.ts";
 export type HostInvoke = (command: string, args?: Record<string, unknown>, bytes?: Uint8Array) => Promise<unknown>;
 
 /** The record reader's limit in UTF-8 bytes (`MAX_RECORD_TEXT` of `curvyo-laser-core`). */
-export const MAX_RECORD_TEXT = 512 * 1024;
+export const MAX_RECORD_TEXT = 640 * 1024;
 
-/** Why a record text is not handed to the host: over 512 KiB it would not read back. */
+/** Why a record text is not handed to the host: over 640 KiB it would not read back. */
 export function recordTextRefusal(text: string): string | null {
-  return new TextEncoder().encode(text).byteLength > MAX_RECORD_TEXT ? "it is over 512 KiB" : null;
+  return new TextEncoder().encode(text).byteLength > MAX_RECORD_TEXT ? `it is over ${MAX_RECORD_TEXT / 1024} KiB` : null;
 }
 
 /** The notice of a photo the host could not keep; the record stays as the session has it. */

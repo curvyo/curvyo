@@ -129,6 +129,14 @@
      * hatch of engraved areas (`specs/0101-laser-operations/ux-notes.md` section 13.1). */
     --cut: #C8102E;
     --engrave-hatch: #C46A1C;
+    /* docs/design-system.md, "Material test picks (`0146`)": the frame and glyph colours of the four
+       picks of a test; every one reaches 3:1 on the panel, the selected body, the hover ground, the
+       canvas and white. Second best is Best's green with a dashed frame. Light values: the dark
+       theme does not exist yet. */
+    --pick-best: #1B7232;
+    --pick-second: var(--pick-best);
+    --pick-fastest: #065774;
+    --pick-deepest: #B8008C;
     /* The ground of a list row under the pointer: lighter than the control hover so the muted
        text on it keeps 4.5:1 (4.58:1 at 8 %). */
     --row-hover: color-mix(in srgb, #2F6FEE 8%, transparent);

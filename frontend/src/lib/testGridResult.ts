@@ -3,7 +3,8 @@
  * names, the roving keys and the status of a choice. Pure functions; the component only draws
  * what they return.
  */
-import type { CellPlace, JudgeAxis } from "./materialsView.ts";
+import type { CellPlace, JudgeAxis, TestPick } from "./materialsView.ts";
+import { PICK_LABEL, kindsText, type PickKind } from "./picks.ts";
 
 /** Width of the row-header column; wider tables share 204 px. */
 export const HEADER_WIDTH = 40;
@@ -23,16 +24,27 @@ export function sparseHeader(values: readonly string[], width: number): boolean 
   return values.some((value) => value.length * DIGIT_PX > width);
 }
 
-/** A cell's accessible name: "60, 1950", with ", best cell" on the marked one. */
-export function cellName(columns: JudgeAxis, rows: JudgeAxis, place: CellPlace, best: boolean): string {
-  const column = columns.values[place.column] ?? "";
-  const row = rows.values[place.row] ?? "";
-  return `${column}, ${row}${best ? ", best cell" : ""}`;
+/** The picks a cell carries, in the order Best, Second best, Fastest, Deepest. */
+export function kindsAt(picks: readonly TestPick[], place: CellPlace): PickKind[] {
+  return picks.filter((p) => p.cell.column === place.column && p.cell.row === place.row).map((p) => p.pick);
 }
 
-/** The polite status of a choice with the units: "Best cell: 60 %, 1950 mm/min." */
-export function bestStatus(columns: JudgeAxis, rows: JudgeAxis, place: CellPlace): string {
-  return `Best cell: ${columns.values[place.column] ?? ""}${columns.unit}, ${rows.values[place.row] ?? ""}${rows.unit}.`;
+/** A cell's accessible name: "60, 1950", with ", Best, Fastest" for the picks it carries. */
+export function cellName(columns: JudgeAxis, rows: JudgeAxis, place: CellPlace, kinds: readonly PickKind[]): string {
+  const column = columns.values[place.column] ?? "";
+  const row = rows.values[place.row] ?? "";
+  return `${column}, ${row}${kindsText(kinds)}`;
+}
+
+/** The polite status of a press: "Fastest: 100 %, 6000 mm/min." on a mark, "Fastest removed." on an unmark. */
+export function pickStatus(columns: JudgeAxis, rows: JudgeAxis, place: CellPlace, pick: PickKind, removed: boolean): string {
+  if (removed) return `${PICK_LABEL[pick]} removed.`;
+  return `${PICK_LABEL[pick]}: ${columns.values[place.column] ?? ""}${columns.unit}, ${rows.values[place.row] ?? ""}${rows.unit}.`;
+}
+
+/** The description of the table: which pick a press marks (criterion 1). */
+export function markingText(pick: PickKind): string {
+  return `Marking ${PICK_LABEL[pick]}`;
 }
 
 /** The cell a key moves the roving focus to; `null` for a key that is no move. */

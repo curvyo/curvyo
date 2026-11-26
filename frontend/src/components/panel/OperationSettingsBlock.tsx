@@ -3,6 +3,7 @@ import { useId, useRef, useState, type ReactNode } from "react";
 
 import { MaterialPick } from "@/components/panel/MaterialPick";
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
+import { PickControl } from "@/components/panel/PickControl";
 import { SettingsNumberFields } from "@/components/panel/SettingsNumberFields";
 import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
 import {
@@ -13,6 +14,7 @@ import {
   fieldName,
   materialDescription,
   materialLine,
+  pickChoices,
   pickValue,
   resetStatus,
   stateLines,
@@ -92,6 +94,11 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
       }}
     />
   );
+  // The pick pick (`specs/0146` criterion 13): under the material pick while an operation points to a material.
+  const choices = noPick ? null : pickChoices(withSettings);
+  const pickPick = choices ? (
+    <PickControl label="Use" value={choices.value} available={choices.available} onPress={(kind) => api.usePick(ids, kind)} />
+  ) : null;
   // The skip notice belongs to a pick over several operations: it shows under the source row of that group.
   const skip = single === null && api.skip !== null ? (
     <p role="status" className="mt-1 text-xs text-[var(--toolbar-icon)]">
@@ -104,6 +111,7 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
       <div role="group" aria-label={`Settings of ${subject}`} className="flex flex-col gap-1">
         <div className="flex h-6 items-center text-[13px] font-semibold text-[var(--toolbar-icon)]">{subject}</div>
         {picker}
+        {pickPick}
         {skip}
       </div>
     );
@@ -127,6 +135,7 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
         </div>
       )}
       {noPick ? null : picker}
+      {pickPick}
       {skip}
       {settings.state === "damaged" ? (
         <p className="flex items-start gap-1 text-xs text-[var(--toolbar-icon)]">

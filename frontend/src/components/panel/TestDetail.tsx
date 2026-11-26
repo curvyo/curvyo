@@ -2,11 +2,14 @@ import { ChevronLeft, MapPin, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { JudgeTable } from "@/components/panel/JudgeTable";
+import { PickControl } from "@/components/panel/PickControl";
+import { PickGlyph } from "@/components/panel/PickGlyph";
 import { TestPhoto } from "@/components/panel/TestPhoto";
 import { ARM_TRASH, ARM_ZONE, type DeleteArm } from "@/hooks/useDeleteArm";
 import type { MaterialsApi } from "@/hooks/useMaterials";
 import { NOTE_MAX, deletedText, testArmText } from "@/lib/materialRows";
 import type { MaterialBody, TestDetail as Detail } from "@/lib/materialsView";
+import { PICK_COLOUR, type PickKind } from "@/lib/picks";
 
 const OUTLINE_BUTTON =
   "flex h-7 w-[228px] items-center gap-1 rounded border border-[var(--lane-line)] px-2 text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
@@ -65,14 +68,37 @@ function NoteField({ material, test, api }: { material: string; test: Detail; ap
   );
 }
 
+/** One line per marked pick under the table (`specs/0146` criterion 7), in the order of the picks. */
+function PickLines({ test }: { test: Detail }) {
+  const lines = test.picks.filter((p) => p.line !== null);
+  if (lines.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      {lines.map((p) => (
+        <p key={p.pick} className="flex items-start gap-1 text-[13px] tabular-nums text-[var(--toolbar-icon)]">
+          <span style={{ color: PICK_COLOUR[p.pick] }} className="mt-[3px] flex shrink-0">
+            <PickGlyph kind={p.pick} size={12} />
+          </span>
+          <span className="min-w-0">
+            {p.line}
+            {p.setFrom ? <span className="text-xs text-[var(--panel-muted-fg)]"> · set from Test {p.setFrom}</span> : null}
+          </span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
 /**
  * The open test in the Materials tab (`specs/0112` `ux-notes.md` 8.2): back, the head with the
- * test's armed trash, the state and axes lines, the best-cell table with the set line, the note,
+ * test's armed trash, the state and axes lines, the pick bar, the pick table with one line per pick, the note,
  * the photo and the place button.
  */
 export function TestDetail({ material, test, api, arm, onBack, onDeleted }: TestDetailProps) {
   const key = `test:${material.id}:${test.id}`;
   const armed = arm.armed === key;
+  // The pressed pick is session state, not a step; it starts at Best on every opening (P10).
+  const [pick, setPick] = useState<PickKind>("best");
   return (
     <div
       role="group"
@@ -126,9 +152,10 @@ export function TestDetail({ material, test, api, arm, onBack, onDeleted }: Test
       </div>
       <p className="text-xs text-[var(--panel-muted-fg)]">{test.stateLine}</p>
       <p className="text-[11px] tabular-nums text-[var(--panel-muted-fg)]">{test.axesLine}</p>
-      <h3 className="text-xs font-semibold text-[var(--toolbar-icon)]">Best cell</h3>
-      <JudgeTable key={`judge:${test.id}`} test={test} onChoose={(column, row) => api.judge(material.id, test.id, column, row)} />
-      {test.setLine ? <p className="text-[13px] tabular-nums text-[var(--toolbar-icon)]">{test.setLine}</p> : null}
+      <h3 className="text-xs font-semibold text-[var(--toolbar-icon)]">Picks</h3>
+      <PickControl label="Pick kind" value={pick} onPress={setPick} />
+      <JudgeTable key={`judge:${test.id}`} test={test} pick={pick} onMark={(column, row) => api.markPick(material.id, test.id, pick, column, row)} />
+      <PickLines test={test} />
       <NoteField material={material.id} test={test} api={api} />
       <TestPhoto key={`photo:${test.id}`} material={material.id} test={test} api={api} arm={arm} />
       <button type="button" onClick={() => api.place(material.id, test.id)} className={OUTLINE_BUTTON}>
