@@ -69,6 +69,8 @@ impl Session {
         let screen = |p: curvyo_document_core::Point| view.document_to_screen(p);
         let mut out = Vec::new();
         let selected = self.selected_fixture();
+        // A filled slot hides its name: the label would show through the artwork (`0154` V16).
+        let filled = self.filled_slots();
         for fixture in fixtures.fixtures.iter().filter(|f| f.shown()) {
             let is_selected = selected == Some(fixture.id);
             if let Shape::Grid(spec) = fixture.shape {
@@ -105,7 +107,7 @@ impl Session {
             for slot in fixture
                 .slots
                 .iter()
-                .filter(|s| slot_label_fits(&s.slot, device))
+                .filter(|s| slot_label_fits(&s.slot, device) && !filled.contains(&s.id))
             {
                 let (x, y) = screen(fixture.global.apply_point(slot.slot.centre));
                 out.push(FixtureLabel {

@@ -15,6 +15,11 @@ mod fit;
 mod grid_handles;
 mod handles;
 mod hit;
+mod into_slot;
+mod into_slot_cue;
+mod into_slot_drag;
+mod into_slot_ghost;
+mod into_slot_put;
 mod jobs;
 mod keys;
 mod labels;
@@ -38,6 +43,8 @@ mod tests_fit;
 #[cfg(test)]
 mod tests_handles;
 #[cfg(test)]
+mod tests_into_slot;
+#[cfg(test)]
 mod tests_pins;
 #[cfg(test)]
 mod tests_profile;
@@ -54,6 +61,10 @@ use curvyo_laser_core::FixtureKind;
 
 pub use apply::ApplyCandidate;
 pub use fit::FitCue;
+pub use into_slot::UnitBox;
+pub use into_slot_cue::{HolderTargets, SlotTargetRow, SlotTargetsView};
+pub use into_slot_drag::SlotDropCue;
+pub use into_slot_put::{SlotDrop, SlotSource};
 pub(in crate::session) use jobs::FixtureRun;
 pub use jobs::{
     AddTarget, FixtureJobsView, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
@@ -90,6 +101,10 @@ pub(in crate::session) struct FixtureState {
     entry: Option<entry::FixtureEntry>,
     /// The fit targets and the current fit of a moved item (criteria 25, 26).
     fit: fit::FitState,
+    /// The targets and the cue of a library drag (`specs/0154` criterion 1).
+    slot_drop: Option<into_slot_drag::SlotDropState>,
+    /// The filled target slots for the document and page they were computed for (UX notes V16).
+    filled_cache: into_slot::FilledCache,
     /// The grid's layout for the parameters it was built from (criterion 35 d).
     grid_cache: draw::GridCache,
     /// The page lists of the last frame for the inputs they were built from.

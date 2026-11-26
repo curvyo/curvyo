@@ -1,0 +1,20 @@
+{
+  "notice": "Fitted into Slot 2 at 50 %, turned.",
+  "page": {
+    "leaves": [
+      [
+        135.0,
+        77.5,
+        145.0,
+        87.5
+      ],
+      [
+        135.0,
+        92.5,
+        145.0,
+        102.5
+      ]
+    ]
+  },
+  "refused": null
+}
