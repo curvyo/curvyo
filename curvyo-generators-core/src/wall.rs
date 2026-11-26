@@ -97,6 +97,7 @@ impl Wall<'_> {
             .map(|r| Window {
                 from: Length::from_mm(r.x0),
                 to: Length::from_mm(r.x1),
+                rows: self.on_arc(r.x0, r.x1).then_some((r.y0, r.y1)),
             })
             .collect();
         let mut waves: Vec<(Slot, bool)> = Vec::new();
@@ -134,6 +135,17 @@ impl Wall<'_> {
         let mut contours = vec![outline(length, height, top, bottom, self.ends.as_ref())];
         contours.extend(holes.map(hole));
         contours
+    }
+
+    /// A tab slot over `x0..x1` that lies on a bend of the true arc (no window chord): the
+    /// columns beside it run on, clipped (ADR 0089 decision 2).
+    fn on_arc(&self, x0: f64, x1: f64) -> bool {
+        let middle = f64::midpoint(x0, x1);
+        self.footprint.spans.iter().any(|span| {
+            matches!(span.shape, crate::footprint::Shape::Bend { .. })
+                && middle >= span.s0 - 1e-9
+                && middle <= span.s0 + span.length + 1e-9
+        })
     }
 
     /// The slots of the plates' tabs, one per tab and joint.

@@ -299,6 +299,7 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         half_width: widest,
         // Two slit columns of the least spacing between two windows.
         min_band: 2.0 * (pattern.width.as_mm() + 1.0) / 0.88,
+        curve: v.choice("bend_tabs") == "curve",
     };
     let (inner, tabs) = inner.with_tabs(spec);
 

@@ -30,6 +30,20 @@ pub(crate) struct WindowSpec {
     pub(crate) half_width: f64,
     /// The least length of the slit band of a stretch, without its two bridges.
     pub(crate) min_band: f64,
+    /// A tab on a bend stands on the true arc and the slits run on through it (`bend_tabs`
+    /// `curve`, ADR 0089 decision 2); where it cannot, the tab keeps its window.
+    pub(crate) curve: bool,
+}
+
+/// Whether a tab of half width `half_width` can stand on the true arc of `radius` (a concave arc
+/// must also hold the tip, which lies one wall thickness nearer the centre).
+pub(crate) fn curve_fits(radius: f64, convex: bool, half_width: f64, wall: f64) -> bool {
+    radius > half_width + 1.0 && (convex || radius > half_width + wall + 1.0)
+}
+
+/// The neutral length of an arc of `radius` and `sweep` on a wall of thickness `wall`.
+pub(crate) fn neutral_arc(radius: f64, sweep: f64, wall: f64) -> f64 {
+    sweep.abs() * (radius + sweep.signum() * wall / 2.0).max(0.0)
 }
 
 impl Footprint {
@@ -237,12 +251,27 @@ impl Layout {
         let chord = 2.0 * spec.half_width + 2.0 * self.wall;
         let half_angle = libm::asin(chord / (2.0 * radius));
         let direction = sweep.signum();
+        let curve = spec.curve && curve_fits(radius, sweep > 0.0, spec.half_width, self.wall);
         #[allow(clippy::cast_precision_loss)]
         let step = sweep / count as f64;
         let mut cursor = from;
         for index in 0..count {
             #[allow(clippy::cast_precision_loss)]
             let middle = from + step * (index as f64 + 0.5);
+            if curve {
+                // The arc stays whole; the tab stands on it at `middle` (unpushed arc from
+                // the cursor to there is part of the strip before the tab).
+                let after = self.s0 + neutral_arc(radius, middle - cursor, self.wall);
+                self.tabs.push(Tab {
+                    s: after,
+                    centre: polar(centre, radius, middle),
+                    along: (
+                        -direction * libm::sin(middle),
+                        direction * libm::cos(middle),
+                    ),
+                });
+                continue;
+            }
             let (start, end) = (
                 middle - direction * half_angle,
                 middle + direction * half_angle,

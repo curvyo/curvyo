@@ -38,6 +38,8 @@ pub(crate) struct Measures {
     /// Set while the spacing is automatic.
     pub(crate) local: Option<LocalSpacing>,
     pub(crate) draft: bool,
+    /// Tabs on a bend stand on the true arc (`bend_tabs` `curve`).
+    pub(crate) curve: bool,
 }
 
 /// A piece's badge on the inner base: its number, the middle of its stretch, the direction into
@@ -366,6 +368,7 @@ pub(crate) fn build(checked: &Checked, m: &Measures) -> (Built, Footprint, Vec<T
     let spec = WindowSpec {
         half_width: widest,
         min_band: 2.0 * (m.pattern.width.as_mm() + 1.0) / 0.88,
+        curve: m.curve,
     };
     let (inner, tabs) = plan.footprint.with_run_tabs(spec);
     let stripped = strips(&plan, &inner, &tabs, m);

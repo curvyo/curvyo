@@ -27,6 +27,7 @@ pub(crate) fn length(
         default: ParamValue::Length(Length::from_mm(default)),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -50,6 +51,7 @@ pub(crate) fn count(
         default: ParamValue::Count(default),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -73,6 +75,7 @@ pub(crate) fn angle(
         default: ParamValue::Angle(Degrees(default)),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -86,6 +89,7 @@ pub(crate) fn switch(key: &'static str, label: &'static str) -> Param {
         default: ParamValue::Switch(false),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -104,6 +108,7 @@ pub(crate) fn choice(
         default: ParamValue::Choice(default.to_owned()),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -135,5 +140,12 @@ pub(crate) fn automatic(mut param: Param) -> Param {
 pub(crate) fn switch_on(key: &'static str, label: &'static str) -> Param {
     let mut param = switch(key, label);
     param.default = ParamValue::Switch(true);
+    param
+}
+
+/// `param` is written as the choice `id` in a new object while a stored one without the key still
+/// reads its default (ADR 0089 decision 2).
+pub(crate) fn initial(mut param: Param, id: &'static str) -> Param {
+    param.initial = Some(ParamValue::Choice(id.to_owned()));
     param
 }

@@ -187,6 +187,7 @@ fn measures(v: &mut Values<'_>, area: f64, draft: bool) -> Measures {
             least,
         }),
         draft,
+        curve: v.choice("bend_tabs") == "curve",
     }
 }
 

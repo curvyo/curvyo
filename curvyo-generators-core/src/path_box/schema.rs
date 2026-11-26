@@ -18,6 +18,7 @@ fn outline() -> Param {
         default: ParamValue::Path(default_outline()),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 

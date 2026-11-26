@@ -1,4 +1,6 @@
-# Plan for Generator joint options, slice 1 (tighter tab windows)
+# Plan for Generator joint options
+
+## Slice 1 (tighter tab windows)
 
 Implementer, 2026-11-26, branch `story/generator-joint-options`. Built under `specification.md` (slice 1, criteria 1 to 9)
 and `adrs.md` (A0). No field, no key, no `format_version` change. Own choices are marked **(Proposal)**.
@@ -34,3 +36,26 @@ sha256 of every golden except the four re-blessed ones. Demo check (9) is the cu
 - Steps follow the existing floor rule (gap at least what the radius asks), which gives the 18 to 24 columns of the spec;
   the spec text "no larger than" would give 29.
 - The test measures the cut flat, the drawn flat less the kerf (drawn slits are centre lines, each edge kerf / 2 inside).
+
+
+## Slice 2 (Bend through tabs, criteria 10 to 17)
+
+Implementer, 2026-11-26, branch `story/joint-bend-through-tabs`. ADR 0089 decision 2. Own choices are **(Proposal)**.
+
+Affected: `curvyo-extension-core` (`Param.initial`, CHANGELOG), `curvyo-generators-core`: `rounded_box/schema.rs` (Choice
+`bend_tabs`, Flat top only, path box too), `tab_layout.rs` / `tab_runs.rs` (a tab on a bend without splitting it),
+`wall_plates.rs` (tab as a rectangle on the normal with a concentric tip), `wall.rs` + `slit_bend.rs` (Window with a height
+span, columns clipped t_w from the slot), `rounded_box/mod.rs`, `path_box/build.rs` (read the key). No new crate, no
+dependency, no `format_version` change.
+
+- [x] 1. Test first: `tests/acceptance_0155_curve.rs`: schema and `initial` (10), strip length without window shortening (13),
+  clipped columns keep t_w and no kerf collision (11, 12), uncut bands (12), mating at five thicknesses (14), curved
+  top and straight-only boxes equal (15), window equals slice 1 (15), small radius never fails (16), CPU time (17).
+- [x] 2. `Param.initial` + `bend_tabs` rows (10).
+- [x] 3. `Window` rows and column clipping in `slit_bend.rs` / `wall.rs` (11, 12).
+- [x] 4. Tabs on a bend: `tab_layout.rs`, `tab_runs.rs`, `wall_plates.rs` (11, 13, 14, 16).
+- [x] 5. Golden `rounded_box_circle_curve.txt`, `path_box_heart_curve.txt`; full gate (15, 17).
+
+Own choices (Proposal): a tab keeps the window layout's count and places (same tabs, no chord); a tab that does not lie wholly on one
+arc, or a concave arc too small for the tip, stays a window on that stretch with a Dependent-free silent fallback, as a window
+is the last resort of criterion 16; a wave slot clipped to a closed piece is drawn as a plain rectangle.

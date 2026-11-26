@@ -56,3 +56,8 @@ migration in that extension.
 - Parameter kinds `Length { min, max }` and `Display` (a value the host shows, not edited).
 - Stored encoding of a length: `{"mm": <number>}`.
 - `FixtureDrawing`: open line segments in page-local millimetres with one line width.
+
+- ADR 0089 decision 2 (`0155` slice 2): `Param` gains `initial: Option<ParamValue>`, the value a new object is written
+  with when it differs from `default` (`Param::defaults` writes `initial` first; `Param::read` is unchanged, so a
+  stored object without the key reads `default`). Serialised only when set. Source-breaking for code that builds a
+  `Param` literal.

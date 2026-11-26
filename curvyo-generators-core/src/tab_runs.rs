@@ -6,8 +6,10 @@ use curvyo_document_core::Point;
 
 use crate::footprint::{Footprint, Shape, Span, Tab};
 use crate::shape_ops::Chain;
+use crate::shape_ops::{between, direction, length};
 use crate::tab_layout::{
     Layout, MIN_CIRCLE_TABS, MIN_STRAIGHT_TABS, MIN_TAB_STRAIGHT, TAB_PITCH, WindowSpec,
+    curve_fits, neutral_arc,
 };
 
 /// A run as the windows see it: its shapes measured as one.
@@ -128,7 +130,7 @@ impl Footprint {
                 Vec::new()
             };
             let at = out.spans.len();
-            out.run(&run, &windows);
+            out.run(&run, &windows, spec);
             if let Some(span) = out.spans.get_mut(at) {
                 span.piece_start = spans[first].piece_start;
             }
@@ -139,10 +141,14 @@ impl Footprint {
 }
 
 impl Layout {
-    /// The run as arcs between its `windows`, each window a chord with its tab.
-    fn run(&mut self, run: &Run, windows: &[(f64, f64)]) {
+    /// The run as arcs between its `windows`, each window a chord with its tab, or (`spec.curve`,
+    /// where the tab fits wholly on one arc) a tab standing on the arc itself.
+    fn run(&mut self, run: &Run, windows: &[(f64, f64)], spec: WindowSpec) {
         let mut cursor = 0.0;
         for &(start, end) in windows {
+            if spec.curve && self.curve_tab(run, f64::midpoint(start, end), cursor, spec) {
+                continue;
+            }
             for shape in run.part(cursor, start) {
                 self.push(shape, false);
             }
@@ -161,6 +167,44 @@ impl Layout {
         for shape in run.part(cursor, run.total) {
             self.push(shape, false);
         }
+    }
+
+    /// A tab at distance `at` on the arc `run` has there, when it lies wholly on that one arc;
+    /// `cursor` is where the arcs not yet pushed start.
+    fn curve_tab(&mut self, run: &Run, at: f64, cursor: f64, spec: WindowSpec) -> bool {
+        let Some((shape, start)) = run.locate(at) else {
+            return false;
+        };
+        let Shape::Bend { radius, sweep, .. } = shape else {
+            return false;
+        };
+        let reach = spec.half_width * 1.25 + 0.5;
+        if !curve_fits(radius, sweep > 0.0, spec.half_width, self.wall)
+            || at - reach < start
+            || at + reach > start + length(&shape)
+        {
+            return false;
+        }
+        let local = at - start;
+        let along = if local < 1e-9 {
+            direction(&shape, false)
+        } else {
+            direction(&between(&shape, 0.0, local), true)
+        };
+        let before: f64 = run
+            .part(cursor, at)
+            .iter()
+            .map(|shape| match *shape {
+                Shape::Bend { radius, sweep, .. } => neutral_arc(radius, sweep, self.wall),
+                Shape::Straight { from, to } => libm::hypot(to.x - from.x, to.y - from.y),
+            })
+            .sum();
+        self.tabs.push(Tab {
+            s: self.s0 + before,
+            centre: run.at(at),
+            along,
+        });
+        true
     }
 }
 
@@ -188,6 +232,7 @@ mod tests {
         let spec = WindowSpec {
             half_width: 3.0,
             min_band: 3.0,
+            curve: false,
         };
         let fp = concave_run();
         let (fitted, tabs) = fp.with_run_tabs(spec);

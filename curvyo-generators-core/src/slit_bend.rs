@@ -50,6 +50,10 @@ pub(crate) struct Band {
 pub(crate) struct Window {
     pub(crate) from: Length,
     pub(crate) to: Length,
+    /// A tab slot on a curved wall: the slot's rows `y0..y1`. Columns beside it are clipped to
+    /// keep a bridge from those rows instead of being dropped (ADR 0089 decision 2); `None` is a
+    /// window that holds no column at all.
+    pub(crate) rows: Option<(f64, f64)>,
 }
 
 /// One slot: a rectangle `width` wide centred on `x`, from `y0` to `y1`. It runs out through the
@@ -95,12 +99,14 @@ pub(crate) fn slots_at(
             0.0
         };
         let half = pattern.width.as_mm() / 2.0 + pattern.bridge.as_mm() + swing;
-        if windows
+        let near: Vec<&Window> = windows
             .iter()
-            .any(|w| x + half > w.from.as_mm() + EDGE && x - half < w.to.as_mm() - EDGE)
-        {
+            .filter(|w| x + half > w.from.as_mm() + EDGE && x - half < w.to.as_mm() - EDGE)
+            .collect();
+        if near.iter().any(|w| w.rows.is_none()) {
             continue;
         }
+        let first = slots.len();
         match pattern.kind {
             SlitKind::Straight => slots.push(straight(column, x, band, pattern)),
             SlitKind::Wave => {
@@ -110,8 +116,58 @@ pub(crate) fn slots_at(
             }
             SlitKind::Offset => slots.extend(offset(column, x, band, pattern)),
         }
+        if !near.is_empty() {
+            let cuts: Vec<(f64, f64)> = near
+                .iter()
+                .filter_map(|w| w.rows)
+                .map(|(y0, y1)| (y0 - pattern.bridge.as_mm(), y1 + pattern.bridge.as_mm()))
+                .collect();
+            let whole: Vec<Slot> = slots.drain(first..).collect();
+            for slot in whole {
+                slots.extend(clip(
+                    slot,
+                    &cuts,
+                    band.height.as_mm(),
+                    pattern.width.as_mm(),
+                ));
+            }
+        }
     }
     slots
+}
+
+/// The pieces of `slot` left outside the `cuts` (row spans along the column). A piece shorter
+/// than the slot's width is dropped; a wave piece that no longer reaches an edge is drawn plain.
+fn clip(slot: Slot, cuts: &[(f64, f64)], height: f64, least: f64) -> Vec<Slot> {
+    let mut pieces = vec![(slot.y0, slot.y1)];
+    for &(c0, c1) in cuts {
+        pieces = pieces
+            .into_iter()
+            .flat_map(|(a, b)| {
+                if b <= c0 || a >= c1 {
+                    return vec![(a, b)];
+                }
+                let mut left = Vec::new();
+                if a < c0 {
+                    left.push((a, c0));
+                }
+                if b > c1 {
+                    left.push((c1, b));
+                }
+                left
+            })
+            .collect();
+    }
+    pieces
+        .into_iter()
+        .filter(|(a, b)| b - a >= least)
+        .map(|(y0, y1)| Slot {
+            y0,
+            y1,
+            wave: slot.wave.filter(|_| y0 <= EDGE || y1 >= height - EDGE),
+            ..slot
+        })
+        .collect()
 }
 
 fn straight(column: usize, x: f64, band: &Band, pattern: &SlitPattern) -> Slot {
@@ -251,6 +307,7 @@ mod tests {
         let window = Window {
             from: mm(110.0),
             to: mm(116.0),
+            rows: None,
         };
         let slots = slots(&band(), &pattern(SlitKind::Straight), &[window]);
         for slot in &slots {
