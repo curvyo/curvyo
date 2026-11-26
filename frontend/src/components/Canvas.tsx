@@ -11,6 +11,7 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, use
 
 import { PageFrames } from "@/components/PageFrames";
 import { FixtureLabels } from "@/components/FixtureLabels";
+import { PickOverlay } from "@/components/PickOverlay";
 import { PrintAndCutLabels } from "@/components/PrintAndCutLabels";
 import { PlacedPageTags } from "@/components/PlacedPageTags";
 import { EditHintChip } from "@/components/EditHintChip";
@@ -309,6 +310,7 @@ export function Canvas({
       {showPageFrames && <PageFrames getSession={editor.getSession} dropTarget={editor.moveBadges.dropTarget} onToggleOperationsView={onToggleOperationsView} onToggleToolpathView={onToggleToolpathView} />}
       {showPageFrames && <PlacedPageTags getSession={editor.getSession} />}
       {showPageFrames && <FixtureLabels getSession={editor.getSession} />}
+      {showPageFrames && <PickOverlay getSession={editor.getSession} />}
       {showPageFrames && <PrintAndCutLabels getSession={editor.getSession} />}
       <SketchAnnotations sketch={sketch} />
       {sketch.view.workbench !== "sketch" && (

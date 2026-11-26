@@ -44,6 +44,7 @@ test("every Rust state decodes, and nothing else is in the folder", () => {
     "format1_record",
     "image_set",
     "test_with_photo",
+    "test_with_picks",
     "test_without_photo",
     "two_lasers",
     "typed_set",
@@ -74,9 +75,9 @@ test("a test with a photo reads its detail, best cell, set line and place button
   assert.ok(view?.unfolded?.test);
   const test = view.unfolded.test;
   assert.equal(test.id, "7K2QX");
-  assert.deepEqual(test.best, { column: 2, row: 1 });
+  assert.deepEqual(test.picks[0]?.cell, { column: 2, row: 1 });
   assert.equal(test.columns.values.length, 5);
-  assert.equal(test.setLine, "Cut set of Diode 20 W: 60 %, 1950 mm/min, 1 ×");
+  assert.equal(test.picks[0]?.line, "Best: Cut set of Diode 20 W: 60 %, 1950 mm/min, 1 ×");
   assert.equal(test.photo, "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c.7K2QX.jpg");
   assert.deepEqual(test.place, { onPage: false, label: "Place on Laser 1" });
 });
@@ -85,8 +86,7 @@ test("a test without a photo or best cell has none of them", () => {
   const view = decodeMaterialsText(raw("test_without_photo"));
   assert.ok(view?.unfolded?.test);
   const test = view.unfolded.test;
-  assert.equal(test.best, null);
-  assert.equal(test.setLine, null);
+  assert.deepEqual(test.picks, []);
   assert.equal(test.photo, null);
   assert.equal(test.note, "");
   assert.equal(test.place.label, "Select on page");
@@ -130,7 +130,7 @@ test("the empty tab decodes with no rows; a missing or mistyped field is refused
     unfolded: { ...(fixture("test_with_photo").unfolded as object), test: { ...detail, ...patch } },
   });
   assert.ok(decodeMaterialsView(withDetail({})));
-  assert.equal(decodeMaterialsView(withDetail({ best: { column: -1, row: 0 } })), null);
+  assert.equal(decodeMaterialsView(withDetail({ picks: [{ pick: "best", cell: { column: -1, row: 0 }, line: null, set_from: null }] })), null);
   assert.equal(decodeMaterialsView(withDetail({ place: { label: "x" } })), null);
   assert.equal(decodeMaterialsView(withDetail({ photo: 3 })), null);
   assert.equal(decodeMaterialsView(withDetail({ kind: "grind" })), null);

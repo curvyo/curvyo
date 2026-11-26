@@ -5,6 +5,7 @@
  * Rust fixtures `operations_view/settings_*.json` pin both sides. No cast: a missing field, a wrong
  * type or an enum text this build does not know decodes to `null`.
  */
+import { asPickKind, type PickKind } from "./picks.ts";
 
 /** The kinds of a material's set. */
 export const SET_KINDS = ["cut", "score", "engrave", "image"] as const;
@@ -55,6 +56,12 @@ export interface DisabledPick {
   reason: string;
 }
 
+/** One of the four picks an operation can follow, with whether its material has that set. */
+export interface PickChoice {
+  pick: PickKind;
+  available: boolean;
+}
+
 /** One row's Settings block. */
 export interface OperationSettings {
   state: SettingsState;
@@ -66,6 +73,10 @@ export interface OperationSettings {
   /** "Speed 7000 is above this machine's 6000 mm/min." */
   overFeed: string | null;
   sets: SetView[];
+  /** The pick the link follows; Best while none is stored (`specs/0146` criterion 15). */
+  pick: PickKind;
+  /** The four picks with their availability; empty while the operation has no link. */
+  picks: PickChoice[];
   /** Whether "Reset to material" shows. */
   reset: boolean;
   needs: SetKind;
@@ -366,6 +377,17 @@ function asOptions(value: unknown): OperationOptions | null | undefined {
   return { hatch, zOffsetMm: value.z_offset_mm, image };
 }
 
+function asPickChoices(value: unknown): PickChoice[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: PickChoice[] = [];
+  for (const raw of value) {
+    const pick = isObject(raw) ? asPickKind(raw.pick) : null;
+    if (!isObject(raw) || pick === null || typeof raw.available !== "boolean") return null;
+    out.push({ pick, available: raw.available });
+  }
+  return out;
+}
+
 const STATES: readonly unknown[] = ["damaged", "own", "live", "stored"];
 
 /** One row's Settings block; `undefined` when wrong, `null` for a row that has none. */
@@ -379,7 +401,11 @@ export function decodeSettings(value: unknown): OperationSettings | null | undef
   const link = value.material === null ? null : asLink(value.material);
   const intervalMm = nullable(value.interval_mm, finite);
   const options = asOptions(value.options);
+  const pick = asPickKind(value.pick);
+  const picks = asPickChoices(value.picks);
   if (
+    pick === null ||
+    picks === null ||
     intervalMm === undefined ||
     options === undefined ||
     typeof value.z_offset_shown !== "boolean" ||
@@ -414,6 +440,8 @@ export function decodeSettings(value: unknown): OperationSettings | null | undef
     differs,
     overFeed,
     sets,
+    pick,
+    picks,
     reset: value.reset,
     needs,
     disabled,

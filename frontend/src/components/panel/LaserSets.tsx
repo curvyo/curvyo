@@ -2,8 +2,10 @@ import { ChevronDown, ChevronRight, Plus, Trash2, Zap } from "lucide-react";
 
 import { EntryField } from "@/components/panel/EntryField";
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
+import { PickGlyph } from "@/components/panel/PickGlyph";
 import { ARM_TRASH, ARM_ZONE, type DeleteArm } from "@/hooks/useDeleteArm";
 import type { MaterialsApi } from "@/hooks/useMaterials";
+import { PICK_COLOUR, PICK_LABEL } from "@/lib/picks";
 import {
   KIND_ORDER,
   KIND_WORD,
@@ -62,7 +64,13 @@ function SetFields({ materialId, laser, set, api, arm, onReturnFocus }: LaserSet
   };
   const fields = setFields(set.kind);
   return (
-    <div role="group" aria-label={setHeadingName(set, laser.name)} {...{ [ARM_ZONE]: key }} className="flex flex-col gap-1">
+    <div
+      role="group"
+      aria-label={setHeadingName(set, laser.name)}
+      aria-description={set.otherPicks.map((o) => `${PICK_LABEL[o.pick]} ${o.numbers}, from ${o.source}`).join("; ") || undefined}
+      {...{ [ARM_ZONE]: key }}
+      className="flex flex-col gap-1"
+    >
       <div className="flex h-6 items-center gap-1 text-xs text-[var(--toolbar-icon)]">
         <OperationGlyph kind={set.kind} />
         <span className="font-semibold">{KIND_WORD[set.kind]}</span>
@@ -92,6 +100,18 @@ function SetFields({ materialId, laser, set, api, arm, onReturnFocus }: LaserSet
         {field(fields[1], 112)}
       </div>
       {fields.slice(2).map((name) => field(name, 228))}
+      {set.otherPicks.map((other) => (
+        <div key={other.pick} className="ml-2 flex flex-col text-xs text-[var(--toolbar-icon)]">
+          <div className="flex h-5 items-center gap-1">
+            <span style={{ color: PICK_COLOUR[other.pick] }} className="flex shrink-0">
+              <PickGlyph kind={other.pick} size={12} />
+            </span>
+            <span>{PICK_LABEL[other.pick]}</span>
+            <span className="min-w-0 flex-1 truncate text-right text-[11px] text-[var(--panel-muted-fg)]">{other.source}</span>
+          </div>
+          <span className="h-4 pl-4 tabular-nums">{other.numbers}</span>
+        </div>
+      ))}
     </div>
   );
 }

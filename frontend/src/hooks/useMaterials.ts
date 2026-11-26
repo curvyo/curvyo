@@ -5,6 +5,7 @@ import { flushMaterialWrites, loadMaterialPhoto, photoFailureText } from "@/lib/
 import { saveFailureText } from "@/lib/materialRows";
 import { decodeMaterialsText, type MaterialsView } from "@/lib/materialsView";
 import type { SetKind } from "@/lib/operationSettingsView";
+import type { PickKind } from "@/lib/picks";
 
 /** What the Materials tab reads from the editor: the session and its re-read signal. */
 export interface MaterialsEditor {
@@ -57,7 +58,7 @@ export interface MaterialsApi {
   editSet: (id: string, profileId: string, kind: SetKind, field: string, value: number) => string;
   deleteSet: (id: string, profileId: string, kind: SetKind) => string;
   openTest: (test: string) => void;
-  judge: (material: string, test: string, column: number, row: number) => string;
+  markPick: (material: string, test: string, pick: PickKind, column: number, row: number) => string;
   setNote: (material: string, test: string, note: string) => string;
   setPhoto: (material: string, test: string, bytes: Uint8Array, cropped: boolean) => string;
   removePhoto: (material: string, test: string) => string;
@@ -184,9 +185,9 @@ export function useMaterials(editor: MaterialsEditor): MaterialsApi {
     [refused],
   );
   const openTest = useCallback((test: string) => void run((s) => s.open_material_test(test)), [run]);
-  const judge = useCallback(
-    (material: string, test: string, column: number, row: number) =>
-      refused((s) => s.judge_test(material, test, column, row, randomBytes())),
+  const markPick = useCallback(
+    (material: string, test: string, pick: PickKind, column: number, row: number) =>
+      refused((s) => s.mark_pick(material, test, pick, column, row, randomBytes())),
     [refused],
   );
   const setNote = useCallback((material: string, test: string, note: string) => refused((s) => s.set_test_note(material, test, note)), [refused]);
@@ -228,7 +229,7 @@ export function useMaterials(editor: MaterialsEditor): MaterialsApi {
     editSet,
     deleteSet,
     openTest,
-    judge,
+    markPick,
     setNote,
     setPhoto,
     removePhoto,

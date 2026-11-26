@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 import { operationIdText, type OperationId } from "@/lib/operationsView";
 import type { SettingsField, SettingsRole } from "@/lib/operationSettingsView";
+import type { PickKind } from "@/lib/picks";
 
 /** What the Settings block reads from the editor: the session and its re-read signal. */
 export interface OperationSettingsEditor {
@@ -20,6 +21,8 @@ export interface OperationSettingsApi {
   skip: string | null;
   /** Picks material `materialId` for `ids`; an empty id is "Own numbers". Whether anything was written. */
   pick: (ids: OperationId[], materialId: string) => boolean;
+  /** Makes `ids` follow the `pick` of their materials (one step "Use pick"); whether anything was written. */
+  usePick: (ids: OperationId[], pick: PickKind) => boolean;
   /** Types `value` into `field` of the `role` set of `id`; the chip text, empty when taken. */
   edit: (id: OperationId, role: SettingsRole, field: SettingsField, value: number) => string;
   /** Reset to material of `id`. */
@@ -51,6 +54,17 @@ export function useOperationSettings(editor: OperationSettingsEditor): Operation
     },
     [getSession, sync],
   );
+  const usePick = useCallback(
+    (ids: OperationId[], pick: PickKind) => {
+      const session = getSession();
+      if (!session) return false;
+      const changed = session.pick_operation_pick(JSON.stringify(ids.map(operationIdText)), pick);
+      setSkip(ids.length > 1 ? (session.operations_notice() ?? null) : null);
+      sync();
+      return changed;
+    },
+    [getSession, sync],
+  );
   const edit = useCallback(
     (id: OperationId, role: SettingsRole, field: SettingsField, value: number) => {
       const session = getSession();
@@ -72,5 +86,5 @@ export function useOperationSettings(editor: OperationSettingsEditor): Operation
     [getSession, sync],
   );
 
-  return { skip, pick, edit, reset };
+  return { skip, pick, usePick, edit, reset };
 }

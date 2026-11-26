@@ -6,6 +6,7 @@
  * `materials_view/*.json` pin both sides.
  */
 import { asSetKind, isObject, type SetKind } from "./operationSettingsView.ts";
+import { asPickKind, type PickKind } from "./picks.ts";
 
 /** A laser as the tab names it: profile id and name. */
 export interface Laser {
@@ -48,6 +49,15 @@ export interface SetNumbers {
   passes: number;
 }
 
+/** A pick set under a laser's set of its kind, read only (`specs/0146` criterion 9). */
+export interface OtherPick {
+  pick: PickKind;
+  /** "50 %, 1800 mm/min, 1 ×" (Engrave and Image also ", 0.10 mm"). */
+  numbers: string;
+  /** "Test K7Q2M". */
+  source: string;
+}
+
 /** One set of a laser. */
 export interface MaterialSet {
   kind: SetKind;
@@ -56,6 +66,8 @@ export interface MaterialSet {
   intervalMm: number | null;
   /** "Test K7Q2M" or "Typed". */
   source: string;
+  /** The Second best, Fastest and Deepest sets of the kind, in that order. */
+  otherPicks: OtherPick[];
 }
 
 /** One laser block of the unfolded material. */
@@ -97,6 +109,15 @@ export interface PlaceButton {
   label: string;
 }
 
+/** One marked pick of the open test: its cell, its line under the table and, when the laser's
+ * set of the pick came from another test, that test's id. */
+export interface TestPick {
+  pick: PickKind;
+  cell: CellPlace;
+  line: string | null;
+  setFrom: string | null;
+}
+
 /** The open test. */
 export interface TestDetail {
   id: string;
@@ -106,8 +127,8 @@ export interface TestDetail {
   axesLine: string;
   columns: JudgeAxis;
   rows: JudgeAxis;
-  best: CellPlace | null;
-  setLine: string | null;
+  /** The marked picks in the order Best, Second best, Fastest, Deepest. */
+  picks: TestPick[];
   note: string;
   /** The photo's file name, `null` without a photo. */
   photo: string | null;
@@ -187,6 +208,19 @@ function row(value: unknown): MaterialRow | null {
   }
 }
 
+function otherPicks(value: unknown): OtherPick[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: OtherPick[] = [];
+  for (const raw of value) {
+    const pick = isObject(raw) ? asPickKind(raw.pick) : null;
+    if (!isObject(raw) || pick === null || pick === "best" || typeof raw.numbers !== "string" || typeof raw.source !== "string") {
+      return null;
+    }
+    out.push({ pick, numbers: raw.numbers, source: raw.source });
+  }
+  return out;
+}
+
 function set(value: unknown): MaterialSet | null {
   if (!isObject(value) || !isObject(value.numbers)) return null;
   const kind = asSetKind(value.kind);
@@ -201,11 +235,14 @@ function set(value: unknown): MaterialSet | null {
   ) {
     return null;
   }
+  const others = otherPicks(value.other_picks);
+  if (others === null) return null;
   return {
     kind,
     numbers: { powerPct: n.power_pct, speedMmMin: n.speed_mm_min, passes: n.passes },
     intervalMm: value.interval_mm as number | null,
     source: value.source,
+    otherPicks: others,
   };
 }
 
@@ -253,13 +290,34 @@ function cell(value: unknown): CellPlace | null | undefined {
   return { column: value.column, row: value.row };
 }
 
+function testPicks(value: unknown): TestPick[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: TestPick[] = [];
+  for (const raw of value) {
+    if (!isObject(raw)) return null;
+    const pick = asPickKind(raw.pick);
+    const place = cell(raw.cell);
+    if (
+      pick === null ||
+      place === null ||
+      place === undefined ||
+      (raw.line !== null && typeof raw.line !== "string") ||
+      (raw.set_from !== null && typeof raw.set_from !== "string")
+    ) {
+      return null;
+    }
+    out.push({ pick, cell: place, line: raw.line as string | null, setFrom: raw.set_from as string | null });
+  }
+  return out;
+}
+
 function detail(value: unknown): TestDetail | null | undefined {
   if (value === null) return null;
   if (!isObject(value)) return undefined;
   const kind = asSetKind(value.kind);
   const columns = axis(value.columns);
   const rows = axis(value.rows);
-  const best = cell(value.best);
+  const picks = testPicks(value.picks);
   const place = value.place;
   if (
     typeof value.id !== "string" ||
@@ -269,8 +327,7 @@ function detail(value: unknown): TestDetail | null | undefined {
     typeof value.axes_line !== "string" ||
     columns === null ||
     rows === null ||
-    best === undefined ||
-    (value.set_line !== null && typeof value.set_line !== "string") ||
+    picks === null ||
     typeof value.note !== "string" ||
     (value.photo !== null && typeof value.photo !== "string") ||
     !isObject(place) ||
@@ -287,8 +344,7 @@ function detail(value: unknown): TestDetail | null | undefined {
     axesLine: value.axes_line,
     columns,
     rows,
-    best,
-    setLine: value.set_line as string | null,
+    picks,
     note: value.note,
     photo: value.photo as string | null,
     place: { onPage: place.on_page, label: place.label },

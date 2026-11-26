@@ -68,13 +68,13 @@ test("c22: a test row has the state line and the photo glyph flag", () => {
   }
 });
 
-test("c23 c24: the test detail holds the axes, the best cell and the set line", () => {
+test("c23 c24: the test detail holds the axes, the picks and their lines", () => {
   const v = decodeMaterialsText(fixture("materials_view/test_with_photo.json"));
   assert.ok(v && v.unfolded && v.unfolded.test);
   const t = v.unfolded.test;
   assert.match(t.id, /^[0-9A-Z]{5}$/);
-  assert.ok(t.best);
-  assert.match(t.setLine ?? "", /^Cut set of .+: [\d.]+ %, \d+ mm\/min, \d+ ×$/);
+  assert.ok(t.picks[0]);
+  assert.match(t.picks[0]?.line ?? "", /^Best: Cut set of .+: [\d.]+ %, \d+ mm\/min, \d+ ×$/);
   assert.match(t.place.label, /^(Place on .+|Select on page)$/);
 });
 

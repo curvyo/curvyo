@@ -39,8 +39,8 @@ test("the rail button has no letter key and is dimmed with 'Laser pages only.' o
 
 test("the hooks are the only callers of the grid and material bindings", () => {
   for (const file of ["hooks/useEditorSession.ts", "App.tsx"]) {
-    assert.doesNotMatch(source(file), /set_test_grid_|test_grid_press|judge_test|set_test_photo/, file);
+    assert.doesNotMatch(source(file), /set_test_grid_|test_grid_press|mark_pick|set_test_photo/, file);
   }
   assert.match(source("hooks/useTestGridTool.ts"), /set_test_grid_field/);
-  assert.match(source("hooks/useMaterials.ts"), /judge_test/);
+  assert.match(source("hooks/useMaterials.ts"), /mark_pick/);
 });

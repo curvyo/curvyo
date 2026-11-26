@@ -14,7 +14,7 @@ import {
   sizeReadout,
   wholeFrame,
 } from "../src/lib/photoSize.ts";
-import { bestStatus, cellName, cellWidth, moveCell, sparseHeader } from "../src/lib/testGridResult.ts";
+import { cellName, cellWidth, moveCell, pickStatus, sparseHeader } from "../src/lib/testGridResult.ts";
 import { newMaterialRefusal } from "../src/lib/materialRows.ts";
 
 test("a photo is scaled to 600 px on its long side and never up", () => {
@@ -71,9 +71,9 @@ test("the judge table: cell width, sparse header, names, status and the roving k
   assert.equal(sparseHeader(["100", "1950"], 17), true);
   const columns = { title: "Power %", unit: " %", values: ["20", "60"] };
   const rows = { title: "mm/min", unit: " mm/min", values: ["600", "1950"] };
-  assert.equal(cellName(columns, rows, { column: 1, row: 1 }, false), "60, 1950");
-  assert.equal(cellName(columns, rows, { column: 1, row: 1 }, true), "60, 1950, best cell");
-  assert.equal(bestStatus(columns, rows, { column: 1, row: 0 }), "Best cell: 60 %, 600 mm/min.");
+  assert.equal(cellName(columns, rows, { column: 1, row: 1 }, []), "60, 1950");
+  assert.equal(cellName(columns, rows, { column: 1, row: 1 }, ["best"]), "60, 1950, Best");
+  assert.equal(pickStatus(columns, rows, { column: 1, row: 0 }, "best", false), "Best: 60 %, 600 mm/min.");
   assert.deepEqual(moveCell({ column: 0, row: 0 }, "ArrowLeft", false, 5, 5), { column: 0, row: 0 });
   assert.deepEqual(moveCell({ column: 0, row: 0 }, "ArrowRight", false, 5, 5), { column: 1, row: 0 });
   assert.deepEqual(moveCell({ column: 2, row: 2 }, "End", false, 5, 5), { column: 4, row: 2 });
