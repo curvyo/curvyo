@@ -59,3 +59,34 @@ dependency, no `format_version` change.
 Own choices (Proposal): a tab keeps the window layout's count and places (same tabs, no chord); a tab that does not lie wholly on one
 arc, or a concave arc too small for the tip, stays a window on that stretch with a Dependent-free silent fallback, as a window
 is the last resort of criterion 16; a wave slot clipped to a closed piece is drawn as a plain rectangle.
+
+
+## Slice 3 (Joint layout for tabs, criteria 18 to 24)
+
+Implementer, 2026-11-26, branch `story/joint-tab-layout` (stacked on `story/joint-bend-through-tabs`). ADR 0089 decision 3. Own
+choices are **(Proposal)**.
+
+Affected: `curvyo-generators-core`: new `joint_layout.rs` (pure 1-D layout, Even and Centred with Spread, the per-edge fit),
+`tab_layout.rs` / `tab_runs.rs` (straight tabs by the layout, typed count on a loop, typed count suppresses windows),
+`wall.rs` / `wall_bands.rs` (`Joint.half_width`), `wall_plates` callers, `rounded_box/mod.rs` + `schema.rs`, `path_box/build.rs`,
+`mod.rs`, `schema.rs`, `values.rs` (`limit_count`); frontend: the Advanced group collapses, `joint_spread` shows "%".
+No new crate, no dependency, no contract change, no `format_version` change.
+
+- [x] 1. Test first: `joint_layout.rs` unit tests (Count 1 centre, no overlap, margins, Spread 100 % equals Even, count rules) (19, 21).
+- [x] 2. Test first: `tests/acceptance_0155_layout.rs`: group and keys, defaults equal the goldens, mating and centres per pattern, seam
+  straight even, clamps with notices, 100 joints per edge CPU time, key round trip (18 to 24).
+- [x] 3. `joint_layout.rs` and `tab_layout.rs` / `tab_runs.rs` (19 to 22).
+- [x] 4. `Joint.half_width`, plates and windows read the joint size (20).
+- [x] 5. Schema group Advanced, reading, clamps and used values in the rounded box and the path box (18, 20, 23).
+- [x] 6. Frontend: collapsed Advanced, "%" unit; tests (18, 19).
+- [x] 7. Full gate; spec status (24).
+
+Own choices (Proposal):
+- Gap is edge to edge; Centred gaps are g, 2g, 3g outward from the middle; the least gap between two tabs is one joint size.
+- Typed values are clamped once for the whole box to the tightest edge that carries tabs (notice "most this box allows"); an edge where
+  not even one tab fits keeps none, as today. The muted Auto count shows the most tabs on one edge.
+- Joint size typed: every plate's tab and the strip slot use it; Auto keeps 2 times each plate's own thickness.
+- Joint gap and Joint spread show with Centred (no contract change: `ShownWhen` has no number test, so not "Count 2 or more").
+- Curved top: Advanced is hidden there (its end-plate tabs are edge tabs, no span layout); slice 4 owns the curved top.
+- The Box's leftover `joint` Choice is not removed here (removal of accepted behaviour, the lead decides).
+- An unknown pattern id reads Even silently, as an unknown slit pattern does.
