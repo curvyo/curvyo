@@ -146,6 +146,8 @@ impl Session {
             return;
         }
         self.held = next;
+        // Shift held during a parameter handle drag makes it a copy (`specs/0073` criterion 1).
+        self.select.set_copy_key(shift);
         if self.workbench() == super::Workbench::Sketch {
             if let Some(point) = self.pointer_position {
                 self.sketch_pointer_hover(point);

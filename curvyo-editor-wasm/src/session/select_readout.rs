@@ -7,6 +7,10 @@ use curvyo_ui_core::{EditHandle, Side, format_degrees, mirror_line, signed_size_
 
 use super::{Session, Tool};
 
+/// What a parameter handle copy drag adds to its readout ("curve 40.0 % · copy",
+/// `specs/0073-parameter-handle-clone` criterion 5).
+pub(super) const PARAM_COPY_SUFFIX: &str = " · copy";
+
 impl Session {
     /// The Select tool's live resolved object for the drag in flight, even
     /// where it equals the committed one (a readout still shows the value at
@@ -116,11 +120,19 @@ impl Session {
                 };
                 with_mirror_line(size, sx, sy)
             }
-            EditHandle::Param(param) => super::corner_readout::param_readout(
-                &self.select_live_transform()?,
-                param,
-                self.select.live_param_drag(anchor),
-            )?,
+            EditHandle::Param(param) => {
+                let readout = super::corner_readout::param_readout(
+                    &self.select_live_transform()?,
+                    param,
+                    self.select.live_param_drag(anchor),
+                )?;
+                // A copy drag says so after the value and any limit word (`0073` criterion 5).
+                if self.select.param_copy_in_flight() {
+                    format!("{readout}{PARAM_COPY_SUFFIX}")
+                } else {
+                    readout
+                }
+            }
             EditHandle::Move => return None,
         };
         Some(super::shapes::LiveReadout { text, anchor })

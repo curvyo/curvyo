@@ -755,7 +755,13 @@ export interface EditorSession {
    * (it stays
    * open). */
   /** `third` is the third field of a laser stop's S chip (`specs/0102` criterion 23). */
-  commitTransformEntry: (first: string, second: string, lastEdited: number, third?: string) => string;
+  commitTransformEntry: (
+    first: string,
+    second: string,
+    lastEdited: number,
+    third: string | undefined,
+    asCopy: boolean,
+  ) => string;
   /** Closes the entry without writing (Escape, blur). Idempotent. */
   cancelTransformEntry: () => void;
   /** For linked fields: the text the other field takes. */
@@ -3083,12 +3089,12 @@ export function useEditorSession(
   );
 
   const commitTransformEntry = useCallback(
-    (first: string, second: string, lastEdited: number, third?: string): string => {
+    (first: string, second: string, lastEdited: number, third: string | undefined, asCopy: boolean): string => {
       const session = sessionRef.current;
       if (!session) {
         return "unchanged";
       }
-      const outcome = session.commit_transform_entry(first, second, lastEdited, third);
+      const outcome = session.commit_transform_entry(first, second, lastEdited, third, asCopy);
       showTransformNotice(session);
       syncFromSession();
       // A typed corner radius past its limit is committed limited and says

@@ -91,6 +91,14 @@ impl Session {
                 snap_offset,
             )
             .and_then(|live| live.axis);
+        // A parameter handle drag with Shift held writes a copy: the plus badge, never before
+        // the press (`specs/0073-parameter-handle-clone` criterion 5).
+        if self.select.param_copy_in_flight() {
+            return MoveIndicators {
+                copy_badge: true,
+                ..none
+            };
+        }
         // With Ctrl held a press either begins a move (copy: plus), or arms
         // a marquee or, with Alt, a lasso (remove: minus), never both, as
         // `classify_press` is the very rule the press acts on.

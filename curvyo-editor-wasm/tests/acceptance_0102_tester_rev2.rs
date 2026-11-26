@@ -120,7 +120,7 @@ fn chip(s: &mut Session, id: NodeId, k: &str, texts: &[&str]) -> EntryOutcome {
     s.set_tool(Tool::Select);
     assert!(s.select_fixture(id));
     assert_eq!(key(s, k), KeyOutcome::EntryOpened, "{k} opens a chip");
-    s.commit_transform_entry_fields(texts, 0)
+    s.commit_transform_entry_fields(texts, 0, false)
 }
 
 /// What the selection announcement of the selected fixture says.
@@ -322,7 +322,7 @@ fn ac38_a_double_click_on_the_head_knob_opens_one_field_chip_that_takes_a_value(
     let k = at(&s, 205.0, 150.0);
     dbl(&mut s, k);
     assert_eq!(
-        s.commit_transform_entry_fields(&["12"], 0),
+        s.commit_transform_entry_fields(&["12"], 0, false),
         EntryOutcome::Committed,
         "one field, mm"
     );
@@ -480,7 +480,7 @@ fn d23_a_stop_has_leg_and_thickness_knobs_and_no_corner_or_edge_resize() {
     let k = at(&s, 200.0, 120.0);
     dbl(&mut s, k);
     assert_eq!(
-        s.commit_transform_entry_fields(&["8"], 0),
+        s.commit_transform_entry_fields(&["8"], 0, false),
         EntryOutcome::Committed
     );
     assert!(announced(&mut s, st).contains("thickness 8.0"));

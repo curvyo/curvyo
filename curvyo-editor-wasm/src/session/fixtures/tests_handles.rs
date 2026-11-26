@@ -281,7 +281,7 @@ fn a_double_click_on_a_stop_knob_opens_its_one_field_chip_and_enter_commits_it()
         let names: Vec<&str> = view.fields.iter().map(|f| f.accessible_name).collect();
         assert_eq!(names, [name]);
         assert_eq!(
-            s.commit_transform_entry_fields(&[text], 0),
+            s.commit_transform_entry_fields(&[text], 0, false),
             EntryOutcome::Committed
         );
         assert_eq!(param(&s, stop, key), want);
