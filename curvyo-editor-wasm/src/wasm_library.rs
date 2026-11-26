@@ -545,7 +545,7 @@ pub fn library_online_add_sent_text(iconify: bool) -> String {
 }
 
 /// The fixed texts of the access token field, the Lock and the token form as JSON
-/// (`specs/0156-library-git-token`, UX notes sections 2 to 4).
+/// (`specs/0157-library-git-token`, UX notes sections 2 to 4).
 #[wasm_bindgen]
 #[must_use]
 pub fn library_token_words() -> String {

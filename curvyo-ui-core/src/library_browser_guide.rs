@@ -35,7 +35,7 @@ pub struct Guide {
     pub rules: Vec<String>,
     /// "Private repositories": the heading of the token steps (desktop build only, UX notes T13).
     pub private_title: String,
-    /// The token steps in plain sentences, numbered by the page (`specs/0156` criterion 16).
+    /// The token steps in plain sentences, numbered by the page (`specs/0157` criterion 16).
     pub private_steps: Vec<String>,
 }
 

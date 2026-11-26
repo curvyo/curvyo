@@ -1,5 +1,5 @@
 // The inline Add source form (`specs/0138-template-library` UX notes section 3): Kind, Address,
-// the line that says what is sent, for a Git catalogue the optional Access token (`specs/0156`),
+// the line that says what is sent, for a Git catalogue the optional Access token (`specs/0157`),
 // Cancel and Add. Add checks the address with one request, which the line under the field says;
 // nothing else is sent. The refusals are Rust's words, each under the field it is about.
 import { GitBranch, Globe, LoaderCircle } from "lucide-react";

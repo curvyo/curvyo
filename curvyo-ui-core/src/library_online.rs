@@ -38,7 +38,7 @@ pub struct IconCell {
     pub tooltip: String,
 }
 
-/// What a source row shows of its access token (`specs/0156` criteria 4, 5, 13).
+/// What a source row shows of its access token (`specs/0157` criteria 4, 5, 13).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct TokenMark {
     /// The source has a token: the Lock mark after its name, from the first paint.

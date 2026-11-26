@@ -37,7 +37,7 @@ pub struct SetsGroup {
     pub key: String,
     /// "api.iconify.design · 280 sets · 4 loaded".
     pub heading: String,
-    /// The group's name alone, so the Lock can follow it (`specs/0156` criterion 4).
+    /// The group's name alone, so the Lock can follow it (`specs/0157` criterion 4).
     pub name: String,
     /// The source has an access token: the Lock mark after the name.
     pub private: bool,

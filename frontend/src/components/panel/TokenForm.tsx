@@ -1,4 +1,4 @@
-// The inline access token form of one Git catalogue (`specs/0156-library-git-token` UX notes 4):
+// The inline access token form of one Git catalogue (`specs/0157-library-git-token` UX notes 4):
 // "Change token…" or "Add token…" opens it in the place of the Add source form. The field is empty
 // on opening (the old token is never shown), Save checks the new token with one request and keeps it
 // only on success, Remove token is an armed action. The refusals are Rust's words.

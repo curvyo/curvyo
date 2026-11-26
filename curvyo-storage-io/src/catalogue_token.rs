@@ -54,7 +54,7 @@ fn account(address: &str) -> String {
 }
 
 /// The entry the OS key store lists for a source: `(account, service)`, shown to the maker when a
-/// delete failed (`specs/0156` criterion 7): the account and the service `curvyo/<slot>`.
+/// delete failed (`specs/0157` criterion 7): the account and the service `curvyo/<slot>`.
 #[must_use]
 pub fn token_label(address: &str, slot: &str) -> (String, String) {
     (account(address), format!("curvyo/{slot}"))

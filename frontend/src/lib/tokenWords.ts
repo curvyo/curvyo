@@ -1,4 +1,4 @@
-// The fixed words of the access token field, the Lock and the token form (`specs/0156-library-git-token`
+// The fixed words of the access token field, the Lock and the token form (`specs/0157-library-git-token`
 // UX notes 2 to 4), worded in Rust and read when drawn (the wasm is loaded then).
 import { library_token_words } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
