@@ -6,8 +6,9 @@ use curvyo_document_core::Point;
 
 use crate::footprint::{Footprint, Shape, Span, Tab};
 use crate::shape_ops::Chain;
+use crate::shape_ops::{between, direction, length};
 use crate::tab_layout::{
-    Layout, MIN_CIRCLE_TABS, MIN_STRAIGHT_TABS, MIN_TAB_STRAIGHT, TAB_PITCH, WindowSpec,
+    Layout, MIN_CIRCLE_TABS, MIN_TAB_STRAIGHT, TAB_PITCH, WindowSpec, curve_fits, neutral_arc,
 };
 
 /// A run as the windows see it: its shapes measured as one.
@@ -77,8 +78,8 @@ impl Footprint {
     /// The tabs of the whole wall and the footprint they stand on, runs of bends taking their
     /// windows as whole (ADR 0083 §13.8): the straights' tabs when they are at least four.
     pub(crate) fn with_run_tabs(&self, spec: WindowSpec) -> (Self, Vec<Tab>) {
-        let straight = self.straight_tabs(spec.half_width);
-        if straight.len() >= MIN_STRAIGHT_TABS {
+        let straight = self.straight_tabs(spec.half_width, &spec.joints);
+        if spec.straight_enough(straight.len()) {
             return (self.clone(), straight);
         }
         let spans = &self.spans;
@@ -116,7 +117,10 @@ impl Footprint {
             let wanted = {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let by_length = (run.total / TAB_PITCH).round() as usize;
-                by_length.max(if lone_loop { MIN_CIRCLE_TABS } else { 1 })
+                match spec.joints.count {
+                    Some(typed) if lone_loop => typed as usize,
+                    _ => by_length.max(if lone_loop { MIN_CIRCLE_TABS } else { 1 }),
+                }
             };
             let enough = lone_loop || run.total >= MIN_TAB_STRAIGHT * self.wall;
             let windows = if enough {
@@ -128,7 +132,7 @@ impl Footprint {
                 Vec::new()
             };
             let at = out.spans.len();
-            out.run(&run, &windows);
+            out.run(&run, &windows, spec);
             if let Some(span) = out.spans.get_mut(at) {
                 span.piece_start = spans[first].piece_start;
             }
@@ -139,10 +143,14 @@ impl Footprint {
 }
 
 impl Layout {
-    /// The run as arcs between its `windows`, each window a chord with its tab.
-    fn run(&mut self, run: &Run, windows: &[(f64, f64)]) {
+    /// The run as arcs between its `windows`, each window a chord with its tab, or (`spec.curve`,
+    /// where the tab fits wholly on one arc) a tab standing on the arc itself.
+    fn run(&mut self, run: &Run, windows: &[(f64, f64)], spec: WindowSpec) {
         let mut cursor = 0.0;
         for &(start, end) in windows {
+            if spec.curve && self.curve_tab(run, f64::midpoint(start, end), cursor, spec) {
+                continue;
+            }
             for shape in run.part(cursor, start) {
                 self.push(shape, false);
             }
@@ -161,6 +169,44 @@ impl Layout {
         for shape in run.part(cursor, run.total) {
             self.push(shape, false);
         }
+    }
+
+    /// A tab at distance `at` on the arc `run` has there, when it lies wholly on that one arc;
+    /// `cursor` is where the arcs not yet pushed start.
+    fn curve_tab(&mut self, run: &Run, at: f64, cursor: f64, spec: WindowSpec) -> bool {
+        let Some((shape, start)) = run.locate(at) else {
+            return false;
+        };
+        let Shape::Bend { radius, sweep, .. } = shape else {
+            return false;
+        };
+        let reach = spec.half_width * 1.25 + 0.5;
+        if !curve_fits(radius, sweep > 0.0, spec.half_width, self.wall)
+            || at - reach < start
+            || at + reach > start + length(&shape)
+        {
+            return false;
+        }
+        let local = at - start;
+        let along = if local < 1e-9 {
+            direction(&shape, false)
+        } else {
+            direction(&between(&shape, 0.0, local), true)
+        };
+        let before: f64 = run
+            .part(cursor, at)
+            .iter()
+            .map(|shape| match *shape {
+                Shape::Bend { radius, sweep, .. } => neutral_arc(radius, sweep, self.wall),
+                Shape::Straight { from, to } => libm::hypot(to.x - from.x, to.y - from.y),
+            })
+            .sum();
+        self.tabs.push(Tab {
+            s: self.s0 + before,
+            centre: run.at(at),
+            along,
+        });
+        true
     }
 }
 
@@ -188,6 +234,8 @@ mod tests {
         let spec = WindowSpec {
             half_width: 3.0,
             min_band: 3.0,
+            curve: false,
+            joints: crate::joint_layout::AUTO,
         };
         let fp = concave_run();
         let (fitted, tabs) = fp.with_run_tabs(spec);

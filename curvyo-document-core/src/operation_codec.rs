@@ -38,6 +38,9 @@ pub(crate) const KEY_OP_GRID_PART: &str = "op_grid_part";
 pub(crate) const MEMBER_PREFIX: &str = "member.";
 /// The separator of the node ids of a clone member's path; it never occurs in an encoded id.
 pub(crate) const PATH_SEPARATOR: char = '/';
+/// The separator of a node id and a part key in `member.<node>#<part>` (ADR 0082 §10); like the
+/// path separator it never occurs in an encoded id (`peer:counter`).
+pub(crate) const PART_SEPARATOR: char = '#';
 /// The register after `x.<process id>.` that holds the Cuts last switch (ADR 0046 §3).
 pub(crate) const CUTS_LAST_FIELD: &str = "cuts_last";
 
@@ -81,9 +84,50 @@ pub(crate) fn member_key(path: &[TreeID]) -> String {
     format!("{MEMBER_PREFIX}{}", texts.join(&PATH_SEPARATOR.to_string()))
 }
 
-/// The path of a membership key's text after the prefix; `None` when an id does not read.
+/// The membership key of the part `part` of generated node `node`: `member.<node>#<part>`.
+pub(crate) fn part_member_key(node: TreeID, part: &str) -> String {
+    format!("{}{PART_SEPARATOR}{part}", member_key(&[node]))
+}
+
+/// The membership key of the target `path`, a part of a generated node when the one id carries
+/// a part (ADR 0082 §10).
+pub(crate) fn member_key_of(path: &[NodeId]) -> String {
+    match path {
+        [only] if only.part().is_some() => part_member_key(
+            crate::paths::tree_id_of(*only),
+            only.part()
+                .map(|p| p.to_string())
+                .unwrap_or_default()
+                .as_str(),
+        ),
+        _ => member_key(
+            &path
+                .iter()
+                .map(|&n| crate::paths::tree_id_of(n))
+                .collect::<Vec<_>>(),
+        ),
+    }
+}
+
+/// The path of a membership key's text after the prefix and the part it names (`<node>#<part>`,
+/// one id only); `None` when an id does not read or the part is not a valid key.
+pub(crate) fn decode_member(text: &str) -> Option<(Vec<TreeID>, Option<crate::PartKey>)> {
+    let Some((nodes, part)) = text.split_once(PART_SEPARATOR) else {
+        return decode_path(text).map(|path| (path, None));
+    };
+    let node = decode_node(nodes)?;
+    Some((vec![node], Some(crate::part_key::PartKey::new(part)?)))
+}
+
+/// The nodes of a membership key's text after the prefix (a part key names its node); `None`
+/// when an id does not read.
 pub(crate) fn decode_path(text: &str) -> Option<Vec<TreeID>> {
-    text.split(PATH_SEPARATOR).map(decode_node).collect()
+    let nodes = match text.split_once(PART_SEPARATOR) {
+        Some((nodes, part)) if crate::part_key::is_valid(part) => nodes,
+        Some(_) => return None,
+        None => text,
+    };
+    nodes.split(PATH_SEPARATOR).map(decode_node).collect()
 }
 
 /// Whether every node of `path` is live.
@@ -140,13 +184,18 @@ pub(crate) fn read_operation(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> O
         if !matches!(value, ValueOrContainer::Value(LoroValue::Bool(true))) {
             members_readable = false;
         }
-        if let Some(path) = decode_path(text).filter(|path| path_is_live(tree, path)) {
-            members.push(path.into_iter().map(node_id).collect::<Vec<NodeId>>());
+        if let Some((path, part)) = decode_member(text).filter(|(path, _)| path_is_live(tree, path))
+        {
+            let mut path: Vec<NodeId> = path.into_iter().map(node_id).collect();
+            if let (Some(part), [only]) = (part, path.as_mut_slice()) {
+                *only = only.with_part(part.as_str()).unwrap_or(*only);
+            }
+            members.push(path);
         }
     });
     members.sort_unstable_by_key(|path| {
         path.iter()
-            .map(|id| (id.peer, id.counter))
+            .map(|id| (id.peer, id.counter, id.part))
             .collect::<Vec<_>>()
     });
     let show = switch(meta, KEY_OP_SHOW);
@@ -176,6 +225,7 @@ pub(crate) fn read_operation(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> O
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PartKey;
 
     #[test]
     fn a_path_key_reads_back_and_the_separator_never_occurs_in_an_id() {
@@ -187,5 +237,27 @@ mod tests {
             Some(path)
         );
         assert!(!encode_node(TreeID::new(u64::MAX, i32::MAX)).contains(PATH_SEPARATOR));
+        assert!(!encode_node(TreeID::new(u64::MAX, i32::MAX)).contains(PART_SEPARATOR));
+    }
+
+    #[test]
+    fn a_part_key_reads_back_as_its_node_and_part() {
+        let key = part_member_key(TreeID::new(7, 3), "lid");
+        assert_eq!(key, "member.7:3#lid");
+        let text = key.strip_prefix(MEMBER_PREFIX).unwrap();
+        assert_eq!(
+            decode_member(text),
+            Some((vec![TreeID::new(7, 3)], PartKey::new("lid")))
+        );
+        assert_eq!(decode_path(text), Some(vec![TreeID::new(7, 3)]));
+        assert_eq!(
+            decode_member("7:3#Lid"),
+            None,
+            "an invalid part key does not read"
+        );
+        assert_eq!(decode_path("7:3#"), None);
+        let id = node_id(TreeID::new(7, 3)).with_part("lid").unwrap();
+        assert_eq!(member_key_of(&[id]), key);
+        assert_eq!(member_key_of(&[id.node()]), "member.7:3");
     }
 }

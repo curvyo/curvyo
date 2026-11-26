@@ -147,6 +147,15 @@ impl<'a> Values<'a> {
         }
     }
 
+    /// Lowers the count `key` to `max` and reports it as a dependent clamp when it moved.
+    pub(crate) fn limit_count(&mut self, key: &'static str, max: u32) {
+        if self.count(key) > max {
+            let value = ParamValue::Count(max);
+            self.stored.insert(key.to_owned(), value.to_stored());
+            self.set_clamp(key, value, Bound::Dependent);
+        }
+    }
+
     /// As `limit_mm` for a lower bound that a choice sets: the notice names `subject`.
     pub(crate) fn limit_min_for(&mut self, key: &'static str, min: f64, subject: &'static str) {
         let before = self.mm(key);

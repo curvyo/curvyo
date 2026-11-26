@@ -13,6 +13,7 @@ use super::plates::plates;
 use super::shape::{Shapes, Vertex, shapes, vertices};
 use super::spans::curve_shapes;
 use crate::footprint::{Footprint, Shape, Span, Tab};
+use crate::joint_layout::{Fitted, Joints};
 use crate::rounded_box::layout::Piece;
 use crate::slit_bend::SlitPattern;
 use crate::tab_layout::WindowSpec;
@@ -20,6 +21,7 @@ use crate::wall::{Ends, Joint, LocalSpacing, Wall};
 
 /// Everything the geometry needs, after the values were clamped.
 #[allow(clippy::struct_excessive_bools)]
+#[derive(Clone)]
 pub(crate) struct Measures {
     pub(crate) wall: f64,
     pub(crate) base: f64,
@@ -38,6 +40,10 @@ pub(crate) struct Measures {
     /// Set while the spacing is automatic.
     pub(crate) local: Option<LocalSpacing>,
     pub(crate) draft: bool,
+    /// Tabs on a bend stand on the true arc (`bend_tabs` `curve`).
+    pub(crate) curve: bool,
+    /// The joint count, size and pattern (`joint_*`).
+    pub(crate) joints: Joints,
 }
 
 /// A piece's badge on the inner base: its number, the middle of its stretch, the direction into
@@ -55,6 +61,8 @@ pub(crate) struct Built {
     /// The smallest gap between two slit columns laid, `None` without a bent span.
     pub(crate) smallest_gap: Option<f64>,
     pub(crate) pieces: usize,
+    /// The joint values fitted to the straights, to report back.
+    pub(crate) fitted: Fitted,
 }
 
 pub(crate) fn warning(id: &'static str, pieces: Vec<u32>) -> Warning {
@@ -220,12 +228,15 @@ fn split_pieces(footprint: &Footprint, corners: &[Vertex]) -> Vec<(usize, usize)
 fn joints_and_height(m: &Measures) -> (Vec<Joint>, f64) {
     let mut joints = vec![Joint {
         thickness: Length::from_mm(m.base),
+        half_width: Length::from_mm(m.joints.half(m.base)),
         inset: Length::from_mm(m.inset),
         from_top: false,
     }];
+    let top = if m.seat { m.ring } else { m.lid };
     if m.lid_on {
         joints.push(Joint {
-            thickness: Length::from_mm(if m.seat { m.ring } else { m.lid }),
+            thickness: Length::from_mm(top),
+            half_width: Length::from_mm(m.joints.half(top)),
             inset: Length::from_mm(0.0),
             from_top: true,
         });
@@ -355,7 +366,8 @@ impl Built {
 }
 
 /// Builds the parts of the box of `points` (clockwise on screen).
-pub(crate) fn build(checked: &Checked, m: &Measures) -> (Built, Footprint, Vec<Tab>) {
+pub(crate) fn build(checked: &Checked, asked: &Measures) -> (Built, Footprint, Vec<Tab>) {
+    let m = asked;
     let least = if m.pattern.kind == crate::slit_bend::SlitKind::Wave {
         (m.pattern.width.as_mm() + 1.0) / 0.88
     } else {
@@ -363,9 +375,17 @@ pub(crate) fn build(checked: &Checked, m: &Measures) -> (Built, Footprint, Vec<T
     };
     let plan = plan(checked, m, 2.0 * least);
     let widest = [m.base, m.ring, m.lid].into_iter().fold(0.0, f64::max);
+    let fitted = plan.footprint.joint_fit(m.joints, widest);
+    let fitted_measures = Measures {
+        joints: fitted.joints,
+        ..m.clone()
+    };
+    let m = &fitted_measures;
     let spec = WindowSpec {
-        half_width: widest,
+        half_width: m.joints.half(widest),
         min_band: 2.0 * (m.pattern.width.as_mm() + 1.0) / 0.88,
+        curve: m.curve,
+        joints: m.joints,
     };
     let (inner, tabs) = plan.footprint.with_run_tabs(spec);
     let stripped = strips(&plan, &inner, &tabs, m);
@@ -384,6 +404,7 @@ pub(crate) fn build(checked: &Checked, m: &Measures) -> (Built, Footprint, Vec<T
         badges,
         smallest_gap: stripped.pitches.into_iter().reduce(f64::min),
         pieces: count,
+        fitted,
     };
     (built, inner, tabs)
 }

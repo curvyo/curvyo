@@ -16,6 +16,7 @@ use curvyo_document_core::{Length, Point};
 use curvyo_extension_core::{Edit, GenerateRequest, Generated, ParamValue};
 
 use super::layout::{Piece, place};
+use crate::joint_layout::Joints;
 use crate::slit_bend::SlitPattern;
 use crate::values::Values;
 
@@ -33,6 +34,10 @@ pub(super) struct Sizes {
     pub(super) kerf: f64,
     /// The largest values the dependent bounds allow now (`Generated::limits`).
     pub(super) limits: Vec<(&'static str, ParamValue)>,
+    /// The joint layout after the fit (spec `0155` criterion 25).
+    pub(super) joints: Joints,
+    /// The most pieces of the mate on one joint, for the muted Auto count.
+    pub(super) used_count: u32,
 }
 
 impl Sizes {
@@ -64,6 +69,8 @@ pub(super) fn generate(request: &GenerateRequest<'_>, mut v: Values<'_>) -> Gene
             width: v.mm("hollow_width"),
             depth: v.mm("hollow_depth"),
         });
+    let tabs = u32::try_from(strip::tab_centres(&s).len()).unwrap_or(u32::MAX);
+    s.used_count = plates::Counts::of(&s).most_fingers().max(tabs);
     let strip = strip::strip(&s, pattern, draft);
     let mut parts = vec![Piece::new(strip, s.wall, "strip")];
     parts[0].number = 1;
@@ -106,6 +113,12 @@ fn used_values(
 ) -> Vec<(&'static str, ParamValue)> {
     let length = |mm: f64| ParamValue::Length(Length::from_mm(mm));
     let mut used = Vec::new();
+    if v.count("joint_count") == 0 {
+        used.push(("joint_count", ParamValue::Count(s.used_count)));
+    }
+    if v.mm("joint_width") == 0.0 {
+        used.push(("joint_width", length(2.0 * s.end.min(s.base))));
+    }
     for (key, value) in [
         ("plate_thickness", s.base),
         ("end_plate_thickness", s.end),

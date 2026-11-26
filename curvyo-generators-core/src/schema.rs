@@ -2,7 +2,7 @@
 
 use curvyo_document_core::Length;
 use curvyo_extension_core::{
-    ChoiceOption, Curve, Degrees, Param, ParamKind, ParamValue, ShownWhen, Track,
+    ChoiceOption, Curve, Degrees, Param, ParamGroup, ParamKind, ParamValue, ShownWhen, Track,
 };
 
 /// A length row.
@@ -27,6 +27,7 @@ pub(crate) fn length(
         default: ParamValue::Length(Length::from_mm(default)),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -50,6 +51,7 @@ pub(crate) fn count(
         default: ParamValue::Count(default),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -73,6 +75,7 @@ pub(crate) fn angle(
         default: ParamValue::Angle(Degrees(default)),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -86,6 +89,7 @@ pub(crate) fn switch(key: &'static str, label: &'static str) -> Param {
         default: ParamValue::Switch(false),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -104,6 +108,7 @@ pub(crate) fn choice(
         default: ParamValue::Choice(default.to_owned()),
         shown_when: None,
         track: None,
+        initial: None,
     }
 }
 
@@ -136,4 +141,99 @@ pub(crate) fn switch_on(key: &'static str, label: &'static str) -> Param {
     let mut param = switch(key, label);
     param.default = ParamValue::Switch(true);
     param
+}
+
+/// `param` is written as the choice `id` in a new object while a stored one without the key still
+/// reads its default (ADR 0089 decision 2).
+pub(crate) fn initial(mut param: Param, id: &'static str) -> Param {
+    param.initial = Some(ParamValue::Choice(id.to_owned()));
+    param
+}
+
+/// How the tabs of an edge are spread (spec `0155` criterion 19).
+pub(crate) const JOINT_PATTERN: &[ChoiceOption] = &[
+    ChoiceOption {
+        id: "even",
+        label: "Even",
+    },
+    ChoiceOption {
+        id: "centred",
+        label: "Centred",
+    },
+];
+
+/// The condition of the gap and the spread: the pattern is Centred.
+pub(crate) const CENTRED: ShownWhen = ShownWhen::Is {
+    key: "joint_pattern",
+    choice: "centred",
+};
+
+/// The Advanced group: the joint layout of the tabs (spec `0155` criteria 18 to 20). `shown` is
+/// the condition every row hangs on and `centred` the one of the gap and the spread (the rounded
+/// box shows the group with the flat top only).
+pub(crate) fn advanced(shown: Option<ShownWhen>, centred: ShownWhen) -> ParamGroup {
+    let on = |param: Param, for_centred: bool| {
+        if for_centred {
+            when(param, centred)
+        } else {
+            shown.map_or(param.clone(), |only| when(param, only))
+        }
+    };
+    ParamGroup {
+        label: "Advanced",
+        params: vec![
+            on(
+                choice("joint_pattern", "Joint pattern", JOINT_PATTERN, "even"),
+                false,
+            ),
+            on(
+                tracked(
+                    automatic(count("joint_count", "Joint count", 1, 200, 0)),
+                    1.0,
+                    20.0,
+                    Curve::Linear,
+                ),
+                false,
+            ),
+            on(
+                tracked(
+                    automatic(length(
+                        "joint_width",
+                        "Joint size",
+                        (1.0, 200.0),
+                        0.0,
+                        (0.5, 2),
+                    )),
+                    1.0,
+                    30.0,
+                    Curve::Linear,
+                ),
+                false,
+            ),
+            on(
+                tracked(
+                    automatic(length(
+                        "joint_gap",
+                        "Joint gap",
+                        (1.0, 400.0),
+                        0.0,
+                        (0.5, 2),
+                    )),
+                    1.0,
+                    60.0,
+                    Curve::Linear,
+                ),
+                true,
+            ),
+            on(
+                tracked(
+                    count("joint_spread", "Joint spread", 0, 100, 0),
+                    0.0,
+                    100.0,
+                    Curve::Linear,
+                ),
+                true,
+            ),
+        ],
+    }
 }

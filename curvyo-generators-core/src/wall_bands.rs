@@ -242,7 +242,7 @@ impl Wall<'_> {
         let widest = self
             .joints
             .iter()
-            .map(|j| j.thickness.as_mm())
+            .map(|j| j.half_width.as_mm())
             .fold(0.0, f64::max);
         let mut out = Vec::new();
         let mut first = 0;

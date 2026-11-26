@@ -256,15 +256,15 @@ fn the_box_plates_partition_the_material_exactly_for_every_lid() {
 }
 
 #[test]
-fn a_box_with_no_joint_is_plain_rectangles() {
+fn a_stored_joint_none_reads_as_fingers_since_the_choice_is_gone() {
     let stored = params(&[("joint", ParamValue::Choice("none".into()))]);
     let generated = generate(BOX, &stored, None);
-    assert!(
-        generated
-            .parts
-            .iter()
-            .all(|part| points(&part.paths[0]).len() == 5)
+    let plain = generate(BOX, &params(&[]), None);
+    assert_eq!(
+        format!("{:?}", generated.parts),
+        format!("{:?}", plain.parts)
     );
+    assert!(!generated.params.contains_key("joint"));
 }
 
 #[test]

@@ -200,17 +200,21 @@ pub(crate) fn plates(
         let lid = if m.seat {
             seat_lid(&outer, m, warnings, rounded)
         } else {
-            tabbed(inner, tabs, m.lid, m.wall)
+            tabbed(inner, tabs, m.joints.half(m.lid), m.wall)
         };
         out.push(Piece::new(vec![lid], m.lid, "lid"));
     }
     out.push(Piece::new(
-        vec![tabbed(inner, tabs, m.base, m.wall)],
+        vec![tabbed(inner, tabs, m.joints.half(m.base), m.wall)],
         m.base,
         "base",
     ));
     if m.lid_on && m.seat {
-        let mut ring = Piece::new(vec![tabbed(inner, tabs, m.ring, m.wall)], m.ring, "ring");
+        let mut ring = Piece::new(
+            vec![tabbed(inner, tabs, m.joints.half(m.ring), m.wall)],
+            m.ring,
+            "ring",
+        );
         let opening = if m.draft {
             Err(OffsetError::NoArea)
         } else {

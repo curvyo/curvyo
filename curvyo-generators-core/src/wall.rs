@@ -15,6 +15,8 @@ use crate::wave_slot::wave;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Joint {
     pub(crate) thickness: Length,
+    /// Half the slot's length along the strip: the tab's half width (the thickness while automatic).
+    pub(crate) half_width: Length,
     pub(crate) inset: Length,
     pub(crate) from_top: bool,
 }
@@ -97,6 +99,7 @@ impl Wall<'_> {
             .map(|r| Window {
                 from: Length::from_mm(r.x0),
                 to: Length::from_mm(r.x1),
+                rows: self.on_arc(r.x0, r.x1).then_some((r.y0, r.y1)),
             })
             .collect();
         let mut waves: Vec<(Slot, bool)> = Vec::new();
@@ -136,20 +139,32 @@ impl Wall<'_> {
         contours
     }
 
+    /// A tab slot over `x0..x1` that lies on a bend of the true arc (no window chord): the
+    /// columns beside it run on, clipped (ADR 0089 decision 2).
+    fn on_arc(&self, x0: f64, x1: f64) -> bool {
+        let middle = f64::midpoint(x0, x1);
+        self.footprint.spans.iter().any(|span| {
+            matches!(span.shape, crate::footprint::Shape::Bend { .. })
+                && middle >= span.s0 - 1e-9
+                && middle <= span.s0 + span.length + 1e-9
+        })
+    }
+
     /// The slots of the plates' tabs, one per tab and joint.
     fn tab_rects(&self, tabs: &[Tab], height: f64) -> Vec<Rect> {
         let mut rects = Vec::new();
         for tab in tabs {
             for joint in &self.joints {
                 let (t, e) = (joint.thickness.as_mm(), joint.inset.as_mm());
+                let half = joint.half_width.as_mm();
                 let (y0, y1) = if joint.from_top {
                     (e, e + t)
                 } else {
                     (height - e - t, height - e)
                 };
                 rects.push(Rect {
-                    x0: tab.s - t,
-                    x1: tab.s + t,
+                    x0: tab.s - half,
+                    x1: tab.s + half,
                     y0,
                     y1,
                 });

@@ -94,7 +94,7 @@ fn a_circle_is_one_closed_bend_from_the_back_point() {
 #[test]
 fn tabs_sit_in_equal_sub_spans_and_the_seam_falls_between_two_tabs() {
     let fp = footprint(120.0, 80.0, 15.0, 3.0);
-    let tabs = fp.straight_tabs(3.0);
+    let tabs = fp.straight_tabs(3.0, &crate::joint_layout::AUTO);
     // Top 90 mm: 3 rounds up to the even 4; right 50: 2; bottom 90: 3; left 50: 2.
     assert_eq!(tabs.len(), 4 + 2 + 3 + 2);
     let total = fp.total();
@@ -115,7 +115,7 @@ fn tabs_sit_in_equal_sub_spans_and_the_seam_falls_between_two_tabs() {
 fn a_short_straight_has_no_tab() {
     // 40 x 28 with r 10: straights of 20 and 8 mm; wall 3 -> 8 < 4 * 3 has none.
     let fp = footprint(40.0, 28.0, 10.0, 3.0);
-    let tabs = fp.straight_tabs(3.0);
+    let tabs = fp.straight_tabs(3.0, &crate::joint_layout::AUTO);
     assert!(
         tabs.iter()
             .all(|tab| (tab.centre.y.abs() - 14.0).abs() < 1e-9)

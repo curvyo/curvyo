@@ -111,6 +111,9 @@ impl Default for PenTool {
     }
 }
 
+// One value per pen tool, never in a collection: the size of the idle case costs nothing, so the
+// large `Placing` stays inline (a part-keyed `NodeId` is 32 bytes, ADR 0082 §10).
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Default)]
 enum State {
     #[default]

@@ -6,6 +6,30 @@
 //! pieces; the plate that owns the corner cubes (the bottom and the lid) keeps the even pieces, the
 //! plates that meet it keep the odd ones.
 
+/// How a joint edge is cut into pieces: `segments` of them, equal when `widths` is empty, else
+/// the widths of each, owner piece first (spec `0155` criterion 26). Both plates of a joint are
+/// cut by one split.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Split {
+    pub(crate) segments: u32,
+    pub(crate) widths: Vec<f64>,
+}
+
+impl Split {
+    /// The fingers of the mate: the odd pieces.
+    pub(crate) fn fingers(&self) -> u32 {
+        self.segments / 2
+    }
+
+    /// The pieces of today's rule: odd, equal, as close to `width` as possible.
+    pub(crate) fn equal(length: f64, width: f64) -> Self {
+        Self {
+            segments: finger_count(length, width),
+            widths: Vec::new(),
+        }
+    }
+}
+
 /// The number of fingers on an edge of `length`: odd, as close to `length / width` as possible.
 pub(crate) fn finger_count(length: f64, width: f64) -> u32 {
     let pairs = ((length / width - 1.0) / 2.0).round().max(0.0);

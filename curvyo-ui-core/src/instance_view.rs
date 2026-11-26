@@ -26,6 +26,35 @@ pub struct RowView {
     pub limit: Option<ParamValue>,
 }
 
+/// One part of a generated object the Parts group lists (ADR 0082 §10, `0147` UX notes §9).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PartView {
+    /// The part's stable key.
+    pub key: String,
+    /// What the row calls it ("Inner base").
+    pub name: &'static str,
+}
+
+/// The name of the part `key` of a rounded box (`0147` UX notes §9); `None` for a key the
+/// Parts group does not list.
+#[must_use]
+pub fn part_name(key: &str) -> Option<&'static str> {
+    Some(match key {
+        "strip" => "Strip",
+        "base" => "Inner base",
+        "cover" => "Cover",
+        "ring" => "Ring",
+        "lid" => "Lid",
+        "left" => "Left end plate",
+        "right" => "Right end plate",
+        "front" => "Front",
+        _ => return None,
+    })
+}
+
+/// The kind whose parts can be detached in this slice (`0147`).
+const DETACHABLE_KIND: &str = "curvyo.generators/rounded-box";
+
 /// What the Properties panel shows for one generated object.
 #[derive(Debug, Clone, Serialize)]
 pub struct InstanceView {
@@ -37,6 +66,8 @@ pub struct InstanceView {
     pub known: bool,
     /// The rows whose condition holds, group by group.
     pub rows: Vec<RowView>,
+    /// The parts the Parts group lists, in layout order; empty for a kind that has none.
+    pub parts: Vec<PartView>,
 }
 
 /// The block of `snapshot`: its rows with their stored values, the hidden ones left out.
@@ -49,6 +80,7 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
             label: snapshot.record.kind.clone(),
             known: false,
             rows: Vec::new(),
+            parts: Vec::new(),
         };
     };
     let schema = found.kind.schema();
@@ -62,6 +94,23 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
             .filter(|mark| matches!(mark, curvyo_extension_core::Mark::Corner { .. }))
             .count()
     });
+    let parts = generated
+        .as_ref()
+        .filter(|_| snapshot.record.kind == DETACHABLE_KIND)
+        .map(|generated| {
+            generated
+                .parts
+                .iter()
+                .filter_map(|part| {
+                    Some(PartView {
+                        key: part.key.to_string(),
+                        name: part_name(&part.key)?,
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .filter(|parts| parts.len() > 1)
+        .unwrap_or_default();
     let (used, states, limits) = generated
         .map(|generated| (generated.automatic, generated.states, generated.limits))
         .unwrap_or_default();
@@ -108,6 +157,7 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
         label: found.kind.label.to_owned(),
         known: true,
         rows,
+        parts,
     }
 }
 
