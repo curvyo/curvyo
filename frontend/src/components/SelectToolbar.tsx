@@ -4,6 +4,7 @@ import { AlignmentGroup } from "@/components/AlignmentGroup";
 import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { StyleGroup } from "@/components/StyleGroup";
 import { BoxFromPathButton } from "@/components/BoxFromPathButton";
+import { BridgeGroup } from "@/components/BridgeGroup";
 import { StrokeToPathButton } from "@/components/StrokeToPathButton";
 import { TraceButton } from "@/components/TraceBar";
 import { RecogniseTextButton } from "@/components/RecogniseBar";
@@ -131,6 +132,9 @@ export interface SelectToolbarProps {
     onEnter: (byKeyboard: boolean) => void;
     notice: RecogniseBarNotice | null;
   };
+  /** The Bridge group (`specs/0156-fused-lettering`): shown on a laser page while the selection
+   * allows Bridge. */
+  bridge?: { shown: boolean; ready: boolean; onBridge: () => void };
   /** Edit width (`specs/0115` criterion 4), last in the bar; renders nothing when not offered. */
   widthEdit?: React.ReactNode;
   /** The flip buttons act: something is selected (`specs/0056-mirror-and-negative-scale/`
@@ -681,6 +685,7 @@ export function SelectToolbar({
   traceShown = false,
   onTrace,
   recognise,
+  bridge,
   widthEdit,
   tile,
   flipEnabled,
@@ -920,6 +925,10 @@ export function SelectToolbar({
         notice={recognise.notice}
       />,
     );
+  }
+  if (bridge?.shown && edits) {
+    // Near the end, in a group of its own, so no earlier control moves.
+    groups.push(<BridgeGroup key="bridge" ready={bridge.ready} onBridge={bridge.onBridge} onReturnFocus={onReturnFocus} />);
   }
   if (widthEdit) {
     // Last, in a group of its own, so no earlier control moves.

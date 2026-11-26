@@ -344,6 +344,7 @@ pub const EDIT_STEPS: &[&str] = &[
     "fracture",
     "flatten",
     "weld",
+    "fuse",
     "stroke_to_path",
     "centre_lines",
     "convert_pattern",

@@ -320,6 +320,11 @@ function Editor() {
                 onPress: editor.strokeToPath.apply,
                 notice: editor.strokeToPath.notice,
               }}
+              bridge={{
+                shown: railCommands.booleans.bridgeAvailability === "ready",
+                ready: railCommands.booleans.bridgeAvailability === "ready" && !railCommands.booleans.busy,
+                onBridge: () => railCommands.booleans.apply("bridge"),
+              }}
               boxFromPath={{
                 shown: editor.flipEnabled && boxFromPath.shown,
                 onPress: boxFromPath.apply,

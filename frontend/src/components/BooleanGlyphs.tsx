@@ -128,6 +128,16 @@ function glyphShapes(op: BooleanCardCommand) {
           <Piece d={UPPER_SQUARE} />
         </>
       );
+    case "bridge":
+      // The dot of an i held to its stem by a filleted neck (UX notes §2, FU1).
+      return (
+        <>
+          <rect x={5} y={8} width={6} height={7} rx={1} fill="currentColor" />
+          <circle cx={8} cy={3.25} r={2.25} fill="currentColor" />
+          <path d="M7 4.5 H9 V8 H7 Z" fill="currentColor" />
+          <path d="M6 8 A1 1 0 0 0 7 7 V8 Z M10 8 A1 1 0 0 1 9 7 V8 Z" fill="currentColor" />
+        </>
+      );
     case "weld":
       // No solid shape: the one stated exception, a line-art result (row "Boolean glyphs").
       return (

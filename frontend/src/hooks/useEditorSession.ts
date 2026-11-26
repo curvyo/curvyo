@@ -1,3 +1,4 @@
+import type { BridgeResult, BridgeSettings } from "@/lib/bridgeText";
 import { memoForImport } from "@/lib/imageClipboard";
 import { createSketchPresentation, type SketchPresentation } from "@/lib/sketchPresentation";
 import { type DropBadgeKind, decodeDragAnswer } from "@/lib/dragAnswer";
@@ -948,6 +949,8 @@ export interface EditorSession {
   applyStack: (command: StackCommand) => StackResult;
   /** Weld on the selection, in one commit (`0068-laserable-lettering`). */
   applyWeld: () => WeldResult;
+  /** Bridge on the selection with `settings`, in one commit (`0156-fused-lettering`). */
+  applyFuse: (settings: BridgeSettings) => BridgeResult;
   /** The Node bar's Close path buttons (`0034-pen-path-extension`): closes the open paths of
    * the editing set with `join` (`"sharp"` or `"smooth"`) in one commit. */
   closePath: (join: "sharp" | "smooth") => ClosePathResult;
@@ -2270,6 +2273,26 @@ export function useEditorSession(
     [syncFromSession, refusedFace],
   );
 
+  const applyFuse = useCallback(
+    (settings: BridgeSettings): BridgeResult => {
+      const raw = sessionRef.current?.apply_fuse(
+        settings.mode === "stencil",
+        settings.widthMm,
+        settings.reachMm,
+        settings.joinAll,
+        settings.bridgesPerIsland,
+      );
+      syncFromSession();
+      if (!raw) {
+        return { kind: "ignored", count: 0, of: 0 };
+      }
+      const result = { kind: raw.kind, count: raw.count, of: raw.of, face: refusedFace(raw.kind) };
+      raw.free();
+      return result;
+    },
+    [syncFromSession, refusedFace],
+  );
+
   const applyWeld = useCallback((): WeldResult => {
     const raw = sessionRef.current?.apply_weld();
     syncFromSession();
@@ -3347,6 +3370,7 @@ export function useEditorSession(
     applyCut,
     applyStack,
     applyWeld,
+    applyFuse,
     closePath,
     onPointerDown,
     onPointerMove,
