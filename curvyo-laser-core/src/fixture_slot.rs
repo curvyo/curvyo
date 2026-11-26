@@ -5,6 +5,9 @@ use curvyo_document_core::{Length, Point};
 
 use crate::fixture_kind::SlotShape;
 
+/// How far past the grown outline a point may round and still lie in it, in mm.
+const HOLDS_EPSILON_MM: f64 = 1e-9;
+
 /// One slot of a holder. The centre is in mm from the board's top-left corner, and only the sizes
 /// of the slot's shape are meaningful: width and height of a rectangle, the diameter of a circle.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -29,6 +32,22 @@ impl Slot {
         match self.shape {
             SlotShape::Rectangle => (self.width, self.height),
             SlotShape::Circle => (self.diameter, self.diameter),
+        }
+    }
+
+    /// Whether `point` (in the board's frame) lies in the slot's closed outline grown by
+    /// `tolerance`: a rectangle by each axis, a circle by the distance to its centre
+    /// (`specs/0154-library-into-slots` Terms "Filled", ADR 0088 decision 4).
+    #[must_use]
+    pub fn holds(&self, point: Point, tolerance: Length) -> bool {
+        let (dx, dy) = (point.x - self.centre.x, point.y - self.centre.y);
+        let grow = tolerance.as_mm() + HOLDS_EPSILON_MM;
+        match self.shape {
+            SlotShape::Rectangle => {
+                dx.abs() <= self.width.as_mm() / 2.0 + grow
+                    && dy.abs() <= self.height.as_mm() / 2.0 + grow
+            }
+            SlotShape::Circle => dx.hypot(dy) <= self.diameter.as_mm() / 2.0 + grow,
         }
     }
 
@@ -80,6 +99,32 @@ mod tests {
             circle.extent(),
             (Length::from_mm(12.0), Length::from_mm(12.0))
         );
+    }
+
+    #[test]
+    fn a_rectangle_holds_a_point_up_to_its_edge_grown_by_the_tolerance() {
+        let slot = rect(50.0, 30.0, 20.0, 10.0);
+        let tol = Length::from_mm(0.1);
+        assert!(slot.holds(Point::new(50.0, 30.0), tol));
+        assert!(slot.holds(Point::new(60.1, 35.1), tol));
+        assert!(!slot.holds(Point::new(60.2, 30.0), tol));
+        assert!(!slot.holds(Point::new(50.0, 35.2), tol));
+    }
+
+    #[test]
+    fn a_circle_holds_a_point_by_its_distance_to_the_centre() {
+        let circle = Slot {
+            shape: SlotShape::Circle,
+            centre: Point::new(0.0, 0.0),
+            width: Length::from_mm(0.0),
+            height: Length::from_mm(0.0),
+            diameter: Length::from_mm(20.0),
+        };
+        let tol = Length::from_mm(0.1);
+        assert!(circle.holds(Point::new(10.1, 0.0), tol));
+        // The box corner is outside the circle.
+        assert!(!circle.holds(Point::new(9.0, 9.0), tol));
+        assert!(!circle.holds(Point::new(0.0, -10.2), tol));
     }
 
     #[test]

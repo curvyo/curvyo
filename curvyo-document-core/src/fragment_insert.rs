@@ -36,6 +36,17 @@ pub enum FragmentTarget<'a> {
         /// The move from the source position to the drop position.
         offset: Vec2,
     },
+    /// Its objects onto the page `page`, moved by `offset`, wrapped in one new group named `name`
+    /// at the end of the draw parent; the group carries the Came from record with the source page
+    /// as the item, each copy its own (`specs/0154` criterion 2, ADR 0088 decision 3).
+    Group {
+        /// The page the group lands on.
+        page: &'a str,
+        /// The move from the source position to the drop position.
+        offset: Vec2,
+        /// The group's name (the source page's).
+        name: &'a str,
+    },
     /// Its page as a new page after the last page.
     Page,
 }
@@ -76,6 +87,9 @@ pub enum ImportError {
     /// The anchor ids are not one per anchor of the fragment, all different.
     #[error("the anchor ids do not fit the fragment")]
     AnchorIds,
+    /// The wrapping group would nest deeper than the group depth limit (`specs/0154` criterion 2).
+    #[error("The pieces are nested too deep to be wrapped in one more group.")]
+    TooDeep,
     /// The pictures and fonts would take the project over its limit (ADR 0047 §3).
     #[error("the project would hold more pictures and fonts than allowed")]
     ProjectFull,
@@ -105,6 +119,10 @@ impl Document {
     ///
     /// # Errors
     /// [`ImportError`]; nothing is written then.
+    ///
+    /// # Panics
+    /// Does not panic in practice: the checks come first and the wrapping group's meta map is
+    /// read right after it is made.
     pub fn insert_fragment(
         &self,
         fragment: &Fragment,
@@ -112,39 +130,94 @@ impl Document {
         came_from: &CameFrom,
         anchor_ids: &[AnchorId],
     ) -> Result<FragmentReport, ImportError> {
+        self.check_insert(fragment, target, anchor_ids)?;
+        Ok(match target {
+            FragmentTarget::Elements { offset, .. } => {
+                self.batch(IMPORT_ELEMENTS_COMMIT_LABEL, |doc| {
+                    let tree = doc.loro().get_tree(OBJECTS_TREE);
+                    let places = vec![doc.drawing_parent(&tree); fragment.roots.len()];
+                    let roots = doc.copy_fragment(fragment, &places, offset, came_from, anchor_ids);
+                    elements_report(fragment, roots)
+                })
+            }
+            FragmentTarget::Group { offset, name, .. } => self
+                .batch(IMPORT_ELEMENTS_COMMIT_LABEL, |doc| {
+                    doc.insert_group(fragment, offset, name, came_from, anchor_ids)
+                }),
+            FragmentTarget::Page => {
+                // invariant: `check_insert` refused a page import without a page.
+                #[allow(clippy::unwrap_used)]
+                let source = fragment.page.as_ref().unwrap();
+                self.batch(IMPORT_PAGE_COMMIT_LABEL, |doc| {
+                    doc.insert_page(fragment, source, came_from, anchor_ids)
+                })
+            }
+        })
+    }
+
+    /// Every check [`Document::insert_fragment`] makes before it writes: the anchor ids, the
+    /// project's asset budget, the target page and, for a wrap, the group depth. A caller that
+    /// inserts several fragments in one step checks them all first, so a refusal writes nothing.
+    ///
+    /// # Errors
+    /// The [`ImportError`] the insert would return.
+    pub fn check_insert(
+        &self,
+        fragment: &Fragment,
+        target: FragmentTarget<'_>,
+        anchor_ids: &[AnchorId],
+    ) -> Result<(), ImportError> {
         let distinct: HashSet<_> = anchor_ids.iter().collect();
         if anchor_ids.len() != fragment.anchor_count() || distinct.len() != anchor_ids.len() {
             return Err(ImportError::AnchorIds);
         }
         self.check_budget(fragment)?;
-        match target {
-            FragmentTarget::Elements { page, offset } => {
-                match self.page_kind(page) {
-                    None => return Err(ImportError::NoSuchPage),
-                    Some(PageKind::Sketch) => return Err(ImportError::SketchPage),
-                    Some(_) => {}
-                }
-                Ok(self.batch(IMPORT_ELEMENTS_COMMIT_LABEL, |doc| {
-                    let tree = doc.loro().get_tree(OBJECTS_TREE);
-                    let parent = doc.drawing_parent(&tree);
-                    let places = vec![parent; fragment.roots.len()];
-                    let roots = doc.copy_fragment(fragment, &places, offset, came_from, anchor_ids);
-                    FragmentReport {
-                        roots,
-                        page: None,
-                        clones_became_paths: fragment.clones_became_paths,
-                        texts_released: fragment.texts_released,
-                        fallback: None,
-                    }
-                }))
-            }
+        let page = match target {
+            FragmentTarget::Elements { page, .. } | FragmentTarget::Group { page, .. } => page,
             FragmentTarget::Page => {
-                let source = fragment.page.as_ref().ok_or(ImportError::NoSuchPage)?;
-                Ok(self.batch(IMPORT_PAGE_COMMIT_LABEL, |doc| {
-                    doc.insert_page(fragment, source, came_from, anchor_ids)
-                }))
+                return fragment
+                    .page
+                    .as_ref()
+                    .map(|_| ())
+                    .ok_or(ImportError::NoSuchPage);
             }
+        };
+        match self.page_kind(page) {
+            None => return Err(ImportError::NoSuchPage),
+            Some(PageKind::Sketch) => return Err(ImportError::SketchPage),
+            Some(_) => {}
         }
+        if matches!(target, FragmentTarget::Group { .. }) {
+            self.check_wrap_depth(fragment)?;
+        }
+        Ok(())
+    }
+
+    /// The wrapped insert inside its batch: the group named `name` at the end of the draw
+    /// parent, the copies in it, Came from on the group with the source page as the item.
+    fn insert_group(
+        &self,
+        fragment: &Fragment,
+        offset: Vec2,
+        name: &str,
+        came_from: &CameFrom,
+        anchor_ids: &[AnchorId],
+    ) -> FragmentReport {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let parent = self.drawing_parent(&tree);
+        let group = wrap_group(&tree, parent, name);
+        let places = vec![TreeParentId::Node(group); fragment.roots.len()];
+        self.copy_fragment(fragment, &places, offset, came_from, anchor_ids);
+        // invariant: the group was just created by this insert.
+        #[allow(clippy::unwrap_used)]
+        crate::came_from::write(
+            &tree.get_meta(group).unwrap(),
+            &came_from.with_item(Some(name.to_owned())),
+        );
+        elements_report(
+            fragment,
+            vec![NodeId::from_parts(group.peer, group.counter)],
+        )
     }
 
     /// Inserts the page of every fragment of `pages` after the last page, in order, as plain
@@ -178,6 +251,30 @@ impl Document {
                 })
                 .collect()
         }))
+    }
+
+    /// Refuses a wrap whose group would pass [`MAX_GROUP_DEPTH`](crate::group_tree::MAX_GROUP_DEPTH)
+    /// under the draw parent.
+    fn check_wrap_depth(&self, fragment: &Fragment) -> Result<(), ImportError> {
+        use crate::group_tree::{MAX_GROUP_DEPTH, groups_above, groups_in, is_group_node};
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let from = fragment.source.loro().get_tree(OBJECTS_TREE);
+        let above = match self.creation_parent(&tree) {
+            TreeParentId::Node(p) if is_group_node(&tree, p) => groups_above(&tree, p) + 1,
+            TreeParentId::Node(p) => groups_above(&tree, p),
+            _ => 0,
+        };
+        let inside = fragment
+            .roots
+            .iter()
+            .map(|&root| groups_in(&from, root))
+            .max()
+            .unwrap_or(0);
+        if above + 1 + inside > MAX_GROUP_DEPTH {
+            Err(ImportError::TooDeep)
+        } else {
+            Ok(())
+        }
     }
 
     /// Refuses a fragment whose new pictures and fonts would pass the project limit.
@@ -406,6 +503,31 @@ impl Document {
         }
         copied.made
     }
+}
+
+/// The report of an elements or a group insert with the root copies `roots`.
+const fn elements_report(fragment: &Fragment, roots: Vec<NodeId>) -> FragmentReport {
+    FragmentReport {
+        roots,
+        page: None,
+        clones_became_paths: fragment.clones_became_paths,
+        texts_released: fragment.texts_released,
+        fallback: None,
+    }
+}
+
+/// Creates the wrapping group named `name` at the end of `parent`. Uncommitted.
+fn wrap_group(tree: &LoroTree, parent: TreeParentId, name: &str) -> TreeID {
+    // invariant: the draw parent is live; the meta map of a node just created takes plain values.
+    #[allow(clippy::unwrap_used)]
+    let group = tree.create(parent).unwrap();
+    #[allow(clippy::unwrap_used)]
+    let meta = tree.get_meta(group).unwrap();
+    #[allow(clippy::unwrap_used)]
+    meta.insert(crate::group_tree::KEY_GROUP, true).unwrap();
+    #[allow(clippy::unwrap_used)]
+    meta.insert(crate::node_registers::KEY_NAME, name).unwrap();
+    group
 }
 
 /// The parent of each root's copy in a page import: the top level for the manufacturing, else

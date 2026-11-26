@@ -1,8 +1,10 @@
-//! The fit rule: a part fits a slot whose size it matches within a tolerance, turned by 90 degrees
-//! only when the other orientation is the fit (`specs/0102-laser-fixtures` criterion 25, Frage
-//! 173 A, Proposal tie rule).
+//! The fit rule: how a part sits in a slot, matched within a tolerance or scaled to it, turned by
+//! 90 degrees only when that is the better fit (`specs/0102-laser-fixtures` criterion 25, Frage
+//! 173 A; `specs/0154-library-into-slots` criterion 6, ADR 0088 decision 1).
 
-use curvyo_document_core::Length;
+use std::f64::consts::FRAC_PI_2;
+
+use curvyo_document_core::{Affine, Angle, Length, Point, Vec2};
 
 use crate::fixture_slot::Slot;
 
@@ -17,6 +19,120 @@ pub struct FitMatch {
 
 /// How far past the tolerance a size difference may round and still fit, in mm.
 const FIT_EPSILON_MM: f64 = 1e-9;
+
+/// The fit tolerance, on each side (customer, 2026-11-10): a part this close to a slot's size
+/// matches it, and a turn must gain more than this on the part's longer side.
+pub const FIT_TOLERANCE: Length = Length::from_mm(0.1);
+
+/// A unit side at or below this many mm has no size to scale by (ADR 0088 decision 1.3).
+const NO_SIZE_MM: f64 = 1e-6;
+
+/// How a unit is fitted into a slot (Frage 379 A).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FitMode {
+    /// Centred, scaled uniformly to fit inside the slot's box, turned when that fits better.
+    Fit,
+    /// Centred at its real size (the held Alt), turned only for a 0.1 mm match.
+    RealSize,
+}
+
+/// How a unit sits in a slot.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SlotFit {
+    /// The uniform scale, a dimensionless ratio (1 for a match or the real size).
+    pub scale: f64,
+    /// Whether the unit is turned by 90 degrees.
+    pub turned: bool,
+    /// Whether the unit's size matched the slot within [`FIT_TOLERANCE`].
+    pub matched: bool,
+    /// Whether the unit at its real size passes a side of the slot by more than the tolerance.
+    pub overflows: bool,
+}
+
+/// How the unit `unit` (width, height, in the board's frame) fits `slot` in `mode`: a 0.1 mm
+/// match first (either orientation, unturned preferred), then the real size or the uniform scale
+/// that makes its box fit inside the slot's box (a circle: the square of its diameter), turned
+/// only when the turn gains more than [`FIT_TOLERANCE`] on the unit's longer side.
+#[must_use]
+pub fn fit_into_slot(unit: (Length, Length), slot: &Slot, mode: FitMode) -> SlotFit {
+    if let Some(found) = fit_slot(unit, std::slice::from_ref(slot), FIT_TOLERANCE) {
+        return SlotFit {
+            scale: 1.0,
+            turned: found.turned,
+            matched: true,
+            overflows: false,
+        };
+    }
+    let (w, h) = (unit.0.as_mm(), unit.1.as_mm());
+    let (sw, sh) = slot_mm(slot);
+    match mode {
+        FitMode::RealSize => {
+            let tol = FIT_TOLERANCE.as_mm() + FIT_EPSILON_MM;
+            SlotFit {
+                scale: 1.0,
+                turned: false,
+                matched: false,
+                overflows: w - sw > tol || h - sh > tol,
+            }
+        }
+        FitMode::Fit => {
+            let (Some(s0), Some(s90)) = (scale_to((w, h), (sw, sh)), scale_to((h, w), (sw, sh)))
+            else {
+                return SlotFit {
+                    scale: 1.0,
+                    turned: false,
+                    matched: false,
+                    overflows: false,
+                };
+            };
+            let longer = w.max(h);
+            let turned = (s90 - s0) * longer > FIT_TOLERANCE.as_mm() + FIT_EPSILON_MM;
+            SlotFit {
+                scale: if turned { s90 } else { s0 },
+                turned,
+                matched: false,
+                overflows: false,
+            }
+        }
+    }
+}
+
+/// The largest uniform scale that keeps `(w, h)` inside `(sw, sh)`; a side without size is left
+/// out of the minimum, and a unit without any size has none.
+fn scale_to((w, h): (f64, f64), (sw, sh): (f64, f64)) -> Option<f64> {
+    let by_w = (w > NO_SIZE_MM).then(|| sw / w);
+    let by_h = (h > NO_SIZE_MM).then(|| sh / h);
+    match (by_w, by_h) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (one, other) => one.or(other),
+    }
+}
+
+/// The map from the unit's space to document space that puts the unit (box centre
+/// `unit_centre`) into a slot at `slot_centre` of a board whose frame maps to document space by
+/// the rigid `board`: `board ∘ T(slot centre) ∘ R(turn) ∘ S(scale) ∘ T(−unit centre)`. A board
+/// turned by any angle turns the unit with it.
+#[must_use]
+pub fn slot_fit_matrix(
+    unit_centre: Point,
+    fit: SlotFit,
+    slot_centre: Point,
+    board: Affine,
+) -> Affine {
+    let turn = if fit.turned {
+        Affine::rotation_about(Point::new(0.0, 0.0), Angle::from_radians(FRAC_PI_2))
+    } else {
+        Affine::IDENTITY
+    };
+    board
+        .compose(Affine::translation(Vec2::new(slot_centre.x, slot_centre.y)))
+        .compose(turn)
+        .compose(Affine::scale(fit.scale, fit.scale))
+        .compose(Affine::translation(Vec2::new(
+            -unit_centre.x,
+            -unit_centre.y,
+        )))
+}
 
 /// The first slot the part `item` (width, height) fits, unturned slots before turned ones, so a
 /// part that fits without a turn is never turned. Both sides must match within `tolerance`
@@ -48,10 +164,13 @@ fn slot_mm(slot: &Slot) -> (f64, f64) {
 }
 
 #[cfg(test)]
+#[path = "fixture_fit_tests.rs"]
+mod into_slot_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::fixture_kind::SlotShape;
-    use curvyo_document_core::Point;
 
     fn rect(w: f64, h: f64) -> Slot {
         Slot {
@@ -67,11 +186,8 @@ mod tests {
         Length::from_mm(value)
     }
 
-    /// The tolerance the customer chose on 2026-11-10: 0.1 mm on each side, centre to centre.
-    const FIT_TOLERANCE_MM: f64 = 0.1;
-
     fn tolerance() -> Length {
-        mm(FIT_TOLERANCE_MM)
+        FIT_TOLERANCE
     }
 
     #[test]
