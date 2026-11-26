@@ -53,6 +53,30 @@ impl GridBox {
             && a.y.min(b.y) <= self.max.1
     }
 
+    /// The box grown by `units` on every side (saturating).
+    pub(crate) fn grown(self, units: i64) -> Self {
+        Self {
+            min: (
+                self.min.0.saturating_sub(units),
+                self.min.1.saturating_sub(units),
+            ),
+            max: (
+                self.max.0.saturating_add(units),
+                self.max.1.saturating_add(units),
+            ),
+        }
+    }
+
+    /// The box as a polygon with positive area.
+    pub(crate) fn polygon(self) -> crate::boolean_grid::Path64 {
+        vec![
+            Point64::new(self.min.0, self.min.1),
+            Point64::new(self.max.0, self.min.1),
+            Point64::new(self.max.0, self.max.1),
+            Point64::new(self.min.0, self.max.1),
+        ]
+    }
+
     /// The smallest box holding both.
     pub(crate) fn union(self, other: Self) -> Self {
         Self {

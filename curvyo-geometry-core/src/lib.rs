@@ -29,6 +29,7 @@ mod curve_settle;
 mod direction;
 mod flatten;
 mod fracture;
+mod fuse;
 mod interior;
 mod medial_axis;
 mod offset;
@@ -69,6 +70,7 @@ pub use curvyo_document_core::Tolerance;
 pub use direction::direction_of_degrees;
 pub use flatten::flatten_outline;
 pub use fracture::{Fracture, fracture_cells};
+pub use fuse::{FuseError, Fused, fuse_cut_out, fuse_stencil};
 pub use interior::{OutlineTriple, contains_point_in_outlines};
 pub use medial_axis::CentreLineError;
 pub use offset::{

@@ -7,11 +7,15 @@
 //! the session's; the sentences are the host's.
 
 use curvyo_document_core::{NewAnchor, NodeId, ObjectSnapshot, Point, Style};
-use curvyo_geometry_core::{BooleanError, Outline, OutlineTriple, Welded, outline_has_area, weld};
+use curvyo_geometry_core::{BooleanError, Outline, Welded, weld};
 
 use crate::anchor_id_minter::AnchorIdMinter;
-use crate::boolean::{BOOLEAN_TOLERANCE, corner_anchors, open_counts, outlines_of};
-use crate::text_convert::{TextRefusal, area_refusal, text_path};
+use crate::boolean::{BOOLEAN_TOLERANCE, corner_anchors, open_counts};
+use crate::kernel_operands::{
+    Owned, collect_operands, extended_path_offenders, leaves_in_order, line_art, operand_has_area,
+    operands_of,
+};
+use crate::text_convert::{TextRefusal, area_refusal};
 use crate::units::SelectedUnit;
 
 /// The commit label of Weld; the undo slice maps it to "Weld".
@@ -94,58 +98,6 @@ pub struct WeldPlan {
     pub stroke_switched_on: bool,
 }
 
-/// The outlines of one operand as the kernel reads them.
-type Owned = Vec<(Vec<OutlineTriple>, bool)>;
-
-/// The selected leaves of `objects` in stacking order.
-fn leaves_in_order<'a>(
-    objects: &'a [ObjectSnapshot],
-    units: &[SelectedUnit],
-) -> Vec<&'a ObjectSnapshot> {
-    objects
-        .iter()
-        .filter(|object| units.iter().any(|unit| unit.leaves.contains(&object.id())))
-        .collect()
-}
-
-/// The operands of one leaf: one per drawn glyph for a text (criterion 11, `0074` criterion 22),
-/// else the leaf's outlines as one operand.
-fn operands_of(object: &ObjectSnapshot) -> Vec<Owned> {
-    let ObjectSnapshot::Text(text) = object else {
-        return vec![outlines_of(object)];
-    };
-    let (Some(outline), Some(path)) = (text.outline.as_deref(), text_path(text)) else {
-        return Vec::new();
-    };
-    let mut subpaths = path.subpaths();
-    outline
-        .glyph_outlines
-        .iter()
-        .map(|&count| {
-            subpaths
-                .by_ref()
-                .take(count)
-                .map(|subpath| {
-                    let anchors = subpath
-                        .anchors
-                        .iter()
-                        .map(|a| (a.point, a.handle_in, a.handle_out))
-                        .collect();
-                    (anchors, subpath.closed)
-                })
-                .collect::<Owned>()
-        })
-        .filter(|glyph| !glyph.is_empty())
-        .collect()
-}
-
-/// Whether some outline of `operand` encloses an area once closed.
-fn has_area(operand: &Owned) -> bool {
-    operand
-        .iter()
-        .any(|(anchors, closed)| outline_has_area(&Outline::new(anchors, *closed)))
-}
-
 /// What the Weld button shows for the selected `units` of `objects` (the caller passes no units
 /// when the Select tool is not active).
 #[must_use]
@@ -201,19 +153,6 @@ fn run_weld(operands: &[Owned], owners: &[NodeId]) -> Result<Welded, (BooleanErr
     }
 }
 
-/// The base's style as line art (criterion 18, 14 A): Fill off; with Stroke off, Stroke on in
-/// the fill colour at the default width of a new path.
-fn line_art(base: &Style) -> Style {
-    let mut style = base.clone();
-    style.fill.enabled = false;
-    if !style.stroke.enabled {
-        style.stroke.enabled = true;
-        style.stroke.color = base.fill.color;
-        style.stroke.width = Style::default().stroke.width;
-    }
-    style
-}
-
 /// The total length of `outlines` in millimetres, closing segments of closed ones included.
 fn line_length(outlines: &[(Vec<Point>, bool)]) -> f64 {
     outlines
@@ -230,24 +169,11 @@ fn line_length(outlines: &[(Vec<Point>, bool)]) -> f64 {
         .sum()
 }
 
-/// Every operand of `leaves` (a text one per glyph) with the leaf it comes from, bottom first.
-fn collect_operands(leaves: &[&ObjectSnapshot]) -> (Vec<Owned>, Vec<NodeId>) {
-    let mut operands: Vec<Owned> = Vec::new();
-    let mut owners: Vec<NodeId> = Vec::new();
-    for leaf in leaves {
-        for operand in operands_of(leaf) {
-            operands.push(operand);
-            owners.push(leaf.id());
-        }
-    }
-    (operands, owners)
-}
-
 /// Welds the operands that enclose an area. `Err(Some(leaves))` names the leaves out of range,
 /// `Err(None)` means nothing with area is left.
 fn weld_with_area(operands: &[Owned], owners: &[NodeId]) -> Result<Welded, Option<Vec<NodeId>>> {
     let with_area: Vec<usize> = (0..operands.len())
-        .filter(|&i| has_area(&operands[i]))
+        .filter(|&i| operand_has_area(&operands[i]))
         .collect();
     if with_area.is_empty() {
         return Err(None);
@@ -282,16 +208,7 @@ pub fn plan_weld(
 ) -> Result<WeldPlan, WeldRefusal> {
     let leaves = leaves_in_order(objects, units);
     let ids: Vec<NodeId> = leaves.iter().map(|leaf| leaf.id()).collect();
-    let offenders: Vec<NodeId> = leaves
-        .iter()
-        .filter(|object| {
-            object.drawn_path().is_some_and(|path| {
-                path.curve_kind != curvyo_document_core::CurveKind::Bezier
-                    || !path.width_points.is_empty()
-            })
-        })
-        .map(|object| object.id())
-        .collect();
+    let offenders = extended_path_offenders(&leaves);
     if !offenders.is_empty() {
         return Err(WeldRefusal::ExtendedPath {
             offenders,
