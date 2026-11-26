@@ -603,7 +603,22 @@ proptest! {
         let live = rig.tool.live_edit(&objects, &rig.selection, to, shift, ctrl);
         let objects = rig.objects();
         rig.tool.pointer_up(&rig.document, &objects, &mut rig.selection, to, Modifiers::new(shift, ctrl), &mut AnchorIdMinter::new(99));
-        let after = rig.object();
+        // A parameter drag released with Shift writes a copy (`0073`, Frage 387) and selects it:
+        // the preview then shows that copy under the original's id.
+        let after = match &live {
+            Some(live) if live.copy => {
+                let copy = rig.selection.ids()[0];
+                prop_assert_eq!(rig.object(), before.clone(), "the original stays");
+                match rig.document.object(copy).unwrap() {
+                    ObjectSnapshot::Primitive(mut primitive) => {
+                        primitive.id = rig.id;
+                        ObjectSnapshot::Primitive(primitive)
+                    }
+                    other => other,
+                }
+            }
+            _ => rig.object(),
+        };
         match live {
             Some(live) => {
                 prop_assert_eq!(live.objects.len(), 1);

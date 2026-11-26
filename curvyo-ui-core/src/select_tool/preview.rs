@@ -31,9 +31,9 @@ pub struct LiveEdit {
     /// which carry the ids of their originals: the originals stay where they
     /// are.
     pub objects: Vec<ObjectSnapshot>,
-    /// Whether the edit is a copy (a move released with Ctrl down): the
-    /// selection boxes and handles stay on the originals while the blue
-    /// outline travels alone (criterion 33).
+    /// Whether the edit is a copy (a move released with Ctrl down, or a parameter drag with
+    /// Shift down, `specs/0073-parameter-handle-clone`): the selection boxes and handles stay on
+    /// the originals while the copy travels alone (criterion 33).
     pub copy: bool,
 }
 
@@ -86,6 +86,11 @@ impl SelectTool {
                 shift,
                 ctrl,
             ) {
+                // A parameter drag with Shift held previews a copy (`0073` criterion 5).
+                copy = matches!(
+                    &self.drag,
+                    SelectDrag::Transforming(drag) if drag.param_copy_with(shift).is_some()
+                );
                 vec![live]
             } else if let SelectDrag::GroupTransforming(drag) = &self.drag
                 && drag.origin.is_active_at(pointer)

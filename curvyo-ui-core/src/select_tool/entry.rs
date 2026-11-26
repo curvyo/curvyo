@@ -214,6 +214,29 @@ impl SelectTool {
         outcome
     }
 
+    /// Enter in a parameter entry with its Copy check set (`specs/0073-parameter-handle-clone`
+    /// criterion 11): `text` goes to a copy, and after a copy the selection is the copy. A
+    /// committed or unchanged entry closes; an invalid one stays open. Any other open entry is
+    /// left as it is and writes nothing: only the parameter chips have the check.
+    pub fn commit_param_entry_as_copy(
+        &mut self,
+        document: &Document,
+        selection: &mut ObjectSelection,
+        text: &str,
+    ) -> EntryOutcome {
+        let Some(OpenEntry::Param(entry)) = self.entry.as_ref() else {
+            return EntryOutcome::Unchanged;
+        };
+        let (outcome, copy) = entry.commit_as_copy(document, text);
+        if !matches!(outcome, EntryOutcome::Invalid { .. }) {
+            self.entry = None;
+        }
+        if let Some(copy) = copy {
+            selection.set(&[copy]);
+        }
+        outcome
+    }
+
     /// Enter in the move chip (criteria 20, 21, 22, 23, 25): `texts` are the X
     /// and Y texts, `absolute` the chip's mode and `copy` the state of its Copy
     /// check. A committed or unchanged entry closes; an invalid one stays

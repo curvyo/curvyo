@@ -248,6 +248,12 @@ pub const FREE_STEPS: &[&str] = &[
 /// The edit commands of criterion 9 that have a label today. Any label in none of the three lists
 /// is an edit as well (Proposal: unknown future commands default to guarded).
 pub const EDIT_STEPS: &[&str] = &[
+    // `specs/0073-parameter-handle-clone`: a parameter handle drag or entry written to a copy.
+    "copy_with_corner_radius",
+    "copy_with_inner_ratio",
+    "copy_with_arc",
+    "copy_with_curve",
+    "copy_with_rounding",
     // `specs/0154-library-into-slots`: the fit written to a fragment's private copy (a scale and
     // a turn of what it holds), never a step of the open document.
     "uniform_map",

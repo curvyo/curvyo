@@ -38,6 +38,7 @@ mod group_entry;
 mod group_handles;
 mod handles;
 mod move_drag;
+mod param_copy;
 mod press;
 mod preview;
 mod snapping;
@@ -522,6 +523,8 @@ impl SelectTool {
             // the commit are the same snapshot.
             converted: converted_for_object(object, handle).map(Box::new),
             signs: ExtentSigns::default(),
+            copy_key: false,
+            shift_lifted: !origin.shift_at_press,
         }
     }
 
@@ -606,7 +609,7 @@ impl SelectTool {
                     snap_offset,
                 );
             }
-            SelectDrag::Transforming(drag) => {
+            SelectDrag::Transforming(mut drag) => {
                 if !Self::spiro_sources_still_current(document, std::slice::from_ref(&drag.start)) {
                     return ZeroRecovery::default();
                 }
@@ -618,8 +621,13 @@ impl SelectTool {
                 } else {
                     point
                 };
+                // The release's own Shift decides a copy (`0073` criterion 1).
+                drag.note_copy_key(shift);
                 let result = drag.resolve(point, shift, ctrl);
                 if !same_within_tolerance(&result, &drag.start) {
+                    if Self::finish_param_copy(&drag, document, selection, &result) {
+                        return ZeroRecovery::default();
+                    }
                     drag.commit(document, &result);
                     return drag.recovery_at(point, shift, ctrl);
                 }

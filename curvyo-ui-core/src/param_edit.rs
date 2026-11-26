@@ -8,8 +8,8 @@
 //! already used.
 
 use curvyo_document_core::{
-    Angle, ArcKind, CornerRadii, Document, InnerRatio, Length, NodeId, ObjectSnapshot, PointCount,
-    PrimitiveSnapshot, RectBounds, Shape, ShapeEditError, Vec2, effective_corner_radii,
+    Angle, ArcKind, CopySource, CornerRadii, Document, InnerRatio, Length, NodeId, ObjectSnapshot,
+    PointCount, PrimitiveSnapshot, RectBounds, Shape, ShapeEditError, Vec2, effective_corner_radii,
 };
 
 use crate::param_handles::{Corner, ParamHandle};
@@ -410,6 +410,58 @@ pub(crate) fn commit_param(document: &Document, handle: ParamHandle, result: &Ob
         }
         _ => {}
     }
+}
+
+/// The step label of a parameter copy through `handle`, one per parameter family
+/// (`specs/0073-parameter-handle-clone` criterion 12).
+#[must_use]
+pub(crate) const fn copy_label(handle: ParamHandle) -> &'static str {
+    match handle {
+        ParamHandle::CornerRadius(_) => "copy_with_corner_radius",
+        ParamHandle::InnerRadius => "copy_with_inner_ratio",
+        ParamHandle::ArcStart | ParamHandle::ArcEnd => "copy_with_arc",
+        ParamHandle::Curve => "copy_with_curve",
+        ParamHandle::Rounded => "copy_with_rounding",
+    }
+}
+
+/// Writes a parameter drag's or entry's `result` for `handle` to a new copy of the
+/// primitive instead of the primitive itself: one step under [`copy_label`] that duplicates
+/// the original in place (directly above it, no offset) and gives the copy the result's value
+/// (`specs/0073-parameter-handle-clone` criteria 3, 4, 12). A result equal to the original
+/// makes a plain copy (an untouched Enter with Copy set). The caller checks that the original
+/// is still current first: the batch has no rollback. Returns the copy's id, `None` when the
+/// result is not a primitive or the original is gone (nothing is written then).
+pub(crate) fn commit_param_copy(
+    document: &Document,
+    handle: ParamHandle,
+    result: &ObjectSnapshot,
+) -> Option<NodeId> {
+    let ObjectSnapshot::Primitive(primitive) = result else {
+        return None;
+    };
+    let original = document.object(primitive.id)?;
+    if !matches!(original, ObjectSnapshot::Primitive(_)) {
+        return None;
+    }
+    document.batch(copy_label(handle), |document| {
+        let source = CopySource {
+            id: primitive.id,
+            anchor_ids: Vec::new(),
+        };
+        let copy = *document
+            .duplicate_objects(&[source], Vec2::ZERO)
+            .ok()?
+            .first()?;
+        if *result != original {
+            let retargeted = ObjectSnapshot::Primitive(PrimitiveSnapshot {
+                id: copy,
+                ..primitive.clone()
+            });
+            commit_param(document, handle, &retargeted);
+        }
+        Some(copy)
+    })
 }
 
 /// The arcs or curves `value` gives each object of `ids`, written as one commit: each
@@ -1058,3 +1110,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "param_copy_tests.rs"]
+mod copy_tests;

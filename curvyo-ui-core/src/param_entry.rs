@@ -6,14 +6,14 @@
 //! every close path of the refinements entry writes nothing here too.
 
 use curvyo_document_core::{
-    Angle, Document, Length, ObjectSnapshot, PrimitiveSnapshot, Shape, effective_corner_radii,
-    effective_curve, effective_rounded, wrapped_angle,
+    Angle, Document, Length, NodeId, ObjectSnapshot, PrimitiveSnapshot, Shape,
+    effective_corner_radii, effective_curve, effective_rounded, wrapped_angle,
 };
 
 use crate::oriented_box::OrientedBox;
 use crate::param_edit::{
     MAX_INNER_RATIO, MIN_INNER_RATIO, PARAM_EQUAL_EPSILON, ParamValue, apply_param, commit_param,
-    radius_is_limited,
+    commit_param_copy, radius_is_limited,
 };
 use crate::param_handles::{Corner, ParamHandle};
 use crate::shape_arc_edit::{ARC_SEAM, ArcEnd, arc_capable, curve_capable};
@@ -277,6 +277,31 @@ impl ParamEntry {
                 commit_param(document, self.handle, &result);
                 EntryOutcome::Committed
             }
+        }
+    }
+
+    /// Enter with the chip's Copy check set (`specs/0073-parameter-handle-clone` criterion 11):
+    /// the typed value goes to a new copy of the object, the object itself stays. Every check
+    /// runs before the copy is made: an object that changed or vanished since the entry opened
+    /// writes nothing, a refused text keeps the entry open. An untouched or equal value makes a
+    /// copy at the current value (Proposal V5). Returns the copy's id with the outcome.
+    #[must_use]
+    pub fn commit_as_copy(
+        &self,
+        document: &Document,
+        text: &str,
+    ) -> (EntryOutcome, Option<NodeId>) {
+        if !still_current(document, &self.start) {
+            return (EntryOutcome::Unchanged, None);
+        }
+        let result = match self.resolve(text) {
+            Err(reason) => return (EntryOutcome::Invalid { field: 0, reason }, None),
+            Ok(None) => self.start.clone(),
+            Ok(Some(result)) => result,
+        };
+        match commit_param_copy(document, self.handle, &result) {
+            Some(copy) => (EntryOutcome::Committed, Some(copy)),
+            None => (EntryOutcome::Unchanged, None),
         }
     }
 }
