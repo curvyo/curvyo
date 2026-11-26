@@ -67,12 +67,12 @@ struct Entry {
 /// The detached parts of the output page's generated objects: part keys by node, sorted so two
 /// reads of the same operations compare equal.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub(in crate::session) struct Detached(Vec<(NodeId, &'static str)>);
+pub(in crate::session) struct Detached(Vec<(NodeId, curvyo_document_core::PartKey)>);
 
 impl Detached {
     /// The part keys of the operations' memberships (`member.<node>#<part>`).
     fn of(operations: &[curvyo_document_core::OperationSnapshot]) -> Self {
-        let mut keys: Vec<(NodeId, &'static str)> = operations
+        let mut keys: Vec<(NodeId, curvyo_document_core::PartKey)> = operations
             .iter()
             .flat_map(|op| op.members.iter())
             .filter_map(|path| match path.as_slice() {
@@ -80,12 +80,12 @@ impl Detached {
                 _ => None,
             })
             .collect();
-        keys.sort_by_key(|(node, part)| (node.full_id(), *part));
+        keys.sort_by_key(|(node, part)| (node.full_id(), part.as_str().to_owned()));
         keys.dedup();
         Self(keys)
     }
 
-    fn of_node(&self, node: NodeId) -> Vec<&'static str> {
+    fn of_node(&self, node: NodeId) -> Vec<curvyo_document_core::PartKey> {
         self.0
             .iter()
             .filter(|(n, _)| *n == node)
@@ -240,7 +240,7 @@ fn own_leaves(
     let split = (!keys.is_empty())
         .then(|| session.document.generated(object.id()))
         .flatten()
-        .map(|snapshot| split_parts(&snapshot, &keys))
+        .and_then(|snapshot| split_parts(&snapshot, &keys))
         .filter(|(_, parts)| !parts.is_empty());
     let Some((rest, parts)) = split else {
         return vec![own_leaf(session, object, at, visible)];
@@ -274,7 +274,7 @@ fn own_leaves(
         out.push(leaf(whole.chain.clone(), rest));
     }
     for (key, mask) in parts {
-        let Some(own) = object.id().with_part(key) else {
+        let Some(own) = object.id().with_part(key.as_str()) else {
             continue;
         };
         let mut chain = vec![vec![own]];
@@ -284,22 +284,30 @@ fn own_leaves(
     out
 }
 
+/// The most parts a bit set tells apart.
+pub(in crate::session) const MAX_SPLIT_PARTS: usize = 64;
+
 /// The parts of `snapshot` split by the detached `keys` that exist in the record: the bit set of
-/// the parts that stay with the box and, in record order, each detached key with its bit.
+/// the parts that stay with the box and, in record order, each detached key with its bit. `None`
+/// for a record of more than [`MAX_SPLIT_PARTS`] parts: the box then stays one leaf, so no part
+/// leaves the job (Detach refuses such a box).
 fn split_parts(
     snapshot: &curvyo_document_core::GeneratedSnapshot,
-    keys: &[&'static str],
-) -> (u64, Vec<(&'static str, u64)>) {
+    keys: &[curvyo_document_core::PartKey],
+) -> Option<(u64, Vec<(curvyo_document_core::PartKey, u64)>)> {
+    if snapshot.record.part_keys.len() > MAX_SPLIT_PARTS {
+        return None;
+    }
     let mut rest = 0_u64;
     let mut parts = Vec::new();
-    for (index, key) in snapshot.record.part_keys.iter().enumerate().take(64) {
+    for (index, key) in snapshot.record.part_keys.iter().enumerate() {
         let bit = 1_u64 << index;
-        match keys.iter().find(|k| **k == key.as_str()) {
+        match keys.iter().find(|k| k.as_str() == key.as_str()) {
             Some(found) => parts.push((*found, bit)),
             None => rest |= bit,
         }
     }
-    (rest, parts)
+    Some((rest, parts))
 }
 
 /// The leaf of the page's own item `object`, at `at` in the drawing read.
@@ -496,4 +504,41 @@ fn path_counts(path: &PathSnapshot) -> (usize, usize) {
             if sub.closed { (c + 1, o) } else { (c, o + 1) }
         },
     )
+}
+
+#[cfg(test)]
+mod split_tests {
+    use super::{MAX_SPLIT_PARTS, split_parts};
+    use curvyo_document_core::{Affine, GeneratedRecord, GeneratedSnapshot, NodeId, PartKey};
+
+    fn snapshot(count: usize) -> GeneratedSnapshot {
+        let square = vec![
+            0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 4.0, 0.0, 4.0, 0.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 0.0,
+            4.0, 0.0, 4.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0,
+        ];
+        GeneratedSnapshot {
+            id: NodeId::NONE,
+            record: GeneratedRecord {
+                kind: "curvyo.generators/rounded-box".into(),
+                seed: 1,
+                params: serde_json::Map::new(),
+                parts: vec![vec![square]; count],
+                part_keys: (0..count).map(|i| format!("wall-{i}")).collect(),
+            },
+            frame: Affine::IDENTITY,
+        }
+    }
+
+    #[test]
+    fn a_box_of_up_to_64_parts_splits_and_a_bigger_one_stays_whole() {
+        let key = |i: usize| PartKey::new(&format!("wall-{i}")).unwrap();
+        let (rest, parts) = split_parts(&snapshot(MAX_SPLIT_PARTS), &[key(63)]).unwrap();
+        assert_eq!(parts, vec![(key(63), 1 << 63)]);
+        assert_eq!(rest, u64::MAX >> 1);
+        assert_eq!(
+            split_parts(&snapshot(MAX_SPLIT_PARTS + 1), &[key(64)]),
+            None,
+            "part 64 would have no bit: the box stays one leaf"
+        );
+    }
 }

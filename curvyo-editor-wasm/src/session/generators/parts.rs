@@ -9,6 +9,10 @@ use serde_json::{Value, json};
 
 use super::super::Session;
 
+/// The refusal for a box of more parts than the job can tell apart.
+const TOO_MANY_PARTS_NOTICE: &str =
+    "This object has too many parts to detach one. Nothing was changed.";
+
 /// The refusal when the box runs with no operation, so there is nothing to copy.
 const NO_OPERATION_NOTICE: &str = "Assign the box to an operation first. Nothing was changed.";
 
@@ -57,6 +61,10 @@ impl Session {
             return false;
         };
         let keys = instance::part_keys(&self.manufacturing.extensions, &snapshot);
+        if keys.len() > super::super::operations::index::MAX_SPLIT_PARTS {
+            self.transform_notice = Some(TOO_MANY_PARTS_NOTICE);
+            return false;
+        }
         let sources: Vec<NodeId> = self.box_operations(id).iter().map(|op| op.id).collect();
         if sources.is_empty() {
             self.transform_notice = Some(NO_OPERATION_NOTICE);

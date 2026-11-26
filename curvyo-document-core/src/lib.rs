@@ -284,6 +284,7 @@ mod objects;
 mod offset_write;
 mod outline_map;
 mod part_key;
+pub use part_key::PartKey;
 mod path_codec;
 mod path_extend;
 mod path_model;

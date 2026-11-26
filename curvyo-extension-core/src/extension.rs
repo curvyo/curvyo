@@ -129,7 +129,10 @@ pub struct Part {
     /// The part's stable key (ADR 0082 §10): unique within one result and the same on every
     /// regeneration, so an operation can hold `member.<node>#<key>`. A gear `gear`, a Box
     /// `bottom`, `front`, `back`, `left`, `right`, `lid`, a rounded box `strip`, `base`, `cover`,
-    /// `ring`, `lid` (and in Curved `left`, `right`, `front`), a path box `wall-<n>` first.
+    /// `ring`, `lid` (and in Curved `left`, `right`, `front`), a path box `wall-<n>` first. A key
+    /// is 1 to 15 characters of `a-z`, `0-9` and `-` (`wall-4294967295` fits); the host refuses a
+    /// record whose keys are longer, repeat or use other characters, so a generator must keep
+    /// to this grammar.
     pub key: Cow<'static, str>,
     /// The outer outline and its holes.
     pub paths: Vec<ClosedPath>,

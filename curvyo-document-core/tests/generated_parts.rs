@@ -283,3 +283,38 @@ fn convert_to_paths_moves_a_part_key_to_the_part_s_new_path_in_the_same_step() {
         "the box keeps its key"
     );
 }
+
+#[test]
+fn the_order_of_part_memberships_follows_the_key_text_and_not_what_was_decoded_before() {
+    // Two documents write the same keys in opposite orders; a third reads other keys first. The
+    // order the operation reports is the text order every time.
+    let order = |keys: &[&str], other_first: bool| {
+        let w = world(&["alpha", "mid", "zeta", "wall-9", "wall-10"]);
+        if other_first {
+            let other = world(&["zz", "aa"]);
+            other
+                .d
+                .detach_part(other.boxed, "zz", "Z", &[other.cut], &[])
+                .unwrap();
+        }
+        for key in keys {
+            w.d.set_operation_members(w.cut, &[vec![w.boxed.with_part(key).unwrap()]], true)
+                .unwrap();
+        }
+        let back = unpack(2, &pack(&w.d, "0.1.0").unwrap()).unwrap();
+        back.operations(w.m).unwrap()[0]
+            .members
+            .iter()
+            .filter_map(|m| m[0].part().map(|p| p.to_string()))
+            .collect::<Vec<_>>()
+    };
+    let expected = ["alpha", "mid", "wall-10", "wall-9", "zeta"];
+    assert_eq!(
+        order(&["zeta", "alpha", "wall-9", "mid", "wall-10"], false),
+        expected
+    );
+    assert_eq!(
+        order(&["wall-10", "mid", "wall-9", "alpha", "zeta"], true),
+        expected
+    );
+}

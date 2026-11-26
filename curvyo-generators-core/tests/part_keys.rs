@@ -3,11 +3,11 @@
 
 #![allow(clippy::unwrap_used)]
 
-use curvyo_document_core::Length;
+use curvyo_document_core::{Length, Point};
 use curvyo_extension_core::{
-    Edit, Extension, GenerateRequest, Generated, ParamValue, Seed, StoredParams,
+    ClosedPath, Cubic, Edit, Extension, GenerateRequest, Generated, ParamValue, Seed, StoredParams,
 };
-use curvyo_generators_core::{BOX, GEAR, GENERATORS, ROUNDED_BOX};
+use curvyo_generators_core::{BOX, GEAR, GENERATORS, PATH_BOX, ROUNDED_BOX};
 
 fn generate(kind: &str, entries: &[(&str, ParamValue)]) -> Generated {
     let params: StoredParams = entries
@@ -64,5 +64,55 @@ fn keys_are_unique_and_stable_across_parameter_changes() {
         sorted.dedup();
         assert_eq!(sorted.len(), a.len(), "{kind}: duplicate key in {a:?}");
         assert_eq!(a, b, "{kind}: keys changed with a size");
+    }
+}
+
+#[test]
+fn a_path_box_names_its_walls_and_plates_with_unique_keys_that_fit_the_grammar() {
+    // A 100 x 60 mm coffin: six straight edges.
+    let points = [
+        (0.0, 30.0),
+        (20.0, 0.0),
+        (80.0, 0.0),
+        (100.0, 30.0),
+        (80.0, 60.0),
+        (20.0, 60.0),
+    ];
+    let segments = (0..points.len())
+        .map(|i| {
+            let (a, b) = (points[i], points[(i + 1) % points.len()]);
+            Cubic {
+                c1: Point::new(a.0, a.1),
+                c2: Point::new(b.0, b.1),
+                to: Point::new(b.0, b.1),
+            }
+        })
+        .collect();
+    let path = ClosedPath {
+        start: Point::new(0.0, 30.0),
+        segments,
+    };
+    let mut params = StoredParams::new();
+    params.insert("outline".to_owned(), ParamValue::Path(path).to_stored());
+    let result = GENERATORS
+        .generate(&GenerateRequest {
+            kind: PATH_BOX,
+            params: &params,
+            seed: Seed(1),
+            edit: None::<Edit<'_>>,
+        })
+        .unwrap();
+    let all = keys(&result);
+    let mut sorted = all.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(sorted.len(), all.len(), "duplicate key in {all:?}");
+    assert!(all.iter().any(|k| k == "wall-1"), "{all:?}");
+    for key in &all {
+        let valid = (1..=15).contains(&key.len())
+            && key
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+        assert!(valid, "key {key:?} breaks the grammar");
     }
 }

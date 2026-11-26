@@ -30,7 +30,7 @@ pub struct NodeId {
     /// The key of one part of a generated object (`member.<node>#<part>`, ADR 0082 §10), `None`
     /// for the node itself. Only operation memberships and the leaf index carry it; it names no
     /// tree node and is never a document id.
-    pub(crate) part: Option<std::num::NonZeroU16>,
+    pub(crate) part: Option<crate::part_key::PartKey>,
 }
 
 impl std::fmt::Debug for NodeId {
@@ -42,7 +42,7 @@ impl std::fmt::Debug for NodeId {
             .field("peer", &self.peer)
             .field("counter", &self.counter);
         if let Some(part) = self.part {
-            shown.field("part", &crate::part_key::text(part));
+            shown.field("part", &part);
         }
         shown.finish()
     }
@@ -69,20 +69,20 @@ impl NodeId {
     }
 
     /// This node's part `key` (ADR 0082 §10): the target an operation holds as
-    /// `member.<node>#<key>`. `None` when `key` is not a valid part key (1 to 32 characters of
-    /// `a-z`, `0-9` and `-`) or the table of keys is full.
+    /// `member.<node>#<key>`. `None` when `key` is not a valid part key (1 to 15 characters of
+    /// `a-z`, `0-9` and `-`).
     #[must_use]
     pub fn with_part(self, key: &str) -> Option<Self> {
         Some(Self {
-            part: Some(crate::part_key::intern(key)?),
+            part: Some(crate::part_key::PartKey::new(key)?),
             ..self
         })
     }
 
     /// The part key this id names, `None` for a node itself.
     #[must_use]
-    pub fn part(self) -> Option<&'static str> {
-        self.part.map(crate::part_key::text)
+    pub const fn part(self) -> Option<crate::PartKey> {
+        self.part
     }
 
     /// The node itself: this id without its part.
@@ -122,7 +122,7 @@ impl Serialize for NodeId {
         NodeIdWire {
             peer: self.peer.to_string(),
             counter: self.counter,
-            part: self.part().map(str::to_owned),
+            part: self.part.map(|part| part.as_str().to_owned()),
         }
         .serialize(serializer)
     }
@@ -135,7 +135,7 @@ impl<'de> Deserialize<'de> for NodeId {
         let part = match wire.part {
             None => None,
             Some(key) => Some(
-                crate::part_key::intern(&key)
+                crate::part_key::PartKey::new(&key)
                     .ok_or_else(|| serde::de::Error::custom("not a part key"))?,
             ),
         };

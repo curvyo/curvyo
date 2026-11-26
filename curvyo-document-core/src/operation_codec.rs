@@ -95,7 +95,10 @@ pub(crate) fn member_key_of(path: &[NodeId]) -> String {
     match path {
         [only] if only.part().is_some() => part_member_key(
             crate::paths::tree_id_of(*only),
-            only.part().unwrap_or_default(),
+            only.part()
+                .map(|p| p.to_string())
+                .unwrap_or_default()
+                .as_str(),
         ),
         _ => member_key(
             &path
@@ -108,13 +111,12 @@ pub(crate) fn member_key_of(path: &[NodeId]) -> String {
 
 /// The path of a membership key's text after the prefix and the part it names (`<node>#<part>`,
 /// one id only); `None` when an id does not read or the part is not a valid key.
-pub(crate) fn decode_member(text: &str) -> Option<(Vec<TreeID>, Option<&'static str>)> {
+pub(crate) fn decode_member(text: &str) -> Option<(Vec<TreeID>, Option<crate::PartKey>)> {
     let Some((nodes, part)) = text.split_once(PART_SEPARATOR) else {
         return decode_path(text).map(|path| (path, None));
     };
     let node = decode_node(nodes)?;
-    let tag = crate::part_key::intern(part)?;
-    Some((vec![node], Some(crate::part_key::text(tag))))
+    Some((vec![node], Some(crate::part_key::PartKey::new(part)?)))
 }
 
 /// The nodes of a membership key's text after the prefix (a part key names its node); `None`
@@ -186,7 +188,7 @@ pub(crate) fn read_operation(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> O
         {
             let mut path: Vec<NodeId> = path.into_iter().map(node_id).collect();
             if let (Some(part), [only]) = (part, path.as_mut_slice()) {
-                *only = only.with_part(part).unwrap_or(*only);
+                *only = only.with_part(part.as_str()).unwrap_or(*only);
             }
             members.push(path);
         }

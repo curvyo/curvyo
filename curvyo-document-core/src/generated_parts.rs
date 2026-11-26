@@ -41,15 +41,15 @@ pub enum PartError {
 }
 
 /// One part membership key of an operation: the operation, the key text, the node and the part.
-struct PartKey {
+struct PartEntry {
     op: TreeID,
     key: String,
     node: TreeID,
-    part: &'static str,
+    part: crate::PartKey,
 }
 
 /// Every part membership key of every operation of every manufacturing whose text reads.
-fn part_keys_of(tree: &LoroTree) -> Vec<PartKey> {
+fn part_keys_of(tree: &LoroTree) -> Vec<PartEntry> {
     let mut out = Vec::new();
     for manufacturing in manufacturing_nodes(tree) {
         for op in operation_nodes(tree, manufacturing) {
@@ -61,7 +61,7 @@ fn part_keys_of(tree: &LoroTree) -> Vec<PartKey> {
                 if let Some((path, Some(part))) = read
                     && let [node] = path.as_slice()
                 {
-                    out.push(PartKey {
+                    out.push(PartEntry {
                         op,
                         key: key.to_owned(),
                         node: *node,
@@ -105,8 +105,8 @@ impl Document {
         let node = tree_id_of(node);
         let mut out: Vec<String> = Vec::new();
         for entry in part_keys_of(&tree).iter().filter(|e| e.node == node) {
-            if !out.iter().any(|k| k == entry.part) {
-                out.push(entry.part.to_owned());
+            if !out.iter().any(|k| k == entry.part.as_str()) {
+                out.push(entry.part.to_string());
             }
         }
         out
@@ -220,7 +220,7 @@ impl Document {
         }
         let mut changed = false;
         for entry in part_keys_of(&tree) {
-            if entry.node == tree_node && entry.part == part_key {
+            if entry.node == tree_node && entry.part.as_str() == part_key {
                 crate::operation::delete_key(&tree, entry.op, &entry.key);
                 changed = true;
             }
@@ -241,7 +241,7 @@ pub(crate) fn rewrite_part_keys(tree: &LoroTree, node: TreeID, keys: &[(String, 
         if entry.node != node {
             continue;
         }
-        let Some((_, target)) = keys.iter().find(|(k, _)| k == entry.part) else {
+        let Some((_, target)) = keys.iter().find(|(k, _)| k == entry.part.as_str()) else {
             continue;
         };
         crate::operation::delete_key(tree, entry.op, &entry.key);
