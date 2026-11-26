@@ -1141,7 +1141,7 @@ fn c45_judging_an_image_test_writes_the_image_set() {
     assert_eq!(fx.s.pick_test_grid_material(Some(&m)), Ok(true));
     let grid: Value = serde_json::from_str(&fx.s.test_grid_view_json()).unwrap();
     let id = grid["id"].as_str().unwrap().to_owned();
-    fx.s.judge_test(&m, &id, 1, 1, &[8; 16]).unwrap();
+    fx.s.mark_pick(&m, &id, "best", 1, 1, &[8; 16]).unwrap();
     fx.s.unfold_material(Some(&m));
     let v = materials(&fx.s);
     let sets = v["unfolded"]["lasers"][0]["sets"]

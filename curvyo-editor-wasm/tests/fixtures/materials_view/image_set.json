@@ -39,6 +39,7 @@
               "power_pct": 70.0,
               "speed_mm_min": 3000
             },
+            "other_picks": [],
             "source": "Typed"
           },
           {
@@ -49,6 +50,7 @@
               "power_pct": 50.0,
               "speed_mm_min": 3000
             },
+            "other_picks": [],
             "source": "Typed"
           }
         ],

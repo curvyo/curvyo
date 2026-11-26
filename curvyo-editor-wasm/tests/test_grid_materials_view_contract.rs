@@ -202,7 +202,26 @@ fn materials_view_fixtures() {
     s.unfold_material(Some(&id));
     pin("materials_view", "image_set.json", &materials_view(&s));
 
+    // `specs/0146`: four picks on three cells (one cell with two), their lines and the folded lines.
     let (mut s, birch, test) = birch();
+    for (seed, pick, column, row) in [
+        (8, "best", 2, 1),
+        (9, "second_best", 1, 1),
+        (10, "fastest", 3, 3),
+        (11, "deepest", 3, 3),
+    ] {
+        s.mark_pick(&birch, &test, pick, column, row, &[seed; 16])
+            .unwrap();
+    }
+    s.unfold_material(Some(&birch));
+    s.open_material_test(Some(&test));
+    pin(
+        "materials_view",
+        "test_with_picks.json",
+        &materials_view(&s),
+    );
+
+    let (mut s, birch, test) = crate::birch();
     s.unfold_material(Some(&birch));
     s.open_material_test(Some(&test));
     pin(
@@ -226,7 +245,7 @@ fn materials_view_fixtures() {
 #[test]
 fn material_writes_fixtures() {
     let (mut s, birch, test) = birch();
-    s.judge_test(&birch, &test, 2, 1, &[8; 16]).unwrap();
+    s.mark_pick(&birch, &test, "best", 2, 1, &[8; 16]).unwrap();
     pin("material_writes", "judge.json", &writes(&mut s));
     s.set_test_photo(&birch, &test, &png(600, 400), false)
         .unwrap();

@@ -77,6 +77,13 @@ impl WasmSession {
         self.session.feed_test_grid_random(bytes);
     }
 
+    /// The picks of the selected test grid for the canvas overlay as JSON (`specs/0146` criterion
+    /// 8): `[{x, y, width, height, pitch, gap, kinds}]` in canvas CSS px, `[]` when there is
+    /// nothing to draw.
+    pub fn pick_marks_json(&self) -> String {
+        serde_json::to_string(&self.session.pick_marks()).unwrap_or_else(|_| "[]".to_owned())
+    }
+
     /// The bar as JSON, `null` when none shows.
     pub fn test_grid_view_json(&self) -> String {
         self.session.test_grid_view_json()

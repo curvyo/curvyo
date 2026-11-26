@@ -40,6 +40,7 @@
               "power_pct": 12.5,
               "speed_mm_min": 3000
             },
+            "other_picks": [],
             "source": "Typed"
           }
         ],
@@ -64,6 +65,7 @@
               "power_pct": 60.0,
               "speed_mm_min": 1950
             },
+            "other_picks": [],
             "source": "Test 7K2QX"
           },
           {
@@ -74,6 +76,7 @@
               "power_pct": 30.0,
               "speed_mm_min": 6000
             },
+            "other_picks": [],
             "source": "Typed"
           }
         ],

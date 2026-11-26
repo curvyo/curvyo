@@ -158,6 +158,7 @@ fn records(history: usize) -> Vec<(String, String)> {
                         )
                     })
                     .collect(),
+                picks: std::collections::BTreeMap::new(),
             };
             let material = Material {
                 id: id.clone(),

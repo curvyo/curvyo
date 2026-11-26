@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use super::*;
-use crate::material::{Interval, MachineTie, Passes, PowerPercent, SetNumbers, Thickness};
+use crate::material::{
+    Interval, MachineTie, Passes, PickKind, PowerPercent, SetNumbers, Thickness,
+};
 use crate::material_record::{LaserSets, Set, SetSource};
 use crate::operation_settings::SetOverride;
 use crate::operation_settings_edit::{TypedNumber, edit_interval, edit_number};
@@ -42,6 +44,7 @@ fn material(id: &str, modified: u64, sets: &[(SetKind, Settings)]) -> Material {
                     )
                 })
                 .collect::<BTreeMap<_, _>>(),
+            picks: BTreeMap::new(),
         }],
         tests: Vec::new(),
         history: Vec::new(),
@@ -58,6 +61,7 @@ fn linked(main: Settings, modified: u64, overrides: Overrides) -> SettingsRead {
             name: "Birch".to_owned(),
             outline_from: None,
             modified,
+            pick: PickKind::Best,
         }),
         overrides,
     })
@@ -208,7 +212,7 @@ fn a_link_runs_its_stored_numbers_with_the_reason_and_the_typed_numbers() {
     );
     assert_eq!(
         reason(&library, "other", OperationKind::Cut),
-        Some(StoredReason::NoSet(SetKind::Cut)),
+        Some(StoredReason::NoSet(SetKind::Cut, PickKind::Best)),
         "a laser without sets in a shared material (ADR 0058 §7)"
     );
     let older = [MaterialRead::Older {
@@ -220,10 +224,10 @@ fn a_link_runs_its_stored_numbers_with_the_reason_and_the_typed_numbers() {
     );
     assert_eq!(
         reason(&library, PROFILE, OperationKind::Score),
-        Some(StoredReason::NoSet(SetKind::Score))
+        Some(StoredReason::NoSet(SetKind::Score, PickKind::Best))
     );
     assert_eq!(
-        StoredReason::NoSet(SetKind::Score).text(),
+        StoredReason::NoSet(SetKind::Score, PickKind::Best).text(),
         "Material has no Score set for this laser, using stored numbers"
     );
     assert_eq!(
@@ -566,7 +570,7 @@ fn an_image_operation_reads_the_image_set_and_never_the_engrave_set() {
     let SettingsState::Stored { reason, .. } = state else {
         panic!("stored: {state:?}")
     };
-    assert_eq!(reason, StoredReason::NoSet(SetKind::Image));
+    assert_eq!(reason, StoredReason::NoSet(SetKind::Image, PickKind::Best));
     assert_eq!(
         reason.text(),
         "Material has no Image set for this laser, using stored numbers"
@@ -614,4 +618,145 @@ fn absent() -> SettingsRead {
         OperationKind::Cut,
         crate::DefaultNumbers::BUILT_IN,
     )
+}
+
+/// `material()` plus a laser pick set of `kind` for `pick`.
+fn with_pick(mut m: Material, kind: SetKind, pick: PickKind, settings: Settings) -> Material {
+    m.lasers[0].picks.insert(
+        (kind, pick),
+        Set {
+            numbers: SetNumbers {
+                settings,
+                interval: kind
+                    .has_interval()
+                    .then(|| Interval::from_hundredths(10).unwrap()),
+            },
+            source: SetSource::Test(crate::test_id::TestId::parse("7K2QX").unwrap()),
+        },
+    );
+    m
+}
+
+/// `specs/0146` criteria 13, 15: Use pick links the pick's numbers; a link without a pick follows
+/// Best, and a pick the material lacks reads the stored state with the kind's word.
+#[test]
+fn use_pick_takes_the_pick_set_and_a_missing_pick_names_its_word() {
+    let m = with_pick(
+        material("m1", 7, &[(SetKind::Cut, set(60.0, 1950, 1))]),
+        SetKind::Cut,
+        PickKind::Fastest,
+        set(80.0, 4650, 1),
+    );
+    let fast = use_pick(
+        &m,
+        PROFILE,
+        OperationKind::Cut,
+        PickKind::Fastest,
+        &absent(),
+    )
+    .unwrap();
+    assert_eq!(fast.main, set(80.0, 4650, 1));
+    assert_eq!(fast.material.as_ref().unwrap().pick, PickKind::Fastest);
+    let best = use_material(&m, PROFILE, OperationKind::Cut, &absent()).unwrap();
+    assert_eq!(best.main, set(60.0, 1950, 1));
+    assert_eq!(best.material.unwrap().pick, PickKind::Best);
+    assert_eq!(
+        use_pick(
+            &m,
+            PROFILE,
+            OperationKind::Cut,
+            PickKind::Deepest,
+            &absent()
+        ),
+        Err(SetKind::Cut)
+    );
+    let library = [MaterialRead::Loaded(m)];
+    let mut gone = fast.clone();
+    gone.material.as_mut().unwrap().pick = PickKind::Deepest;
+    let state = resolve(
+        &SettingsRead::Stored(gone),
+        OperationKind::Cut,
+        &library,
+        PROFILE,
+    );
+    let SettingsState::Stored { reason, .. } = state else {
+        panic!("stored");
+    };
+    assert_eq!(reason, StoredReason::NoSet(SetKind::Cut, PickKind::Deepest));
+    assert_eq!(
+        reason.text(),
+        "Material has no Deepest set for this laser, using stored numbers."
+    );
+}
+
+/// Criterion 14: a linked pick follows the material when it is re-judged, and typed numbers stay.
+#[test]
+fn a_linked_pick_follows_the_material() {
+    let m = with_pick(
+        material("m1", 7, &[(SetKind::Cut, set(60.0, 1950, 1))]),
+        SetKind::Cut,
+        PickKind::Fastest,
+        set(80.0, 4650, 1),
+    );
+    let fast = use_pick(
+        &m,
+        PROFILE,
+        OperationKind::Cut,
+        PickKind::Fastest,
+        &absent(),
+    )
+    .unwrap();
+    let read = SettingsRead::Stored(fast);
+    let mut moved = with_pick(
+        material("m1", 9, &[(SetKind::Cut, set(60.0, 1950, 1))]),
+        SetKind::Cut,
+        PickKind::Fastest,
+        set(90.0, 5000, 1),
+    );
+    moved.name = "Birch".to_owned();
+    let library = [MaterialRead::Loaded(moved)];
+    let fresh = refresh(&read, OperationKind::Cut, &library, PROFILE, true).unwrap();
+    assert_eq!(fresh.main, set(90.0, 5000, 1));
+    assert_eq!(fresh.material.unwrap().pick, PickKind::Fastest);
+}
+
+/// Criterion 13: Engrave + Outline takes the Score set of the pick for the outline, else the
+/// Engrave set of that pick.
+#[test]
+fn engrave_outline_follows_the_pick_for_both_parts() {
+    let engrave = with_pick(
+        material("m1", 7, &[(SetKind::Engrave, set(30.0, 6000, 1))]),
+        SetKind::Engrave,
+        PickKind::Fastest,
+        set(40.0, 9000, 1),
+    );
+    let engrave_only = use_pick(
+        &engrave,
+        PROFILE,
+        OperationKind::EngraveOutline,
+        PickKind::Fastest,
+        &absent(),
+    )
+    .unwrap();
+    assert_eq!(engrave_only.outline, Some(set(40.0, 9000, 1)));
+    assert_eq!(
+        engrave_only.material.unwrap().outline_from,
+        Some(SetKind::Engrave)
+    );
+    let with_score = with_pick(
+        engrave,
+        SetKind::Score,
+        PickKind::Fastest,
+        set(20.0, 12000, 1),
+    );
+    let both = use_pick(
+        &with_score,
+        PROFILE,
+        OperationKind::EngraveOutline,
+        PickKind::Fastest,
+        &absent(),
+    )
+    .unwrap();
+    assert_eq!(both.outline, Some(set(20.0, 12000, 1)));
+    assert_eq!(both.main, set(40.0, 9000, 1));
 }

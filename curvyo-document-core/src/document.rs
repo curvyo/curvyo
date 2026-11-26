@@ -744,7 +744,13 @@ impl DocumentVersion {
 /// parameter edit. Damage: `part_keys` that is not a list of valid distinct key strings as long as
 /// `parts` refuses the file; a part key of an operation that does not read is kept and never
 /// touched. Goldens: `generated_part_ops_v65.curvyo`, `generated_part_keys_damaged_v65.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 65;
+/// Version 66 (`specs/0146-material-test-picks`, ADR 0092 decision 9): the atomic `material` map of
+/// an operation's `op_settings` may carry `"pick"`: `"second_best"`, `"fastest"` or `"deepest"`
+/// (absent means Best, `"best"` is never written and reads as a bad link). A build that stops at
+/// 65 reads such a link as Damaged settings, so this build's files are refused there by version.
+/// No migration: a file of 65 or lower opens unchanged and every link follows Best. Goldens:
+/// `material_pick_v66.curvyo`, `material_pick_damaged_v66.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 66;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

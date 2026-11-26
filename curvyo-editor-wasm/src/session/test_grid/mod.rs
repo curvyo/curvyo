@@ -5,6 +5,7 @@
 mod bar;
 mod canvas;
 mod items;
+mod pick_marks;
 mod picture;
 #[cfg(test)]
 mod picture_tests;
@@ -12,6 +13,8 @@ mod place;
 mod prepared;
 #[cfg(test)]
 mod review_tests;
+#[cfg(test)]
+mod round_cells_tests;
 #[cfg(test)]
 pub(in crate::session) mod tests;
 mod view_json;

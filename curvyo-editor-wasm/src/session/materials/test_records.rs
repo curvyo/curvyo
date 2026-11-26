@@ -4,11 +4,12 @@
 use curvyo_document_core::{
     CROP_TEST_PHOTO_COMMIT_LABEL, DELETE_TEST_COMMIT_LABEL, EDIT_TEST_NOTE_COMMIT_LABEL,
     JUDGE_TEST_COMMIT_LABEL, REMOVE_TEST_PHOTO_COMMIT_LABEL, SET_TEST_PHOTO_COMMIT_LABEL,
+    UNMARK_PICK_COMMIT_LABEL,
 };
 use curvyo_laser_core::grids::TestId;
 use curvyo_laser_core::library::{RecordRefusal, Stamp, remove_photo, write_photo};
 use curvyo_laser_core::new_record_id;
-use curvyo_laser_core::settings::CellIndex;
+use curvyo_laser_core::settings::{CellIndex, PickKind};
 
 use super::super::Session;
 use super::{now_ms, sixteen};
@@ -24,31 +25,45 @@ impl Session {
         self.materials.tab.open_test = test.and_then(TestId::parse);
     }
 
-    /// A tap on the cell `column`, `row` of the test (criterion 24): the best cell, and the
-    /// laser's set of the test's kind from its values, one step "Choose best cell"; a tap on the
-    /// best cell changes nothing (G14). `random` holds 16 caller bytes (the history entry id).
+    /// A tap on the cell `column`, `row` of the test with the pick kind `pick` pressed
+    /// (`specs/0146` criteria 2, 3): the cell gets the pick and the laser's set (Best) or pick
+    /// set from its values, one step "Mark pick"; a tap on the cell that already carries the pick
+    /// takes it off, one step "Unmark pick". `random` holds 16 caller bytes (the history entry
+    /// id).
     ///
     /// # Errors
-    /// The refusal ("Nothing changed." for the best cell).
-    pub fn judge_test(
+    /// The refusal text, or "Unknown pick.".
+    pub fn mark_pick(
         &mut self,
         material: &str,
         test: &str,
+        pick: &str,
         column: u8,
         row: u8,
         random: &[u8],
     ) -> Result<(), String> {
         let test = test_id(test)?;
+        let pick = PickKind::parse(pick).ok_or_else(|| "Unknown pick.".to_owned())?;
+        let cell = CellIndex { column, row };
+        let marked = self
+            .materials
+            .library()
+            .find(material)
+            .and_then(|m| m.test(test))
+            .and_then(|t| t.marks.get(pick));
         let entry = new_record_id(sixteen(random, 0));
         let now = now_ms(self);
+        let stamp = Stamp {
+            entry_id: &entry,
+            now,
+        };
+        if marked == Some(cell) {
+            return self.library_step(UNMARK_PICK_COMMIT_LABEL, |this, change| {
+                this.change_record(change, material, |m| m.unmark(test, pick, stamp))
+            });
+        }
         self.library_step(JUDGE_TEST_COMMIT_LABEL, |this, change| {
-            let stamp = Stamp {
-                entry_id: &entry,
-                now,
-            };
-            this.change_record(change, material, |m| {
-                m.judge(test, CellIndex { column, row }, stamp)
-            })
+            this.change_record(change, material, |m| m.judge(test, cell, pick, stamp))
         })
     }
 

@@ -60,7 +60,9 @@
           }
         ],
         "state": "own",
-        "z_offset_shown": false
+        "z_offset_shown": false,
+        "pick": "best",
+        "picks": []
       },
       "source": null
     },
@@ -88,7 +90,9 @@
         "reset": false,
         "sets": [],
         "state": "damaged",
-        "z_offset_shown": false
+        "z_offset_shown": false,
+        "pick": "best",
+        "picks": []
       },
       "source": null
     },
@@ -122,7 +126,9 @@
           }
         ],
         "state": "own",
-        "z_offset_shown": false
+        "z_offset_shown": false,
+        "pick": "best",
+        "picks": []
       },
       "source": null
     }

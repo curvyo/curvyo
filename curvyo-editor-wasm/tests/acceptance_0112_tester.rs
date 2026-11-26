@@ -1461,16 +1461,17 @@ fn c23_test_detail() {
 fn c24_judging_one_cell_becomes_the_laser_set() {
     let (mut s, _, b, id) = birch();
     let n = s.undo_len();
-    s.judge_test(&b, &id, 2, 1, &[8; 16]).unwrap();
+    s.mark_pick(&b, &id, "best", 2, 1, &[8; 16]).unwrap();
     assert_eq!(s.undo_len(), n + 1);
     s.unfold_material(Some(&b));
     s.open_material_test(Some(&id));
     let v = materials_view(&s);
     let t = &v["unfolded"]["test"];
-    assert_eq!(t["best"], json!({"column": 2, "row": 1}));
+    assert_eq!(t["picks"][0]["pick"], "best");
+    assert_eq!(t["picks"][0]["cell"], json!({"column": 2, "row": 1}));
     assert_eq!(
-        t["set_line"],
-        "Cut set of Generic laser: 60 %, 1950 mm/min, 1 ×"
+        t["picks"][0]["line"],
+        "Best: Cut set of Generic laser: 60 %, 1950 mm/min, 1 ×"
     );
     let set = &v["unfolded"]["lasers"][0]["sets"][0];
     assert_eq!(set["kind"], "cut");
@@ -1478,10 +1479,10 @@ fn c24_judging_one_cell_becomes_the_laser_set() {
     assert_eq!(set["numbers"]["power_pct"], 60.0);
     assert_eq!(set["numbers"]["speed_mm_min"], 1950);
     // Another cell moves the mark and the set.
-    s.judge_test(&b, &id, 4, 4, &[9; 16]).unwrap();
+    s.mark_pick(&b, &id, "best", 4, 4, &[9; 16]).unwrap();
     let v = materials_view(&s);
     assert_eq!(
-        v["unfolded"]["test"]["best"],
+        v["unfolded"]["test"]["picks"][0]["cell"],
         json!({"column": 4, "row": 4})
     );
     assert_eq!(
@@ -1492,18 +1493,21 @@ fn c24_judging_one_cell_becomes_the_laser_set() {
         v["unfolded"]["lasers"][0]["sets"][0]["numbers"]["speed_mm_min"],
         6000
     );
-    // The same cell again changes nothing.
-    let n = s.undo_len();
-    assert!(s.judge_test(&b, &id, 4, 4, &[10; 16]).is_err());
-    assert_eq!(s.undo_len(), n);
     // Outside the table: refused.
-    assert!(s.judge_test(&b, &id, 5, 0, &[11; 16]).is_err());
+    assert!(s.mark_pick(&b, &id, "best", 5, 0, &[11; 16]).is_err());
     let _ = s.undo();
     let v = materials_view(&s);
     assert_eq!(
-        v["unfolded"]["test"]["best"],
+        v["unfolded"]["test"]["picks"][0]["cell"],
         json!({"column": 2, "row": 1})
     );
+    // The same cell again unmarks it (`0146` criterion 3, replacing G14): one step, the set stays.
+    let n = s.undo_len();
+    s.mark_pick(&b, &id, "best", 2, 1, &[10; 16]).unwrap();
+    assert_eq!(s.undo_len(), n + 1);
+    let v = materials_view(&s);
+    assert_eq!(v["unfolded"]["test"]["picks"], json!([]));
+    assert_eq!(v["unfolded"]["lasers"][0]["sets"][0]["source"], "Typed");
 }
 
 #[test]
@@ -1522,7 +1526,7 @@ fn c24_engrave_shared_values_come_from_row_1() {
         .find(|x| x["param"] == "interval")
         .map(|x| x["value"].as_f64().unwrap())
         .expect("interval shared on a power x speed Engrave grid");
-    s.judge_test(&b, &id, 0, 0, &[8; 16]).unwrap();
+    s.mark_pick(&b, &id, "best", 0, 0, &[8; 16]).unwrap();
     s.unfold_material(Some(&b));
     let v = materials_view(&s);
     let set = v["unfolded"]["lasers"][0]["sets"]
@@ -1542,7 +1546,7 @@ fn c24_engrave_shared_values_come_from_row_1() {
 fn c24_judging_works_lasered_or_not() {
     let (mut s, g, b, id) = birch();
     s.mark_test_grid_lasered_for_tests(g, 5).unwrap();
-    assert!(s.judge_test(&b, &id, 1, 1, &[8; 16]).is_ok());
+    assert!(s.mark_pick(&b, &id, "best", 1, 1, &[8; 16]).is_ok());
 }
 
 #[test]
@@ -1704,7 +1708,7 @@ fn c30_store_refuses_a_write_over_512_kib() {
     let mut s = session();
     s.load_materials(&[(format!("{id}.json"), text)], None);
     assert_eq!(materials_view(&s)["rows"][0]["state"], "loaded");
-    // 500 four-byte characters per note push the record past 512 KiB.
+    // 500 four-byte characters per note push the record past 640 KiB.
     let wide: String = "𝄞".repeat(500);
     let mut refused = None;
     for t in &tests {
@@ -1716,11 +1720,11 @@ fn c30_store_refuses_a_write_over_512_kib() {
             }
         }
     }
-    let e = refused.expect("a record over 512 KiB is refused");
-    assert!(e.contains("512 KiB"), "{e}");
+    let e = refused.expect("a record over 640 KiB is refused");
+    assert!(e.contains("640 KiB"), "{e}");
     let w = writes(&mut s);
     for x in w.iter().filter(|x| x["op"] == "write") {
-        assert!(x["text"].as_str().unwrap().len() <= 512 * 1024);
+        assert!(x["text"].as_str().unwrap().len() <= 640 * 1024);
     }
 }
 
@@ -1741,7 +1745,8 @@ fn c30_format2_record_loads_and_writes_back_format_2() {
     let back: Value = serde_json::from_str(rec["text"].as_str().unwrap()).unwrap();
     // Since `specs/0123` (Frage 237 A) a format-2 record is written back as format 3.
     // Superseded by 0135 slice 1 (2026-11-19): as format 4 (ADR 0072 §6).
-    assert_eq!(back["format_version"], 4);
+    // Superseded by 0146 (ADR 0090): as format 5.
+    assert_eq!(back["format_version"], 5);
     assert_eq!(back["name"], "Birch renamed");
     assert_eq!(back["tests"], v["tests"]);
     assert_eq!(back["lasers"], v["lasers"]);

@@ -1,0 +1,86 @@
+{
+  "cells": [
+    {
+      "column": 0,
+      "cx": 263.301,
+      "cy": 14.0,
+      "row": 0,
+      "rx": 5.0,
+      "ry": 5.0,
+      "shape": "ellipse"
+    },
+    {
+      "column": 1,
+      "cx": 275.301,
+      "cy": 14.0,
+      "row": 0,
+      "rx": 5.0,
+      "ry": 5.0,
+      "shape": "ellipse"
+    },
+    {
+      "column": 2,
+      "cx": 287.301,
+      "cy": 14.0,
+      "row": 0,
+      "rx": 5.0,
+      "ry": 5.0,
+      "shape": "ellipse"
+    },
+    {
+      "column": 0,
+      "cx": 263.301,
+      "cy": 26.0,
+      "row": 1,
+      "rx": 5.0,
+      "ry": 5.0,
+      "shape": "ellipse"
+    },
+    {
+      "column": 1,
+      "cx": 275.301,
+      "cy": 26.0,
+      "row": 1,
+      "rx": 5.0,
+      "ry": 5.0,
+      "shape": "ellipse"
+    },
+    {
+      "column": 2,
+      "cx": 287.301,
+      "cy": 26.0,
+      "row": 1,
+      "rx": 5.0,
+      "ry": 5.0,
+      "shape": "ellipse"
+    },
+    {
+      "column": 0,
+      "cx": 263.301,
+      "cy": 38.0,
+      "row": 2,
+      "rx": 5.0,
+      "ry": 5.0,
+      "shape": "ellipse"
+    },
+    {
+      "column": 1,
+      "cx": 275.301,
+      "cy": 38.0,
+      "row": 2,
+      "rx": 5.0,
+      "ry": 5.0,
+      "shape": "ellipse"
+    },
+    {
+      "column": 2,
+      "cx": 287.301,
+      "cy": 38.0,
+      "row": 2,
+      "rx": 5.0,
+      "ry": 5.0,
+      "shape": "ellipse"
+    }
+  ],
+  "labels": 9
+}

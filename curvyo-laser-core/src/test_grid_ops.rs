@@ -242,6 +242,7 @@ mod tests {
                 name: "Birch".to_owned(),
                 outline_from: None,
                 modified: 7,
+                pick: crate::material::PickKind::Best,
             },
             numbers: SetNumbers {
                 settings: own_label_numbers(),

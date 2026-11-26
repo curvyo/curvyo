@@ -40,6 +40,7 @@
               "power_pct": 12.5,
               "speed_mm_min": 3000
             },
+            "other_picks": [],
             "source": "Typed"
           }
         ],
@@ -64,6 +65,7 @@
               "power_pct": 60.0,
               "speed_mm_min": 1950
             },
+            "other_picks": [],
             "source": "Test 7K2QX"
           },
           {
@@ -74,6 +76,7 @@
               "power_pct": 30.0,
               "speed_mm_min": 6000
             },
+            "other_picks": [],
             "source": "Typed"
           }
         ],
@@ -84,10 +87,6 @@
     "other_lasers": [],
     "test": {
       "axes_line": "Power 20–100 % × Speed 600–6000 mm/min · 1 × · cell 10 mm · 12 Nov 2025",
-      "best": {
-        "column": 2,
-        "row": 1
-      },
       "columns": {
         "title": "Power %",
         "unit": " %",
@@ -104,6 +103,18 @@
       "kind": "cut",
       "note": "Clean edge at 60 %.",
       "photo": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c.7K2QX.jpg",
+      "picks": [
+        {
+          "cell": {
+            "column": 2,
+            "row": 1
+          },
+          "label": "Best",
+          "line": "Best: Cut set of Diode 20 W: 60 %, 1950 mm/min, 1 ×",
+          "pick": "best",
+          "set_from": null
+        }
+      ],
       "place": {
         "label": "Place on Laser 1",
         "on_page": false
@@ -119,7 +130,6 @@
           "6000"
         ]
       },
-      "set_line": "Cut set of Diode 20 W: 60 %, 1950 mm/min, 1 ×",
       "state_line": "Lasered 12 Nov 2025 · not on a page"
     },
     "tests": [

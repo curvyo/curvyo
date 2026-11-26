@@ -25,8 +25,8 @@ pub enum StoreRefusal {
     /// The record is of a newer format and is never written.
     #[error("The material needs a newer Curvyo.")]
     Newer,
-    /// The record text would pass 512 KiB (ADR 0058 §6): the write is refused.
-    #[error("Could not save {name}: it is over 512 KiB.")]
+    /// The record text would pass 640 KiB (ADR 0058 §6): the write is refused.
+    #[error("Could not save {name}: it is over 640 KiB.")]
     TooLarge {
         /// The material's name.
         name: String,
@@ -237,7 +237,7 @@ impl Library {
     }
 
     /// Applies `change` to a copy of the readable material `id` and keeps it when the record
-    /// text stays within 512 KiB (ADR 0058 §6).
+    /// text stays within 640 KiB (ADR 0058 §6).
     ///
     /// # Errors
     /// [`StoreRefusal::Unknown`], [`StoreRefusal::TooLarge`] or the record's refusal; nothing
@@ -387,7 +387,7 @@ impl Library {
     }
 }
 
-/// The record text of `material`, refused over 512 KiB.
+/// The record text of `material`, refused over 640 KiB.
 fn checked_text(material: &Material) -> Result<String, StoreRefusal> {
     let text = write_record(material);
     if text.len() > MAX_RECORD_TEXT {

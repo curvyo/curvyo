@@ -162,7 +162,7 @@ fn c30_format2_golden_round_trips_byte_for_byte() {
     // Superseded by 0135 slice 1 (2026-11-19): as format 4 (ADR 0072 §6).
     assert_eq!(
         back,
-        text.replacen("\"format_version\": 2,", "\"format_version\": 4,", 1)
+        text.replacen("\"format_version\": 2,", "\"format_version\": 5,", 1)
     );
     let again = read_record(&file_name(FULL_ID), &back).unwrap();
     assert_eq!(write_record(&again), back);

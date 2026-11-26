@@ -5,7 +5,9 @@
 use serde_json::{Map, Value, json};
 
 use crate::machine_profile::{DefaultNumbers, FeedRate};
-use crate::material::{Interval, MAX_MATERIAL_NAME_CHARS, Passes, PowerPercent, SetKind, Settings};
+use crate::material::{
+    Interval, MAX_MATERIAL_NAME_CHARS, Passes, PickKind, PowerPercent, SetKind, Settings,
+};
 use crate::operation_kind::OperationKind;
 
 /// A link of an operation to a material, with the name and `modified` it had when its numbers
@@ -21,6 +23,9 @@ pub struct MaterialLink {
     pub outline_from: Option<SetKind>,
     /// The record's `modified` the numbers were taken from (the refresh guard).
     pub modified: u64,
+    /// Which pick of the material the operation follows; stored only when it is not Best
+    /// (`specs/0146`, ADR 0090 decision 7).
+    pub pick: PickKind,
 }
 
 /// The two sets an operation may hold.
@@ -161,7 +166,7 @@ pub enum SettingsDamage {
     BadSet,
     /// An `outline` on a kind other than Engrave + Outline.
     OutlineOnKind,
-    /// A link without an id or `modified`, with a bad name or a bad `outline_from`.
+    /// A link without an id or `modified`, with a bad name, a bad `outline_from` or a bad `pick`.
     BadLink,
     /// `overrides` without a link, empty, with an empty role map, an unknown key, a bad number,
     /// or an `outline` on a kind other than Engrave + Outline.
@@ -312,7 +317,7 @@ fn read_link(value: &Value) -> Option<MaterialLink> {
     let map = value.as_object()?;
     if map
         .keys()
-        .any(|k| !["id", "name", "outline_from", "modified"].contains(&k.as_str()))
+        .any(|k| !["id", "name", "outline_from", "modified", "pick"].contains(&k.as_str()))
     {
         return None;
     }
@@ -325,11 +330,17 @@ fn read_link(value: &Value) -> Option<MaterialLink> {
         None => None,
         Some(text) => Some(SetKind::parse(text.as_str()?).filter(|k| *k != SetKind::Cut)?),
     };
+    // `"best"` is never written, so it is a bad link like any other unknown word.
+    let pick = match map.get("pick") {
+        None => PickKind::Best,
+        Some(text) => PickKind::parse(text.as_str()?).filter(|p| *p != PickKind::Best)?,
+    };
     Some(MaterialLink {
         id: id.to_owned(),
         name: name.to_owned(),
         outline_from,
         modified: map.get("modified")?.as_u64()?,
+        pick,
     })
 }
 
@@ -421,6 +432,9 @@ impl StoredSettings {
                 fields.insert("outline_from".to_owned(), json!(from.as_str()));
             }
             fields.insert("modified".to_owned(), json!(link.modified));
+            if link.pick != PickKind::Best {
+                fields.insert("pick".to_owned(), json!(link.pick.as_str()));
+            }
             map.insert("material".to_owned(), Value::Object(fields));
             if !self.overrides.is_empty() {
                 let mut roles = Map::new();

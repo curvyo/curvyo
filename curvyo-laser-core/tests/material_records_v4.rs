@@ -29,8 +29,8 @@ fn read(text: &str) -> Result<curvyo_laser_core::library::Material, RecordFileEr
 }
 
 #[test]
-fn the_format_is_4() {
-    assert_eq!(RECORD_FORMAT_VERSION, 4);
+fn the_format_is_5() {
+    assert_eq!(RECORD_FORMAT_VERSION, 5);
 }
 
 /// Criterion 51: the picture test reads with its source and its Strength axis, and is written
@@ -39,7 +39,10 @@ fn the_format_is_4() {
 fn a_picture_test_keeps_its_source_and_strength_axis_byte_for_byte() {
     let text = fixture("format4_picture_test.json");
     let material = read(&text).unwrap();
-    assert_eq!(write_record(&material), text);
+    assert_eq!(
+        write_record(&material),
+        text.replacen("\"format_version\": 4,", "\"format_version\": 5,", 1)
+    );
     let picture_test = material.test(TestId::parse("7ST4R").unwrap()).unwrap();
     let recipe = &picture_test.recipe;
     assert_eq!(recipe.picture(), PictureSource::Selected);
@@ -75,7 +78,7 @@ fn a_format_3_record_reads_as_is_and_is_written_as_format_4() {
     let written = write_record(&material);
     assert_eq!(
         written,
-        text.replacen("\"format_version\": 3,", "\"format_version\": 4,", 1)
+        text.replacen("\"format_version\": 3,", "\"format_version\": 5,", 1)
     );
     assert_eq!(read(&written).unwrap(), material);
 }

@@ -133,7 +133,7 @@ fn a_record_over_512_kib_is_refused() {
     );
     assert_eq!(
         refused.unwrap_err().to_string(),
-        "Could not save Birch: it is over 512 KiB."
+        "Could not save Birch: it is over 640 KiB."
     );
     assert_eq!(library.text(ONE), Some(before.as_str()));
 }
