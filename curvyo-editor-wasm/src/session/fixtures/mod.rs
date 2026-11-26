@@ -19,6 +19,7 @@ mod into_slot;
 mod into_slot_cue;
 mod into_slot_drag;
 mod into_slot_ghost;
+mod into_slot_place;
 mod into_slot_put;
 mod jobs;
 mod keys;
@@ -44,6 +45,8 @@ mod tests_fit;
 mod tests_handles;
 #[cfg(test)]
 mod tests_into_slot;
+#[cfg(test)]
+mod tests_into_slot_place;
 #[cfg(test)]
 mod tests_pins;
 #[cfg(test)]

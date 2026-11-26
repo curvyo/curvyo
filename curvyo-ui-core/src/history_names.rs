@@ -220,6 +220,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("import_elements", "Import elements"),
     // `specs/0154-library-into-slots` criteria 4, 7 and 8 (ADR 0088 decision 5).
     ("put_into_slot", "Put into slot"),
+    ("place_page_into_slot", "Place page into slot"),
     ("replace_slot_content", "Replace slot content"),
     ("fill_slots", "Fill slots"),
     // The fit written to a fragment's private copy before the insert; never a step of its own.

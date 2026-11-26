@@ -14,7 +14,7 @@ use super::add_fixture;
 use super::tests::{chip, corner, laser, last_label, mm, place};
 use super::{SlotSource, UnitBox};
 
-fn record() -> CameFrom {
+pub(super) fn record() -> CameFrom {
     CameFrom {
         document: "Box job".into(),
         page: "Coaster".into(),
@@ -26,7 +26,7 @@ fn record() -> CameFrom {
 }
 
 /// A read-only library source whose first page is 60 x 40 mm with two rectangles on it.
-fn source() -> Session {
+pub(super) fn source() -> Session {
     let mut s = Session::new(5);
     s.resize_viewport(1200.0, 800.0);
     s.document
@@ -44,7 +44,7 @@ fn source() -> Session {
 }
 
 /// A laser page with one holder (320 x 240 at 10, 10) and slots: 30 x 30, 60 x 40, circle 25.
-fn laser_with_slots() -> (Session, NodeId, [NodeId; 3]) {
+pub(super) fn laser_with_slots() -> (Session, NodeId, [NodeId; 3]) {
     let mut s = laser();
     let holder = add_fixture(&mut s, "holder").unwrap();
     chip(&mut s, holder, 's', &["320", "240"]);
@@ -63,7 +63,7 @@ fn laser_with_slots() -> (Session, NodeId, [NodeId; 3]) {
     (s, holder, [ids[0], ids[1], ids[2]])
 }
 
-fn page_source(source: &Session) -> SlotSource<'_> {
+pub(super) fn page_source(source: &Session) -> SlotSource<'_> {
     SlotSource {
         source,
         roots: &[],
@@ -73,14 +73,14 @@ fn page_source(source: &Session) -> SlotSource<'_> {
 }
 
 /// The slot's centre in document space.
-fn slot_centre(s: &Session, holder: NodeId, cx: f64) -> Point {
+pub(super) fn slot_centre(s: &Session, holder: NodeId, cx: f64) -> Point {
     let origin = s.active_page().origin;
     let frame = corner(s, holder);
     Point::new(origin.x + frame.x + cx, origin.y + frame.y + 100.0)
 }
 
 /// The joint outline box of the selection.
-fn selection_box(s: &Session) -> (Point, Point) {
+pub(super) fn selection_box(s: &Session) -> (Point, Point) {
     let ids: Vec<NodeId> = s
         .selection
         .ids()
@@ -102,7 +102,7 @@ fn selection_box(s: &Session) -> (Point, Point) {
     super::into_slot::joint(&boxes).unwrap()
 }
 
-fn assert_box(b: (Point, Point), centre: Point, w: f64, h: f64) {
+pub(super) fn assert_box(b: (Point, Point), centre: Point, w: f64, h: f64) {
     let (min, max) = b;
     let c = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
     assert!(

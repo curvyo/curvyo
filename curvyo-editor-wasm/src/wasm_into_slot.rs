@@ -152,7 +152,8 @@ impl WasmSession {
     }
 
     /// Puts the page `page` (or the picks `roots`) of `source` into the slot `slot`, as one
-    /// step; with `replace` the slot's content goes in the same step. Returns `{"refused",
+    /// step; with `replace` the slot's content goes in the same step, with `place` a whole page is
+    /// placed live (a new page and its placement) instead of copied. Returns `{"refused",
     /// "notice"}` or `{"error"}` as JSON.
     #[allow(clippy::needless_pass_by_value, clippy::too_many_arguments)]
     pub fn put_into_slot(
@@ -164,6 +165,7 @@ impl WasmSession {
         slot: &str,
         real_size: bool,
         replace: bool,
+        place: bool,
     ) -> String {
         let Ok(record) = serde_json::from_str::<CameFromWire>(came_from) else {
             return error("the record is not readable");
@@ -179,9 +181,34 @@ impl WasmSession {
             page: page.as_deref(),
             came_from: &record,
         };
+        let done = if place {
+            self.session
+                .place_library_page_into_slot(&from, slot, mode(real_size), replace)
+        } else {
+            self.session
+                .put_into_slot(&from, slot, mode(real_size), replace)
+        };
+        match done {
+            Ok(done) => serde_json::to_string(&done).unwrap_or_default(),
+            Err(text) => error(&text),
+        }
+    }
+
+    /// Places the drawing page `page` of the open document into the slot `slot` as a live placed
+    /// page, one step. Returns `{"refused", "notice"}` or `{"error"}` as JSON.
+    pub fn place_page_into_slot(
+        &mut self,
+        page: &str,
+        slot: &str,
+        real_size: bool,
+        replace: bool,
+    ) -> String {
+        let Some(slot) = self.session.fixture_part_named(slot) else {
+            return error("the slot is gone");
+        };
         match self
             .session
-            .put_into_slot(&from, slot, mode(real_size), replace)
+            .place_page_into_slot(page, slot, mode(real_size), replace)
         {
             Ok(done) => serde_json::to_string(&done).unwrap_or_default(),
             Err(text) => error(&text),
