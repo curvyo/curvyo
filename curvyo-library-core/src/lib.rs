@@ -49,5 +49,5 @@ pub use search::{
     MAX_QUERY_CHARS, Scratch, SearchIndex, WEIGHT_ALIAS, WEIGHT_CATEGORY, WEIGHT_KEYWORD,
     WEIGHT_NAME, WEIGHT_RELATED, WEIGHT_SOURCE, WEIGHT_TAG, Weight, Why,
 };
-pub use sources::{AddRefusal, Millis, SOURCES_FILE, SourceEntry, Sources};
+pub use sources::{AddRefusal, Millis, SOURCES_FILE, SourceEntry, Sources, TokenRefusal};
 pub use verify::{sha256_hex, verify};

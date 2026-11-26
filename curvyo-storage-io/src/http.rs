@@ -6,6 +6,8 @@ use std::time::Duration;
 
 use curvyo_library_core::{Failure, Request, host_of};
 
+use crate::catalogue_token::AccessToken;
+
 /// Why a GET gave no body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum HttpError {
@@ -42,6 +44,51 @@ pub trait Transport {
     /// # Errors
     /// [`HttpError`].
     fn get(&self, request: &Request, max_bytes: usize) -> Result<Vec<u8>, HttpError>;
+
+    /// GET `request` with `Authorization: Bearer <token>`, sent only to the request's own origin
+    /// (ADR 0090 decision 5). A transport that cannot send a token fails closed: it never sends the
+    /// request without it.
+    ///
+    /// # Errors
+    /// [`HttpError`].
+    fn get_bearer(
+        &self,
+        _request: &Request,
+        _max_bytes: usize,
+        _token: &AccessToken,
+    ) -> Result<Vec<u8>, HttpError> {
+        Err(HttpError::Connection)
+    }
+}
+
+/// A [`Transport`] that sends the token of one Git catalogue with every request that goes through
+/// it, to the request's own origin only (ADR 0090 decision 5).
+pub struct Authorized<'a> {
+    inner: &'a dyn Transport,
+    token: &'a AccessToken,
+}
+
+impl<'a> Authorized<'a> {
+    /// `inner`, with `token` on every request.
+    #[must_use]
+    pub const fn new(inner: &'a dyn Transport, token: &'a AccessToken) -> Self {
+        Self { inner, token }
+    }
+}
+
+impl Transport for Authorized<'_> {
+    fn get(&self, request: &Request, max_bytes: usize) -> Result<Vec<u8>, HttpError> {
+        self.inner.get_bearer(request, max_bytes, self.token)
+    }
+
+    fn get_bearer(
+        &self,
+        request: &Request,
+        max_bytes: usize,
+        _token: &AccessToken,
+    ) -> Result<Vec<u8>, HttpError> {
+        self.get(request, max_bytes)
+    }
 }
 
 const MAX_REDIRECTS: usize = 3;
@@ -96,15 +143,27 @@ impl UreqTransport {
         })
     }
 
-    fn get_url(&self, url: &str, pin_host: bool, max_bytes: usize) -> Result<Vec<u8>, HttpError> {
+    fn get_url(
+        &self,
+        url: &str,
+        pin_host: bool,
+        max_bytes: usize,
+        token: Option<&AccessToken>,
+    ) -> Result<Vec<u8>, HttpError> {
         let origin = host_of(url);
+        let full_origin = origin_of(url);
+        // A request with a token stays on its own origin: another one is refused, not followed.
+        let pin_host = pin_host || token.is_some();
         let mut url = url.to_owned();
         for _ in 0..=MAX_REDIRECTS {
-            let mut response = self
-                .agent()
-                .get(&url)
-                .call()
-                .map_err(|_| HttpError::Connection)?;
+            let mut request = self.agent().get(&url);
+            if let Some(token) = token
+                && origin_of(&url) == full_origin
+            {
+                // Per request, never on the agent: a hop elsewhere cannot carry it.
+                request = request.header("Authorization", token.bearer().as_str());
+            }
+            let mut response = request.call().map_err(|_| HttpError::Connection)?;
             let status = response.status().as_u16();
             if matches!(status, 301 | 302 | 303 | 307 | 308) {
                 let next = response
@@ -113,6 +172,9 @@ impl UreqTransport {
                     .and_then(|value| value.to_str().ok())
                     .ok_or(HttpError::Redirect)?;
                 url = redirect_target(&url, next, pin_host, origin.as_deref())?;
+                if token.is_some() && origin_of(&url) != full_origin {
+                    return Err(HttpError::Redirect);
+                }
                 continue;
             }
             if status != 200 {
@@ -131,6 +193,13 @@ impl UreqTransport {
         }
         Err(HttpError::Redirect)
     }
+}
+
+/// Scheme, host and port of a URL, lower case: the unit a token is bound to.
+fn origin_of(url: &str) -> Option<String> {
+    let (scheme, rest) = url.split_once("://")?;
+    let authority = rest.split('/').next()?;
+    (!authority.is_empty()).then(|| format!("{scheme}://{authority}").to_ascii_lowercase())
 }
 
 /// The URL a redirect leads to: an absolute `https` URL, or a path on the same host; for the
@@ -157,7 +226,16 @@ fn redirect_target(
 
 impl Transport for UreqTransport {
     fn get(&self, request: &Request, max_bytes: usize) -> Result<Vec<u8>, HttpError> {
-        self.get_url(request.url(), request.pins_host(), max_bytes)
+        self.get_url(request.url(), request.pins_host(), max_bytes, None)
+    }
+
+    fn get_bearer(
+        &self,
+        request: &Request,
+        max_bytes: usize,
+        token: &AccessToken,
+    ) -> Result<Vec<u8>, HttpError> {
+        self.get_url(request.url(), request.pins_host(), max_bytes, Some(token))
     }
 }
 
@@ -212,11 +290,13 @@ mod tests {
         ]);
         let transport = UreqTransport::new(false);
         assert_eq!(
-            transport.get_url(&format!("{base}/a"), false, 100).unwrap(),
+            transport
+                .get_url(&format!("{base}/a"), false, 100, None)
+                .unwrap(),
             b"hello"
         );
         assert_eq!(
-            transport.get_url(&format!("{base}/b"), false, 100),
+            transport.get_url(&format!("{base}/b"), false, 100, None),
             Err(HttpError::Status(404))
         );
     }
@@ -226,7 +306,7 @@ mod tests {
         let base = serve(vec![ok("0123456789")]);
         let transport = UreqTransport::new(false);
         assert_eq!(
-            transport.get_url(&format!("{base}/a"), false, 5),
+            transport.get_url(&format!("{base}/a"), false, 5, None),
             Err(HttpError::TooLarge)
         );
     }
@@ -235,7 +315,7 @@ mod tests {
     fn a_closed_port_is_a_connection_failure() {
         let transport = UreqTransport::new(false);
         assert_eq!(
-            transport.get_url("http://127.0.0.1:1/", false, 5),
+            transport.get_url("http://127.0.0.1:1/", false, 5, None),
             Err(HttpError::Connection)
         );
     }
@@ -244,7 +324,7 @@ mod tests {
     fn plain_http_is_refused_by_the_real_transport() {
         let transport = UreqTransport::default();
         assert_eq!(
-            transport.get_url("http://127.0.0.1:1/", false, 5),
+            transport.get_url("http://127.0.0.1:1/", false, 5, None),
             Err(HttpError::Connection)
         );
     }
@@ -257,7 +337,9 @@ mod tests {
         ]);
         let transport = UreqTransport::new(false);
         assert_eq!(
-            transport.get_url(&format!("{base}/a"), true, 100).unwrap(),
+            transport
+                .get_url(&format!("{base}/a"), true, 100, None)
+                .unwrap(),
             b"moved"
         );
         assert_eq!(
@@ -304,7 +386,7 @@ mod tests {
         ]);
         let transport = UreqTransport::new(false);
         assert_eq!(
-            transport.get_url(&format!("{base}/a"), false, 100),
+            transport.get_url(&format!("{base}/a"), false, 100, None),
             Err(HttpError::Redirect)
         );
     }
@@ -321,7 +403,7 @@ mod tests {
         ]);
         let transport = UreqTransport::new(false);
         assert_eq!(
-            transport.get_url(&format!("{base}/a"), false, 100),
+            transport.get_url(&format!("{base}/a"), false, 100, None),
             Err(HttpError::Redirect)
         );
     }
@@ -331,8 +413,12 @@ mod tests {
         let set_cookie = "HTTP/1.1 200 OK\r\nSet-Cookie: id=1\r\nContent-Length: 1\r\nConnection: close\r\n\r\nx";
         let (base, seen) = serve_recording(vec![set_cookie.into(), ok("y")]);
         let transport = UreqTransport::new(false);
-        transport.get_url(&format!("{base}/a"), false, 100).unwrap();
-        transport.get_url(&format!("{base}/b"), false, 100).unwrap();
+        transport
+            .get_url(&format!("{base}/a"), false, 100, None)
+            .unwrap();
+        transport
+            .get_url(&format!("{base}/b"), false, 100, None)
+            .unwrap();
         let requests = seen.lock().unwrap().clone();
         assert_eq!(requests.len(), 2);
         for request in &requests {
@@ -342,5 +428,80 @@ mod tests {
             assert!(!lower.contains("cookie:"), "{request}");
             assert!(!lower.contains("referer:"), "{request}");
         }
+    }
+
+    #[test]
+    fn the_token_is_sent_on_the_first_hop_and_a_same_origin_redirect_only_when_given() {
+        let hop = "HTTP/1.1 302 Found\r\nLocation: /next\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let token = AccessToken::parse("SENTINEL-tok_123").unwrap();
+        let (base, seen) = serve_recording(vec![hop.into(), ok("a"), ok("b")]);
+        let transport = UreqTransport::new(false);
+        assert_eq!(
+            transport
+                .get_url(&format!("{base}/x"), false, 100, Some(&token))
+                .unwrap(),
+            b"a"
+        );
+        transport
+            .get_url(&format!("{base}/y"), false, 100, None)
+            .unwrap();
+        let requests = seen.lock().unwrap().clone();
+        assert_eq!(requests.len(), 3);
+        for with in &requests[..2] {
+            assert!(
+                with.contains("authorization: Bearer SENTINEL-tok_123\r\n")
+                    || with.contains("Authorization: Bearer SENTINEL-tok_123\r\n"),
+                "{with}"
+            );
+        }
+        assert!(
+            !requests[2].to_ascii_lowercase().contains("authorization"),
+            "no token, no header"
+        );
+    }
+
+    #[test]
+    fn a_redirect_to_another_host_is_refused_and_never_carries_the_token() {
+        let (base, seen) = serve_recording(vec![
+            "HTTP/1.1 302 Found\r\nLocation: https://localhost:9/x\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+        ]);
+        let token = AccessToken::parse("SENTINEL-tok_123").unwrap();
+        let transport = UreqTransport::new(false);
+        assert_eq!(
+            transport.get_url(&format!("{base}/x"), false, 100, Some(&token)),
+            Err(HttpError::Redirect)
+        );
+        assert_eq!(seen.lock().unwrap().len(), 1, "nothing was sent on the hop");
+    }
+
+    #[test]
+    fn an_origin_is_scheme_host_and_port() {
+        assert_eq!(
+            origin_of("HTTPS://Example.org:8443/a/b").as_deref(),
+            Some("https://example.org:8443")
+        );
+        assert_ne!(
+            origin_of("https://e.org/a"),
+            origin_of("https://e.org:8443/a")
+        );
+        assert_ne!(origin_of("https://e.org/a"), origin_of("http://e.org/a"));
+        assert_eq!(origin_of("no scheme"), None);
+    }
+
+    #[test]
+    fn authorized_hands_its_token_to_the_inner_transport_and_a_plain_double_fails_closed() {
+        struct Plain;
+        impl Transport for Plain {
+            fn get(&self, _: &Request, _: usize) -> Result<Vec<u8>, HttpError> {
+                Ok(b"anonymous".to_vec())
+            }
+        }
+        let token = AccessToken::parse("t").unwrap();
+        let request = curvyo_library_core::Catalogue::request("https://example.org/cat/");
+        assert_eq!(
+            Authorized::new(&Plain, &token).get(&request, 10),
+            Err(HttpError::Connection),
+            "never an anonymous request in place of an authorised one"
+        );
     }
 }
