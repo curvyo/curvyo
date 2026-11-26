@@ -1,6 +1,6 @@
 # Generator joint options: bend through the tabs, and your own number, size and pattern of tabs and fingers
 
-Status: Slice 1 Done (PR #496); Slice 2 Done (PR #504); Slice 3 Done (PR #TBD); slice 4 Ready (Fragen 381 to 385 answered 2026-11-26; Frage 384 C)
+Status: Slice 1 Done (PR #496); Slice 2 Done (PR #504); Slice 3 Done (PR #505); slice 4 Ready (Fragen 381 to 385 answered 2026-11-26; Frage 384 C)
 Priority: Should
 Origin: Customer (2026-11-25, after the visual check of PR #489, translated): "I only checked it visually, I still have to laser it. I suspect we will have trouble bending the material at the curves, because at the tabs no slits are cut. That should probably be possible as an option, otherwise it becomes a polygon. I'd also like to set the number and height of the tabs/fingers (as advanced). On some boxes it looks nicer with just one in the middle, or two in the middle closer together and fewer at the edges. It brings more calm, is easier to assemble and is often enough." Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
@@ -21,7 +21,7 @@ As a maker I want the slit-bent walls of my rounded and path boxes to bend smoot
 
 - **Slice 1 (A0): Tighter tab windows.** Criteria 1 to 9. No field, no key. The unslit flat across a tab on a bent span shrinks from about pitch + 2t + 4t_w to the window length l. Frage 385 (JOINT-WINDOW) answered A on 2026-11-26. **Ready.**
 - **Slice 2 (A1): Bend through tabs.** Criteria 10 to 17. Option Choice `bend_tabs` (`window` | `curve`): the true arc keeps its slits through the tab. Frage 381 answered A. **Ready.**
-- **Slice 3 (B, tabs): Joint layout for tabs** (Rounded box, Path box, curved-top back tabs). Criteria 18 to 24. Fragen 382 A, 383 A, 384 C answered. **Done (PR #TBD).** Deviations (Proposals): the curved top shows no Advanced rows yet (slice 4); Joint gap and spread show with Centred, not "Count 2 or more" (no number condition in `ShownWhen`, no contract change).
+- **Slice 3 (B, tabs): Joint layout for tabs** (Rounded box, Path box, curved-top back tabs). Criteria 18 to 24. Fragen 382 A, 383 A, 384 C answered. **Done (PR #505).** Deviations (Proposals): the curved top shows no Advanced rows yet (slice 4); Joint gap and spread show with Centred, not "Count 2 or more" (no number condition in `ShownWhen`, no contract change).
 - **Slice 4 (B, fingers): Joint layout for finger joints** (Box, curved-top plates). Criteria 25 to 29. Same Fragen. **Ready.**
 - **Later (not slices of this story):** a layout per edge (Frage 383 B, C), free manual positions, different tab sizes inside one edge, patterns on path-box corner joints, joints for the gear or other generators.
 
@@ -52,7 +52,7 @@ Terms: t = the strip's thickness, t_w = the tab's plate thickness, w = the slit 
 16. Given a radius so small that a slot cannot sit between two columns with the minimum bridge, then the box is built with a status notice (fewer or narrower tabs on that span, then the window as a last resort), never an error dialog.
 17. Given any parameter change, then regeneration stays within 100 ms of thread CPU time for 400 slots with `curve`; the demo check is a test cut (MDF and plywood) that the softer joint holds.
 
-### Slice 3: Joint layout for tabs (Part B, Done (PR #TBD); Fragen 382 A, 383 A, 384 C)
+### Slice 3: Joint layout for tabs (Part B, Done (PR #505); Fragen 382 A, 383 A, 384 C)
 
 18. Given a Rounded box or a Path box, then the Generator block has a group **Advanced**, **collapsed by default** (group state is not stored), holding the joint fields. A box with all Advanced fields at default equals the output before this slice, byte for byte (golden). The new keys are `joint_pattern`, `joint_count`, `joint_width`, `joint_gap`, `joint_spread`; no contract change; no `format_version` bump (**Proposal**, ADR 0080 §5; the architect confirms).
 19. **Joint pattern** (choice): **Even** (default; today's layout) and **Centred** (Frage 384 C: Centred plus a Spread slider). Centred groups the tabs about the middle of the edge, the gaps widening toward the ends. Count 1 is the single centred tab; Count 2 the closer pair (gap = **Joint gap**, default 2 times the joint size, **Proposal**); Count 3 or more: each next gap outward adds the Joint gap. **Joint spread** (`joint_spread`, number 0 to 100 %, default 0 %, shown only for Centred with Count 2 or more; **Proposal**) moves every tab from its Centred place toward its Even place: 0 % is the Centred layout as defined above, 100 % equals Even, in between each centre is the linear blend (so no overlap and the margins hold, both ends being valid). At Count 1 it has no effect. Joint gap applies at 0 % and fades with the blend; a gap too large for the edge is lowered with a notice (criterion 23). An unknown id reads Even with a notice.
