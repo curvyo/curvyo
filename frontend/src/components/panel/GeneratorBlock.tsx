@@ -162,6 +162,47 @@ function ClampNotice({ text }: { text: string }) {
   );
 }
 
+/** The Parts group (`specs/0147-rounded-box` criterion 15, UX notes §9): a row per part with the
+ * name of the operation it runs with, muted, and a text button Detach, or Attach once detached. */
+function PartsGroup({ api, onReturnFocus }: { api: GeneratorBlockApi; onReturnFocus: () => void }) {
+  const parts = api.view?.parts ?? [];
+  if (parts.length === 0) {
+    return null;
+  }
+  return (
+    <section className="flex flex-col gap-2" data-generator-parts>
+      <h3 className="text-sm text-[var(--toolbar-icon)]">Parts</h3>
+      {parts.map((part) => (
+        <div key={part.key} className="flex h-7 w-[244px] items-center gap-2" data-generator-part={part.key}>
+          <span className="min-w-0 flex-1 truncate text-sm text-[var(--toolbar-icon)]">{part.name}</span>
+          <span
+            className="min-w-0 max-w-[96px] truncate text-xs text-[var(--toolbar-icon)] opacity-60"
+            title={part.operation}
+          >
+            {part.operation}
+          </span>
+          <button
+            type="button"
+            disabled={!part.canDetach}
+            aria-label={`${part.detached ? "Attach" : "Detach"} ${part.name.toLowerCase()}`}
+            onClick={() => {
+              if (part.detached) {
+                api.attachPart(part.key);
+              } else {
+                api.detachPart(part.key);
+              }
+              onReturnFocus();
+            }}
+            className="h-6 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] px-2 text-xs text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] disabled:opacity-40"
+          >
+            {part.detached ? "Attach" : "Detach"}
+          </button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 /**
  * The Generator block of the Style tab (`specs/0141-parametric-generators` criteria 1 to 4, UX
  * notes §3): drawn only from the generator's schema, a heading per group and a field per row,
@@ -228,6 +269,7 @@ export function GeneratorBlock({
           ))}
         </section>
       ))}
+      <PartsGroup api={api} onReturnFocus={onReturnFocus} />
       <button
         type="button"
         data-generator-convert

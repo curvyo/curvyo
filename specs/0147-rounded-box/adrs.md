@@ -65,7 +65,7 @@ at the demo.
 6. 2026-11-24, revision 3: **Resize at full round** (lead decision, Proposal, UX question 9 A):
    the radius stays; a larger full-round box becomes a rounded rectangle, a smaller one is
    clamped and stays full round (ADR 0082 §5).
-7. 2026-11-24, revision 3: **Detach part writes a copy** of the box's operation, "<operation> ·
+7. 2026-11-24, revision 3 (built in slice 3, 2026-11-26; see ADR 0082 §10 "Built"): **Detach part writes a copy** of the box's operation, "<operation> ·
    <part>", right after it (UX notes revision 3 §9; ADR 0082 §10; confirm when slice 3 is
    Ready).
 

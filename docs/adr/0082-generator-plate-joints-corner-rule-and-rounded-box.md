@@ -432,6 +432,17 @@ moves with the box and keeps its layout place):
       ignores the key silently and never sweeps it (hence the bump). The
       rule stays pure in `curvyo-laser-core` (`operation_group.rs` neighbour); document-core
       parses the key form and gives the job the outlines of a generated leaf per part key.
+    - **Built** (slice 3, 2026-11-26, customer accepted with Frage 370 A; `format_version` 65). Deviations, all
+      **(Proposal)**: a part target is a `NodeId` that carries its key (`NodeId::with_part`, interned `'static`
+      text, never stored in an id or `document.json`), so `curvyo-laser-core`'s nearest rule needed no change:
+      the leaf index (`editor-wasm`) gives a box with a detached part one leaf for the rest (chain `[N]`) and one
+      leaf per detached part (chain `[N#P]`, `[N]`, the groups above); geometry comes from the record's parts.
+      The commands are `Document::detach_part` and `attach_part` (one commit each, label `detach_part` /
+      `attach_part`) rather than composed ui-core commands, because one step must write the copies and the
+      keys; Detach copies every operation of the box's nearest assignment. Part keys are valid as 1 to 32 of
+      `a-z`, `0-9`, `-`. Convert to paths rewrites `N#P` to the part's new path in the same commit (a single
+      part: to the node). The record's `part_keys` are written by every generation (`record_of`) and by Detach
+      on a record that has none.
     - **Slice.** Slice 3 of spec `0147` (Frage 363 A); slices 1 and 2 write no part keys and no
       `#` membership, and keep `format_version`. `Part.key` may enter the contract earlier, as it
       is run time only; the record's `part_keys` and the membership form land with slice 3.

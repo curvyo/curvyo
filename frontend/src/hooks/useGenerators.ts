@@ -61,6 +61,10 @@ export interface GeneratorBlockApi {
   convert: () => void;
   /** Replace outline: arms the pick of a new outline (`0149`). */
   replaceOutline: () => void;
+  /** Detach part: the part gets operations of its own (`0147` criterion 15); one step. */
+  detachPart: (key: string) => void;
+  /** Attach part: the part runs with the box's operations again; one step. */
+  attachPart: (key: string) => void;
 }
 
 /** The Generator block's state; also shows the once-only notice of an opened file with a
@@ -134,7 +138,31 @@ export function useGeneratorBlock(editor: GeneratorsEditor): GeneratorBlockApi {
     getSession()?.begin_replace_outline();
     sync();
   }, [getSession, sync]);
-  return { view, notice, setValue, preview, cancelPreview, convert, replaceOutline };
+  const detachPart = useCallback(
+    (key: string) => {
+      getSession()?.detach_generated_part(key);
+      sync();
+    },
+    [getSession, sync],
+  );
+  const attachPart = useCallback(
+    (key: string) => {
+      getSession()?.attach_generated_part(key);
+      sync();
+    },
+    [getSession, sync],
+  );
+  return {
+    view,
+    notice,
+    setValue,
+    preview,
+    cancelPreview,
+    convert,
+    replaceOutline,
+    detachPart,
+    attachPart,
+  };
 }
 
 /** The Select bar's Box from path (`specs/0149-path-box` UX notes §1.1). */

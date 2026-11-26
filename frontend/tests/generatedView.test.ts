@@ -268,3 +268,28 @@ test("a refusal shows in the refusal look for 8 s, a warning as a status for 5 s
   assert.deepEqual(canvasNoticeLook("The corner between pieces 4 and 5 is very sharp: 9.5°."), { kind: "status", ms: 5000 });
   assert.deepEqual(canvasNoticeLook("No place for the finger hollow on this lid."), { kind: "status", ms: 5000 });
 });
+
+test("the Parts group decodes its rows with their state and an old session has none", () => {
+  const withParts = JSON.stringify({
+    id: "1",
+    label: "Rounded box",
+    known: true,
+    rows: [],
+    parts: [
+      { key: "strip", name: "Strip", detached: false, operation: "Cut 1", can_detach: true },
+      { key: "lid", name: "Lid", detached: true, operation: "Cut 1 · Lid", can_detach: true },
+    ],
+  });
+  const view = decodeGeneratedView(withParts);
+  assert.ok(view);
+  assert.deepEqual(
+    view.parts.map((part) => [part.key, part.detached, part.operation, part.canDetach]),
+    [
+      ["strip", false, "Cut 1", true],
+      ["lid", true, "Cut 1 · Lid", true],
+    ],
+  );
+  const plain = decodeGeneratedView(json([MODULE]));
+  assert.ok(plain);
+  assert.deepEqual(plain.parts, []);
+});

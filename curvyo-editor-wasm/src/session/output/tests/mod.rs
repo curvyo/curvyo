@@ -7,6 +7,7 @@ mod focus_tests;
 mod frame_tests;
 mod group_tests;
 mod image_kind_tests;
+mod part_tests;
 mod play_tests;
 mod raster_tests;
 mod send_tests;

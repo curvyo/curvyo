@@ -2987,3 +2987,15 @@ at the demo. The rectangle keeps its corner radii (Frage 326, answered B). A rou
 exports as a path with the shadow (Inkscape has no live equivalent, so `d` is the outline) and
 imports back live from the seventh shadow number. **Resolution:** none planned; a squircle would be its own
 spec.
+
+## Part keys are interned in a process-wide table (`0147` slice 3, 2026-11-26)
+
+A `NodeId` carries a part key as a `u16` tag into one `static` table in `curvyo-document-core`
+(`part_key.rs`, at most 4096 distinct keys, each a leaked `'static` string), so the id stays 16 bytes and
+`Copy` and `curvyo-laser-core`'s nearest rule needed no change. The table is hidden global state in a
+`*-core` crate (no I/O, but not a pure function of its arguments); tags are never stored or sent, only the
+key text is. Also open: the Parts row's hover look on the canvas and the part's context-menu entry (UX
+notes §9: only if the customer asks); a box in a group assigned with the group's operation takes the
+group's key on a detached part too (the group rule treats `N#P` as an inner node with its own key).
+**Resolution:** carry the key as part of an owned `Target` type through `OperationSnapshot.members` and the
+laser rule once a second kind of target needs it (path boxes' `wall-<n>` parts). Trigger: that second kind.

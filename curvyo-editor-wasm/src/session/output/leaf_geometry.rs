@@ -46,6 +46,32 @@ pub(super) fn leaf_geometry(object: &ObjectSnapshot, map: Affine) -> Option<Leaf
     })
 }
 
+/// The outlines of the parts of `snapshot` whose bits are set in `parts` (bit `i` is part `i`),
+/// frame applied, mapped by `map` (ADR 0082 §10: the rest of a box with detached parts, or one
+/// detached part). `None` when no part is picked.
+pub(super) fn part_geometry(
+    snapshot: &curvyo_document_core::GeneratedSnapshot,
+    parts: u64,
+    map: Affine,
+) -> Option<LeafGeometry> {
+    let outlines: Vec<LeafOutline> = snapshot
+        .outlines()
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| *index < 64 && parts >> index & 1 == 1)
+        .flat_map(|(_, subpaths)| subpaths)
+        .map(|sub| LeafOutline {
+            anchors: sub
+                .anchors
+                .iter()
+                .map(|a| mapped(map, (a.point, a.handle_in, a.handle_out)))
+                .collect(),
+            closed: sub.closed,
+        })
+        .collect();
+    (!outlines.is_empty()).then_some(LeafGeometry::Outlines(outlines))
+}
+
 /// The gradient `object`'s fill paints, placed in its box mapped by `map` (`specs/0123`
 /// criterion 26: the gradient moves with the shape); `None` without a gradient fill.
 fn placed_gradient(object: &ObjectSnapshot, map: Affine) -> Option<PlacedGradient> {

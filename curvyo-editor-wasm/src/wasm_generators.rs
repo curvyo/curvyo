@@ -53,6 +53,18 @@ impl WasmSession {
         self.session.cancel_generated_preview();
     }
 
+    /// Detach part `key` of the selected rounded box: it gets a copy of the box's operations of its
+    /// own (`0147` criterion 15); one step "Detach part". `false` when nothing changes.
+    pub fn detach_generated_part(&mut self, key: &str) -> bool {
+        self.session.detach_selected_part(key)
+    }
+
+    /// Attach part `key` of the selected rounded box: it runs with the box's operations again; one
+    /// step "Attach part". `false` when it was not detached.
+    pub fn attach_generated_part(&mut self, key: &str) -> bool {
+        self.session.attach_selected_part(key)
+    }
+
     /// Convert to paths of the selected generated objects; one step.
     pub fn convert_selected_generated(&mut self) -> bool {
         self.session.convert_selected_generated()

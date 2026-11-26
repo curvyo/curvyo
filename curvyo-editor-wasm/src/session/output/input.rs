@@ -21,7 +21,7 @@ use super::super::fixtures::FixtureRun;
 use super::super::manufacturing::ActiveCopy;
 use super::super::object_cache::DocumentRead;
 use super::super::operations::index::{IndexedLeaf, LeafSource};
-use super::leaf_geometry::{leaf_geometry, polygon};
+use super::leaf_geometry::{leaf_geometry, part_geometry, polygon};
 
 /// The job input of one laser page and the facts of its gate.
 #[derive(Debug, Clone, PartialEq)]
@@ -48,7 +48,9 @@ struct GeometryEntry {
 /// The id a check line selects for a leaf: the first node of its chain (a clone member selects
 /// its clone, a placed page's member its source object).
 pub(super) fn select_id(leaf: &IndexedLeaf) -> Option<NodeId> {
-    leaf.chain.first().and_then(|key| key.first().copied())
+    leaf.chain
+        .first()
+        .and_then(|key| key.first().map(|id| id.node()))
 }
 
 /// The page-mm maps of a laser page: the page's own (document to page) first, then each
@@ -96,6 +98,10 @@ fn geometry_of(
     };
     match leaf.source {
         LeafSource::Own(at) => leaf_geometry(read.leaves.get(at)?, own),
+        LeafSource::GeneratedParts { at, parts } => {
+            let id = read.leaves.get(at)?.id();
+            part_geometry(&session.document.generated(id)?, parts, own)
+        }
         LeafSource::CloneMember { clone, member } => {
             leaf_geometry(read.leaves.get(clone)?.picture()?.get(member)?, own)
         }

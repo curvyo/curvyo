@@ -44,6 +44,20 @@ export interface GeneratedRow {
   value: number | boolean | string;
 }
 
+/** One row of the Parts group (`specs/0147-rounded-box` criterion 15, UX notes §9). */
+export interface GeneratedPart {
+  /** The part's stable key (`lid`). */
+  key: string;
+  /** What the row calls it ("Lid"). */
+  name: string;
+  /** Whether the part has operations of its own. */
+  detached: boolean;
+  /** The names of the operations it runs with now ("Cut 3 mm"), empty when it has none. */
+  operation: string;
+  /** Detach is offered: the box runs with an operation to copy, or the part is detached. */
+  canDetach: boolean;
+}
+
 /** The block of one selected generated object. */
 export interface GeneratedView {
   /** The kind's name ("Gear"). */
@@ -51,6 +65,8 @@ export interface GeneratedView {
   /** Whether the generator is available: an unknown kind shows no block. */
   known: boolean;
   rows: GeneratedRow[];
+  /** The Parts group, empty for a kind with nothing to detach. */
+  parts: GeneratedPart[];
 }
 
 /** The decoder of `generated_panel_json`: `null` for no block. */
@@ -67,6 +83,7 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
   const view = raw as {
     label?: unknown;
     known?: unknown;
+    parts?: { key: string; name: string; detached?: boolean; operation?: string; can_detach?: boolean }[];
     rows?: {
       group: string;
       param: {
@@ -88,6 +105,13 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
   return {
     label: view.label,
     known: true,
+    parts: (view.parts ?? []).map((part) => ({
+      key: part.key,
+      name: part.name,
+      detached: part.detached === true,
+      operation: part.operation ?? "",
+      canDetach: part.can_detach === true,
+    })),
     rows: view.rows.map((row) => ({
       group: row.group,
       key: row.param.key,
