@@ -171,7 +171,7 @@ to it instead of restating it.
 | R-MAT-003 | Record the result of a test pattern (which cell worked) and attach it to the material record for reuse in future jobs on the same machine. | Must | Customer |
 | R-MAT-004 | Material records are per-machine but a maker can view/compare records for the same material across machines/materials. | Should | Proposal |
 | R-MAT-005 | Material records sync across the maker's computers (same mechanism as R-SYS-004). | Should | Customer |
-| R-MAT-006 | Test picks (customer, 2026-11-20): besides the Best cell a test marks a Second best, a Fastest and a Deepest cell (one per kind, symbol and colour), stored per laser in the shared material and synced; an operation chooses which pick it follows (Best by default); the Engrave test grid's marks are filled circles. Revises `0112`. Draft. `specs/0146-material-test-picks/` | Should | Customer (2026-11-20) |
+| R-MAT-006 | Test picks (customer, 2026-11-20): besides the Best cell a test marks a Second best, a Fastest and a Deepest cell (one per kind, symbol and colour), stored per laser in the shared material and synced; an operation chooses which pick it follows (Best by default); the Engrave test grid's marks are filled circles. Revises `0112`. Draft (ADR 0092; picks in material record format 5). `specs/0146-material-test-picks/` | Should | Customer (2026-11-20) |
 
 ## 10. Font management
 
