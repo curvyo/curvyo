@@ -1,6 +1,6 @@
 # ADRs for the generator joint options
 
-Status: Draft (architect, 2026-11-25; ADR 0089 written 2026-11-26), written beside the PO's first draft of `specification.md`,
+Status: Accepted 2026-11-26 (Fragen 381 to 385 answered; architect, 2026-11-25; ADR 0089 written 2026-11-26), written beside the PO's first draft of `specification.md`,
 so criteria are named by topic, not by number. Read against `curvyo-generators-core` at `e0fc2ebe`
 (`tab_layout.rs`, `tab_runs.rs`, `wall.rs`, `wall_bands.rs`, `slit_bend.rs`, `footprint.rs`,
 `wall_plates.rs`, `fingers.rs`, `rounded_box/`, `path_box/`, `boxes/`) and the golden
