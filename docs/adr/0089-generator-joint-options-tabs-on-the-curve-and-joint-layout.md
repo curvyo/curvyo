@@ -1,4 +1,4 @@
-# ADR 0087: Generator joint options: tabs on the curve and joint layout
+# ADR 0089: Generator joint options: tabs on the curve and joint layout
 
 **Status:** Proposed 2026-11-26 by the architect. Slice 1 (decision 1, tighter windows) is
 decided: the customer answered Frage 385 (JOINT-WINDOW) with A on 2026-11-26. Decision 2 follows
