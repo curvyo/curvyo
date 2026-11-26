@@ -5,7 +5,7 @@
 import { createIconBatcher } from "@/lib/iconBatch";
 import { invoke } from "@/platform/host";
 
-/** The field a refusal is shown under (`specs/0156` UX notes T1). */
+/** The field a refusal is shown under (`specs/0157` UX notes T1). */
 export type RefusalField = "address" | "token";
 
 /** The refusal and its field, or the key of the added source. */

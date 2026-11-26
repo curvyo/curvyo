@@ -1,4 +1,4 @@
-// The masked access token field (`specs/0156-library-git-token` UX notes 2, criterion 8): an
+// The masked access token field (`specs/0157-library-git-token` UX notes 2, criterion 8): an
 // UNCONTROLLED password input, so no `value` attribute ever holds the typed text (React syncs the
 // attribute of a controlled input). Its text is read through the handle at Add or Save and cleared
 // by the caller; it is never in React state, a store, `localStorage` or a `title`.

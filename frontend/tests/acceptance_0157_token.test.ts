@@ -1,4 +1,4 @@
-// `specs/0156-library-git-token` criterion 8 on the page's side: the token field is uncontrolled and
+// `specs/0157-library-git-token` criterion 8 on the page's side: the token field is uncontrolled and
 // its text never reaches state, a store, `localStorage` or a `title`. The DOM check (`value`
 // attribute null after typing and after Add) runs in the real app; this guards the source.
 

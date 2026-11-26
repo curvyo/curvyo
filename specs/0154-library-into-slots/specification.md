@@ -1,6 +1,6 @@
 # Library into slots: drop a finished page or picked elements onto a fixture slot of a laser page
 
-Status: Slice 1 Done (PR #495; Ready 2026-11-25; Fragen 377 to 379 and 385 built at their defaults, slice 2 = live placed page; ADR 0088 Proposed, not `needs-customer`)
+Status: Done (PR #495 slice 1, PR #498 slice 2; Ready 2026-11-25; Fragen 377 to 379 and 385 built at their defaults; ADR 0088 Proposed, not `needs-customer`)
 Priority: Should
 Origin: Customer, 2026-11-25 (translated): "We still need to add that from workspaces you can insert single objects of pages, or whole pages, into laser placeholders. That's partly the idea behind the fixture placeholders: that you can simply insert a finished page there." Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 Depends on: `0102` (holders, slots, fit), `0103` (fixture jobs, unchanged), `0113` (fixture sets), `0100` (placed pages, clones, slot snap for placed pages), `0137` (copy import, Came from), `0152` (browser pane, drag, double-click)

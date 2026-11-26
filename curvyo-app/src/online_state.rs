@@ -76,7 +76,7 @@ impl OnlineState {
     /// Add source (criterion 1, UX F6): the address is checked with one request, except the ready
     /// Curvyo catalogue, which sends nothing until it is opened. With a `token` the key store is
     /// opened first, the request carries the token, and only after it succeeded the token is kept
-    /// (`specs/0156` criteria 2, 3, 11). `Err` is the refusal and the field it is shown under;
+    /// (`specs/0157` criteria 2, 3, 11). `Err` is the refusal and the field it is shown under;
     /// `Ok` the key of the source now in `sources`.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn add(

@@ -572,7 +572,7 @@ fn a_cancelled_add_discards_the_check_and_lists_nothing() {
     assert_eq!(state.add_generation(), before + 1);
 }
 
-// --- `specs/0156` library Git token -----------------------------------------------------------
+// --- `specs/0157` library Git token -----------------------------------------------------------
 
 use curvyo_storage_io::{AccessToken, CredentialStore, load_token};
 

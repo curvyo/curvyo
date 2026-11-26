@@ -83,7 +83,7 @@ pub enum Failure {
     /// A redirect the guard refuses (another host, or not `https`).
     Redirect,
     /// The source has a token in the key store and it could not be read: nothing was sent
-    /// (ADR 0090 decision 5, `specs/0156` criterion 12).
+    /// (ADR 0090 decision 5, `specs/0157` criterion 12).
     TokenUnreadable,
 }
 

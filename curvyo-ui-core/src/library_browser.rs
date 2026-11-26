@@ -229,7 +229,7 @@ pub struct BrowseGroup {
     pub label: String,
     /// The order: My documents, the Curvyo catalogue, Git catalogues, Iconify sources.
     pub rank: u8,
-    /// The source has an access token: the Lock mark after the name (`specs/0156` criterion 4).
+    /// The source has an access token: the Lock mark after the name (`specs/0157` criterion 4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub private: bool,
 }

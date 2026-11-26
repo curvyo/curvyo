@@ -522,7 +522,7 @@ fn criterion_32_the_guide_does_not_name_an_index_script_that_does_not_exist() {
 
 #[test]
 fn criterion_33_the_guide_explains_the_access_token_and_no_longer_says_public_only() {
-    // Changed with `0156` criteria 15 and 16: the line "The repository must be public." is gone.
+    // Changed with `0157` criteria 15 and 16: the line "The repository must be public." is gone.
     let guide = hosting_guide();
     assert_eq!(guide.private_title, "Private repositories");
     assert!(

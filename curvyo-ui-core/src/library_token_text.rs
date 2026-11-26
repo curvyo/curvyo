@@ -1,4 +1,4 @@
-//! The words of a Git catalogue's access token (`specs/0156-library-git-token` criteria 1 to 16,
+//! The words of a Git catalogue's access token (`specs/0157-library-git-token` criteria 1 to 16,
 //! UX notes 2 to 7): what a refusal says and under which field, the failure line of a source, and
 //! the fixed texts of the form. The token itself is never an input here.
 
