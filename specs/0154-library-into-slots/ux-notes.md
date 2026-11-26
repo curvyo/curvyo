@@ -350,6 +350,16 @@ opening the list, or a refused drop.
 - The Into slot list ignores a held Enter or Space (key repeat): the Enter that opened the list
   never runs on into its first row, the Fill row; Enter on a slot row only ever puts into that slot.
 
+## Slice 2 build (2026-11-26, Proposal)
+
+- Ctrl while dropping a whole page over a slot places it live: the badge reads "Placed page into
+  Slot 2 · 50 %", the release is one undo step "Place page into slot" (a static name; the slot name
+  is in the badge and the fit notice). Picks, icons and Shift fill keep copying; Ctrl is ignored there.
+- The Into slot list has a **Placed page** toggle beside Real size, shown for a whole page only.
+- A drawing page row of the Pages panel released over a slot with Ctrl is placed fitted (open
+  document, no page added); without Ctrl the `0100` drop is unchanged.
+- Only a drawing page is placed; a laser or sketch library page is refused with a sentence.
+
 ## Links
 
 Spec: `specification.md`. Slots and fit cue: `specs/0102-laser-fixtures/ux-notes.md` 4.2, 5.2,
