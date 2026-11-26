@@ -205,8 +205,8 @@ decoders and the Shift rule.
   link mark, Enter commits coupled, Escape and a blur write nothing), the `--dim-guide` extension
   lines and arrowheads of the knob's dimension and its partners' on hover and drag, the follower
   border on partner fields during a coupled field drag. The link commands live in
-  `instance_link_commands.rs`. Not built: the focus moves after Link and Unlink (UX notes 12.9.1)
-  and the status-bar line of criterion 26 (not built by the criterion).
+  `instance_link_commands.rs`. The focus moves after Link and Unlink (UX notes 12.9.1; `fix/sketch-link-focus`). Not built:
+  the status-bar line of criterion 26 (not built by the criterion).
 - (Proposal) `linked_change` takes the clone's inherited values besides its own (A14 lists only the
   own), so "the value changes" of criterion 34 compares with what the clone shows up a chain.
 - (Proposal) The dimension pill's accessible name adds ", linked in group A" (UX notes ask for
