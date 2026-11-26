@@ -14,6 +14,7 @@ import {
   rowRange,
   stepRowText,
   unitOf,
+  unitOfRow,
   positionOf,
   automaticWords,
   sliderEnd,
@@ -267,4 +268,16 @@ test("a refusal shows in the refusal look for 8 s, a warning as a status for 5 s
   assert.deepEqual(canvasNoticeLook("Select one closed outline. Nothing was changed."), { kind: "alert", ms: 8000 });
   assert.deepEqual(canvasNoticeLook("The corner between pieces 4 and 5 is very sharp: 9.5°."), { kind: "status", ms: 5000 });
   assert.deepEqual(canvasNoticeLook("No place for the finger hollow on this lid."), { kind: "status", ms: 5000 });
+});
+
+test("the Joint spread count is a percentage, other counts have no unit", () => {
+  const spread = {
+    group: "Advanced",
+    param: { key: "joint_spread", label: "Joint spread", kind: { kind: "count", min: 0, max: 100 } },
+    value: { kind: "count", value: 25 },
+  };
+  const view = decodeGeneratedView(json([spread, TEETH]));
+  assert.ok(view);
+  assert.equal(unitOfRow(view.rows[0]), "%");
+  assert.equal(unitOfRow(view.rows[1]), "");
 });

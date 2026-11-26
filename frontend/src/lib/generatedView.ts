@@ -151,6 +151,11 @@ export function unitOf(kind: GeneratedKind): string | undefined {
   return kind.kind === "length" ? "mm" : kind.kind === "angle" ? "°" : undefined;
 }
 
+/** The unit of a row: the Joint spread count is a percentage. */
+export function unitOfRow(row: GeneratedRow): string {
+  return row.key === "joint_spread" ? "%" : (unitOf(row.kind) ?? "");
+}
+
 /** The text a number row shows for its stored value. */
 export function rowText(row: GeneratedRow): string {
   const { kind } = row;
@@ -281,6 +286,9 @@ export function dragSpan(row: GeneratedRow): { min: number; limit: number } {
 
 /** The unit spelled out for `aria-valuetext`. */
 export function unitWordsOf(row: GeneratedRow): string {
+  if (row.key === "joint_spread") {
+    return "percent";
+  }
   return row.kind.kind === "length" ? "millimetres" : row.kind.kind === "angle" ? "degrees" : row.label.toLowerCase();
 }
 
