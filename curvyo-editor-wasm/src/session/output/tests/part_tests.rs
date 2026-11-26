@@ -189,3 +189,39 @@ fn convert_to_paths_keeps_the_lid_in_its_own_operation() {
         "no part key is left"
     );
 }
+
+#[test]
+fn criterion_15_the_copy_counts_the_detached_lid_as_its_item() {
+    let (mut s, _) = boxed();
+    assert!(s.detach_selected_part("lid"));
+    let view: Value = serde_json::from_str(&s.operations_view_json()).unwrap();
+    let items: Vec<(String, u64)> = view["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            (
+                row["name"].as_str().unwrap().to_owned(),
+                row["items"].as_u64().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        items,
+        [("Cut 1".to_owned(), 1), ("Cut 1 · Lid".to_owned(), 1)]
+    );
+}
+
+#[test]
+fn criterion_16_a_curved_top_lists_strip_end_plates_front_base() {
+    let (mut s, _) = boxed();
+    let answer = s.set_generated_value("top_shape", "\"curved\"");
+    assert!(answer.contains("\"written\":true"), "{answer}");
+    let keys: Vec<String> = panel(&s)["parts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["key"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(keys, ["strip", "left", "right", "front", "base"]);
+}
