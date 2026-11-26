@@ -1,7 +1,8 @@
 # 0073 Parameter handle clone: UX notes
 
-ux-engineer, 2026-11-26. Written from `specification.md` (Draft, criteria 1 to 8) at the default
-of the open question **COPY-KEY A (Alt)**; section 9 lists the words that change under Ctrl.
+ux-engineer, 2026-11-26. Written from `specification.md` (Draft, criteria 1 to 8) for the copy
+key **Shift** (COPY-KEY, Frage 387, answered by the customer 2026-11-26; first written for Alt,
+changed to Shift by the lead with the implementation).
 Checked against `docs/design-system.md` (rows "Parameter handle", "Drag ghost", "Live transform
 readout", "Modifier badge", "Move entry chip", "Transform entry chip", "Limited tag", "Corner
 radius readout and chip texts", "Offset handles", "Cloning drag", "Bend a segment", "Group handle
@@ -11,7 +12,7 @@ chip", "No notice after a success"), `specs/0021-ellipse-arcs-and-shaping/` (cri
 criterion 9, and the code: `curvyo-ui-core/src/select_tool/press.rs` (`arms_lasso`),
 `frontend/src/components/MoveEntryChip.tsx` (the Copy check), `TransformEntryChip.tsx` (the
 parameter chips). No new colour token, glyph, component kind, panel section, hint line or notice.
-**(Proposal)** items are vetoable at the demo and listed as V1 to V7 in section 10; section 11
+**(Proposal)** items are vetoable at the demo and listed as V1 to V7 in section 9; section 10
 lists the spec deltas K1 to K5 for the product owner. Distances are screen pixels.
 
 Terms: "knob" is a parameter handle (row "Parameter handle"). "Copy drag" is a knob drag that
@@ -25,35 +26,24 @@ a plus badge and the word "copy" in the readout say which of the two is happenin
 the current frame decides what is drawn; the state at the release decides what is written
 (criterion 1). Nothing else on screen changes.
 
-## 2. The key: when Alt counts (criterion 1)
+## 2. The key: when Shift counts (criterion 1)
 
-Alt at the press is already taken in the Select tool, and these notes do not take it away:
+- **Shift pressed at any time during the knob drag** (after the press, before or after the 3 px
+  dead zone) makes it a copy drag in the frame of the keydown; releasing Shift makes it a change
+  drag again in the frame of the keyup. Held, not toggled: a held Shift is a copy, a released one is
+  not.
+- The press is unchanged: Shift at a press on a knob starts the knob drag and does not toggle the
+  selection; on a corner radius knob it chooses one corner (`0013`). A Shift held from the press is
+  therefore no copy until it is let go and pressed again during the drag **(Proposal V1)**.
+- The live state is taken from window-level key events and corrected by the `shiftKey` flag of
+  every pointer event; **the release is decided by the `shiftKey` flag of the pointer-up** (the
+  "Cloning drag" rule), so a lost keyup cannot turn a visible copy into a change or back.
+- Shift keeps its meaning on every other handle (resize about the centre, rotate steps, skew) and
+  in a move (axis lock).
 
-- `press.rs` `arms_lasso`: an Alt press arms the lasso "wherever the press lands, handles and objects
-  included" (`0009` criterion 35, `0014` criteria 16 and 17); the lasso cursor shows while Alt is
-  held with no button down, so a knob under the pointer with Alt held already promises a lasso.
-- Linux window managers take Alt+drag at the press (rows "Bend a segment", "Offset handles";
-  the customer's own Linux/WebKitGTK setup). The press may never reach the app.
-
-So, as the Offset corner style does it (row "Offset handles", fourth round) **(Proposal V1)**:
-
-- The press on a knob starts **without** Alt, as today. Alt held at the press stays the lasso
-  (unchanged accepted behaviour).
-- **Alt pressed at any time during the knob drag** (after the press, before or after the 3 px dead
-  zone) makes it a copy drag in the frame of the keydown; releasing Alt makes it a change drag again
-  in the frame of the keyup. Held, not toggled: a held Alt is a copy, a released one is not.
-- Alt keydown and keyup during a knob drag are `preventDefault`ed (the webview would otherwise focus
-  a menu or menubar); key repeat ignored; AltGr (`getModifierState("AltGraph")`) does not count.
-- The live state is taken from window-level key events and corrected by the `altKey` flag of every
-  pointer event; **the release is decided by the `altKey` flag of the pointer-up** (the "Cloning
-  drag" rule), so a lost keyup cannot turn a visible copy into a change or back.
-- Outside a knob drag Alt is not intercepted. During a knob drag Alt has no other meaning: the
-  `0060` Alt snapping inversion is defined for object moves and creation phases only, and 0145 §3
-  gives Alt no meaning on the Rounded knob.
-
-A maker who holds Alt first and then presses a knob gets a lasso, as today. If the customer wants
-"Alt at the press" instead, that is a change of accepted behaviour (the lasso no longer starts on a
-knob) and may not work on his window manager; the lead puts it to him (see the report).
+Considered and not chosen: Alt (at a press it arms the lasso, `0014` criteria 16 and 17, and Linux
+window managers take Alt+drag at the press); Ctrl (it snaps the value on a knob, `0021` criteria 7,
+23 and 41, `0145` §3).
 
 ## 3. What the canvas shows during a copy drag (criteria 1, 2)
 
@@ -61,7 +51,7 @@ Scope: every primitive parameter knob of the Select tool: Curve, Start, End, inn
 radius and the Rounded knob of `0145`; not knobs that only share the look (text Position `0080`,
 sketch instance `0099`, tiling `0069`, generator knobs, Offset corners) **(Proposal V7)**.
 
-In the frame Alt is pressed and for as long as it is held:
+In the frame Shift is pressed and for as long as it is held:
 
 | Element | Change drag (today) | Copy drag |
 |---|---|---|
@@ -71,7 +61,7 @@ In the frame Alt is pressed and for as long as it is held:
 | Dragged knob | dragging look, at the new value | dragging look, at the copy's value under the pointer (unchanged look) |
 | Parameter handle guide, Rounded ticks | as today | as today, on the copy's value |
 | Cursor | built-in `pointer` | built-in `pointer` ("Modifiers never change a handle cursor") |
-| Modifier badge | none | **Copy badge** (plus on solid `--accent`) 16 px left of and below the hotspot, its placement rules; gone in the frame Alt is released |
+| Modifier badge | none | **Copy badge** (plus on solid `--accent`) 16 px left of and below the hotspot, its placement rules; gone in the frame Shift is released |
 | Readout | "curve 40.0 %" | "curve 40.0 % · copy" |
 
 - Where the copy covers the original (same fill, a larger value), the copy is what shows; where the
@@ -82,22 +72,22 @@ In the frame Alt is pressed and for as long as it is held:
   sweep 120.0° · copy", "r 3.5 mm · copy", "r 12.3 mm · all corners · copy", "ratio 0.45 · copy",
   "rounded 0.35 · copy". At a limit the limit word comes first: "r 12.0 mm max · copy", "rounded
   10.00 max · copy".
-- Before the press no copy badge is shown over a knob (with Alt held the press would lasso; the
-  badge never lies). The badge appears only once a knob drag is running and Alt is down.
+- Before the press no copy badge is shown over a knob (a Shift at the press is no copy; the badge
+  never lies). The badge appears only once a knob drag is running and Shift counts as the copy key.
 - A switch mid-drag swaps the two columns in the frame of the key event; the readout keeps its place.
 - Escape (first step of the cascade), the other button, a cancelled pointer and window blur cancel
   either kind: nothing is written, the badge and the copy are gone in that frame. A press and
-  release under 3 px writes nothing, with or without Alt.
-- Ctrl (the snaps of `0021` criteria 7, 23, 41 and `0145` §3) and Shift (the Link corners inversion,
-  decided at the press) keep working in a copy drag and combine with Alt.
-- **Ctrl without Alt in a knob drag shows no badge and no copy word; only Alt does.** The move's
+  release under 3 px writes nothing, with or without Shift.
+- Ctrl (the snaps of `0021` criteria 7, 23, 41 and `0145` §3) and the Link corners inversion
+  (Shift at the press) keep working in a copy drag and combine with it.
+- **Ctrl without Shift in a knob drag shows no badge and no copy word; only Shift does.** The move's
   Ctrl-keyed plus badge and " Copy" readout rules must not be reused for knobs: there Ctrl snaps.
 
 ## 4. After the release (criteria 2, 4)
 
-- Alt down at the pointer-up: one new object, at the same place, directly above the original, with
+- Shift down at the pointer-up: one new object, at the same place, directly above the original, with
   the dragged value; **the copy is selected, the original is not**; the copy's box and knobs are
-  drawn at once (the dragged knob in its idle look under the pointer). Alt up: the original changed,
+  drawn at once (the dragged knob in its idle look under the pointer). Shift up: the original changed,
   as today.
 - No notice, no toast, no announcement beyond the selection change (rule "No notice after a
   success"). The History step label is the product owner's ("Copy with curve" and so on).
@@ -117,8 +107,9 @@ The parameter entry chips (`TransformEntryChip.tsx` kinds `curve`, `arc-angle`, 
   high label row is the hit target (`label` wraps the input, `cursor-pointer`). The chip grows by
   30 px; its placement rule is unchanged (flip and clamp use the full height).
 - **Starts unset every time** the chip opens (criterion 3), also when the previous Enter used it,
-  and also with Alt held at the double-click **(Proposal V4)**. This differs from the Move chip,
-  which presets the check from Ctrl at the second press; here the Alt press belongs to the lasso.
+  and also with Shift held at the double-click **(Proposal V4)**. This differs from the Move chip,
+  which presets the check from Ctrl at the second press; here Shift at the press chooses the corner
+  scope (`0013`).
 - **Keyboard:** the field takes the focus with its text selected, as today. Tab: field, Copy, back to
   the field; Shift+Tab reverses; the chip is a closed loop (the Move chip's `loopFocus`). Space on the
   check toggles it (native). Enter in the field or on the check applies. Escape closes from either
@@ -159,37 +150,24 @@ whole object with all four radii as the change would set them. Nothing to design
 
 ## 8. Not present, by rule (criterion 8)
 
-No hint chip line ("Alt: copy" is not added to the corner radius hint chip or anywhere else), no
+No hint chip line ("Shift: copy" is not added to the corner radius hint chip or anywhere else), no
 tooltip line, no panel section, no rail or bar button, no success notice, no new cursor. The check
 is the only new element.
 
-## 9. Under COPY-KEY B (Ctrl)
+## 9. Proposals
 
-Replace "Alt" by "Ctrl" in sections 2 to 5, with these differences:
-
-- Section 2 shrinks to the move-copy rule: Ctrl may be held at the press or pressed during the drag,
-  the pointer-up flag decides; no lasso and no window-manager conflict; no menubar `preventDefault`.
-- The Copy badge shows **before the press** too, wherever a press with Ctrl would start a knob drag
-  (the move copy badge's rule), so the copy is announced as for a move.
-- The Ctrl snaps of `0021` criteria 7, 23, 41 (15° and 22.5° stops, 25-point stops) and `0145` §3
-  (steps of 0.25) lose their key; where they go is the architect's call (`adrs.md`). Section 3's
-  last bullet then names that key instead of Ctrl.
-- Section 5: the check can be preset by Ctrl at the second press of the double-click, exactly as the
-  Move chip does (then V4 falls away).
-
-## 10. Proposals
-
-- V1: Alt counts only during the drag; Alt at the press stays the lasso (section 2).
+- V1: Shift counts only once pressed during the drag; a Shift held from the press keeps its press
+  meaning until let go (section 2).
 - V2: readout suffix " · copy" after the existing readout, limit word first (section 3).
 - V3: the check is labelled "Copy", as in the Move entry chip (section 5).
-- V4: Alt at the double-click does not preset the check (section 5).
+- V4: Shift at the double-click does not preset the check (section 5).
 - V5: an unedited Enter with the check set makes a copy with the current value (section 5).
 - V6: the selection box and the other knobs stay on the original during a copy drag (section 3).
 - V7: scope includes the Rounded knob of `0145` (a primitive parameter knob added after the spec's
   list); it excludes knobs that only share the look: text Position (`0080`), sketch instance
   (`0099`), tiling (`0069`), generator knobs, Offset corners (K4).
 
-## 11. Spec deltas for the product owner
+## 10. Spec deltas for the product owner
 
 - K1: criterion 3 "As copy" becomes "Copy" (V3).
 - K2: criterion 6 has no case on the canvas (section 7); drop it or say it applies to nothing now.
@@ -198,41 +176,40 @@ Replace "Alt" by "Ctrl" in sections 2 to 5, with these differences:
 - K4: Terms list "number of sides": no such knob exists (Points is a bar field only); drop it, and
   add Rounded (`0145`) if V7 stands.
 - K5: criterion 1 "held at the press" becomes "held at the release, pressed at any time during the
-  drag" under Alt (V1).
+  drag" (V1).
 
-## 12. Design-system rows for the implementer (same PR)
+## 11. Design-system rows for the implementer (same PR)
 
-- New row **"Parameter handle copy drag"**: "`0073`. Alt pressed during a knob drag (not at the press:
-  that is the lasso) makes a copy: the original stays drawn as committed with its box and other
+- New row **"Parameter handle copy drag"**: "`0073`. Shift pressed during a knob drag (a Shift held
+  from the press counts once let go and pressed again) makes a copy: the original stays drawn as committed with its box and other
   knobs, the copy is drawn as itself directly above it at the same place with the dragged knob, no
-  ghost; Copy badge; readout + ' · copy'. Alt keydown and keyup `preventDefault`ed during the drag,
-  AltGr ignored, the pointer-up `altKey` decides. The copy is selected."
-- Row "Drag ghost": add "Alt knob copy (`0073`): as the Ctrl copy, at the same place."
+  ghost; Copy badge; readout + ' · copy'. The pointer-up `shiftKey` decides. The copy is selected."
+- Row "Drag ghost": add "Shift knob copy (`0073`): as the Ctrl copy, at the same place."
 - Row "Modifier badge": add "and during a knob copy drag (`0073`), never before its press."
 - Row "Live transform readout": add "' · copy' after a parameter readout during a knob copy drag."
 - Row "Transform entry chip": add "the parameter chips end with the Copy check of the Move entry
   chip, unset on every open; an unedited Enter with Copy set makes a copy at the current value
   (`0073`, exception to 'Numeric entry chip')".
-- Keyboard table: a row "Copy with a parameter handle | hold Alt during the knob drag; or the Copy
+- Keyboard table: a row "Copy with a parameter handle | hold Shift during the knob drag; or the Copy
   check of its entry box | `0073`".
 
-## 13. Review checklist
+## 12. Review checklist
 
-1. Knob drag, Alt pressed after the press: original unchanged and boxed, copy drawn above, badge,
+1. Knob drag, Shift pressed after the press: original unchanged and boxed, copy drawn above, badge,
    "· copy" in the readout, all in the keydown frame with the pointer at rest.
-2. Alt released mid-drag: change look (ghost) in the keyup frame; release writes a change.
-3. Release with Alt down: one new object at the same position (compare X, Y, W, H in the Move chip:
+2. Shift released mid-drag: change look (ghost) in the keyup frame; release writes a change.
+3. Release with Shift down: one new object at the same position (compare X, Y, W, H in the Move chip:
    identical), directly above in Layers, selected; original unchanged and not selected.
-4. Alt held before the press on a knob: a lasso, as before (regression check).
-5. No menubar or menu focus after Alt in a knob drag (desktop build and browser).
-6. Escape, the other button and window blur during a copy drag: nothing written, badge gone.
-7. One undo removes the copy; the original is selected again; History shows one step.
-8. Every knob kind: Curve (ellipse, polygon, star), Start, End, inner radius, corner radius (linked,
-   one corner with Shift), Rounded; Ctrl snap and Shift work together with Alt; a Ctrl snap without
-   Alt shows no badge and no "copy".
-9. Limits: readout "r 12.0 mm max · copy", "rounded 10.00 max · copy"; the copy has the limited value.
-10. Entry chip: Copy check last, 24 px row, unset on every open, Tab loop field and check, Space
+4. Shift held at the press on a knob: the knob drag (one corner on a rectangle), no toggle of the
+   selection, no copy until Shift is let go and pressed again.
+5. Escape, the other button and window blur during a copy drag: nothing written, badge gone.
+6. One undo removes the copy; the original is selected again; History shows one step.
+7. Every knob kind: Curve (ellipse, polygon, star), Start, End, inner radius, corner radius (linked,
+   one corner with Shift), Rounded; Ctrl snap works together with Shift; a Ctrl snap without
+   Shift shows no badge and no "copy".
+8. Limits: readout "r 12.0 mm max · copy", "rounded 10.00 max · copy"; the copy has the limited value.
+9. Entry chip: Copy check last, 24 px row, unset on every open, Tab loop field and check, Space
     toggles, Enter applies from both, Escape closes; screen reader reads "Copy, check box, not
     checked"; chip flips and clamps correctly with the taller body at the canvas edges.
-11. No hint chip line, tooltip line, panel section, notice or new cursor anywhere.
-12. 200 % zoom and 1x display: badge and readout stay clear of the knob and of each other.
+10. No hint chip line, tooltip line, panel section, notice or new cursor anywhere.
+11. 200 % zoom and 1x display: badge and readout stay clear of the knob and of each other.

@@ -5,10 +5,9 @@
   or meta key, no `format_version` change.
 - `0014` (history, undo and branches): the copy and its new value are one step under one label; an
   undo removes the copy and leaves the original.
-- The key is the customer's open question COPY-KEY (Frage 387). Default A: Alt pressed DURING the
-  drag makes a copy and Alt's state at the RELEASE decides; Alt at the press still arms the lasso
-  and nothing existing changes. B: Alt at the press (needs the lasso carve-out). C: Ctrl. The note
-  below is written for A; section 8 says what B and C change. It decides no key.
+- The key is the customer's answer to COPY-KEY (Frage 387, 2026-11-26): **Shift** pressed during the
+  drag, Shift's state at the release decides. Considered: Alt (the lasso at the press, window managers
+  take Alt+drag) and Ctrl (it snaps on parameter handles).
 
 ## Note 2026-11-26: a parameter drag or entry that writes a copy
 
@@ -16,28 +15,27 @@ No new ADR, crate, trait, `Document` method or format change. Everything sits on
 exists: `Document::batch`, `Document::duplicate_objects`, `param_edit::apply_param` and
 `commit_param`, and the copy preview of `LiveEdit.copy` and `DragSwap`.
 
-**1. When the key is read (Proposal, default A).** Not fixed at the press: the copy flag is read
-live. `TransformDrag` gets one field, the live Alt state (`alt: bool`). It is updated by every
-pointer move and by Alt keydown and keyup during the drag (each redraws, also with the pointer at
-rest), and by the pointer-up event's own `altKey` flag at the release, so a lost keyup cannot turn a
-visible copy into a change. The preview (`live_edit_snapped`) and the commit
-(`pointer_up_snapped_with_artwork`) both read that one field, so what was drawn in the last frame is
-what is written (one rule, as the "one resolving function per gesture" of `TransformDrag`). Alt is
-plumbed as an argument next to Shift and Ctrl; today `select_pointer_up` takes only those two and
-reads Alt from `held.alt`, which may be stale. Alt held at the press still arms the lasso
-(`press.rs` `arms_lasso`), so the press, `classify_press` and the cursor are unchanged. Alt
-pressed mid-drag and released before the end writes a plain change, no copy. This follows the
-customer's rule "state of the frame decides what is drawn, state at the release what is written"
-(`ux-notes.md` sections 1, 2). Consequence for the spec: criterion 1 reads "Alt held at the release,
-pressed at any time during the drag" (K5); for the PO through the lead.
+**1. When the key is read.** Not fixed at the press: the copy flag is read live. `TransformDrag`
+gets the live Shift state (`copy_key`) and `shift_lifted`; `TransformDrag::note_copy_key` sets them
+from every pointer and key event (through `Session::modifiers_changed`, which the wasm layer calls
+with the event's own flags before every pointer event and on every key event, so each redraws, also
+with the pointer at rest) and, last, from the pointer-up's own `shiftKey` in
+`pointer_up_snapped_with_artwork`, so a lost keyup cannot turn a visible copy into a change. The
+preview (`live_edit_snapped`) and the commit both read that one field, so what was drawn in the last
+frame is what is written. A Shift held from the press counts only once it was let go
+(`shift_lifted`): at the press it chose the one-corner drag of `0013` and keeps that meaning alone
+(Proposal). Shift pressed mid-drag and released before the end writes a plain change, no copy.
+`classify_press` and the press are unchanged: Shift at a press on a knob starts the knob drag and
+does not toggle the selection. A parameter drag reads no other Shift (`shape_knobs.rs`,
+`param_edit.rs`); resize, rotate and skew keep their own Shift (`param_copy` is `None` for them).
 
 **2. Preview.** A copy drag returns `LiveEdit { copy: true }` with the resolved object under the
 original's id, as a move copy does. `DragSwap` then keeps the original drawn as itself, draws the
 copy directly above it and draws no ghost; this is the look Duplicate's result will have.
 Decorations: `live_objects_in` substitutes nothing for a copy, so the box and the other knobs stay
-on the original, which is what `ux-notes.md` section 3 (V6) asks for; the dragged knob and its
-readout are drawn at the copy's value (the " · copy" suffix is a frontend/readout text), so the code
-change is limited to the dragged knob's position in `live_objects_in`.
+on the original, which is what `ux-notes.md` section 3 (V6) asks for; the dragged knob, the Rounded
+guide and the readout are drawn at the copy's value (`select_view.rs` `param_copy_knob`; the
+" · copy" suffix in `select_readout.rs`).
 
 **3. Commit.** New `pub(crate) fn commit_param_copy(document, handle, result) -> Option<NodeId>` in
 `curvyo-ui-core/src/param_edit.rs`: `document.batch(copy_label(handle), ..)` around
@@ -55,9 +53,9 @@ drag, so it gets the limited value and the drag's readout ("max") unchanged. The
 limit notice in `commit_transform_entry_fields` reads `entry.object().id()`, the original; for a
 copy it must read the copy. The selection must be the copy before `arc_or_curve_announcement` runs.
 
-**5. Entry box (unchanged by the key).** `ParamEntry::commit` and `SelectTool::commit_entry` take an `as_copy` flag (labelled "Copy" in the
-UI, `ux-notes.md` V3) and
-hand back the copy's id; the session selects it. The check's state lives only in the DOM chip and
+**5. Entry box (unchanged by the key).** `ParamEntry::commit_as_copy` and
+`SelectTool::commit_param_entry_as_copy` (the "Copy" check in the UI, `ux-notes.md` V3) write the
+copy and select it, as `commit_move_entry` does; `commit_entry` is unchanged. The check's state lives only in the DOM chip and
 starts unset on every open (Proposal). Public API change: the wasm exports
 `commit_transform_entry` and `commit_transform_entry_fields` gain an `as_copy: bool`.
 
@@ -73,39 +71,25 @@ criterion 6 has no case today; a parameter drag on a multi-selection would be a 
 function takes one result; no batch path is built ahead (`CLAUDE.md` §5). `ParamHandle` has no
 point-count ("sides") knob, but has `Rounded` (`0145`); the spec's handle list should match.
 
-**8. What only one key changes.**
-
-| Part | A (default): Alt during the drag | B: Alt at the press | C: Ctrl |
-|---|---|---|---|
-| Copy flag | live (`TransformDrag.alt`), release decides | `copy` fixed at the press in `begin_handle_press` | live like A, Ctrl's flag |
-| `classify_press` | unchanged (Alt press = Lasso, also on a knob) | parameter-knob hit before the Alt lasso clause | none (handles already come before the Ctrl marquee clause) |
-| Hover cursor (`select_gesture.rs`, `arms_lasso`) | unchanged | knob over lasso | none |
-| Accepted behaviour | nothing changes (`0009` criterion 35, `0014` criteria 16 and 17 stay) | Alt on a knob no longer starts a lasso: a customer decision, covered by COPY-KEY | none |
-| Snap during a copy | Ctrl still snaps; the preview passes raw Ctrl and raw Alt | as A, after the press | Ctrl is the copy flag and can no longer snap: the snaps lose their key, the replacement key is the customer's call |
-| Spec texts to amend | `0073` criterion 1 only | `0009` criterion 35, `0014` criterion 16 | `0021` criteria 7, 23 and 41, `0145` §3 |
-
-**Bug warning (preview):** `select_view.rs` passes `ctrl && !alt` to the preview today. For a knob
-drag it must pass raw Ctrl and raw Alt; otherwise the Alt+Ctrl curve or arc drag previews an
-unsnapped value and commits a snapped one.
+**8. Preview modifiers.** The knob preview passes raw Shift (the copy key lives on the drag, not in
+the argument) and Ctrl as today; Shift keeps driving resize-about-centre and the hover pivot marker
+of the transform handles.
 
 **9. Tests.** In `curvyo-ui-core`: for each family, original unchanged, one new object with the
 value directly above it, one step with its label, and one undo leaves only the original; a limited
 corner radius and curve on the copy; an unchanged value as a copy adds no step; the copy's first
 object-history row is "Duplicate of" the original; `pointer_up` selects the copy; `live_edit` is a
-copy exactly while the live Alt state is set: Alt pressed mid-drag shows the copy in that frame,
-Alt released shows the change again; Alt pressed mid-drag and released before the end commits no
-copy (one changed original, no new object); Alt pressed mid-drag and down at the release commits
-the copy; the release reads the pointer-up event's Alt, not a stale `held.alt`; the entry with
-`as_copy` and with a stale object; `classify_press` with Alt at the press still returns Lasso on a
-knob, a resize handle, an object and empty canvas. In `curvyo-editor-wasm`: a drag end to end
+copy exactly while the live Shift state is set: Shift pressed mid-drag shows the copy in that frame,
+Shift released shows the change again; Shift pressed mid-drag and released before the end commits
+no copy; Shift down at the release commits the copy; the release reads the pointer-up event's
+Shift; a Shift held from the press is no copy until let go; the entry with `as_copy` and with a
+stale object; `classify_press` with Shift at the press on a knob still returns the knob, and the
+selection is not toggled. In `curvyo-editor-wasm`: a drag end to end
 (object count, selection, step name, undo); a preview frame with the original as itself, the copy
 above it and no ghost; an entry copy whose limit notice shows the copy's value; size and node
-handles unchanged under Alt (criterion 7); an Alt+Ctrl curve drag whose preview value equals the
-committed value.
+handles unchanged under Shift (criterion 14).
 
-**10. Risks.** Alt+drag is taken by some Linux window managers in the desktop app at the press;
-under A only a mid-drag Alt is needed, so the press is never affected. Alt keydown/keyup during a
-knob drag are `preventDefault`ed against the webview menubar (`ux-notes.md` section 2). The batch has no rollback, so a failed setter after the duplicate would
+**10. Risks.** The batch has no rollback, so a failed setter after the duplicate would
 leave a plain copy under a "Copy with ..." label; the checks in 3 and the setters' own validation
 must make that unreachable, and a test pins it. A copy of a clone source leaves its linked clones
 on the original, and a text on the primitive stays on the original, as Duplicate does today.
