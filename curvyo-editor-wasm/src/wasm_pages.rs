@@ -79,6 +79,16 @@ impl WasmSession {
     pub fn row_drag_drop(&mut self) -> bool {
         self.session.row_drag_drop()
     }
+    /// Ends the row drag with Ctrl: over a slot of the active laser page the page is placed live,
+    /// fitted into the slot (`specs/0154`). JSON `{"refused", "notice"}` or `{"error"}`; `null`
+    /// when there is no slot under the drag (then `row_drag_drop` is the release).
+    pub fn row_drag_drop_into_slot(&mut self, real_size: bool) -> String {
+        match self.session.row_drag_drop_into_slot(real_size) {
+            None => "null".to_owned(),
+            Some(Ok(done)) => serde_json::to_string(&done).unwrap_or_default(),
+            Some(Err(text)) => serde_json::json!({ "error": text }).to_string(),
+        }
+    }
     /// Cancels the row drag; nothing is written.
     pub fn row_drag_cancel(&mut self) {
         self.session.row_drag_cancel();

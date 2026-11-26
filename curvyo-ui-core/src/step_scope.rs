@@ -204,6 +204,7 @@ pub const FREE_STEPS: &[&str] = &[
     // `specs/0154-library-into-slots` (ADR 0088 decision 5): a copy put into a slot, a fill, and
     // the replace that removes a slot's content first.
     "put_into_slot",
+    "place_page_into_slot",
     "replace_slot_content",
     "fill_slots",
     // `specs/0138-template-library`: loading a template and importing an icon add new objects only.

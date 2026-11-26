@@ -6,7 +6,10 @@ use curvyo_render_core::DrawList;
 use curvyo_ui_core::{SnapProbe, object_bounds};
 use serde::Serialize;
 
+use curvyo_laser_core::FitMode;
+
 use super::Session;
+use super::fixtures::SlotDrop;
 
 /// Past this many member leaves a page row's ghost is its frame only (UX notes §3).
 const GHOST_LEAVES: usize = 2_000;
@@ -273,6 +276,31 @@ impl Session {
             return false;
         };
         self.place_sketch_clone(sketch, centre.vector_to(at), drag.answer.target.as_deref())
+    }
+
+    /// Ends the row drag of a drawing page over a slot of the active laser page, with Ctrl, as a
+    /// live placed page fitted into the slot (`specs/0154` criterion 3, slice 2): one step.
+    /// `None` when the drag is no drawing page over a slot (nothing happened; the normal drop
+    /// follows).
+    pub fn row_drag_drop_into_slot(&mut self, real_size: bool) -> Option<Result<SlotDrop, String>> {
+        let drag = self.row_drag.as_ref()?;
+        let RowDragSource::DrawingPage { page } = &drag.source else {
+            return None;
+        };
+        let (page, at) = (page.clone(), drag.at?);
+        if drag.answer.target.as_deref() != Some(self.active_page().id.as_str()) {
+            return None;
+        }
+        let slot = self.slot_at(at)?;
+        self.row_drag = None;
+        self.end_snapping_drag();
+        self.end_fixture_fit();
+        let mode = if real_size {
+            FitMode::RealSize
+        } else {
+            FitMode::Fit
+        };
+        Some(self.place_page_into_slot(&page, slot, mode, false))
     }
 
     /// Cancels the row drag (Escape, a release over a panel): nothing is written.

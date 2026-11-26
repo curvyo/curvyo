@@ -17,6 +17,8 @@ use super::into_slot::{SlotTarget, UnitBox};
 
 /// The commit label of a copy put into a slot ("Put into slot").
 pub(in crate::session) const PUT_INTO_SLOT_LABEL: &str = "put_into_slot";
+/// The commit label of a whole page placed live into a slot ("Place page into slot").
+pub(in crate::session) const PLACE_PAGE_INTO_SLOT_LABEL: &str = "place_page_into_slot";
 /// The commit label of a replace of a slot's content ("Replace slot content").
 pub(in crate::session) const REPLACE_SLOT_CONTENT_LABEL: &str = "replace_slot_content";
 /// The commit label of a fill of every empty slot of a holder ("Fill slots").
