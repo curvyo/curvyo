@@ -19,7 +19,7 @@ assigned in the order the folders are created** and a row sits in the group of
 its state, so inside a group the numbers can be out of order (the order the
 lead starts the waiting ones is in "Proposed build order" below).
 
-The next free number is 0158; the next free Frage is 406 (the number history is in
+The next free number is 0158; the next free Frage is 407 (the number history is in
 "State of the list" below).
 
 Columns: **No.** = folder number. **MVP slice** = the label the same feature
