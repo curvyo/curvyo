@@ -183,6 +183,7 @@ pub use send_button::{
 pub use step_scope::{EDIT_STEPS, FREE_STEPS, MOVE_STEPS, StepScope, step_scope};
 mod centre_lines_plan;
 mod controller_warnings;
+mod fuse_plan;
 mod kernel_operands;
 mod placement_view;
 mod poly_star_tool;
@@ -397,6 +398,10 @@ pub use format_form::{
 };
 pub use format_list_view::{FormatGroupView, FormatListView, FormatRowView, format_list_view};
 pub use fracture::{FRACTURE_COMMIT_LABEL, plan_fracture};
+pub use fuse_plan::{
+    FUSE_BRIDGES_PER_ISLAND, FUSE_COMMIT_LABEL, FUSE_MAX_BRIDGES, FUSE_REACH_MM, FUSE_WIDTH_MM,
+    FieldRange, FuseMode, FusePlan, FuseRefusal, FuseSettings, plan_fuse,
+};
 pub use glyph_table::{GlyphGroup, GlyphTable, MAX_GLYPH_QUERY_CHARS, NO_BLOCK, glyph_table};
 pub use gradient_drag::GradientDragStart;
 pub use gradient_handles::{

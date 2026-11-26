@@ -28,6 +28,12 @@ import {
   stackRefusalText,
 } from "@/lib/stackText";
 import {
+  type BridgeAvailability,
+  bridgeRefusalOutlines,
+  bridgeRefusalText,
+} from "@/lib/bridgeText";
+import { bridgeSettings } from "@/hooks/useBridgeSettings";
+import {
   type WeldAvailabilityState,
   weldRefusalOutlines,
   weldRefusalText,
@@ -37,6 +43,8 @@ export interface BooleanCommands {
   availability: BooleanAvailabilityState;
   /** What the Weld button shows: its own rule, one or more objects (`0068`). */
   weldAvailability: WeldAvailabilityState;
+  /** What the Bridge buttons show (`0156`): absent off a laser page. */
+  bridgeAvailability: BridgeAvailability;
   /** A kernel call is about to run or running: wait cursor, input ignored. */
   busy: boolean;
   /** Runs `command` on the selection. Does nothing while dimmed or busy. */
@@ -132,6 +140,7 @@ const NO_PATH_AVAILABILITY: PathAvailabilityState = {
 export function useRailCommands(editor: EditorSession): RailCommands {
   const { getSession, syncRevision, tool, selectionCount, applyBoolean, applyStack, applyWeld } =
     editor;
+  const { applyFuse } = editor;
   const { applyCombine, applySplit, applyBreakApart, applyCut } = editor;
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -160,6 +169,11 @@ export function useRailCommands(editor: EditorSession): RailCommands {
     return state;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getSession, syncRevision]);
+  const bridgeAvailability = useMemo<BridgeAvailability>(() => {
+    const raw = getSession()?.fuse_availability();
+    return raw === "ready" || raw === "needs_one" ? raw : "absent";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getSession, syncRevision]);
   const pathAvailability = useMemo<PathAvailabilityState>(() => {
     const raw = getSession()?.path_availability();
     if (!raw) {
@@ -178,6 +192,8 @@ export function useRailCommands(editor: EditorSession): RailCommands {
   booleanRef.current = booleanAvailability;
   const weldRef = useRef(weldAvailability);
   weldRef.current = weldAvailability;
+  const bridgeRef = useRef(bridgeAvailability);
+  bridgeRef.current = bridgeAvailability;
   const pathRef = useRef(pathAvailability);
   pathRef.current = pathAvailability;
 
@@ -224,6 +240,17 @@ export function useRailCommands(editor: EditorSession): RailCommands {
       if (busyRef.current) {
         return;
       }
+      if (command === "bridge") {
+        if (bridgeRef.current !== "ready") {
+          return;
+        }
+        runBusy(() => {
+          const result = applyFuse(bridgeSettings());
+          outlinedRef.current = bridgeRefusalOutlines(result);
+          showRefusal(bridgeRefusalText(result));
+        });
+        return;
+      }
       if (command === "weld") {
         if (weldRef.current.needsOne) {
           return;
@@ -253,7 +280,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
         showRefusal(refusalText(op, result));
       });
     },
-    [applyBoolean, applyStack, applyWeld, runBusy, showRefusal],
+    [applyBoolean, applyFuse, applyStack, applyWeld, runBusy, showRefusal],
   );
 
   const applyPath = useCallback(
@@ -288,7 +315,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
   );
 
   return {
-    booleans: { availability: booleanAvailability, weldAvailability, busy, apply },
+    booleans: { availability: booleanAvailability, weldAvailability, bridgeAvailability, busy, apply },
     path: { availability: pathAvailability, busy, apply: applyPath },
     notice,
   };

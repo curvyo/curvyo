@@ -298,6 +298,7 @@ mod preset_units;
 mod primitive_model;
 mod primitive_outline;
 mod replace;
+mod replace_group;
 mod ring_curve;
 mod ring_random;
 mod ring_rounded;
@@ -488,6 +489,7 @@ pub use primitive_outline::{
     ellipse_outline, outline_of, outline_of_rotated, polygon_outline, rect_outline, star_outline,
 };
 pub use replace::{PieceFill, PieceOutlines};
+pub use replace_group::{NewGroup, NewGroupIds};
 pub use ring_curve::{
     Curve, curve_from_position, curve_handle_position, curve_limit, curve_max, effective_curve,
     ring_bounds, ring_extent,

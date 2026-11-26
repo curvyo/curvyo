@@ -98,6 +98,8 @@ mod wasm_formats;
 #[cfg(target_arch = "wasm32")]
 mod wasm_fracture;
 #[cfg(target_arch = "wasm32")]
+mod wasm_fuse;
+#[cfg(target_arch = "wasm32")]
 mod wasm_generators;
 #[cfg(target_arch = "wasm32")]
 mod wasm_gradient;
@@ -238,7 +240,8 @@ pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{DropBadge, RowDragAnswer, RowDragSource, SketchRowState, SketchUsage};
 pub use session::{ExportedJob, OutputGroupView, PlayView, SendView, SentJobFile, send_notice};
 pub use session::{
-    FrameImages, ImageCopy, ImportOrigin, ImportOutcome, StrokeToPathOutcome, WeldOutcome,
+    FrameImages, FuseAvailability, FuseOutcome, FuseSessionRefusal, ImageCopy, ImportOrigin,
+    ImportOutcome, StrokeToPathOutcome, WeldOutcome,
 };
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
 pub use session::{MaterialWrite, MaterialsView, TestGridView};

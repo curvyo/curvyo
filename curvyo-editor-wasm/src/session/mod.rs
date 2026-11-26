@@ -220,6 +220,9 @@ mod device_sync_tests;
 mod document_fonts;
 #[cfg(test)]
 mod document_fonts_tests;
+mod fuse;
+#[cfg(test)]
+mod fuse_tests;
 #[cfg(test)]
 mod membership_tests;
 #[cfg(test)]
@@ -355,6 +358,7 @@ pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
 pub use fracture::StackOutcome;
+pub use fuse::{FuseAvailability, FuseOutcome, FuseSessionRefusal};
 #[cfg(target_arch = "wasm32")]
 pub use grid::GridRecord;
 pub use grouping::{GroupingKind, GroupingResult};

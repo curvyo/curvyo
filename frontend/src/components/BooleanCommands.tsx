@@ -9,14 +9,29 @@ import {
 } from "@/components/railCard";
 import type { BooleanCommands as BooleanCommandsState } from "@/hooks/useRailCommands";
 import { operationName, operationRule, tooltipNote } from "@/lib/booleanText";
+import { BRIDGE_NAME, BRIDGE_RULE, bridgeTooltipNote } from "@/lib/bridgeText";
 import {
-  BOOLEAN_CARD_COMMANDS,
   type BooleanCardCommand,
+  booleanCardCommands,
   isStackCommand,
   stackName,
   stackRule,
 } from "@/lib/stackText";
 import { WELD_NAME, WELD_RULE, weldTooltipNote } from "@/lib/weldText";
+
+/** A button's name line. */
+function buttonName(op: BooleanCardCommand): string {
+  if (op === "bridge") return BRIDGE_NAME;
+  if (op === "weld") return WELD_NAME;
+  return isStackCommand(op) ? stackName(op) : operationName(op);
+}
+
+/** A button's rule line. */
+function buttonRule(op: BooleanCardCommand): string {
+  if (op === "bridge") return BRIDGE_RULE;
+  if (op === "weld") return WELD_RULE;
+  return isStackCommand(op) ? stackRule(op) : operationRule(op);
+}
 
 interface BooleanCommandsProps {
   commands: BooleanCommandsState;
@@ -28,9 +43,10 @@ interface BooleanCommandsProps {
   onReturnFocus: () => void;
 }
 
-/** The index a navigation key moves the focus to (no wrap), or `null` for any other key. */
-function targetIndex(key: string, index: number): number | null {
-  const last = BOOLEAN_CARD_COMMANDS.length - 1;
+/** The index a navigation key moves the focus to (no wrap) among `count` buttons, or `null` for
+ * any other key. */
+function targetIndex(key: string, index: number, count: number): number | null {
+  const last = count - 1;
   switch (key) {
     case "ArrowDown":
       return Math.min(index + 1, last);
@@ -49,12 +65,14 @@ function targetIndex(key: string, index: number): number | null {
  * The Boolean toolbox of the tool rail (`docs/design-system.md`, rows "Boolean toolbox" and
  * "Toolbox card"): a card of its own below the Path card in column B, eight commands, not tools,
  * one column: the five operations, then Fracture and Flatten (`specs/0037-fracture-and-flatten/`),
- * then Weld (`specs/0068-laserable-lettering/`), which has its own availability rule.
+ * then Weld (`specs/0068-laserable-lettering/`), which has its own availability rule, and on a
+ * laser page Bridge (`specs/0156-fused-lettering/`), absent elsewhere.
  * One Tab stop with roving focus. It shows what the session says is available and
  * decides nothing. Its notice is drawn by the rail (`BooleanNotice`).
  */
 export function BooleanCommands({ commands, selectTool, onReturnFocus }: BooleanCommandsProps) {
-  const { availability, weldAvailability, busy, apply } = commands;
+  const { availability, weldAvailability, bridgeAvailability, busy, apply } = commands;
+  const list = booleanCardCommands(bridgeAvailability !== "absent");
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const [stop, setStop] = useState(0);
   const [pressed, setPressed] = useState<BooleanCardCommand | null>(null);
@@ -68,27 +86,35 @@ export function BooleanCommands({ commands, selectTool, onReturnFocus }: Boolean
       className={RAIL_CARD_CLASS}
       style={RAIL_CARD_STYLE}
     >
-      {BOOLEAN_CARD_COMMANDS.map((op, index) => (
+      {list.map((op, index) => (
         <CommandButton
           key={op}
           ref={(element) => {
             buttons.current[index] = element;
           }}
-          name={op === "weld" ? WELD_NAME : isStackCommand(op) ? stackName(op) : operationName(op)}
-          rule={op === "weld" ? WELD_RULE : isStackCommand(op) ? stackRule(op) : operationRule(op)}
+          name={buttonName(op)}
+          rule={buttonRule(op)}
           note={
-            op === "weld"
-              ? weldTooltipNote(weldAvailability, selectTool)
-              : tooltipNote(availability, selectTool)
+            op === "bridge"
+              ? bridgeTooltipNote(bridgeAvailability, selectTool)
+              : op === "weld"
+                ? weldTooltipNote(weldAvailability, selectTool)
+                : tooltipNote(availability, selectTool)
           }
           glyph={<BooleanGlyph op={op} />}
-          dimmed={op === "weld" ? weldAvailability.needsOne : availability.needsTwo}
+          dimmed={
+            op === "bridge"
+              ? bridgeAvailability !== "ready"
+              : op === "weld"
+                ? weldAvailability.needsOne
+                : availability.needsTwo
+          }
           tooltipOffset={COLUMN_B_TOOLTIP_OFFSET_PX}
           tabIndex={index === stop ? 0 : -1}
           pressed={busy && pressed === op}
           onFocus={() => setStop(index)}
           onKeyDown={(event) => {
-            const target = targetIndex(event.key, index);
+            const target = targetIndex(event.key, index, list.length);
             if (target !== null) {
               event.preventDefault();
               buttons.current[target]?.focus();
