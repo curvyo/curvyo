@@ -183,6 +183,7 @@ pub use send_button::{
 pub use step_scope::{EDIT_STEPS, FREE_STEPS, MOVE_STEPS, StepScope, step_scope};
 mod centre_lines_plan;
 mod controller_warnings;
+mod kernel_operands;
 mod placement_view;
 mod poly_star_tool;
 pub mod presence;

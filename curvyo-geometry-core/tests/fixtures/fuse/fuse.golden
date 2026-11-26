@@ -1,0 +1,7 @@
+# Bridge (specs/0156-fused-lettering criteria 16 and 18).
+# Regenerate with CURVYO_UPDATE_GOLDEN=1.
+i: outlines 1 nodes 55 area_mm2 25.436 hash f4bdf9abedeebd44 bridges 1 [37 86bcb668b1dfc424]
+u_umlaut: outlines 1 nodes 112 area_mm2 49.721 hash ac800f3f67856d5e bridges 2 [38 20ac6af88357f255] [38 ccf03af19ad0f495]
+bars: outlines 1 nodes 52 area_mm2 43.873 hash 2862e64235e54216 bridges 1 [44 5bbbb995d8761c36]
+vertical_horizontal: outlines 1 nodes 34 area_mm2 43.422 hash 3bde292d834eb859 bridges 1 [32 3f5d2956e57f5c96]
+stencil_o: outlines 2 nodes 220 area_mm2 191.236 hash 6234e832dd73c163 bridges 2 [60 4fcf6107cba1fe6d] [60 3de1119799f806ab]
