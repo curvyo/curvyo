@@ -133,6 +133,7 @@ function SlotItem({ slot, selected, api, arm, locked }: { slot: SlotRow; selecte
       >
         <SlotGlyph shape={slot.shape} className="shrink-0" />
         <span className="truncate">{slot.name}</span>
+        {api.filledSlots?.has(slot.id) ? <span className="shrink-0 text-[11px] text-[var(--panel-muted-fg)]">filled</span> : null}
         {slot.outside ? <span className="shrink-0 text-[11px] text-[var(--panel-muted-fg)]">Outside the board</span> : null}
       </button>
       {locked ? null : (

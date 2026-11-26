@@ -34,6 +34,8 @@ interface DetailBarProps {
   why: WhyWords | null;
   onAction: (action: Action, words: TileWords) => void;
   onLicence: (url: string) => void;
+  /** The Into slot… button of a page tile (`specs/0154` criterion 10), last in the column. */
+  extra?: React.ReactNode;
 }
 
 /** A card's picture in the bar: its samples at 32 px, else its glyph. */
@@ -53,7 +55,7 @@ function CardPicture({ card, box }: { card: CardWords; box: number }) {
   );
 }
 
-export function BrowserDetailBar({ words, card, isCurrent, wide, why, onAction, onLicence }: DetailBarProps) {
+export function BrowserDetailBar({ words, card, isCurrent, wide, why, onAction, onLicence, extra = null }: DetailBarProps) {
   const box = wide ? 96 : 72;
   const actions = words && isCurrent ? words.actions : [];
   const shown = words ?? card;
@@ -105,6 +107,7 @@ export function BrowserDetailBar({ words, card, isCurrent, wide, why, onAction, 
                 </Tooltip>
               ),
             )}
+            {extra}
           </div>
           <div className="flex min-w-0 flex-1 flex-col self-start pt-1 select-text">
             <p className={`${wide ? "line-clamp-2" : "truncate"} text-sm break-words text-[var(--toolbar-icon)]`}>{shown.name}</p>

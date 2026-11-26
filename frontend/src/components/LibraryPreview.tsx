@@ -16,6 +16,8 @@ import {
 import type { WasmSession } from "@/lib/editorSession";
 import type { PaneLayout } from "@/lib/fontPreviewLayout";
 import { watchCanvasDrag } from "@/lib/libraryDrag";
+import { IntoSlotButton, IntoSlotList } from "@/components/IntoSlotList";
+import { type SlotUnitSource, fillSlots, putIntoSlot } from "@/lib/intoSlot";
 import { importFromLibrary } from "@/lib/libraryImport";
 import { isBackKey } from "@/lib/browserBack";
 import { returnToBrowser } from "@/lib/libraryBrowserStore";
@@ -86,6 +88,9 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
   const [marquee, setMarquee] = useState<Box | null>(null);
   const [objects, setObjects] = useState<PickObject[]>([]);
   const [ring, setRing] = useState(-1);
+  // The Into slot list, a band above the footer (`specs/0154` UX notes V20).
+  const [slotListOpen, setSlotListOpen] = useState(false);
+  const slotButtonRef = useRef<HTMLElement>(null);
   const [announce, setAnnounce] = useState("");
   const [refusal, setRefusal] = useState("");
   const body = useRef<HTMLDivElement>(null);
@@ -222,6 +227,18 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
     }
   };
 
+  /** The page (no picks) or the picks as a slot source (`specs/0154`). */
+  const slotSource = (roots: string[]): SlotUnitSource | null =>
+    reader
+      ? {
+          reader,
+          from: { documentName: page.documentName, pageName: page.pageName, pageId: page.pageId },
+          whole: roots.length === 0,
+          roots,
+        }
+      : null;
+  const slotCtx = { getSession, sync, showNotice };
+
   const local = (event: { clientX: number; clientY: number }) => {
     const box = canvas.current?.getBoundingClientRect();
     return box ? { x: event.clientX - box.left, y: event.clientY - box.top } : { x: 0, y: 0 };
@@ -320,6 +337,24 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
         `${next.length} picked`,
         () => (activeIsSketch() ? null : "copy"),
         (drop) => runImport(false, drop),
+        null,
+        {
+          getSession,
+          redraw: sync,
+          source: () => slotSource(next),
+          multiPage: () => false,
+          onSlot: (cue, alt) => {
+            const source = slotSource(next);
+            if (!source) {
+              return;
+            }
+            if (cue.kind === "fill" && cue.holder) {
+              fillSlots(slotCtx, source, cue.holder, alt);
+            } else if (cue.slot) {
+              putIntoSlot(slotCtx, source, cue.slot, alt);
+            }
+          },
+        },
       );
     }
   };
@@ -489,7 +524,21 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
           {announce}
         </span>
       </div>
-      <footer className="library-preview-footer">
+      {slotListOpen && reader ? (
+        <IntoSlotList
+          ctx={slotCtx}
+          caption={picks.length > 0 ? `${picks.length} elements` : page.pageName}
+          resolve={() => {
+            const source = slotSource(picks);
+            return Promise.resolve(source ? { source, done: () => {} } : null);
+          }}
+          close={() => {
+            setSlotListOpen(false);
+            slotButtonRef.current?.querySelector<HTMLElement>("[data-into-slot-button]")?.focus();
+          }}
+        />
+      ) : null}
+      <footer className="library-preview-footer" ref={slotButtonRef}>
         <span id="library-preview-count" role="status">
           {status}
         </span>
@@ -500,6 +549,9 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
         ) : null}
         {!error ? (
           <>
+            {reader ? (
+              <IntoSlotButton ctx={slotCtx} look="text" open={slotListOpen} onToggle={() => setSlotListOpen((o) => !o)} />
+            ) : null}
             <button type="button" disabled={!reader} onClick={() => runImport(true, null)}>
               Import page
             </button>

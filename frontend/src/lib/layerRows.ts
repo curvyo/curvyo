@@ -35,6 +35,8 @@ export interface LayerRowData {
   generator?: string | null;
   name: string;
   named: boolean;
+  /** The slot the member's centre lies in, " · Slot 2" after the name (`specs/0154` V17). */
+  slot?: string;
   /** What the row shows when it differs from the name: a dimension's value without the kind
    * word (`0070` UI review); the name when absent. */
   text?: string;
