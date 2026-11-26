@@ -17,7 +17,7 @@ change, no `format_version` bump.** No trait, no generic.
 - [ADR 0002 §5, §9](../../docs/adr/0002-document-model-units-and-svg-round-trip.md): the
   stacking order is the document's; one interaction, one commit.
 - [ADR 0014](../../docs/adr/0014-history-undo-and-branches.md): one step, label `fuse`, which
-  `history_names.rs` maps to "Fuse".
+  `history_names.rs` maps to "Bridge".
 - [ADR 0024 §1](../../docs/adr/0024-spatial-pages.md) and
   [ADR 0042 §7](../../docs/adr/0042-page-kinds.md): page membership by bounds. The tools follow
   the active page, with no `if laser` in the shell.
@@ -62,7 +62,7 @@ change, no `format_version` bump.** No trait, no generic.
    ```rust
    pub struct Fused { pub outline: Vec<Vec<Point>>, pub connectors: Vec<Vec<Vec<Point>>> }
    pub enum FuseError { Operands(BooleanError), NothingToJoin, TooManyBridges }
-   pub fn fuse_cut_out(operands: &[&[Outline<'_>]], width: Length, reach: Length,
+   pub fn fuse_cut_out(operands: &[&[Outline<'_>]], width: Length, reach: Option<Length>,
                        max_bridges: usize, tolerance: Tolerance) -> Result<Fused, FuseError>
    ```
 
@@ -72,8 +72,9 @@ change, no `format_version` bump.** No trait, no generic.
    - `FuseError` uses `thiserror`, with `#[from] BooleanError` as `StackError` does.
    - `TooManyBridges` is decided once the forest is known, before any band is built. The limit
      comes from the caller (`FUSE_MAX_BRIDGES = 2000` in `ui-core`), as Fracture's limit does.
-   - Slice 2 adds `fuse_stencil(operands, width, bridges_per_island: u8, tolerance)` and
-     `FuseError::NoIslands`. It is a second function, not a mode enum, so slice 1 has no
+   - `reach: None` is Join all (Frage 398 C): every piece is joined whatever its gap.
+   - Slice 2 adds `fuse_stencil(operands, width, bridges_per_island: u8, max_bridges, tolerance)`
+     and `FuseError::NoIslands`. It is a second function, not a mode enum, so slice 1 has no
      speculative variant.
    - Blend is not a parameter. Its radius is `width` (spec Words, Proposal), so there is no
      speculative option.
@@ -152,9 +153,9 @@ change, no `format_version` bump.** No trait, no generic.
      `curvyo-document-core/src/replace_group.rs`, in **one commit**. It:
      - deletes the operands;
      - creates the named group at the place of the **top-most** operand (criterion 11);
-     - creates the child path "Outline", and above it the child group "Connectors" holding one
-       path per connector (named "Connector 1".., in kernel order, Proposal; the UX notes may
-       rename them);
+     - creates the child group "Bridges" holding one path per bridge (named "Bridge 1".., in
+       kernel order) and above it the child path "Outline" (built order: Outline is the top
+       member, as the UX notes and criterion 11 list it);
      - writes the `member.` keys of the given operation ids for the Outline. The key encoding is
        already document-core's (`operation_codec`).
 
@@ -163,8 +164,10 @@ change, no `format_version` bump.** No trait, no generic.
      style, as Union does (Proposal; the UX notes decide the look).
    - **Operations (Frage 396 A):** the operations are the bottom-most operand's **effective**
      assignment by the nearest rule (`curvyo-laser-core` `operation_nearest`, read in the
-     session). Connectors get none (spec issue 9).
-   - **Session:** `session/fuse.rs`, with `wasm_fuse.rs` binding it. `apply_fuse(width, reach)`
+     session), written on the Outline. The Bridges get none of their own (spec issue 9); under a
+     group or layer that holds an operation they inherit it by the nearest rule like any leaf
+     (Frage 404 A, customer 2026-11-26; no refusal).
+   - **Session:** `session/fuse.rs`, with `wasm_fuse.rs` binding it. `apply_fuse(settings)`
      runs under `recording`. The texts are converted in the same step (`texts_as_paths`). The
      result is selected.
 
@@ -174,33 +177,27 @@ change, no `format_version` bump.** No trait, no generic.
      new object kind and **no `format_version` change**.
    - A save-and-reopen golden covers criterion 20.
    - The panel values are app preferences, not document data. The frontend keys are
-     `curvyo.fuse-width-mm` and `curvyo.fuse-reach-mm`, and slice 2 adds `curvyo.fuse-mode` and
-     `curvyo.fuse-bridges`. The values are clamped again by `ui-core` when they are read back.
+     `curvyo.fuse-width-mm`, `curvyo.fuse-reach-mm` and `curvyo.fuse-join-all`, and slice 2 adds
+     `curvyo.fuse-mode` and `curvyo.fuse-bridges`. The values are clamped again by `ui-core` when they are read back.
 
 7. **2026-11-26: laser-page-only gate (criteria 1, 2, 4).**
    - `Session::fuse_available()` is `operations_available()`: an active laser page whose
      extension is on (0101 criterion 28). That is the same predicate `test_grid_tool_available`
      builds on.
-   - The wasm side exposes `fuse_available()`. The `vectorRail` in `workbenches/builtin.tsx`
-     passes it to `ToolRail` as a prop, and `BooleanCommands` renders Fuse only when it is true.
+   - The wasm side exposes `fuse_availability()` (`absent`, `needs_one`, `ready`). The rail
+     commands read it; `BooleanCommands` renders Bridge only when it is not `absent`, and the
+     Select bar shows its Bridge group (fields and button, Frage 395 as answered) when `ready`.
      The shell never names a process.
    - `apply_fuse` returns `Ignored` when the gate is false, as a second line of defence.
    - Criterion 4 is a session check: every selected leaf must be a member of the active page
      (ADR 0024 §1), and none may be a placement (spec issue 8).
 
-8. **2026-11-26: preview and budget (criteria 3, 19).**
-   - The preview runs **the same `fuse_cut_out`**. A cheaper connector-only pass would be a
-     second implementation that could disagree with the result.
-   - It runs on each committed field value (Enter, Up/Down step, leaving the field), not on each
-     character. The session caches it by (selection revision, width, reach). Pressing Fuse reuses
-     the cached result when nothing has changed. It is never written to the document.
+8. **2026-11-26: budget (criterion 19).** (Revised 2026-11-26: Frage 395 was answered with
+   no chip and no preview, so the preview pass and its cache are dropped.)
    - Budget: `curvyo-editor-wasm/tests/fuse_budget.rs` measures `apply_fuse` end to end with the
      `cpu_time` helper (thread CPU time, scaled by `CURVYO_BUDGET_FACTOR`). The input is 60
-     pieces and 3,000 nodes, and the limit is 300 ms in release. It joins the
+     pieces and 3,000 nodes, and the limit is 300 ms in release (measured: 131 ms). It joins the
      `performance-budgets` job.
-   - If the budget misses, the allowed fix is to cache the pieces and gaps across Width changes,
-     since gaps do not depend on Width. If it still misses, the implementer logs it in
-     `docs/technical-debt.md`, as 0068 decision 8 did.
 
 ## Spec issues (for the product owner; each a Proposal)
 
@@ -251,4 +248,21 @@ change, no `format_version` bump.** No trait, no generic.
 
 ## Implementation notes (implementer)
 
-(Dated notes go here.)
+2026-11-26, as built (Proposals, vetoable at the demo):
+
+- **Tie rule (decision 4).** Read literally, criterion 9's bars give y = 6.38: the 0.01 mm tie
+  lets the stretch run 0.245 mm round the far bar's corner at one end only. Built: the bridge's
+  centre is half way between the middles of **both** pieces' tied stretches (the first piece's
+  stretch with the smallest middle, the second piece's stretch facing it), and its ends are the
+  points of each piece nearest that centre. Bars: 6.5; the i: (1, 10) to (1, 12).
+- **Fillet radius (decision 3 step 8).** A closing of radius `width` fills every gap narrower
+  than twice the width along the whole neighbourhood of the bridge. Built: radius =
+  min(width, 0.45 x the gap), so only the junctions are filled.
+- **Stencil crossings.** Cast from the island's boundary along its normal into the stroke,
+  sampled every 0.05 mm and at every vertex; the nearest point of the outer contour was ambiguous
+  where a vertex faces a chord (0.024 mm off on the O). Stencil bridges have a straight axis;
+  their fillet radius is min(width, 0.45 x the crossing).
+- **Dots (criteria 7 and 15).** A dot is attached to its nearest non-dot (rule 7a) and takes no
+  part in rule 7b, so it never forms a path between two letters (lead decision on criterion 15).
+- **Criterion 4** is checked before the session's edit guard, so the maker gets its sentence.
+- **Module** `fuse/measure.rs` holds the floating-point helpers the other modules share.

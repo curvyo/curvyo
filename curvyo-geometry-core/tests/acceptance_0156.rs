@@ -417,21 +417,24 @@ fn c17_more_bridges_than_allowed_is_refused_before_any_band_is_built() {
 // the middle piece.
 // ---------------------------------------------------------------------------------------------
 
-/// As written in criterion 15: the narrow middle piece (area 2 mm²) is below a quarter of the
-/// largest piece within reach (20 / 4 = 5 mm²), so rule 7a treats it as a dot. Expected by the
-/// spec text: two connectors. Reported as a spec conflict if this fails (see report).
+/// Criterion 15 with a middle piece that is a dot (area 2 mm², below a quarter of the largest
+/// piece within Reach, 20 / 4 = 5 mm²). Lead decision of 2026-11-26 (Proposal): criterion 15 is
+/// meant with a non-dot middle piece; a dot is attached to its nearest non-dot (rule 7a) and never
+/// forms a path between two letters. So the dot joins A, the A-C edge through it is obstructed,
+/// and C stays apart: one connector, between A and the dot.
 #[test]
-fn c15_as_written_narrow_middle_piece_gives_two_connectors() {
+fn c15_as_written_a_dot_in_the_middle_joins_one_letter_only() {
     let row = vec![
         vec![rect(0.0, 0.0, 2.0, 10.0)],
         vec![rect(4.0, 4.0, 5.0, 6.0)],
         vec![rect(7.0, 0.0, 9.0, 10.0)],
     ];
-    let fused = cut(&row, 1.0, 5.0).expect("three pieces in a row must join");
-    assert_eq!(
-        fused.connectors.len(),
-        2,
-        "two connectors, the chain A-M and M-C"
+    let fused = cut(&row, 1.0, 5.0).expect("the dot joins A");
+    assert_eq!(fused.connectors.len(), 1, "only the dot's own connector");
+    let centre = centre_of(&fused.connectors[0]).x;
+    assert!(
+        centre > 2.0 && centre < 4.0,
+        "between A and the dot: {centre}"
     );
 }
 
