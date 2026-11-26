@@ -108,6 +108,7 @@ mod generated_commands;
 #[cfg(test)]
 mod generated_damage_tests;
 mod generated_outline;
+mod generated_parts;
 mod print_and_cut_codec;
 mod print_and_cut_commands;
 pub use print_and_cut_codec::{
@@ -282,6 +283,7 @@ mod object_read;
 mod objects;
 mod offset_write;
 mod outline_map;
+mod part_key;
 mod path_codec;
 mod path_extend;
 mod path_model;
@@ -405,6 +407,7 @@ pub use generated_commands::{
     ADD_GENERATED_COMMIT_LABEL, CHANGE_PARAMETER_COMMIT_LABEL, CONVERT_GENERATED_COMMIT_LABEL,
     GeneratedError, KEY_SUBJECT_KIND, KEY_SUBJECT_PARAM,
 };
+pub use generated_parts::{ATTACH_PART_COMMIT_LABEL, DETACH_PART_COMMIT_LABEL, PartError};
 pub use group_tree::MAX_GROUP_DEPTH;
 pub use groups::{GROUP_COMMIT_LABEL, UNGROUP_COMMIT_LABEL};
 pub use guides::{GuideMarking, SET_GUIDE_COMMIT_LABEL};

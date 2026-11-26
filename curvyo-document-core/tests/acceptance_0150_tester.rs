@@ -109,7 +109,7 @@ fn golden_operations(d: &Document) -> Vec<OperationSnapshot> {
 
 #[test]
 fn c28_the_format_number_is_59_and_the_golden_is_written_as_59() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 64);
+    assert_eq!(CURRENT_FORMAT_VERSION, 65);
     assert_eq!(format_of(&fixture("operation_defaults_v59.curvyo")), 59);
 }
 

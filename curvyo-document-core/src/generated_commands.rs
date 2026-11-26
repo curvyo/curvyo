@@ -2,7 +2,7 @@
 //! one commit, convert to paths. The generator itself lives in an extension crate the document
 //! cannot call; the caller passes in what it generated.
 
-use loro::TreeParentId;
+use loro::{TreeID, TreeParentId};
 
 use crate::affine::Affine;
 use crate::document::{Document, OBJECTS_TREE};
@@ -49,6 +49,7 @@ fn record_is_valid(record: &GeneratedRecord) -> bool {
         .split_once('/')
         .is_some_and(|(extension, name)| !extension.is_empty() && !name.is_empty());
     kind_ok
+        && record.keys_are_valid()
         && !record.parts.is_empty()
         && record.parts.iter().all(|part| {
             !part.is_empty()
@@ -325,22 +326,32 @@ impl Document {
             [only] => only.split_first(),
             _ => None,
         };
+        let part_keys = generated_codec::read_record(&meta)
+            .map(|record| record.part_keys)
+            .unwrap_or_default();
         generated_codec::strip(&meta);
+        let mut moved_keys: Vec<(String, TreeID)> = Vec::new();
         if let Some((first, rest)) = single {
             shape_codec::write_converted_path_fields(&meta, &first.0, first.1);
             crate::subpath_codec::append_outlines(&meta, rest);
+            moved_keys.extend(part_keys.iter().map(|key| (key.clone(), tree_id)));
         } else {
             // invariant: the node is a live leaf; a group marker is a plain bool insert.
             #[allow(clippy::unwrap_used)]
             meta.insert(crate::group_tree::KEY_GROUP, true).unwrap();
             let style = crate::style_codec::read_style(&meta);
-            for part in parts {
+            for (at, part) in parts.iter().enumerate() {
                 // invariant: the node was just confirmed live and is now a group.
                 #[allow(clippy::unwrap_used)]
                 let child = tree.create(TreeParentId::Node(tree_id)).unwrap();
                 crate::replace::write_path_node(&tree, child, &style, part);
+                if let Some(key) = part_keys.get(at).filter(|_| part_keys.len() == parts.len()) {
+                    moved_keys.push((key.clone(), child));
+                }
             }
         }
+        // ADR 0082 §10 Lifecycle: `member.<node>#<part>` follows the part to its new path.
+        crate::generated_parts::rewrite_part_keys(&tree, tree_id, &moved_keys);
         self.commit_with_label(CONVERT_GENERATED_COMMIT_LABEL);
         Ok(())
     }

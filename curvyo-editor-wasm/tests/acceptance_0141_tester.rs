@@ -167,6 +167,7 @@ fn c7_an_unknown_kind_refuses_a_resize_but_moves_in_one_step() {
                 seed: 1,
                 params: serde_json::Map::new(),
                 parts: vec![vec![square]],
+                part_keys: Vec::new(),
             },
             Affine::IDENTITY,
         )

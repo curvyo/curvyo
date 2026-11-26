@@ -30,6 +30,7 @@ fn record(kind: &str) -> GeneratedRecord {
         seed: 77,
         params,
         parts: vec![vec![square(0.0, 10.0)], vec![square(20.0, 6.0)]],
+        part_keys: Vec::new(),
     }
 }
 
