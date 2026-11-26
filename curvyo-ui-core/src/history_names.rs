@@ -281,6 +281,13 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("set_ellipse_arc", "Change arc"),
     ("set_curve", "Change curve"),
     ("set_rounded", "Change rounding"),
+    // `specs/0073-parameter-handle-clone` criterion 12: a parameter handle drag or entry written
+    // to a copy.
+    ("copy_with_corner_radius", "Copy with corner radius"),
+    ("copy_with_inner_ratio", "Copy with inner ratio"),
+    ("copy_with_arc", "Copy with arc"),
+    ("copy_with_curve", "Copy with curve"),
+    ("copy_with_rounding", "Copy with rounding"),
     // `specs/0145-shape-spiro-handles` slice 3 criteria 21 and 22.
     ("set_randomized", "Change randomizing"),
     ("reroll_seed", "New seed"),

@@ -534,7 +534,8 @@ fn the_switch_and_shift_decide_one_corner_or_all_four() {
 
 #[test]
 fn shift_is_read_once_at_the_press_and_frozen() {
-    // Linked, press without Shift, Shift down at preview and release: still all four.
+    // Linked, press without Shift, Shift down at preview and release: still all four, written
+    // to a copy since `0073` (Frage 387, Shift is the copy key); the original stays.
     let mut rig = Rig::new(100.0, 60.0, [5.0, 0.0, 12.0, 3.0], 3.0);
     let from = rig.knob(Corner::Tl);
     let to = rig.target(Corner::Tl, 6.0);
@@ -543,7 +544,9 @@ fn shift_is_read_once_at_the_press_and_frozen() {
     let l = arr(rect_radii(&live));
     assert!(l.iter().all(|v| *v == l[0]), "{l:?}");
     rig.release(to, true);
-    let a = rig.stored();
+    assert_eq!(rig.stored(), [5.0, 0.0, 12.0, 3.0], "the original stays");
+    let copy = rig.selection.ids()[0];
+    let a = arr(rect_radii(&rig.document.object(copy).unwrap()));
     assert!(a.iter().all(|v| *v == a[0]), "{a:?}");
 
     // Linked, press with Shift (one corner), Shift released mid-drag: still one corner.

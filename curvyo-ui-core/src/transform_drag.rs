@@ -236,6 +236,14 @@ pub(crate) struct TransformDrag {
     /// (`specs/0056-mirror-and-negative-scale/` criterion 15), noted by
     /// [`TransformDrag::note_frame`]; positive at the press.
     pub(crate) signs: ExtentSigns,
+    /// Whether the copy key of a parameter drag is down now (`specs/0073-parameter-handle-clone`
+    /// criterion 1, Frage 387 answered: Shift): Shift pressed during the drag, set by every
+    /// pointer and key event through [`TransformDrag::note_copy_key`] and, last, by the release's
+    /// own flag. A Shift held from the press keeps its meaning there (one corner, `0013`) and
+    /// counts only once it was let go and pressed again. Every other handle ignores it.
+    pub(crate) copy_key: bool,
+    /// Whether Shift was up at some event since the press (always, when it was up at the press).
+    pub(crate) shift_lifted: bool,
 }
 
 /// The value a drag of an arc or curve handle asks for with the pointer at `local` (the
@@ -475,6 +483,28 @@ impl TransformDrag {
     /// no stroke width (anchors only).
     pub(crate) fn commit(&self, document: &Document, result: &ObjectSnapshot) {
         commit_gesture(document, self.handle, result, self.modes);
+    }
+
+    /// Notes Shift's state of one event for the copy key (criterion 1).
+    pub(crate) const fn note_copy_key(&mut self, shift: bool) {
+        self.shift_lifted = self.shift_lifted || !shift;
+        self.copy_key = shift && self.shift_lifted;
+    }
+
+    /// The parameter handle of a drag that writes a copy right now: a parameter drag with Shift
+    /// held (`specs/0073-parameter-handle-clone` criterion 1). `None` for a plain drag and for
+    /// every other handle, whose Shift keeps its meaning (criterion 14).
+    pub(crate) const fn param_copy(&self) -> Option<ParamHandle> {
+        self.param_copy_with(self.copy_key)
+    }
+
+    /// [`TransformDrag::param_copy`] for an event whose Shift is `shift` (the preview reads
+    /// the frame's raw Shift, `specs/0073-parameter-handle-clone` criterion 5).
+    pub(crate) const fn param_copy_with(&self, shift: bool) -> Option<ParamHandle> {
+        match self.handle {
+            EditHandle::Param(param) if shift && self.shift_lifted => Some(param),
+            _ => None,
+        }
     }
 }
 
