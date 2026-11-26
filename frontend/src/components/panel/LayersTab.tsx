@@ -663,7 +663,24 @@ export function LayersTab({
   const pinnedRoot = view.laserTree
     ? (parseLayersView(getSession()?.layers_view(0, 1) ?? "").rows[0] ?? null)
     : null;
-  const listed = pinnedRoot ? [pinnedRoot, ...view.rows.filter((row) => row.index !== 0)] : view.rows;
+  // A member whose centre lies in a slot names it (`specs/0154` UX notes V17), computed each read.
+  // Keyed by the id's parts: the rows and the slot pairs write the id's keys in other orders.
+  const memberKey = (id: { peer: string; counter: number }) => `${id.peer}:${id.counter}`;
+  const memberSlots = useMemo(() => {
+    void syncRevision;
+    try {
+      const pairs = JSON.parse(getSession()?.member_slots_json() ?? "[]") as [{ peer: string; counter: number }, string][];
+      return new Map(pairs.map(([id, slot]) => [memberKey(id), slot]));
+    } catch {
+      return new Map<string, string>();
+    }
+  }, [getSession, syncRevision]);
+  const listedRows = pinnedRoot ? [pinnedRoot, ...view.rows.filter((row) => row.index !== 0)] : view.rows;
+  // Only a row in a slot is copied: the pinned root is found by identity below.
+  const listed = listedRows.map((row) => {
+    const slot = memberSlots.get(memberKey(row.id));
+    return slot ? { ...row, slot } : row;
+  });
   const rows = listed.map((row) => (
     <LayerRow
       key={rowKey(row)}

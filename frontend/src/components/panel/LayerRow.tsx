@@ -310,7 +310,7 @@ export function LayerRow({
       aria-selected={selected}
       aria-expanded={row.container ? row.expanded : undefined}
       aria-current={active || entered ? "true" : undefined}
-      aria-label={row.label}
+      aria-label={row.slot ? `${row.label}, in ${row.slot}` : row.label}
       aria-readonly={row.readOnly ? "true" : undefined}
       tabIndex={tabbable && cell === "name" ? 0 : -1}
       data-row-index={row.index}
@@ -411,6 +411,7 @@ export function LayerRow({
               <span className={nameClass} title={row.name}>{row.text ?? row.name}</span>
             </Tooltip>
           )}
+          {row.slot ? <span className="shrink-0 text-xs text-[var(--panel-muted-fg)]">{` · ${row.slot}`}</span> : null}
           {root ? (
             <span className="flex shrink-0 items-center gap-1 text-[11px] text-[var(--panel-muted-fg)]">
               <Zap size={12} strokeWidth={1.5} aria-hidden />

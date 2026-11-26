@@ -47,7 +47,21 @@ import {
 } from "@/lib/libraryBrowserStore";
 import { watchCanvasDrag } from "@/lib/libraryDrag";
 import { useKeywords, wantKeywords, whyMatched } from "@/lib/libraryKeywords";
-import { type LoadContext, importIcon, importPage, loadTemplate } from "@/lib/libraryLoad";
+import {
+  type LoadContext,
+  type PageToImport,
+  importIcon,
+  importPage,
+  intoSelectedSlot,
+  loadPage,
+  loadTemplate,
+  iconSlotSource,
+  pageSlotDrag,
+  pageSlotSource,
+  slotDragOf,
+  templateSlotSource,
+} from "@/lib/libraryLoad";
+import { IntoSlotButton, IntoSlotList, type SlotResolve } from "@/components/IntoSlotList";
 import { openPreview } from "@/lib/libraryStore";
 import {
   addReadySource,
@@ -153,6 +167,24 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, searching, current, prefs.text, store.version, keywords.version],
   );
+  // The Into slot list of the current tile, a band above the detail bar (`specs/0154` V20): a
+  // local page, an icon or a one-page template is a source (V1).
+  const [slotListOpen, setSlotListOpen] = useState(false);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const currentWords = useMemo(
+    () => (view !== "items" || current === null ? null : (tileWords([current])[0] ?? null)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [view, current, store.version],
+  );
+  const slotResolve: SlotResolve | null = !currentWords || currentWords.refusal
+    ? null
+    : currentWords.kind === "page"
+      ? () => pageSlotSource(pageOfWords(currentWords))
+      : currentWords.kind === "icon"
+        ? () => iconSlotSource(currentWords.host, currentWords.prefix, currentWords.name, sourceName(currentWords))
+        : currentWords.kind === "template" && currentWords.pages <= 1
+          ? () => templateSlotSource(currentWords.host, currentWords.path, currentWords.meta)
+          : null;
   const back = backName();
   void store.history;
 
@@ -325,13 +357,34 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
     setBrowserSession({ guide: false, licences: false });
   };
 
+  const pageOfWords = (words: TileWords): PageToImport => ({
+    source: words.host,
+    path: words.path,
+    pageId: words.page_id,
+    pageName: words.page_name,
+    documentName: words.document,
+    sourceName: sourceName(words),
+  });
+
   const load = async (words: TileWords, byKeyboard: boolean, drop: { x: number; y: number } | null = null) => {
     if (words.refusal) {
       return;
     }
     let done = false;
     let name = words.name;
-    if (words.kind === "icon") {
+    // A double-click or Enter puts an icon or a one-page template into a selected target slot
+    // (`specs/0154` UX notes 9), as a page below.
+    const slotted =
+      drop !== null
+        ? null
+        : words.kind === "icon"
+          ? await intoSelectedSlot(ctx, () => iconSlotSource(words.host, words.prefix, words.name, sourceName(words)))
+          : words.kind === "template" && words.pages <= 1
+            ? await intoSelectedSlot(ctx, () => templateSlotSource(words.host, words.path, words.meta))
+            : null;
+    if (slotted !== null) {
+      done = slotted;
+    } else if (words.kind === "icon") {
       done = await importIcon(ctx, words.host, words.prefix, words.name, sourceName(words), drop);
     } else if (words.kind === "template") {
       // A template loads all its pages, also one with several (UX U46).
@@ -340,18 +393,8 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
       name = loaded ?? name;
       browserFetched();
     } else if (words.kind === "page") {
-      done = await importPage(
-        ctx,
-        {
-          source: words.host,
-          path: words.path,
-          pageId: words.page_id,
-          pageName: words.page_name,
-          documentName: words.document,
-          sourceName: sourceName(words),
-        },
-        drop,
-      );
+      // A double-click or Enter puts the page into a selected target slot (`specs/0154` criterion 17).
+      done = drop ? await importPage(ctx, pageOfWords(words), drop) : await loadPage(ctx, pageOfWords(words));
     }
     if (done) {
       setAnnounce(`Loaded ${name}`);
@@ -505,6 +548,11 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
       () => (words.kind === "icon" ? "copy" : "import"),
       (at) => void load(words, false, words.kind === "template" ? null : at),
       picture,
+      words.kind === "page"
+        ? pageSlotDrag(ctx, pageOfWords(words))
+        : words.kind === "icon"
+          ? slotDragOf(ctx, () => iconSlotSource(words.host, words.prefix, words.name, sourceName(words)), { eager: true })
+          : slotDragOf(ctx, () => templateSlotSource(words.host, words.path, words.meta), { eager: false, pages: words.pages }),
     );
   };
 
@@ -706,6 +754,19 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
         )}
       </div>
       {standIn ? null : (
+        <div ref={detailRef} className="contents">
+        {slotListOpen && slotResolve && currentWords ? (
+          <IntoSlotList
+            key={currentWords.index}
+            ctx={ctx}
+            caption={currentWords.kind === "page" ? currentWords.page_name : currentWords.name}
+            resolve={slotResolve}
+            close={() => {
+              setSlotListOpen(false);
+              detailRef.current?.querySelector<HTMLElement>("[data-into-slot-button]")?.focus();
+            }}
+          />
+        ) : null}
         <BrowserDetailBar
           words={shownWords}
           card={shownCard}
@@ -714,7 +775,13 @@ export function LibraryBrowser({ api, layout, onSwitchView, canvasRef, onReturnF
           why={shownWhy}
           onAction={action}
           onLicence={(url) => void openLicence(url).catch(() => undefined)}
+          extra={
+            slotResolve && shownWords && shownWords.index === current ? (
+              <IntoSlotButton ctx={ctx} look={wide ? "text" : "icon"} open={slotListOpen} onToggle={() => setSlotListOpen((o) => !o)} />
+            ) : null
+          }
         />
+        </div>
       )}
     </section>
   );

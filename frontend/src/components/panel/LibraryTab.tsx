@@ -42,8 +42,17 @@ import {
   importIcon as importLibraryIcon,
   importPage as importLibraryPage,
   isOnlineSource,
+  loadPage as loadLibraryPage,
   loadTemplate as loadLibraryTemplate,
+  iconSlotSource,
+  intoSelectedSlot,
+  pageSlotDrag,
+  pageSlotSource,
+  slotDragOf,
+  templateSlotSource,
 } from "@/lib/libraryLoad";
+import { IntoSlotButton, IntoSlotList } from "@/components/IntoSlotList";
+import { intoSlotListHeight } from "@/lib/intoSlot";
 import { BROWSE_BUTTON_ID, notifyLibraryChanged, onBrowserFetched, toggleBrowser, useBrowserOpen } from "@/lib/libraryBrowserStore";
 import {
   addReadySource,
@@ -245,6 +254,9 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     return () => window.clearTimeout(timer);
   }, [armed]);
 
+  // The page row whose Into slot list is open, and the list's height: the rows below move down by
+  // it (`specs/0154` UX notes V20).
+  const [slotList, setSlotList] = useState<{ key: string; height: number } | null>(null);
   // Offsets, tree positions and places of the rows (the virtualised `0095` tree, UX notes 4, 12).
   const tops = useMemo(() => {
     const result: RowMeta[] = [];
@@ -265,6 +277,9 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
         stack.push(index);
       }
       at += height;
+      if (slotList && row.key === slotList.key) {
+        at += slotList.height;
+      }
     }
     const sets = new Map<string, number[]>();
     for (const [index, row] of rows.entries()) {
@@ -286,7 +301,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
       });
     }
     return { result, total: at };
-  }, [rows]);
+  }, [rows, slotList]);
 
   // Roving focus: the tree is one Tab stop (UX notes 11); the focused row stays rendered.
   const focusable = rows
@@ -402,22 +417,19 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
       : undefined;
 
   const loadContext: LoadContext = { getSession, sync, showNotice };
+  const pageOf = (row: LibraryRow) => ({
+    source: row.source,
+    path: row.path,
+    pageId: row.page_id ?? "",
+    pageName: row.name,
+    documentName: documentName(row),
+    sourceName: sourceNameOf(row),
+  });
   const importPage = async (row: LibraryRow, drop: DropAt) => {
     if (!row.page_id) {
       return;
     }
-    await importLibraryPage(
-      loadContext,
-      {
-        source: row.source,
-        path: row.path,
-        pageId: row.page_id,
-        pageName: row.name,
-        documentName: documentName(row),
-        sourceName: sourceNameOf(row),
-      },
-      drop,
-    );
+    await importLibraryPage(loadContext, pageOf(row), drop);
   };
 
   const addFolder = async () => {
@@ -519,14 +531,33 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     remove: (row) => void remove(row),
     load: (row) => void loadTemplate(row),
     licence: (url) => void openLicence(url).catch(() => undefined),
-    importIcon: (row, cell, at) => void importIcon(row, cell, at),
+    // A double-click or Enter on a cell puts the icon into a selected target slot (`specs/0154`
+    // UX notes 9, customer 2026-11-26), else imports it.
+    importIcon: (row, cell, at) =>
+      void (async () => {
+        const slotted =
+          at === null
+            ? await intoSelectedSlot(loadContext, () => iconSlotSource(row.source, cell.prefix, cell.name, sourceNameOf(row)))
+            : null;
+        if (slotted === null) {
+          await importIcon(row, cell, at);
+        }
+      })(),
     dragIcon: (event, row, cell) => {
       if (event.button !== 0) {
         return;
       }
-      watchCanvasDrag(event, () => canvasRef.current, cell.name, () => "copy", (at) => {
-        void importIcon(row, cell, at);
-      });
+      watchCanvasDrag(
+        event,
+        () => canvasRef.current,
+        cell.name,
+        () => "copy",
+        (at) => {
+          void importIcon(row, cell, at);
+        },
+        null,
+        slotDragOf(loadContext, () => iconSlotSource(row.source, cell.prefix, cell.name, sourceNameOf(row)), { eager: true }),
+      );
     },
     armed,
     armedText: (row) => library_remove_armed_text(row.name),
@@ -565,7 +596,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
     focusRow,
     toggle,
     openRow,
-    importPage: (row) => (row.kind === "template" ? void loadTemplate(row) : void importPage(row, null)),
+    importPage: (row) => (row.kind === "template" ? void loadTemplate(row) : void loadLibraryPage(loadContext, pageOf(row))),
     remove: (row) => void remove(row),
     typeIntoSearch: (key) => {
       setQuery((q) => q + key);
@@ -682,6 +713,29 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
           <p className="library-empty">{emptyText}</p>
         ) : (
           <div style={{ height: tops.total, position: "relative" }}>
+            {(() => {
+              const at = slotList ? rows.findIndex((r) => r.key === slotList.key) : -1;
+              const row = rows[at];
+              const meta = tops.result[at];
+              if (!slotList || !row || !meta) {
+                return null;
+              }
+              return (
+                <IntoSlotList
+                  key={row.key}
+                  ctx={loadContext}
+                  caption={row.name}
+                  resolve={() => pageSlotSource(pageOf(row))}
+                  style={{ top: meta.top + meta.height, height: slotList.height }}
+                  close={() => {
+                    setSlotList(null);
+                    listRef.current
+                      ?.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(row.key)}"] [data-into-slot-button]`)
+                      ?.focus();
+                  }}
+                />
+              );
+            })()}
             {shown.map(({ row, index }) => (
               <div
                 key={row.key}
@@ -724,13 +778,13 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
                     const picture = event.currentTarget.querySelector<HTMLImageElement>("img.library-document-picture")?.src ?? null;
                     watchCanvasDrag(event, () => canvasRef.current, row.name, () => "import", () => {
                       void loadTemplate(row);
-                    }, picture);
+                    }, picture, slotDragOf(loadContext, () => templateSlotSource(row.source, row.path, sourceNameOf(row)), { eager: false }));
                     return;
                   }
                   const picture = event.currentTarget.querySelector<HTMLImageElement>("img.library-page-picture")?.src ?? null;
                   watchCanvasDrag(event, () => canvasRef.current, row.name, () => "import", (at) => {
                     void importPage(row, at);
-                  }, picture);
+                  }, picture, pageSlotDrag(loadContext, pageOf(row)));
                 }}
                 tabIndex={row.kind === "heading" ? undefined : active?.index === index ? 0 : -1}
                 title={row.kind === "heading" ? undefined : tooltipOf(row, index)}
@@ -768,6 +822,16 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
                       <OnlineSourceCells row={row} handlers={handlers} />
                     ) : row.kind === "source" || row.kind === "folder" ? (
                       row.unreadable ? null : <span className="library-count">{row.line}</span>
+                    ) : null}
+                    {row.kind === "page" ? (
+                      <IntoSlotButton
+                        ctx={loadContext}
+                        look="icon"
+                        open={slotList?.key === row.key}
+                        onToggle={() =>
+                          setSlotList((open) => (open?.key === row.key ? null : { key: row.key, height: intoSlotListHeight(loadContext) }))
+                        }
+                      />
                     ) : null}
                     {row.kind === "page" ? (
                       <button

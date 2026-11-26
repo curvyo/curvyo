@@ -14,6 +14,7 @@ import { paneLayoutSize } from "@/lib/libraryBrowserLayout";
 import { claimPane, registerPaneCloser, releasePane } from "@/lib/sidePaneStore";
 import { useFontPreview } from "@/hooks/useFontPreview";
 import { CanvasNotice } from "@/components/CanvasNotice";
+import { SlotReplaceNotice } from "@/components/SlotReplaceNotice";
 import { ErrorDialog } from "@/components/ErrorDialog";
 import { NodeToolbar } from "@/components/NodeToolbar";
 import { PenModeBar } from "@/components/PenModeBar";
@@ -460,7 +461,12 @@ function Editor() {
           }}
           announcement={editor.grouping.announcement}
           laserGroup={operations.view?.enteredGroup ?? null}
-          persistent={<HistoryPreviewLine getSession={editor.getSession} />}
+          persistent={
+            <>
+              <HistoryPreviewLine getSession={editor.getSession} />
+              <SlotReplaceNotice />
+            </>
+          }
         />
     </>
   );

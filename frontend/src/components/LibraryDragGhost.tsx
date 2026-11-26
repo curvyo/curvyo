@@ -12,8 +12,43 @@ export type LibraryDropKind = "import" | "copy" | null;
 
 const WORDS = { import: "New page", copy: "Copy" } as const;
 
-export function LibraryDragGhost({ label, picture, over, kind }: { label: string; picture: string | null; over: boolean; kind: LibraryDropKind }) {
+/** The badge over a fixture slot (`specs/0154` UX notes 3.1, 3.3, 5.2). */
+export interface SlotBadge {
+  kind: "slot" | "fill" | "filled" | "refused" | "none";
+  word: string;
+}
+
+export function LibraryDragGhost({
+  label,
+  picture,
+  over,
+  kind,
+  slot = null,
+}: {
+  label: string;
+  picture: string | null;
+  over: boolean;
+  kind: LibraryDropKind;
+  slot?: SlotBadge | null;
+}) {
   const refused = over && kind === null;
+  if (slot) {
+    return (
+      <>
+        {picture ? <img src={picture} alt="" className="library-drag-picture" style={{ opacity: 0.4 }} /> : null}
+        <DropBadgePill
+          position="absolute"
+          badge={{
+            kind: slot.kind === "slot" ? "fit" : slot.kind === "fill" ? "fill" : "not_on_sketch_page",
+            word: slot.word,
+            refused: slot.kind === "refused",
+            x: BADGE_OFFSET_PX,
+            y: BADGE_OFFSET_PX,
+          }}
+        />
+      </>
+    );
+  }
   return (
     <>
       {picture ? (

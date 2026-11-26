@@ -23,6 +23,8 @@ export interface FixturesEditor {
 export interface FixturesApi extends FixtureSetCommands {
   /** The decoded view of the active laser page; `null` on any other page. */
   view: FixturesView | null;
+  /** The full ids of the filled slots, computed from the drawing (`specs/0154` UX notes V18). */
+  filledSlots: Set<string>;
   /** The notice of the last command and the field that gave it, `null` when it had none. */
   notice: FieldNotice | null;
   /** Names the field `id` as the one committing next, so its clamp notice shows under it. */
@@ -56,11 +58,21 @@ export interface FixturesApi extends FixtureSetCommands {
 
 interface Snapshot {
   view: FixturesView | null;
+  filledSlots: Set<string>;
+}
+
+function readFilled(session: WasmSession): Set<string> {
+  try {
+    return new Set(JSON.parse(session.filled_slots_json()) as string[]);
+  } catch {
+    return new Set();
+  }
 }
 
 function readSnapshot(session: WasmSession | null): Snapshot {
-  if (!session) return { view: null };
-  return { view: decodeFixturesText(session.fixtures_view_json()) };
+  if (!session) return { view: null, filledSlots: new Set() };
+  const view = decodeFixturesText(session.fixtures_view_json());
+  return { view, filledSlots: view ? readFilled(session) : new Set() };
 }
 
 /** The Fixtures block's API for `editor`. */
@@ -155,6 +167,7 @@ export function useFixtures(editor: FixturesEditor): FixturesApi {
 
   return {
     view: snapshot.view,
+    filledSlots: snapshot.filledSlots,
     notice,
     claimField,
     ...commands,
