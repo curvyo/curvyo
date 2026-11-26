@@ -3,7 +3,10 @@
 use curvyo_extension_core::Curve::{Linear, Log};
 use curvyo_extension_core::{ChoiceOption, ParamGroup, ShownWhen};
 
-use crate::schema::{automatic, choice, count, initial, length, switch_on, tracked, when};
+use crate::schema::{
+    CENTRED as CENTRED_PATTERN, advanced, automatic, choice, count, initial, length, switch_on,
+    tracked, when,
+};
 
 pub(crate) const PATTERN: &[ChoiceOption] = &[
     ChoiceOption {
@@ -311,6 +314,10 @@ pub(crate) fn layout() -> ParamGroup {
     }
 }
 
+const FLAT_CENTRED: ShownWhen = ShownWhen::All {
+    conditions: &[FLAT, CENTRED_PATTERN],
+};
+
 pub(crate) fn groups() -> Vec<ParamGroup> {
     vec![
         size(),
@@ -337,5 +344,6 @@ pub(crate) fn groups() -> Vec<ParamGroup> {
             ],
         ),
         layout(),
+        advanced(Some(FLAT), FLAT_CENTRED),
     ]
 }

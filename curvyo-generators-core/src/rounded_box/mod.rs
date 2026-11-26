@@ -11,6 +11,7 @@ use curvyo_extension_core::{
 };
 
 use crate::footprint::{Footprint, Tab};
+use crate::joint_layout::{self, Joints};
 use crate::slit_bend::{SlitKind, SlitPattern};
 use crate::tab_layout::WindowSpec;
 use crate::values::Values;
@@ -219,7 +220,7 @@ fn plates(
     v: &Values<'_>,
     s: &Sizes,
     (inner, outer): (&Footprint, &Footprint),
-    tabs: &[Tab],
+    (tabs, joints): (&[Tab], &Joints),
 ) -> Vec<Piece> {
     let (lid_on, seat, cover_on) = (
         v.switch("lid"),
@@ -240,14 +241,14 @@ fn plates(
             plates.push(Piece::new(vec![plain(outer, hollow)], s.lid, "lid"));
         } else {
             plates.push(Piece::new(
-                vec![tabbed(inner, tabs, s.lid, s.wall)],
+                vec![tabbed(inner, tabs, joints.half(s.lid), s.wall)],
                 s.lid,
                 "lid",
             ));
         }
     }
     plates.push(Piece::new(
-        vec![tabbed(inner, tabs, s.base, s.wall)],
+        vec![tabbed(inner, tabs, joints.half(s.base), s.wall)],
         s.base,
         "base",
     ));
@@ -260,7 +261,10 @@ fn plates(
             mm(s.wall),
         );
         plates.push(Piece::new(
-            vec![tabbed(inner, tabs, s.ring, s.wall), opening(&hole)],
+            vec![
+                tabbed(inner, tabs, joints.half(s.ring), s.wall),
+                opening(&hole),
+            ],
             s.ring,
             "ring",
         ));
@@ -295,8 +299,15 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         mm(s.wall),
     );
     let widest = [s.base, s.ring, s.lid].into_iter().fold(0.0, f64::max);
+    if own(&v, "joint_width").is_some() {
+        v.limit_mm("joint_width", joint_layout::least_width(s.kerf), f64::MAX);
+    }
+    let fitted = inner.joint_fit(Joints::read(&v), widest);
+    joint_layout::apply(&mut v, &fitted.limits);
+    let joint = fitted.joints;
     let spec = WindowSpec {
-        half_width: widest,
+        half_width: joint.half(widest),
+        joints: joint,
         // Two slit columns of the least spacing between two windows.
         min_band: 2.0 * (pattern.width.as_mm() + 1.0) / 0.88,
         curve: v.choice("bend_tabs") == "curve",
@@ -305,12 +316,14 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
 
     let mut joints = vec![Joint {
         thickness: mm(s.base),
+        half_width: mm(joint.half(s.base)),
         inset: mm(s.inset),
         from_top: false,
     }];
     if lid_on {
         joints.push(Joint {
             thickness: mm(if seat { s.ring } else { s.lid }),
+            half_width: mm(joint.half(if seat { s.ring } else { s.lid })),
             inset: mm(0.0),
             from_top: true,
         });
@@ -329,7 +342,7 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
     };
     let strip = Piece::new(wall.contours(&tabs), s.wall, "strip");
 
-    let plates = plates(&v, &s, (&inner, &outer), &tabs);
+    let plates = plates(&v, &s, (&inner, &outer), (&tabs, &joint));
     let placed = place(
         std::slice::from_ref(&strip),
         plates,
@@ -337,7 +350,8 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         v.mm("gap") + s.kerf,
     );
     let handles = handles(&placed, &inner, &s);
-    let automatic = used_values(&v, &s, &pattern);
+    let mut automatic = used_values(&v, &s, &pattern);
+    automatic.extend(joint_layout::used(&v, &fitted, 2.0 * widest));
     let states = if s.radius >= s.width.min(s.depth) / 2.0 - 0.005 {
         vec![("corner_radius", "full round")]
     } else {

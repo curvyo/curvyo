@@ -97,6 +97,7 @@ pub(super) fn strip(s: &Sizes, pattern: SlitPattern, draft: bool) -> Vec<Contour
         .collect();
     let joint = |from_top| Joint {
         thickness: Length::from_mm(s.end),
+        half_width: Length::from_mm(s.end),
         inset: Length::from_mm(0.0),
         from_top,
     };

@@ -8,8 +8,7 @@ use crate::footprint::{Footprint, Shape, Span, Tab};
 use crate::shape_ops::Chain;
 use crate::shape_ops::{between, direction, length};
 use crate::tab_layout::{
-    Layout, MIN_CIRCLE_TABS, MIN_STRAIGHT_TABS, MIN_TAB_STRAIGHT, TAB_PITCH, WindowSpec,
-    curve_fits, neutral_arc,
+    Layout, MIN_CIRCLE_TABS, MIN_TAB_STRAIGHT, TAB_PITCH, WindowSpec, curve_fits, neutral_arc,
 };
 
 /// A run as the windows see it: its shapes measured as one.
@@ -79,8 +78,8 @@ impl Footprint {
     /// The tabs of the whole wall and the footprint they stand on, runs of bends taking their
     /// windows as whole (ADR 0083 §13.8): the straights' tabs when they are at least four.
     pub(crate) fn with_run_tabs(&self, spec: WindowSpec) -> (Self, Vec<Tab>) {
-        let straight = self.straight_tabs(spec.half_width);
-        if straight.len() >= MIN_STRAIGHT_TABS {
+        let straight = self.straight_tabs(spec.half_width, &spec.joints);
+        if spec.straight_enough(straight.len()) {
             return (self.clone(), straight);
         }
         let spans = &self.spans;
@@ -118,7 +117,10 @@ impl Footprint {
             let wanted = {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let by_length = (run.total / TAB_PITCH).round() as usize;
-                by_length.max(if lone_loop { MIN_CIRCLE_TABS } else { 1 })
+                match spec.joints.count {
+                    Some(typed) if lone_loop => typed as usize,
+                    _ => by_length.max(if lone_loop { MIN_CIRCLE_TABS } else { 1 }),
+                }
             };
             let enough = lone_loop || run.total >= MIN_TAB_STRAIGHT * self.wall;
             let windows = if enough {
@@ -233,6 +235,7 @@ mod tests {
             half_width: 3.0,
             min_band: 3.0,
             curve: false,
+            joints: crate::joint_layout::AUTO,
         };
         let fp = concave_run();
         let (fitted, tabs) = fp.with_run_tabs(spec);

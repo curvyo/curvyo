@@ -15,6 +15,8 @@ use crate::wave_slot::wave;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Joint {
     pub(crate) thickness: Length,
+    /// Half the slot's length along the strip: the tab's half width (the thickness while automatic).
+    pub(crate) half_width: Length,
     pub(crate) inset: Length,
     pub(crate) from_top: bool,
 }
@@ -154,14 +156,15 @@ impl Wall<'_> {
         for tab in tabs {
             for joint in &self.joints {
                 let (t, e) = (joint.thickness.as_mm(), joint.inset.as_mm());
+                let half = joint.half_width.as_mm();
                 let (y0, y1) = if joint.from_top {
                     (e, e + t)
                 } else {
                     (height - e - t, height - e)
                 };
                 rects.push(Rect {
-                    x0: tab.s - t,
-                    x1: tab.s + t,
+                    x0: tab.s - half,
+                    x1: tab.s + half,
                     y0,
                     y1,
                 });

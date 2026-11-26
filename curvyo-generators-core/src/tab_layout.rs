@@ -4,6 +4,7 @@
 use curvyo_document_core::Point;
 
 use crate::footprint::{Footprint, Shape, Span, Tab};
+use crate::joint_layout::{self, Edge, Joints};
 use crate::outline::polar;
 
 /// The aimed distance between two tabs.
@@ -33,6 +34,19 @@ pub(crate) struct WindowSpec {
     /// A tab on a bend stands on the true arc and the slits run on through it (`bend_tabs`
     /// `curve`, ADR 0089 decision 2); where it cannot, the tab keeps its window.
     pub(crate) curve: bool,
+    /// The count, size and pattern the maker chose (`half_width` already follows the size).
+    pub(crate) joints: Joints,
+}
+
+impl WindowSpec {
+    /// Straight tabs enough to leave the bends alone: four, or two when a count was typed.
+    pub(crate) fn straight_enough(&self, tabs: usize) -> bool {
+        tabs >= if self.joints.typed() {
+            2
+        } else {
+            MIN_STRAIGHT_TABS
+        }
+    }
 }
 
 /// Whether a tab of half width `half_width` can stand on the true arc of `radius` (a concave arc
@@ -47,10 +61,36 @@ pub(crate) fn neutral_arc(radius: f64, sweep: f64, wall: f64) -> f64 {
 }
 
 impl Footprint {
+    /// The straights that carry tabs: whole straights of at least four wall thicknesses.
+    pub(crate) fn tab_edges(&self) -> Vec<Edge> {
+        let mut seen = Vec::new();
+        let mut edges = Vec::new();
+        for span in &self.spans {
+            let (Some(whole), Shape::Straight { .. }) = (span.whole, span.shape) else {
+                continue;
+            };
+            if whole.length < MIN_TAB_STRAIGHT * self.wall || seen.contains(&whole.id) {
+                continue;
+            }
+            seen.push(whole.id);
+            edges.push(Edge {
+                length: whole.length,
+                seam: whole.seam,
+            });
+        }
+        edges
+    }
+
+    /// Fits the typed joint values to these straights; `widest` is the widest plate's thickness.
+    pub(crate) fn joint_fit(&self, joints: Joints, widest: f64) -> joint_layout::Fitted {
+        joint_layout::fit(&self.tab_edges(), self.margin, 2.0 * widest, joints)
+    }
+
     /// The tabs of straights that hold at least four wall thicknesses, `half_width` being the
-    /// widest tab's half width (ADR 0082 §5).
-    pub(crate) fn straight_tabs(&self, half_width: f64) -> Vec<Tab> {
+    /// widest tab's half width (ADR 0082 §5), placed by `joints`.
+    pub(crate) fn straight_tabs(&self, half_width: f64, joints: &Joints) -> Vec<Tab> {
         let mut tabs = Vec::new();
+        let width = 2.0 * half_width;
         for span in &self.spans {
             let (Some(whole), Shape::Straight { from, to }) = (span.whole, span.shape) else {
                 continue;
@@ -58,19 +98,17 @@ impl Footprint {
             if whole.length < MIN_TAB_STRAIGHT * self.wall {
                 continue;
             }
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let mut count = ((whole.length / TAB_PITCH).round() as usize).max(1);
-            if whole.seam && count % 2 == 1 {
-                count += 1;
-            }
-            #[allow(clippy::cast_precision_loss)]
-            let pitch = whole.length / count as f64;
+            let edge = Edge {
+                length: whole.length,
+                seam: whole.seam,
+            };
+            let count = edge.count(width, self.margin, joints);
+            let gap = edge.gap(count, width, self.margin, joints);
+            let centres = joint_layout::centres(whole.length, count, width, joints, gap);
             let (dx, dy) = (to.x - from.x, to.y - from.y);
             let length = libm::hypot(dx, dy);
             let along = (dx / length, dy / length);
-            for index in 0..count {
-                #[allow(clippy::cast_precision_loss)]
-                let u = pitch * (index as f64 + 0.5);
+            for u in centres {
                 let local = u - whole.offset;
                 if local < 0.0 || local >= length {
                     continue;
@@ -94,8 +132,8 @@ impl Footprint {
     /// are at least four, else windows on the bends. A window is a flat chord of length
     /// `2 half_width + 2 wall` that replaces its stretch of the arc.
     pub(crate) fn with_tabs(&self, spec: WindowSpec) -> (Self, Vec<Tab>) {
-        let straight = self.straight_tabs(spec.half_width);
-        if straight.len() >= MIN_STRAIGHT_TABS {
+        let straight = self.straight_tabs(spec.half_width, &spec.joints);
+        if spec.straight_enough(straight.len()) {
             return (self.clone(), straight);
         }
         let no_straight = self
@@ -117,7 +155,11 @@ impl Footprint {
                         (length, 1)
                     };
                     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                    let wanted = ((whole / TAB_PITCH).round() as usize).max(minimum);
+                    let by_length = ((whole / TAB_PITCH).round() as usize).max(minimum);
+                    let wanted = match spec.joints.count {
+                        Some(typed) if no_straight => typed as usize,
+                        _ => by_length,
+                    };
                     let enough = no_straight || length >= MIN_TAB_STRAIGHT * self.wall;
                     let count = if enough {
                         self.fitting_count(span, wanted, spec)
