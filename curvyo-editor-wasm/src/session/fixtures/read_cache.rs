@@ -13,7 +13,7 @@ use super::placed::PageFixtures;
 /// Everything the reads depend on: the document (fixtures and sets are its nodes), the page
 /// choice and the extensions switched on.
 #[derive(Debug, Clone, PartialEq)]
-struct ReadKey {
+pub(super) struct ReadKey {
     version: DocumentVersion,
     workbench: Workbench,
     extensions: curvyo_ui_core::ExtensionSettings,
@@ -33,7 +33,7 @@ pub(super) struct ReadCache {
 }
 
 impl Session {
-    fn read_key(&self) -> ReadKey {
+    pub(super) fn read_key(&self) -> ReadKey {
         ReadKey {
             version: self.document.version(),
             workbench: self.workbench(),

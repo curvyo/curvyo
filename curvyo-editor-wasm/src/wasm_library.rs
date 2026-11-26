@@ -21,14 +21,14 @@ use crate::wasm_thumbnail::WasmThumbnail;
 /// packed, never committed into, no recovery copy, no room.
 #[wasm_bindgen]
 pub struct WasmLibrarySource {
-    session: Session,
+    pub(crate) session: Session,
     /// The pane's size in CSS pixels.
     size: (f64, f64),
     /// The pane's zoom and pan.
     view: PreviewView,
 }
 
-fn ids_of(json: &str) -> Vec<NodeId> {
+pub(crate) fn ids_of(json: &str) -> Vec<NodeId> {
     serde_json::from_str(json).unwrap_or_default()
 }
 
@@ -308,7 +308,7 @@ impl WasmSession {
 /// The record as the page sends it: the Came from fields, the online keys of an online item and
 /// how the import is run (`step` `icon`, fonts left out).
 #[derive(serde::Deserialize)]
-struct CameFromWire {
+pub(crate) struct CameFromWire {
     document: String,
     page: String,
     page_id: String,
@@ -322,7 +322,7 @@ struct CameFromWire {
 }
 
 impl CameFromWire {
-    fn into_record(self) -> CameFrom {
+    pub(crate) fn into_record(self) -> CameFrom {
         CameFrom {
             document: self.document,
             page: self.page,

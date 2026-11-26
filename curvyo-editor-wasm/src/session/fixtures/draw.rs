@@ -290,6 +290,7 @@ impl Session {
         if let Some(result) = self.fixture_drag_snap() {
             list.extend(self.snap_marker_of(result));
         }
+        list.extend(self.slot_drop_overlay());
         if let Some((slot, fit)) = self.current_fit() {
             if slot.drawn {
                 list.extend(curvyo_render_core::build_slot_cue(

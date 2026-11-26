@@ -485,11 +485,8 @@ impl Session {
             apply_candidates: self.apply_fixture_candidates(),
             apply_picked: self.apply_preview_source().map(NodeId::full_id),
         };
-        Some(view_of(
-            &fixtures,
-            |id| self.fixtures.sets.is_unfolded(id),
-            state,
-        ))
+        let view = view_of(&fixtures, |id| self.fixtures.sets.is_unfolded(id), state);
+        Some(self.with_filled_holders(view))
     }
 
     /// [`Session::fixtures_view`] as JSON text, `null` off a laser page.

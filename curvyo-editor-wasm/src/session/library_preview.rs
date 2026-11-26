@@ -60,9 +60,10 @@ impl Session {
         let read = self.document_read();
         let mut objects = Vec::new();
         let mut owners = Vec::new();
+        let placed = super::library_import::placement_ids(&self.document);
         for object in read.drawn.iter() {
             let id = object.id();
-            let top = super::library_import::top_level(&self.document, id);
+            let top = super::library_import::top_level_among(&self.document, id, &placed);
             if tops.contains(&top) && !read.guides.contains(&id) {
                 objects.push(object.clone());
                 owners.push(top);

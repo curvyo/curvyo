@@ -4,15 +4,13 @@
 //! centre to centre. The slots are read once at the drag's start.
 
 use curvyo_document_core::{Affine, Angle, Length, NodeId, ObjectSnapshot, Point, Vec2};
-use curvyo_laser_core::{Slot, SlotShape, fit_slot};
+use curvyo_laser_core::{FIT_TOLERANCE, Slot, SlotShape, fit_slot};
 use curvyo_render_core::SlotOutline;
 use serde::Serialize;
 
 use super::super::Session;
 use super::placed::{PageFixtures, PlacedFixture};
 
-/// The fit tolerance, centre to centre (customer, 2026-11-10).
-const FIT_TOLERANCE_MM: f64 = 0.1;
 /// A holder's turn counts as square to the page within this many radians.
 const SQUARE_EPS: f64 = 1e-6;
 /// The commit label of a fitted move ("Move to slot", a MOVE step).
@@ -150,7 +148,7 @@ impl Session {
             Length::from_mm(max.y - min.y),
         );
         let centre = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
-        let tolerance = Length::from_mm(FIT_TOLERANCE_MM);
+        let tolerance = FIT_TOLERANCE;
         let best = slots
             .iter()
             .enumerate()

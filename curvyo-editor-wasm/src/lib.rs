@@ -226,8 +226,9 @@ pub use session::{
 };
 pub use session::{
     AddTarget, ApplyCandidate, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow,
-    FixturesView, GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
-    RoleToggle, RoundValues, SetView, SlotRow, TapesView,
+    FixturesView, GridValues, HolderTargets, JobGroupView, JobKindView, JobRowView, PartRowView,
+    PartsView, RoleToggle, RoundValues, SetView, SlotDrop, SlotDropCue, SlotRow, SlotSource,
+    SlotTargetRow, SlotTargetsView, TapesView, UnitBox,
 };
 pub use session::{
     BackgroundItem, BackgroundKind, DiskAnswer, DiskScan, DiskStep, DocumentPlace, ListEdit,
@@ -276,6 +277,8 @@ mod wasm_fixtures;
 mod wasm_image_adjust;
 #[cfg(target_arch = "wasm32")]
 mod wasm_image_ai;
+#[cfg(target_arch = "wasm32")]
+mod wasm_into_slot;
 #[cfg(target_arch = "wasm32")]
 mod wasm_machine_profiles;
 #[cfg(target_arch = "wasm32")]

@@ -41,10 +41,13 @@ impl Session {
             return Vec::new();
         };
         let leaves = contents.get(page).cloned().unwrap_or_default();
+        // The placed pages are read once: a leaf's walk up asks at every step (ADR 0088 decision 9).
+        let placed = placement_ids(&self.document);
+        let mut seen = std::collections::HashSet::new();
         let mut tops: Vec<NodeId> = Vec::new();
         for leaf in leaves {
-            let top = top_level(&self.document, leaf);
-            if !tops.contains(&top) {
+            let top = top_level_among(&self.document, leaf, &placed);
+            if seen.insert(top) {
                 tops.push(top);
             }
         }
@@ -212,7 +215,7 @@ impl Session {
 
     /// Each placed page of this document with the top-level members of its drawing page by the
     /// membership read: what a placement becomes when it is imported.
-    fn library_placed_members(&self) -> Vec<(NodeId, Vec<NodeId>)> {
+    pub(in crate::session) fn library_placed_members(&self) -> Vec<(NodeId, Vec<NodeId>)> {
         self.document
             .placed_pages()
             .into_iter()
@@ -281,12 +284,22 @@ impl Session {
     }
 }
 
-/// The top-level object `leaf` belongs to: its ancestor whose parent is a layer or the root.
-pub(super) fn top_level(document: &Document, leaf: NodeId) -> NodeId {
+/// The ids of the document's placed pages.
+pub(super) fn placement_ids(document: &Document) -> std::collections::HashSet<NodeId> {
+    document.placed_pages().iter().map(|p| p.id).collect()
+}
+
+/// The top-level object `leaf` belongs to: its ancestor whose parent is a layer or the root;
+/// `placed` holds the document's placed pages, read once by the caller.
+pub(super) fn top_level_among(
+    document: &Document,
+    leaf: NodeId,
+    placed: &std::collections::HashSet<NodeId>,
+) -> NodeId {
     let mut current = leaf;
     while let Some(parent) = document.parent_node(current) {
         // A placed page is itself the top: its parent is its laser page's manufacturing.
-        if document.is_layer(parent) || document.is_placement(current) {
+        if document.is_layer(parent) || placed.contains(&current) {
             break;
         }
         current = parent;
@@ -295,7 +308,7 @@ pub(super) fn top_level(document: &Document, leaf: NodeId) -> NodeId {
 }
 
 /// The joint outline box of `ids` in `document`.
-fn joint_box(document: &Document, ids: &[NodeId]) -> (Point, Point) {
+pub(in crate::session) fn joint_box(document: &Document, ids: &[NodeId]) -> (Point, Point) {
     let mut lo = Point::new(f64::INFINITY, f64::INFINITY);
     let mut hi = Point::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
     for &id in ids {

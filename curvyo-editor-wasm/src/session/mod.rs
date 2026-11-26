@@ -130,8 +130,9 @@ mod registration_marks;
 #[cfg_attr(not(target_arch = "wasm32"), allow(unused_imports))] // the wasm bridge takes it
 pub use fixtures::{
     AddTarget, ApplyCandidate, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow,
-    FixturesView, GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
-    RoleToggle, RoundValues, SetView, SlotRow, TapesView,
+    FixturesView, GridValues, HolderTargets, JobGroupView, JobKindView, JobRowView, PartRowView,
+    PartsView, RoleToggle, RoundValues, SetView, SlotDrop, SlotDropCue, SlotRow, SlotSource,
+    SlotTargetRow, SlotTargetsView, TapesView, UnitBox,
 };
 pub use library_sync::LibraryEdit;
 pub use materials::{MaterialWrite, MaterialsView};
