@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { hostingGuide } from "@/lib/libraryBrowserQuery";
 import { openLicence } from "@/lib/onlineApi";
+import { isTauri } from "@/platform/host";
 
 const LINK = "text-[var(--editor-accent)] underline";
 
@@ -40,7 +41,17 @@ export function GuideView() {
             <li key={step}>{step}</li>
           ))}
         </ol>
-        <p className="font-semibold">{guide.private}</p>
+        {/* The token steps are the desktop build's: the browser build has no Online section (`0156` T13). */}
+        {isTauri ? (
+          <>
+            <h3 className="mt-2 text-xs font-semibold text-[var(--panel-muted-fg)]">{guide.private_title}</h3>
+            <ol className="list-decimal pl-5">
+              {guide.private_steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          </>
+        ) : null}
         <div className="mt-2 flex items-center justify-between">
           <h3 className="text-xs font-semibold text-[var(--panel-muted-fg)]">Example</h3>
           <button

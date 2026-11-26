@@ -2,6 +2,7 @@
 // 0.2): one card per set, catalogue, folder or unfetched source, in groups by source with sticky
 // headers; a press selects, a double-click or Enter opens, Space selects; arrows move by card and
 // by row; at the end Host your own library….
+import { Lock } from "lucide-react";
 import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { BrowserCard } from "@/components/libraryBrowser/BrowserTile";
@@ -154,9 +155,22 @@ export const SetsGrid = forwardRef<SetsHandle, SetsGridProps>(function SetsGrid(
     >
       <div role="listbox" aria-label="Sets" onKeyDown={onKeyDown}>
         {answer.groups.map((group) => (
-          <div key={group.key} role="group" aria-label={group.heading} className="mb-2">
+          <div
+            key={group.key}
+            role="group"
+            aria-label={group.private ? `${group.heading}, private` : group.heading}
+            className="mb-2"
+          >
             <p className="sticky top-[-12px] z-10 flex h-7 items-center bg-[var(--canvas-bg)] text-xs font-semibold text-[var(--panel-muted-fg)]">
-              {group.heading}
+              {group.private && group.heading.startsWith(group.name) ? (
+                <>
+                  {group.name}
+                  <Lock size={12} strokeWidth={1.5} aria-hidden="true" className="ml-1 shrink-0" />
+                  {group.heading.slice(group.name.length)}
+                </>
+              ) : (
+                group.heading
+              )}
             </p>
             <div className="flex flex-wrap" style={{ gap: GRID_GAP_PX }}>
               {group.cards.map((index) => {

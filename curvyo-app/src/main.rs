@@ -48,6 +48,7 @@ mod menu;
 mod native_file_lists;
 mod online;
 mod online_state;
+mod online_token;
 #[cfg(target_os = "linux")]
 mod preview_fonts;
 #[cfg(target_os = "linux")]
@@ -102,6 +103,8 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         online::online_add,
         online::online_add_ready,
         online::online_remove,
+        online::online_set_token,
+        online::online_forget_token,
         online::online_open,
         online::online_add_cancel,
         online::online_search_begin,
@@ -253,6 +256,7 @@ fn main() {
         })
         .setup(|app| {
             let handle = app.handle().clone();
+            online::use_system_key_store(&handle);
             // WebKitGTK hides a dragged file list from the page; the host keeps it for a drop.
             #[cfg(target_os = "linux")]
             native_file_lists::watch_drags(&handle);

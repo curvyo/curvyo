@@ -19,6 +19,8 @@ use curvyo_ui_core::library_online::READY_NAME;
 struct Fake {
     answers: HashMap<String, Result<Vec<u8>, HttpError>>,
     asked: Mutex<Vec<String>>,
+    /// The URLs asked with a token (the token itself cannot be read back, by design).
+    bearer: Mutex<Vec<String>>,
 }
 
 impl Fake {
@@ -47,6 +49,31 @@ impl Transport for Fake {
     }
 }
 
+impl Fake {
+    fn bearer_asked(&self) -> Vec<String> {
+        self.bearer.lock().unwrap().clone()
+    }
+}
+
+/// The same double also records the requests that carry a token.
+struct Bearing(Fake);
+
+impl Transport for Bearing {
+    fn get(&self, request: &Request, max_bytes: usize) -> Result<Vec<u8>, HttpError> {
+        self.0.get(request, max_bytes)
+    }
+
+    fn get_bearer(
+        &self,
+        request: &Request,
+        max_bytes: usize,
+        _token: &curvyo_storage_io::AccessToken,
+    ) -> Result<Vec<u8>, HttpError> {
+        self.0.bearer.lock().unwrap().push(request.url().to_owned());
+        self.0.get(request, max_bytes)
+    }
+}
+
 /// Enter in the search as the commands run it: mark, then one request per Iconify source.
 fn search_all(state: &OnlineState, fake: &Fake, sources: &Sources, text: &str) -> Vec<String> {
     let Some((words, keys)) = state.search_begin(sources, text) else {
@@ -68,6 +95,7 @@ fn git() -> SourceEntry {
         address: GIT.into(),
         name: "Cat".into(),
         added: Millis(1),
+        token: false,
     }
 }
 
@@ -77,6 +105,7 @@ fn iconify() -> SourceEntry {
         address: ICONS.into(),
         name: "api.iconify.design".into(),
         added: Millis(2),
+        token: false,
     }
 }
 
@@ -162,6 +191,7 @@ fn enter_sends_the_words_only_to_the_added_iconify_sources() {
         address: READY_ADDRESS.into(),
         name: READY_NAME.into(),
         added: Millis(3),
+        token: false,
     };
     let all = sources(&[git(), ready, iconify()]);
     let asked = search_all(&state, &fake, &all, "  home   icon ");
@@ -387,6 +417,7 @@ fn add_sends_exactly_one_request_and_the_ready_entry_none() {
             &mut list,
             SourceKind::Git,
             "https://example.org/cat",
+            None,
             Millis(5),
             &|| true,
         )
@@ -405,6 +436,7 @@ fn add_sends_exactly_one_request_and_the_ready_entry_none() {
                 &mut list,
                 SourceKind::Git,
                 "https://example.org/cat/",
+                None,
                 Millis(6),
                 &|| true
             )
@@ -417,6 +449,7 @@ fn add_sends_exactly_one_request_and_the_ready_entry_none() {
                 &mut list,
                 SourceKind::Git,
                 "http://example.org/x/",
+                None,
                 Millis(6),
                 &|| true
             )
@@ -430,6 +463,7 @@ fn add_sends_exactly_one_request_and_the_ready_entry_none() {
             &mut list,
             SourceKind::Git,
             READY_ADDRESS,
+            None,
             Millis(7),
             &|| true,
         )
@@ -450,13 +484,17 @@ fn a_source_that_does_not_answer_is_not_added_and_leaves_nothing() {
             &mut list,
             SourceKind::Iconify,
             "https://api.example.org",
+            None,
             Millis(1),
             &|| true,
         )
         .unwrap_err();
     assert_eq!(
         text,
-        AddStop::Refused("Offline. Nothing was sent.".to_owned())
+        AddStop::Refused(Refusal {
+            field: RefusalField::Address,
+            text: "Offline. Nothing was sent.".to_owned()
+        })
     );
     assert_eq!(list.entries().len(), 0);
     assert_eq!(
@@ -518,6 +556,7 @@ fn a_cancelled_add_discards_the_check_and_lists_nothing() {
             &mut list,
             SourceKind::Git,
             "https://example.org/cat/",
+            None,
             Millis(1),
             &|| false,
         )
@@ -531,4 +570,391 @@ fn a_cancelled_add_discards_the_check_and_lists_nothing() {
     let before = state.add_generation();
     state.cancel_add();
     assert_eq!(state.add_generation(), before + 1);
+}
+
+// --- `specs/0156` library Git token -----------------------------------------------------------
+
+use curvyo_storage_io::{AccessToken, CredentialStore, load_token};
+
+/// The sentinel every file and line of a run is searched for (criterion 9).
+const SENTINEL: &str = "SENTINEL-tok_0156-xyz";
+
+/// A state whose key store is the encrypted key file in `dir`: the test double of the system one.
+fn keyed(dir: &std::path::Path) -> OnlineState {
+    let state = OnlineState::default();
+    let dir = dir.to_path_buf();
+    state.use_keys(crate::online_token::Keys::new(
+        "slot".to_owned(),
+        Box::new(move || CredentialStore::file(&dir, "pw")),
+    ));
+    state
+}
+
+fn tok(text: &str) -> AccessToken {
+    AccessToken::parse(text).unwrap()
+}
+
+fn index_json() -> Vec<u8> {
+    br#"{"catalogue_format":1,"name":"Private","templates":[]}"#.to_vec()
+}
+
+const INDEX_URL: &str = "https://example.org/cat/curvyo-catalogue.json";
+
+fn stored(dir: &std::path::Path) -> bool {
+    let store = CredentialStore::file(dir, "pw").unwrap();
+    load_token(&store, GIT).unwrap().is_some()
+}
+
+#[test]
+fn add_with_a_token_sends_it_on_the_one_request_and_keeps_it_only_on_success() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = keyed(dir.path());
+    let mut list = Sources::default();
+    let fake = Bearing(Fake::default().with(INDEX_URL, Ok(index_json())));
+    let token = tok(SENTINEL);
+    let key = state
+        .add(
+            &fake,
+            &mut list,
+            SourceKind::Git,
+            GIT,
+            Some(&token),
+            Millis(1),
+            &|| true,
+        )
+        .unwrap();
+    assert_eq!(fake.0.asked(), vec![INDEX_URL.to_owned()]);
+    assert_eq!(
+        fake.0.bearer_asked(),
+        vec![INDEX_URL.to_owned()],
+        "with the token"
+    );
+    assert!(list.find(&key).unwrap().token, "the flag, not the secret");
+    assert!(stored(dir.path()));
+    assert!(!list.to_text().contains(SENTINEL));
+}
+
+#[test]
+fn a_refused_token_is_not_kept_and_the_refusal_is_under_the_token_field() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = keyed(dir.path());
+    let mut list = Sources::default();
+    let token = tok(SENTINEL);
+    for (answer, text) in [
+        (HttpError::Status(401), "The server refused the token."),
+        (
+            HttpError::Status(403),
+            "This token has no read access to the repository.",
+        ),
+        (
+            HttpError::Status(404),
+            "This token has no read access to the repository.",
+        ),
+        (
+            HttpError::Redirect,
+            "The server sent the request elsewhere. The token was not sent there.",
+        ),
+    ] {
+        let fake = Bearing(Fake::default().with(INDEX_URL, Err(answer)));
+        let stop = state
+            .add(
+                &fake,
+                &mut list,
+                SourceKind::Git,
+                GIT,
+                Some(&token),
+                Millis(1),
+                &|| true,
+            )
+            .unwrap_err();
+        assert_eq!(
+            stop,
+            AddStop::Refused(Refusal {
+                field: RefusalField::Token,
+                text: text.to_owned()
+            })
+        );
+    }
+    assert_eq!(list.entries().len(), 0);
+    assert!(!stored(dir.path()), "nothing saved on a failure");
+    assert!(state.held.lock().unwrap().is_empty());
+}
+
+#[test]
+fn without_a_key_store_add_with_a_token_is_refused_before_anything_is_sent() {
+    let state = OnlineState::default();
+    let mut list = Sources::default();
+    let fake = Bearing(Fake::default().with(INDEX_URL, Ok(index_json())));
+    let stop = state
+        .add(
+            &fake,
+            &mut list,
+            SourceKind::Git,
+            GIT,
+            Some(&tok("t")),
+            Millis(1),
+            &|| true,
+        )
+        .unwrap_err();
+    assert_eq!(
+        stop,
+        AddStop::Refused(Refusal {
+            field: RefusalField::Token,
+            text: "Your system's key store is not available, so the token cannot be kept. The source was not added."
+                .to_owned()
+        })
+    );
+    assert_eq!(fake.0.asked(), Vec::<String>::new());
+    assert_eq!(list.entries().len(), 0);
+    // A source without a token is added as before.
+    state
+        .add(
+            &fake,
+            &mut list,
+            SourceKind::Git,
+            GIT,
+            None,
+            Millis(1),
+            &|| true,
+        )
+        .unwrap();
+    assert!(!list.entries()[0].token);
+}
+
+#[test]
+fn a_token_for_iconify_or_the_ready_entry_is_never_kept_or_sent() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = keyed(dir.path());
+    let mut list = Sources::default();
+    let fake = Bearing(Fake::default());
+    state
+        .add(
+            &fake,
+            &mut list,
+            SourceKind::Git,
+            READY_ADDRESS,
+            Some(&tok(SENTINEL)),
+            Millis(1),
+            &|| true,
+        )
+        .unwrap();
+    assert!(!list.entries()[0].token);
+    let icons =
+        Bearing(Fake::default().with("https://api.iconify.design/collections", Ok(b"{}".to_vec())));
+    state
+        .add(
+            &icons,
+            &mut list,
+            SourceKind::Iconify,
+            ICONS,
+            Some(&tok(SENTINEL)),
+            Millis(2),
+            &|| true,
+        )
+        .unwrap();
+    assert!(!list.entries()[1].token);
+    assert_eq!(icons.0.bearer_asked(), Vec::<String>::new());
+    assert_eq!(fake.0.bearer_asked(), Vec::<String>::new());
+}
+
+#[test]
+fn a_source_with_a_token_sends_it_to_its_own_requests_and_no_other_source_does() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = keyed(dir.path());
+    let fake = Bearing(Fake::default().with(INDEX_URL, Ok(index_json())));
+    let mut list = Sources::default();
+    state
+        .add(
+            &fake,
+            &mut list,
+            SourceKind::Git,
+            GIT,
+            Some(&tok(SENTINEL)),
+            Millis(1),
+            &|| true,
+        )
+        .unwrap();
+    list.add(
+        SourceKind::Git,
+        "https://other.example/c/",
+        "Other",
+        Millis(2),
+    )
+    .unwrap();
+    let before = fake.0.bearer_asked().len();
+    let private = list.entries()[0].clone();
+    state.fetch_list(&fake, &private);
+    assert_eq!(fake.0.bearer_asked().len(), before + 1, "Refresh sends it");
+    let other = list.entries()[1].clone();
+    state.fetch_list(&fake, &other);
+    assert_eq!(
+        fake.0.bearer_asked().len(),
+        before + 1,
+        "another catalogue gets none"
+    );
+}
+
+#[test]
+fn a_flagged_source_whose_token_cannot_be_read_sends_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = keyed(dir.path());
+    let fake = Bearing(Fake::default().with(INDEX_URL, Ok(index_json())));
+    let mut entry = git();
+    entry.token = true;
+    state.fetch_list(&fake, &entry);
+    assert_eq!(
+        fake.0.asked(),
+        Vec::<String>::new(),
+        "no silent anonymous request"
+    );
+    assert_eq!(
+        state.with(&entry.key(), |h| h.failure),
+        Some(Failure::TokenUnreadable)
+    );
+    // No key store at all reads the same.
+    let none = OnlineState::default();
+    none.fetch_list(&fake, &entry);
+    assert_eq!(fake.0.asked(), Vec::<String>::new());
+    let mut flagged = sources(&[git()]);
+    flagged.set_token(&entry.key(), true).unwrap();
+    let probe = none.rows(&flagged, &HashSet::new(), "");
+    let opened: HashSet<String> = std::iter::once(
+        probe
+            .iter()
+            .find(|r| r.kind == curvyo_ui_core::library_tree::RowKind::Source)
+            .unwrap()
+            .key
+            .clone(),
+    )
+    .collect();
+    let rows = none.rows(&flagged, &opened, "");
+    assert!(
+        rows.iter()
+            .any(|r| r.name == "The saved token could not be read from the key store.")
+    );
+}
+
+fn open_all() -> HashSet<String> {
+    std::iter::once("s:online:https://example.org/cat/".to_owned()).collect()
+}
+
+#[test]
+fn change_token_replaces_only_on_success_and_a_failure_changes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = keyed(dir.path());
+    let ok = Bearing(Fake::default().with(INDEX_URL, Ok(index_json())));
+    let mut list = Sources::default();
+    state
+        .add(
+            &ok,
+            &mut list,
+            SourceKind::Git,
+            GIT,
+            Some(&tok("old-token")),
+            Millis(1),
+            &|| true,
+        )
+        .unwrap();
+    let key = list.entries()[0].key();
+    let refused = Bearing(Fake::default().with(INDEX_URL, Err(HttpError::Status(401))));
+    let held_before = state.with(&key, |h| h.catalogue.is_some());
+    let err = state
+        .set_token(&refused, &mut list, &key, "new-token")
+        .unwrap_err();
+    assert_eq!(err.field, RefusalField::Token);
+    assert_eq!(err.text, "The server refused the token.");
+    assert!(list.entries()[0].token, "old state unchanged");
+    assert!(stored(dir.path()), "the old token stays");
+    assert_eq!(state.with(&key, |h| h.catalogue.is_some()), held_before);
+    assert_eq!(state.with(&key, |h| h.failure), None);
+    // A bad text is refused before anything is sent.
+    let before = ok.0.asked().len();
+    let err = state
+        .set_token(&ok, &mut list, &key, "has space")
+        .unwrap_err();
+    assert_eq!(
+        err.text,
+        "Enter a token of at most 1024 characters, without spaces."
+    );
+    assert_eq!(ok.0.asked().len(), before);
+    // Success: one GET with the new token.
+    state
+        .set_token(&ok, &mut list, &key, "  new-token \n")
+        .unwrap();
+    assert_eq!(ok.0.asked().len(), before + 1);
+    assert_eq!(
+        ok.0.bearer_asked().last().map(String::as_str),
+        Some(INDEX_URL)
+    );
+}
+
+#[test]
+fn add_token_to_a_public_source_marks_it_private_and_remove_token_clears_both() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = keyed(dir.path());
+    let ok = Bearing(Fake::default().with(INDEX_URL, Ok(index_json())));
+    let mut list = sources(&[git()]);
+    let key = list.entries()[0].key();
+    state
+        .set_token(&ok, &mut list, &key, "added-later")
+        .unwrap();
+    assert!(list.entries()[0].token && stored(dir.path()));
+    assert_eq!(state.delete_token(GIT), None);
+    assert!(!stored(dir.path()), "the key store entry is gone");
+}
+
+#[test]
+fn a_key_store_that_will_not_delete_names_the_entry_by_hand() {
+    let state = OnlineState::default();
+    state.use_keys(crate::online_token::Keys::new(
+        "abc".to_owned(),
+        Box::new(|| Err(curvyo_storage_io::CredentialError::NoKeychain)),
+    ));
+    assert_eq!(
+        state.delete_token(GIT).as_deref(),
+        Some(
+            "The saved token could not be deleted from the key store; remove it there by hand: git-token:https://example.org/cat/ in curvyo/abc."
+        )
+    );
+}
+
+#[test]
+fn no_file_the_app_writes_and_no_line_it_shows_holds_the_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = keyed(dir.path());
+    let fake = Bearing(Fake::default().with(INDEX_URL, Ok(index_json())));
+    let mut list = Sources::default();
+    let token = tok(SENTINEL);
+    let key = state
+        .add(
+            &fake,
+            &mut list,
+            SourceKind::Git,
+            GIT,
+            Some(&token),
+            Millis(1),
+            &|| true,
+        )
+        .unwrap();
+    let app_dir = tempfile::tempdir().unwrap();
+    std::fs::write(app_dir.path().join("online-sources.toml"), list.to_text()).unwrap();
+    let rows = state.rows(&list, &open_all(), "");
+    let shown = format!("{rows:?}{}", serde_json::to_string(&rows).unwrap());
+    let browse = serde_json::to_string(&state.browse_list(&list, None)).unwrap();
+    let debug = format!("{token:?}{list:?}{:?}", state.with(&key, |h| h.failure));
+    for text in [shown, browse, debug] {
+        assert!(!text.contains(SENTINEL));
+    }
+    for entry in std::fs::read_dir(app_dir.path()).unwrap() {
+        let bytes = std::fs::read(entry.unwrap().path()).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains(SENTINEL));
+    }
+    // The key file is the key store itself and holds it only encrypted.
+    for entry in std::fs::read_dir(dir.path()).unwrap() {
+        let bytes = std::fs::read(entry.unwrap().path()).unwrap();
+        assert!(
+            !String::from_utf8_lossy(&bytes).contains(SENTINEL),
+            "sealed"
+        );
+    }
 }

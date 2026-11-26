@@ -12,13 +12,14 @@ use curvyo_library_core::{
     SourceKind, Sources, base_address, host_of, icon_svg_mm, is_ready, needs_credit, search_words,
 };
 use curvyo_storage_io::{
-    Transport, UreqTransport, fetch_catalogue, fetch_collection, fetch_collections, fetch_icons,
-    fetch_search, fetch_template, fetch_thumbnail,
+    AccessToken, Authorized, Transport, UreqTransport, fetch_catalogue, fetch_collection,
+    fetch_collections, fetch_icons, fetch_search, fetch_template, fetch_thumbnail, save_token,
 };
 use curvyo_ui_core::library_index::IndexedDocument;
 use curvyo_ui_core::library_online::{
-    OnlineSourceView, OnlineView, READY_NAME, SearchView, add_address_text, add_duplicate_text,
-    add_failure_text, icon_credit_text, online_rows, search_done_text,
+    OnlineSourceView, OnlineView, READY_NAME, Refusal, RefusalField, SearchView, add_address_text,
+    add_duplicate_text, add_refusal, icon_credit_text, key_store_text, online_rows,
+    search_done_text,
 };
 use curvyo_ui_core::library_tree::LibraryRow;
 
@@ -45,6 +46,8 @@ pub(crate) struct Held {
 #[derive(Default)]
 pub(crate) struct OnlineState {
     pub(crate) transport: UreqTransport,
+    /// The key store of the access tokens (ADR 0090); none until the app installs it.
+    pub(crate) keys: std::sync::OnceLock<crate::online_token::Keys>,
     /// Counts the Cancels of the Add source form; a check that started before one is discarded.
     add_cancels: std::sync::atomic::AtomicU64,
     held: Mutex<HashMap<String, Held>>,
@@ -71,32 +74,55 @@ impl OnlineState {
     }
 
     /// Add source (criterion 1, UX F6): the address is checked with one request, except the ready
-    /// Curvyo catalogue, which sends nothing until it is opened. `Err` is the sentence under the
-    /// Address field; `Ok` the key of the source now in `sources`.
+    /// Curvyo catalogue, which sends nothing until it is opened. With a `token` the key store is
+    /// opened first, the request carries the token, and only after it succeeded the token is kept
+    /// (`specs/0156` criteria 2, 3, 11). `Err` is the refusal and the field it is shown under;
+    /// `Ok` the key of the source now in `sources`.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn add(
         &self,
         transport: &dyn Transport,
         sources: &mut Sources,
         kind: SourceKind,
         address: &str,
+        token: Option<&AccessToken>,
         now: Millis,
         wanted: &dyn Fn() -> bool,
     ) -> Result<String, AddStop> {
-        let base = base_address(kind, address)
-            .map_err(|_| AddStop::Refused(add_address_text().to_owned()))?;
+        let under_address = |text: &str| {
+            AddStop::Refused(Refusal {
+                field: RefusalField::Address,
+                text: text.to_owned(),
+            })
+        };
+        let base = base_address(kind, address).map_err(|_| under_address(add_address_text()))?;
         if sources.entries().iter().any(|e| e.address == base) {
-            return Err(AddStop::Refused(add_duplicate_text().to_owned()));
+            return Err(under_address(add_duplicate_text()));
         }
+        // A token is only for a Git catalogue of the maker's own, never the ready entry.
+        let token = token.filter(|_| kind == SourceKind::Git && !is_ready(&base));
+        let store = token
+            .map(|_| {
+                self.open_keys().map_err(|_| {
+                    AddStop::Refused(crate::online_token::under_token(key_store_text(false)))
+                })
+            })
+            .transpose()?;
         let probe = SourceEntry {
             kind,
             address: base.clone(),
             name: String::new(),
             added: Millis(0),
+            token: false,
         };
         let name = if is_ready(&base) {
             READY_NAME.to_owned()
         } else {
-            self.fetch_list(transport, &probe);
+            let authorized = token.map(|token| Authorized::new(transport, token));
+            let sender: &dyn Transport = authorized
+                .as_ref()
+                .map_or(transport, |a| a as &dyn Transport);
+            self.fetch_list(sender, &probe);
             let key = probe.key();
             // Cancel while the check ran: what it fetched is discarded, nothing is listed.
             if !wanted() {
@@ -105,7 +131,11 @@ impl OnlineState {
             }
             if let Some(failure) = self.with(&key, |held| held.failure) {
                 self.forget(&key);
-                return Err(AddStop::Refused(add_failure_text(kind, failure)));
+                return Err(AddStop::Refused(add_refusal(
+                    kind,
+                    token.is_some(),
+                    failure,
+                )));
             }
             let given = self.with(&key, |held| held.catalogue.as_ref().map(|c| c.name.clone()));
             given
@@ -113,9 +143,22 @@ impl OnlineState {
                 .or_else(|| host_of(&base))
                 .unwrap_or_else(|| base.clone())
         };
-        sources
+        if let (Some(token), Some(store)) = (token, &store)
+            && save_token(store, &base, token).is_err()
+        {
+            self.forget(&probe.key());
+            return Err(AddStop::Refused(crate::online_token::under_token(
+                key_store_text(false),
+            )));
+        }
+        let key = sources
             .add(kind, &base, &name, now)
-            .map_err(|_| AddStop::Refused(add_duplicate_text().to_owned()))
+            .map_err(|_| under_address(add_duplicate_text()))?;
+        if token.is_some() {
+            // invariant: the source was just added and is a Git catalogue of the maker's own.
+            let _ = sources.set_token(&key, true);
+        }
+        Ok(key)
     }
 
     /// Fetches the list of `entry` (the index or the icon sets) and keeps it or its failure.
@@ -123,7 +166,9 @@ impl OnlineState {
     pub(crate) fn fetch_list(&self, transport: &dyn Transport, entry: &SourceEntry) {
         let key = entry.key();
         let outcome = match entry.kind {
-            SourceKind::Git => fetch_catalogue(transport, &entry.address).map(|c| (Some(c), None)),
+            SourceKind::Git => self
+                .sent(transport, entry, |t| fetch_catalogue(t, &entry.address))
+                .map(|c| (Some(c), None)),
             SourceKind::Iconify => {
                 fetch_collections(transport, &entry.address).map(|s| (None, Some(s)))
             }
@@ -182,7 +227,10 @@ impl OnlineState {
                 held.catalogue.as_ref().and_then(|c| c.entry(path).cloned())
             })
             .ok_or(Failure::Invalid)?;
-        let result = fetch_template(transport, &entry.address, &template).and_then(|bytes| {
+        let fetched = self.sent(transport, entry, |t| {
+            fetch_template(t, &entry.address, &template)
+        });
+        let result = fetched.and_then(|bytes| {
             let members = curvyo_document_core::read_library_members(Cursor::new(&bytes));
             let segments: Vec<String> = path.split('/').map(str::to_owned).collect();
             let size = bytes.len() as u64;
@@ -212,7 +260,7 @@ impl OnlineState {
             }
             Err(failure) => {
                 self.with(&key, |held| {
-                    if failure == Failure::Offline {
+                    if matches!(failure, Failure::Offline | Failure::TokenUnreadable) {
                         held.failure = Some(failure);
                     } else {
                         held.refused.insert(path.to_owned(), failure);
@@ -237,7 +285,10 @@ impl OnlineState {
         let template = self.with(&key, |held| {
             held.catalogue.as_ref().and_then(|c| c.entry(path).cloned())
         })?;
-        let png = fetch_thumbnail(transport, &entry.address, &template)
+        let png = self
+            .sent(transport, entry, |t| {
+                fetch_thumbnail(t, &entry.address, &template)
+            })
             .ok()
             .flatten()
             .map(Arc::new);
@@ -359,6 +410,7 @@ impl OnlineState {
                     name: &entry.name,
                     address: &entry.address,
                     kind: entry.kind,
+                    token: entry.token,
                     failure: held.failure,
                     catalogue: held.catalogue.as_ref(),
                     sets: held.sets.as_deref(),
@@ -485,6 +537,18 @@ impl OnlineState {
         })
     }
 
+    /// Replaces what the session holds of the list of `key` with a freshly fetched `catalogue`.
+    pub(crate) fn install_catalogue(&self, key: &str, catalogue: Catalogue) {
+        self.with(key, |held| {
+            held.failure = None;
+            held.catalogue = Some(catalogue);
+            held.files.clear();
+            held.documents.clear();
+            held.refused.clear();
+            held.thumbnails.clear();
+        });
+    }
+
     pub(crate) fn forget(&self, key: &str) {
         self.held
             .lock()
@@ -501,8 +565,8 @@ impl OnlineState {
 /// Why Add did not add a source.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum AddStop {
-    /// Refused, with the sentence under the Address field.
-    Refused(String),
+    /// Refused, with the sentence and the field it is shown under.
+    Refused(Refusal),
     /// Cancelled while the check ran.
     Cancelled,
 }
