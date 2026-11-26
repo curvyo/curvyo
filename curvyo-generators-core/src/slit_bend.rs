@@ -9,6 +9,9 @@ use curvyo_document_core::Length;
 /// A bend needs at least two columns, else a band at the bridge height stays uncut.
 const MIN_COLUMNS: usize = 2;
 
+/// A column whose bridge ends exactly on a window's edge is outside it (float noise, millimetres).
+const EDGE: f64 = 1e-6;
+
 /// Which pattern the columns follow. An open set: a new kind is one arm of `slots`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SlitKind {
@@ -94,7 +97,7 @@ pub(crate) fn slots_at(
         let half = pattern.width.as_mm() / 2.0 + pattern.bridge.as_mm() + swing;
         if windows
             .iter()
-            .any(|w| x + half > w.from.as_mm() && x - half < w.to.as_mm())
+            .any(|w| x + half > w.from.as_mm() + EDGE && x - half < w.to.as_mm() - EDGE)
         {
             continue;
         }

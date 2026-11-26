@@ -324,23 +324,25 @@ fn slit_centres(part: &Part) -> Vec<f64> {
 }
 
 /// Criterion 6 (slit gaps): on a bent run the solid wood between neighbouring slit columns stays
-/// within the run's gap g (at most 1.5 g: the columns divide the integral of 1/g evenly), except
-/// across a flat tab window (its chord 2 w + 2 t = 12 mm, two bridges of 3 mm and the half steps
-/// to the next columns) and at the ends of a piece.
+/// within the run's gap g (at most 1.5 g, the columns divide the integral of 1/g evenly; g reaches 0.22 r where the
+/// outline is nearly straight, so a band there holds two columns up to 30 mm apart), except
+/// across a flat tab window (`0155` slice 1: the columns beside it stand at the chord's ends, so
+/// the centres are the chord 2 w + 2 t = 12 mm plus one slit width apart) and at the ends of a piece.
 #[test]
 fn solid_wood_between_slit_columns_on_a_bent_run_stays_within_the_gap_except_at_windows() {
     for (name, path, g_max) in [
-        ("heart", heart(), 6.0),
-        ("ellipse", ellipse(45.0, 30.0), 10.5),
+        ("heart", heart(), 30.0),
+        ("ellipse", ellipse(45.0, 30.0), 30.0),
     ] {
         let g = generate_path(path, None);
         for (k, wall) in walls(&g).iter().enumerate() {
             let xs = slit_centres(wall);
             let gaps: Vec<f64> = xs.windows(2).map(|w| w[1] - w[0]).collect();
             // Gaps this long hold a window; the rest lie inside one slit band.
-            let window = 12.0 + 2.0 * 3.0;
+            // The columns beside a window stand at the chord's ends: 12 mm plus one slit width.
+            let window = 12.3;
             for (i, gap) in gaps.iter().enumerate() {
-                let inside = *gap < 14.0;
+                let inside = (*gap - window).abs() > 0.05;
                 if inside {
                     assert!(
                         *gap <= g_max,
@@ -348,7 +350,7 @@ fn solid_wood_between_slit_columns_on_a_bent_run_stays_within_the_gap_except_at_
                     );
                 } else {
                     assert!(
-                        *gap <= window + 1.5 * g_max,
+                        (*gap - window).abs() <= 0.05,
                         "{name} piece {k} gap {i}: {gap} across a window"
                     );
                 }
@@ -385,8 +387,9 @@ fn no_two_slits_of_the_narrow_v_heart_are_closer_than_the_least_gap() {
 }
 
 /// The narrow-V heart of the browser review (`M100 140 C90 125 60 110 60 90 C60 60 96 62 100 80
-/// C104 62 140 60 140 90 C140 110 110 125 100 140 Z`): both pieces have a bend too short for two
-/// slits, which is told, and no two neighbouring slits are closer than the slit width plus 1 mm.
+/// C104 62 140 60 140 90 C140 110 110 125 100 140 Z`): no two neighbouring slits are closer than the
+/// slit width plus 1 mm. Before `0155` slice 1 both pieces told `bend_too_short`; the bands now run
+/// to the window chords and hold two columns, so nothing is told.
 #[test]
 fn the_reviewed_narrow_v_heart_tells_bend_too_short_and_keeps_the_slit_gap() {
     let outline = curve(
@@ -406,7 +409,7 @@ fn the_reviewed_narrow_v_heart_tells_bend_too_short_and_keeps_the_slit_gap() {
         .flat_map(|w| w.pieces.clone())
         .collect();
     short.sort_unstable();
-    assert_eq!(short, vec![1, 2]);
+    assert_eq!(short, Vec::<u32>::new());
     for (k, wall) in walls(&g).iter().enumerate() {
         for pair in slit_centres(wall).windows(2) {
             assert!(pair[1] - pair[0] >= 1.3 - 1e-6, "piece {}: {pair:?}", k + 1);

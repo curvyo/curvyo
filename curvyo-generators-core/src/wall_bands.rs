@@ -4,7 +4,7 @@
 use curvyo_document_core::Length;
 
 use crate::footprint::{Shape, Span};
-use crate::slit_bend::{Band, SlitPattern, Slot, Window, slots, slots_at};
+use crate::slit_bend::{Band, SlitKind, SlitPattern, Slot, Window, slots, slots_at};
 use crate::wall::{LocalSpacing, Wall, column_pitch};
 
 /// One band and the bends it lies on.
@@ -15,6 +15,17 @@ pub(crate) struct BandSpec {
     pub(crate) arcs: Vec<(f64, f64, f64)>,
     /// The shape of each of those bends, for the stretch of the inner face under the band.
     pub(crate) shapes: Vec<Shape>,
+    /// The band starts at the end of a tab window (the chord already holds the bridge).
+    pub(crate) lead_window: bool,
+    /// The band ends at the start of a tab window.
+    pub(crate) trail_window: bool,
+}
+
+/// How a band's columns keep from a window: the half width of a slot and whether it swings.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct WindowEnds {
+    pub(crate) half_width: f64,
+    pub(crate) wave: bool,
 }
 
 /// The columns of a run: where they stand along the strip and the period each takes. N =
@@ -75,6 +86,102 @@ pub(crate) fn run_columns(spec: &BandSpec, local: LocalSpacing) -> (Vec<f64>, Ve
     (xs, periods)
 }
 
+/// The columns of a band that ends at a tab window, laid from its ends (ADR 0083 §13.6, 0155): the
+/// outer columns stand half a slit width (and a wave's swing) inside the band ends. `gaps` are the pieces `(start, end, gap)` the band
+/// lies on; the columns are even in the integral of 1 / gap, no step below the gap.
+/// `least` bounds the count by the least gap (`None`: two columns at least, always).
+pub(crate) fn window_columns(
+    spec: &BandSpec,
+    gaps: &[(f64, f64, f64)],
+    ends: WindowEnds,
+    least: Option<f64>,
+) -> (Vec<f64>, Vec<f64>) {
+    let (from, to) = (spec.band.from.as_mm(), spec.band.to.as_mm());
+    let mut pieces: Vec<(f64, f64, f64)> = gaps
+        .iter()
+        .filter_map(|&(s0, s1, g)| {
+            let (a, b) = (s0.max(from), s1.min(to));
+            (b > a).then_some((a, b, g))
+        })
+        .collect();
+    // The band may start inside a window's span (its chord holds the kink of the bend).
+    if let Some(first) = pieces.first_mut() {
+        first.0 = from;
+    }
+    if let Some(last) = pieces.last_mut() {
+        last.1 = to;
+    }
+    let Some(&(_, _, first_gap)) = pieces.first() else {
+        return (Vec::new(), Vec::new());
+    };
+    let last_gap = pieces[pieces.len() - 1].2;
+    let total: f64 = pieces.iter().map(|&(a, b, g)| (b - a) / g).sum();
+    // Per end: the fixed inset in the integral, and the share of a step it adds. Every end of the
+    // band keeps half a slit width (and a wave's swing), so no step falls below the gap.
+    let swing = if ends.wave { 0.125 } else { 0.0 };
+    let (lead_fixed, lead_share) = (ends.half_width / first_gap, swing);
+    let (trail_fixed, trail_share) = (ends.half_width / last_gap, swing);
+    let room = total - lead_fixed - trail_fixed;
+    let share = lead_share + trail_share;
+    // As many columns as keep every step at the gap the radius asks for or above (as the even
+    // layout does), two at least.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let mut columns = ((room - share).floor().max(0.0) as usize + 1).max(2);
+    if let Some(least) = least {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let fits = ((to - from) / least + 1e-9).floor() as usize;
+        columns = columns.min(fits);
+    }
+    if columns == 0 {
+        return (Vec::new(), Vec::new());
+    }
+    #[allow(clippy::cast_precision_loss)]
+    let step = room / (columns as f64 - 1.0 + share);
+    let at = |target: f64| {
+        let mut done = 0.0;
+        let mut x = to;
+        for &(a, b, g) in &pieces {
+            let part = (b - a) / g;
+            if target <= done + part || (a, b, g) == pieces[pieces.len() - 1] {
+                x = a + (target - done).clamp(0.0, part) * g;
+                break;
+            }
+            done += part;
+        }
+        x
+    };
+    let mut xs: Vec<f64> = if columns == 1 {
+        vec![at(lead_fixed + room / 2.0)]
+    } else {
+        #[allow(clippy::cast_precision_loss)]
+        (0..columns)
+            .map(|k| at(lead_fixed + lead_share * step + k as f64 * step))
+            .collect()
+    };
+    // A wave swings by an eighth of its period, which is the gap to its neighbour: the column at an
+    // end stands where its swing just reaches the end (the gaps vary on a run).
+    if ends.wave && columns >= 2 {
+        let end = columns - 1;
+        for _ in 0..4 {
+            xs[0] = (from + ends.half_width + xs[1] / 8.0) / 1.125;
+            xs[end] = (to - ends.half_width + xs[end - 1] / 8.0) / 1.125;
+        }
+    }
+    let periods = (0..columns)
+        .map(|k| {
+            let before = k.checked_sub(1).map(|i| xs[k] - xs[i]);
+            let after = xs.get(k + 1).map(|next| next - xs[k]);
+            match (before, after) {
+                (Some(a), Some(b)) => a.min(b),
+                (Some(a), None) => a,
+                (None, Some(b)) => b,
+                (None, None) => to - from,
+            }
+        })
+        .collect();
+    (xs, periods)
+}
+
 /// The bends of `spans` as `(start, end, inner radius)` along the strip, and their shapes.
 fn arcs_of(spans: &[Span]) -> (Vec<(f64, f64, f64)>, Vec<Shape>) {
     let arcs = spans
@@ -125,11 +232,18 @@ impl Wall<'_> {
                 band: band(0.0, length),
                 arcs: vec![(0.0, length, 0.0)],
                 shapes: Vec::new(),
+                lead_window: false,
+                trail_window: false,
             }];
         }
-        // A bend ends one bridge from a window; at a straight it runs on to the junction.
+        // A bend ends at a window's chord; at a straight it runs on to the junction.
         let spans = &self.footprint.spans;
         let is_bend = |i: usize| matches!(spans[i].shape, Shape::Bend { .. });
+        let widest = self
+            .joints
+            .iter()
+            .map(|j| j.thickness.as_mm())
+            .fold(0.0, f64::max);
         let mut out = Vec::new();
         let mut first = 0;
         while first < spans.len() {
@@ -140,22 +254,25 @@ impl Wall<'_> {
             let last = self.run_end(first);
             let before = first.checked_sub(1).and_then(|i| spans.get(i));
             let after = spans.get(last + 1);
-            let lead = if before.is_some_and(|s| s.window) {
-                bridge
-            } else {
-                0.0
-            };
-            let trail = if after.is_some_and(|s| s.window) {
-                bridge
-            } else {
-                0.0
-            };
-            let (start, finish) = (spans[first].s0, spans[last].s0 + spans[last].length);
+            // Beside a window the band starts one bridge from the widest tab slot, which stands
+            // in the middle of the window's span (the chord already holds that bridge).
+            let lead_window = before.is_some_and(|s| s.window);
+            let trail_window = after.is_some_and(|s| s.window);
+            let lead = before
+                .filter(|s| s.window)
+                .map_or(spans[first].s0, |s| s.s0 + s.length / 2.0 + widest + bridge);
+            let trail = after
+                .filter(|s| s.window)
+                .map_or(spans[last].s0 + spans[last].length, |s| {
+                    s.s0 + s.length / 2.0 - widest - bridge
+                });
             let (arcs, shapes) = arcs_of(&spans[first..=last]);
             let spec = BandSpec {
-                band: band(start + lead, finish - trail),
+                band: band(lead, trail),
                 arcs,
                 shapes,
+                lead_window,
+                trail_window,
             };
             if spec.band.to.as_mm() > spec.band.from.as_mm() {
                 out.push(spec);
@@ -185,10 +302,32 @@ impl Wall<'_> {
         self.local_spacing.filter(|_| self.runs)
     }
 
+    /// Where the columns of `spec` stand and the period each takes, when the band is laid by the
+    /// integral of the gap (a run) or from the end of a tab window; `None` for the even layout of
+    /// a single bend with no window beside it.
+    fn columns(&self, spec: &BandSpec) -> Option<(Vec<f64>, Vec<f64>)> {
+        if spec.lead_window || spec.trail_window {
+            let gaps: Vec<(f64, f64, f64)> = spec
+                .arcs
+                .iter()
+                .map(|&(a, b, radius)| match self.local_spacing {
+                    Some(local) if radius > 0.0 => (a, b, (local.factor * radius).max(local.least)),
+                    _ => (a, b, self.pattern.spacing.as_mm()),
+                })
+                .collect();
+            let ends = WindowEnds {
+                half_width: self.pattern.width.as_mm() / 2.0,
+                wave: self.pattern.kind == SlitKind::Wave,
+            };
+            let least = self.run_spacing().map(|local| local.least);
+            return Some(window_columns(spec, &gaps, ends, least));
+        }
+        self.run_spacing().map(|local| run_columns(spec, local))
+    }
+
     /// The slots of one band.
     pub(crate) fn band_slots(&self, spec: &BandSpec, windows: &[Window]) -> Vec<Slot> {
-        if let Some(local) = self.run_spacing() {
-            let (xs, periods) = run_columns(spec, local);
+        if let Some((xs, periods)) = self.columns(spec) {
             return slots_at(&spec.band, (&xs, &periods), &self.pattern, windows);
         }
         let pattern = self.pattern_for(&spec.band, spec.arcs[0].2);
@@ -201,14 +340,11 @@ impl Wall<'_> {
         let length = self.footprint.total();
         self.bands(length, self.height.as_mm())
             .iter()
-            .filter_map(|spec| match self.run_spacing() {
-                Some(local) => {
-                    let (xs, periods) = run_columns(spec, local);
-                    periods
-                        .into_iter()
-                        .reduce(f64::min)
-                        .filter(|_| xs.len() >= 2)
-                }
+            .filter_map(|spec| match self.columns(spec) {
+                Some((xs, periods)) => periods
+                    .into_iter()
+                    .reduce(f64::min)
+                    .filter(|_| xs.len() >= 2),
                 None => Some(self.pattern_for(&spec.band, spec.arcs[0].2).spacing.as_mm()),
             })
             .collect()
@@ -217,13 +353,13 @@ impl Wall<'_> {
     /// The length of every band of a run that cannot hold two columns at the least
     /// gap (it gets one or none, ADR 0083 §13.6); empty for the rounded box.
     pub(crate) fn short_bands(&self) -> Vec<f64> {
-        let Some(local) = self.run_spacing() else {
+        if self.run_spacing().is_none() {
             return Vec::new();
-        };
+        }
         let length = self.footprint.total();
         self.bands(length, self.height.as_mm())
             .iter()
-            .filter(|spec| run_columns(spec, local).0.len() < 2)
+            .filter(|spec| self.columns(spec).is_some_and(|(xs, _)| xs.len() < 2))
             .map(|spec| spec.band.to.as_mm() - spec.band.from.as_mm())
             .collect()
     }
@@ -242,6 +378,8 @@ mod tests {
             },
             arcs: arcs.to_vec(),
             shapes: Vec::new(),
+            lead_window: false,
+            trail_window: false,
         }
     }
 
@@ -282,6 +420,38 @@ mod tests {
         );
         // The outer two columns stand half a step from the band's ends.
         assert!((xs[0] - gaps[0] / 2.0).abs() < gaps[0] * 0.6);
+    }
+
+    #[test]
+    fn a_band_between_two_windows_has_its_outer_columns_half_a_width_from_the_band_ends() {
+        let mut band = spec(&[(0.0, 21.0, 30.0)]);
+        band.lead_window = true;
+        band.trail_window = true;
+        let ends = WindowEnds {
+            half_width: 0.15,
+            wave: false,
+        };
+        let (xs, periods) = window_columns(&band, &[(0.0, 21.0, 6.6)], ends, None);
+        assert_eq!(xs.len(), 4, "21 mm at 6.6 mm gaps: three steps");
+        assert!((xs[0] - 0.15).abs() < 1e-9 && (xs[3] - 20.85).abs() < 1e-9);
+        let step = xs[1] - xs[0];
+        assert!(step >= 6.6 - 1e-9, "no gap below the radius's");
+        assert!(xs.windows(2).all(|w| (w[1] - w[0] - step).abs() < 1e-9));
+        assert!(periods.iter().all(|p| (p - step).abs() < 1e-9));
+    }
+
+    #[test]
+    fn a_band_with_a_window_at_one_end_only_keeps_the_same_inset_at_the_other() {
+        let mut band = spec(&[(0.0, 21.0, 30.0)]);
+        band.lead_window = true;
+        let ends = WindowEnds {
+            half_width: 0.15,
+            wave: false,
+        };
+        let (xs, _) = window_columns(&band, &[(0.0, 21.0, 6.6)], ends, None);
+        assert!((xs[0] - 0.15).abs() < 1e-9);
+        assert!((xs[xs.len() - 1] - 20.85).abs() < 1e-9);
+        assert!(xs[1] - xs[0] >= 6.6 - 1e-9);
     }
 
     #[test]
