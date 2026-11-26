@@ -273,6 +273,7 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
     let (parts, origins) = layout(&plates, gap + kerf, kerf);
     let handles = handles(&plates, &origins, kerf / 2.0);
     let automatic = joint_layout::used(&v, &fitted, ("finger_width", width));
+    let warnings = joint_layout::pattern_warnings(&v);
     let (params, clamps) = v.finish();
     Generated {
         params,
@@ -282,7 +283,7 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         automatic,
         states: Vec::new(),
         limits: Vec::new(),
-        warnings: Vec::new(),
+        warnings,
         marks: curvyo_extension_core::Marks::default(),
     }
 }

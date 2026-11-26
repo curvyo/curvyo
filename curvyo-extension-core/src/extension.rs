@@ -188,7 +188,7 @@ pub struct Clamp {
 pub struct Warning {
     /// Which warning (`sharp_corner`, `tight_bend`, `ring_closed`, `hollow_left_out`,
     /// `smallest_size`, `outline_crosses`, `cover_rounded`, `cover_offset_failed`,
-    /// `fillet_failed`, `bend_too_short`).
+    /// `fillet_failed`, `bend_too_short`, `tab_window`, `unknown_joint_pattern`).
     pub id: &'static str,
     /// The wall pieces it names, by their numbers (1 based, walk order).
     pub pieces: Vec<u32>,

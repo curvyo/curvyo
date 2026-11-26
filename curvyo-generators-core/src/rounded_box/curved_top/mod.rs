@@ -91,6 +91,7 @@ pub(super) fn generate(request: &GenerateRequest<'_>, mut v: Values<'_>) -> Gene
     } else {
         Vec::new()
     };
+    let warnings = crate::joint_layout::pattern_warnings(&v);
     let (params, clamps) = v.finish();
     Generated {
         params,
@@ -100,7 +101,7 @@ pub(super) fn generate(request: &GenerateRequest<'_>, mut v: Values<'_>) -> Gene
         automatic,
         states,
         limits: s.limits,
-        warnings: Vec::new(),
+        warnings,
         marks,
     }
 }

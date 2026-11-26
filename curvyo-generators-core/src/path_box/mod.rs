@@ -286,7 +286,8 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         checked.area,
         matches!(request.edit, Some(Edit::Draft)),
     );
-    let (mut built, _inner, _tabs) = build(&checked, &m);
+    let (mut built, inner, _tabs) = build(&checked, &m);
+    let inner_windowed = inner.windowed;
     joint_layout::apply(&mut v, &built.fitted.limits, "joint_width");
     let spacing = m.kerf + v.mm("gap");
     let plates = built.plates_owned();
@@ -302,6 +303,8 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
     let mut warnings = checked.warnings;
     warnings.extend(built.warnings);
     warnings.extend(resized);
+    warnings.extend(joint_layout::pattern_warnings(&v));
+    warnings.extend(joint_layout::window_warnings(inner_windowed));
     let (params, clamps) = v.finish();
     Generated {
         params,

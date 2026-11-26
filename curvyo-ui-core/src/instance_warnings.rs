@@ -90,6 +90,23 @@ fn short(group: &[&Warning], one_piece: bool) -> String {
     }
 }
 
+/// Tabs that kept their flat window although Bend through tabs asks for the arc.
+fn windows(group: &[&Warning]) -> String {
+    let count: u32 = group
+        .iter()
+        .filter_map(|w| {
+            w.value
+                .as_ref()
+                .and_then(curvyo_extension_core::ParamValue::count)
+        })
+        .sum();
+    if count == 1 {
+        "1 tab does not fit on one arc, so it stands in a flat window.".to_owned()
+    } else {
+        format!("{count} tabs do not fit on one arc, so they stand in flat windows.")
+    }
+}
+
 /// One sentence per limit: convex stretches ("bends to"), concave ones ("bends inward").
 fn tight(group: &[&Warning], context: Context) -> Vec<String> {
     let one_piece = context.one_piece;
@@ -236,6 +253,10 @@ pub fn sentences_in(warnings: &[Warning], context: Context) -> Vec<String> {
                     "The cover could not be rounded; it is built exactly and may cross itself."
                         .to_owned()
                 }
+                "tab_window" => windows(&group),
+                "unknown_joint_pattern" => {
+                    "The Joint pattern is not known here; Even is used.".to_owned()
+                }
                 "bend_too_short" => short(&group, context.one_piece),
                 "fillet_failed" => {
                     "A slight bend could not be rounded; it is built as a sharp bend.".to_owned()
@@ -299,6 +320,30 @@ mod tests {
         assert_eq!(
             sentences(&[a, b]),
             ["Pieces 2 and 5 bend below 6 mm; the wall may crack there."]
+        );
+    }
+
+    #[test]
+    fn tabs_that_keep_their_window_say_how_many_and_why() {
+        let mut one = warning("tab_window", &[]);
+        one.value = Some(ParamValue::Count(1));
+        assert_eq!(
+            sentences(std::slice::from_ref(&one)),
+            ["1 tab does not fit on one arc, so it stands in a flat window."]
+        );
+        let mut three = warning("tab_window", &[]);
+        three.value = Some(ParamValue::Count(3));
+        assert_eq!(
+            sentences(&[three]),
+            ["3 tabs do not fit on one arc, so they stand in flat windows."]
+        );
+    }
+
+    #[test]
+    fn an_unknown_joint_pattern_says_even_is_used() {
+        assert_eq!(
+            sentences(&[warning("unknown_joint_pattern", &[])]),
+            ["The Joint pattern is not known here; Even is used."]
         );
     }
 

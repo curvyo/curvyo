@@ -74,6 +74,9 @@ pub(crate) struct Footprint {
     /// How far a tab keeps from either end of a straight (the wall thickness for the rounded
     /// box; the finger zone and the wall thickness beside a corner of a path box).
     pub(crate) margin: f64,
+    /// Tabs that keep a flat window on a bend although the tab could stand on the arc
+    /// (`bend_tabs` `curve`); the generator tells the maker.
+    pub(crate) windowed: u32,
 }
 
 /// A piece of the cycle before the seam is chosen.
@@ -227,6 +230,7 @@ impl Footprint {
             spans,
             wall,
             margin: wall,
+            windowed: 0,
         }
     }
 
@@ -260,6 +264,7 @@ impl Footprint {
             spans,
             wall,
             margin,
+            windowed: 0,
         }
     }
 
