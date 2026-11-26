@@ -1,6 +1,6 @@
 # Generator joint options: bend through the tabs, and your own number, size and pattern of tabs and fingers
 
-Status: Slice 1 Ready (2026-11-26, Frage 385 answered A); slices 2 to 4 Draft (Fragen 381 to 384 open, all with defaults A; need the joint-options ADR and UX notes)
+Status: Slice 1 Done (PR #496; 2026-11-26, Frage 385 answered A); slices 2 to 4 Draft (Fragen 381 to 384 open, all with defaults A; need the joint-options ADR and UX notes)
 Priority: Should
 Origin: Customer (2026-11-25, after the visual check of PR #489, translated): "I only checked it visually, I still have to laser it. I suspect we will have trouble bending the material at the curves, because at the tabs no slits are cut. That should probably be possible as an option, otherwise it becomes a polygon. I'd also like to set the number and height of the tabs/fingers (as advanced). On some boxes it looks nicer with just one in the middle, or two in the middle closer together and fewer at the edges. It brings more calm, is easier to assemble and is often enough." Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
