@@ -9,6 +9,8 @@
 
 **Note ([`specs/0150` adrs.md](../../specs/0150-operation-always-has-numbers/adrs.md), needs-customer, proposed 2026-11-24, accepted with the `0150` story PR):** §1 and §2: an absent `op_settings` no longer means No settings; it reads as own numbers from the copy's default pair (`SettingsRead::None` and `SettingsState::NoSettings` go). §3: three more writes store those numbers: the `add_operation` commit, a step that changes the copy's pair (before the change), and a save of a changed project in the reserved commit `refresh_material_numbers`; nothing is written on open (decisions 3 to 5).
 
+**Note ([ADR 0092](0092-material-test-picks-and-round-engrave-cells.md), proposed 2026-11-26, spec `0146`, accepted with the story PR):** §1: `material` may hold `pick` (`second_best`, `fastest`, `deepest`; absent = Best; any other value is a bad link). §2: the main set (and the outline's Score or Engrave set) is the material's set of that pick, and a missing pick set is the stored state. Project format next free at merge (65 today).
+
 ## Context
 
 `0101` and `0103` stored no power, speed or passes. `0028` adds them to the work operations, adds a generated test grid whose cells each run with their own numbers, and lets an operation take its numbers from a material in the maker's library, with numbers the maker types on top. Three things must hold for a laser: a set of numbers that runs was chosen by someone (never mixed from two concurrent edits); a project opened on a computer without the maker's library still runs with known numbers; the numbers that will run are visible before the run.
