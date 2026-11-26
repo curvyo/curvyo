@@ -294,3 +294,18 @@ fn note_photo_name_and_thickness_edits_raise_modified() {
         .unwrap();
     assert_eq!(m.modified, 600);
 }
+
+/// Criterion 25 (0112): deleting a judged test leaves the set's source naming the tombstoned id,
+/// and the record still serialises and reloads (it is not damage).
+#[test]
+fn a_record_whose_judged_test_was_deleted_reloads_with_its_source() {
+    let mut m = material();
+    m.judge(id("7K2QX"), CellIndex { column: 2, row: 1 }, stamp(500))
+        .unwrap();
+    m.delete_test(id("7K2QX"), 600).unwrap();
+    let text = crate::material_record_file::write_record(&m);
+    let back = crate::material_record_file::read_record(&format!("{UUID}.json"), &text).unwrap();
+    let set = back.set_for(&diode().id, SetKind::Cut).unwrap();
+    assert_eq!(set.source, SetSource::Test(id("7K2QX")));
+    assert_eq!(back, m);
+}
