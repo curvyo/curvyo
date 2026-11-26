@@ -114,7 +114,7 @@ impl Document {
 
     /// Detach part: gives the part `part_key` of the generated object `node` its own operations,
     /// in one step labelled [`DETACH_PART_COMMIT_LABEL`]. Each of `operations` (the operations the
-    /// box runs with) is copied under the name "<operation> · `part_name`", placed right after
+    /// box runs with) is copied under the name "`operation` · `part_name`", placed right after
     /// it, with the part's key as its only membership, so the job does not change. `keys` are the
     /// part keys of a fresh generation, written to a record that has none yet (an older file).
     /// Returns the copies, in the order of `operations`.

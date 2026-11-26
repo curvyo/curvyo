@@ -43,7 +43,7 @@ impl Session {
     }
 
     /// Detach part: gives the part `key` of the selected rounded box a copy of the box's
-    /// operations of its own, named "<operation> · <part>" and placed right after it. One step
+    /// operations of its own, named "`operation` · `part`" and placed right after it. One step
     /// "Detach part". `false` when nothing is selected, the part does not exist, it is detached
     /// already or the box has no operation (a notice says so).
     pub fn detach_selected_part(&mut self, key: &str) -> bool {
