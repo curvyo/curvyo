@@ -19,7 +19,7 @@ press on a category replaces, Shift+click adds; no Load button, double-click or 
 your own library, possibly in a private Git repository with a token. Sections 0.1 to 0.7 are the
 new design; the sections after them are amended in place where they disagree (each amended place
 names its 0.x section). New proposals are U31 to U48 (section 14), the spec deltas for the product
-owner H1 to H14 (section 15.1), the customer question Frage 376 (LIB-TOKEN, section 16; answered A, built in `0156`). The
+owner H1 to H14 (section 15.1), the customer question Frage 376 (LIB-TOKEN, section 16; answered A, built in `0157`). The
 search UI is unchanged except where the views and the history need it (the architect looks at
 search quality separately).
 
@@ -173,15 +173,15 @@ search quality separately).
      (index 4 MiB and 10,000 templates, picture 1 MiB, template 64 MiB); `customizable` as a tag
      (Frage 371 A).
   6. **Private repositories**: Frage 376 answered A (2026-11-26): the steps for a read-only token,
-     specified in `specs/0156-library-git-token/ux-notes.md` section 7. Until `0156` is built, #483
+     specified in `specs/0157-library-git-token/ux-notes.md` section 7. Until `0157` is built, #483
      ships one line "The repository must be public."
 - **No separate help window, no web page as the only copy**: the guide must match the Curvyo that
   shows it (its `catalogue_format`), so it ships with it (U48).
 
-### 0.7 Access token for a private repository (Frage 376 A, built in `0156`)
+### 0.7 Access token for a private repository (Frage 376 A, built in `0157`)
 
 Frage 376 was answered A on 2026-11-26 and is its own story: the design is
-`specs/0156-library-git-token/ux-notes.md` (Access token row of the Add source form, `Lock` mark on
+`specs/0157-library-git-token/ux-notes.md` (Access token row of the Add source form, `Lock` mark on
 the tab row and the Sets view group header, the `KeyRound` action **Change token…** / **Add token…**
 with its inline form and an armed **Remove token**, the refusals, the key-store-unavailable line,
 the failure lines "The token was refused." and "The saved token could not be read from the key
@@ -629,7 +629,7 @@ Offline is a state, never an alert; nothing probes, nothing refetches by itself 
 | H10 | 11 to 16 | The Sets view's facets are Sources (the sources), Colour (the set's palette flag) and Category (the set category); each view keeps its own facet values and search text |
 | H11 | new | **Host your own library…** in the Add source form (kind Git catalogue) and at the end of the Sets view opens an in-app guide (a place, with Back): the folder layout, the steps, an example `curvyo-catalogue.json` with Copy, the field rules and limits of ADR 0085 decision 3, a link to `github.com/curvyo/templates`; the product owner writes its text; it ships with the app, no request |
 | H12 | new | The guide names the index script of ADR 0085 decision 3 as the way to write `curvyo-catalogue.json`; that script must exist in `curvyo/templates` first (today the repository is empty), else the guide describes the hand-written index only |
-| H13 | new (Frage 376) | Frage 376 answered A (2026-11-26), built in `0156` (criteria 1 to 18, ADR 0090; UX `specs/0156-library-git-token/ux-notes.md`): an optional **Access token** field for a Git catalogue in the Add source form, the `Lock` mark on the source, Change, Add and Remove token, the refusals. Until `0156` is built, #483 says "The repository must be public." in the form and the guide |
+| H13 | new (Frage 376) | Frage 376 answered A (2026-11-26), built in `0157` (criteria 1 to 18, ADR 0090; UX `specs/0157-library-git-token/ux-notes.md`): an optional **Access token** field for a Git catalogue in the Add source form, the `Lock` mark on the source, Change, Add and Remove token, the refusals. Until `0157` is built, #483 says "The repository must be public." in the form and the guide |
 | H14 | 11 | Empty states: Items "No items yet." with Show sets; Sets 'No set matches "hrat".' with Clear all |
 
 ## 16. Customer question
@@ -645,7 +645,7 @@ Frage 374 (LIB-DETAIL): Should the browser get a detail bar for the selected ite
 - Recommendation: A (the licence and credit are readable before loading, small sizes stay dense,
   and nothing loads by a stray click). Default if unanswered: A.
 
-Frage 376 (LIB-TOKEN), answered A (2026-11-26), built in `0156`: Should a Git catalogue in a
+Frage 376 (LIB-TOKEN), answered A (2026-11-26), built in `0157`: Should a Git catalogue in a
 private repository be reachable with an access token?
 - A: Yes: an optional read-only token per Git catalogue in the Add source form, kept in the
   operating system's key store, sent as a request header only to that source's own address (never

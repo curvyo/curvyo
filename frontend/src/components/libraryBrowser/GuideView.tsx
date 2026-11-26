@@ -41,7 +41,7 @@ export function GuideView() {
             <li key={step}>{step}</li>
           ))}
         </ol>
-        {/* The token steps are the desktop build's: the browser build has no Online section (`0156` T13). */}
+        {/* The token steps are the desktop build's: the browser build has no Online section (`0157` T13). */}
         {isTauri ? (
           <>
             <h3 className="mt-2 text-xs font-semibold text-[var(--panel-muted-fg)]">{guide.private_title}</h3>

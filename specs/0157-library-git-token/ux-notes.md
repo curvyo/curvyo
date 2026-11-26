@@ -1,4 +1,4 @@
-# 0156 Library token: UX notes
+# 0157 Library token: UX notes
 
 ux-engineer, 2026-11-26. Written from `specification.md` (criteria 1 to 18) at the defaults of
 Fragen 386 A (no key store: refuse, nothing kept), 387 A (`Authorization: Bearer` to the source's own

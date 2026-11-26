@@ -19,7 +19,7 @@ assigned in the order the folders are created** and a row sits in the group of
 its state, so inside a group the numbers can be out of order (the order the
 lead starts the waiting ones is in "Proposed build order" below).
 
-The next free number is 0157; the next free Frage is 406 (the number history is in
+The next free number is 0158; the next free Frage is 406 (the number history is in
 "State of the list" below).
 
 Columns: **No.** = folder number. **MVP slice** = the label the same feature
@@ -98,7 +98,7 @@ own entry when the customer schedules it.
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
 |---|---|---|---|---|---|---|
 | [0155](0155-generator-joint-options/) | `generator-joint-options` | Customer review of PR #489, 2026-11-25: slice 1 tighter tab windows (Frage 385 A: flat across a tab shrinks to the window length, 5 goldens re-blessed), slice 2 Bend through tabs option (`bend_tabs`), slice 3 Joint layout for tabs, slice 4 Joint layout for fingers (Advanced group: count, size, pattern Even or Centred). Criteria 1 to 29; Fragen 381 to 384 open (defaults A), 385 answered. | Slice 1 Done (#496); slices 2 to 4 Draft | Should | R-EDIT-055 | - |
-| [0156](0156-library-git-token/) | `library-git-token` | Customer go 2026-11-26 on Frage 376 A: a token per private Git catalogue in the OS key store (desktop only), sent only to the catalogue's own host, never in `online-sources.toml`. Criteria 1 to 18; Fragen 386 to 388 at default A. | Ready | Should | R-EDIT-055 | - |
+| [0157](0157-library-git-token/) | `library-git-token` | Customer go 2026-11-26 on Frage 376 A: a token per private Git catalogue in the OS key store (desktop only), sent only to the catalogue's own host, never in `online-sources.toml`. Criteria 1 to 18; Fragen 386 to 388 at default A. | Ready | Should | R-EDIT-055 | - |
 | 0151 | `generator-ui-polish` | Idea, reserved 2026-11-25: make the generator UI (Generators bar, Generator block, Box from path pick mode, canvas marks of the rounded box and the path box) look and feel great; the customer after PR #481: functional now, the UI needs another pass. Scope comes from the UX engineer's review of the shipped `0141`, `0147` and `0149`. | Idea | Should | - | - |
 | 0027 | `manufacturing-roles` | Assign a cut or engrave role to geometry (by layer) within one file. **Superseded by 0101 `laser-operations`** (concept A of `0063`, 2026-11-05); PR #269 was closed unmerged (Frage 152 A), its geometry rules, look tokens and tests move into 0101. The number stays as a placeholder and is not reused. | Superseded by 0101 | Must | R-MFG-002 | 14 |
 | 0104 | `page-kind-change` | Dropped (customer, 2026-11-11: "Kind change ist nicht nötig, komplett streichen. Die Seite bleibt vom Typ so wie sie angelegt wurde"). A page keeps the kind it was created with; only Sketch to Drawing by Convert to paths (`0099`) exists. | Dropped | - | R-MFG-012 | - |

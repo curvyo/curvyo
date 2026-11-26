@@ -572,12 +572,12 @@ fn a_cancelled_add_discards_the_check_and_lists_nothing() {
     assert_eq!(state.add_generation(), before + 1);
 }
 
-// --- `specs/0156` library Git token -----------------------------------------------------------
+// --- `specs/0157` library Git token -----------------------------------------------------------
 
 use curvyo_storage_io::{AccessToken, CredentialStore, load_token};
 
 /// The sentinel every file and line of a run is searched for (criterion 9).
-const SENTINEL: &str = "SENTINEL-tok_0156-xyz";
+const SENTINEL: &str = "SENTINEL-tok_0157-xyz";
 
 /// A state whose key store is the encrypted key file in `dir`: the test double of the system one.
 fn keyed(dir: &std::path::Path) -> OnlineState {

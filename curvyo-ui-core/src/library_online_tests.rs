@@ -471,7 +471,7 @@ fn announcements_and_counts_read_singular_and_per_source() {
     );
 }
 
-// `specs/0156` criteria 4, 6 and 13: the Lock and the token action come from the flag alone, so a
+// `specs/0157` criteria 4, 6 and 13: the Lock and the token action come from the flag alone, so a
 // first paint needs no request; the failure line and the always-shown action follow the failure.
 #[test]
 fn a_source_with_a_token_has_the_lock_the_change_action_and_a_private_name() {

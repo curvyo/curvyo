@@ -196,7 +196,7 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
   const [armed, setArmed] = useState<string | null>(null);
   const [refusal, setRefusal] = useState("");
   const [addingSource, setAddingSource] = useState(false);
-  // The source whose access token form is open: one inline form at a time (`specs/0156` UX T8).
+  // The source whose access token form is open: one inline form at a time (`specs/0157` UX T8).
   const [tokenFor, setTokenFor] = useState<{ source: string; name: string; hasToken: boolean } | null>(null);
   // The key store could not delete a removed source's token: a persistent line (UX T12).
   const [keyStoreLine, setKeyStoreLine] = useState("");
