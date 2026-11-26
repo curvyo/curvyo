@@ -10,6 +10,7 @@ fn fixture(name: &str) -> Vec<u8> {
 }
 
 struct Held {
+    token: bool,
     catalogue: Option<Catalogue>,
     sets: Option<Vec<IconSet>>,
     set_icons: HashMap<String, SetListing>,
@@ -22,6 +23,7 @@ struct Held {
 impl Held {
     fn git() -> Self {
         Self {
+            token: false,
             catalogue: Some(Catalogue::parse(&fixture("curvyo-catalogue.json")).unwrap()),
             sets: None,
             set_icons: HashMap::new(),
@@ -64,6 +66,7 @@ impl Held {
                 name,
                 address,
                 kind,
+                token: self.token,
                 failure,
                 catalogue: self.catalogue.as_ref(),
                 sets: self.sets.as_deref(),
@@ -466,4 +469,83 @@ fn announcements_and_counts_read_singular_and_per_source() {
         failure_text(SourceKind::Git, Failure::NotFound),
         "No Git catalogue at this address."
     );
+}
+
+// `specs/0156` criteria 4, 6 and 13: the Lock and the token action come from the flag alone, so a
+// first paint needs no request; the failure line and the always-shown action follow the failure.
+#[test]
+fn a_source_with_a_token_has_the_lock_the_change_action_and_a_private_name() {
+    let held = Held {
+        token: true,
+        ..Held::git()
+    };
+    let none = HashSet::new();
+    let rows = online_rows(&held.view(SourceKind::Git, None, &none, "", false));
+    let extra = rows[1].online.as_ref().unwrap();
+    assert!(extra.token.private);
+    assert_eq!(extra.token.action, "Change token…");
+    assert!(!extra.token.attention);
+    assert!(
+        rows[1]
+            .label
+            .starts_with("Curvyo catalogue, Git catalogue, private, "),
+        "{}",
+        rows[1].label
+    );
+    let plain = Held::git();
+    let rows = online_rows(&plain.view(SourceKind::Git, None, &none, "", false));
+    let extra = rows[1].online.as_ref().unwrap();
+    assert!(!extra.token.private);
+    assert_eq!(extra.token.action, "Add token…");
+    assert!(!rows[1].label.contains("private"));
+    let iconify = Held::iconify();
+    let rows = online_rows(&iconify.view(SourceKind::Iconify, None, &none, "", false));
+    assert_eq!(
+        rows[1].online.as_ref().unwrap().token.action,
+        "",
+        "no token for Iconify"
+    );
+}
+
+#[test]
+fn a_refused_token_reads_so_keeps_what_was_fetched_and_keeps_the_action_shown() {
+    let held = Held {
+        token: true,
+        ..Held::git()
+    };
+    let key = "r:online:https://example.org/cat/".to_owned();
+    let _ = key;
+    for (failure, line) in [
+        (Failure::Status(401), "The token was refused."),
+        (Failure::Status(403), "The token was refused."),
+        (Failure::NotFound, "The token was refused."),
+        (
+            Failure::TokenUnreadable,
+            "The saved token could not be read from the key store.",
+        ),
+    ] {
+        let none = HashSet::new();
+        let probe = online_rows(&held.view(SourceKind::Git, None, &none, "", false));
+        let source_key = probe[1].key.clone();
+        let opened = open(&source_key);
+        let rows = online_rows(&held.view(SourceKind::Git, Some(failure), &opened, "", false));
+        assert!(
+            rows[1].online.as_ref().unwrap().token.attention,
+            "{failure:?}"
+        );
+        assert!(
+            rows[1].label.ends_with(line.trim_end_matches('.')),
+            "{}",
+            rows[1].label
+        );
+        let failed = rows
+            .iter()
+            .find(|r| r.online.as_ref().is_some_and(|o| o.status == "failed"));
+        assert_eq!(failed.unwrap().name, line);
+        assert!(
+            rows.iter()
+                .any(|r| r.kind != RowKind::Status && r.level == 1),
+            "the cached items stay visible"
+        );
+    }
 }

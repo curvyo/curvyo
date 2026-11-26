@@ -7,7 +7,7 @@ use crate::library_browser::{BrowseCard, BrowseGroup, BrowseList, CardKind};
 use crate::library_browser_items::LocalView;
 use crate::library_index::DocumentState;
 use crate::library_online::{OnlineSourceView, OnlineView, READY_NAME, kind_glyph};
-use crate::library_online_text::failure_text;
+use crate::library_token_text::source_failure_text;
 use crate::workspace_rows::natural_cmp;
 
 /// The local group's key.
@@ -39,9 +39,9 @@ fn card(kind: CardKind, name: &str, group: &str) -> BrowseCard {
     }
 }
 
-fn failure_of(kind: SourceKind, failure: Option<Failure>) -> (String, bool) {
+fn failure_of(kind: SourceKind, token: bool, failure: Option<Failure>) -> (String, bool) {
     failure.map_or((String::new(), false), |f| {
-        (failure_text(kind, f), f == Failure::Offline)
+        (source_failure_text(kind, token, f), f == Failure::Offline)
     })
 }
 
@@ -70,13 +70,14 @@ fn push_folders(list: &mut BrowseList, local: LocalView<'_>) {
             key: LOCAL_GROUP.to_owned(),
             label: "My documents".to_owned(),
             rank: 0,
+            private: false,
         });
     }
 }
 
 fn push_catalogue(list: &mut BrowseList, view: &OnlineSourceView<'_>) {
     let host = host_of(view.address).unwrap_or_default();
-    let (failure, offline) = failure_of(view.kind, view.failure);
+    let (failure, offline) = failure_of(view.kind, view.token, view.failure);
     let base = BrowseCard {
         key: view.key.clone(),
         host: host.clone(),
@@ -100,7 +101,7 @@ fn push_catalogue(list: &mut BrowseList, view: &OnlineSourceView<'_>) {
 fn push_iconify(list: &mut BrowseList, view: &OnlineSourceView<'_>) {
     let host = host_of(view.address).unwrap_or_default();
     let Some(sets) = view.sets else {
-        let (failure, offline) = failure_of(view.kind, view.failure);
+        let (failure, offline) = failure_of(view.kind, view.token, view.failure);
         list.cards.push(BrowseCard {
             key: view.key.clone(),
             host,
@@ -112,7 +113,11 @@ fn push_iconify(list: &mut BrowseList, view: &OnlineSourceView<'_>) {
         return;
     };
     for set in sets {
-        let (failure, offline) = failure_of(view.kind, view.set_failures.get(&set.prefix).copied());
+        let (failure, offline) = failure_of(
+            view.kind,
+            view.token,
+            view.set_failures.get(&set.prefix).copied(),
+        );
         list.cards.push(BrowseCard {
             key: view.key.clone(),
             host: host.clone(),
@@ -148,6 +153,7 @@ pub(crate) fn push_cards(
             key: READY_GROUP.to_owned(),
             label: READY_NAME.to_owned(),
             rank: 1,
+            private: false,
         });
         list.cards.push(BrowseCard {
             host: READY_HOST.to_owned(),
@@ -168,6 +174,7 @@ pub(crate) fn push_cards(
             key: view.key.clone(),
             label,
             rank,
+            private: view.token,
         });
         match view.kind {
             SourceKind::Git => push_catalogue(list, view),

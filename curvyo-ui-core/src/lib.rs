@@ -116,6 +116,7 @@ mod library_online_icons;
 mod library_online_templates;
 pub mod library_online_text;
 pub mod library_text;
+pub mod library_token_text;
 pub mod library_tree;
 mod page_tree_rows;
 pub mod slot_drop_text;

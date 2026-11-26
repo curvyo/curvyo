@@ -6,13 +6,14 @@ use std::collections::{HashMap, HashSet};
 use serde::Serialize;
 
 use curvyo_library_core::{
-    Catalogue, Failure, IconRef, IconSet, READY_HOST, SetListing, SourceKind, host_of,
+    Catalogue, Failure, IconRef, IconSet, READY_HOST, SetListing, SourceKind, host_of, is_ready,
 };
 
 use crate::library_index::IndexedDocument;
 use crate::library_online_icons::push_iconify;
 use crate::library_online_templates::push_templates;
 pub use crate::library_online_text::*;
+pub use crate::library_token_text::*;
 use crate::library_tree::{LibraryRow, RowKind, plain_row, row_key};
 
 /// The heading of the group.
@@ -37,6 +38,18 @@ pub struct IconCell {
     pub tooltip: String,
 }
 
+/// What a source row shows of its access token (`specs/0156` criteria 4, 5, 13).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct TokenMark {
+    /// The source has a token: the Lock mark after its name, from the first paint.
+    pub private: bool,
+    /// The token action's name ("Change token…", "Add token…"); empty for a source that cannot
+    /// have a token (Iconify, the Curvyo catalogue).
+    pub action: String,
+    /// The failure line is a token or access failure: the action stays shown.
+    pub attention: bool,
+}
+
 /// What an online row adds to a [`LibraryRow`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct OnlineExtra {
@@ -48,6 +61,8 @@ pub struct OnlineExtra {
     pub state: String,
     /// Whether Refresh is offered.
     pub refresh: bool,
+    /// The Lock mark and the token action of a source row.
+    pub token: TokenMark,
     /// A status row's icon: `loading`, `offline`, `failed` or `search`.
     pub status: String,
     /// A template's or set's author.
@@ -93,6 +108,8 @@ pub struct OnlineSourceView<'a> {
     pub address: &'a str,
     /// Git catalogue or Iconify.
     pub kind: SourceKind,
+    /// Whether the key store holds an access token for the source (criterion 4).
+    pub token: bool,
     /// The failure of the source's last request of its list, if it failed.
     pub failure: Option<Failure>,
     /// The checked index, once fetched.
@@ -205,14 +222,17 @@ fn push_source(rows: &mut Vec<LibraryRow>, source: &OnlineSourceView<'_>, view: 
         _ => String::new(),
     };
     let kind_word = match source.kind {
+        SourceKind::Git if source.token => "Git catalogue, private",
         SourceKind::Git => "Git catalogue",
         SourceKind::Iconify => "icon API",
     };
+    let user_git = source.kind == SourceKind::Git && !is_ready(source.address);
+    let words = token_words();
     let label = match (source.failure, count) {
         (Some(failure), _) => format!(
             "{}, {kind_word}, {}",
             source.name,
-            failure_text(source.kind, failure).trim_end_matches('.')
+            source_failure_text(source.kind, source.token, failure).trim_end_matches('.')
         ),
         (None, Some(n)) => format!("{}, {kind_word}, {}", source.name, counted(n, count_word)),
         (None, None) => format!("{}, {kind_word}", source.name),
@@ -228,6 +248,15 @@ fn push_source(rows: &mut Vec<LibraryRow>, source: &OnlineSourceView<'_>, view: 
             host,
             state,
             refresh: true,
+            token: TokenMark {
+                private: source.token,
+                action: match (user_git, source.token) {
+                    (false, _) => String::new(),
+                    (true, true) => words.change,
+                    (true, false) => words.add,
+                },
+                attention: user_git && token_attention(source.kind, source.failure),
+            },
             ..OnlineExtra::default()
         }),
         ..plain_row(key, RowKind::Source, 0, source.name, &source.key)
@@ -248,7 +277,7 @@ pub(crate) fn loading(source: &OnlineSourceView<'_>, level: usize) -> LibraryRow
 }
 
 pub(crate) fn failed(source: &OnlineSourceView<'_>, level: usize, failure: Failure) -> LibraryRow {
-    let text = failure_text(source.kind, failure);
+    let text = source_failure_text(source.kind, source.token, failure);
     let status = if failure == Failure::Offline {
         "offline"
     } else {

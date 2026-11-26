@@ -554,6 +554,7 @@ fn criterion_10_cards_are_not_items_and_live_in_the_sets_view() {
         key: "g".to_owned(),
         label: "api".to_owned(),
         rank: 3,
+        private: false,
     }];
     let mut browser = Browser::new(list);
     let answer = browser.query(&state());

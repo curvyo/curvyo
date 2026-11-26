@@ -55,6 +55,14 @@ pub(crate) fn push_templates(
         );
         return;
     };
+    // A refused or unreadable token, or a repository that went private, says so above the items
+    // already fetched, which stay (`specs/0156` criterion 13).
+    if let Some(failure) = source
+        .failure
+        .filter(|f| crate::library_token_text::token_attention(source.kind, Some(*f)))
+    {
+        rows.push(failed(source, 1, failure));
+    }
     let mut root = Level::default();
     for entry in catalogue.templates.iter().filter(|e| kept(e, view.query)) {
         root.insert(entry);
