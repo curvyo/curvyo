@@ -58,6 +58,33 @@ for it.
 - Not built: the page thumbnail inside the ghost (the content outlines stand for it), the
   `LoaderCircle` while a template downloads on the release.
 
+## Slice 2: a live placed page into a slot (Frage 377 C, slice 2)
+
+Implementer, 2026-11-26. Criterion 3 (second half), 6 (the fit is the same `slot_fit_matrix`), 7, 10, 14. ADR 0088
+decision 7 is the whole design: the fit's matrix becomes the placement's page-local matrix
+`T(-laser origin) o M o T(source origin)` and `place_page` runs in the same batch as the page import
+of `0137` (a library page) or alone (a page of the open document). No format change: a placement
+is what `0093` already stores.
+
+Proposals: the undo step of a placed page is named "Place page into slot" (labels are static; the
+slot name is only in the badge "Placed page into Slot 2" and the notice); Ctrl over Fill (Shift) is
+ignored, a fill stays copies; only a drawing page can be placed (a laser or sketch library page is
+refused with a sentence, nothing written); a library page is placed from its own copy, so the page of a
+saved file that is also open is added as a new page like any other library page.
+
+- [x] 9. session: `place_page_into_slot` (a page of the open document) and `place_library_page_into_slot`
+  (import page, then place; one step; refusal of a filled slot, Replace removes the slot's content
+  and a placed page as a reference; the laser page stays active; picks and icons are refused; a slot
+  centre off the page is refused before anything is written); unit tests: fit scale, turn, Alt real
+  size, turned holder, one undo step, filled by a placed page and Replace, Layers/filled words
+  (AC 3, 6, 7, 14)
+- [x] 10. ui-core: label "place_page_into_slot" (history name, free step) (AC 4)
+- [x] 11. wasm: `put_into_slot` takes `place`; `place_page_into_slot` for a page of the open document;
+  Pages panel row drag released over a slot with Ctrl places fitted (AC 3, 6)
+- [x] 12. frontend: Ctrl while dropping (badge "Placed page into Slot 2" for a whole page), the
+  Placed page switch in the Into slot list, the retry of Replace keeps the choice (AC 3, 10)
+- [x] 13. full gate
+
 ## Validation
 
 Table-driven unit test of the fit in laser-core; session tests per command (one undo step, undo
