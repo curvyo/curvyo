@@ -183,6 +183,9 @@ fn plates(sizes: &Sizes) -> Vec<Plate> {
     plates
 }
 
+/// The part keys of the plates in layout order (ADR 0082 §10).
+const PLATE_KEYS: [&str; 6] = ["bottom", "front", "back", "left", "right", "lid"];
+
 /// The plates in one row, top aligned, centred on the origin, `spacing` apart: their parts and the
 /// top-left corner of each.
 fn layout(plates: &[Plate], spacing: f64, kerf: f64) -> (Vec<Part>, Vec<Point>) {
@@ -192,9 +195,10 @@ fn layout(plates: &[Plate], spacing: f64, kerf: f64) -> (Vec<Part>, Vec<Point>) 
     let (mut x, y) = (-total / 2.0, -tallest / 2.0);
     let mut parts = Vec::new();
     let mut origins = Vec::new();
-    for plate in plates {
+    for (plate, key) in plates.iter().zip(PLATE_KEYS) {
         origins.push(Point::new(x, y));
         parts.push(Part {
+            key: key.into(),
             paths: vec![translated(&plate.outline(kerf), x, y)],
         });
         x += plate.width + spacing;

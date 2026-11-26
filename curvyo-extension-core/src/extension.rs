@@ -1,6 +1,8 @@
 //! The `Extension` trait and the generator contract (ADR 0080 §1, §2): what the registry holds and
 //! what a generator receives and returns.
 
+use std::borrow::Cow;
+
 use curvyo_document_core::{Length, Point, Vec2};
 use serde::Serialize;
 
@@ -124,6 +126,11 @@ impl ClosedPath {
 /// One compound outline in frame-local mm: its subpaths, holes by the compound-path rule (`0035`).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Part {
+    /// The part's stable key (ADR 0082 §10): unique within one result and the same on every
+    /// regeneration, so an operation can hold `member.<node>#<key>`. A gear `gear`, a Box
+    /// `bottom`, `front`, `back`, `left`, `right`, `lid`, a rounded box `strip`, `base`, `cover`,
+    /// `ring`, `lid` (and in Curved `left`, `right`, `front`), a path box `wall-<n>` first.
+    pub key: Cow<'static, str>,
     /// The outer outline and its holes.
     pub paths: Vec<ClosedPath>,
 }

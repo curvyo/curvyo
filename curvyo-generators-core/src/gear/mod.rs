@@ -133,7 +133,10 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
     let (params, clamps) = v.finish();
     Generated {
         params,
-        parts: vec![Part { paths }],
+        parts: vec![Part {
+            key: "gear".into(),
+            paths,
+        }],
         handles,
         clamps,
         automatic: Vec::new(),

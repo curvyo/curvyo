@@ -56,3 +56,8 @@ migration in that extension.
 - Parameter kinds `Length { min, max }` and `Display` (a value the host shows, not edited).
 - Stored encoding of a length: `{"mm": <number>}`.
 - `FixtureDrawing`: open line segments in page-local millimetres with one line width.
+
+- ADR 0082 §10 (`0147` slice 3, Detach part): `Part` gains `key: Cow<'static, str>`, a stable key unique within one result, so an
+  operation can hold `member.<node>#<key>` for one part. A gear `gear`, a Box `bottom`, `front`, `back`, `left`, `right`, `lid`, a rounded
+  box `strip`, `base`, `cover`, `ring`, `lid` (and in Curved `left`, `right`, `front`), a path box `wall-<n>` first. Source-breaking for
+  code that builds a `Part` literal. The host stores the keys beside the parts (`format_version` 65).
