@@ -285,6 +285,7 @@ fn piece_footprint(
         spans,
         wall: inner.wall,
         margin: inner.margin,
+        windowed: 0,
     };
     let length = footprint.total();
     let local = tabs

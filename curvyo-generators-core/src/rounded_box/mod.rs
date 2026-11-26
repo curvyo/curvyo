@@ -361,6 +361,8 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
     } else {
         Vec::new()
     };
+    let mut warnings = joint_layout::pattern_warnings(&v);
+    warnings.extend(joint_layout::window_warnings(inner.windowed));
     let (params, clamps) = v.finish();
     Generated {
         params,
@@ -370,7 +372,7 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         automatic,
         states,
         limits: s.limits.clone(),
-        warnings: Vec::new(),
+        warnings,
         marks: curvyo_extension_core::Marks::default(),
     }
 }

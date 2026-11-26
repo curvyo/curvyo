@@ -151,6 +151,7 @@ impl Layout {
             if spec.curve && self.curve_tab(run, f64::midpoint(start, end), cursor, spec) {
                 continue;
             }
+            self.windowed += u32::from(spec.curve);
             for shape in run.part(cursor, start) {
                 self.push(shape, false);
             }

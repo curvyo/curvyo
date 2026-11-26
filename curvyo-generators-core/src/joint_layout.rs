@@ -4,7 +4,7 @@
 //! Pure 1-D arithmetic along an edge of a given length; the footprint code (`tab_layout`) calls it
 //! once per straight. Everything is millimetres.
 
-use curvyo_extension_core::ParamValue;
+use curvyo_extension_core::{ParamValue, Warning};
 
 use crate::fingers::Split;
 use crate::values::Values;
@@ -359,6 +359,32 @@ pub(crate) fn places(span: f64, width: f64, joints: &Joints) -> Option<Vec<f64>>
     let count = edge.count(width, margin, joints).min(most);
     let gap = edge.gap(count, width, margin, joints);
     Some(centres(span, count, width, joints, gap))
+}
+
+/// The notice of an unknown Joint pattern id, which reads Even (spec `0155` criterion 19).
+pub(crate) fn pattern_warnings(v: &Values<'_>) -> Vec<Warning> {
+    notice(
+        "unknown_joint_pattern",
+        v.unknown_choice("joint_pattern"),
+        None,
+    )
+}
+
+/// The notice of `count` tabs that keep their flat window on a bend although Bend through tabs
+/// is `curve` (criterion 16); none when `count` is 0.
+pub(crate) fn window_warnings(count: u32) -> Vec<Warning> {
+    notice("tab_window", count > 0, Some(ParamValue::Count(count)))
+}
+
+fn notice(id: &'static str, told: bool, value: Option<ParamValue>) -> Vec<Warning> {
+    told.then(|| Warning {
+        id,
+        pieces: Vec::new(),
+        value,
+        limit: None,
+    })
+    .into_iter()
+    .collect()
 }
 
 /// The least tab width: 1.5 times the kerf plus 1 mm (criterion 23).

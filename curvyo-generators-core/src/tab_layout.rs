@@ -209,6 +209,8 @@ pub(crate) struct Layout {
     pub(crate) s0: f64,
     /// The signed angle the next window's chord replaces (positive on a convex stretch).
     pub(crate) turn: f64,
+    /// The tabs that kept a window although `curve` was asked for.
+    pub(crate) windowed: u32,
 }
 
 impl Layout {
@@ -220,6 +222,7 @@ impl Layout {
             tabs: Vec::new(),
             s0: 0.0,
             turn: 0.0,
+            windowed: 0,
         }
     }
 
@@ -229,6 +232,7 @@ impl Layout {
                 spans: self.spans,
                 wall: self.wall,
                 margin: self.margin,
+                windowed: self.windowed,
             },
             self.tabs,
         )
@@ -314,6 +318,7 @@ impl Layout {
                 });
                 continue;
             }
+            self.windowed += u32::from(spec.curve);
             let (start, end) = (
                 middle - direction * half_angle,
                 middle + direction * half_angle,

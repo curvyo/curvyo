@@ -10,6 +10,8 @@ pub(crate) struct Values<'a> {
     schema: &'a [Param],
     stored: StoredParams,
     clamps: Vec<Clamp>,
+    /// The choices whose stored id is not one of the options (they read the default).
+    unknown: Vec<&'static str>,
 }
 
 impl<'a> Values<'a> {
@@ -20,8 +22,16 @@ impl<'a> Values<'a> {
             schema,
             stored: StoredParams::new(),
             clamps: Vec::new(),
+            unknown: Vec::new(),
         };
         for param in schema {
+            if matches!(param.kind, ParamKind::Choice { .. })
+                && let Some(asked) = params.get(param.key).and_then(ParamValue::from_stored)
+                && matches!(asked, ParamValue::Choice(_))
+                && param.accept(asked).is_none()
+            {
+                values.unknown.push(param.key);
+            }
             let typed = params
                 .get(param.key)
                 .and_then(ParamValue::from_stored)
@@ -67,6 +77,11 @@ impl<'a> Values<'a> {
     fn set_clamp(&mut self, key: &'static str, value: ParamValue, bound: Bound) {
         self.clamps.retain(|clamp| clamp.key != key);
         self.clamps.push(Clamp { key, value, bound });
+    }
+
+    /// Whether the stored id of the choice `key` is none of its options (it reads the default).
+    pub(crate) fn unknown_choice(&self, key: &str) -> bool {
+        self.unknown.contains(&key)
     }
 
     fn param(&self, key: &str) -> Option<&Param> {
