@@ -92,12 +92,12 @@ As a maker who looks for an icon, a template or an old page, I want a large brow
 30. Given the maker moves through places, then the browser keeps a **history of places** for the session only (view, level, search, facets, sort, current item, scroll anchor; at most 50 entries), pushed by a view switch, opening a set, card or item, Show pages, Pick elements… and the hosting guide; **Back** at the start of the subject line restores the place exactly and returns the focus to what was opened; there is no Forward. Back is also Alt+Left (Cmd+[ on a Mac), the mouse back button and the Back buttons; Backspace does not go back; Escape goes Back while the newest entry was left by opening something, else closes (H5, H6).
 31. Given the Sources and Category lists (and their workspace and folder rows), then a plain press **replaces** the selection with that row, a press on the only selected row clears it, and **Shift+press adds or removes** a row; Space and Shift+Space do the same from the keyboard; the lists are multi-select listboxes (H7).
 32. Given the Add source form (kind Git catalogue) and the end of the Sets view, then **Host your own library…** opens an in-app guide, a place with Back (criterion 30): the folder layout, the steps, an example `curvyo-catalogue.json` with a Copy button, the field rules and limits of ADR 0085 decision 3, and a link to `github.com/curvyo/templates`; it ships with the app and sends no request; its final text is the product owner's (H11). *Note, not a criterion (H12):* the guide may name the index script of ADR 0085 decision 3 only once that script exists in `curvyo/templates` (today the repository has none); until then the guide describes the hand-written index only.
-33. Given a Git catalogue in a private repository, then, at the default of Frage 376 B, no token is stored or sent, the Add source form says "The repository must be public." and the hosting guide says so (H13 applies only if the customer chooses A or C).
+33. Given a Git catalogue in a private repository, then (changed 2026-11-26 by the customer's answer A to Frage 376, built in `0156`) the Add source form offers an optional **Access token** kept in the operating system's key store (criteria 1 to 13 of `0156`), and without a token a private repository fails with "The server refused the request. For a private repository, add an access token."; until `0156` is built, #483 ships the old behaviour: no token is stored or sent, the form says "The repository must be public." and the hosting guide says so.
 
 ## Out of scope
 
 - Search by synonyms or related words ("kreis" finds "circle", "bin" finds "trash"): Frage 375 (LIB-SYNONYMS), default A, **its own follow-up story after #483** (use the keywords icon projects publish, Lucide ISC, Tabler MIT, MDI Apache-2.0, plus a related-words table built from them, shipped with the app, about 300 KiB). The architect's research: Iconify's server search matches name parts only and has no per-icon tags; an on-device AI model is rejected.
-- Access tokens for private Git catalogues: Frage 376 (LIB-TOKEN), recommendation A as its own story after 375, needs an ADR; #483 ships B.
+- Access tokens for private Git catalogues: Frage 376 (LIB-TOKEN) answered A (2026-11-26), its own story `0156-library-git-token` with an ADR; #483 ships the public-only behaviour until then.
 
 - A translation or synonym dictionary ("kreis" finds "circle"); stemming; search inside object contents or text (`0137` Out of scope).
 - Editing, tagging, favouriting, collecting items or custom categories for items (a library of favourites is a later story; the font preview's favourites are not shared with it).
@@ -116,11 +116,12 @@ Frage 375 (LIB-SYNONYMS): How should the search find icons by related words, not
 - C: An on-device AI model (rejected by the architect's research: size, speed, licence).
 - Recommendation: A. Default if unanswered: A, as the follow-up story; nothing changes in #483.
 
-Frage 376 (LIB-TOKEN): Should a Git catalogue in a private repository be reachable with an access token?
+Frage 376 (LIB-TOKEN) - answered A (2026-11-26), see `0156`: Should a Git catalogue in a private repository be reachable with an access token?
 - A: A token per Git catalogue in the operating system's key store (desktop only; needs an ADR).
 - B: No tokens now: public repositories only, plus the hosting guide.
 - C: A token in plain text in `online-sources.toml`.
 - Recommendation: A, as its own story after Frage 375. Default if unanswered: B now in #483.
+- **Answered A (2026-11-26), see `0156`.**
 
 Frage 371 (LIB-CUSTOMIZABLE): What does "customizable" mean in the filter?
 - A: What the data says today: an icon from a monochrome set (it takes the colour of the object) and a catalogue template tagged `customizable`. No format or catalogue change.

@@ -19,7 +19,7 @@ press on a category replaces, Shift+click adds; no Load button, double-click or 
 your own library, possibly in a private Git repository with a token. Sections 0.1 to 0.7 are the
 new design; the sections after them are amended in place where they disagree (each amended place
 names its 0.x section). New proposals are U31 to U48 (section 14), the spec deltas for the product
-owner H1 to H14 (section 15.1), the new customer question Frage 376 (LIB-TOKEN, section 16). The
+owner H1 to H14 (section 15.1), the customer question Frage 376 (LIB-TOKEN, section 16; answered A, built in `0156`). The
 search UI is unchanged except where the views and the history need it (the architect looks at
 search quality separately).
 
@@ -172,27 +172,20 @@ search quality separately).
      credit, fonts, size, hashes, `format_version`); a CC BY licence needs a credit; the limits
      (index 4 MiB and 10,000 templates, picture 1 MiB, template 64 MiB); `customizable` as a tag
      (Frage 371 A).
-  6. **Private repositories**: with Frage 376 B one line "The repository must be public."; with A
-     the steps for a read-only token (section 0.7).
+  6. **Private repositories**: Frage 376 answered A (2026-11-26): the steps for a read-only token,
+     specified in `specs/0156-library-git-token/ux-notes.md` section 7. Until `0156` is built, #483
+     ships one line "The repository must be public."
 - **No separate help window, no web page as the only copy**: the guide must match the Curvyo that
   shows it (its `catalogue_format`), so it ships with it (U48).
 
-### 0.7 Access token for a private repository (depends on Frage 376)
+### 0.7 Access token for a private repository (Frage 376 A, built in `0156`)
 
-Sketch only; nothing of this is built before the customer answers and the architect writes the
-ADR (credential storage, where the header may go). It is the `0138` F1 field, now specified:
-
-- **Add source form**, kind Git catalogue: under Address, a row **Access token (optional)**: label
-  12 px above, password field full width 28 px (masked, `autocomplete="off"`, no Show button,
-  never filled again after Add), and under it the statement line 12 px muted "The token is sent
-  only to this address and kept in your system's key store." (a statement of what leaves the
-  machine, like "What is sent").
-- **Source row** (tab) and **group header** (Sets view): `Lock` 12 px after the name for a source
-  with a token; tooltip line 2 "Private, with a token". Remove (armed) also forgets the token.
-- **Refusals** under the field, the form stays: "The server refused the token." / "This token has
-  no read access to the repository." A later 401 or 403 on Refresh or a load is the source's
-  failure line "The token was refused." and its card's row 3; Refresh after a new token needs
-  **Change token…**, a 28 px text button in the source row's expanded actions (sketch, B only).
+Frage 376 was answered A on 2026-11-26 and is its own story: the design is
+`specs/0156-library-git-token/ux-notes.md` (Access token row of the Add source form, `Lock` mark on
+the tab row and the Sets view group header, the `KeyRound` action **Change token…** / **Add token…**
+with its inline form and an armed **Remove token**, the refusals, the key-store-unavailable line,
+the failure lines "The token was refused." and "The saved token could not be read from the key
+store."). That file replaces the sketch that stood here; ADR 0090 decides storage and sending.
 
 ## 1. Principle
 
@@ -636,7 +629,7 @@ Offline is a state, never an alert; nothing probes, nothing refetches by itself 
 | H10 | 11 to 16 | The Sets view's facets are Sources (the sources), Colour (the set's palette flag) and Category (the set category); each view keeps its own facet values and search text |
 | H11 | new | **Host your own library…** in the Add source form (kind Git catalogue) and at the end of the Sets view opens an in-app guide (a place, with Back): the folder layout, the steps, an example `curvyo-catalogue.json` with Copy, the field rules and limits of ADR 0085 decision 3, a link to `github.com/curvyo/templates`; the product owner writes its text; it ships with the app, no request |
 | H12 | new | The guide names the index script of ADR 0085 decision 3 as the way to write `curvyo-catalogue.json`; that script must exist in `curvyo/templates` first (today the repository is empty), else the guide describes the hand-written index only |
-| H13 | new (Frage 376) | With Frage 376 A only: an optional **Access token** field for a Git catalogue in the Add source form, the `Lock` mark on the source, the refusals of 0.7; needs an architect's ADR (credential store, where the header may be sent). With A the guide says "The repository must be public." |
+| H13 | new (Frage 376) | Frage 376 answered A (2026-11-26), built in `0156` (criteria 1 to 18, ADR 0090; UX `specs/0156-library-git-token/ux-notes.md`): an optional **Access token** field for a Git catalogue in the Add source form, the `Lock` mark on the source, Change, Add and Remove token, the refusals. Until `0156` is built, #483 says "The repository must be public." in the form and the guide |
 | H14 | 11 | Empty states: Items "No items yet." with Show sets; Sets 'No set matches "hrat".' with Clear all |
 
 ## 16. Customer question
@@ -652,8 +645,8 @@ Frage 374 (LIB-DETAIL): Should the browser get a detail bar for the selected ite
 - Recommendation: A (the licence and credit are readable before loading, small sizes stay dense,
   and nothing loads by a stray click). Default if unanswered: A.
 
-Frage 376 (LIB-TOKEN): Should a Git catalogue in a private repository be reachable with an access
-token?
+Frage 376 (LIB-TOKEN), answered A (2026-11-26), built in `0156`: Should a Git catalogue in a
+private repository be reachable with an access token?
 - A: Yes: an optional read-only token per Git catalogue in the Add source form, kept in the
   operating system's key store, sent as a request header only to that source's own address (never
   on a redirect to another host); the source shows a lock. Needs an architect's ADR (key store,
