@@ -1,7 +1,11 @@
 //! Acceptance of `specs/0155-generator-joint-options`, slice 3 (criteria 18 to 24): the Advanced
 //! group and the joint layout of the tabs. Black-box: measured on the generated parts.
 
-#![allow(clippy::unwrap_used, clippy::many_single_char_names)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::many_single_char_names
+)]
 
 mod budget_factor;
 
@@ -345,7 +349,7 @@ fn criterion_21_every_pattern_and_count_builds_without_overlap() {
 fn criterion_20_joint_size_is_the_tab_width_in_the_strip_and_the_plates() {
     let g = rounded(&[("joint_width", mm(10.0))]);
     let found = base_notches(&g);
-    assert!(!found.is_empty());
+    assert!(found.len() >= 4, "{found:?}");
     for (_, width) in &found {
         assert!((width - 10.0).abs() < 0.01, "slot {width}");
     }
@@ -421,7 +425,7 @@ fn criterion_23_a_size_too_big_for_the_shortest_edge_is_lowered_with_a_notice() 
     assert_eq!(c.bound, Bound::Dependent);
     // The left and right straights are 70 mm: 70 less two wall thicknesses.
     assert_eq!(c.value, mm(64.0));
-    assert!(!g.parts.is_empty());
+    assert_eq!(g.parts.len(), rounded(&[]).parts.len());
 }
 
 #[test]
