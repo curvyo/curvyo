@@ -77,6 +77,9 @@ export function IntoSlotList({
 }) {
   const [realSize, setRealSize] = useState(false);
   const [size, setSize] = useState<[number, number] | null>(null);
+  // A whole page can be placed live instead of copied (`specs/0154` slice 2, V5); session only.
+  const [whole, setWhole] = useState(false);
+  const [placed, setPlaced] = useState(false);
   const [focus, setFocus] = useState(0);
   const list = useRef<HTMLDivElement>(null);
   const arm = useArm("into-slot-row");
@@ -87,6 +90,7 @@ export function IntoSlotList({
     void first.current().then((got) => {
       if (got && live) {
         setSize(unitSize(got.source));
+        setWhole(got.source.whole);
       }
       got?.done();
     });
@@ -123,7 +127,7 @@ export function IntoSlotList({
           fillSlots(ctx, got.source, row.id, realSize);
           got.done();
         } else {
-          putIntoSlot(ctx, got.source, row.id, realSize, replace, got.done);
+          putIntoSlot(ctx, got.source, row.id, realSize, replace, got.done, placed);
         }
         close();
       });
@@ -170,6 +174,11 @@ export function IntoSlotList({
     >
       <div className="into-slot-caption">
         <span>{size ? `${caption} · ${size[0].toFixed(0)} × ${size[1].toFixed(0)} mm` : caption}</span>
+        {whole ? (
+          <button type="button" aria-pressed={placed} title="Place the page live: it follows the source page" onClick={() => setPlaced((p) => !p)}>
+            Placed page
+          </button>
+        ) : null}
         <button type="button" aria-pressed={realSize} onClick={() => setRealSize((r) => !r)}>
           Real size
         </button>

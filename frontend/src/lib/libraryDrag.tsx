@@ -5,7 +5,7 @@
 import { createRoot, type Root } from "react-dom/client";
 
 import { LibraryDragGhost, type LibraryDropKind } from "@/components/LibraryDragGhost";
-import type { SlotCue, SlotUnitSource } from "@/lib/intoSlot";
+import { type SlotCue, type SlotUnitSource, placedBadge } from "@/lib/intoSlot";
 import type { WasmSession } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 const THRESHOLD_PX = 4;
@@ -19,7 +19,8 @@ export interface SlotDrag {
   /** The source once it is read (its size and outlines go to the cue), else null. */
   source: () => SlotUnitSource | null;
   multiPage: () => boolean;
-  onSlot: (cue: SlotCue, alt: boolean) => void;
+  /** `ctrl`: the release places a whole page live instead of copying it (slice 2). */
+  onSlot: (cue: SlotCue, alt: boolean, ctrl: boolean) => void;
   /** Called when the drag ends, after `onSlot` when there was a slot release. */
   end?: () => void;
 }
@@ -101,7 +102,7 @@ export function watchCanvasDrag(
   };
   /** The pointer's last place, so Alt and Shift switch the cue without a move. */
   let last: { clientX: number; clientY: number } | null = null;
-  const move = (event: Pick<PointerEvent, "pointerId" | "clientX" | "clientY" | "altKey" | "shiftKey">) => {
+  const move = (event: Pick<PointerEvent, "pointerId" | "clientX" | "clientY" | "altKey" | "shiftKey" | "ctrlKey" | "metaKey">) => {
     if (event.pointerId !== down.pointerId) {
       return;
     }
@@ -123,6 +124,10 @@ export function watchCanvasDrag(
     if (slot && rect) {
       startSlot();
       cue = cueAt(slot, { x: event.clientX - rect.left, y: event.clientY - rect.top }, event.altKey, event.shiftKey);
+      // Ctrl over a slot: a whole page is placed live, so the badge says it (UX notes V5).
+      if (cue?.kind === "slot" && (event.ctrlKey || event.metaKey) && slot.source()?.whole) {
+        cue = { ...cue, badge: cue.badge ? placedBadge(cue.badge) : cue.badge };
+      }
       if (cue && slot.multiPage()) {
         cue = { ...cue, kind: "refused", badge: "Only one page goes into a slot.", status: "Only one page goes into a slot." };
       }
@@ -161,7 +166,7 @@ export function watchCanvasDrag(
         if (last.page) {
           slot.getSession()?.activate_page(last.page);
         }
-        slot.onSlot(last, event.altKey);
+        slot.onSlot(last, event.altKey, event.ctrlKey || event.metaKey);
       }
       end();
       return;
@@ -177,8 +182,15 @@ export function watchCanvasDrag(
       event.preventDefault();
     }
     // Alt and Shift switch the ghost and the badge live, also while the pointer rests (UX 3.1).
-    if ((event.key === "Alt" || event.key === "Shift") && ghost && last && slot) {
-      move({ pointerId: down.pointerId, ...last, altKey: event.altKey, shiftKey: event.shiftKey });
+    if ((event.key === "Alt" || event.key === "Shift" || event.key === "Control" || event.key === "Meta") && ghost && last && slot) {
+      move({
+        pointerId: down.pointerId,
+        ...last,
+        altKey: event.altKey,
+        shiftKey: event.shiftKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+      });
     }
     if (event.key === "Escape") {
       event.stopPropagation();

@@ -8,6 +8,13 @@ const BADGE_W = 200;
 const BADGE_H = 20;
 const OFFSET = 16;
 
+/** What the Ctrl release over a slot answers. */
+interface SlotAnswer {
+  refused?: string | null;
+  notice?: string | null;
+  error?: string;
+}
+
 export function badgePlace(x: number, y: number): { x: number; y: number } {
   const right = x + OFFSET + BADGE_W > window.innerWidth;
   const below = y + OFFSET + BADGE_H > window.innerHeight;
@@ -27,6 +34,7 @@ export function usePageRowDrag(
   getSession: () => WasmSession | null,
   canvas: () => HTMLElement | null,
   onPlaced: () => void,
+  onNotice?: (text: string, kind: "status" | "alert") => void,
 ) {
   const [badge, setBadge] = useState<DropBadge | null>(null);
   const dragging = useRef<{ name: string } | null>(null);
@@ -83,10 +91,22 @@ export function usePageRowDrag(
     setBadge(word ? { kind: answer.badge, word, refused, ...badgePlace(clientX, clientY) } : null);
   };
   /** The release: places the clone where the session allows it. Whether it did. */
-  const drop = () => {
+  const drop = (ctrl = false, alt = false) => {
     if (!dragging.current) return false;
     dragging.current = null;
-    const placed = getSession()?.row_drag_drop() ?? false;
+    const session = getSession();
+    // Ctrl over a slot places the page live, fitted into the slot (`specs/0154`, slice 2).
+    const into = ctrl && session ? (JSON.parse(session.row_drag_drop_into_slot(alt)) as SlotAnswer | null) : null;
+    if (into) {
+      setBadge(null);
+      setCursor(false);
+      const text = into.error ? `Nothing was changed: ${into.error}.` : (into.refused ?? into.notice);
+      if (text) onNotice?.(text, into.error || into.refused ? "alert" : "status");
+      const written = !into.error && !into.refused;
+      if (written) onPlaced();
+      return written;
+    }
+    const placed = session?.row_drag_drop() ?? false;
     setBadge(null);
     setCursor(false);
     if (placed) onPlaced();

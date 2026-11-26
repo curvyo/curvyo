@@ -471,7 +471,7 @@ html[data-library-drag="refused"], html[data-library-drag="refused"] * { cursor:
 .into-slot-list [role="listbox"] { outline: none; }
 .into-slot-list [role="listbox"]:focus-visible .into-slot-row.current { box-shadow: inset 0 0 0 2px var(--editor-accent); }
 .into-slot-caption { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 28px; font-size: 12px; color: var(--panel-muted-fg); }
-.into-slot-caption > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.into-slot-caption > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .into-slot-caption button { height: 24px; padding: 0 6px; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent); color: var(--toolbar-icon); }
 .into-slot-caption button[aria-pressed="true"] { background: var(--toolbar-icon-active-bg); }
 .into-slot-heading { display: flex; justify-content: space-between; height: 24px; align-items: center; font-size: 12px; font-weight: 600; color: var(--panel-muted-fg); }

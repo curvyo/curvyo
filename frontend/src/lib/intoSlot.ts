@@ -153,7 +153,14 @@ function answered(ctx: SlotContext, answer: SlotAnswer, retry: (() => void) | nu
   return true;
 }
 
-/** Puts `source` into the slot `slot` (one step); a filled slot offers the armed Replace.
+/** The badge words of a drop that places the page live: "Into Slot 2 · 50 %" becomes "Placed page
+ * into Slot 2 · 50 %" (UX notes V5). */
+export function placedBadge(words: string): string {
+  return words.startsWith("Into ") ? `Placed page into ${words.slice(5)}` : words;
+}
+
+/** Puts `source` into the slot `slot` (one step); a filled slot offers the armed Replace. With
+ * `place` a whole page is placed live (a placed page, `0093`) instead of copied.
  * `release` frees the source's reader once nothing needs it any more: after the put, or, for a
  * filled slot, when the Replace is pressed and done or its notice goes. */
 export function putIntoSlot(
@@ -163,6 +170,7 @@ export function putIntoSlot(
   realSize: boolean,
   replace = false,
   release: () => void = () => {},
+  place = false,
 ): boolean {
   const session = ctx.getSession();
   if (!session) {
@@ -179,9 +187,10 @@ export function putIntoSlot(
       slot,
       realSize,
       replace,
+      place && source.whole,
     ),
   );
-  const retry = replace ? null : () => putIntoSlot(ctx, source, slot, realSize, true, release);
+  const retry = replace ? null : () => putIntoSlot(ctx, source, slot, realSize, true, release, place);
   return answered(ctx, answer, retry, release);
 }
 
