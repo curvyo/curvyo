@@ -31,6 +31,7 @@ const fn tool_word(tool: Tool) -> &'static str {
         Tool::Trace => "trace",
         Tool::TestGrid => "test-grid",
         Tool::Generators => "generators",
+        Tool::Pencil => "pencil",
     }
 }
 

@@ -296,6 +296,8 @@ fn letter_action(input: &KeyInput<'_>, state: KeyState, letter: Option<char>) ->
         (Some('e'), _) => Binding::Tool(Tool::Ellipse),
         (Some('o'), _) => Binding::Tool(Tool::Offset),
         (Some('t'), _) => Binding::Tool(Tool::Text),
+        // The Pencil (`specs/0158-pen-display` slice 1, UX notes §1): a tool letter in every state.
+        (Some('p'), _) => Binding::Tool(Tool::Pencil),
         // The Trace tool (`specs/0025-raster-trace` criterion 1); Ctrl+I stays Import.
         (Some('i'), _) => Binding::Tool(Tool::Trace),
         (_, "*") => Binding::Tool(Tool::PolygonStar),

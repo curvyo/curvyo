@@ -64,6 +64,9 @@ impl Session {
         if self.tool == Tool::Offset {
             return self.offset_cursor_hint().to_string();
         }
+        if self.tool == Tool::Pencil {
+            return self.pencil_cursor().to_string();
+        }
         if self.tool == Tool::Node
             && let Some(hint) = self.node_marquee_cursor()
         {

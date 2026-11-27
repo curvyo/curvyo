@@ -231,6 +231,7 @@ impl Session {
             Tool::Offset => self.offset_drag_in_flight() || self.select.drag_in_flight(),
             Tool::Measure => self.dimension_drag_in_flight(),
             Tool::Trace => self.trace.mask.drag.is_some(),
+            Tool::Pencil => self.pencil_in_contact(),
             Tool::Pen | Tool::Text | Tool::TestGrid | Tool::Generators => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
@@ -517,6 +518,7 @@ impl Session {
                 self.cancel_offset_drag() || marquee
             }
             Tool::Measure => self.measure_escape(),
+            Tool::Pencil => self.pencil_escape(),
             Tool::Pen | Tool::Text | Tool::Trace | Tool::TestGrid | Tool::Generators => false,
         }
     }
@@ -664,6 +666,7 @@ impl Session {
             | Tool::Measure
             | Tool::Trace
             | Tool::TestGrid
+            | Tool::Pencil
             | Tool::Generators => false,
             Tool::Node => self.node.clear_selection(),
             Tool::Select | Tool::Offset => {
@@ -700,6 +703,8 @@ impl Session {
             self.cancel_gesture();
         }
         self.button_down = false;
+        // A lost pen contact writes nothing (`specs/0158-pen-display` criterion 15).
+        self.pencil_reset();
     }
 
     /// Cancels whatever gesture the active tool has in flight when the
@@ -752,6 +757,7 @@ impl Session {
                 | Tool::Text
                 | Tool::Measure
                 | Tool::Trace
+                | Tool::Pencil
                 | Tool::TestGrid | Tool::Generators => {}
             }
         });

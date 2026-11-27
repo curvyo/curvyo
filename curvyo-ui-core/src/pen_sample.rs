@@ -4,7 +4,11 @@
 //! Pure: the host reads its toolkit's events into [`RawPenEvent`]s and sends [`PenBatch`]es; this
 //! module shapes nothing else, so a pen without a device is testable.
 
+mod flat;
+
 use serde::{Deserialize, Serialize};
+
+pub use flat::PEN_SAMPLE_STRIDE;
 
 use crate::ScreenPx;
 

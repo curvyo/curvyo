@@ -180,6 +180,19 @@ impl Session {
                 ..SelectDecorationInput::default()
             };
         }
+        if self.tool == Tool::Pencil {
+            // The eraser end's set: what it would delete or has touched (`specs/0158` crit. 12).
+            history_hovered.extend(
+                self.pencil_erase_hits()
+                    .iter()
+                    .filter_map(|&id| self.box_of(objects, id)),
+            );
+            return SelectDecorationInput {
+                history_hovered,
+                device_pixel_ratio: self.device_pixel_ratio,
+                ..SelectDecorationInput::default()
+            };
+        }
         if self.tool == Tool::Text {
             // The Text tool shows the hover box of the text a click would edit, never a selected
             // box or a handle (`specs/0074-text-objects`, UX notes §1 "Hover").

@@ -166,6 +166,8 @@ pub use evaluate_path::{
 };
 
 mod pen_tool;
+mod pencil_pressure;
+mod pencil_tool;
 pub use page_membership::{PageMembership, Reach, page_contents, page_contents_with_artwork};
 mod edit_context;
 mod edit_context_text;
@@ -218,6 +220,7 @@ pub mod sharing_text;
 mod skew_entry;
 mod skew_math;
 mod snapping;
+mod speed_pressure;
 mod split;
 mod stack_plan;
 mod stroke_to_path_plan;
@@ -544,13 +547,20 @@ pub use pen_entry_text::{
     pen_entry_added_sentence, pen_entry_label, pen_entry_name, pen_entry_notice, pen_entry_suffix,
 };
 pub use pen_sample::{
-    PEN_BATCH_LIMIT, PenBatch, PenBatcher, PenEnd, PenPhase, PenSample, Pressure, RawKind,
-    RawPenEvent, RawSource, Tilt, TimeUnwrap, event_age_ms,
+    PEN_BATCH_LIMIT, PEN_SAMPLE_STRIDE, PenBatch, PenBatcher, PenEnd, PenPhase, PenSample,
+    Pressure, RawKind, RawPenEvent, RawSource, Tilt, TimeUnwrap, event_age_ms,
 };
 pub use pen_target::{EndNode, EndNodeIndex, PenTarget, continuation_of, pen_target};
 pub use pen_tool::{
     ClosingPreview, Continuation, PenMode, PenTool, PointerUpOutcome as PenPointerUpOutcome,
     PressAction,
+};
+pub use pencil_pressure::{
+    PencilWidths, PressureCurve, is_usable_pressure, smooth_pressures, smoothed_at,
+};
+pub use pencil_tool::{
+    DEFAULT_PENCIL_SMOOTHING_MM, MIN_STROKE_LENGTH_MM, MIN_STROKE_SAMPLES, PencilOutcome,
+    PencilSettings, PencilStroke, PencilTool, WidthSource,
 };
 pub use placement_view::{
     placed_bounds, placed_bounds_with_artwork, placement_map, placement_members,
@@ -608,6 +618,7 @@ pub use snapping::{
     SnapProbe, SnapResult, SnapSettings, SnapState, SnapTarget, SnapTargets, TargetAxis,
     TargetKind, grid_snap_nodes, resolve, resolve_along, resolve_probe_along, resolve_with_grid,
 };
+pub use speed_pressure::{ZERO_PRESSURE_SPEED_MM_PER_S, speed_pressure_at};
 pub use split::{SPLIT_COMMIT_LABEL, SplitPlan, SplitRefusal, plan_split};
 pub use stack_plan::{MAX_STACK_PIECES, StackPlan, StackRefusal};
 pub use stroke_to_path_plan::{

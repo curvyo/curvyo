@@ -171,6 +171,7 @@ use clone_drop::DropMode;
 pub use row_drag::{DropBadge, RowDragAnswer, RowDragSource};
 pub use sketch_use::{SketchRowState, SketchUsage};
 mod pen_entry;
+mod pencil;
 mod placement;
 mod placement_view;
 mod project;
@@ -487,6 +488,9 @@ pub enum Tool {
     /// The Test grid tool (`specs/0112-test-grid-and-materials` criteria 1, 2): on a laser page
     /// a press places a test grid with the bar's values.
     TestGrid,
+    /// The Pencil (`specs/0158-pen-display` slice 1): key `P`, draws from pen samples
+    /// ([`Session::pen_samples`]), never from `pointer_*`.
+    Pencil,
 }
 
 /// One open document's whole editing session.
@@ -567,6 +571,8 @@ pub struct Session {
     /// The objects of the History row, or the targets of Select original, the pointer or focus
     /// rests on (`history.rs`, `clone_view.rs`): they show the hover box.
     history_hover: Vec<NodeId>,
+    /// The Pencil's tool, settings and eraser hover set (`specs/0158-pen-display` slice 1).
+    pencil: pencil::PencilState,
     /// The page's clock, Unix ms and the local offset in minutes, for the change times of the
     /// Came from lines (`specs/0137` criterion 7); view state, set by the page.
     clock: std::cell::Cell<(i64, i32)>,
@@ -812,6 +818,7 @@ impl Session {
             hovered: None,
             hovered_object: None,
             history_hover: Vec::new(),
+            pencil: pencil::PencilState::default(),
             clock: std::cell::Cell::new((0, 0)),
             pointer_position: None,
             node_hover_on_nothing: false,
@@ -938,6 +945,7 @@ impl Session {
             hovered: None,
             hovered_object: None,
             history_hover: Vec::new(),
+            pencil: pencil::PencilState::default(),
             clock: std::cell::Cell::new((0, 0)),
             pointer_position: None,
             node_hover_on_nothing: false,
@@ -1088,6 +1096,9 @@ impl Session {
             // Leaving the Pen ends its path as drawn (a lone node is dropped): no
             // unfinished path stays behind that the Document section's resize would
             // not move (`specs/0015-document-size-and-rulers/` criterion 14a).
+            if tool != Tool::Pencil {
+                this.pencil_reset();
+            }
             if this.tool == Tool::Pen && tool != Tool::Pen {
                 if this.curve_pen_blocked() && this.pen_path_open() {
                     this.notice_blocked_curve();
@@ -1291,7 +1302,8 @@ impl Session {
             Tool::Text => self.text_pointer_down(point, shift),
             Tool::Trace => self.trace_pointer_down(point, shift),
             Tool::TestGrid => self.test_grid_pointer_down(point),
-            Tool::Generators => {}
+            // The Pencil draws from pen samples only (ADR 0095 decision 2).
+            Tool::Generators | Tool::Pencil => {}
         }
     }
 
@@ -1391,6 +1403,7 @@ impl Session {
             }
             Tool::TestGrid => self.test_grid_hover(Some(point)),
             Tool::Generators => self.generators_hover(Some(point)),
+            Tool::Pencil => {}
         }
     }
 
@@ -1508,7 +1521,7 @@ impl Session {
                 Tool::Trace => {
                     this.trace_mask_release(point, shift, constrain);
                 }
-                Tool::TestGrid => {}
+                Tool::TestGrid | Tool::Pencil => {}
                 Tool::Generators => this.generators_pointer_up(point),
             }
         });
@@ -1601,7 +1614,8 @@ impl Session {
                 | Tool::PolygonStar
                 | Tool::Measure
                 | Tool::TestGrid
-                | Tool::Generators => {}
+                | Tool::Generators
+                | Tool::Pencil => {}
             }
             DoubleClickHint::None
         })

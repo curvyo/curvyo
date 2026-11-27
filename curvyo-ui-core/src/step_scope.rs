@@ -14,6 +14,8 @@ pub const MOVE_STEPS: &[&str] = &[
     "place_linked_clones",
     "place_page",
     "delete_objects",
+    // `specs/0158-pen-display` slice 1 criterion 12: the eraser end removes whole objects.
+    "erase",
     "delete_placement",
     "resize_path",
     "resize_rect",
@@ -229,6 +231,8 @@ pub const FREE_STEPS: &[&str] = &[
     "load_online_template",
     "import_icon",
     "create_path",
+    // `specs/0158-pen-display` slice 1: a Pencil stroke adds a new path only.
+    "pencil_stroke",
     "create_rect",
     "create_ellipse",
     "create_polygon",
