@@ -1,6 +1,6 @@
 # QR codes, barcodes and Data Matrix: live code objects with styles, a logo clear area and colours, cut-ready for laser and plotter
 
-Status: Slice 1 (QR) Done (PR #TBD, 2026-11-26); slices 2 and 3 Draft. Was: Ready for slice 1 (QR, revision 2, 2026-11-26; Frage 321 B; ADR 0091 Proposed, `adrs.md` and UX notes revision 1 exist; Fragen 319, 320, 321, 322, 323 and 406 stand at their defaults until the customer answers). Slices 2 (1D barcodes) and 3 (Data Matrix) stay Draft: their criteria are outlined, ADR 0091 §9 and the UX notes §11 are outlines only.
+Status: Slice 1 (QR) Done (PR #518, 2026-11-26); slices 2 and 3 Draft. Was: Ready for slice 1 (QR, revision 2, 2026-11-26; Frage 321 B; ADR 0091 Proposed, `adrs.md` and UX notes revision 1 exist; Fragen 319, 320, 321, 322, 323 and 406 stand at their defaults until the customer answers). Slices 2 (1D barcodes) and 3 (Data Matrix) stay Draft: their criteria are outlined, ADR 0091 §9 and the UX notes §11 are outlines only.
 Priority: Should
 Origin: Customer (2026-11-20, translated): generate QR codes as SVG paths, also "pretty" ones (a logo field in the centre, different styles: module shapes, rounded, dots, finder-pattern styles), plus 1D barcodes (Code 128, EAN/UPC, Code 39) and Data Matrix; also coloured (fill colours, gradients where sensible); everything somewhat adjustable (gap between modules, module size, rounding, error-correction level, quiet zone, logo size and clear area). Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
