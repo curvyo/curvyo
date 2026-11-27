@@ -49,6 +49,7 @@ fn generate(stored: &StoredParams, edit: Option<Edit<'_>>) -> Generated {
             params: stored,
             seed: Seed(1),
             edit,
+            glyphs: None,
         })
         .unwrap()
 }

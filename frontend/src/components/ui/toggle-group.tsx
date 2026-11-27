@@ -39,6 +39,10 @@ interface ToggleGroupProps<T extends string> {
   /** Lays the items out in this many columns (a strip of four long names in two rows of two,
    * `specs/0144` UX notes §3); one radio group, one Tab stop. */
   columns?: number;
+  /** With `columns`: how many items each row holds (`[2, 3, 2]`); an item spans `columns / n` of the
+   * grid columns, so rows of different counts fill the same width (the Symbology strip, `specs/0144`
+   * UX notes §11.14). */
+  rows?: readonly number[];
   /** The tool bars' look (the Polygon/Star switch): one ring around the strip, no lines between
    * the items (the Pen bar, customer 2026-11-11). */
   bar?: boolean;
@@ -70,7 +74,18 @@ export function ToggleGroup<T extends string>({
   firstFocus = false,
   bar = false,
   columns,
+  rows,
 }: ToggleGroupProps<T>) {
+  // Position of every item in a `rows` layout: its row, whether it starts the row, its span.
+  const places = rows
+    ? rows.flatMap((count, row) =>
+        Array.from({ length: count }, (_, at) => ({
+          row,
+          first: at === 0,
+          span: (columns ?? count) / count,
+        })),
+      )
+    : [];
   return (
     <RadioGroup.Root
       // With nothing pressed the first item is the Tab stop (Radix would keep the
@@ -136,13 +151,19 @@ export function ToggleGroup<T extends string>({
               }
             }}
             className={`flex items-center justify-center bg-transparent text-[var(--toolbar-icon)] outline-none enabled:hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] aria-checked:enabled:!bg-[var(--toolbar-icon-active-bg)] aria-checked:enabled:!text-[var(--toolbar-icon-active-fg)] aria-checked:disabled:bg-[color-mix(in_srgb,var(--toolbar-icon)_30%,transparent)] ${
-              columns
+              rows && places[index]
+                ? `${places[index].first ? "" : `border-l ${BORDER}`} ${places[index].row > 0 ? `border-t ${BORDER}` : ""}`
+                : columns
                 ? `${index % columns > 0 ? `border-l ${BORDER}` : ""} ${index >= columns ? `border-t ${BORDER}` : ""}`
                 : index > 0 && !bar
                   ? `border-l ${BORDER}`
                   : ""
             }`}
-            style={{ width: option.width ?? itemWidth, height: itemHeight }}
+            style={{
+              width: option.width ?? itemWidth * (places[index]?.span ?? 1),
+              height: itemHeight,
+              ...(places[index] ? { gridColumn: `span ${places[index].span}` } : {}),
+            }}
           >
             {option.icon}
           </RadioGroup.Item>

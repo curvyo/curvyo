@@ -1023,6 +1023,7 @@ mod tests {
         param_centre_yield_mm: 2.0,
         move_only: false,
         corners_only: false,
+        no_skew: false,
         yielded: crate::YieldedHandles::NONE,
     };
 

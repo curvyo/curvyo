@@ -70,8 +70,10 @@ fn a_press_places_a_qr_code_in_one_step_called_add_qr_code() {
     let name = s.history_target_name(curvyo_document_core::Direction::Undo);
     assert_eq!(name.as_deref(), Some("Add QR code"));
     let kinds: Value = serde_json::from_str(&s.generator_kinds_json()).unwrap();
-    assert_eq!(kinds[3]["label"], "QR code");
-    assert_eq!(kinds[3]["icon"], "QrCode");
+    // One segment "Code" for the whole family, in the place of the QR code's own (slice 2, criterion 5).
+    assert_eq!(kinds[2]["segment"], "Code");
+    assert_eq!(kinds[2]["label"], "QR code");
+    assert_eq!(kinds[2]["icon"], "QrCode");
 }
 
 #[test]

@@ -46,8 +46,9 @@ impl<'a> Values<'a> {
     fn report(&mut self, param: &Param, asked: &ParamValue, accepted: &ParamValue) {
         let below = match (asked, accepted) {
             (ParamValue::Length(a), ParamValue::Length(b)) => a.as_mm() < b.as_mm(),
-            (ParamValue::Count(a), ParamValue::Count(b))
-            | (ParamValue::Percent(a), ParamValue::Percent(b)) => a < b,
+            (ParamValue::Count(a), ParamValue::Count(b)) => a < b,
+            (ParamValue::Percent(a), ParamValue::Percent(b)) => a < b,
+            (ParamValue::Ratio(a), ParamValue::Ratio(b)) => a < b,
             _ => return,
         };
         let bound = if below {
@@ -101,8 +102,13 @@ impl<'a> Values<'a> {
         self.value(key).count().unwrap_or(0)
     }
 
-    pub(crate) fn percent(&self, key: &str) -> u32 {
+    /// The whole percentage `key` (signed, `-30` to `30` for Bar width adjust).
+    pub(crate) fn percent(&self, key: &str) -> i32 {
         self.value(key).percent().unwrap_or(0)
+    }
+
+    pub(crate) fn ratio(&self, key: &str) -> f64 {
+        self.value(key).ratio().unwrap_or(0.0)
     }
 
     pub(crate) fn switch(&self, key: &str) -> bool {

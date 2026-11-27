@@ -67,6 +67,35 @@ pub struct GeneratorKind {
     pub groups: Vec<ParamGroup>,
     /// `Some` for a kind built from the selected outline instead of placed at the pointer.
     pub source: Option<Source>,
+    /// Whether a scanner reads the outline: the contrast against the document background is
+    /// checked for it (`0144` criterion 9).
+    pub scanned: bool,
+    /// The family the kind belongs to: the bar shows one segment per family and the Properties
+    /// block a Symbology group (ADR 0092 §2); `None` for a kind that stands alone.
+    pub family: Option<Family>,
+    /// How the object resizes (ADR 0092 §4).
+    pub resize: Resize,
+}
+
+/// A group of kinds that are one thing to the maker with several forms (the symbologies of a code).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Family {
+    /// The family id (`code`).
+    pub id: &'static str,
+    /// The text of the bar's one segment ("Code").
+    pub segment: &'static str,
+    /// The heading of the group that switches the kind ("Symbology").
+    pub label: &'static str,
+}
+
+/// How a generated object follows a resize of its box.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Resize {
+    /// Proportional only: corner handles, one factor (`Edit::Scale`).
+    Proportional,
+    /// Edges and corners, one factor per axis (`Edit::Stretch`).
+    Free,
 }
 
 /// A kind built from a selected closed outline (ADR 0083 §2): which `Path` parameter the outline
@@ -80,11 +109,14 @@ pub struct Source {
 }
 
 impl GeneratorKind {
-    /// The text the bar segment shows: the command of a kind with a source, else its label. The
-    /// registry orders the segments by it.
+    /// The text the bar segment shows: the command of a kind with a source, the segment of its
+    /// family, else its label. The registry orders the segments by it.
     #[must_use]
     pub fn segment(&self) -> &'static str {
-        self.source.map_or(self.label, |source| source.command)
+        self.source.map_or_else(
+            || self.family.map_or(self.label, |family| family.segment),
+            |source| source.command,
+        )
     }
 
     /// Every parameter of every group, in order.

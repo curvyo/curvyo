@@ -32,6 +32,7 @@ fn generate(kind: &str, entries: &[(&str, ParamValue)]) -> Generated {
             params: &stored(entries),
             seed: Seed(1),
             edit: None,
+            glyphs: None,
         })
         .unwrap()
 }

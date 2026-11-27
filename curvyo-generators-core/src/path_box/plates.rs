@@ -189,6 +189,8 @@ pub(crate) fn plates(
             pieces: Vec::new(),
             value: Some(ParamValue::Length(Length::from_mm(m.wall))),
             limit: None,
+            param: None,
+            subject: None,
         });
     }
     let outer = Footprint::from_shapes(&contour_shapes(&outer_contour), m.wall, m.wall);

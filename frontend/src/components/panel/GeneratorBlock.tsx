@@ -220,7 +220,7 @@ function TextRow({
       <textarea
         ref={field}
         data-generator-text={row.key}
-        aria-label="QR code content"
+        aria-label={`${api.view?.label ?? "QR code"} content`}
         aria-invalid={invalid}
         aria-describedby={invalid ? reason : undefined}
         value={draft}
@@ -271,6 +271,194 @@ function TextRow({
           <span>{row.problem}</span>
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The Symbology group (`specs/0144` criterion 20, UX notes §11.4): one radio group of the family's
+ * kinds, two rows of three 80 px cells (with Data Matrix three rows, 120 + 120, 3 x 80, 2 x 80); a press switches the object in place, one step.
+ */
+function SymbologyGroup({
+  api,
+  onReturnFocus,
+}: {
+  api: GeneratorBlockApi;
+  onReturnFocus: () => void;
+}) {
+  const family = api.view?.family ?? null;
+  if (!family) {
+    return null;
+  }
+  const options: ToggleOption<string>[] = family.kinds.map((kind) => ({
+    value: kind.id,
+    label: kind.label,
+    tooltip: "",
+    icon: <span className="text-sm">{kind.label}</span>,
+  }));
+  return (
+    <section className="flex flex-col gap-2" data-generator-symbology>
+      <h3 className="text-sm text-[var(--toolbar-icon)]">{family.label}</h3>
+      <ToggleGroup
+        label={family.label}
+        options={options}
+        value={family.current}
+        onChange={api.switchKind}
+        // Seven kinds with Data Matrix: QR code and Data Matrix 120 px, the rest 80 px
+        // (`specs/0144` UX notes §11.14); a family of six keeps two rows of three.
+        itemWidth={family.kinds.length === 7 ? 40 : 80}
+        columns={family.kinds.length === 7 ? 6 : 3}
+        rows={family.kinds.length === 7 ? [2, 3, 2] : undefined}
+        onReturnFocus={onReturnFocus}
+      />
+    </section>
+  );
+}
+
+/**
+ * The text field of a 1D code (`specs/0144` UX notes §11.6): one line, Enter and Ctrl+Enter commit
+ * and return to the canvas, Tab and a press elsewhere commit, Escape restores, a paste is one line.
+ * Every keystroke previews; the reason content cannot be drawn is a lasting line under it.
+ */
+function LineRow({
+  row,
+  api,
+  onReturnFocus,
+}: {
+  row: GeneratedRow;
+  api: GeneratorBlockApi;
+  onReturnFocus: () => void;
+}) {
+  const stored = typeof row.value === "string" ? row.value : "";
+  const [draft, setDraft] = useState(stored);
+  const editing = useRef(false);
+  const skipBlur = useRef(false);
+  const reason = useId();
+  useEffect(() => {
+    if (!editing.current) {
+      setDraft(stored);
+    }
+  }, [stored]);
+  const commit = () => {
+    editing.current = false;
+    if (skipBlur.current) {
+      skipBlur.current = false;
+      return;
+    }
+    if (draft !== stored) {
+      api.setValue(row.key, draft);
+    } else {
+      api.cancelPreview();
+    }
+  };
+  const invalid = row.problem !== null;
+  return (
+    <div className="flex w-[244px] flex-col gap-1">
+      <input
+        type="text"
+        data-generator-text={row.key}
+        aria-label={`${api.view?.label ?? ""} content`}
+        aria-invalid={invalid}
+        aria-describedby={invalid ? reason : undefined}
+        value={draft}
+        spellCheck={false}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(":focus-visible")) {
+            event.currentTarget.select();
+          }
+        }}
+        onChange={(event) => {
+          editing.current = true;
+          // A pasted line break is a space: the field is one line.
+          const next = event.target.value.replace(/\r?\n/g, " ");
+          setDraft(next);
+          api.preview(row.key, next);
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+            skipBlur.current = true;
+            onReturnFocus();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            editing.current = false;
+            skipBlur.current = true;
+            setDraft(stored);
+            api.cancelPreview();
+            event.currentTarget.blur();
+          }
+        }}
+        onKeyUp={(event) => event.stopPropagation()}
+        className="box-border h-7 w-[244px] rounded-[5px] bg-white px-2 text-sm text-black outline-none focus:border-[var(--editor-accent)]"
+        style={{
+          border: invalid
+            ? "2px solid var(--field-invalid)"
+            : "1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent)",
+        }}
+      />
+      {invalid ? (
+        <p
+          id={reason}
+          role="status"
+          className="flex items-start gap-1 text-xs"
+          style={{ color: "var(--field-invalid)" }}
+        >
+          <TriangleAlert
+            size={12}
+            className="mt-[2px] shrink-0"
+            aria-hidden="true"
+          />
+          <span>{row.problem}</span>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The Font row of a code's text (`specs/0144` UX notes §11.9): a labelled button with the face name;
+ * a press opens the Fonts tab, whose pick writes the face. A face missing on this computer says so.
+ */
+function FontRow({
+  row,
+  api,
+  onOpenFonts,
+}: {
+  row: GeneratedRow;
+  api: GeneratorBlockApi;
+  onOpenFonts: () => void;
+}) {
+  const name = typeof row.value === "string" ? row.value : "";
+  const missing = api.view?.fontMissing === true;
+  const shown = missing ? `${name}, missing` : name;
+  return (
+    <div className="flex w-[244px] items-center gap-2">
+      <span className="w-[60px] shrink-0 text-sm text-[var(--toolbar-icon)]">
+        {row.label}
+      </span>
+      <button
+        type="button"
+        data-generator-font
+        aria-label={`${row.label}: ${shown}`}
+        title={
+          missing ? "Missing on this computer. Shown in Source Sans 3." : name
+        }
+        onClick={onOpenFonts}
+        className="flex h-7 w-[176px] items-center gap-1 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+      >
+        {missing ? (
+          <TriangleAlert
+            size={16}
+            className="shrink-0"
+            style={{ color: "var(--field-invalid)" }}
+            aria-hidden="true"
+          />
+        ) : null}
+        <span className="min-w-0 flex-1 truncate text-left">{shown}</span>
+      </button>
     </div>
   );
 }
@@ -343,9 +531,11 @@ function PartsGroup({ api, onReturnFocus }: { api: GeneratorBlockApi; onReturnFo
 export function GeneratorBlock({
   api,
   onReturnFocus,
+  onOpenFonts,
 }: {
   api: GeneratorBlockApi;
   onReturnFocus: () => void;
+  onOpenFonts: () => void;
 }) {
   const { view } = api;
   // The Advanced group starts collapsed; its state is not stored (`specs/0155` criterion 18).
@@ -363,7 +553,21 @@ export function GeneratorBlock({
     }
   }
   return (
-    <div role="group" aria-label={view.label} className="flex flex-col gap-4" data-generator-block>
+    <div
+      role="group"
+      aria-label={view.label}
+      aria-busy={view.loading}
+      className="flex flex-col gap-4"
+      data-generator-block
+    >
+      {view.loading ? (
+        <p role="status" className="text-xs text-[var(--toolbar-icon)]">
+          Loading font{"\u2026"}
+        </p>
+      ) : null}
+      {/* While the face of the text loads the rows wait: nothing is written (ADR 0092 §3.4). */}
+      <div className="flex flex-col gap-4" inert={view.loading}>
+      <SymbologyGroup api={api} onReturnFocus={onReturnFocus} />
       {groups.map((group) => (
         <section key={group.label} className="flex flex-col gap-2">
           {group.label === ADVANCED ? (
@@ -409,8 +613,12 @@ export function GeneratorBlock({
                 </div>
               ) : row.kind.kind === "choice" ? (
                 <ChoiceRow row={row} api={api} onReturnFocus={onReturnFocus} />
-              ) : row.kind.kind === "text" ? (
+              ) : row.kind.kind === "text" && row.kind.multiline ? (
                 <TextRow row={row} api={api} onReturnFocus={onReturnFocus} />
+              ) : row.kind.kind === "text" ? (
+                <LineRow row={row} api={api} onReturnFocus={onReturnFocus} />
+              ) : row.kind.kind === "font" ? (
+                <FontRow row={row} api={api} onOpenFonts={onOpenFonts} />
               ) : (
                 <NumberRow row={row} api={api} onReturnFocus={onReturnFocus} />
               )}
@@ -439,6 +647,7 @@ export function GeneratorBlock({
       >
         Convert to paths
       </button>
+      </div>
     </div>
   );
 }

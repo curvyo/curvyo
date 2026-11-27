@@ -140,18 +140,23 @@ mod tests {
                     params: &defaults,
                     seed: Seed(1),
                     edit: None,
+                    glyphs: None,
                 };
                 let generated = generate_object(manifest.id, &request).expect(kind.id);
                 assert_ne!(generated.parts.len(), 0);
                 kinds += 1;
             }
         }
-        assert_eq!(kinds, 5, "box, path box, gear, rounded box, QR code");
+        assert_eq!(
+            kinds, 11,
+            "box, path box, gear, rounded box, QR code, Data Matrix and the five 1D codes"
+        );
         let request = GenerateRequest {
             kind: "gear",
             params: &StoredParams::new(),
             seed: Seed(1),
             edit: None,
+            glyphs: None,
         };
         assert!(generate_object("curvyo.laser", &request).is_none());
         assert!(generate_object("example.cnc", &request).is_none());

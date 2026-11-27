@@ -134,7 +134,12 @@ pub fn style(grid: &ModuleGrid, style: &Style) -> Vec<ClosedPath> {
 }
 
 /// One module's outline; `whole` draws the full cell whatever the shape.
-fn module(frame: Frame, style: &Style, (x, y): (usize, usize), whole: bool) -> ClosedPath {
+pub(crate) fn module(
+    frame: Frame,
+    style: &Style,
+    (x, y): (usize, usize),
+    whole: bool,
+) -> ClosedPath {
     #[allow(clippy::cast_precision_loss)]
     let (x, y) = (x as f64, y as f64);
     let fill = if whole { 1.0 } else { style.fill };

@@ -71,6 +71,8 @@ pub(crate) fn warning(id: &'static str, pieces: Vec<u32>) -> Warning {
         pieces,
         value: None,
         limit: None,
+        param: None,
+        subject: None,
     }
 }
 

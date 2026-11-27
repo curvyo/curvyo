@@ -98,6 +98,8 @@ fn warning(id: &'static str) -> Warning {
         pieces: Vec::new(),
         value: None,
         limit: None,
+        param: None,
+        subject: None,
     }
 }
 

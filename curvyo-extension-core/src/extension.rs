@@ -2,6 +2,7 @@
 //! what a generator receives and returns.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 
 use curvyo_document_core::{Length, Point, Vec2};
 use serde::Serialize;
@@ -49,6 +50,34 @@ pub enum Edit<'a> {
     /// Only the outer outlines are wanted, for a ghost under the pointer: a generator may leave
     /// out fine detail (the slits of a bending wall). The result is never stored.
     Draft,
+    /// The object was resized freely, by the factors of its box along the frame's axes; only a
+    /// kind that declares [`Resize::Free`](crate::Resize::Free) is sent this (ADR 0092 §4). The
+    /// generator decides which lengths each factor writes.
+    Stretch {
+        /// The factor along the frame's x axis.
+        x: ScaleFactor,
+        /// The factor along the frame's y axis.
+        y: ScaleFactor,
+    },
+}
+
+/// One character's outlines at a size of 1 mm (the face's cap height is 1 mm, as a text's Size),
+/// baseline at y = 0, y down as the frame, outers and holes wound opposite so the fill rule holds
+/// (ADR 0092 §3).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Glyph {
+    /// The closed outlines of the glyph (empty for a space).
+    pub paths: Vec<ClosedPath>,
+    /// How far the pen moves after it.
+    pub advance: Length,
+}
+
+/// The characters a generator may set as outlines, built by the host from one face; no shaping or
+/// kerning (ADR 0092 §3). A character the face lacks is absent.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct GlyphTable {
+    /// The glyphs by character.
+    pub glyphs: BTreeMap<char, Glyph>,
 }
 
 /// A request to generate: pure and deterministic, no I/O, clock or randomness source.
@@ -62,6 +91,9 @@ pub struct GenerateRequest<'a> {
     pub seed: Seed,
     /// What changed, `None` for a fresh object or a plain regeneration.
     pub edit: Option<Edit<'a>>,
+    /// The outlines of the face a `Font` parameter names, for a kind that has one; `None` for any
+    /// other kind or while the face is not loaded.
+    pub glyphs: Option<&'a GlyphTable>,
 }
 
 /// One cubic segment; a line is written with `c1 = start` and `c2 = to`.
@@ -199,6 +231,12 @@ pub struct Warning {
     pub value: Option<ParamValue>,
     /// The limit it breaks (the least radius).
     pub limit: Option<ParamValue>,
+    /// The row the sentence belongs under when the generator answers no parts (a lasting line
+    /// under the field, `0144` criterion 13); `None` for a warning about the result as a whole.
+    pub param: Option<&'static str>,
+    /// The words the generator names the cause with ("error correction M", "digits"); the kind's
+    /// own label is the shell's.
+    pub subject: Option<&'static str>,
 }
 
 /// One drawing the shell lays over the generated object (ADR 0083 §11): never geometry, never cut.

@@ -78,3 +78,80 @@ fn a_version_10_code_edits_within_20_ms() {
 fn a_version_40_code_edits_within_100_ms() {
     measure(40, 2300, Duration::from_millis(100));
 }
+
+const EAN13: &str = "curvyo.codes/ean-13";
+
+fn fonts_dir() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../frontend/public/fonts")
+}
+
+/// A session with the included faces listed and the ones wanted loaded (the human-readable text).
+fn session_with_fonts() -> Session {
+    let index: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(fonts_dir().join("index.json")).unwrap())
+            .unwrap();
+    let faces = index["faces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| {
+            (
+                f["file"].as_str().unwrap().to_owned(),
+                f["family"].as_str().unwrap().to_owned(),
+                f["style"].as_str().unwrap().to_owned(),
+                0,
+            )
+        })
+        .collect();
+    let mut s = session();
+    s.set_font_list(curvyo_ui_core::FontBlock::Included, faces, Vec::new());
+    for file in s.wanted_font_files() {
+        let bytes = std::fs::read(fonts_dir().join(&file)).unwrap();
+        assert!(s.add_font_file(&file, &bytes), "{file} loads");
+    }
+    s
+}
+
+/// Criterion 17, slice 2: a 1D code with its text regenerates within 20 ms (the glyph table is
+/// built once per face, not per edit).
+#[test]
+fn a_one_d_code_with_text_edits_within_20_ms() {
+    let mut s = session_with_fonts();
+    s.set_generator_kind(EAN13);
+    assert!(s.place_generated(200.0, 200.0));
+    set(&mut s, "text_size", "2.5");
+    let (_, took) = cpu_time_of(|| {
+        set(&mut s, "module_width", "0.4");
+        s.draw_list()
+    });
+    check("EAN-13 with text", took, Duration::from_millis(20));
+}
+
+/// Criterion 12 and 17, slice 3: a Data Matrix of the largest size regenerates within 100 ms like a
+/// version 40 QR code (Square Merged and Dot Separate).
+#[test]
+fn a_144_by_144_data_matrix_edits_within_100_ms() {
+    let high: String = (0..1555)
+        .map(|i| char::from(0xa1 + u8::try_from(i * 7 % 90).unwrap()))
+        .collect();
+    for (name, dot) in [("Square Merged", false), ("Dot Separate", true)] {
+        let mut s = session();
+        s.set_generator_kind("curvyo.codes/data-matrix");
+        assert!(s.place_generated(200.0, 200.0));
+        set(&mut s, "content", &serde_json::to_string(&high).unwrap());
+        if dot {
+            set(&mut s, "module_shape", "\"dot\"");
+        }
+        let (_, took) = cpu_time_of(|| {
+            set(&mut s, "module_size", "1.5");
+            s.draw_list()
+        });
+        let size = s.pack("0.1.0").unwrap().len();
+        println!("144 x 144, {name}: the saved file is {size} bytes");
+        check(
+            &format!("Data Matrix 144, {name}"),
+            took,
+            Duration::from_millis(100),
+        );
+    }
+}

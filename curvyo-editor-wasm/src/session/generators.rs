@@ -8,9 +8,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use curvyo_document_core::{GeneratedRecord, NodeId, ObjectSnapshot, Point, ViewTransform};
+use curvyo_document_core::{
+    FontRef, GeneratedRecord, NodeId, ObjectSnapshot, Point, ViewTransform,
+};
 use curvyo_render_core::DrawList;
-use curvyo_ui_core::instance::{self, InstanceError};
+use curvyo_ui_core::instance;
 use curvyo_ui_core::instance_source;
 use serde_json::{Value, json};
 
@@ -29,6 +31,9 @@ const UNKNOWN_RESIZE_NOTICE: &str =
 const OFF_RESIZE_NOTICE: &str =
     "This object's generator is switched off under Extensions; it cannot be resized.";
 
+/// The status while the face a code's text is set in is still loading (ADR 0092 §3.4).
+const LOADING_FONT_NOTICE: &str = "Loading font\u{2026}";
+
 /// A regenerated outline shown before it is written: a field being stepped or a handle being dragged
 /// (`0141` UX notes §7). Nothing is in the document until the commit.
 #[derive(Debug)]
@@ -42,15 +47,26 @@ struct Preview {
     refused: bool,
 }
 
+mod code_fonts;
 mod handles;
+mod panel;
 mod parts;
 mod refusal;
+mod resize_rules;
+mod source;
 
 /// The Generators tool's state.
 #[derive(Debug, Default)]
 pub(super) struct GeneratorsState {
     /// The stored `<extension>/<kind>` the bar has pressed; empty until the first use.
     kind: String,
+    /// The last kind of a family the session placed or switched to (the Code segment places it);
+    /// empty until the first use.
+    family_kind: String,
+    /// A face a pick is about to write to a code, so the funnel has its table before the write.
+    extra_font: Option<FontRef>,
+    /// The glyph tables of the faces codes are set in, built once per face (`code_fonts.rs`).
+    glyph_tables: RefCell<HashMap<(String, u32), Arc<curvyo_extension_core::GlyphTable>>>,
     /// The pointer over the canvas with the tool active, for the ghost.
     hover: Option<Point>,
     /// Whether the notice of an open file with unknown generator objects was not shown yet.
@@ -86,19 +102,47 @@ fn tone(tone: curvyo_ui_core::path_box_marks::Tone) -> curvyo_render_core::MarkT
 }
 
 impl Session {
-    /// The kinds the Generators bar offers, as JSON `[{id, label, icon}]` in registry order.
+    /// The kinds the Generators bar offers, as JSON `[{id, label, icon}]` in registry order; a
+    /// family is one entry that places the last kind of it the session used (ADR 0092 §2), and
+    /// `loading` says its placed kind waits for the included sans.
     #[must_use]
     pub fn generator_kinds_json(&self) -> String {
+        let mut seen: Vec<&'static str> = Vec::new();
         let kinds: Vec<Value> = instance::enabled_kinds(&self.manufacturing.extensions)
             .iter()
+            .filter(|found| {
+                found.kind.family.is_none_or(|family| {
+                    let first = !seen.contains(&family.id);
+                    seen.push(family.id);
+                    first
+                })
+            })
             .map(|found| {
+                let stored = format!("{}/{}", found.manifest.id, found.kind.id);
+                // A family entry places the last kind of the family the session used.
+                let placed = found
+                    .kind
+                    .family
+                    .filter(|_| !self.generators.family_kind.is_empty())
+                    .and_then(|_| {
+                        instance::find_kind(
+                            &self.manufacturing.extensions,
+                            &self.generators.family_kind,
+                        )
+                    })
+                    .unwrap_or_else(|| found.clone());
+                let placed_id = format!("{}/{}", placed.manifest.id, placed.kind.id);
                 json!({
-                    "id": format!("{}/{}", found.manifest.id, found.kind.id),
-                    "label": found.kind.label,
-                    // What the segment shows: the command of a kind built from an outline.
+                    "id": placed_id,
+                    "label": placed.kind.label,
+                    // What the segment shows: the command of a kind built from an outline, the
+                    // family's segment ("Code").
                     "segment": found.kind.segment(),
                     "source": found.kind.source.is_some(),
-                    "icon": found.kind.icon,
+                    "icon": placed.kind.icon,
+                    "family": found.kind.family.map(|family| family.id),
+                    "loading": self.included_sans_loading(&stored)
+                        || self.included_sans_loading(&placed_id),
                 })
             })
             .collect();
@@ -129,6 +173,7 @@ impl Session {
     pub fn set_generator_kind(&mut self, kind: &str) {
         if instance::find_kind(&self.manufacturing.extensions, kind).is_some() {
             kind.clone_into(&mut self.generators.kind);
+            self.remember_family_kind(kind);
         }
     }
 
@@ -198,6 +243,11 @@ impl Session {
             return self.pick_source(&kind, Some(at));
         }
         let kind = self.generator_kind();
+        // A kind with text waits for the included sans (ADR 0092 §3.4): nothing is written yet.
+        if self.included_sans_loading(&kind) {
+            return false;
+        }
+        self.publish_code_glyphs(true);
         let name = self
             .kind_label(&kind)
             .map(|label| format!("Add {}", instance::noun(label)));
@@ -210,463 +260,6 @@ impl Session {
         self.selection.set(&[id]);
         self.set_tool(Tool::Select);
         true
-    }
-
-    /// The kind of the chosen segment when it is built from an outline, else `None`.
-    fn source_kind(&self) -> Option<String> {
-        let kind = self.generator_kind();
-        instance::find_kind(&self.manufacturing.extensions, &kind)
-            .filter(|found| found.kind.source.is_some())
-            .map(|_| kind)
-    }
-
-    /// The first generator kind built from an outline (`<extension>/<kind>`), for the Select bar
-    /// button.
-    fn first_source_kind(&self) -> Option<String> {
-        instance::enabled_kinds(&self.manufacturing.extensions)
-            .into_iter()
-            .find(|found| found.kind.source.is_some())
-            .map(|found| format!("{}/{}", found.manifest.id, found.kind.id))
-    }
-
-    /// Whether the Select bar shows Box from path: exactly one object is selected and it is one
-    /// closed outline (`0149` UX notes §1.1; the self-intersection and size tests run on the
-    /// press).
-    #[must_use]
-    pub fn box_from_path_shown(&self) -> bool {
-        let ids = self.selection.ids();
-        let [id] = ids else {
-            return false;
-        };
-        self.first_source_kind().is_some()
-            && !self.document.is_generated(*id)
-            && self
-                .document
-                .object(*id)
-                .is_some_and(|object| instance_source::outline_of(&object).is_some())
-    }
-
-    /// Box from path on the selected outline, in one step "Add path box": the box is selected,
-    /// the source untouched. Empty on success, else the refusal sentence ("Nothing was
-    /// changed.").
-    pub fn apply_box_from_path(&mut self) -> String {
-        let Some(kind) = self.first_source_kind() else {
-            return String::new();
-        };
-        let &[source] = self.selection.ids() else {
-            return instance_source::SourceRefusal::NotOneOutline.to_string();
-        };
-        self.build_from_source(&kind, source)
-    }
-
-    /// Replace outline: the pick mode of the Generators tool for the selected path box; the next
-    /// click or Enter on a closed outline replaces its stored outline. Escape cancels.
-    pub fn begin_replace_outline(&mut self) -> bool {
-        let &[id] = self.selection.ids() else {
-            return false;
-        };
-        let Some(snapshot) = self.document.generated(id) else {
-            return false;
-        };
-        if instance::find_kind(&self.manufacturing.extensions, &snapshot.record.kind)
-            .is_none_or(|found| found.kind.source.is_none())
-        {
-            return false;
-        }
-        self.generators.kind = snapshot.record.kind;
-        self.set_tool(Tool::Generators);
-        self.generators.replace = Some(id);
-        true
-    }
-
-    /// The outline under `at`, or under the pointer for Enter.
-    fn outline_under(&self, at: Option<Point>) -> Option<NodeId> {
-        let point = at.or(self.pointer_position)?;
-        let objects = self.objects();
-        curvyo_ui_core::hit_test_objects(&objects, point, self.object_tolerance())
-            .first()
-            .copied()
-    }
-
-    /// A pick while Replace outline is armed.
-    fn replace_pick(&mut self, target: NodeId, at: Option<Point>) -> bool {
-        let Some(source) = self.outline_under(at) else {
-            if at.is_none() {
-                self.generators.refusal = instance_source::SourceRefusal::NotOneOutline.to_string();
-            }
-            return false;
-        };
-        let outcome = self.recording_named_guarded(Some("Replace outline".to_owned()), |this| {
-            Some(instance_source::replace_outline(
-                &this.document,
-                &this.manufacturing.extensions,
-                target,
-                source,
-            ))
-        });
-        match outcome {
-            Some(Ok(())) => {
-                self.set_tool(Tool::Select);
-                self.selection.set(&[target]);
-                true
-            }
-            Some(Err(refusal)) => {
-                self.generators.refusal = refusal.to_string();
-                false
-            }
-            None => false,
-        }
-    }
-
-    /// A click of the pick mode on the object under `at`, or Enter on the selection.
-    fn pick_source(&mut self, kind: &str, at: Option<Point>) -> bool {
-        if let Some(target) = self.generators.replace {
-            return self.replace_pick(target, at);
-        }
-        let source = match at {
-            Some(point) => {
-                let objects = self.objects();
-                curvyo_ui_core::hit_test_objects(&objects, point, self.object_tolerance())
-                    .first()
-                    .copied()
-            }
-            None => match self.selection.ids() {
-                &[id] => Some(id),
-                _ => None,
-            },
-        };
-        match source {
-            Some(id) => self.build_from_source(kind, id).is_empty(),
-            // A click on empty canvas says nothing (the Pick mode rule); Enter says why.
-            None if at.is_none() => {
-                self.generators.refusal = instance_source::SourceRefusal::NotOneOutline.to_string();
-                false
-            }
-            None => false,
-        }
-    }
-
-    /// Builds from `source`; a refusal is returned and kept for the canvas notice slot.
-    fn build_from_source(&mut self, kind: &str, source: NodeId) -> String {
-        let name = self
-            .kind_label(kind)
-            .map(|label| format!("Add {}", instance::noun(label)));
-        let outcome = self.recording_named_guarded(name, |this| {
-            Some(instance_source::place_from_source(
-                &this.document,
-                &this.manufacturing.extensions,
-                kind,
-                source,
-            ))
-        });
-        match outcome {
-            Some(Ok(id)) => {
-                self.selection.set(&[id]);
-                self.set_tool(Tool::Select);
-                // Warnings about the result go to the canvas notice slot (UX notes §6).
-                if let Some(snapshot) = self.document.generated(id) {
-                    self.generators.refusal =
-                        instance::warning_notices(&self.manufacturing.extensions, &snapshot)
-                            .join(" ");
-                }
-                String::new()
-            }
-            Some(Err(refusal)) => {
-                let text = refusal.to_string();
-                self.generators.refusal.clone_from(&text);
-                text
-            }
-            None => String::new(),
-        }
-    }
-
-    /// The cursor of the pick mode: `pointer` over an outline a box can be built from, the arrow
-    /// elsewhere, `None` outside the mode.
-    pub(in crate::session) fn pick_cursor(&self) -> Option<&'static str> {
-        if self.tool != Tool::Generators {
-            return None;
-        }
-        let kind = self.source_kind()?;
-        let eligible = self
-            .generators
-            .hover
-            .and_then(|point| self.outline_under(Some(point)))
-            .is_some_and(|id| {
-                instance_source::preview(&self.document, &self.manufacturing.extensions, &kind, id)
-                    .is_ok()
-            });
-        Some(if eligible { "pointer" } else { "arrow" })
-    }
-
-    /// Whether the selection holds a generated object whose generator is unknown or switched off:
-    /// it is kept as stored and cannot be resized or changed by number (ADR 0080 §5).
-    pub(in crate::session) fn selection_has_unavailable_generated(&self) -> bool {
-        self.selected_generated().iter().any(|id| {
-            self.document.generated(*id).is_some_and(|snapshot| {
-                instance::find_kind(&self.manufacturing.extensions, &snapshot.record.kind).is_none()
-            })
-        })
-    }
-
-    /// Whether the selection is generated objects and nothing else.
-    pub(in crate::session) fn selection_all_generated(&self) -> bool {
-        !self.selection.ids().is_empty()
-            && self.selected_generated().len() == self.selection.ids().len()
-    }
-
-    /// Tells the Select tool whether the next resize keeps the proportions (generated objects only).
-    pub(in crate::session) fn sync_generated_resize_mode(&mut self) {
-        let proportional = self.selection_all_generated();
-        self.select.set_proportional_resize(proportional);
-    }
-
-    /// A press on a resize handle, or a size entry, of a selection with an unavailable generated
-    /// object is refused with the status of UX notes §12.
-    pub(in crate::session) fn refuse_unavailable_generated_resize(&mut self) -> bool {
-        let resizing = matches!(
-            self.select.dragging_handle(),
-            Some(curvyo_ui_core::EditHandle::Resize(_))
-        );
-        let sizing = self.select.size_entry_open();
-        if !(resizing || sizing) || !self.selection_has_unavailable_generated() {
-            return false;
-        }
-        if resizing {
-            self.select.escape();
-        }
-        if sizing {
-            self.select.cancel_entry();
-        }
-        // A kind the registry has, with its extension off, is told apart from one it has not.
-        let all_on = curvyo_ui_core::ExtensionSettings::default();
-        let unknown = self.selected_generated().iter().any(|id| {
-            self.document.generated(*id).is_some_and(|snapshot| {
-                instance::find_kind(&self.manufacturing.extensions, &snapshot.record.kind).is_none()
-                    && instance::find_kind(&all_on, &snapshot.record.kind).is_none()
-            })
-        });
-        self.transform_notice = Some(if unknown {
-            UNKNOWN_RESIZE_NOTICE
-        } else {
-            OFF_RESIZE_NOTICE
-        });
-        true
-    }
-
-    /// The generated objects of the selection.
-    pub(super) fn selected_generated(&self) -> Vec<NodeId> {
-        self.selection
-            .ids()
-            .iter()
-            .copied()
-            .filter(|id| self.document.generated(*id).is_some())
-            .collect()
-    }
-
-    /// The Generator block of the Style tab: JSON of the one selected generated object (kind,
-    /// whether its generator is available and its rows with their values), or `null` for no
-    /// selection, several objects or another kind of object (UX notes §10 keeps one kind per
-    /// block; mixed selections show none in this first slice).
-    #[must_use]
-    pub fn generated_panel_json(&self) -> String {
-        let selected = self.selected_generated();
-        let [id] = selected[..] else {
-            return "null".to_owned();
-        };
-        if self.selection.ids().len() != 1 {
-            return "null".to_owned();
-        }
-        let Some(mut snapshot) = self.document.generated(id) else {
-            return "null".to_owned();
-        };
-        // The fields follow a preview in flight (Pitch diameter while the Module is stepped).
-        if let Some(preview) = self.generators.preview.as_ref().filter(|p| p.id == id) {
-            snapshot.record = preview.record.clone();
-        }
-        let view = instance::view(&self.manufacturing.extensions, &snapshot);
-        let rows = self.parts_rows(id, &view.parts);
-        let Ok(mut value) = serde_json::to_value(&view) else {
-            return "null".to_owned();
-        };
-        value["parts"] = Value::Array(rows);
-        value["contrast_low"] = Value::Bool(self.code_contrast_is_low(id, &snapshot.record.kind));
-        value.to_string()
-    }
-
-    /// Whether the fill of the code `id` is below 3 : 1 against the document background, so the
-    /// Colours group says "Low contrast, may not scan" (`0144` criterion 9). Never for another kind
-    /// of object, on a page that is not a drawing page (colours there are operations, `0101`) or
-    /// while the background is not painted.
-    fn code_contrast_is_low(&self, id: NodeId, kind: &str) -> bool {
-        if !kind.starts_with("curvyo.codes/") || !self.active_page().kind.is_drawing() {
-            return false;
-        }
-        let background = self.shown_background();
-        if background.paint == curvyo_document_core::BackgroundPaint::None {
-            return false;
-        }
-        let Some(ObjectSnapshot::Path(path)) = self.document.object(id) else {
-            return false;
-        };
-        curvyo_ui_core::code_contrast::is_low(&path.style.fill, background.color)
-    }
-
-    /// A value typed or stepped into the row `key` of the block, as JSON text (`12.5`, `true` or
-    /// `"spokes"`): the generator clamps and derives, one step. Answers JSON
-    /// `{"written": bool, "notices": [...]}`, or `{"error": "..."}`.
-    pub fn set_generated_value(&mut self, key: &str, value: &str) -> String {
-        self.generators.preview = None;
-        let selected = self.selected_generated();
-        let [id] = selected[..] else {
-            return json!({"error": "no generated object"}).to_string();
-        };
-        let Ok(parsed) = serde_json::from_str::<Value>(value) else {
-            return json!({"error": "not a value"}).to_string();
-        };
-        let Some(snapshot) = self.document.generated(id) else {
-            return json!({"error": "no generated object"}).to_string();
-        };
-        let Some(found) =
-            instance::find_kind(&self.manufacturing.extensions, &snapshot.record.kind)
-        else {
-            return json!({"error": "unknown generator"}).to_string();
-        };
-        let Some(typed) = found
-            .kind
-            .params()
-            .find(|param| param.key == key)
-            .and_then(|param| instance::value_from_json(param, &parsed))
-        else {
-            return json!({"error": "not a value"}).to_string();
-        };
-        let name = self.kind_label(&snapshot.record.kind).map(|label| {
-            let field = found
-                .kind
-                .params()
-                .find(|p| p.key == key)
-                .map_or(key, |p| p.label);
-            // Reset of a thickness that follows the wall (a stored 0) says so.
-            let follows =
-                key.ends_with("_thickness") && typed.length().is_some_and(|l| l.as_mm() == 0.0);
-            if follows {
-                format!("{label}: {field} follows wall thickness")
-            } else {
-                format!("{label}: {field}")
-            }
-        });
-        let outcome = self.recording_named_guarded(name, |this| {
-            Some(instance::change_value(
-                &this.document,
-                &this.manufacturing.extensions,
-                id,
-                key,
-                &typed,
-            ))
-        });
-        match outcome {
-            Some(Ok(changed)) => {
-                // The frame after this commit generates nothing again to know the answer.
-                if let Some(found) = self.document.generated_params(id) {
-                    let params = found.params;
-                    self.generators
-                        .refusals
-                        .borrow_mut()
-                        .insert(id, (params, changed.refused));
-                }
-                json!({"written": changed.written, "notices": changed.notices})
-            }
-            Some(Err(InstanceError::UnknownKind)) => json!({"error": "unknown generator"}),
-            _ => json!({"error": "refused"}),
-        }
-        .to_string()
-    }
-
-    /// A value stepped into the row `key` of the block, shown without writing: the object is drawn
-    /// as the generator would rebuild it (UX notes §7). The key-up commits through
-    /// [`Session::set_generated_value`]; [`Session::cancel_generated_preview`] drops it. Answers
-    /// JSON `{"notices": [...]}` or `{"error": "..."}`.
-    pub fn preview_generated_value(&mut self, key: &str, value: &str) -> String {
-        let selected = self.selected_generated();
-        let [id] = selected[..] else {
-            return json!({"error": "no generated object"}).to_string();
-        };
-        let Ok(parsed) = serde_json::from_str::<Value>(value) else {
-            return json!({"error": "not a value"}).to_string();
-        };
-        let typed = self
-            .document
-            .generated(id)
-            .and_then(|snapshot| {
-                instance::find_kind(&self.manufacturing.extensions, &snapshot.record.kind)
-            })
-            .and_then(|found| {
-                found
-                    .kind
-                    .params()
-                    .find(|param| param.key == key)
-                    .and_then(|param| instance::value_from_json(param, &parsed))
-            });
-        let Some(typed) = typed else {
-            return json!({"error": "not a value"}).to_string();
-        };
-        match instance::plan_value(
-            &self.document,
-            &self.manufacturing.extensions,
-            id,
-            key,
-            &typed,
-        ) {
-            Ok(plan) => {
-                self.generators.preview = Some(Preview {
-                    id,
-                    record: plan.record,
-                    frame: plan.snapshot.frame,
-                    overlay: false,
-                    refused: plan.refused,
-                });
-                json!({"notices": plan.notices}).to_string()
-            }
-            Err(_) => json!({"error": "refused"}).to_string(),
-        }
-    }
-
-    /// Drops the preview in flight: Escape, or a field left without a commit.
-    pub fn cancel_generated_preview(&mut self) {
-        self.generators.preview = None;
-    }
-
-    /// Whether a preview is in flight that draws in place of the committed object.
-    pub(in crate::session) fn generated_preview_in_place(&self) -> bool {
-        self.generators
-            .preview
-            .as_ref()
-            .is_some_and(|p| !p.overlay && self.selection.contains(p.id))
-    }
-
-    /// Replaces the outline of the previewed object in `objects` (the artwork of this frame) by the
-    /// rebuilt one, in its own style.
-    pub(in crate::session) fn apply_generated_preview(&self, objects: &mut [ObjectSnapshot]) {
-        let Some(preview) = self.generators.preview.as_ref().filter(|p| !p.overlay) else {
-            return;
-        };
-        for object in objects.iter_mut() {
-            let ObjectSnapshot::Path(path) = object else {
-                continue;
-            };
-            if path.id != preview.id {
-                continue;
-            }
-            let snapshot = curvyo_document_core::GeneratedSnapshot {
-                id: preview.id,
-                record: preview.record.clone(),
-                frame: preview.frame,
-            };
-            if let Some(shown) =
-                curvyo_ui_core::instance_preview::outline_path(&snapshot, path.style.clone())
-            {
-                *path = shown;
-            }
-        }
     }
 
     /// The corner crosses and the bent stretches of a path box: on the selected box's inner base,

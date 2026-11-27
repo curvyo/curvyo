@@ -1,12 +1,14 @@
-import { Box, Cog, QrCode, Spline, SquareRoundCorner } from "lucide-react";
+import { Barcode, Box, Cog, Grid3x3, QrCode, Spline, SquareRoundCorner } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import type { GeneratorKindsApi } from "@/hooks/useGenerators";
 
 const GLYPHS: Record<string, ReactNode> = {
+  Barcode: <Barcode size={16} strokeWidth={1.5} aria-hidden />,
   Box: <Box size={16} strokeWidth={1.5} aria-hidden />,
   Cog: <Cog size={16} strokeWidth={1.5} aria-hidden />,
+  Grid3x3: <Grid3x3 size={16} strokeWidth={1.5} aria-hidden />,
   QrCode: <QrCode size={16} strokeWidth={1.5} aria-hidden />,
   Spline: <Spline size={16} strokeWidth={1.5} aria-hidden />,
   SquareRoundCorner: <SquareRoundCorner size={16} strokeWidth={1.5} aria-hidden />,
@@ -41,7 +43,8 @@ export function GeneratorsBar({
   const options: ToggleOption<string>[] = api.kinds.map((kind) => ({
     value: kind.id,
     label: kind.segment,
-    tooltip: "",
+    // The Code segment waits for the included sans (ADR 0092 §3.4).
+    tooltip: kind.loading ? "Loading font\u2026" : "",
     width: segmentWidth(kind.segment),
     icon: (
       <span className="flex items-center gap-1 text-sm whitespace-nowrap">

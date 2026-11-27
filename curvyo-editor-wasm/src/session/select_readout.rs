@@ -105,7 +105,8 @@ impl Session {
                             &self.document,
                             &self.manufacturing.extensions,
                             other,
-                        ) {
+                        ) && !view.readout.is_empty()
+                        {
                             return Some(super::shapes::LiveReadout {
                                 text: view.readout,
                                 anchor,

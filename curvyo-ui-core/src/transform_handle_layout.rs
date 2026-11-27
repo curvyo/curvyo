@@ -157,6 +157,9 @@ pub struct TransformHandleTolerances {
     /// no edge resize handle and no skew handle is drawn or hit (`specs/0141-parametric-generators`
     /// criterion 5, UX notes §8).
     pub corners_only: bool,
+    /// The selection is generated objects that resize freely (a 1D code): the eight resize handles
+    /// stay, no skew handle is drawn or hit (`specs/0144` criterion 14, ADR 0092 §4).
+    pub no_skew: bool,
     /// The handles that yield to a gradient handle drawn within 8 px of them: neither drawn nor
     /// hit (`specs/0124-gradient-fill` criterion 6).
     pub yielded: YieldedHandles,
@@ -190,6 +193,7 @@ impl TransformHandleTolerances {
             param_centre_yield_mm: mm(CENTRE_YIELD_PX),
             move_only: false,
             corners_only: false,
+            no_skew: false,
             yielded: YieldedHandles::NONE,
         }
     }
@@ -198,12 +202,13 @@ impl TransformHandleTolerances {
     /// does not have.
     #[must_use]
     pub fn drops_for_corners_only(&self, handle: EditHandle) -> bool {
-        self.corners_only
-            && match handle {
-                EditHandle::Resize(direction) => !is_corner(direction),
-                EditHandle::Skew(_) => true,
-                EditHandle::Rotate(_) | EditHandle::Move | EditHandle::Param(_) => false,
-            }
+        (self.no_skew && matches!(handle, EditHandle::Skew(_)))
+            || (self.corners_only
+                && match handle {
+                    EditHandle::Resize(direction) => !is_corner(direction),
+                    EditHandle::Skew(_) => true,
+                    EditHandle::Rotate(_) | EditHandle::Move | EditHandle::Param(_) => false,
+                })
     }
 }
 

@@ -54,6 +54,7 @@ fn run(kind: &'static str, params: &StoredParams) -> Generated {
             params,
             seed: Seed(1),
             edit: None,
+            glyphs: None,
         })
         .expect("the generator answers its own kind")
 }

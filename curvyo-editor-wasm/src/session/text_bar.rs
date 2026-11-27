@@ -302,6 +302,10 @@ impl Session {
                 return;
             };
             this.text.pending_pick = None;
+            // A code selected alone takes the face for its human-readable text (ADR 0092 §3).
+            if this.bar_text_ids().is_empty() && this.set_code_font(&font) {
+                return;
+            }
             this.text.next_font = Some(font.clone());
             if let Some(edit) = this.text.edit.as_mut() {
                 edit.font = font.clone();

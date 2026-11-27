@@ -40,6 +40,7 @@ fn generate(kind: &str, params: &StoredParams) -> Generated {
             params,
             seed: Seed(1),
             edit: None,
+            glyphs: None,
         })
         .unwrap()
 }

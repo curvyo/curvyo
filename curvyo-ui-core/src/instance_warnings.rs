@@ -168,9 +168,8 @@ pub struct Context {
     /// The wall thickness: a limit equal to it belongs to a concave stretch, twice it to a
     /// convex one.
     pub wall: curvyo_document_core::Length,
-    /// The error-correction letter of a QR code (`M`), for the sentence of content that is too
-    /// long.
-    pub level: char,
+    /// The kind's label ("QR code", "EAN-13"), which the sentences about the content name.
+    pub label: &'static str,
 }
 
 impl Default for Context {
@@ -181,7 +180,7 @@ impl Default for Context {
             seat: true,
             hollow: true,
             wall: curvyo_document_core::Length::from_mm(3.0),
-            level: 'M',
+            label: "code",
         }
     }
 }
@@ -189,7 +188,7 @@ impl Default for Context {
 impl Context {
     /// The context of a generated object: its stored switches and whether it has badges.
     #[must_use]
-    pub fn of(generated: &curvyo_extension_core::Generated) -> Self {
+    pub fn of(generated: &curvyo_extension_core::Generated, label: &'static str) -> Self {
         let on = |key: &str, default: bool| {
             generated
                 .params
@@ -209,34 +208,49 @@ impl Context {
                 .and_then(curvyo_extension_core::ParamValue::from_stored)
                 .and_then(|value| value.length())
                 .unwrap_or_else(|| curvyo_document_core::Length::from_mm(3.0)),
-            level: generated
-                .params
-                .get("ec")
-                .and_then(curvyo_extension_core::ParamValue::from_stored)
-                .and_then(|value| value.choice().and_then(|id| id.chars().next()))
-                .map_or('M', |letter| letter.to_ascii_uppercase()),
+            label,
         }
     }
 }
 
-/// Whether the warning `id` says the content of a code cannot be drawn (it stays under the field).
+/// Whether the warning names a row and the generator drew nothing: the reason stays under that
+/// row as a lasting line (`0144` criterion 13), not as a notice.
 #[must_use]
-pub fn is_content_problem(id: &str) -> bool {
-    matches!(id, "content_empty" | "content_too_long")
+pub fn is_row_problem(warning: &Warning, drew_nothing: bool) -> bool {
+    drew_nothing && warning.param.is_some()
 }
 
-/// "Too long for a QR code at error correction M: 2412 bytes, at most 2331."
-fn too_long(group: &[&Warning], level: char) -> String {
-    let count = |value: Option<&curvyo_extension_core::ParamValue>| {
-        value
-            .and_then(curvyo_extension_core::ParamValue::count)
-            .unwrap_or(0)
+fn count_of(value: Option<&curvyo_extension_core::ParamValue>) -> u32 {
+    value
+        .and_then(curvyo_extension_core::ParamValue::count)
+        .unwrap_or(0)
+}
+
+/// "Too long for a QR code at error correction M: 2412 bytes, at most 2331." (the unit is bytes)
+/// or "Too long for Code 128: 92 characters, at most 80." (the unit is characters).
+fn too_long(group: &[&Warning], context: Context, unit: &str) -> String {
+    let warning = group.first();
+    let value = count_of(warning.and_then(|w| w.value.as_ref()));
+    let limit = count_of(warning.and_then(|w| w.limit.as_ref()));
+    let cause = warning
+        .and_then(|w| w.subject)
+        .map_or_else(String::new, |subject| format!(" at {subject}"));
+    let name = if unit == "bytes" {
+        format!("a {}", crate::instance_notice::noun(context.label))
+    } else {
+        context.label.to_owned()
     };
+    format!("Too long for {name}{cause}: {value} {unit}, at most {limit}.")
+}
+
+/// "EAN-13 takes 12 or 13 digits.": the symbology and its two lengths.
+fn wrong_length(group: &[&Warning], context: Context) -> String {
     let warning = group.first();
     format!(
-        "Too long for a QR code at error correction {level}: {} bytes, at most {}.",
-        count(warning.and_then(|w| w.value.as_ref())),
-        count(warning.and_then(|w| w.limit.as_ref()))
+        "{} takes {} or {} digits.",
+        context.label,
+        count_of(warning.and_then(|w| w.value.as_ref())),
+        count_of(warning.and_then(|w| w.limit.as_ref()))
     )
 }
 
@@ -286,7 +300,19 @@ pub fn sentences_in(warnings: &[Warning], context: Context) -> Vec<String> {
                 }
                 "tab_window" => windows(&group),
                 "content_empty" => "Enter a text to encode.".to_owned(),
-                "content_too_long" => too_long(&group, context.level),
+                "content_too_long" => too_long(&group, context, "bytes"),
+                "too_many_characters" => too_long(&group, context, "characters"),
+                "wrong_length" => wrong_length(&group, context),
+                "digits_only" => format!("{} takes digits only.", context.label),
+                "not_encodable" => format!(
+                    "{} takes {} only.",
+                    context.label,
+                    group[0].subject.unwrap_or("other characters")
+                ),
+                "check_digit_corrected" => "Check digit corrected.".to_owned(),
+                "glyph_missing" => {
+                    "The font has no outline for some characters; they are left out.".to_owned()
+                }
                 "unknown_joint_pattern" => {
                     "The Joint pattern is not known here; Even is used.".to_owned()
                 }
@@ -310,177 +336,5 @@ pub fn sentences_in(warnings: &[Warning], context: Context) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use curvyo_document_core::Length;
-    use curvyo_extension_core::{Degrees, ParamValue};
-
-    fn warning(id: &'static str, pieces: &[u32]) -> Warning {
-        Warning {
-            id,
-            pieces: pieces.to_vec(),
-            value: None,
-            limit: None,
-        }
-    }
-
-    #[test]
-    fn one_and_several_sharp_corners_read_as_in_the_ux_notes() {
-        let mut a = warning("sharp_corner", &[3, 4]);
-        a.value = Some(ParamValue::Angle(Degrees(22.0)));
-        assert_eq!(
-            sentences(std::slice::from_ref(&a)),
-            ["The corner between pieces 3 and 4 is very sharp: 22°."]
-        );
-        let b = warning("sharp_corner", &[6, 1]);
-        assert_eq!(
-            sentences(&[a, b]),
-            ["2 corners are very sharp: between pieces 3 and 4, and 6 and 1."]
-        );
-    }
-
-    #[test]
-    fn tight_bends_name_the_radius_and_the_limit() {
-        let mut a = warning("tight_bend", &[2]);
-        a.value = Some(ParamValue::Length(Length::from_mm(2.5)));
-        a.limit = Some(ParamValue::Length(Length::from_mm(6.0)));
-        assert_eq!(
-            sentences(std::slice::from_ref(&a)),
-            ["Piece 2 bends to 2.5 mm; below 6 mm the wall may crack."]
-        );
-        let mut b = warning("tight_bend", &[5]);
-        b.limit = a.limit.clone();
-        assert_eq!(
-            sentences(&[a, b]),
-            ["Pieces 2 and 5 bend below 6 mm; the wall may crack there."]
-        );
-    }
-
-    #[test]
-    fn tabs_that_keep_their_window_say_how_many_and_why() {
-        let mut one = warning("tab_window", &[]);
-        one.value = Some(ParamValue::Count(1));
-        assert_eq!(
-            sentences(std::slice::from_ref(&one)),
-            ["1 tab does not fit on one arc, so it stands in a flat window."]
-        );
-        let mut three = warning("tab_window", &[]);
-        three.value = Some(ParamValue::Count(3));
-        assert_eq!(
-            sentences(&[three]),
-            ["3 tabs do not fit on one arc, so they stand in flat windows."]
-        );
-    }
-
-    #[test]
-    fn an_unknown_joint_pattern_says_even_is_used() {
-        assert_eq!(
-            sentences(&[warning("unknown_joint_pattern", &[])]),
-            ["The Joint pattern is not known here; Even is used."]
-        );
-    }
-
-    #[allow(clippy::fn_params_excessive_bools)]
-    fn with_context(one_piece: bool, lid: bool, seat: bool, hollow: bool) -> Context {
-        Context {
-            one_piece,
-            lid,
-            seat,
-            hollow,
-            wall: curvyo_document_core::Length::from_mm(3.0),
-            level: 'M',
-        }
-    }
-
-    #[test]
-    fn a_rounded_cover_names_what_was_built_and_the_wall_thickness() {
-        let mut w = warning("cover_rounded", &[]);
-        w.value = Some(ParamValue::Length(Length::from_mm(3.0)));
-        let said = |c| sentences_in(std::slice::from_ref(&w), c)[0].clone();
-        assert_eq!(
-            said(with_context(false, true, true, true)),
-            "The notch is too narrow for the cover at 3 mm walls: the cover and lid are rounded there, without a finger hollow."
-        );
-        for c in [
-            with_context(false, false, true, true),
-            with_context(false, true, false, true),
-        ] {
-            assert_eq!(
-                said(c),
-                "The notch is too narrow for the cover at 3 mm walls: the cover is rounded there."
-            );
-        }
-        assert_eq!(
-            said(with_context(false, true, true, false)),
-            "The notch is too narrow for the cover at 3 mm walls: the cover and lid are rounded there."
-        );
-    }
-
-    fn tight_warning(piece: u32, radius: f64, limit: f64) -> Warning {
-        let mut w = warning("tight_bend", &[piece]);
-        w.value = Some(ParamValue::Length(Length::from_mm(radius)));
-        w.limit = Some(ParamValue::Length(Length::from_mm(limit)));
-        w
-    }
-
-    #[test]
-    fn one_piece_says_the_wall() {
-        let one = with_context(true, true, true, true);
-        assert_eq!(
-            sentences_in(&[tight_warning(1, 2.5, 6.0)], one),
-            ["The wall bends to 2.5 mm; below 6 mm it may crack."]
-        );
-        let mut sharp = warning("sharp_corner", &[1, 1]);
-        sharp.value = Some(ParamValue::Angle(Degrees(22.0)));
-        assert_eq!(
-            sentences_in(&[sharp], one),
-            ["The corner of the wall is very sharp: 22°."]
-        );
-    }
-
-    #[test]
-    fn a_concave_stretch_has_its_own_sentence_and_limit() {
-        let all = [
-            tight_warning(2, 2.5, 6.0),
-            tight_warning(5, 4.0, 6.0),
-            tight_warning(3, 2.0, 3.0),
-        ];
-        assert_eq!(
-            sentences_in(&all, Context::default()),
-            [
-                "Pieces 2 and 5 bend below 6 mm; the wall may crack there. Piece 3 bends inward to 2 mm; below 3 mm the wall may crack."
-            ]
-        );
-        let two = [tight_warning(3, 2.0, 3.0), tight_warning(4, 1.0, 3.0)];
-        assert_eq!(
-            sentences_in(&two, Context::default()),
-            ["Pieces 3 and 4 bend inward below 3 mm; the wall may crack there."]
-        );
-    }
-
-    #[test]
-    fn a_bend_too_short_for_two_slits_has_its_own_sentence() {
-        let mut w = warning("bend_too_short", &[2]);
-        w.value = Some(ParamValue::Length(Length::from_mm(4.1)));
-        assert_eq!(
-            sentences(std::slice::from_ref(&w)),
-            ["Piece 2 has a bend too short for two slits (4.1 mm); it may crack there."]
-        );
-        let mut v = warning("bend_too_short", &[5]);
-        v.value = Some(ParamValue::Length(Length::from_mm(3.0)));
-        assert_eq!(
-            sentences(&[w, v]),
-            ["Pieces 2 and 5 have a bend too short for two slits; they may crack there."]
-        );
-        let mut one = warning("bend_too_short", &[1]);
-        one.value = Some(ParamValue::Length(Length::from_mm(2.0)));
-        let single = Context {
-            one_piece: true,
-            ..Context::default()
-        };
-        assert_eq!(
-            sentences_in(&[one], single),
-            ["The wall has a bend too short for two slits (2 mm); it may crack there."]
-        );
-    }
-}
+#[path = "instance_warnings_tests.rs"]
+mod tests;

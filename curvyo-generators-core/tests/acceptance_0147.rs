@@ -67,6 +67,7 @@ fn generate_with(params: &StoredParams, edit: Option<Edit<'_>>) -> Generated {
             params,
             seed: Seed(7),
             edit,
+            glyphs: None,
         })
         .expect("the rounded box answers its own kind")
 }
@@ -1017,6 +1018,7 @@ fn criterion_8_regeneration_from_the_stored_values_is_identical_and_ignores_the_
             params: &stored_values,
             seed: Seed(9_999),
             edit: None,
+            glyphs: None,
         })
         .expect("answers");
     assert_eq!(first, other_seed, "the seed does not change a rounded box");
@@ -1029,6 +1031,7 @@ fn criterion_8_an_undeclared_kind_is_not_generated() {
         params: &StoredParams::new(),
         seed: Seed(0),
         edit: None,
+        glyphs: None,
     });
     assert!(answer.is_none(), "an unknown kind yields no outline");
 }
@@ -1265,6 +1268,7 @@ fn the_rounded_box_does_not_change_the_gear_or_box_kinds() {
                 params: &StoredParams::new(),
                 seed: Seed(0),
                 edit: None,
+                glyphs: None,
             })
             .expect("answers at its defaults");
         assert!(!generated.parts.is_empty(), "{kind} still has outlines");

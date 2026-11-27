@@ -674,7 +674,15 @@ export function PropertiesPanel({
                 <>
                   {/* The Generator block of a selected generated object: first, above the Style
                       sections (`specs/0141` UX notes §3). */}
-                  <GeneratorBlock api={generators} onReturnFocus={returnFocus} />
+                  <GeneratorBlock
+                    api={generators}
+                    onReturnFocus={returnFocus}
+                    onOpenFonts={() => {
+                      shortcut("fonts");
+                      setOpen(true);
+                      focusCurrentFont();
+                    }}
+                  />
                   <PlacedPageBlock text={placedPage} />
                   {/* A placed page has no style of its own: no Stroke, no Fill (`specs/0106`
                       criterion 12). */}

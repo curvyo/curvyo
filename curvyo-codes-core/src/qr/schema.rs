@@ -1,9 +1,8 @@
 //! The QR code's parameter groups (UX notes of `0144` §3; the keys are file format, ADR 0034 §5).
 
-use curvyo_document_core::Length;
-use curvyo_extension_core::{
-    ChoiceOption, Curve, Param, ParamGroup, ParamKind, ParamValue, ShownWhen, Track,
-};
+use curvyo_extension_core::{ChoiceOption, Curve, ParamGroup, ParamKind, ParamValue, ShownWhen};
+
+use crate::rows::{choice, length, percent, row, shown, switch, tracked};
 
 /// The module size range in mm.
 pub(crate) const MODULE_RANGE: (f64, f64) = (0.1, 20.0);
@@ -84,83 +83,12 @@ const OUTPUTS: &[ChoiceOption] = &[
     },
 ];
 
-fn row(key: &'static str, label: &'static str, kind: ParamKind, default: ParamValue) -> Param {
-    Param {
-        key,
-        label,
-        tooltip: label,
-        kind,
-        default,
-        shown_when: None,
-        track: None,
-        initial: None,
-    }
-}
-
-fn length(
-    key: &'static str,
-    label: &'static str,
-    (min, max): (f64, f64),
-    default: f64,
-    step: f64,
-) -> Param {
-    row(
-        key,
-        label,
-        ParamKind::Length {
-            min: Length::from_mm(min),
-            max: Length::from_mm(max),
-            step,
-            decimals: 2,
-            automatic: false,
-        },
-        ParamValue::Length(Length::from_mm(default)),
-    )
-}
-
-fn percent(key: &'static str, label: &'static str, (min, max): (u32, u32), default: u32) -> Param {
-    row(
-        key,
-        label,
-        ParamKind::Percent { min, max },
-        ParamValue::Percent(default),
-    )
-}
-
-fn choice(
-    key: &'static str,
-    label: &'static str,
-    options: &'static [ChoiceOption],
-    default: &str,
-) -> Param {
-    row(
-        key,
-        label,
-        ParamKind::Choice { options },
-        ParamValue::Choice(default.to_owned()),
-    )
-}
-
-fn switch(key: &'static str, label: &'static str) -> Param {
-    row(key, label, ParamKind::Switch, ParamValue::Switch(false))
-}
-
-fn shown(mut param: Param, condition: ShownWhen) -> Param {
-    param.shown_when = Some(condition);
-    param
-}
-
-fn tracked(mut param: Param, from: f64, to: f64, curve: Curve) -> Param {
-    param.track = Some(Track { from, to, curve });
-    param
-}
-
 const LOGO_ON: ShownWhen = ShownWhen::On { key: "logo" };
 
 pub(crate) fn groups() -> Vec<ParamGroup> {
     vec![
         content(),
-        size(),
+        size(29.0),
         modules(),
         finder(),
         ParamGroup {
@@ -168,15 +96,20 @@ pub(crate) fn groups() -> Vec<ParamGroup> {
             params: vec![choice("ec", "Error correction", LEVELS, "m")],
         },
         logo(),
-        ParamGroup {
-            label: "Colours",
-            params: vec![switch("inverted", "Inverted")],
-        },
-        advanced(),
+        colours(),
+        advanced(4),
     ]
 }
 
-fn content() -> ParamGroup {
+/// The Colours group: Inverted.
+pub(crate) fn colours() -> ParamGroup {
+    ParamGroup {
+        label: "Colours",
+        params: vec![switch("inverted", "Inverted")],
+    }
+}
+
+pub(crate) fn content() -> ParamGroup {
     ParamGroup {
         label: "Content",
         params: vec![row(
@@ -188,7 +121,8 @@ fn content() -> ParamGroup {
     }
 }
 
-fn size() -> ParamGroup {
+/// The Size group; `width` is the default outer width in mm (derived, so only the default).
+pub(crate) fn size(width: f64) -> ParamGroup {
     ParamGroup {
         label: "Size",
         params: vec![
@@ -200,7 +134,7 @@ fn size() -> ParamGroup {
             ),
             // Derived: the outer width including the quiet zone (the Pitch diameter rule).
             tracked(
-                length("width", "Width", (2.1, 4000.0), 29.0, 1.0),
+                length("width", "Width", (2.1, 4000.0), width, 1.0),
                 5.0,
                 300.0,
                 Curve::Log,
@@ -209,7 +143,7 @@ fn size() -> ParamGroup {
     }
 }
 
-fn modules() -> ParamGroup {
+pub(crate) fn modules() -> ParamGroup {
     ParamGroup {
         label: "Modules",
         params: vec![
@@ -260,7 +194,8 @@ fn logo() -> ParamGroup {
     }
 }
 
-fn advanced() -> ParamGroup {
+/// The Advanced group; `quiet` is the default Quiet zone in modules.
+pub(crate) fn advanced(quiet: u32) -> ParamGroup {
     ParamGroup {
         label: "Advanced",
         params: vec![
@@ -272,7 +207,7 @@ fn advanced() -> ParamGroup {
                     max: QUIET_RANGE.1,
                     automatic: false,
                 },
-                ParamValue::Count(4),
+                ParamValue::Count(quiet),
             ),
             shown(
                 choice("output", "Output", OUTPUTS, "merged"),

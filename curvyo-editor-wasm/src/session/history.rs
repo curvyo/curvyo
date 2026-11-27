@@ -131,6 +131,8 @@ impl Session {
         self.sync_context();
         // The write below reads the per-user extension settings (a resize of a generated object).
         curvyo_ui_core::set_active_extension_settings(&self.manufacturing.extensions);
+        // ... and the glyph tables of the faces a selected code is set in (ADR 0092 §3.3).
+        self.publish_code_glyphs(false);
         let move_only = self.edit_scope() == curvyo_ui_core::Scope::MoveOnly;
         // The repair count belongs to this command alone (review S2).
         let _ = self.document.take_clone_repair();
