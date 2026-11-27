@@ -1,6 +1,8 @@
 import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { EntryField } from "@/components/panel/EntryField";
+import { Swatch } from "@/components/panel/Swatch";
 import { ValueField } from "@/components/panel/ValueField";
 import { PanelSwitch } from "@/components/ui/switch";
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
@@ -9,6 +11,7 @@ import {
   type GeneratedRow,
   automaticWords,
   dragSpan,
+  parseColourText,
   parseNumber,
   positionOf,
   rowText,
@@ -463,6 +466,40 @@ function FontRow({
   );
 }
 
+const COLOUR_MESSAGES = { colour: "Enter 3 or 6 hex digits" } as const;
+
+/** A colour row (`specs/0144` UX notes §3): the swatch and the hex field, `#RRGGBB`. */
+function ColourRow({
+  row,
+  api,
+  onReturnFocus,
+}: {
+  row: GeneratedRow;
+  api: GeneratorBlockApi;
+  onReturnFocus: () => void;
+}) {
+  const hex = typeof row.value === "string" ? row.value : "#000000";
+  const rgb = Number.parseInt(hex.slice(1), 16);
+  return (
+    <div className="flex h-7 items-center gap-1">
+      <Swatch rgb={Number.isNaN(rgb) ? 0 : rgb} opacity={100} mixed={false} />
+      <EntryField
+        label={`${row.label} colour`}
+        shown={hex}
+        mixed={false}
+        width={176}
+        align="left"
+        messages={COLOUR_MESSAGES}
+        onSubmit={(text) => {
+          const parsed = parseColourText(text);
+          return parsed === null ? "invalid:colour" : api.setValue(row.key, parsed);
+        }}
+        onReturnFocus={onReturnFocus}
+      />
+    </div>
+  );
+}
+
 /** A clamp notice under the edited row (UX notes §6): the "Action notice" status look, an
  * overlay that moves no row and takes no focus. */
 function ClampNotice({ text }: { text: string }) {
@@ -619,6 +656,8 @@ export function GeneratorBlock({
                 <LineRow row={row} api={api} onReturnFocus={onReturnFocus} />
               ) : row.kind.kind === "font" ? (
                 <FontRow row={row} api={api} onOpenFonts={onOpenFonts} />
+              ) : row.kind.kind === "colour" ? (
+                <ColourRow row={row} api={api} onReturnFocus={onReturnFocus} />
               ) : (
                 <NumberRow row={row} api={api} onReturnFocus={onReturnFocus} />
               )}

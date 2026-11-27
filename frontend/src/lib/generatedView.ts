@@ -19,7 +19,8 @@ export type GeneratedKind =
   | { kind: "text"; multiline: boolean }
   | { kind: "percent"; min: number; max: number }
   | { kind: "ratio"; min: number; max: number; step: number; decimals: number }
-  | { kind: "font" };
+  | { kind: "font" }
+  | { kind: "colour" };
 
 /** The span a number's slider is drawn on. */
 export interface GeneratedTrack {
@@ -163,8 +164,30 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
   };
 }
 
+/** `#RRGGBB` of a colour value `{ r, g, b }` (`ParamValue::Colour`); black for any other shape. */
+export function colourHex(value: unknown): string {
+  const rgb = value as { r?: unknown; g?: unknown; b?: unknown } | null;
+  const channel = (n: unknown) => (typeof n === "number" ? Math.max(0, Math.min(255, Math.round(n))) : 0);
+  const two = (n: unknown) => channel(n).toString(16).padStart(2, "0");
+  return `#${two(rgb?.r)}${two(rgb?.g)}${two(rgb?.b)}`.toUpperCase();
+}
+
+/** The `[r, g, b]` of typed text `#RRGGBB`, `RRGGBB`, `#RGB` or `RGB`; `null` for anything else. */
+export function parseColourText(text: string): [number, number, number] | null {
+  const match = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(text.trim());
+  if (!match) {
+    return null;
+  }
+  const digits = match[1].length === 3 ? [...match[1]].map((d) => d + d).join("") : match[1];
+  const n = Number.parseInt(digits, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 /** A font value (`null` or the stored face) as the name a row shows; any other value unchanged. */
 function fontName(value: unknown, kind: GeneratedKind): number | boolean | string {
+  if (kind.kind === "colour") {
+    return colourHex(value);
+  }
   if (kind.kind !== "font") {
     return value as number | boolean | string;
   }
