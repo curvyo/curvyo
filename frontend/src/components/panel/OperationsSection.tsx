@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { DropBadgePill } from "@/components/DropBadgePill";
 import { OperationRowView, type RowActions } from "@/components/panel/OperationRow";
@@ -23,7 +23,7 @@ import {
   type ListEntry,
 } from "@/lib/operationRows";
 import { operationIdKey, type OperationsView } from "@/lib/operationsView";
-import { bodyOpen, entryHeight, pressUnfolds, ROW_HEIGHT, ROW_HEIGHT_COARSE, rowHeight } from "@/lib/operationUnfold";
+import { bodyOpen, pressUnfolds, rowHeight, unfoldedViewport } from "@/lib/operationUnfold";
 import { visibleRange } from "@/lib/operationWindow";
 
 /** The list's scroll area: 300 px high; the rows outside it (and the overscan) are not drawn. */
@@ -89,7 +89,6 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   const { view, notice, dropKey, dropBadge } = api;
   /** A coarse pointer takes the 64 px rows (`specs/0029` P25). */
   const coarse = useMemo(() => window.matchMedia?.("(pointer: coarse)").matches ?? false, []);
-  const rowBase = coarse ? ROW_HEIGHT_COARSE : ROW_HEIGHT;
   /** The selected rows (Ctrl and Shift extend, `specs/0028` ux-notes 8.2); one opens its Settings block. */
   const [selection, setSelection] = useState<RowSelection>(NO_ROWS);
   /** The row whose name is being edited in place (criterion 3): one at a time. */
@@ -123,6 +122,17 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   const [stop, setStop] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  /** The room between the list's top and the bottom of what scrolls it (`specs/0139` UX review). */
+  const [room, setRoom] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const next = roomUnder(listRef.current);
+      setRoom((previous) => (previous === next ? previous : next));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  });
   const addRef = useRef<HTMLElement>(null);
   /** A row to focus after the next render: a moved row keeps the focus, a deleted one hands it on. */
   const pending = useRef<number | "add" | null>(null);
@@ -275,17 +285,12 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   const entries = listEntries(view, openBodyKey, bodyHeight, coarse);
   const rowEntry = entryOfRow(entries);
   const openIndex = openKey === null ? -1 : indexOfKey(view, openKey);
-  // The unfolded row is one tall item: the list grows to hold it and the row after it, up to
-  // 520 px; a list that fits in 520 px (section headings included) shows whole.
+  // The unfolded row is one tall item: the list grows to hold it, up to the room left under its top
+  // (the window's or its scroll container's), so the whole item part can be reached at any size.
   // Rounded up with 1 px to spare: fractional row heights summed below the content's own height
   // would show a horizontal scrollbar and clip the last row ("mm/min", UX review U4).
   const listHeight = Math.ceil(entries.reduce((sum, entry) => sum + entry.height, 0)) + 1;
-  const viewport =
-    openBodyKey === null
-      ? VIEWPORT
-      : listHeight <= 520
-        ? Math.max(VIEWPORT, listHeight)
-        : Math.min(520, Math.max(VIEWPORT, entryHeight(true, bodyHeight, rowBase) + rowBase));
+  const viewport = openBodyKey === null ? VIEWPORT : unfoldedViewport(listHeight, room, VIEWPORT);
   const range = visibleRange(
     entries.map((entry) => entry.height),
     scrollTop,
@@ -439,7 +444,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
                           settings={settings}
                           tools={tools}
                           onEditMaterial={onEditMaterial}
-                          onReturnToRow={() => focusRow(listRef.current, entry.index)}
+                          onReturnToRow={() => focusRow(listRef.current, entry.index, true)}
                           rowKey={operationIdKey(entry.row.id)}
                           onHeight={onBodyHeight}
                           tabChip={view.tabChip}
@@ -533,6 +538,25 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
 }
 
 /** Moves the focus to the name button of the row at `index`. */
-function focusRow(list: HTMLElement | null, index: number) {
-  list?.querySelector<HTMLButtonElement>(`li[data-row-index="${index}"] [data-row-name]`)?.focus();
+/** Focuses row `index`'s name; `keepScroll` for a press in its body, which must not scroll the
+ * list back to the row (`specs/0139` UX review). */
+function focusRow(list: HTMLElement | null, index: number, keepScroll = false) {
+  list?.querySelector<HTMLButtonElement>(`li[data-row-index="${index}"] [data-row-name]`)?.focus({ preventScroll: keepScroll });
+}
+
+/** The px the list may take: inside a scrolling ancestor (the panel) its visible height, which
+ * the panel's own scroll brings fully into view; else what is left between the list's top and the
+ * bottom of its clipping ancestor or the window. Less a small margin; `null` before it is drawn. */
+function roomUnder(list: HTMLElement | null): number | null {
+  if (!list) return null;
+  let bottom = window.innerHeight;
+  for (let at = list.parentElement; at; at = at.parentElement) {
+    const overflow = getComputedStyle(at).overflowY;
+    if (overflow === "auto" || overflow === "scroll") return Math.max(0, at.clientHeight - 8);
+    if (overflow === "hidden") {
+      bottom = Math.min(bottom, at.getBoundingClientRect().bottom);
+      break;
+    }
+  }
+  return Math.max(0, Math.floor(bottom - list.getBoundingClientRect().top - 8));
 }

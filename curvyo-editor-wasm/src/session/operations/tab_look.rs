@@ -116,7 +116,6 @@ fn dashed(
         }
         return;
     };
-    let period = on + off;
     let mut walked = 0.0_f64;
     for pair in points.windows(2) {
         let (a, b) = (pair[0], pair[1]);
@@ -130,19 +129,38 @@ fn dashed(
                 a.y + (b.y - a.y) * t / length,
             )
         };
-        let mut t = 0.0;
-        while t < length {
-            let phase = (walked + t) % period;
-            if phase < on {
-                let end = (t + on - phase).min(length);
-                list.extend(thick_line(at(t), at(end), width, color));
-                t = end;
-            } else {
-                t += period - phase;
-            }
+        for (from, to) in dash_spans(walked, length, on, off) {
+            list.extend(thick_line(at(from), at(to), width, color));
         }
         walked += length;
     }
+}
+
+/// The dashes of `(on, off)` on one segment of `length` that starts `walked` along its line, as
+/// stretches of the segment. Dash `k` covers `k * (on + off)` to that plus `on` along the line;
+/// every dash index is visited once, so the walk ends whatever the rounding (a phase a hair under
+/// `on` once left `t` where it was and froze the page).
+fn dash_spans(walked: f64, length: f64, on: f64, off: f64) -> Vec<(f64, f64)> {
+    let period = on + off;
+    if !(period > 0.0 && on > 0.0 && length > 0.0 && walked.is_finite() && length.is_finite()) {
+        return Vec::new();
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    // invariant: finite and at least 0; a line is a few thousand dashes at most
+    let first = (walked / period).floor().max(0.0) as u64;
+    let mut out = Vec::new();
+    for k in first.. {
+        #[allow(clippy::cast_precision_loss)] // dash counts are far below 2^53
+        let start = k as f64 * period - walked;
+        if start >= length {
+            break;
+        }
+        let (from, to) = (start.max(0.0), (start + on).min(length));
+        if to > from {
+            out.push((from, to));
+        }
+    }
+    out
 }
 
 /// An open ink chevron at `at` pointing along `direction`, with its white casing (UX 6.1).
@@ -237,5 +255,47 @@ impl Session {
             }
         }
         list
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dash_spans;
+
+    #[test]
+    fn the_dash_walk_ends_on_the_lengths_that_froze_the_page() {
+        // A 5 mm lead at 4.5 px/mm: on 3 px, off 2 px in mm, the phase lands a hair under `on`.
+        for scale in [1.0, 2.0, 3.7, 4.5, 8.0, 12.0, 33.3] {
+            let (on, off) = (3.0 / scale, 2.0 / scale);
+            for length in [4.5, 5.0, 8.0, 12.0] {
+                let spans = dash_spans(0.0, length, on, off);
+                let total: f64 = spans.iter().map(|(a, b)| b - a).sum();
+                assert!(total <= length + 1e-9 && !spans.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn every_dash_walk_advances_over_lengths_from_half_a_millimetre_to_twenty() {
+        let mut walked = 0.0;
+        for step in 0..400_u32 {
+            let length = 0.5 + f64::from(step) * 0.04875;
+            for scale in [0.7, 1.0, 4.5, 9.1] {
+                let (on, off) = (3.0 / scale, 2.0 / scale);
+                let spans = dash_spans(walked, length, on, off);
+                let period = on + off;
+                #[allow(clippy::cast_precision_loss)] // a few dashes
+                let count = spans.len() as f64;
+                assert!(count <= length / period + 2.0);
+                for pair in spans.windows(2) {
+                    assert!(pair[1].0 > pair[0].1, "ordered, gaps between");
+                }
+                for (a, b) in &spans {
+                    assert!(*a >= 0.0 && b <= &length && b > a);
+                }
+            }
+            walked += length;
+        }
+        assert_eq!(dash_spans(0.0, 5.0, 0.0, 0.0), Vec::new());
     }
 }
