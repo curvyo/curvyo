@@ -40,6 +40,7 @@ impl Session {
         let background = self.shown_background();
         let mut grids = self.grid_lists(&pages, background);
         self.add_fixture_lists(&pages, &mut grids);
+        self.add_mat_lists(&pages, &mut grids);
         let mut list = build_page_areas_with_grids(
             &pages,
             background,

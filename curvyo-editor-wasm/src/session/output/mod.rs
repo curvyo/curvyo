@@ -10,6 +10,7 @@ mod focus;
 mod frame;
 mod gate_facts;
 mod input;
+pub(in crate::session) use input::select_id;
 mod job_cache;
 mod leaf_geometry;
 mod pane_picture;

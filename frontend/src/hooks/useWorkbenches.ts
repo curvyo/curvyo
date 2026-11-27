@@ -4,6 +4,7 @@ import type { EditorSession } from "@/hooks/useEditorSession";
 import { storeExtensions } from "@/lib/extensionsFile";
 import { flushMachineWrites } from "@/lib/machineProfilesFile";
 import { flushMaterialWrites } from "@/lib/materialsFile";
+import type { PlotterView } from "@/lib/plotterView";
 import { NO_WORKBENCHES, type WorkbenchList } from "@/workbenches/registry";
 
 /** The active laser page's values (`manufacturing_view_json`), `null` on another page. */
@@ -25,6 +26,8 @@ export interface ManufacturingView {
     visible: boolean;
     values: Record<string, number | string>;
   }[];
+  /** The plotter page's own view (`specs/0159`), present on a plotter page only. */
+  plotter?: PlotterView | null;
 }
 
 /** A corner of the output page, as stored. */
@@ -118,11 +121,39 @@ export function useWorkbenches(editor: EditorSession) {
     const session = getSession();
     return session ? (JSON.parse(session.machine_profiles_json()) as MachineProfileRow[]) : [];
   }, [getSession, syncRevision]);
+  const plotterProfiles = useMemo<MachineProfileRow[]>(() => {
+    void syncRevision;
+    const session = getSession();
+    return session ? (JSON.parse(session.plotter_profiles_json()) as MachineProfileRow[]) : [];
+  }, [getSession, syncRevision]);
   return {
     list,
     view,
     /** The machine list of the Add page group, the starting profile chosen. */
     profiles,
+    /** The machine lists of the other families' kinds, by process (`specs/0159` criterion 2). */
+    familyProfiles: {
+      "curvyo.cutter": plotterProfiles,
+      // Their machine lists come with their slices (`0160`, `0161`).
+      "curvyo.embroidery": [],
+      "curvyo.cnc": [],
+    } as Record<string, MachineProfileRow[]>,
+    /** The commands of a plotter page (`specs/0159`); each returns what the session says. */
+    plotter: {
+      pick: (id: string) => run((session) => session.pick_plotter_profile(id)) ?? false,
+      saveAs: () => run((session) => session.save_plotter_profile(randomBytes(), Date.now())) ?? "",
+      /** `default_pressure`, `default_speed` or `max_speed`; the field message or "". */
+      setDefault: (field: string, text: string) => run((session) => session.set_plotter_default(field, text)) ?? "",
+      setMat: (size: string) => run((session) => session.set_plotter_mat(size)) ?? false,
+      setGrip: (grip: string) => run((session) => session.set_plotter_grip(grip)) ?? false,
+      setGrid: (on: boolean) => run((session) => session.set_plotter_mat_grid(on)) ?? false,
+      press: (kind: string, shift: boolean) => run((session) => session.press_plotter_kind(kind, shift)) ?? "",
+      removeSelection: (id: string) => run((session) => session.remove_selection_from_plotter_operation(id)) ?? false,
+      remove: (id: string) => run((session) => session.delete_plotter_operation(id)) ?? false,
+      /** `pressure`, `speed` or `passes`; the field message or "". */
+      setNumber: (id: string, field: string, text: string) =>
+        run((session) => session.edit_plotter_setting(id, field, text)) ?? "",
+    },
     /** Add page with the Kind switch (`specs/0098` criteria 1 to 4); the new page's id. */
     addPage: (kind: string, profile: string) => {
       // The drawing tools' context ends before the canvas changes owner.

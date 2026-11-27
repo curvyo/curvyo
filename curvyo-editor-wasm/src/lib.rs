@@ -148,6 +148,8 @@ mod wasm_pen_entry;
 #[cfg(target_arch = "wasm32")]
 mod wasm_pencil;
 #[cfg(target_arch = "wasm32")]
+mod wasm_plotter;
+#[cfg(target_arch = "wasm32")]
 mod wasm_print_and_cut;
 #[cfg(target_arch = "wasm32")]
 mod wasm_properties_panel;

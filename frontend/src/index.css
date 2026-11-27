@@ -143,6 +143,14 @@
     /* docs/design-system.md, "Color tokens": the lines of branch lanes and the calm eye and lock of
        the Layers list (`--toolbar-icon` at 60 % on `--panel-bg`, 3.1:1). */
     --lane-line: #7B7B7F;
+    /* docs/design-system.md, "Color tokens" (`specs/0159`): the plotter mat's grips and its white
+       printing. The canvas draws the grips from the session; the printing's numbers use
+       `--mat-print`. Light theme only. */
+    --mat-lightgrip: #8FB3CC;
+    --mat-standardgrip: #9CB87D;
+    --mat-stronggrip: #B6A7DB;
+    --mat-fabricgrip: #D6A1B7;
+    --mat-print: #FFFFFF;
     /* docs/design-system.md, "Font preview (`0077`)": the specimen card of a preview tile and its
        decorative 1px edge (`--toolbar-icon` at 25 % on white), and the quiet bar a tile shows until
        its face's glyphs are drawn (`--toolbar-icon` at 8 % on white). Light theme only. */

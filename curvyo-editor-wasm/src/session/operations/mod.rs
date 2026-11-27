@@ -56,7 +56,7 @@ pub(super) const ADD_REFUSED_NOTICE: &str = "The operation could not be added.";
 /// notes §10) and the state of the operation tools (`tools.rs`).
 #[derive(Debug, Default)]
 pub(in crate::session) struct OperationsState {
-    notice: Option<String>,
+    pub(in crate::session) notice: Option<String>,
     status: Option<String>,
     tools: tools::OperationTools,
     /// The output page's leaves, for the drawing read they were built from (`index.rs`).

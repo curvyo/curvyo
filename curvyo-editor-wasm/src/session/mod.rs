@@ -126,6 +126,7 @@ mod offset_view;
 mod open_error;
 mod operations;
 mod output;
+mod plotter;
 mod print_and_cut;
 mod print_and_cut_overlay;
 mod registration_marks;

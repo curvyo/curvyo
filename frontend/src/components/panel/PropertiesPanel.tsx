@@ -637,6 +637,7 @@ export function PropertiesPanel({
                       workbenches={workbenches}
                       unit={doc.view.unit}
                       library={devicesForTabs.library}
+                      output={output}
                       onReturnFocus={returnFocus}
                     />
                   ) : page.off ? (

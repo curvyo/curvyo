@@ -76,6 +76,9 @@ impl Session {
     #[must_use]
     pub fn machine_name_of(&self, kind: &PageKind) -> Option<String> {
         let manufacturing = self.document.manufacturing(kind.manufacturing()?)?;
+        if let Some(name) = Self::plotter_machine_name(&manufacturing) {
+            return Some(name);
+        }
         let read = curvyo_laser_core::read_copy(
             manufacturing.profile.as_ref(),
             manufacturing.legacy_machine_name.as_deref(),
@@ -152,6 +155,9 @@ impl Session {
     /// (UX notes §3 to §6; the Machine block of `0026`); `null` in a drawing workbench.
     #[must_use]
     pub fn manufacturing_view_json(&self) -> String {
+        if let Some(plotter) = self.plotter_view() {
+            return self.family_view_json(&plotter);
+        }
         let Some(manufacturing) = self.active_manufacturing() else {
             return "null".to_owned();
         };
@@ -195,6 +201,36 @@ impl Session {
             // The fixture rows in listing order (`0113` criterion 16), the one type of
             // `fixtures/view_json.rs`.
             "fixtures": self.fixtures_view().map(|v| v.rows()).unwrap_or_default(),
+        })
+        .to_string()
+    }
+
+    /// The view of an output page of another machine family: its name, process and status line
+    /// and the family's own view under its key (`plotter`); no laser Machine block.
+    fn family_view_json(&self, plotter: &Value) -> String {
+        let Some(manufacturing) = self.active_output_page() else {
+            return "null".to_owned();
+        };
+        let area = manufacturing.work_area();
+        let name = manufacturing
+            .page
+            .as_ref()
+            .map(|p| p.name.clone())
+            .unwrap_or_default();
+        json!({
+            "id": manufacturing.id.full_id(),
+            "name": name,
+            "process": manufacturing.process,
+            "status": format!(
+                "{} · {:.1} × {:.1} mm",
+                plotter["profile"]["name"].as_str().unwrap_or_default(),
+                area.width.as_mm(),
+                area.height.as_mm()
+            ),
+            "machine": Value::Null,
+            "notices": {},
+            "fixtures": [],
+            "plotter": plotter,
         })
         .to_string()
     }

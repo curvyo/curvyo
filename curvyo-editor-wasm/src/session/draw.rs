@@ -292,6 +292,10 @@ impl Session {
             }
             None => self.artwork_list(&artwork_objects, &guides, view, self.visible_rect()),
         };
+        // A plotter page's Toolpath view over its items (`specs/0159` criterion 10).
+        if let Some(toolpath) = self.plotter_toolpath(view) {
+            list.extend(toolpath);
+        }
         // The dimensions over the artwork, following a drag in the same frame (`0070`).
         list.extend(self.dimension_layer(&artwork_objects));
         list.extend(self.kept_point_list());

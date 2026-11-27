@@ -82,6 +82,7 @@ impl Session {
     /// record's sets without an undo step (`0113` criteria 44, 47; ADR 0059 §10).
     pub fn load_machine_profiles(&mut self, entries: &[(String, String)]) {
         self.manufacturing.machine.profiles = MachineProfiles::load(entries);
+        self.manufacturing.plotter = super::super::plotter::PlotterLibrary::load(entries);
         self.align_fixture_pages(None);
     }
 

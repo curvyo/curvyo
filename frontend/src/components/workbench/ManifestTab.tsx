@@ -2,6 +2,8 @@ import { TriangleAlert } from "lucide-react";
 
 import { InlinePickList } from "@/components/InlinePickList";
 import { MachineBlock } from "@/components/workbench/MachineBlock";
+import { PlotterPanel } from "@/components/workbench/PlotterPanel";
+import type { OutputApi } from "@/hooks/useOutput";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { ManufacturingView, WorkbenchesApi } from "@/hooks/useWorkbenches";
 import type { LibrarySyncApi } from "@/lib/devicesApi";
@@ -18,6 +20,8 @@ interface ManifestTabProps {
   unit: UnitSymbol;
   /** The library sync's toggles (`specs/0116-library-sync`). */
   library?: LibrarySyncApi;
+  /** Export, the Toolpath view and the check counts of an output page (`specs/0159`). */
+  output?: Pick<OutputApi, "exportJob" | "toggleRoute" | "selectItems">;
   onReturnFocus: () => void;
 }
 
@@ -27,7 +31,20 @@ interface ManifestTabProps {
  * (`specs/0026-machine-profile`) in the manifest's order; a `FixtureList` block draws nothing here (the Fixtures tab, `specs/0113`). Nothing here names a
  * process.
  */
-export function ManifestTab({ contribution, pages, view, workbenches, unit, library, onReturnFocus }: ManifestTabProps) {
+export function ManifestTab({ contribution, pages, view, workbenches, unit, library, output, onReturnFocus }: ManifestTabProps) {
+  // A family with its own view draws its own panel (`specs/0159`): the laser blocks are absent.
+  if (view.plotter) {
+    return (
+      <PlotterPanel
+        view={view.plotter}
+        api={workbenches.plotter}
+        onExport={() => void output?.exportJob()}
+        onToggleToolpath={(page) => output?.toggleRoute(page)}
+        onSelectItems={(ids) => output?.selectItems(ids)}
+        onReturnFocus={onReturnFocus}
+      />
+    );
+  }
   const blocks = contribution.tabs[0]?.blocks ?? [];
   return (
     <div className="flex flex-col gap-4">

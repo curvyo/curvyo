@@ -402,6 +402,7 @@ export function PagesBlock({
         <AddPageGroup
           kinds={kindOptions(workbenches.list)}
           profiles={workbenches.profiles}
+          familyProfiles={workbenches.familyProfiles}
           onCancel={() => {
             setAdding(false);
             requestAnimationFrame(() => addButton.current?.focus());

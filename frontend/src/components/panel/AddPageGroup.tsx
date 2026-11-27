@@ -35,12 +35,16 @@ const TEXT_BUTTON =
  */
 export function AddPageGroup({
   kinds,
-  profiles,
+  profiles: laserProfiles,
+  familyProfiles,
   onAdd,
   onCancel,
 }: {
   kinds: PageKindEntry[];
   profiles: MachineProfileRow[];
+  /** The machine lists of the other machine families by process (ADR 0097, `specs/0159`
+   * criterion 2); an empty list shows no machine list. A kind not named here lists `profiles`. */
+  familyProfiles?: Record<string, MachineProfileRow[]>;
   /** Adds a page of `kind` with the machine `profile` (empty for a page without one). */
   onAdd: (kind: string, profile: string) => void;
   onCancel: () => void;
@@ -49,12 +53,19 @@ export function AddPageGroup({
   const [kind, setKind] = useState(
     kinds.some((k) => k.id === remembered) ? (remembered as string) : "drawing",
   );
-  const chosen = profiles.find((p) => p.chosen) ?? profiles[0];
-  const [profile, setProfile] = useState(chosen?.id ?? "");
+  const listOf = (id: string) => familyProfiles?.[id] ?? laserProfiles;
+  const profiles = listOf(kind);
+  const chosenOf = (id: string) => {
+    const list = listOf(id);
+    return (list.find((p) => p.chosen) ?? list[0])?.id ?? "";
+  };
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const profile = picked[kind] ?? chosenOf(kind);
+  const setProfile = (id: string) => setPicked((old) => ({ ...old, [kind]: id }));
   const kindRow = useRef<HTMLDivElement>(null);
   const machineRow = useRef<HTMLDivElement>(null);
   const entry = kinds.find((k) => k.id === kind);
-  const output = entry?.workbench === "manufacturing";
+  const output = entry?.workbench === "manufacturing" && profiles.length > 0;
 
   useEffect(() => {
     kindRow.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();

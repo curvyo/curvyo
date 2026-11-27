@@ -15,9 +15,9 @@ use super::index::IndexedLeaf;
 
 /// The selection as operation targets.
 #[derive(Debug, Default)]
-pub(super) struct Selection {
+pub(in crate::session) struct Selection {
     /// The assignable items: own items, groups, clones and placed pages, each by its own node.
-    pub(super) targets: Vec<NodeId>,
+    pub(in crate::session) targets: Vec<NodeId>,
     /// The targets that are groups (criterion 9).
     pub(super) groups: HashSet<NodeId>,
     /// The selected guides (named in the notice).
@@ -122,7 +122,7 @@ fn not_assigned_notice(guides: usize) -> String {
 impl Session {
     /// The selection's assignable items, guides and dimensions counted apart. A selected group is
     /// one target, the group node (criterion 9): its leaves are not.
-    pub(super) fn selection_targets(&self) -> Selection {
+    pub(in crate::session) fn selection_targets(&self) -> Selection {
         let read = self.document_read();
         let mut selection = Selection::default();
         for unit in self.units().selected(self.selection.ids()) {

@@ -100,6 +100,8 @@ impl Session {
             .manufacturings()
             .iter()
             .filter(|m| self.process_enabled(&m.process))
+            // Only laser pages hold laser fixtures; a plotter page draws its mat itself (`0159`).
+            .filter(|m| m.process == curvyo_laser_core::PROCESS_ID)
             .filter_map(PageFixtures::read)
             .collect()
     }

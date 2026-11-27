@@ -249,5 +249,5 @@ fn c35a_damaged_values_are_kept_as_stored_and_saved_back_unchanged() {
 #[test]
 fn the_format_is_63() {
     // Format 63 since `specs/0118-machine-control` slice 2d (`adrs.md` P8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 68);
+    assert_eq!(CURRENT_FORMAT_VERSION, 69);
 }

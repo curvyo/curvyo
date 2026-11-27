@@ -29,11 +29,20 @@ pub(super) struct ManufacturingState {
     pub(super) placed: frame::PlacedCache,
     /// The maker's machine profiles and the last pick (`specs/0026-machine-profile`).
     pub(super) machine: machine::MachineState,
+    /// The maker's cutter profiles (`specs/0159-cutting-plotter` criterion 2).
+    pub(super) plotter: super::plotter::PlotterLibrary,
 }
 
 impl Session {
-    /// The manufacturing of the active page, `None` on another page or when it is gone.
+    /// The manufacturing of the active laser page, `None` on another page, on an output page of
+    /// another machine family (ADR 0095: the laser's tools leave those pages) or when it is gone.
     pub(in crate::session) fn active_manufacturing(&self) -> Option<ManufacturingSnapshot> {
+        self.active_output_page()
+            .filter(|m| m.process == curvyo_laser_core::PROCESS_ID)
+    }
+
+    /// The manufacturing of the active output page of any process, `None` on another page.
+    pub(in crate::session) fn active_output_page(&self) -> Option<ManufacturingSnapshot> {
         match self.workbench() {
             Workbench::Manufacturing(id) => self.document.manufacturing(id),
             _ => None,

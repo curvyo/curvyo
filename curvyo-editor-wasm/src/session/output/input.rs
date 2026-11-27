@@ -49,7 +49,7 @@ struct GeometryEntry {
 
 /// The id a check line selects for a leaf: the first node of its chain (a clone member selects
 /// its clone, a placed page's member its source object).
-pub(super) fn select_id(leaf: &IndexedLeaf) -> Option<NodeId> {
+pub(in crate::session) fn select_id(leaf: &IndexedLeaf) -> Option<NodeId> {
     leaf.chain
         .first()
         .and_then(|key| key.first().map(|id| id.node()))
@@ -139,7 +139,7 @@ fn geometry_of(
 
 impl Session {
     /// The page-mm geometry of each of `leaves`, from the cache while the leaves and maps hold.
-    fn leaf_geometries(
+    pub(in crate::session) fn leaf_geometries(
         &self,
         manufacturing: &curvyo_document_core::ManufacturingSnapshot,
         leaves: &Arc<[IndexedLeaf]>,

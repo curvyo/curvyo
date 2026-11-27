@@ -118,6 +118,20 @@ impl Session {
     /// The job file of the active laser page for the save dialog (criterion 27), `None` while a
     /// block disables Export or on another page. Nothing is written to the project.
     pub fn export_job(&mut self, project_file: &str) -> Option<ExportedJob> {
+        // A plotter page writes its own file and records nothing (`specs/0159` UX C16).
+        if let Some(plotter) = self.plotter_export() {
+            let exports = &mut self.output.exports;
+            let token = exports.next;
+            exports.next = exports.next.wrapping_add(1);
+            exports.pending.insert(token, ExportEffects::default());
+            return Some(ExportedJob {
+                bytes: plotter.text.into_bytes(),
+                name: job_file_name(project_file, &plotter.page, plotter.extension),
+                file_type: plotter.file_type,
+                extension: plotter.extension,
+                token,
+            });
+        }
         let HandOut { job, effects } = self.hand_out()?;
         let format = job.input.machine.values.output_format;
         let exports = &mut self.output.exports;

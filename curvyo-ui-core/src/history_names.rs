@@ -147,6 +147,12 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0150-operation-always-has-numbers` criteria 1 and 22.
     ("edit_default_power", "Edit default power"),
     ("edit_default_speed", "Edit default speed"),
+    // `specs/0159-cutting-plotter`: the plotter page's mat and copy.
+    ("set_mat", "Set mat"),
+    ("set_grip", "Set grip"),
+    ("set_mat_grid", "Mat grid"),
+    ("edit_default_pressure", "Edit default pressure"),
+    ("edit_max_speed", "Edit max speed"),
     ("edit_laser_mode", "Edit laser mode"),
     // `specs/0111-laser-operation-tools` criterion 22.
     ("motorised_z_on", "Motorised Z axis on"),

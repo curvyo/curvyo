@@ -770,7 +770,18 @@ impl DocumentVersion {
 /// version; a file of 67 or lower opens unchanged with every path Automatic and no lead. The
 /// records are opaque here, kept unchanged when damaged, and go with the membership key as the
 /// tabs do. Goldens: `laser_path_options_v68.curvyo`, `laser_path_options_damaged_v68.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 68;
+/// Version 69 (`specs/0159-cutting-plotter` slice 1, ADR 0097 §6, `adrs.md` PL3, Frage 431 A): an
+/// output page of process `curvyo.cutter` (a plotter page) holds a cutter profile copy in
+/// `mfg_profile`, its mats as job fixtures of kind `curvyo.cutter/mat-12x12` and
+/// `curvyo.cutter/mat-12x24` with the params `grip` and `grid` (one `active`), and operations of
+/// `op_kind` `cut` or `draw` with `op_settings` `{ pressure_pct, speed_mm_s, passes }`, all opaque
+/// here and read by the cutter extension. A build that stops at 68 would open such a page as a
+/// laser page and read its copy and operations as laser values, so this build's files are refused
+/// there by version; a file of 68 or lower opens unchanged. Damage (read by the extension): an
+/// unknown mat kind reads as the 12 x 12 in `StandardGrip` mat, a value out of its range as its
+/// default, with a notice; nothing is rewritten on read. Goldens (in `curvyo-editor-wasm`):
+/// `plotter_page_v69.curvyo`, `plotter_page_damaged_v69.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 69;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

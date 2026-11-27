@@ -194,6 +194,12 @@ pub const FREE_STEPS: &[&str] = &[
     "edit_max_power",
     "edit_default_power",
     "edit_default_speed",
+    // `specs/0159-cutting-plotter`: the plotter page's mat and copy.
+    "set_mat",
+    "set_grip",
+    "set_mat_grid",
+    "edit_default_pressure",
+    "edit_max_speed",
     "edit_laser_mode",
     "motorised_z_on",
     "motorised_z_off",
