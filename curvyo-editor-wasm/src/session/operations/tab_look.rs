@@ -1,11 +1,12 @@
-//! How the tabs look on the canvas (`specs/0139` criterion 7, `ux-notes.md` 5.1, 6.1): the
-//! handles of the selected items and the gap marks of the Operations view.
+//! How the tabs and path options look on the canvas (`specs/0139` criteria 7, 14, 15, 19,
+//! `ux-notes.md` 5.1, 6.1): the tab handles of the selected items and the gap, lead, overcut and
+//! start marks of the Operations view.
 
 use curvyo_document_core::Point;
 use curvyo_laser_core::job::PointUm;
 use curvyo_render_core::{
-    DrawList, TransformDecorationInput, TransformGlyphKind, TransformHandleGlyph,
-    build_transform_draw_list,
+    DrawList, OP_CUT, OP_INK, RgbaColor, TransformDecorationInput, TransformGlyphKind,
+    TransformHandleGlyph, build_transform_draw_list, thick_line,
 };
 
 use super::super::Session;
@@ -94,6 +95,75 @@ impl Session {
     }
 }
 
+/// A lead's line, 1 px, dashed 3 on 2 (UX 6.1).
+const LEAD_PX: f64 = 1.0;
+const DASH_PX: f64 = 3.0;
+const GAP_PX: f64 = 2.0;
+/// The chevron of a set start or fixed direction: 5 px arms (UX 6.1).
+const CHEVRON_PX: f64 = 5.0;
+
+/// `points` as a line of `width`, solid or in dashes of `(dash, gap)` along its length.
+fn dashed(
+    list: &mut DrawList,
+    points: &[Point],
+    width: f64,
+    color: RgbaColor,
+    dash: Option<(f64, f64)>,
+) {
+    let Some((on, off)) = dash else {
+        for pair in points.windows(2) {
+            list.extend(thick_line(pair[0], pair[1], width, color));
+        }
+        return;
+    };
+    let period = on + off;
+    let mut walked = 0.0_f64;
+    for pair in points.windows(2) {
+        let (a, b) = (pair[0], pair[1]);
+        let length = a.vector_to(b).length();
+        if length <= 0.0 {
+            continue;
+        }
+        let at = |t: f64| {
+            Point::new(
+                a.x + (b.x - a.x) * t / length,
+                a.y + (b.y - a.y) * t / length,
+            )
+        };
+        let mut t = 0.0;
+        while t < length {
+            let phase = (walked + t) % period;
+            if phase < on {
+                let end = (t + on - phase).min(length);
+                list.extend(thick_line(at(t), at(end), width, color));
+                t = end;
+            } else {
+                t += period - phase;
+            }
+        }
+        walked += length;
+    }
+}
+
+/// An open ink chevron at `at` pointing along `direction`, with its white casing (UX 6.1).
+fn chevron(list: &mut DrawList, at: Point, direction: (f64, f64), scale: f64) {
+    let (dx, dy) = direction;
+    let arm = CHEVRON_PX / scale;
+    let back = |side: f64| {
+        Point::new(
+            at.x - (dx + side * -dy) * arm * std::f64::consts::FRAC_1_SQRT_2,
+            at.y - (dy + side * dx) * arm * std::f64::consts::FRAC_1_SQRT_2,
+        )
+    };
+    for (width, color) in [
+        (CASING_PX / scale, RgbaColor::WHITE),
+        (BAR_WIDTH_PX / scale, OP_INK),
+    ] {
+        list.extend(thick_line(back(1.0), at, width, color));
+        list.extend(thick_line(back(-1.0), at, width, color));
+    }
+}
+
 /// The bar across a gap in the Operations view: 8 px long (UX 6.1).
 const BAR_PX: f64 = 8.0;
 /// Its width, 1.5 px, and the white casing that breaks the red cut line, 3 px.
@@ -126,13 +196,33 @@ impl Session {
             Point::new(page.x + origin.x, page.y + origin.y)
         };
         for plan in job.built.plans.iter().flatten() {
+            for mark in &plan.marks {
+                let points = |list: &[PointUm]| list.iter().map(|&p| doc(p)).collect::<Vec<_>>();
+                for lead in [&mark.lead_in, &mark.lead_out] {
+                    let lead = points(lead);
+                    dashed(&mut list, &lead, CASING_PX / scale, RgbaColor::WHITE, None);
+                    let dash = Some((DASH_PX / scale, GAP_PX / scale));
+                    dashed(&mut list, &lead, LEAD_PX / scale, OP_CUT, dash);
+                }
+                let overcut = points(&mark.overcut);
+                let dash = Some((DASH_PX / scale, GAP_PX / scale));
+                dashed(&mut list, &overcut, BAR_WIDTH_PX / scale, OP_INK, dash);
+                if let Some((at, (dx, dy))) = mark.start {
+                    chevron(
+                        &mut list,
+                        doc(at),
+                        (f64::from(dx) / 1e6, f64::from(dy) / 1e6),
+                        scale,
+                    );
+                }
+            }
             for gap in plan.marks.iter().flat_map(|mark| &mark.gaps) {
                 for pair in gap.points.windows(2) {
-                    list.extend(curvyo_render_core::thick_line(
+                    list.extend(thick_line(
                         doc(pair[0]),
                         doc(pair[1]),
                         CASING_PX / scale,
-                        curvyo_render_core::RgbaColor::WHITE,
+                        RgbaColor::WHITE,
                     ));
                 }
                 let (dx, dy) = (
@@ -143,12 +233,7 @@ impl Session {
                 let centre = doc(gap.centre);
                 let a = Point::new(centre.x - dy * half, centre.y + dx * half);
                 let b = Point::new(centre.x + dy * half, centre.y - dx * half);
-                list.extend(curvyo_render_core::thick_line(
-                    a,
-                    b,
-                    BAR_WIDTH_PX / scale,
-                    curvyo_render_core::OP_INK,
-                ));
+                list.extend(thick_line(a, b, BAR_WIDTH_PX / scale, OP_INK));
             }
         }
         list

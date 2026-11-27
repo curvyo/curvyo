@@ -26,6 +26,7 @@
         "counter": 39,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "engrave",
@@ -57,6 +58,7 @@
             "scan_angle_deg": 0.0
           },
           "image": null,
+          "path": null,
           "tabs": null,
           "z_offset_mm": 0.0
         },
@@ -92,6 +94,7 @@
         "counter": 44,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "cut",
@@ -118,6 +121,13 @@
         "options": {
           "hatch": null,
           "image": null,
+          "path": {
+            "lead_in": "none",
+            "lead_in_mm": 1.0,
+            "lead_out": "none",
+            "lead_out_mm": 1.0,
+            "overcut_mm": 0.0
+          },
           "tabs": {
             "count": 0,
             "placed": null,

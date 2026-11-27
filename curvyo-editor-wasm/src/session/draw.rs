@@ -365,6 +365,7 @@ impl Session {
         list.extend(self.generators_draw_list(view));
         list.extend(self.generator_knobs_draw_list());
         list.extend(self.tab_handles_draw_list());
+        list.extend(self.start_markers_draw_list());
         list.extend(self.sketch_knobs_draw_list());
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
         // the blue preview, whose white casing would otherwise cover it where the two coincide

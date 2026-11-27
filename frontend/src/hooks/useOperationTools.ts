@@ -51,6 +51,14 @@ export interface OperationToolsApi {
   setTabsOwn: (id: OperationId, own: boolean) => boolean;
   /** The current tab's width in mm, `null` for the operation's; the chip text, empty when taken. */
   setTabWidth: (mm: number | null) => string;
+  /** The Path options pill of the item part of row `id` (`specs/0139` criterion 21). */
+  setPathOwn: (id: OperationId, own: boolean) => boolean;
+  /** Types `value` into the selected items' own path field `option`; the chip text, empty when taken. */
+  editOwnPath: (id: OperationId, option: string, value: number) => string;
+  /** The Automatic button of the item part's Start row; whether it wrote. */
+  setStartAutomatic: (id: OperationId) => boolean;
+  /** The Direction pick of the item part; whether it wrote. */
+  setDirection: (id: OperationId, direction: "automatic" | "as_drawn" | "reversed") => boolean;
 }
 
 /** The operation tools' API for `editor`. */
@@ -127,5 +135,41 @@ export function useOperationTools(editor: OperationToolsEditor): OperationToolsA
     [run],
   );
 
-  return { press, pressed, status, unfold, edit, setDither, toggleView, reveal, leaveGroup, setTabsTool, setTabsOwn, setTabWidth };
+  const setPathOwn = useCallback(
+    (id: OperationId, own: boolean) => run(false, (s) => s.set_selection_path_own(operationIdText(id), own)),
+    [run],
+  );
+  const editOwnPath = useCallback(
+    (id: OperationId, option: string, value: number) =>
+      run("", (s) => s.edit_selection_path_option(operationIdText(id), option, value)),
+    [run],
+  );
+  const setStartAutomatic = useCallback(
+    (id: OperationId) => run(false, (s) => s.set_selection_start_automatic(operationIdText(id))),
+    [run],
+  );
+  const setDirection = useCallback(
+    (id: OperationId, direction: "automatic" | "as_drawn" | "reversed") =>
+      run(false, (s) => s.set_selection_direction(operationIdText(id), direction)),
+    [run],
+  );
+
+  return {
+    press,
+    pressed,
+    status,
+    unfold,
+    edit,
+    setDither,
+    toggleView,
+    reveal,
+    leaveGroup,
+    setTabsTool,
+    setTabsOwn,
+    setTabWidth,
+    setPathOwn,
+    editOwnPath,
+    setStartAutomatic,
+    setDirection,
+  };
 }

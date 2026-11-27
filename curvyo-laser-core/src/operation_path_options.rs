@@ -213,6 +213,65 @@ pub enum PathEdit {
     Overcut(Overcut),
 }
 
+/// One field of the Path options group, by its host name (`lead_in`, `lead_in_mm`, `lead_out`,
+/// `lead_out_mm`, `overcut`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PathField {
+    /// The lead-in pill: 0 None, 1 Line, 2 Arc.
+    LeadIn,
+    /// The lead-in length field.
+    LeadInLength,
+    /// The lead-out pill.
+    LeadOut,
+    /// The lead-out length field.
+    LeadOutLength,
+    /// The overcut field.
+    Overcut,
+}
+
+impl PathField {
+    /// The field of its host name.
+    #[must_use]
+    pub fn of(name: &str) -> Option<Self> {
+        Some(match name {
+            "lead_in" => Self::LeadIn,
+            "lead_in_mm" => Self::LeadInLength,
+            "lead_out" => Self::LeadOut,
+            "lead_out_mm" => Self::LeadOutLength,
+            "overcut" => Self::Overcut,
+            _ => return None,
+        })
+    }
+
+    /// The edit of `value` typed into (or, for a pill, the segment index `value` pressed in)
+    /// this field.
+    ///
+    /// # Errors
+    /// The chip text of UX section 10.
+    pub fn typed(self, value: f64) -> Result<PathEdit, &'static str> {
+        let kind = || {
+            if value.fract() != 0.0 || value < 0.0 {
+                return Err(ENTER_NUMBER);
+            }
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            // invariant: a whole number at least 0, checked above
+            let index = value as u64;
+            LeadKind::of_index(index).ok_or(ENTER_NUMBER)
+        };
+        match self {
+            Self::LeadIn => kind().map(PathEdit::LeadIn),
+            Self::LeadOut => kind().map(PathEdit::LeadOut),
+            Self::LeadInLength => {
+                CutLength::typed(value, CutLength::LEAD_IN_RANGE_TEXT).map(PathEdit::LeadInLength)
+            }
+            Self::LeadOutLength => {
+                CutLength::typed(value, CutLength::LEAD_OUT_RANGE_TEXT).map(PathEdit::LeadOutLength)
+            }
+            Self::Overcut => Overcut::typed(value).map(PathEdit::Overcut),
+        }
+    }
+}
+
 const KEY_LEAD_IN: &str = "lead_in";
 const KEY_LEAD_IN_MM: &str = "lead_in_mm";
 const KEY_LEAD_OUT: &str = "lead_out";
@@ -329,6 +388,21 @@ mod tests {
         assert_eq!(Overcut::typed(5.004).map(Overcut::um), Ok(5_000));
         assert_eq!(LeadKind::of_index(2), Some(LeadKind::Arc));
         assert_eq!(LeadKind::of_index(3), None);
+        let field = |name| PathField::of(name).unwrap();
+        assert_eq!(
+            field("lead_in").typed(1.0),
+            Ok(PathEdit::LeadIn(LeadKind::Line))
+        );
+        assert_eq!(field("lead_out").typed(3.0), Err("Enter a number."));
+        assert_eq!(
+            field("lead_out_mm").typed(0.0),
+            Err("Lead-out is 0.10 to 20.00 mm.")
+        );
+        assert_eq!(
+            field("overcut").typed(11.0),
+            Err("Overcut is 0.00 to 10.00 mm.")
+        );
+        assert_eq!(PathField::of("lead"), None);
     }
 
     #[test]

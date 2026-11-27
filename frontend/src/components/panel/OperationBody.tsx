@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 import { ImageSettingsGroup } from "@/components/panel/ImageSettingsGroup";
 import { OperationOptionsPart, OptionFieldView } from "@/components/panel/OperationOptionsPart";
 import { OperationSettingsBlock } from "@/components/panel/OperationSettingsBlock";
+import { OperationPathGroup } from "@/components/panel/OperationPathPart";
 import { OperationItemPart, OperationTabsGroup } from "@/components/panel/OperationTabsPart";
 import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
 import type { OperationToolsApi } from "@/hooks/useOperationTools";
@@ -87,6 +88,7 @@ export function OperationBody({ row, pick, settings, tools, onEditMaterial, onRe
       {image ? <ImageSettingsGroup row={row} image={image} tools={tools} onReturnFocus={onReturnToRow} /> : null}
       <OperationOptionsPart row={row} tools={tools} onReturnFocus={onReturnToRow} />
       <OperationTabsGroup row={row} tools={tools} onReturnFocus={onReturnToRow} />
+      <OperationPathGroup row={row} tools={tools} onReturnFocus={onReturnToRow} />
       <OperationItemPart row={row} chip={tabChip} tools={tools} onReturnFocus={onReturnToRow} />
     </div>
   );

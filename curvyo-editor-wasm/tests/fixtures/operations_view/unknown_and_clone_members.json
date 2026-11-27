@@ -27,6 +27,7 @@
         "counter": 47,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "unknown",
@@ -49,6 +50,7 @@
         "counter": 42,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "cut",
@@ -75,6 +77,13 @@
         "options": {
           "hatch": null,
           "image": null,
+          "path": {
+            "lead_in": "none",
+            "lead_in_mm": 1.0,
+            "lead_out": "none",
+            "lead_out_mm": 1.0,
+            "overcut_mm": 0.0
+          },
           "tabs": {
             "count": 0,
             "placed": null,

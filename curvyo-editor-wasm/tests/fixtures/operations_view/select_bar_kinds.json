@@ -27,6 +27,7 @@
         "counter": 35,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "engrave",
@@ -58,6 +59,7 @@
             "scan_angle_deg": 0.0
           },
           "image": null,
+          "path": null,
           "tabs": null,
           "z_offset_mm": 0.0
         },

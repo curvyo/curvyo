@@ -54,64 +54,102 @@ impl CutRun {
             }
             return (pieces, ends);
         };
-        let length = m.length();
         let stretches = self.stretches_from(at);
         let (first, last) = (stretches[0], stretches[stretches.len() - 1]);
-        let mut end = at + last.1;
-        let overcut = um(self.path.overcut.um());
-        if overcut > 0.0 && last.1 >= length - SPECK && first.0 <= SPECK {
-            let run_on = overcut.min(length).min(first.1);
-            if run_on > SPECK {
-                let stretch = self.polyline(at + length, at + length + run_on);
-                if let Some(piece) = pieces.last_mut() {
-                    piece.extend(stretch.iter().skip(1).copied());
-                    piece.dedup();
-                }
-                end = at + length + run_on;
-                ends.overcut = stretch;
-            }
-        }
+        let end = self.overcut_into(at, first, last, &mut pieces, &mut ends);
         if let Some(OutlineEntry::Start(_)) = self.entry {
             let (dx, dy) = m.tangent_at(at + first.0);
             ends.start = Some((pieces[0][0], (millionths(dx), millionths(dy))));
         }
-        let Some(inside) = inside_left(m.points()) else {
-            return (pieces, ends);
-        };
-        if self.path.lead_in != LeadKind::None {
-            let from = at + first.0;
-            let t = m.tangent_at(from);
-            let n = waste_normal(t, inside, self.depth);
-            let length = um(self.path.lead_in_length.um());
-            let mut lead = rounded(&lead_in(self.path.lead_in, length, m.point_at(from), t, n));
-            let junction = pieces[0][0];
-            lead.pop();
-            lead.push(junction);
-            lead.dedup();
-            let mut first_piece = lead.clone();
-            first_piece.extend(pieces[0].iter().skip(1).copied());
-            pieces[0] = first_piece;
-            let mut from_junction = lead.clone();
-            from_junction.reverse();
-            ends.own_touch[0] = touches_own(&from_junction, m.points());
-            ends.lead_in = lead;
-        }
-        if self.path.lead_out != LeadKind::None {
-            let t = m.tangent_before(end);
-            let n = waste_normal(t, inside, self.depth);
-            let length = um(self.path.lead_out_length.um());
-            let mut lead = rounded(&lead_out(self.path.lead_out, length, m.point_at(end), t, n));
-            if let Some(piece) = pieces.last_mut()
-                && let Some(&junction) = piece.last()
-            {
-                lead[0] = junction;
-                lead.dedup();
-                piece.extend(lead.iter().skip(1).copied());
-            }
-            ends.own_touch[1] = touches_own(&lead, m.points());
-            ends.lead_out = lead;
+        if let Some(inside) = inside_left(m.points()) {
+            self.lead_in_into(at + first.0, inside, &mut pieces, &mut ends);
+            self.lead_out_into(end, inside, &mut pieces, &mut ends);
         }
         (pieces, ends)
+    }
+
+    /// Appends the overcut to the last piece when it closes at the entry `at` (the first burnt
+    /// stretch `first` starts there, the last `last` ends there): `min(d, L)`, stopping at the
+    /// first tab. Returns the arc where the burn ends.
+    fn overcut_into(
+        &self,
+        at: f64,
+        first: (f64, f64),
+        last: (f64, f64),
+        pieces: &mut [Vec<PointUm>],
+        ends: &mut CutEnds,
+    ) -> f64 {
+        let length = self.measured.length();
+        let overcut = um(self.path.overcut.um());
+        if overcut <= 0.0 || last.1 < length - SPECK || first.0 > SPECK {
+            return at + last.1;
+        }
+        let run_on = overcut.min(length).min(first.1);
+        if run_on <= SPECK {
+            return at + last.1;
+        }
+        let stretch = self.polyline(at + length, at + length + run_on);
+        if let Some(piece) = pieces.last_mut() {
+            piece.extend(stretch.iter().skip(1).copied());
+            piece.dedup();
+        }
+        ends.overcut = stretch;
+        at + length + run_on
+    }
+
+    /// Prepends the lead-in that ends at the first burnt point, arc `from`.
+    fn lead_in_into(
+        &self,
+        from: f64,
+        inside: bool,
+        pieces: &mut [Vec<PointUm>],
+        ends: &mut CutEnds,
+    ) {
+        if self.path.lead_in == LeadKind::None {
+            return;
+        }
+        let m = &self.measured;
+        let t = m.tangent_at(from);
+        let n = waste_normal(t, inside, self.depth);
+        let length = um(self.path.lead_in_length.um());
+        let mut lead = rounded(&lead_in(self.path.lead_in, length, m.point_at(from), t, n));
+        lead.pop();
+        lead.push(pieces[0][0]);
+        lead.dedup();
+        let mut first_piece = lead.clone();
+        first_piece.extend(pieces[0].iter().skip(1).copied());
+        pieces[0] = first_piece;
+        let mut from_junction = lead.clone();
+        from_junction.reverse();
+        ends.own_touch[0] = touches_own(&from_junction, m.points());
+        ends.lead_in = lead;
+    }
+
+    /// Appends the lead-out that starts at the last burnt point, arc `end`.
+    fn lead_out_into(
+        &self,
+        end: f64,
+        inside: bool,
+        pieces: &mut [Vec<PointUm>],
+        ends: &mut CutEnds,
+    ) {
+        if self.path.lead_out == LeadKind::None {
+            return;
+        }
+        let m = &self.measured;
+        let t = m.tangent_before(end);
+        let n = waste_normal(t, inside, self.depth);
+        let length = um(self.path.lead_out_length.um());
+        let mut lead = rounded(&lead_out(self.path.lead_out, length, m.point_at(end), t, n));
+        if let Some(piece) = pieces.last_mut()
+            && let Some(&junction) = piece.last()
+        {
+            lead[0] = junction;
+            lead.dedup();
+            piece.extend(lead.iter().skip(1).copied());
+        }
+        ends.own_touch[1] = touches_own(&lead, m.points());
+        ends.lead_out = lead;
     }
 }
 

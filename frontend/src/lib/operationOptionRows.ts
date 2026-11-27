@@ -9,7 +9,7 @@ import type { OperationKind } from "./operationsView.ts";
 
 /** A typed field of the unfolded row: the session's option name and how the field is drawn. */
 export interface OptionField {
-  key: "interval" | "scan_angle" | "overscan" | "z_offset" | "tab_count" | "tab_width";
+  key: "interval" | "scan_angle" | "overscan" | "z_offset" | "tab_count" | "tab_width" | "lead_in_mm" | "lead_out_mm" | "overcut";
   /** The word inside the field's left edge. */
   label: string;
   /** The accessible name (UX 11). */
@@ -50,6 +50,13 @@ export const TAB_FIELDS: readonly OptionField[] = [
   { key: "tab_count", label: "Count", name: "Tab count", unit: "", step: 1, shiftStep: 5, decimals: 0, width: 96 },
   { key: "tab_width", label: "Width", name: "Tab width, millimetres", unit: "mm", step: 0.1, shiftStep: 1, decimals: 2, width: 128 },
 ];
+
+/** The lengths and Overcut of the Path options group (`specs/0139` `ux-notes.md` 2). */
+export const PATH_FIELDS = {
+  leadIn: { key: "lead_in_mm", label: "", name: "Lead-in length, millimetres", unit: "mm", step: 0.1, shiftStep: 1, decimals: 2, width: 84 },
+  leadOut: { key: "lead_out_mm", label: "", name: "Lead-out length, millimetres", unit: "mm", step: 0.1, shiftStep: 1, decimals: 2, width: 84 },
+  overcut: { key: "overcut", label: "Overcut", name: "Overcut, millimetres", unit: "mm", step: 0.1, shiftStep: 1, decimals: 2, width: 128 },
+} as const satisfies Record<string, OptionField>;
 
 /** A toggle of the lower part. */
 export interface OptionToggle {
