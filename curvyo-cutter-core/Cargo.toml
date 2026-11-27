@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "The cutting plotter extension (ADR 0095, `specs/0159-cutting-plotter`): its manifest and built-in machine profiles."
+description = "The cutting plotter extension (ADR 0097, `specs/0159-cutting-plotter`): manifest, profiles, mats, operations, job and the Design Space SVG and HPGL writers."
 
 [lints]
 workspace = true
@@ -12,3 +12,13 @@ workspace = true
 [dependencies]
 curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+curvyo-geometry-core = { path = "../curvyo-geometry-core", version = "0.1.0" }
+curvyo-library-core = { path = "../curvyo-library-core", version = "0.1.0" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+# The golden files are also compared in the wasm build, in Node (`adrs.md` PL7); MIT OR
+# Apache-2.0, already in the lock file through the laser's tests.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
