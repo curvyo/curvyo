@@ -231,6 +231,7 @@ mod laser_output_commands;
 mod operation;
 mod operation_codec;
 mod operation_members;
+mod operation_records;
 mod operation_settings_commands;
 mod test_grid_codec;
 mod test_grid_commands;
@@ -250,6 +251,10 @@ pub use operation::{
     SET_OPERATION_OUTPUT_COMMIT_LABEL, SET_OPERATION_SHOW_COMMIT_LABEL,
 };
 pub use operation_codec::OperationSnapshot;
+pub use operation_records::{
+    ADD_TAB_COMMIT_LABEL, DELETE_TAB_COMMIT_LABEL, MOVE_TAB_COMMIT_LABEL,
+    OPERATIONS_TABS_COMMIT_LABEL, OWN_TABS_COMMIT_LABEL, TAB_WIDTH_COMMIT_LABEL, member_key_text,
+};
 pub use operation_settings_commands::{
     ADD_MATERIAL_COMMIT_LABEL, ADD_MATERIAL_SET_COMMIT_LABEL, CROP_TEST_PHOTO_COMMIT_LABEL,
     DELETE_MATERIAL_COMMIT_LABEL, DELETE_MATERIAL_SET_COMMIT_LABEL, DELETE_TEST_COMMIT_LABEL,

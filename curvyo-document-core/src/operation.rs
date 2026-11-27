@@ -352,7 +352,13 @@ impl Document {
                     self.member_keys_may_exist.set(true);
                     meta.insert(&key, true)
                 }
-                (false, true) => meta.delete(&key),
+                (false, true) => {
+                    // `specs/0139` L4: the item's records of this operation go with its key.
+                    if let Some(text) = key.strip_prefix(crate::operation_codec::MEMBER_PREFIX) {
+                        crate::operation_records::delete_records_of(&tree, tree_id_of(id), text);
+                    }
+                    meta.delete(&key)
+                }
                 _ => continue,
             };
             written.map_err(|_| OperationError::NoSuchOperation)?;

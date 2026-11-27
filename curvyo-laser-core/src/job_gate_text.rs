@@ -291,6 +291,14 @@ pub fn check_text(issue: &Issue, names: &Names) -> CheckText {
             button: names.item(*item).to_owned(),
             after: " could not run.".to_owned(),
         },
+        Cause::CoveredByTabs { .. } => CheckText::led(
+            format!("{count} {}", verb(count, "path", "paths")),
+            verb(
+                count,
+                " is covered by tabs and cuts nothing.",
+                " are covered by tabs and cut nothing.",
+            ),
+        ),
         Cause::StaleResults { item } => CheckText {
             before: format!("{count} stored AI {} of ", verb(count, "result", "results")),
             button: names.item(*item).to_owned(),

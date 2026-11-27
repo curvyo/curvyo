@@ -27,6 +27,7 @@
         "counter": 35,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "engrave",
       "margin_mm": 0.0,
@@ -57,6 +58,7 @@
             "scan_angle_deg": 0.0
           },
           "image": null,
+          "tabs": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -110,5 +112,7 @@
       "description": "Creates Image 1",
       "kind": "image"
     }
-  ]
+  ],
+  "tab_chip": null,
+  "tabs_tool": null
 }

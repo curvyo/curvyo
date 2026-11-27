@@ -29,6 +29,8 @@ export interface EntryFieldProps {
   onClose?: () => void;
   /** The suffix is a 12 px word ("x width") instead of a 14 px unit. */
   smallSuffix?: boolean;
+  /** The message chip hangs from the field's left edge instead of its right edge: for a field at the left of a narrow column. */
+  messageFromLeft?: boolean;
   /** Hex fields are left-aligned, the number fields right-aligned. */
   align?: "left" | "right";
   /** Enter or Tab: `"committed"`, `"unchanged"` or `"invalid:<code>"`. */
@@ -87,6 +89,7 @@ export function EntryField({
   placeholder,
   gutter,
   smallSuffix = false,
+  messageFromLeft = false,
   suffixRight = 6,
   autoFocus = false,
   initialText,
@@ -280,7 +283,7 @@ export function EntryField({
         <div
           id={messageId}
           role="alert"
-          className="pointer-events-none absolute top-full right-0 z-30 mt-1 flex w-max max-w-[244px] items-start gap-1 rounded-md bg-popover px-2 py-1 text-xs text-[var(--field-invalid)] ring-1 ring-[var(--field-invalid)]"
+          className={`pointer-events-none absolute top-full ${messageFromLeft ? "left-0" : "right-0"} z-30 mt-1 flex w-max max-w-[244px] items-start gap-1 rounded-md bg-popover px-2 py-1 text-xs text-[var(--field-invalid)] ring-1 ring-[var(--field-invalid)]`}
         >
           <CircleAlert size={12} aria-hidden className="mt-0.5 shrink-0" />
           {message}

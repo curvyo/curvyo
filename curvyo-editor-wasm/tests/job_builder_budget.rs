@@ -3,8 +3,9 @@
 //! the thread clock already is): (a) 1,000 Cut items of 20 nodes plan in 100 ms; (b) a 200 x 200
 //! mm Engrave at 0.1 mm (2,000 lines, bidirectional) in 150 ms; (c) the same with Crosshatch in
 //! 300 ms; (d) the job, timeline and gate after a numbers edit on 50 operations and 1,000 items,
-//! plans cached, in 16 ms. Budgets are asserted in release builds; a debug build prints the
-//! times and checks the rest.
+//! plans cached, in 16 ms; and `specs/0139` criterion 25 (a): the 1,000 Cut items with four tabs
+//! each in 150 ms. Budgets are asserted in release builds; a debug build prints the times and
+//! checks the rest.
 
 #![allow(clippy::unwrap_used)]
 
@@ -146,6 +147,7 @@ fn cut_page(operations: usize, power: f64) -> JobInput {
             node: ids[i],
             stacking: u32::try_from(i).unwrap(),
             geometry: LeafGeometry::Outlines(vec![polygon(5.0 + col * 9.5, 5.0 + row * 11.5)]),
+            cut: curvyo_laser_core::tabs::LeafTabs::default(),
         });
     }
     page(blocks)
@@ -160,6 +162,7 @@ fn engrave_page(crosshatch: bool) -> JobInput {
         overscan: Overscan::DEFAULT,
         z_offset: ZOffset::default(),
         image: curvyo_laser_core::settings::ImageSettings::DEFAULT,
+        cut: curvyo_laser_core::settings::CutSettings::DEFAULT,
     };
     page(vec![block(
         ids[0],
@@ -170,6 +173,7 @@ fn engrave_page(crosshatch: bool) -> JobInput {
             node: ids[1],
             stacking: 0,
             geometry: LeafGeometry::Outlines(vec![square(50.0, 50.0, 200.0)]),
+            cut: curvyo_laser_core::tabs::LeafTabs::default(),
         }],
     )])
 }
@@ -188,6 +192,25 @@ fn a_thousand_cut_items_build_within_100_ms() {
     assert_eq!(built.job.blocks.len(), 1);
     assert!(built.job.moves.len() > 20_000);
     check("36 (a)", took, Duration::from_millis(100));
+}
+
+/// `specs/0139` criterion 25 (adrs L13), slice 1: the same 1,000 Cut items with Count 4 build
+/// within 150 ms (slice 2 adds Lead-in Arc, Lead-out Line and Overcut to this case).
+#[test]
+fn a_thousand_cut_items_with_four_tabs_build_within_150_ms() {
+    let mut input = cut_page(1, 90.0);
+    if let BlockSource::Operation {
+        options: Ok(options),
+        ..
+    } = &mut input.blocks[0].source
+    {
+        options.cut.tab_count = curvyo_laser_core::settings::TabCount::new(4).unwrap();
+    }
+    let (built, took) = cpu_time::cpu_time_of(|| build_job(&input, &[], &mut PlanCache::default()));
+    let plan = built.plans[0].as_ref().unwrap();
+    assert_eq!(plan.marks.len(), 1_000);
+    assert!(plan.marks.iter().all(|m| m.gaps.len() == 4));
+    check("0139 25 (a)", took, Duration::from_millis(150));
 }
 
 #[test]

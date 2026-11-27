@@ -11,7 +11,7 @@ use curvyo_laser_core::library::MaterialRead;
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
     Field, Interval, OperationOptions, PickKind, Role, SetKind, Settings, SettingsRead,
-    SettingsState, hatches, main_set, read_options, resolve, scans,
+    SettingsState, cuts_through, hatches, main_set, read_options, resolve, scans,
 };
 use serde::Serialize;
 
@@ -167,6 +167,21 @@ pub struct OptionsView {
     /// The Image settings group, only while the Engrave operation holds a raster item
     /// (`specs/0123` criterion 11); the settings stay stored while it is `None`.
     pub image: Option<ImageSettingsView>,
+    /// The Tabs group, Cut and Cut-out only (`specs/0139` criteria 1, 2).
+    pub tabs: Option<TabsView>,
+}
+
+/// The Tabs group of a Cut or Cut-out row (`specs/0139` criteria 1 to 3).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TabsView {
+    /// Tabs per path.
+    pub count: u8,
+    /// The tab width in mm.
+    pub width_mm: f64,
+    /// Skip inner shapes.
+    pub skip_inner: bool,
+    /// The muted line under Count: "Placed: 3 per path", only when some path gets fewer.
+    pub placed: Option<String>,
 }
 
 /// The four hatch options.
@@ -182,8 +197,19 @@ pub struct HatchOptionsView {
     pub overscan_pct: u8,
 }
 
-fn options_view(options: OperationOptions, kind: OperationKind, facts: RasterFacts) -> OptionsView {
+fn options_view(
+    options: OperationOptions,
+    kind: OperationKind,
+    facts: RasterFacts,
+    placed: Option<String>,
+) -> OptionsView {
     OptionsView {
+        tabs: cuts_through(kind).then(|| TabsView {
+            count: options.cut.tab_count.get(),
+            width_mm: options.cut.tab_width.mm(),
+            skip_inner: options.cut.tab_skip_inner,
+            placed,
+        }),
         image: (kind == OperationKind::Image).then(|| image_settings_view(&options.image, facts)),
         hatch: scans(kind).then(|| HatchOptionsView {
             crosshatch: hatches(kind).then_some(options.crosshatch),
@@ -341,6 +367,9 @@ pub(super) struct PageFacts {
     pub(super) motorised_z: bool,
     /// What each Image operation's items need of its group, by operation.
     pub(super) raster: HashMap<NodeId, RasterFacts>,
+    /// The placed line of each Cut or Cut-out whose paths get fewer tabs than Count
+    /// (`specs/0139` criterion 2), by operation.
+    pub(super) placed: HashMap<NodeId, String>,
 }
 
 impl PageFacts {
@@ -352,6 +381,7 @@ impl PageFacts {
             defaults: session.active_defaults(),
             motorised_z: session.active_motorised_z(),
             raster: session.raster_facts(),
+            placed: session.placed_lines(),
         }
     }
 }
@@ -447,7 +477,7 @@ pub(super) fn settings_view(
         interval_mm: interval_view(&state),
         options: options.map(|options| {
             let facts = page.raster.get(&op.id).copied().unwrap_or_default();
-            options_view(options, kind, facts)
+            options_view(options, kind, facts, page.placed.get(&op.id).cloned())
         }),
         z_offset_shown: page.motorised_z,
     })

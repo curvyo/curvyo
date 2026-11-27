@@ -750,7 +750,17 @@ impl DocumentVersion {
 /// 65 reads such a link as Damaged settings, so this build's files are refused there by version.
 /// No migration: a file of 65 or lower opens unchanged and every link follows Best. Goldens:
 /// `material_pick_v66.curvyo`, `material_pick_damaged_v66.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 66;
+/// Version 67 (`specs/0139-laser-cut-path-options` slice 1, `adrs.md` L2 to L6): the `op_options`
+/// of a Cut or Cut-out operation may hold `tab_count`, `tab_width_mm` and `tab_skip_inner`, and an
+/// operation node may hold `tabs.<key>` (the own tabs of the item whose membership key is
+/// `member.<key>`; a plain map from an outline reference to a list of `{ at, width_mm? }`). A build
+/// that stops at 66 reads the new `op_options` keys as damaged settings and ignores the tabs, which
+/// would cut a held part loose, so this build's files are refused there by version; a file of 66 or
+/// lower opens unchanged with no tabs. The records are opaque here: the laser extension reads them,
+/// a damaged one makes its item run nothing and is kept unchanged. They go with the membership
+/// key (unassign, delete, the dead-key sweep). Goldens: `laser_path_options_v67.curvyo`,
+/// `laser_path_options_damaged_v67.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 67;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

@@ -32,6 +32,8 @@ pub(super) struct PageInput {
     pub input: JobInput,
     /// The gate's facts beside the job.
     pub facts: GateFacts,
+    /// Where each cut leaf's tabs are stored (`specs/0139`).
+    pub cut_keys: Vec<super::cut_keys::CutKey>,
 }
 
 /// The page-mm geometry of each indexed leaf, for the leaf list it was built from.
@@ -200,6 +202,7 @@ impl Session {
         let statuses = leaf_statuses(&list, &leaves);
         let maps = page_maps(self, &manufacturing);
         let mut blocks = fixture_blocks(&self.running_fixture_runs(), maps.first().copied());
+        let mut cut_keys = Vec::new();
         for (row, &at) in list.sequence().iter().enumerate() {
             let op = &active.operations[at];
             if !op.output {
@@ -215,9 +218,21 @@ impl Session {
                     && (!op.grid
                         || select_id(&leaves[index]).is_some_and(|id| grid_parts.contains(&id)))
             };
-            let rows = (0..leaves.len()).filter(|&i| runs_here(i));
-            let mut block = self.operation_block(op, rows, &leaves, &geometry, &statuses);
+            let rows: Vec<usize> = (0..leaves.len()).filter(|&i| runs_here(i)).collect();
+            let mut block =
+                self.operation_block(op, rows.iter().copied(), &leaves, &geometry, &statuses);
             block.ring = ring;
+            // The rows that gave a leaf, in the order `operation_block` pushed them.
+            let used: Vec<usize> = rows
+                .into_iter()
+                .filter(|&at| select_id(&leaves[at]).is_some() && geometry[at].is_some())
+                .collect();
+            let cut = super::cut_keys::CutRows {
+                leaves: &leaves,
+                statuses: &statuses,
+                used: &used,
+            };
+            self.cut_tabs_into(op, &mut block, &cut, &mut cut_keys);
             blocks.push(block);
         }
         self.retain_job_pixels(&blocks);
@@ -233,6 +248,7 @@ impl Session {
                 blocks,
             },
             facts: super::gate_facts::gate_facts(&active.operations, &list, &leaves, &statuses),
+            cut_keys,
         })
     }
 
@@ -349,6 +365,7 @@ impl Session {
                     node,
                     stacking,
                     geometry,
+                    cut: curvyo_laser_core::tabs::LeafTabs::default(),
                 });
                 continue;
             }
@@ -409,6 +426,7 @@ fn add_cut_out(
             item,
             stacking,
             leaves: vec![outlines],
+            cut: curvyo_laser_core::tabs::LeafTabs::default(),
         });
     }
 }
@@ -477,12 +495,14 @@ fn fixture_blocks(runs: &[FixtureRun], to_page: Option<Affine>) -> Vec<BlockInpu
                         item: fixture,
                         stacking,
                         leaves: vec![parts],
+                        cut: curvyo_laser_core::tabs::LeafTabs::default(),
                     });
                 } else {
                     block.leaves.push(LeafInput {
                         node: fixture,
                         stacking,
                         geometry: LeafGeometry::Outlines(parts),
+                        cut: curvyo_laser_core::tabs::LeafTabs::default(),
                     });
                 }
             }

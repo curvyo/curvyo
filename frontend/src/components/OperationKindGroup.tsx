@@ -1,6 +1,7 @@
+import { Toggle } from "radix-ui";
 import { useId } from "react";
 
-import { OperationGlyph } from "@/components/panel/OperationGlyphs";
+import { OperationGlyph, TabsGlyph } from "@/components/panel/OperationGlyphs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { kindButtonName, leavesEnteredGroup } from "@/lib/kindButtons";
 import type { KindButton } from "@/lib/operationsView";
@@ -12,6 +13,8 @@ interface OperationKindGroupProps {
   onPress: (kind: string, shift: boolean) => void;
   /** Escape on a button inside an entered group: leave it. Absent outside a group. */
   onLeaveGroup?: () => void;
+  /** The Tabs toggle after the kinds (`specs/0139` `ux-notes.md` 4.2); absent while hidden. */
+  tabs?: { on: boolean; onToggle: (on: boolean) => void };
 }
 
 /**
@@ -21,7 +24,7 @@ interface OperationKindGroupProps {
  * Shift press (Shift+Enter, Shift+Space too) creates a new operation. The focus stays on the
  * pressed button, so Escape there leaves an entered group through `onLeaveGroup`.
  */
-export function OperationKindGroup({ kinds, onPress, onLeaveGroup }: OperationKindGroupProps) {
+export function OperationKindGroup({ kinds, onPress, onLeaveGroup, tabs }: OperationKindGroupProps) {
   const id = useId();
   return (
     <div
@@ -55,6 +58,18 @@ export function OperationKindGroup({ kinds, onPress, onLeaveGroup }: OperationKi
           </Tooltip>
         );
       })}
+      {tabs ? (
+        <Tooltip side="bottom" offset={6} content="Tabs">
+          <Toggle.Root
+            pressed={tabs.on}
+            onPressedChange={tabs.onToggle}
+            aria-label="Tabs"
+            className="ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
+          >
+            <TabsGlyph pressed={tabs.on} />
+          </Toggle.Root>
+        </Tooltip>
+      ) : null}
     </div>
   );
 }

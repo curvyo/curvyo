@@ -10,5 +10,7 @@
   "operations_view": true,
   "pick": [],
   "rows": [],
-  "select_bar_kinds": null
+  "select_bar_kinds": null,
+  "tab_chip": null,
+  "tabs_tool": null
 }

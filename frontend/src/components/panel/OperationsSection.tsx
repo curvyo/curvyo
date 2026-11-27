@@ -442,6 +442,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
                           onReturnToRow={() => focusRow(listRef.current, entry.index)}
                           rowKey={operationIdKey(entry.row.id)}
                           onHeight={onBodyHeight}
+                          tabChip={view.tabChip}
                         />
                       ) : undefined
                     }

@@ -3,6 +3,7 @@
 //! play bar, the exports not yet saved.
 
 mod commands;
+mod cut_keys;
 mod export;
 mod fixture_pick;
 mod focus;
@@ -28,10 +29,12 @@ use std::collections::HashSet;
 
 use curvyo_document_core::NodeId;
 
+pub(in crate::session) use cut_keys::CutKey;
 pub use export::ExportedJob;
 pub use fixture_pick::FixtureOutputView;
 #[cfg(target_arch = "wasm32")]
 pub use frame::shape_of;
+pub(in crate::session) use job_cache::PageJob;
 pub use play::PlayView;
 pub use send::{SendView, SentJobFile, send_notice};
 pub use tab_facts::RowRunView;

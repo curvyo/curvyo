@@ -4,11 +4,12 @@ import { useLayoutEffect, useRef } from "react";
 import { ImageSettingsGroup } from "@/components/panel/ImageSettingsGroup";
 import { OperationOptionsPart, OptionFieldView } from "@/components/panel/OperationOptionsPart";
 import { OperationSettingsBlock } from "@/components/panel/OperationSettingsBlock";
+import { OperationItemPart, OperationTabsGroup } from "@/components/panel/OperationTabsPart";
 import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
 import type { OperationToolsApi } from "@/hooks/useOperationTools";
 import { INTERVAL_FIELD, optionText } from "@/lib/operationOptionRows";
 import type { PickMaterial } from "@/lib/operationSettingsView";
-import type { OperationRow } from "@/lib/operationsView";
+import type { OperationRow, TabChip } from "@/lib/operationsView";
 
 interface OperationBodyProps {
   row: OperationRow;
@@ -22,6 +23,8 @@ interface OperationBodyProps {
   rowKey: string;
   /** The body's height once drawn, for the window's one tall item (`ux-notes.md` 6.1). */
   onHeight: (key: string, height: number) => void;
+  /** The width chip of the current tab handle (`specs/0139` criterion 6); `null` without one. */
+  tabChip?: TabChip | null;
 }
 
 /**
@@ -29,7 +32,7 @@ interface OperationBodyProps {
  * part is the Settings block of `0028` with Interval beside Passes for the hatching kinds; under
  * a hairline the lower part holds the operation-only settings.
  */
-export function OperationBody({ row, pick, settings, tools, onEditMaterial, onReturnToRow, rowKey, onHeight }: OperationBodyProps) {
+export function OperationBody({ row, pick, settings, tools, onEditMaterial, onReturnToRow, rowKey, onHeight, tabChip = null }: OperationBodyProps) {
   const box = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = box.current;
@@ -83,6 +86,8 @@ export function OperationBody({ row, pick, settings, tools, onEditMaterial, onRe
       ) : null}
       {image ? <ImageSettingsGroup row={row} image={image} tools={tools} onReturnFocus={onReturnToRow} /> : null}
       <OperationOptionsPart row={row} tools={tools} onReturnFocus={onReturnToRow} />
+      <OperationTabsGroup row={row} tools={tools} onReturnFocus={onReturnToRow} />
+      <OperationItemPart row={row} chip={tabChip} tools={tools} onReturnFocus={onReturnToRow} />
     </div>
   );
 }

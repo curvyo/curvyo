@@ -3,6 +3,9 @@
 
 use serde_json::{Map, Value, json};
 
+use crate::operation_cut_options::{
+    CUT_KEYS, CutEdit, CutSettings, cuts_through, read_cut_key, write_cut_keys,
+};
 use crate::operation_image_options::{
     IMAGE_KEYS, ImageEdit, ImageSettings, read_image_key, write_image_keys,
 };
@@ -195,6 +198,8 @@ pub struct OperationOptions {
     pub z_offset: ZOffset,
     /// The Image settings of a raster item (Image only, `specs/0123`; ADR 0069 §13).
     pub image: ImageSettings,
+    /// The cut path settings (Cut and Cut-out only, `specs/0139` adrs L2).
+    pub cut: CutSettings,
 }
 
 impl Default for OperationOptions {
@@ -206,6 +211,7 @@ impl Default for OperationOptions {
             overscan: Overscan::DEFAULT,
             z_offset: ZOffset::default(),
             image: ImageSettings::DEFAULT,
+            cut: CutSettings::DEFAULT,
         }
     }
 }
@@ -242,6 +248,8 @@ pub enum OptionEdit {
     ZOffset(ZOffset),
     /// One of the Image settings (Image only, `specs/0123` criteria 11, 12).
     Image(ImageEdit),
+    /// One of the cut path settings (Cut and Cut-out only, `specs/0139` criterion 1).
+    Cut(CutEdit),
 }
 
 const KEY_CROSSHATCH: &str = "crosshatch";
@@ -272,6 +280,8 @@ fn key_on_kind(key: &str, kind: OperationKind) -> bool {
         scans(kind)
     } else if IMAGE_KEYS.contains(&key) {
         kind == OperationKind::Image
+    } else if CUT_KEYS.contains(&key) {
+        cuts_through(kind)
     } else {
         true
     }
@@ -305,7 +315,9 @@ pub fn read_options(
         if !key_on_kind(key, kind) {
             return Err(OptionsDamage::KeyOnKind);
         }
-        if read_image_key(&mut options.image, key, value)? {
+        if read_image_key(&mut options.image, key, value)?
+            || read_cut_key(&mut options.cut, key, value)?
+        {
             continue;
         }
         match key {
@@ -330,8 +342,8 @@ pub fn read_options(
 }
 
 impl OperationOptions {
-    /// The whole map to store for an operation of kind `kind`: every key the kind takes, so
-    /// [`read_options`] reads it back equal.
+    /// The whole map to store for an operation of kind `kind`: every key the kind takes (the cut
+    /// path keys only when one differs from its default), so [`read_options`] reads it back equal.
     #[must_use]
     pub fn to_value(&self, kind: OperationKind) -> Value {
         let mut map = Map::new();
@@ -345,6 +357,11 @@ impl OperationOptions {
         }
         if kind == OperationKind::Image {
             write_image_keys(&self.image, &mut map);
+        }
+        // Only settings that differ from the defaults are written, so a project without tabs
+        // stores the same map as before `specs/0139` (criterion 24).
+        if cuts_through(kind) && self.cut != CutSettings::DEFAULT {
+            write_cut_keys(self.cut, &mut map);
         }
         map.insert(KEY_Z_OFFSET.to_owned(), json!(self.z_offset.mm()));
         Value::Object(map)
@@ -364,6 +381,7 @@ impl OperationOptions {
             OptionEdit::Image(edit) if kind == OperationKind::Image => {
                 next.image = next.image.with(edit);
             }
+            OptionEdit::Cut(edit) if cuts_through(kind) => next.cut = next.cut.with(edit),
             _ => return None,
         }
         (next != *self).then_some(next)

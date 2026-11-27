@@ -45,6 +45,12 @@ export interface OperationToolsApi {
   /** Escape on a kind button inside an entered group: the session leaves one level, as Escape
    * on the canvas does; whether it left. */
   leaveGroup: () => boolean;
+  /** The Tabs toggle of the Select bar (`specs/0139` UX 4.2); whether it changed. */
+  setTabsTool: (on: boolean) => boolean;
+  /** The Tabs pill of the item part of row `id`: Own or the operation's; whether it wrote. */
+  setTabsOwn: (id: OperationId, own: boolean) => boolean;
+  /** The current tab's width in mm, `null` for the operation's; the chip text, empty when taken. */
+  setTabWidth: (mm: number | null) => string;
 }
 
 /** The operation tools' API for `editor`. */
@@ -111,5 +117,15 @@ export function useOperationTools(editor: OperationToolsEditor): OperationToolsA
     [run],
   );
 
-  return { press, pressed, status, unfold, edit, setDither, toggleView, reveal, leaveGroup };
+  const setTabsTool = useCallback((on: boolean) => run(false, (s) => s.set_tabs_tool(on)), [run]);
+  const setTabsOwn = useCallback(
+    (id: OperationId, own: boolean) => run(false, (s) => s.set_selection_tabs_own(operationIdText(id), own)),
+    [run],
+  );
+  const setTabWidth = useCallback(
+    (mm: number | null) => run("", (s) => s.set_current_tab_width(mm ?? Number.NaN)),
+    [run],
+  );
+
+  return { press, pressed, status, unfold, edit, setDither, toggleView, reveal, leaveGroup, setTabsTool, setTabsOwn, setTabWidth };
 }

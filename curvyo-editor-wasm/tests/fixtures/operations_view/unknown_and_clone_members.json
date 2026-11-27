@@ -27,6 +27,7 @@
         "counter": 47,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "unknown",
       "margin_mm": 0.0,
@@ -48,6 +49,7 @@
         "counter": 42,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "cut",
       "margin_mm": 0.0,
@@ -73,6 +75,12 @@
         "options": {
           "hatch": null,
           "image": null,
+          "tabs": {
+            "count": 0,
+            "placed": null,
+            "skip_inner": false,
+            "width_mm": 0.5
+          },
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -101,5 +109,7 @@
       "unfolded": false
     }
   ],
-  "select_bar_kinds": null
+  "select_bar_kinds": null,
+  "tab_chip": null,
+  "tabs_tool": null
 }

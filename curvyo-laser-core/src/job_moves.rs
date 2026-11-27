@@ -303,7 +303,7 @@ impl Moves {
                     let Some(&first) = path.points.first() else {
                         continue;
                     };
-                    let (lead_in, lead_out) = if path.hatch && run_out > 0.0 {
+                    let (run_in, run_out_end) = if path.hatch && run_out > 0.0 {
                         let last = path.points[path.points.len() - 1];
                         (
                             Some(self.extend(first, last, run_out)),
@@ -312,11 +312,11 @@ impl Moves {
                     } else {
                         (None, None)
                     };
-                    self.push(lead_in.unwrap_or(first), MoveKind::Travel, index);
+                    self.push(run_in.unwrap_or(first), MoveKind::Travel, index);
                     if let Some(z) = z_pending.take() {
                         self.push(self.head, MoveKind::Z(z), index);
                     }
-                    if lead_in.is_some() {
+                    if run_in.is_some() {
                         self.push(first, MoveKind::RunOut(run.role), index);
                     }
                     for &point in &path.points[1..] {
@@ -326,7 +326,7 @@ impl Moves {
                         };
                         self.push(point, kind, index);
                     }
-                    if let Some(end) = lead_out {
+                    if let Some(end) = run_out_end {
                         self.push(end, MoveKind::RunOut(run.role), index);
                     }
                 }
@@ -360,7 +360,7 @@ impl Moves {
         let MoveKind::Sweep { role, .. } = kind else {
             return;
         };
-        let (lead_in, lead_out) = if run_out > 0.0 {
+        let (run_in, run_out_end) = if run_out > 0.0 {
             (
                 Some(self.extend(sweep.start, sweep.end, run_out)),
                 Some(self.extend(sweep.end, sweep.start, run_out)),
@@ -368,15 +368,15 @@ impl Moves {
         } else {
             (None, None)
         };
-        self.push(lead_in.unwrap_or(sweep.start), MoveKind::Travel, index);
+        self.push(run_in.unwrap_or(sweep.start), MoveKind::Travel, index);
         if let Some(z) = z_pending.take() {
             self.push(self.head, MoveKind::Z(z), index);
         }
-        if lead_in.is_some() {
+        if run_in.is_some() {
             self.push(sweep.start, MoveKind::RunOut(role), index);
         }
         self.push(sweep.end, kind, index);
-        if let Some(end) = lead_out {
+        if let Some(end) = run_out_end {
             self.push(end, MoveKind::RunOut(role), index);
         }
     }

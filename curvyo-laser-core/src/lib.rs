@@ -10,6 +10,8 @@
     allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)
 )]
 
+mod cut_item_records;
+mod cut_tabs;
 mod fixture_fit;
 mod fixture_grid;
 mod fixture_kind;
@@ -31,6 +33,7 @@ mod image_dither;
 mod image_preset;
 mod job_anchor;
 mod job_build;
+mod job_cut_path;
 mod job_effects;
 mod job_fingerprint;
 mod job_flatten;
@@ -43,9 +46,11 @@ mod job_gate_text;
 mod job_hatch;
 mod job_input;
 mod job_moves;
+mod job_nesting;
 mod job_numbers;
 mod job_order;
 mod job_plan;
+mod job_plan_cuts;
 mod job_raster_dither;
 mod job_raster_grid;
 mod job_raster_items;
@@ -78,6 +83,7 @@ mod material_record_picks;
 mod material_retired;
 mod material_store;
 mod material_test_file;
+mod operation_cut_options;
 mod operation_cut_out;
 mod operation_group;
 mod operation_image_options;
@@ -166,6 +172,7 @@ pub mod print_and_cut {
 pub mod job {
     pub use crate::job_anchor::{BurnBox, anchor, burn_box};
     pub use crate::job_build::{Built, build_frame_job, build_job, prepare_job};
+    pub use crate::job_cut_path::TabGap;
     pub use crate::job_effects::{ExportEffects, export_effects};
     pub use crate::job_frame::{FrameShape, outline as frame_outline};
     pub use crate::job_gate::{
@@ -188,7 +195,8 @@ pub mod job {
         BlockNumbers, NumbersContext, NumbersRead, NumbersSource, RunNumbers, block_numbers,
     };
     pub use crate::job_plan::{
-        FLATTEN_MM, Plan, PlanCache, PlannedPath, PlannedRun, PlannedSweep, plan_block,
+        CutMark, FLATTEN_MM, Plan, PlanCache, PlannedPath, PlannedRun, PlannedSweep,
+        cut_out_outlines, cut_outlines, plan_block,
     };
     pub use crate::job_raster_items::ADJUST_DOTS;
     pub use crate::job_raster_plan::{
@@ -207,6 +215,18 @@ pub mod job {
     };
 }
 
+/// The tabs of cut paths (`specs/0139-laser-cut-path-options` slice 1): the own tabs of an item
+/// in one operation, their outline references, the automatic placement and the handle rules.
+pub mod tabs {
+    pub use crate::cut_item_records::{
+        LeafTabs, OwnTab, OwnTabs, PathFraction, RecordDamage, below_target, outline_ref,
+        read_own_tabs,
+    };
+    pub use crate::cut_tabs::{
+        MIN_PIECE_UM, Measured, NO_ROOM_TEXT, Slide, TabSpan, add, automatic, automatic_count,
+        has_room, overlap, own_spans, placed_text, slide, with_width,
+    };
+}
 /// The settings of operations and the numbers they share with material records (ADR 0054 §1 to
 /// §3; ADR 0055 §2; ADR 0058 §2), with the operation-only settings of
 /// `specs/0111-laser-operation-tools` (ADR 0056 §5, §6).
@@ -214,6 +234,9 @@ pub mod settings {
     pub use crate::material::{
         CellIndex, Interval, MAX_HISTORY_ENTRIES, MAX_MATERIAL_NAME_CHARS, MachineTie, Passes,
         PickKind, PowerPercent, SetKind, SetNumbers, Settings, Thickness, next_modified,
+    };
+    pub use crate::operation_cut_options::{
+        CutEdit, CutLength, CutSettings, TabCount, cuts_through,
     };
     pub use crate::operation_image_options::{Dither, ImageEdit, ImageField, ImageSettings};
     pub use crate::operation_options::{

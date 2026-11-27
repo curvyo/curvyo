@@ -100,6 +100,10 @@ impl Session {
         if let Some(hint) = self.fixture_cursor() {
             return hint;
         }
+        // Tab handles and the Tabs tool's add (`specs/0139` UX 4.3, 5.1).
+        if let Some(hint) = self.tab_cursor() {
+            return hint.to_owned();
+        }
         let objects = self.objects();
         // The cursor arrows follow the box the maker sees: its direction is the
         // shown angle (`orientation()`), which is the `rotation` register for

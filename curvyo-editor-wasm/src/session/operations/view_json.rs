@@ -44,6 +44,11 @@ pub struct OperationsView {
     /// The materials of this machine the Material pick lists (`specs/0028` criterion 25), in the
     /// order of the Materials section; damaged and newer records are not listed.
     pub pick: Vec<PickView>,
+    /// The Tabs toggle of the Select bar (`specs/0139` UX 4.2): `None` while it is hidden, else
+    /// whether it is on.
+    pub tabs_tool: Option<bool>,
+    /// The width chip of the current tab handle (`specs/0139` criterion 6); `None` without one.
+    pub tab_chip: Option<super::tabs::TabChipView>,
 }
 
 /// One operation's row.
@@ -77,6 +82,9 @@ pub struct RowView {
     /// Its Settings block (`specs/0028` criteria 24 to 26); `None` for a grid row and an
     /// unknown operation.
     pub settings: Option<SettingsView>,
+    /// The Tabs row of the item part while selected items run in this unfolded Cut or Cut-out
+    /// (`specs/0139` criterion 5, UX 3); `None` otherwise.
+    pub item_tabs: Option<super::tabs::ItemTabsView>,
     /// The source line of a test grid's derived row (`specs/0112` criterion 12); `None` for any
     /// other row.
     pub source: Option<SourceView>,
@@ -273,6 +281,9 @@ impl Session {
                     tick,
                     group_in_part,
                     unfolded: unfolded == Some(op.id),
+                    item_tabs: (unfolded == Some(op.id))
+                        .then(|| self.item_tabs_view(op.id))
+                        .flatten(),
                     settings: settings_view(self, op, &pick, &page),
                     source: source_view(self, op, &mut sources),
                     run,
@@ -299,6 +310,8 @@ impl Session {
             select_bar_kinds: self.select_bar_kinds(&active),
             entered_group: self.entered_group_view(),
             pick,
+            tabs_tool: self.tabs_tool_shown().then(|| self.tabs_tool()),
+            tab_chip: self.current_tab_chip(),
         })
     }
 

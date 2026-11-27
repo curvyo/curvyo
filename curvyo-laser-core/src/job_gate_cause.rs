@@ -142,6 +142,12 @@ pub enum Cause {
         /// The picture.
         item: NodeId,
     },
+    /// `specs/0139` criterion 10: paths whose own tabs cover them whole cut nothing; the count
+    /// is the paths'.
+    CoveredByTabs {
+        /// The operation.
+        op: NodeId,
+    },
 }
 
 impl Cause {
@@ -177,6 +183,7 @@ impl Cause {
             Self::DamagedSettings => 25,
             Self::BrokenAdjustments { .. } => 26,
             Self::StaleResults { .. } => 27,
+            Self::CoveredByTabs { .. } => 28,
         }
     }
 

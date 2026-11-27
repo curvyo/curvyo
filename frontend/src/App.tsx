@@ -354,6 +354,10 @@ function Editor() {
                 entered: operations.view?.enteredGroup != null,
                 onPress: (kind, shift) => operationTools.press(kind, shift),
                 onLeaveGroup: operationTools.leaveGroup,
+                tabs:
+                  operations.view?.tabsTool == null || operations.view.tabsTool === undefined
+                    ? undefined
+                    : { on: operations.view.tabsTool, onToggle: (on) => operationTools.setTabsTool(on) },
               }}
               tile={{ slot: editor.tiling.slot, onEnter: editor.tiling.enter, onRelease: editor.tiling.release }}
               widthEdit={<WidthEditToggle editor={editor} inBar />}

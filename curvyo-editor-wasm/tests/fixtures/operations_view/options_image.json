@@ -22,6 +22,7 @@
         "counter": 23,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "image",
       "margin_mm": 0.0,
@@ -85,6 +86,7 @@
               "value": 12.5
             }
           },
+          "tabs": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -113,5 +115,7 @@
       "unfolded": true
     }
   ],
-  "select_bar_kinds": null
+  "select_bar_kinds": null,
+  "tab_chip": null,
+  "tabs_tool": null
 }

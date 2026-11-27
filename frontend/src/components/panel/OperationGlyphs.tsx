@@ -93,3 +93,20 @@ export function TestGridGlyph({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+/**
+ * The Tabs glyph (`specs/0139` `ux-notes.md` 4.1): a horizontal cut line in `--cut` with a 4 px gap
+ * and an ink bar across the gap, the canvas tab look in small. `pressed` turns the red part to the
+ * toggle's pressed foreground.
+ */
+export function TabsGlyph({ size = 16, pressed = false }: { size?: number; pressed?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" strokeWidth={1.5} aria-hidden focusable={false} className="shrink-0">
+      <g stroke={pressed ? "currentColor" : "var(--cut)"}>
+        <line x1="2" y1="8" x2="6" y2="8" />
+        <line x1="10" y1="8" x2="14" y2="8" />
+      </g>
+      <line x1="8" y1="5" x2="8" y2="11" stroke="currentColor" />
+    </svg>
+  );
+}
