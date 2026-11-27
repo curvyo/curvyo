@@ -4,13 +4,15 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 # Not the workspace's AGPL-3.0-or-later: this crate is a port of Ink/Stitch and stays under its
-# licence (ADR 0095 decision 7). `LICENSE` holds the text, `NOTICE.md` the upstream and changes.
+# licence (ADR 0097 decision 7). `LICENSE` holds the text, `NOTICE.md` the upstream and changes.
 license = "GPL-3.0-or-later"
-description = "The Ink/Stitch port (ADR 0095 decision 7): embroidery stitch algorithms from plain geometry in millimetres to stitch point lists, under GPL-3.0-or-later and without any Curvyo crate."
+description = "The Ink/Stitch port (ADR 0097 decision 7): embroidery stitch algorithms from plain geometry in millimetres to stitch point lists, under GPL-3.0-or-later and without any Curvyo crate."
 
 [lints]
 workspace = true
 
-# No dependencies yet. The port may use `kurbo`, `i_overlay` and `thiserror` only, and never a
-# `curvyo-*` crate, so the licence boundary stays this one crate edge (ADR 0095 §2).
+# The port may use `kurbo`, `i_overlay` and `thiserror` only, and never a `curvyo-*` crate, so
+# the licence boundary stays this one crate edge (ADR 0097 §2). Slice 1 needs `kurbo` only; the
+# row clip is the port's own scanline (`adrs.md` EM1).
 [dependencies]
+kurbo.workspace = true

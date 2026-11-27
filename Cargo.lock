@@ -1172,6 +1172,14 @@ version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
  "curvyo-extension-core",
+ "curvyo-geometry-core",
+ "curvyo-inkstitch-core",
+ "curvyo-library-core",
+ "kurbo",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -1239,6 +1247,9 @@ dependencies = [
 [[package]]
 name = "curvyo-inkstitch-core"
 version = "0.1.0"
+dependencies = [
+ "kurbo",
+]
 
 [[package]]
 name = "curvyo-laser-core"

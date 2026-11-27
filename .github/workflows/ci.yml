@@ -654,6 +654,8 @@ jobs:
           cargo test --target wasm32-unknown-unknown -p curvyo-ui-core --test tiling_golden
           cargo test --target wasm32-unknown-unknown -p curvyo-image-core --test adjust_goldens
           cargo test --target wasm32-unknown-unknown -p curvyo-laser-core --test adjust_goldens
+          # specs/0160-embroidery adrs.md EM9: the DST goldens (the port's tatami rows among them).
+          cargo test --target wasm32-unknown-unknown -p curvyo-embroidery-core --test dst_goldens
 
   # Dependency-graph/license check, not compiled code — one run sees every
   # target deny.toml's [graph] lists (including wasm32-unknown-unknown),
