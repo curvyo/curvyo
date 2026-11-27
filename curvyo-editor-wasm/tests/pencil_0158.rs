@@ -1,6 +1,11 @@
 //! The Pressure Pencil at session level (`specs/0158-pen-display` slice 1): every behaviour is fed
 //! as batches of flat `PenSample` records, so no tablet is needed (ADR 0095 decision 1).
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::assert_is_empty, missing_docs)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::assert_is_empty,
+    missing_docs
+)]
 
 use curvyo_document_core::{
     AnchorId, Direction, Document, NewAnchor, NodeId, PathSnapshot, Point, pack, unpack,

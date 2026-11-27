@@ -19,6 +19,7 @@ import { SlotReplaceNotice } from "@/components/SlotReplaceNotice";
 import { ErrorDialog } from "@/components/ErrorDialog";
 import { NodeToolbar } from "@/components/NodeToolbar";
 import { PenModeBar } from "@/components/PenModeBar";
+import { PencilBar } from "@/components/PencilBar";
 import { PropertiesPanel } from "@/components/panel/PropertiesPanel";
 import { Rulers } from "@/components/Rulers";
 import { CurveToBezierButton } from "@/components/CurveToBezierButton";
@@ -265,7 +266,7 @@ function Editor() {
             // The Select bar is left-aligned so its two switches never move
             // when the selection changes; the Node and Shape bars stay
             // centred (`docs/design-system.md`, "Select bar layout").
-            editor.tool === "select" || editor.tool === "trace" || editor.tool === "test-grid" || (editor.tool === "node" && editor.centreLines.open) ? "justify-start" : editor.tool === "pen" ? PEN_BAR_PLACE : "justify-center"
+            editor.tool === "select" || editor.tool === "trace" || editor.tool === "test-grid" || (editor.tool === "node" && editor.centreLines.open) ? "justify-start" : editor.tool === "pen" || editor.tool === "pencil" ? PEN_BAR_PLACE : "justify-center"
           } ${
             // The Select bar's chips (Curve to Bézier, Width) go to a second row when they do
             // not fit beside it, so they never squeeze it (`specs/0110` UX review U4).
@@ -387,6 +388,7 @@ function Editor() {
             />
           ) : null}
           {editor.tool === "pen" ? <PenModeBar editor={editor} /> : null}
+          {editor.tool === "pencil" ? <PencilBar editor={editor} /> : null}
           {editor.tool === "node" && editor.centreLines.open ? (
             <CentreLinesBar api={editor.centreLines} info={centreInfo} onReturnFocus={() => editor.containerRef.current?.focus()} />
           ) : null}

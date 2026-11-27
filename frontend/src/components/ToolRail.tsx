@@ -8,6 +8,7 @@ import {
   Square,
   Star,
   Type,
+  PencilLine,
 } from "lucide-react";
 import { Tooltip } from "radix-ui";
 
@@ -269,7 +270,23 @@ export function ToolRail({
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
+            {/* The Pencil (`specs/0158-pen-display` slice 1, UX notes §1): the eighth slot, after
+                Text; P is a tool letter in every state. */}
+            <ToolButton
+              tool="pencil"
+              active={tool === "pencil"}
+              label="Pencil tool"
+              name="Pencil tool (P)"
+              shortcut="P"
+              icon={<PencilLine size={20} />}
+              onSelect={onSelect}
+              onReturnFocus={onReturnFocus}
+            />
           </div>
+          {/* "Too short" (design-system row "Tool rail architecture"): the Tools card stays, the
+              cards below it scroll inside column A; the negative margin keeps room for their
+              shadows. */}
+          <div className="-mx-3 -mb-1 flex min-h-0 flex-col gap-2 overflow-y-auto px-3 pb-1 [scrollbar-width:thin]">
           {moveOnly ? null : <GroupCommands
             commands={grouping}
             selectTool={tool === "select"}
@@ -335,6 +352,7 @@ export function ToolRail({
             ) : null}
           </div>
           <ImportCard primary={MAC ? "Cmd" : "Ctrl"} onImport={onImport} />
+          </div>
         </div>
         {/* Column B: the Path card and, 8px below it, the Boolean card. */}
         <div className="flex w-12 flex-col gap-2">
