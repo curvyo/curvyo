@@ -224,6 +224,7 @@ impl Session {
                 record: plan.record,
                 frame: plan.snapshot.frame,
                 overlay: true,
+                refused: false,
             });
             if let Some(drag) = self.generators.knobs.drag.as_mut() {
                 drag.asked = asked;

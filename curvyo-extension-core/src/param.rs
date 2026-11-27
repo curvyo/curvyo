@@ -14,6 +14,11 @@ const COUNT: &str = "count";
 const ON: &str = "on";
 const CHOICE: &str = "choice";
 const PATH: &str = "path";
+const TEXT: &str = "text";
+const PCT: &str = "pct";
+/// The most bytes a stored text may hold (a QR code at version 40 takes 2,953); longer text is
+/// cut at a character boundary by [`Param::accept`].
+const MAX_TEXT_BYTES: usize = 8192;
 /// The most cubics a stored outline may hold, and the largest coordinate it may use (mm).
 const MAX_PATH_CUBICS: usize = 2000;
 const MAX_PATH_MM: f64 = 1e7;
@@ -87,6 +92,11 @@ pub enum ShownWhen {
         /// The option id it must hold.
         choice: &'static str,
     },
+    /// The percentage `key` is at its maximum (a Module fill of 100 %).
+    Full {
+        /// The percentage's key.
+        key: &'static str,
+    },
     /// The length `key` is above zero.
     Positive {
         /// The length's key.
@@ -122,6 +132,18 @@ impl ShownWhen {
                 .all(|key| matches!(value(key), Some(ParamValue::Switch(true)))),
             Self::Is { key, choice } => {
                 matches!(value(key), Some(ParamValue::Choice(current)) if current == choice)
+            }
+            Self::Full { key } => {
+                let full = schema
+                    .iter()
+                    .find(|param| param.key == key)
+                    .and_then(|param| match (param.kind, param.read(params)) {
+                        (ParamKind::Percent { max, .. }, ParamValue::Percent(now)) => {
+                            Some(now == max)
+                        }
+                        _ => None,
+                    });
+                full == Some(true)
             }
             Self::Positive { key } => {
                 matches!(value(key), Some(ParamValue::Length(length)) if length.as_mm() > 0.0)
@@ -196,6 +218,18 @@ pub enum ParamKind {
     },
     /// One closed outline in frame-local mm (ADR 0083 §2); the block draws no field for it.
     Path,
+    /// A text of any length up to 8,192 bytes (ADR 0091 §3), one line or several.
+    Text {
+        /// Whether the field takes line breaks (Enter inserts one).
+        multiline: bool,
+    },
+    /// A whole percentage within `min..=max` (ADR 0091 §3).
+    Percent {
+        /// The smallest value.
+        min: u32,
+        /// The largest value.
+        max: u32,
+    },
 }
 
 /// A typed parameter value.
@@ -214,6 +248,10 @@ pub enum ParamValue {
     Choice(String),
     /// One closed outline, as `{"path": [x0, y0, c1x, c1y, c2x, c2y, x, y, ...]}`.
     Path(ClosedPath),
+    /// A text, as `{"text": "..."}`.
+    Text(String),
+    /// A whole percentage, as `{"pct": n}`.
+    Percent(u32),
 }
 
 impl ParamValue {
@@ -238,6 +276,8 @@ impl ParamValue {
             Self::Switch(on) => (ON, Value::from(*on)),
             Self::Choice(id) => (CHOICE, Value::from(id.as_str())),
             Self::Path(path) => (PATH, Value::from(path.flat())),
+            Self::Text(text) => (TEXT, Value::from(text.as_str())),
+            Self::Percent(percent) => (PCT, Value::from(*percent)),
         };
         let mut map = Map::new();
         map.insert(key.to_owned(), value);
@@ -267,6 +307,8 @@ impl ParamValue {
             COUNT => Some(Self::Count(u32::try_from(inner.as_u64()?).ok()?)),
             ON => Some(Self::Switch(inner.as_bool()?)),
             CHOICE => Some(Self::Choice(inner.as_str()?.to_owned())),
+            TEXT => Some(Self::Text(inner.as_str()?.to_owned())),
+            PCT => Some(Self::Percent(u32::try_from(inner.as_u64()?).ok()?)),
             PATH => {
                 let numbers: Option<Vec<f64>> = inner
                     .as_array()?
@@ -324,6 +366,24 @@ impl ParamValue {
         }
     }
 
+    /// The text this value holds, if it is one.
+    #[must_use]
+    pub fn text(&self) -> Option<&str> {
+        match self {
+            Self::Text(text) => Some(text),
+            _ => None,
+        }
+    }
+
+    /// The percentage this value holds, if it is one.
+    #[must_use]
+    pub const fn percent(&self) -> Option<u32> {
+        match self {
+            Self::Percent(percent) => Some(*percent),
+            _ => None,
+        }
+    }
+
     /// The chosen option id this value holds, if it is a choice.
     #[must_use]
     pub fn choice(&self) -> Option<&str> {
@@ -332,6 +392,18 @@ impl ParamValue {
             _ => None,
         }
     }
+}
+
+/// `text` cut to [`MAX_TEXT_BYTES`] at a character boundary.
+fn cut_text(mut text: String) -> String {
+    if text.len() > MAX_TEXT_BYTES {
+        let mut end = MAX_TEXT_BYTES;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.truncate(end);
+    }
+    text
 }
 
 /// The shape check of an outline (ADR 0083 §2): at least two cubics, at most 2,000, every number
@@ -400,6 +472,12 @@ impl Param {
             }
             (ParamKind::Path, ParamValue::Path(path)) if path_is_usable(&path) => {
                 Some(ParamValue::Path(path))
+            }
+            (ParamKind::Percent { min, max }, ParamValue::Percent(percent)) => {
+                Some(ParamValue::Percent(percent.clamp(min, max)))
+            }
+            (ParamKind::Text { .. }, ParamValue::Text(text)) => {
+                Some(ParamValue::Text(cut_text(text)))
             }
             _ => None,
         }
@@ -646,6 +724,61 @@ mod tests {
             }
             .holds(std::slice::from_ref(&choice), &StoredParams::new())
         );
+    }
+
+    #[test]
+    fn text_and_percent_round_trip_clamp_and_cut() {
+        let text = Param {
+            key: "content",
+            label: "Content",
+            tooltip: "Content",
+            kind: ParamKind::Text { multiline: true },
+            default: ParamValue::Text("a".into()),
+            shown_when: None,
+            track: None,
+            initial: None,
+        };
+        let percent = Param {
+            key: "fill",
+            label: "Fill",
+            tooltip: "Fill",
+            kind: ParamKind::Percent { min: 50, max: 100 },
+            default: ParamValue::Percent(100),
+            shown_when: None,
+            track: None,
+            initial: None,
+        };
+        for value in [
+            ParamValue::Text("two\nlines \u{e4}".into()),
+            ParamValue::Percent(70),
+        ] {
+            assert_eq!(ParamValue::from_stored(&value.to_stored()), Some(value));
+        }
+        assert_eq!(
+            ParamValue::Text("x".into()).to_stored(),
+            serde_json::json!({"text": "x"})
+        );
+        assert_eq!(
+            ParamValue::Percent(7).to_stored(),
+            serde_json::json!({"pct": 7})
+        );
+        assert_eq!(
+            percent.accept(ParamValue::Percent(10)),
+            Some(ParamValue::Percent(50))
+        );
+        assert_eq!(percent.accept(ParamValue::Text("1".into())), None);
+        let long = "\u{e4}".repeat(5000);
+        let kept = text.accept(ParamValue::Text(long)).unwrap();
+        assert!(kept.text().unwrap().len() <= 8192);
+        assert_ne!(kept.text().unwrap().len(), 0);
+        let schema = [percent];
+        let mut stored = StoredParams::new();
+        assert!(
+            ShownWhen::Full { key: "fill" }.holds(&schema, &stored),
+            "default is full"
+        );
+        stored.insert("fill".into(), ParamValue::Percent(90).to_stored());
+        assert!(!ShownWhen::Full { key: "fill" }.holds(&schema, &stored));
     }
 
     fn square(side: f64) -> ClosedPath {

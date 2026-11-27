@@ -77,6 +77,22 @@ impl Document {
         generated_codec::read_snapshot(id, &meta)
     }
 
+    /// The kind, seed and parameters of the generated object `id` without its outline (no subpath
+    /// decoded), `None` when it is not one or cannot be read.
+    #[must_use]
+    pub fn generated_params(&self, id: NodeId) -> Option<crate::GeneratedParams> {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let tree_id = tree_id_of(id);
+        if !leaf_exists(&tree, tree_id) {
+            return None;
+        }
+        let meta = tree.get_meta(tree_id).ok()?;
+        if !is_generated_meta(&meta) {
+            return None;
+        }
+        generated_codec::read_kind_params(&meta)
+    }
+
     /// Whether `id` is a generated object, read from its shape tag alone (no record decoded): the
     /// Node tool leaves such an object out of its editing set.
     #[must_use]

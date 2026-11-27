@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Circle,
   Cog,
+  QrCode,
   Eye,
   EyeOff,
   Frame,
@@ -85,6 +86,7 @@ const GENERATOR_GLYPHS: Record<string, Glyph> = {
   box: Box,
   "rounded box": SquareRoundCorner,
   "path box": Spline,
+  "qr code": QrCode,
 };
 
 /** The kind word of a fixture row as a glyph kind; anything unlisted is the unknown glyph. */

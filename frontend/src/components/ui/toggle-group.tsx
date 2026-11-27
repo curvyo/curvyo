@@ -36,6 +36,9 @@ interface ToggleGroupProps<T extends string> {
   onReturnFocus: () => void;
   /** Marks the group's tab stop as the panel's first focus target. */
   firstFocus?: boolean;
+  /** Lays the items out in this many columns (a strip of four long names in two rows of two,
+   * `specs/0144` UX notes §3); one radio group, one Tab stop. */
+  columns?: number;
   /** The tool bars' look (the Polygon/Star switch): one ring around the strip, no lines between
    * the items (the Pen bar, customer 2026-11-11). */
   bar?: boolean;
@@ -66,6 +69,7 @@ export function ToggleGroup<T extends string>({
   onReturnFocus,
   firstFocus = false,
   bar = false,
+  columns,
 }: ToggleGroupProps<T>) {
   return (
     <RadioGroup.Root
@@ -106,6 +110,7 @@ export function ToggleGroup<T extends string>({
           onChange(target.dataset.value as T);
         }
       }}
+      style={columns ? { display: "grid", gridTemplateColumns: `repeat(${columns}, ${itemWidth}px)` } : undefined}
       className={
         bar
           ? "inline-flex w-fit shrink-0 overflow-hidden rounded-md ring-1 ring-border"
@@ -131,7 +136,11 @@ export function ToggleGroup<T extends string>({
               }
             }}
             className={`flex items-center justify-center bg-transparent text-[var(--toolbar-icon)] outline-none enabled:hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] aria-checked:enabled:!bg-[var(--toolbar-icon-active-bg)] aria-checked:enabled:!text-[var(--toolbar-icon-active-fg)] aria-checked:disabled:bg-[color-mix(in_srgb,var(--toolbar-icon)_30%,transparent)] ${
-              index > 0 && !bar ? `border-l ${BORDER}` : ""
+              columns
+                ? `${index % columns > 0 ? `border-l ${BORDER}` : ""} ${index >= columns ? `border-t ${BORDER}` : ""}`
+                : index > 0 && !bar
+                  ? `border-l ${BORDER}`
+                  : ""
             }`}
             style={{ width: option.width ?? itemWidth, height: itemHeight }}
           >

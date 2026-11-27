@@ -26,6 +26,7 @@ vectrace.workspace = true
 curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }
 curvyo-generators-core = { path = "../curvyo-generators-core", version = "0.1.0" }
+curvyo-codes-core = { path = "../curvyo-codes-core", version = "0.1.0" }
 kurbo.workspace = true
 serde.workspace = true
 # The stored trace settings of a part are a map of plain JSON values (ADR 0061 §5); the

@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useRef, useState } from "react";
+import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { ValueField } from "@/components/panel/ValueField";
 import { PanelSwitch } from "@/components/ui/switch";
@@ -70,7 +70,7 @@ function NumberRow({
         dragMin={min}
         mixed={false}
         // A derived field (Pitch diameter) reserves the slot but never offers a reset.
-        resettable={row.key !== "pitch_diameter" && stored !== defaultNumber}
+        resettable={row.key !== "pitch_diameter" && row.key !== "width" && stored !== defaultNumber}
         muted={automatic}
         valueText={`${rowText(row)} ${unitWordsOf(row)}${words}`}
         // The tooltip's first line says it too: "Rounded box lid thickness: 3 mm, follows wall
@@ -117,6 +117,10 @@ function NumberRow({
   );
 }
 
+/** The rows whose choice strip carries its own visible name: two strips with the same cells
+ * (Finder Outer and Inner, `specs/0144` UX notes §3). */
+const LABELLED_GROUPS = new Set(["Finder"]);
+
 function ChoiceRow({
   row,
   api,
@@ -129,21 +133,145 @@ function ChoiceRow({
   if (row.kind.kind !== "choice") {
     return null;
   }
+  const count = row.kind.options.length;
+  // Four long names wrap into two rows of two (Module shape); four short ones stay in a row
+  // (Error correction).
+  const wrap = count === 4 && row.kind.options.some((option) => option.label.length > 8);
+  const labelled = LABELLED_GROUPS.has(row.group);
+  const itemWidth = wrap ? Math.floor(WIDTH / 2) : Math.floor((labelled ? 176 : WIDTH) / count);
   const options: ToggleOption<string>[] = row.kind.options.map((option) => ({
     value: option.id,
     label: option.label,
     tooltip: "",
     icon: <span className="text-sm">{option.label}</span>,
   }));
-  return (
+  const strip = (
     <ToggleGroup
       label={row.label}
       options={options}
       value={typeof row.value === "string" ? row.value : null}
       onChange={(next) => api.setValue(row.key, next)}
-      itemWidth={Math.floor(WIDTH / options.length)}
+      itemWidth={itemWidth}
+      columns={wrap ? 2 : undefined}
       onReturnFocus={onReturnFocus}
     />
+  );
+  return labelled ? (
+    <div className="flex w-[244px] items-center gap-2">
+      <span className="w-[60px] shrink-0 text-sm text-[var(--toolbar-icon)]">{row.label}</span>
+      {strip}
+    </div>
+  ) : (
+    strip
+  );
+}
+
+/**
+ * The multi-line text field (`specs/0144` UX notes §4): the panel's Text field look, one line
+ * high growing to five, Enter inserts a line break, Ctrl+Enter commits and returns to the canvas,
+ * Tab and a press elsewhere commit, Escape restores. Every keystroke previews, so the code
+ * follows the text; the reason content cannot be drawn is a lasting line under it.
+ */
+function TextRow({
+  row,
+  api,
+  onReturnFocus,
+}: {
+  row: GeneratedRow;
+  api: GeneratorBlockApi;
+  onReturnFocus: () => void;
+}) {
+  const stored = typeof row.value === "string" ? row.value : "";
+  const [draft, setDraft] = useState(stored);
+  const editing = useRef(false);
+  // The blur an Escape or a Ctrl+Enter causes must not commit a second time (or the typed text).
+  const skipBlur = useRef(false);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const reason = useId();
+  // The stored text follows the document while the field is not being typed in (undo, selection).
+  useEffect(() => {
+    if (!editing.current) {
+      setDraft(stored);
+    }
+  }, [stored]);
+  // One line high, growing with the text to five lines (108 px), then it scrolls.
+  useLayoutEffect(() => {
+    const element = field.current;
+    if (element) {
+      element.style.height = "0px";
+      element.style.height = `${Math.min(108, Math.max(28, element.scrollHeight))}px`;
+    }
+  }, [draft]);
+  const commit = () => {
+    editing.current = false;
+    if (skipBlur.current) {
+      skipBlur.current = false;
+      return;
+    }
+    if (draft !== stored) {
+      api.setValue(row.key, draft);
+    } else {
+      api.cancelPreview();
+    }
+  };
+  const invalid = row.problem !== null;
+  return (
+    <div className="flex w-[244px] flex-col gap-1">
+      <textarea
+        ref={field}
+        data-generator-text={row.key}
+        aria-label="QR code content"
+        aria-invalid={invalid}
+        aria-describedby={invalid ? reason : undefined}
+        value={draft}
+        rows={1}
+        spellCheck={false}
+        onFocus={(event) => {
+          // Tab in selects all; a click places the caret.
+          if (event.currentTarget.matches(":focus-visible")) {
+            event.currentTarget.select();
+          }
+        }}
+        onChange={(event) => {
+          editing.current = true;
+          setDraft(event.target.value);
+          api.preview(row.key, event.target.value);
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          // Every key typed here stays here: tool letters, Delete and undo never reach the canvas.
+          event.stopPropagation();
+          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+            event.preventDefault();
+            commit();
+            skipBlur.current = true;
+            onReturnFocus();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            editing.current = false;
+            skipBlur.current = true;
+            setDraft(stored);
+            api.cancelPreview();
+            event.currentTarget.blur();
+          }
+        }}
+        onKeyUp={(event) => event.stopPropagation()}
+        className="box-border w-[244px] resize-none break-all rounded-[5px] bg-white px-2 py-[5px] text-sm leading-[18px] text-black outline-none focus:border-[var(--editor-accent)]"
+        style={{
+          border: invalid
+            ? "2px solid var(--field-invalid)"
+            : "1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent)",
+          minHeight: 28,
+          maxHeight: 108,
+        }}
+      />
+      {invalid ? (
+        <p id={reason} role="status" className="flex items-start gap-1 text-xs" style={{ color: "var(--field-invalid)" }}>
+          <TriangleAlert size={12} className="mt-[2px] shrink-0" aria-hidden="true" />
+          <span>{row.problem}</span>
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -281,12 +409,20 @@ export function GeneratorBlock({
                 </div>
               ) : row.kind.kind === "choice" ? (
                 <ChoiceRow row={row} api={api} onReturnFocus={onReturnFocus} />
+              ) : row.kind.kind === "text" ? (
+                <TextRow row={row} api={api} onReturnFocus={onReturnFocus} />
               ) : (
                 <NumberRow row={row} api={api} onReturnFocus={onReturnFocus} />
               )}
               {api.notice?.key === row.key ? <ClampNotice text={api.notice.text} /> : null}
             </div>
           ))}
+          {group.label === "Colours" && view.contrastLow ? (
+            <p role="status" className="flex w-[244px] items-start gap-1 text-xs text-[var(--toolbar-icon)]">
+              <TriangleAlert size={12} className="mt-[2px] shrink-0" aria-hidden="true" />
+              <span>Low contrast, may not scan</span>
+            </p>
+          ) : null}
         </section>
       ))}
       <PartsGroup api={api} onReturnFocus={onReturnFocus} />

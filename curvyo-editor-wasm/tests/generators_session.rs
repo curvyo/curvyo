@@ -21,7 +21,7 @@ fn panel(session: &Session) -> Value {
 }
 
 #[test]
-fn the_bar_offers_box_box_from_path_gear_and_rounded_box_and_a_press_places_the_chosen_one_selected()
+fn the_bar_offers_box_box_from_path_gear_qr_code_and_rounded_box_and_a_press_places_the_chosen_one_selected()
  {
     let mut s = session();
     let kinds: Value = serde_json::from_str(&s.generator_kinds_json()).unwrap();
@@ -37,6 +37,7 @@ fn the_bar_offers_box_box_from_path_gear_and_rounded_box_and_a_press_places_the_
             "curvyo.generators/box",
             "curvyo.generators/path-box",
             "curvyo.generators/gear",
+            "curvyo.codes/qr",
             "curvyo.generators/rounded-box"
         ]
     );
@@ -126,12 +127,25 @@ fn a_file_with_an_unknown_generator_opens_as_stored_and_says_so_once() {
 fn the_bar_offers_no_kind_while_the_generators_extension_is_off() {
     let mut s = session();
     s.set_extension_enabled("curvyo.generators", false);
+    let rest: Value = serde_json::from_str(&s.generator_kinds_json()).unwrap();
+    assert_eq!(
+        rest.as_array().unwrap().len(),
+        1,
+        "the QR code of the codes extension stays"
+    );
+    assert_eq!(
+        s.generator_kind(),
+        "curvyo.codes/qr",
+        "the first kind the bar offers"
+    );
+    s.set_extension_enabled("curvyo.codes", false);
     assert_eq!(
         s.generator_kinds_json(),
         "[]",
         "the rail button hides on this"
     );
     s.set_extension_enabled("curvyo.generators", true);
+    s.set_extension_enabled("curvyo.codes", true);
     assert_ne!(s.generator_kinds_json(), "[]");
 }
 

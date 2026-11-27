@@ -53,8 +53,8 @@ export interface GeneratorBlockApi {
   notice: { key: string; text: string } | null;
   /** A number, switch or choice into a row; `"committed"`, `"unchanged"` or `"invalid:<code>"`. */
   setValue: (key: string, value: number | boolean | string) => string;
-  /** A value stepped into a row, drawn on the canvas without writing (UX notes §7). */
-  preview: (key: string, value: number) => void;
+  /** A value stepped or typed into a row, drawn on the canvas without writing (UX notes §7). */
+  preview: (key: string, value: number | string) => void;
   /** Drops the preview of a stepped value (Escape, or the field left without a commit). */
   cancelPreview: () => void;
   /** Convert to paths. */
@@ -115,7 +115,7 @@ export function useGeneratorBlock(editor: GeneratorsEditor): GeneratorBlockApi {
     [getSession, sync],
   );
   const preview = useCallback(
-    (key: string, value: number) => {
+    (key: string, value: number | string) => {
       const session = getSession();
       if (!session) {
         return;

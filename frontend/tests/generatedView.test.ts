@@ -306,3 +306,39 @@ test("the Parts group decodes its rows with their state and an old session has n
   assert.ok(plain);
   assert.deepEqual(plain.parts, []);
 });
+
+// `specs/0144-qr-and-barcodes`: the text and percent rows and the lasting reason line.
+const CONTENT = {
+  group: "Content",
+  param: { key: "content", label: "Content", kind: { kind: "text", multiline: true } },
+  value: { kind: "text", value: "two\nlines" },
+  problem: "Enter a text to encode.",
+};
+const FILL = {
+  group: "Modules",
+  param: { key: "module_fill", label: "Module fill", kind: { kind: "percent", min: 50, max: 100 } },
+  value: { kind: "percent", value: 90 },
+};
+
+test("a text row keeps its line breaks and its reason; a row without one has none", () => {
+  const view = decodeGeneratedView(json([CONTENT, FILL]));
+  assert.ok(view);
+  assert.equal(view.rows[0].value, "two\nlines");
+  assert.equal(view.rows[0].kind.kind, "text");
+  assert.equal(view.rows[0].problem, "Enter a text to encode.");
+  assert.equal(view.rows[1].problem, null);
+});
+
+test("a percent row is a number with a percent sign, whole steps and its own bounds", () => {
+  const view = decodeGeneratedView(json([FILL]));
+  assert.ok(view);
+  const [row] = view.rows;
+  assert.equal(unitOf(row.kind), "%");
+  assert.equal(rowText(row), "90");
+  assert.deepEqual(rowRange(row), { now: 90, min: 50, max: 100 });
+  assert.equal(positionOf(row, 75), 0.5);
+  assert.equal(valueAt(row, 1, "normal"), 100);
+  assert.equal(valueAt(row, 0, "normal"), 50);
+  assert.equal(stepValue(row, 90, 15, "normal"), 100, "held inside the bounds");
+  assert.equal(stepRowText(row, "90", "ArrowUp", false, false), "91");
+});

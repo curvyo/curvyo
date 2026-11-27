@@ -140,6 +140,7 @@ pub fn change(
         return Ok(Changed {
             notices,
             written: false,
+            refused: false,
         });
     }
     let subject = ExposedKey::parse(key);
@@ -153,6 +154,7 @@ pub fn change(
     Ok(Changed {
         notices,
         written: true,
+        refused: false,
     })
 }
 

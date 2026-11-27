@@ -26,6 +26,7 @@ mod clone_marks;
 mod clone_panel;
 mod close_path;
 mod closing_join;
+pub mod code_contrast;
 mod colour_hsv;
 mod colour_pick;
 mod combine;

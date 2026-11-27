@@ -32,7 +32,27 @@ fn say(param: &Param, value: &ParamValue) -> String {
             format!("{}°", shown(degrees.0, decimals))
         }
         (_, ParamValue::Count(count)) => count.to_string(),
+        (_, ParamValue::Percent(percent)) => format!("{percent} %"),
+        (ParamKind::Choice { options }, ParamValue::Choice(id)) => options
+            .iter()
+            .find(|option| option.id == id)
+            // "Q 25 %" is said "Q": the first word names the option.
+            .and_then(|option| option.label.split_whitespace().next())
+            .unwrap_or_default()
+            .to_owned(),
         _ => String::new(),
+    }
+}
+
+/// A kind's label inside a sentence: "gear", "rounded box", but "QR code" keeps its acronym.
+#[must_use]
+pub fn noun(label: &str) -> String {
+    let mut chars = label.chars();
+    match (chars.next(), chars.next()) {
+        (Some(first), Some(second)) if first.is_uppercase() && second.is_uppercase() => {
+            label.to_owned()
+        }
+        _ => label.to_lowercase(),
     }
 }
 
@@ -41,8 +61,22 @@ fn say(param: &Param, value: &ParamValue) -> String {
 pub fn clamp_notice(kind: &GeneratorKind, clamp: &Clamp) -> Option<String> {
     let param = kind.params().find(|param| param.key == clamp.key)?;
     let value = say(param, &clamp.value);
-    let name = kind.label.to_lowercase();
+    let name = noun(kind.label);
     Some(match clamp.bound {
+        Bound::DependentFor(subject) => {
+            // "Logo size" (group and row), but "Error correction" once.
+            let group = kind
+                .groups
+                .iter()
+                .find(|group| group.params.iter().any(|p| p.key == clamp.key))
+                .map_or("", |group| group.label);
+            let subject_of_clamp = if group == param.label || group.is_empty() {
+                param.label.to_owned()
+            } else {
+                format!("{group} {}", param.label.to_lowercase())
+            };
+            format!("{subject_of_clamp} set to {value}, the most {subject} allows.")
+        }
         Bound::Minimum => format!("{} set to {value}, the minimum.", param.label),
         Bound::Maximum => format!("{} set to {value}, the maximum.", param.label),
         Bound::Dependent => format!(

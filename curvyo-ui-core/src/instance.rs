@@ -18,7 +18,7 @@ use curvyo_extension_core::{
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::extensions::{ExtensionSettings, generate_object, manifests};
 use crate::instance_notice::notices;
-pub use crate::instance_notice::{clamp_notice, shown};
+pub use crate::instance_notice::{clamp_notice, noun, shown};
 pub use crate::instance_resize::{ResizeView, resize_view};
 pub use crate::instance_view::{
     InstanceView, PartView, RowView, part_name, value_from_json, value_from_number, view,
@@ -80,7 +80,7 @@ pub fn find_kind(settings: &ExtensionSettings, stored: &str) -> Option<KindRef> 
 /// offers.
 #[must_use]
 pub fn enabled_kinds(settings: &ExtensionSettings) -> Vec<KindRef> {
-    manifests()
+    let mut kinds: Vec<KindRef> = manifests()
         .into_iter()
         .filter(|manifest| settings.is_enabled(manifest.id))
         .flat_map(|manifest| {
@@ -93,7 +93,11 @@ pub fn enabled_kinds(settings: &ExtensionSettings) -> Vec<KindRef> {
                 })
                 .collect::<Vec<_>>()
         })
-        .collect()
+        .collect();
+    // The built-ins by the text of their segment (`0144` UX notes §1); stable, so one extension's
+    // own order holds for equal texts.
+    kinds.sort_by_key(|found| found.kind.segment());
+    kinds
 }
 
 /// The stored record of what a generator returned.
@@ -114,6 +118,22 @@ pub(crate) fn record_of(kind: &str, seed: u32, generated: &Generated) -> Generat
             .collect(),
         part_keys: generated.parts.iter().map(|p| p.key.to_string()).collect(),
     }
+}
+
+/// The record of an edit of the object whose record is `stored`: what a generator returned, or,
+/// when it answered no parts (the content cannot be drawn, ADR 0091 §3), the stored parts with
+/// the new parameters, so the object keeps its last valid geometry.
+pub(crate) fn record_keeping(stored: &GeneratedRecord, generated: &Generated) -> GeneratedRecord {
+    if generated.parts.is_empty() {
+        return GeneratedRecord {
+            kind: stored.kind.clone(),
+            seed: stored.seed,
+            params: generated.params.clone(),
+            parts: stored.parts.clone(),
+            part_keys: stored.part_keys.clone(),
+        };
+    }
+    record_of(&stored.kind, stored.seed, generated)
 }
 
 pub(crate) fn generate(
@@ -187,6 +207,32 @@ pub fn draws_marks(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -
                 .get("top_shape")
                 .and_then(ParamValue::from_stored)
                 .is_some_and(|value| value.choice() == Some("curved")))
+}
+
+/// Whether a generator of `kind` can answer no parts at all: only one with a text parameter can
+/// (ADR 0091 §3: content that cannot be clamped), so a box or a gear is never asked.
+#[must_use]
+pub fn can_refuse(settings: &ExtensionSettings, kind: &str) -> bool {
+    find_kind(settings, kind).is_some_and(|found| {
+        found
+            .kind
+            .params()
+            .any(|param| matches!(param.kind, curvyo_extension_core::ParamKind::Text { .. }))
+    })
+}
+
+/// Whether the generator of `kind` answers no parts for `params`: the stored outline is then the last
+/// valid one and is drawn in the No solution look (ADR 0091 §3). `false` for an unknown kind.
+#[must_use]
+pub fn is_refused(
+    settings: &ExtensionSettings,
+    kind: &str,
+    params: &StoredParams,
+    seed: u32,
+) -> bool {
+    find_kind(settings, kind)
+        .and_then(|found| generate(&found, params, seed, None))
+        .is_some_and(|generated| generated.parts.is_empty())
 }
 
 /// The record of a new object of `found` at its defaults as a ghost draws it: the outer
@@ -282,6 +328,9 @@ pub struct Changed {
     pub notices: Vec<String>,
     /// Whether a commit was written (a value equal to the stored one writes nothing).
     pub written: bool,
+    /// Whether the generator answered no parts for the new values: the stored outline is the
+    /// last valid one (`0144` criterion 13).
+    pub refused: bool,
 }
 
 /// What setting one parameter would write: the object as stored, the rebuilt record and the
@@ -297,6 +346,8 @@ pub struct ValuePlan {
     /// The words the generator gave to values at a limit that is a shape ("full round"), by
     /// parameter.
     pub states: Vec<(&'static str, &'static str)>,
+    /// Whether the generator answered no parts: the record keeps the stored outline.
+    pub refused: bool,
 }
 
 /// What setting the parameter `key` of the generated object `id` to `value` would give, without
@@ -331,10 +382,17 @@ pub fn plan_value(
         Some(Edit::Param(key)),
     )
     .ok_or(InstanceError::UnknownKind)?;
-    let record = record_of(&snapshot.record.kind, snapshot.record.seed, &generated);
+    let record = record_keeping(&snapshot.record, &generated);
     let mut notices = notices(&found.kind, &generated.clamps);
+    // The reason content cannot be drawn stays under its field (`InstanceView`), not a notice.
+    let reported: Vec<_> = generated
+        .warnings
+        .iter()
+        .filter(|warning| !crate::instance_warnings::is_content_problem(warning.id))
+        .cloned()
+        .collect();
     notices.extend(crate::instance_warnings::sentences_in(
-        &generated.warnings,
+        &reported,
         crate::instance_warnings::Context::of(&generated),
     ));
     Ok(ValuePlan {
@@ -342,6 +400,7 @@ pub fn plan_value(
         record,
         notices,
         states: generated.states,
+        refused: generated.parts.is_empty(),
     })
 }
 
@@ -362,12 +421,14 @@ pub fn change_value(
         snapshot,
         record,
         notices,
+        refused,
         ..
     } = plan_value(document, settings, id, key, value)?;
     if record == snapshot.record {
         return Ok(Changed {
             notices,
             written: false,
+            refused,
         });
     }
     document
@@ -385,6 +446,7 @@ pub fn change_value(
     Ok(Changed {
         notices,
         written: true,
+        refused,
     })
 }
 
@@ -432,6 +494,10 @@ pub fn plan_resize(
         Some(Edit::Scale(ScaleFactor(factor))),
     )
     .ok_or(InstanceError::UnknownKind)?;
+    // A code whose content cannot be drawn has nothing to scale: the resize is refused.
+    if generated.parts.is_empty() {
+        return Err(InstanceError::Refused);
+    }
     Ok(ResizePlan {
         id,
         record: record_of(&snapshot.record.kind, snapshot.record.seed, &generated),

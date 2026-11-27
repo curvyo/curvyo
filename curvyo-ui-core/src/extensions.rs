@@ -11,9 +11,10 @@ use curvyo_extension_core::{Extension, GenerateRequest, Generated, Manifest, Not
 use serde::{Deserialize, Serialize};
 
 /// Every compiled-in extension, in list order.
-static EXTENSIONS: [&dyn Extension; 2] = [
+static EXTENSIONS: [&dyn Extension; 3] = [
     &curvyo_laser_core::LASER,
     &curvyo_generators_core::GENERATORS,
+    &curvyo_codes_core::CODES,
 ];
 
 fn extension(id: &str) -> Option<&'static dyn Extension> {
@@ -117,9 +118,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_laser_and_the_generators_are_the_compiled_in_extensions() {
+    fn the_laser_the_generators_and_the_codes_are_the_compiled_in_extensions() {
         let ids: Vec<&str> = manifests().iter().map(|m| m.id).collect();
-        assert_eq!(ids, vec!["curvyo.laser", "curvyo.generators"]);
+        assert_eq!(
+            ids,
+            vec!["curvyo.laser", "curvyo.generators", "curvyo.codes"]
+        );
         assert!(manifest("curvyo.laser").is_some());
         assert!(manifest("example.cnc").is_none());
     }
@@ -142,7 +146,7 @@ mod tests {
                 kinds += 1;
             }
         }
-        assert_eq!(kinds, 4, "box, path box, gear, rounded box");
+        assert_eq!(kinds, 5, "box, path box, gear, rounded box, QR code");
         let request = GenerateRequest {
             kind: "gear",
             params: &StoredParams::new(),

@@ -24,6 +24,9 @@ pub struct RowView {
     pub state: Option<String>,
     /// The largest value a bound that depends on other values allows now, for the slider's end.
     pub limit: Option<ParamValue>,
+    /// Why the stored value cannot be drawn ("Enter a text to encode."): a lasting line under the
+    /// field while the object keeps its last geometry (`0144` criterion 13).
+    pub problem: Option<String>,
 }
 
 /// One part of a generated object the Parts group lists (ADR 0082 §10, `0147` UX notes §9).
@@ -70,6 +73,22 @@ pub struct InstanceView {
     pub parts: Vec<PartView>,
 }
 
+/// The sentence of the reason the content cannot be drawn, if the generator reported one.
+fn content_problem(generated: &curvyo_extension_core::Generated) -> Option<String> {
+    let warnings: Vec<_> = generated
+        .warnings
+        .iter()
+        .filter(|warning| crate::instance_warnings::is_content_problem(warning.id))
+        .cloned()
+        .collect();
+    crate::instance_warnings::sentences_in(
+        &warnings,
+        crate::instance_warnings::Context::of(generated),
+    )
+    .into_iter()
+    .next()
+}
+
 /// The block of `snapshot`: its rows with their stored values, the hidden ones left out.
 #[must_use]
 pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> InstanceView {
@@ -111,6 +130,7 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
         })
         .filter(|parts| parts.len() > 1)
         .unwrap_or_default();
+    let problem = generated.as_ref().and_then(content_problem);
     let (used, states, limits) = generated
         .map(|generated| (generated.automatic, generated.states, generated.limits))
         .unwrap_or_default();
@@ -150,6 +170,11 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
                 .iter()
                 .find(|(key, _)| *key == param.key)
                 .map(|(_, value)| value.clone()),
+            problem: if param.key == "content" {
+                problem.clone()
+            } else {
+                None
+            },
         })
         .collect();
     InstanceView {
@@ -178,7 +203,14 @@ pub fn value_from_number(param: &Param, number: f64) -> Option<ParamValue> {
             let count = (number + 0.5).floor().clamp(0.0, f64::from(u32::MAX)) as u32;
             Some(ParamValue::Count(count))
         }
-        ParamKind::Switch | ParamKind::Choice { .. } | ParamKind::Path => None,
+        ParamKind::Percent { .. } => {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let percent = (number + 0.5).floor().clamp(0.0, f64::from(u32::MAX)) as u32;
+            Some(ParamValue::Percent(percent))
+        }
+        ParamKind::Switch | ParamKind::Choice { .. } | ParamKind::Path | ParamKind::Text { .. } => {
+            None
+        }
     }
 }
 
@@ -188,6 +220,7 @@ pub fn value_from_json(param: &Param, value: &Value) -> Option<ParamValue> {
     match (param.kind, value) {
         (ParamKind::Switch, Value::Bool(on)) => Some(ParamValue::Switch(*on)),
         (ParamKind::Choice { .. }, Value::String(id)) => Some(ParamValue::Choice(id.clone())),
+        (ParamKind::Text { .. }, Value::String(text)) => Some(ParamValue::Text(text.clone())),
         (_, Value::Number(number)) => value_from_number(param, number.as_f64()?),
         _ => None,
     }

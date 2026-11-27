@@ -1,4 +1,4 @@
-import { Box, Cog, Spline, SquareRoundCorner } from "lucide-react";
+import { Box, Cog, QrCode, Spline, SquareRoundCorner } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
@@ -7,6 +7,7 @@ import type { GeneratorKindsApi } from "@/hooks/useGenerators";
 const GLYPHS: Record<string, ReactNode> = {
   Box: <Box size={16} strokeWidth={1.5} aria-hidden />,
   Cog: <Cog size={16} strokeWidth={1.5} aria-hidden />,
+  QrCode: <QrCode size={16} strokeWidth={1.5} aria-hidden />,
   Spline: <Spline size={16} strokeWidth={1.5} aria-hidden />,
   SquareRoundCorner: <SquareRoundCorner size={16} strokeWidth={1.5} aria-hidden />,
 };

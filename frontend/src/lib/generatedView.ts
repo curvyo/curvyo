@@ -15,7 +15,9 @@ export type GeneratedKind =
   | { kind: "angle"; min: number; max: number; step: number; decimals: number }
   | { kind: "switch" }
   | { kind: "choice"; options: GeneratedOption[] }
-  | { kind: "path" };
+  | { kind: "path" }
+  | { kind: "text"; multiline: boolean }
+  | { kind: "percent"; min: number; max: number };
 
 /** The span a number's slider is drawn on. */
 export interface GeneratedTrack {
@@ -38,9 +40,13 @@ export interface GeneratedRow {
   state: string | null;
   /** For an automatic row stored as 0: the value the generator used, `null` otherwise. */
   used: number | null;
+  /** Why the stored value cannot be drawn ("Enter a text to encode."), a lasting line under the
+   * field while the object keeps its last geometry (`specs/0144` criterion 13); `null` when none. */
+  problem: string | null;
   /** The schema default of the row, for the reset slot. */
   defaultValue: number | boolean | string;
-  /** A number for a length, count or angle; a boolean for a switch; an option id for a choice. */
+  /** A number for a length, count, angle or percent; a boolean for a switch; an option id for a
+   * choice; the text of a text row. */
   value: number | boolean | string;
 }
 
@@ -67,6 +73,8 @@ export interface GeneratedView {
   rows: GeneratedRow[];
   /** The Parts group, empty for a kind with nothing to detach. */
   parts: GeneratedPart[];
+  /** A code's fill is below 3 : 1 against the document background (`specs/0144` criterion 9). */
+  contrastLow: boolean;
 }
 
 /** The decoder of `generated_panel_json`: `null` for no block. */
@@ -83,6 +91,7 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
   const view = raw as {
     label?: unknown;
     known?: unknown;
+    contrast_low?: unknown;
     parts?: { key: string; name: string; detached?: boolean; operation?: string; can_detach?: boolean }[];
     rows?: {
       group: string;
@@ -97,6 +106,7 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
       used?: { value: unknown } | null;
       state?: string | null;
       limit?: { value: unknown } | null;
+      problem?: string | null;
     }[];
   };
   if (typeof view.label !== "string" || view.known !== true || !Array.isArray(view.rows)) {
@@ -105,6 +115,7 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
   return {
     label: view.label,
     known: true,
+    contrastLow: view.contrast_low === true,
     parts: (view.parts ?? []).map((part) => ({
       key: part.key,
       name: part.name,
@@ -121,6 +132,7 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
       used: typeof row.used?.value === "number" ? row.used.value : null,
       state: typeof row.state === "string" ? row.state : null,
       limit: typeof row.limit?.value === "number" ? row.limit.value : null,
+      problem: typeof row.problem === "string" ? row.problem : null,
       defaultValue: (row.param.default?.value ?? row.value.value) as number | boolean | string,
       value: row.value.value as number | boolean | string,
     })),
@@ -169,10 +181,10 @@ export function shownNumber(value: number, decimals: number): string {
   return text.includes(".") ? text.replace(/0+$/, "").replace(/\.$/, "") : text;
 }
 
-/** The unit inside the right edge of a row: millimetres whatever the display unit, degrees, none
- * for a count. */
+/** The unit inside the right edge of a row: millimetres whatever the display unit, degrees, a
+ * percent sign, none for a count. */
 export function unitOf(kind: GeneratedKind): string | undefined {
-  return kind.kind === "length" ? "mm" : kind.kind === "angle" ? "°" : undefined;
+  return kind.kind === "length" ? "mm" : kind.kind === "angle" ? "°" : kind.kind === "percent" ? "%" : undefined;
 }
 
 /** The unit of a row: the Joint spread count is a percentage. */
@@ -206,7 +218,7 @@ export function rowRange(row: GeneratedRow): { now: number; min: number; max: nu
   if (typeof row.value !== "number") {
     return null;
   }
-  if (kind.kind === "length" || kind.kind === "count" || kind.kind === "angle") {
+  if (kind.kind === "length" || kind.kind === "count" || kind.kind === "angle" || kind.kind === "percent") {
     return { now: row.value, min: kind.min, max: kind.max };
   }
   return null;
@@ -239,7 +251,7 @@ export type SliderGrid = "normal" | "coarse" | "fine";
 /** The smallest and largest value a number row may hold. */
 function bounds(row: GeneratedRow): { min: number; max: number } {
   const { kind } = row;
-  return kind.kind === "length" || kind.kind === "count" || kind.kind === "angle"
+  return kind.kind === "length" || kind.kind === "count" || kind.kind === "angle" || kind.kind === "percent"
     ? { min: kind.min, max: kind.max }
     : { min: 0, max: 1 };
 }
@@ -311,6 +323,9 @@ export function dragSpan(row: GeneratedRow): { min: number; limit: number } {
 /** The unit spelled out for `aria-valuetext`. */
 export function unitWordsOf(row: GeneratedRow): string {
   if (row.key === "joint_spread") {
+    return "percent";
+  }
+  if (row.kind.kind === "percent") {
     return "percent";
   }
   return row.kind.kind === "length" ? "millimetres" : row.kind.kind === "angle" ? "degrees" : row.label.toLowerCase();

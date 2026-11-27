@@ -164,6 +164,9 @@ pub enum Bound {
     Dependent,
     /// A bound that depends on other parameters, the value was raised to it ("the least").
     DependentMinimum,
+    /// A bound that depends on other parameters, named by its cause: "the most error correction M
+    /// allows" (the name is the subject).
+    DependentFor(&'static str),
     /// The same, because of a choice that sets its own minimum ("the least the Wave pattern
     /// allows"): the name of that choice.
     DependentMinimumFor(&'static str),
