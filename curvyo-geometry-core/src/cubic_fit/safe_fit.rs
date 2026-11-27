@@ -53,7 +53,7 @@ impl ParamCurveFit for GuardedSource {
 
 /// `smooth` (a tangent-continuous path) simplified within `accuracy`, as `simplify_bezpath`
 /// with its default options does, without the candidates kurbo cannot measure.
-pub(super) fn simplify(smooth: &BezPath, accuracy: f64) -> BezPath {
+pub(crate) fn simplify(smooth: &BezPath, accuracy: f64) -> BezPath {
     if smooth.elements().len() <= 2 {
         return smooth.clone();
     }
@@ -65,7 +65,7 @@ pub(super) fn simplify(smooth: &BezPath, accuracy: f64) -> BezPath {
 }
 
 /// kurbo's `fit_to_cubic`, or `None` where it would measure an oversized candidate.
-pub(super) fn fit_to_cubic(
+pub(crate) fn fit_to_cubic(
     source: &impl ParamCurveFit,
     range: Range<f64>,
     accuracy: f64,
@@ -267,14 +267,14 @@ fn candidate_arms(th0: f64, th1: f64, area: f64, mx: f64) -> Vec<(f64, f64)> {
 }
 
 /// A fitted cubic may stray this many times the accuracy from the piece's polyline.
-pub(super) const STRAY: f64 = 3.0;
+pub(crate) const STRAY: f64 = 3.0;
 /// Points sampled on each fitted cubic for the stray test.
 const STRAY_SAMPLES: usize = 16;
 
 /// Whether a point of `path` (sampled) lies farther than `limit` from the polyline `points`:
 /// kurbo measures a candidate's error by rays from the source only, so it accepts a cubic that
 /// runs on past the source's end along a straight run.
-pub(super) fn strays(path: &BezPath, points: &[Point], limit: f64) -> bool {
+pub(crate) fn strays(path: &BezPath, points: &[Point], limit: f64) -> bool {
     use kurbo::ParamCurve;
     let within = |p: Point, k: usize| {
         let (a, b) = (points[k], points[k + 1]);

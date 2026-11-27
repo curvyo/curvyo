@@ -17,7 +17,6 @@ mod profile;
 #[cfg(test)]
 mod quality_tests;
 mod rings;
-mod safe_fit;
 mod stages;
 #[cfg(test)]
 mod tests;
@@ -34,6 +33,7 @@ use branch_trim::{ParentCurve, cut_branch};
 use chains::{Chain, ChainEnd, chains};
 use curvyo_document_core::{Length, Point as DocPoint};
 use fit::{Budget, Fitted, fit, fit_with_tips, tolerance};
+pub(crate) use profile::fit_profile_within;
 pub use stages::{CentreStages, StageRuns};
 
 /// The options of Find centre lines (`specs/0117-centre-lines` criteria 10, 12, 13).
