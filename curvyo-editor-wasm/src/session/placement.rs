@@ -412,6 +412,7 @@ const fn placement_kind(tool: Tool) -> Option<PlacementKind> {
         | Tool::Trace
         | Tool::TestGrid
         | Tool::Generators
+        | Tool::Pencil
         | Tool::Measure => None,
     }
 }

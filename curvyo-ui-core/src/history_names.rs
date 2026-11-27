@@ -174,6 +174,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("convert_sketch_page", "Convert sketch to paths"),
     ("delete_sketch_page", "Delete sketch page"),
     ("create_path", "Draw path"),
+    // `specs/0158-pen-display` slice 1 criteria 1 and 12.
+    ("pencil_stroke", "Pencil stroke"),
+    ("erase", "Erase"),
     ("extend_path", "Extend path"),
     ("connect_paths", "Connect paths"),
     ("close_path", "Close path"),

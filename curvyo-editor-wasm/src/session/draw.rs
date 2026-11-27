@@ -515,6 +515,10 @@ impl Session {
                 ));
             }
         }
+        // The Pencil stroke in progress (`specs/0158-pen-display` criterion 10).
+        if self.tool == Tool::Pencil {
+            list.extend(self.pencil_preview_list(view));
+        }
         // What a press would continue, join or close onto, before the click (`0034`).
         if self.tool == Tool::Pen {
             list.extend(curvyo_render_core::build_pen_cue(

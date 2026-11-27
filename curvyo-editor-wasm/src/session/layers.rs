@@ -104,6 +104,7 @@ impl Session {
             | Tool::PolygonStar
             | Tool::Text
             | Tool::TestGrid
+            | Tool::Pencil
             | Tool::Generators => true,
             Tool::Select | Tool::Node | Tool::Offset | Tool::Trace | Tool::Measure => false,
         };
