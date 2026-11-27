@@ -167,3 +167,29 @@ fn the_maximal_record_with_every_pick_fits_640_kib() {
     let material = read("format5_max.json").unwrap();
     assert_eq!(write_record(&material), text);
 }
+
+/// Criterion 23, ADR 0058 §6: a pick record of the wrong shape names the field, not "not a
+/// material record".
+#[test]
+fn a_wrongly_typed_pick_field_is_named() {
+    let text = fixture("format5_picks.json");
+    let cases = [
+        (
+            text.replacen("\"speed_mm_min\": 4650", "\"speed_mm_min\": \"fast\"", 1),
+            "speed_mm_min",
+        ),
+        (
+            text.replacen("\"column\": 3,\n        \"row\": 3", "\"column\": 3", 1),
+            "row",
+        ),
+    ];
+    for (changed, field) in cases {
+        assert_ne!(changed, text, "{field}: the fixture was edited");
+        let Err(RecordFileError::Damaged(reason)) = read_record(&format!("{ID}.json"), &changed)
+        else {
+            panic!("{field}: expected Damaged");
+        };
+        assert!(reason.contains(field), "{field}: {reason}");
+        assert!(!reason.contains("not a material record"), "{reason}");
+    }
+}

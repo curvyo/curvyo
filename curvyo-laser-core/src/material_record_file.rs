@@ -170,7 +170,8 @@ pub fn read_record(file_name: &str, text: &str) -> Result<Material, RecordFileEr
     if version < OLDEST_READ_FORMAT {
         return Err(RecordFileError::Older);
     }
-    let record: RecordJson = serde_json::from_value(value).map_err(|e| shape_error(&e))?;
+    let record: RecordJson =
+        RecordJson::deserialize(&value).map_err(|e| shape_error(&e, &value))?;
     let thickness = check_fields(file_name, &record)?;
     let tests = read_tests(record.tests, version)?;
     let lasers = read_lasers(record.lasers, &tests, version)?;
@@ -224,15 +225,35 @@ fn check_fields(file_name: &str, record: &RecordJson) -> Result<Thickness, Recor
     })
 }
 
-/// The reason of a JSON shape error: the unknown key by name, else one text.
-fn shape_error(error: &serde_json::Error) -> RecordFileError {
+/// The reason of a JSON shape error: the unknown or missing key by name, a wrongly typed value by
+/// the key it sits under.
+fn shape_error(error: &serde_json::Error, value: &Value) -> RecordFileError {
     let message = error.to_string();
+    let key_of = |rest: &str| rest.split('`').next().map(str::to_owned);
     if let Some(rest) = message.strip_prefix("unknown field `")
-        && let Some(key) = rest.split('`').next()
+        && let Some(key) = key_of(rest)
     {
         return damaged(format!("Unknown key {key}."));
     }
-    damaged("The file is not a material record.")
+    if let Some(rest) = message.strip_prefix("missing field `")
+        && let Some(key) = key_of(rest)
+    {
+        return damaged(format!("Missing key {key}."));
+    }
+    match typed_key(value) {
+        Some(key) => damaged(format!("The value of {key} is not valid.")),
+        None => damaged("The file is not a material record."),
+    }
+}
+
+/// The key of the first wrongly typed value: the pretty-printed record is read again and the
+/// error's line names it (`"key": value`).
+fn typed_key(value: &Value) -> Option<String> {
+    let text = serde_json::to_string_pretty(value).ok()?;
+    let line = serde_json::from_str::<RecordJson>(&text).err()?.line();
+    let line = text.lines().nth(line.checked_sub(1)?)?.trim_start();
+    let key = line.strip_prefix('"')?.split("\": ").next()?;
+    (!key.is_empty()).then(|| key.to_owned())
 }
 
 pub(crate) fn read_machine(machine: MachineJson) -> Result<MachineTie, RecordFileError> {
