@@ -30,6 +30,7 @@
           "engrave",
           "image"
         ],
+        "missing_picks": [],
         "open": true,
         "sets": [
           {
@@ -55,6 +56,7 @@
           "score",
           "image"
         ],
+        "missing_picks": [],
         "open": true,
         "sets": [
           {

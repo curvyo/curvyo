@@ -149,6 +149,18 @@ pub struct LaserBlockView {
     pub sets: Vec<SetView>,
     /// The kinds without a set, one "+ `<kind>` set" button each.
     pub missing: Vec<SetKindView>,
+    /// The pick lines of the missing kinds that hold picks, shown under their "+ `<kind>` set"
+    /// button (`specs/0146` UX notes 8).
+    pub missing_picks: Vec<MissingPicksView>,
+}
+
+/// The pick lines of one kind that has picks but no main set.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MissingPicksView {
+    /// The kind.
+    pub kind: SetKindView,
+    /// Its Second best, Fastest and Deepest sets, read only.
+    pub other_picks: Vec<OtherPickView>,
 }
 
 /// One set of a laser.

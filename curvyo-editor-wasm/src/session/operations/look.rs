@@ -13,7 +13,9 @@ use curvyo_document_core::{NodeId, ObjectSnapshot, Opacity, OperationSnapshot, V
 use curvyo_laser_core::operations::{
     ChainScope, Hidden, KindRead, LeafShape, OperationKind, OperationList, kind_run,
 };
-use curvyo_render_core::{CONTEXT_DIM, DrawList, Glyph, OperationLook, dim_outside, restyled};
+use curvyo_render_core::{
+    CONTEXT_DIM, DrawList, Glyph, OperationLook, dim_outside, engrave_cell_edge, restyled,
+};
 
 use super::super::Session;
 use super::grid_look::GridLooks;
@@ -320,7 +322,14 @@ impl Session {
                 out.extend((!matches!(look, LeafLook::Hidden)).then(|| object.clone()));
                 continue;
             }
-            out.extend(dimming.dim(object.id(), drawn_as(object, look, view)));
+            let mut drawn = drawn_as(object, look, view);
+            if grids.parts.get(&object.id()) == Some(&OperationLook::AreaFill)
+                && matches!(look, LeafLook::Shown(_))
+            {
+                // The edge of a test grid's Engrave circle cell (`specs/0146` UX notes 7.2).
+                drawn.extend(engrave_cell_edge(object, view));
+            }
+            out.extend(dimming.dim(object.id(), drawn));
             if let LeafLook::Shown(looks) = look {
                 own_overlay(
                     object,
