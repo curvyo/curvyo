@@ -38,6 +38,9 @@ interface FileTabProps {
   /** The Workspace section (`specs/0095-workspace` `ux-notes.md` section 1), appended below Export
    * SVG and above Quit; the desktop build only. */
   workspace?: ReactNode;
+  /** Diagnostics at the end of the tab, above the version (`specs/0158-pen-display` slice 0: the
+   * Pen probe's button). */
+  diagnostics?: ReactNode;
   /** The copies a crash left (`specs/0136-autosave-and-restore` criterion 4): a block above the
    * project block while any waits. */
   recovery?: RecoveryApi;
@@ -63,6 +66,7 @@ export function FileTab({
   extensions,
   workspace,
   recovery,
+  diagnostics,
 }: FileTabProps) {
   const { info, dirty, check } = project;
   const buttonProps = { project, desktop, tooltipFor, onReturnFocus };
@@ -99,6 +103,7 @@ export function FileTab({
         </>
       ) : null}
       {extensions}
+      {diagnostics}
       <p className={`${desktop ? "mt-3" : "mt-4"} text-xs text-[var(--panel-muted-fg)]`}>
         {`Curvyo ${version}`}
       </p>

@@ -6,6 +6,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { Canvas } from "@/components/Canvas";
 import { CanvasArea } from "@/components/CanvasArea";
 import { FontPreview } from "@/components/fontPreview/FontPreview";
+import { PenProbe } from "@/components/PenProbe";
 import { LibraryPreview } from "@/components/LibraryPreview";
 import { useLibraryPane } from "@/lib/libraryStore";
 import { LibraryBrowser } from "@/components/libraryBrowser/LibraryBrowser";
@@ -663,6 +664,7 @@ function Editor() {
           output={output}
         />
       </div>
+      <PenProbe />
       <ErrorDialog
         title={openError?.title ?? "Can't open project"}
         message={openError?.message ?? null}
