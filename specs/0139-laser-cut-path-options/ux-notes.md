@@ -1,6 +1,6 @@
 # 0139 Laser cut path options: UX notes
 
-ux-engineer, 2026-11-26. Written from `specification.md` (revision 2026-11-26, criteria 1 to 25, Fragen 279 A, 280 A, 281 A, 407 default A), `docs/design-system.md` ("Interaction conventions": no operating tips, no success notice, hidden not disabled, no popups in the panel, "Numeric entry chip", "Parameter handles", "Blue new, black old", "Canvas notice slot"; rows "Parameter handle", "Position handle", "Transform entry chip", "Live transform readout", "Select bar layout", "Override rows (`0057`)", "Bend a segment" for Alt on Linux) and the built notes `specs/0111-laser-operation-tools/ux-notes.md` (unfolded row, lower part, Operation group), `specs/0101-laser-operations/ux-notes.md` 13 (canvas look, `--cut`, budget) and `specs/0029-laser-job-preview-and-output/ux-notes.md` 4 and 6.4 (Toolpath look, Checks). Code read: `OperationBody.tsx`, `OperationOptionsPart.tsx`, `lib/operationOptionRows.ts`, `OperationKindGroup.tsx`, `CloneBlock.tsx` (`OverrideRow`). Customer rules applied: no invented colour (red `--cut` and ink only on the laser look, `--accent` for what is selected), symbols with names as tooltip, units inside fields, plain fields and no sliders, no popup in the panel, hidden not disabled, no operating tip and no success notice. Items marked (Proposal) are vetoable at the demo; section 14 lists them as C1 to C14.
+ux-engineer, 2026-11-26. Written from `specification.md` (revision 2026-11-26, criteria 1 to 25, Fragen 279 A, 280 A, 281 A, 414 default A), `docs/design-system.md` ("Interaction conventions": no operating tips, no success notice, hidden not disabled, no popups in the panel, "Numeric entry chip", "Parameter handles", "Blue new, black old", "Canvas notice slot"; rows "Parameter handle", "Position handle", "Transform entry chip", "Live transform readout", "Select bar layout", "Override rows (`0057`)", "Bend a segment" for Alt on Linux) and the built notes `specs/0111-laser-operation-tools/ux-notes.md` (unfolded row, lower part, Operation group), `specs/0101-laser-operations/ux-notes.md` 13 (canvas look, `--cut`, budget) and `specs/0029-laser-job-preview-and-output/ux-notes.md` 4 and 6.4 (Toolpath look, Checks). Code read: `OperationBody.tsx`, `OperationOptionsPart.tsx`, `lib/operationOptionRows.ts`, `OperationKindGroup.tsx`, `CloneBlock.tsx` (`OverrideRow`). Customer rules applied: no invented colour (red `--cut` and ink only on the laser look, `--accent` for what is selected), symbols with names as tooltip, units inside fields, plain fields and no sliders, no popup in the panel, hidden not disabled, no operating tip and no success notice. Items marked (Proposal) are vetoable at the demo; section 14 lists them as C1 to C14.
 
 Terminology: "unfolded row", "lower part" and "ink" (`--toolbar-icon`) as in `0111`. "Item part" is the new block for the selected items in an unfolded row. "Handle" is a tab handle or a start marker on the canvas. "Current handle" is the one handle that keys act on.
 
@@ -20,7 +20,7 @@ Built differently (kept for the demo, vetoable):
 - **No heading** in the item part (3.1): the group is named "Selected items in <operation>" for assistive tech only.
 - **Copies** (Duplicate, Ctrl copy, Paste) keep no tab records.
 - **Tabs toggle** stays pressed when the Toolpath view is pressed and released again (4.2 says the Toolpath view turns it off).
-- **Start markers** are not drawn in slice 1 (Frage 410 C has nothing to show yet); a start may not sit inside a tab (spec reconciliation, ADR issue 3), which overrides 5.2.
+- **Start markers** are not drawn in slice 1 (Frage 415 C has nothing to show yet); a start may not sit inside a tab (spec reconciliation, ADR issue 3), which overrides 5.2.
 
 Open findings at review time (lead decides): a plain click on a tab handle moves the tab to the pointer and writes "Move tab" and makes the tabs Own; Escape during a tab drag does not cancel it (the press made the tab current, so `tabs_escape` runs before `cancel_drag_in_flight`); the Count field has no `aria-describedby` for the placed line; the operation's Width and the item part's Width share one accessible name.
 
@@ -93,7 +93,7 @@ Commit, revert and refusal exactly as `0111` 6.4: Enter or leaving commits, Esca
 - **Add:** the pointer within 6 screen px of a selected item's cut path shows a ghost tab handle (hover ground, section 5.1) at the nearest point, snapped to a node within 8 px; Alt held suspends the snap. A click (press and release within the 3px dead zone) adds one tab there: step "Add tab". Where the 1 mm rule leaves no room, the ghost is not drawn and the click changes nothing; no notice (the missing ghost is the feedback). A drag from there moves the object as the Select tool does.
 - Cursor over an addable point: built-in `crosshair`; elsewhere the Select tool's cursors.
 - A click on anything else does what the Select tool does (select, marquee, deselect).
-- **Automatic start markers** show (section 5.2, C4 / Frage 410).
+- **Automatic start markers** show (section 5.2, C4 / Frage 415).
 - The arrow keys, Tab and Insert act on handles (section 7) instead of nudging and z-order.
 
 ## 5. Handles on the canvas (criteria 5, 6, 19)
@@ -111,7 +111,7 @@ Drawn in the WebGL draw list, screen-constant, never exported, `aria-hidden`; on
 
 ### 5.2 Start marker (slice 2, not built)
 
-- One per closed outline of a selected item (a compound path or a group: one each). An isosceles triangle 10 x 8px whose base centre sits on the start point and whose tip points along the cut direction (it turns with the path); 1.5px `--accent` ring. **Set:** solid `--accent`, shown whenever the item is selected. **Automatic:** white ground, shown only while Tabs is on (Frage 410 default), resting where the job really enters the outline (C7, spec issue 1). Hover `--accent-hover`. Hit radius 12px; cursor `pointer`. A triangle is the one handle that shows a direction; parameter knobs are round, tab handles capsules.
+- One per closed outline of a selected item (a compound path or a group: one each). An isosceles triangle 10 x 8px whose base centre sits on the start point and whose tip points along the cut direction (it turns with the path); 1.5px `--accent` ring. **Set:** solid `--accent`, shown whenever the item is selected. **Automatic:** white ground, shown only while Tabs is on (Frage 415 default), resting where the job really enters the outline (C7, spec issue 1). Hover `--accent-hover`. Hit radius 12px; cursor `pointer`. A triangle is the one handle that shows a direction; parameter knobs are round, tab handles capsules.
 - **Drag:** as the tab handle (nearest point, wrapping, node snap 8px, Alt suspends). Readout "Start · 12.50 mm" (" · node"). Release: step "Move start point"; from then the outline is Set. Escape cancels. The marker cannot be dropped inside a tab (it stops at the tab's edge); a tab added later over it moves the burn start to that tab's end (spec criterion 19, ADR issue 3).
 - Delete or Backspace on a current set marker returns that outline to Automatic, step "Automatic start" (C8). A double-click does nothing.
 - Open paths have no marker; their direction is the item part's Direction pick, shown on the canvas by the Operations view's arrowhead (section 6).
@@ -216,7 +216,7 @@ In both warn lines the count with its noun ("2 paths", "3 leads") is the text bu
 - **C1** The placed number is a per-operation range line, shown only when some path gets fewer.
 - **C2** Own tabs and own path options are per item and operation; the item part sits in that operation's body; the unfolded row decides whose handles show.
 - **C3** The `0057` pill "Operation's | Own" enters and leaves own tabs and own path options; new step "Own tabs".
-- **C4** Automatic start markers only while Tabs is on (Frage 410).
+- **C4** Automatic start markers only while Tabs is on (Frage 415).
 - **C5** Handles on at most 50 selected leaves in the viewport and only on paths of 48 screen px or more.
 - **C6** A typed width that leaves a piece under 1 mm is refused.
 - **C7** The Automatic marker rests where the job enters, not at the first stored point.
