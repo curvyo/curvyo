@@ -109,7 +109,7 @@ impl CutRun {
             return;
         }
         let m = &self.measured;
-        let t = m.tangent_at(from);
+        let t = junction_direction(m, from, true);
         let n = waste_normal(t, inside, self.depth);
         let length = um(self.path.lead_in_length.um());
         let mut lead = rounded(&lead_in(self.path.lead_in, length, m.point_at(from), t, n));
@@ -137,7 +137,7 @@ impl CutRun {
             return;
         }
         let m = &self.measured;
-        let t = m.tangent_before(end);
+        let t = junction_direction(m, end, false);
         let n = waste_normal(t, inside, self.depth);
         let length = um(self.path.lead_out_length.um());
         let mut lead = rounded(&lead_out(self.path.lead_out, length, m.point_at(end), t, n));
@@ -150,6 +150,61 @@ impl CutRun {
         }
         ends.own_touch[1] = touches_own(&lead, m.points());
         ends.lead_out = lead;
+    }
+}
+
+/// A turn below this at a vertex is a flattened curve, not a corner (cos 30°).
+const SMOOTH_TURN_COS: f64 = 0.866_025_403_784_438_6;
+
+/// The tangent of a flattened curve at vertex arc `v`: the mean of the arriving and the leaving
+/// segment, `None` at a corner (a turn of 30° or more) or an open path's end.
+fn smooth_at(m: &crate::cut_tabs::Measured, v: f64) -> Option<(f64, f64)> {
+    if !m.closed() && (v <= 0.0 || v >= m.length()) {
+        return None;
+    }
+    let out = m.tangent_at(v);
+    let into = m.tangent_before(v);
+    if out.0 * into.0 + out.1 * into.1 < SMOOTH_TURN_COS {
+        return None;
+    }
+    let (x, y) = (out.0 + into.0, out.1 + into.1);
+    let norm = (x * x + y * y).sqrt();
+    Some((x / norm, y / norm))
+}
+
+/// The path's direction at the junction `arc` of a lead (criterion 14): at a corner the segment
+/// that leaves (`leaving`, a lead-in) or arrives (a lead-out); on a flattened curve (both ends of
+/// the segment turn under 30°) the curve's tangent, the smooth tangents of the segment's ends
+/// blended by position, so a tangent Arc does not cross the curve it is tangent to.
+fn junction_direction(m: &crate::cut_tabs::Measured, arc: f64, leaving: bool) -> (f64, f64) {
+    let fallback = if leaving {
+        m.tangent_at(arc)
+    } else {
+        m.tangent_before(arc)
+    };
+    let arcs = m.vertex_arcs();
+    let length = m.length();
+    if arcs.len() < 2 || length <= 0.0 {
+        return fallback;
+    }
+    let pos = m.wrap(arc);
+    let i = arcs.partition_point(|&v| v <= pos).saturating_sub(1);
+    let start = arcs[i];
+    let end = arcs.get(i + 1).copied().unwrap_or(length);
+    let (Some(s0), Some(s1)) = (smooth_at(m, start), smooth_at(m, end)) else {
+        return fallback;
+    };
+    let along = if end > start {
+        ((pos - start) / (end - start)).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let (x, y) = (s0.0 + (s1.0 - s0.0) * along, s0.1 + (s1.1 - s0.1) * along);
+    let norm = (x * x + y * y).sqrt();
+    if norm > 0.0 {
+        (x / norm, y / norm)
+    } else {
+        fallback
     }
 }
 
@@ -285,6 +340,31 @@ mod tests {
         assert_eq!(ends.overcut.len(), 0);
         assert!((burn(&pieces) - (length - 2.0 + 1.0)).abs() < 0.02);
         assert_eq!(ends.lead_out.len(), 2);
+    }
+
+    #[test]
+    fn an_arc_lead_that_hugs_a_hole_wall_from_its_junction_does_not_touch_it() {
+        // A 10 mm hole flattened as the job flattens it, Arc 4 mm inside: tangent at the junction
+        // and drawing away from the wall, only the chords' sagitta brings them near (criterion 18).
+        let hole = circle(std::f64::consts::PI * 10.0, 52);
+        for (kind, length) in [
+            (LeadKind::Arc, 400),
+            (LeadKind::Arc, 200),
+            (LeadKind::Line, 400),
+        ] {
+            let lead = options(&[
+                PathEdit::LeadIn(kind),
+                PathEdit::LeadInLength(CutLength::tab(length).unwrap()),
+                PathEdit::LeadOut(kind),
+                PathEdit::LeadOutLength(CutLength::tab(length).unwrap()),
+            ]);
+            let mut run = CutRun::new(hole.clone(), Vec::new(), lead, None).unwrap();
+            run.depth = 1;
+            for arc in [0.0, 1_234.0, 17_000.0] {
+                let (_, ends) = run.run(CutEntry::Closed(arc));
+                assert_eq!(ends.own_touch, [false, false], "{kind:?} {length} at {arc}");
+            }
+        }
     }
 
     #[test]

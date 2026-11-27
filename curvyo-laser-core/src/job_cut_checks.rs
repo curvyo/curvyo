@@ -11,6 +11,10 @@ use crate::job_order::OrderedPath;
 /// A lead nearer than this to a cut touches it (criterion 18, adrs L10 `LEAD_TOUCH`), in µm.
 pub(crate) const LEAD_TOUCH_UM: f64 = 10.0;
 
+/// The band around a lead's junction that is never a touch: 0.01 mm plus twice the flattening
+/// tolerance of both the outline and the arc, in µm.
+const JUNCTION_BAND_UM: f64 = LEAD_TOUCH_UM + 2.0 * crate::job_flatten::FLATTEN_MM * 1000.0;
+
 type Box2 = (f64, f64, f64, f64);
 
 fn as_f64(um: i64) -> f64 {
@@ -185,7 +189,9 @@ pub(crate) fn touching(ends: &[(usize, CutEnds)], paths: &[OrderedPath]) -> Vec<
 }
 
 /// Whether `lead`, read from its junction with `outline` (a closed ring) on, comes near the
-/// outline again once it has left the 0.01 mm band around the junction (adrs L11).
+/// outline again once it has left the band around the junction (adrs L11). The band is 0.01 mm
+/// plus twice the flattening tolerance: an arc lead tangent to a curved outline runs within a few
+/// µm of the flattened chords for a while, which is the junction, not a touch (criterion 18).
 pub(crate) fn touches_own(lead_from_junction: &[PointUm], outline: &[PointUm]) -> bool {
     let mut ring = outline.to_vec();
     if let Some(&first) = outline.first() {
@@ -193,7 +199,7 @@ pub(crate) fn touches_own(lead_from_junction: &[PointUm], outline: &[PointUm]) -
     }
     let away = lead_from_junction.iter().position(|&p| {
         ring.windows(2)
-            .all(|s| point_segment(xy(p), xy(s[0]), xy(s[1])) > LEAD_TOUCH_UM)
+            .all(|s| point_segment(xy(p), xy(s[0]), xy(s[1])) > JUNCTION_BAND_UM)
     });
     let Some(away) = away else {
         return false;

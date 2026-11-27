@@ -52,3 +52,14 @@ export function pressUnfolds(row: OperationRow, selectedKeys: readonly string[],
 export function entryHeight(open: boolean, measuredBody: number | null, base: number = ROW_HEIGHT): number {
   return open ? base + (measuredBody ?? UNFOLDED_BODY_ESTIMATE) : base;
 }
+
+/**
+ * The height of the operations list while a row is unfolded: the whole list when it fits, else
+ * the `room` left between the list's top and the bottom of what scrolls it, so the end of the
+ * unfolded body (the item part) is always reachable (`specs/0139` UX review). Never under the
+ * folded window `folded`; before the room is measured, 520 px.
+ */
+export function unfoldedViewport(listHeight: number, room: number | null, folded: number): number {
+  const limit = room ?? 520;
+  return Math.max(folded, Math.min(listHeight, limit));
+}

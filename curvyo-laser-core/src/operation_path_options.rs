@@ -162,15 +162,16 @@ impl PathOptions {
     }
 
     /// The muted summary line of the item part (UX 3.2): "Lead-in Arc 1 mm · Lead-out None ·
-    /// Overcut 0.5 mm".
+    /// Overcut 0.5 mm", each unit tied to its number by a no-break space so a wrap never leaves
+    /// "mm" alone.
     #[must_use]
     pub fn summary(self) -> String {
         let lead = |name: &str, kind: LeadKind, length: CutLength| match kind {
             LeadKind::None => format!("{name} None"),
-            _ => format!("{name} {} {} mm", kind.label(), short(length.mm())),
+            _ => format!("{name} {} {}\u{a0}mm", kind.label(), short(length.mm())),
         };
         format!(
-            "{} · {} · Overcut {} mm",
+            "{} · {} · Overcut {}\u{a0}mm",
             lead("Lead-in", self.lead_in, self.lead_in_length),
             lead("Lead-out", self.lead_out, self.lead_out_length),
             short(self.overcut.mm())
@@ -482,7 +483,7 @@ mod tests {
         assert_eq!(read_own_path(&record), Err(RecordDamage::WrongType));
         assert_eq!(
             own.summary(),
-            "Lead-in None · Lead-out Line 2.5 mm · Overcut 0 mm"
+            "Lead-in None · Lead-out Line 2.5\u{a0}mm · Overcut 0\u{a0}mm"
         );
         assert!(PathOptions::DEFAULT.is_inert() && !own.is_inert());
     }

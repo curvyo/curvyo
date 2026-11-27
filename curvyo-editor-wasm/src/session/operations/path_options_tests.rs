@@ -86,7 +86,7 @@ fn the_path_options_pill_copies_edits_and_returns_each_one_step() {
     assert_eq!(options.own, Some(false));
     assert_eq!(
         options.summary.as_deref(),
-        Some("Lead-in None · Lead-out Line 1 mm · Overcut 0 mm")
+        Some("Lead-in None · Lead-out Line 1\u{a0}mm · Overcut 0\u{a0}mm")
     );
     assert_eq!(view.direction, None, "no open path selected");
     assert!(fx.s.set_selection_path_own(op, true));

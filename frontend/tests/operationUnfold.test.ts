@@ -8,6 +8,7 @@ import {
   canUnfold,
   entryHeight,
   pressUnfolds,
+  unfoldedViewport,
 } from "../src/lib/operationUnfold.ts";
 import { ROW_HEIGHT } from "../src/lib/operationRows.ts";
 
@@ -43,4 +44,17 @@ test("the unfolded row is one tall window item; every other row keeps the fixed 
   assert.equal(entryHeight(false, null), ROW_HEIGHT);
   assert.equal(entryHeight(true, null), ROW_HEIGHT + UNFOLDED_BODY_ESTIMATE);
   assert.equal(entryHeight(true, 212), ROW_HEIGHT + 212);
+});
+
+test("an unfolded list fills the room under it at any window size, never past it (specs/0139 UX review)", () => {
+  // 1920 x 1080: 900 px of room holds a 760 px body list whole.
+  assert.equal(unfoldedViewport(760, 900, 300), 760);
+  // 800 x 640: a 760 px list scrolls inside the 380 px left under its top, so its end is reachable.
+  assert.equal(unfoldedViewport(760, 380, 300), 380);
+  // Never under the folded window, and the old 520 px cap is gone.
+  assert.equal(unfoldedViewport(760, 120, 300), 300);
+  assert.equal(unfoldedViewport(1200, 1000, 300), 1000);
+  // Before the room is measured the list keeps the 520 px of old.
+  assert.equal(unfoldedViewport(760, null, 300), 520);
+  assert.equal(unfoldedViewport(200, null, 300), 300);
 });
