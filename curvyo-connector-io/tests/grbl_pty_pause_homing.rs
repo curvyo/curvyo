@@ -43,6 +43,7 @@ fn server(link: &Path, state: &Path) -> RunningServer {
         controller: ControllerChoice::Serial(SerialSettings {
             port: link.to_str().unwrap().to_owned(),
             baud: 115_200,
+            spindle: false,
             timing: timing(),
         }),
         require_local_start: false,

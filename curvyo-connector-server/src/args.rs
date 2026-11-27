@@ -37,6 +37,7 @@ pub enum Command {
 
 /// The parsed command line.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)] // independent command-line switches
 pub struct Args {
     /// What to do.
     pub command: Command,
@@ -56,6 +57,8 @@ pub struct Args {
     pub baud: u32,
     /// How long its `$H` may go unanswered.
     pub homing_timeout: Duration,
+    /// The GRBL machine drives a spindle, not a laser (`specs/0161-cnc-output` criterion 19).
+    pub spindle: bool,
     /// `Start` waits for Enter on this terminal.
     pub require_local_start: bool,
     /// Print a new pairing code at start.
@@ -67,13 +70,14 @@ pub struct Args {
 }
 
 /// The run flags that make foreground mode (A28).
-const FOREGROUND_FLAGS: [&str; 8] = [
+const FOREGROUND_FLAGS: [&str; 9] = [
     "--fake-controller",
     "--fake-lines-per-second",
     "--fake-alarm-at-line",
     "--serial",
     "--baud",
     "--homing-timeout",
+    "--spindle",
     "--require-local-start",
     "--pair",
 ];
@@ -105,6 +109,8 @@ Run flags (foreground mode, refused when connector.toml exists):
   --baud <n>                       baud rate, 1 to 4000000 (default 115200; needs --serial)
   --homing-timeout <seconds>       the controller counts as lost when homing ($H) gets no answer
                                    for this long; 10 to 3600 (default 120; needs --serial)
+  --spindle                        the GRBL machine drives a spindle (a CNC router): laser mode
+                                   $32=0 is expected, not refused (needs --serial)
   --require-local-start            a job starts only after Enter on this terminal
   --pair                           print a new pairing code at start
 
@@ -167,6 +173,7 @@ pub fn parse(
         serial: None,
         baud: DEFAULT_BAUD,
         homing_timeout: HOMING_CAP,
+        spindle: false,
         require_local_start: false,
         pair: false,
         foreground_flag: None,
@@ -213,6 +220,7 @@ pub fn parse(
                 parsed.homing_timeout = homing_timeout(&value(&mut args, &flag)?)?;
                 homing_given = true;
             }
+            "--spindle" => parsed.spindle = true,
             "--require-local-start" => parsed.require_local_start = true,
             "--pair" => parsed.pair = true,
             "--list-clients" => parsed.command = Command::ListClients,
@@ -229,6 +237,9 @@ pub fn parse(
     }
     if baud_given && parsed.serial.is_none() {
         return Err(UsageError("--baud needs --serial".to_owned()));
+    }
+    if parsed.spindle && parsed.serial.is_none() {
+        return Err(UsageError("--spindle needs --serial".to_owned()));
     }
     if homing_given && parsed.serial.is_none() {
         return Err(UsageError("--homing-timeout needs --serial".to_owned()));

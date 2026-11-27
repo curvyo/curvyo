@@ -83,7 +83,10 @@ impl GrblController {
 
     /// Why the restart cannot go out now, by the settings as last read; `None` when it can.
     fn start_refusal(&self, start: &StartAt<'_>) -> Option<String> {
-        match (self.settings.laser_mode(), self.word.as_deref()) {
+        match (
+            self.guarded_laser_mode(&self.settings),
+            self.word.as_deref(),
+        ) {
             (None, _) => Some(texts::LASER_MODE_UNKNOWN.to_owned()),
             (Some(false), _) => Some(texts::LASER_MODE_OFF.to_owned()),
             (_, Some(word)) if BUSY_WORDS.contains(&word) => {
@@ -165,7 +168,10 @@ impl GrblController {
     /// Keeps the settings of a `$$` read after identify, and tells the job machine when the
     /// laser mode changed (G34: no job starts while it is off or unknown).
     fn take_settings(&mut self, fresh: Settings) {
-        let (before, now) = (self.settings.laser_mode(), fresh.laser_mode());
+        let (before, now) = (
+            self.guarded_laser_mode(&self.settings),
+            self.guarded_laser_mode(&fresh),
+        );
         self.settings = fresh;
         if let Some(info) = self.info.as_mut() {
             info.settings = Some(self.settings.to_wire());

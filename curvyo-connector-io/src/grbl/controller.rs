@@ -90,9 +90,24 @@ pub struct GrblController {
     pub(super) entering: Option<[f64; 2]>,
     /// A restart that waits for its `$$` answer before the first byte (`specs/0118` 38).
     pub(super) recheck: Option<crate::grbl::restart::Recheck>,
+    /// The machine drives a spindle: laser mode off is expected (`specs/0161` criterion 19).
+    pub(super) spindle: bool,
 }
 
 impl GrblController {
+    /// The controller of a spindle machine (a CNC router): `$32=0` is no reason to refuse a job.
+    #[must_use]
+    pub fn with_spindle(mut self, spindle: bool) -> Self {
+        self.spindle = spindle;
+        self
+    }
+
+    /// The laser mode as the job guards read it: always on for a spindle machine whose `$32`
+    /// was read, so only a laser is refused with laser mode off (Frage 240 B).
+    pub(super) fn guarded_laser_mode(&self, settings: &Settings) -> Option<bool> {
+        settings.laser_mode().map(|on| on || self.spindle)
+    }
+
     /// A controller on `port` opened at `at`: the soft reset is the first byte (G17).
     #[must_use]
     pub fn new(port: &str, baud: u32, timing: Timing, at: Duration) -> Self {
@@ -139,6 +154,7 @@ impl GrblController {
             pulse: None,
             entering: None,
             recheck: None,
+            spindle: false,
         }
     }
 
@@ -201,14 +217,15 @@ impl GrblController {
                     self.port,
                     self.settings.summary()
                 ));
-                if self.settings.laser_mode() == Some(false) {
+                let mode = self.guarded_laser_mode(&self.settings);
+                if mode == Some(false) {
                     self.notices.push(texts::LASER_MODE_OFF.to_owned());
                 }
-                let unknown = self.settings.laser_mode().is_none();
+                let unknown = mode.is_none();
                 if unknown {
                     self.notices.push(texts::LASER_MODE_UNKNOWN.to_owned());
                 }
-                let laser_off = self.settings.laser_mode() == Some(false);
+                let laser_off = mode == Some(false);
                 if let Some(blocks) = found.planner {
                     self.events.push(Event::Planner { blocks });
                 }
@@ -321,7 +338,8 @@ impl GrblController {
             // A stop is still being confirmed; its end decides, never a new stream.
             return;
         }
-        let refusal = match (self.settings.laser_mode(), self.word.as_deref()) {
+        let mode = self.guarded_laser_mode(&self.settings);
+        let refusal = match (mode, self.word.as_deref()) {
             (None, _) => Some(texts::LASER_MODE_UNKNOWN.to_owned()),
             (_, Some(word)) if BUSY_WORDS.contains(&word) => {
                 Some(format!("Controller state: {word}"))
@@ -336,7 +354,7 @@ impl GrblController {
             });
             return;
         }
-        if self.settings.laser_mode() == Some(false) {
+        if mode == Some(false) {
             // Lasering without GRBL's laser mode is refused before the first byte (Frage 240 B).
             self.events.push(Event::JobFailedWith {
                 elapsed_ms: 0,

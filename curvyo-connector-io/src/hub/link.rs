@@ -89,7 +89,8 @@ impl Hub {
             return;
         }
         let controller =
-            GrblController::new(&serial.port, serial.baud, serial.timing, self.at(now));
+            GrblController::new(&serial.port, serial.baud, serial.timing, self.at(now))
+                .with_spindle(serial.spindle);
         inner.controller = Some(Box::new(controller));
     }
 

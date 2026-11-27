@@ -49,6 +49,9 @@ pub struct SerialSettings {
     pub port: String,
     /// Its baud rate.
     pub baud: u32,
+    /// The machine drives a spindle, not a laser: GRBL's laser mode off is expected and no job is
+    /// refused for it (`specs/0161-cnc-output` criterion 19, Proposal).
+    pub spindle: bool,
     /// The limits (the tests shorten them).
     pub timing: Timing,
 }

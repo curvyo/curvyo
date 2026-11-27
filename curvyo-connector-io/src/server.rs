@@ -86,6 +86,7 @@ pub fn choice_of(
         C::GrblSerial { port, baud } => ControllerChoice::Serial(crate::hub::SerialSettings {
             port: port.clone(),
             baud: *baud,
+            spindle: false,
             timing,
         }),
         C::Fake {

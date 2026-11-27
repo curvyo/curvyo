@@ -68,6 +68,7 @@ fn g23_the_whole_demo_over_a_real_pty() {
         controller: ControllerChoice::Serial(SerialSettings {
             port: link.to_str().unwrap().to_owned(),
             baud: 115_200,
+            spindle: false,
             timing: timing(),
         }),
         require_local_start: false,

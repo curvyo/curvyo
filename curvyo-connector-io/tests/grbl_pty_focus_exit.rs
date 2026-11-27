@@ -54,6 +54,7 @@ fn the_exit_during_a_pulse_waits_for_the_confirmed_stop_and_its_reset() {
         controller: ControllerChoice::Serial(SerialSettings {
             port: link.to_str().unwrap().to_owned(),
             baud: 115_200,
+            spindle: false,
             timing: timing(),
         }),
         require_local_start: false,

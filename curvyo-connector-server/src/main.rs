@@ -67,6 +67,7 @@ fn controller(args: &Args) -> ControllerChoice {
         ControllerChoice::Serial(SerialSettings {
             port: port.clone(),
             baud: args.baud,
+            spindle: args.spindle,
             timing: Timing {
                 homing: args.homing_timeout,
                 ..Timing::default()

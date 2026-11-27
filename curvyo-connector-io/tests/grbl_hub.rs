@@ -31,6 +31,7 @@ fn g15_get_status_after_the_serial_thread_died_is_not_running() {
     let serial = SerialSettings {
         port: "/dev/ttyHub".into(),
         baud: 115_200,
+        spindle: false,
         timing: Timing::default(),
     };
     let started = Instant::now();

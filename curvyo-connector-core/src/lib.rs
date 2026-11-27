@@ -15,6 +15,7 @@ mod config;
 mod count;
 mod focus;
 mod frame_text;
+pub mod gcode_line;
 mod gcode_words;
 mod handshake;
 mod job_list;
@@ -25,6 +26,7 @@ mod millimetres;
 mod modal;
 mod restart;
 mod send_watch;
+pub mod virtual_grbl;
 
 pub use access::{Mode, admit, refusal};
 pub use admin::{ClientEntry, ConnectorMode, LogName, Role, Secret};
