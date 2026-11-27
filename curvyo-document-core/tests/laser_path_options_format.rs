@@ -418,6 +418,7 @@ fn golden_document_v68() -> Document {
         curvyo_document_core::DIRECTION_COMMIT_LABEL,
     );
     let b = rect(&d, 40.0);
+    let cut_out = op(&d, mfg, "cut_out", "Cut-out 1", &[]);
     let c = rect(&d, 80.0);
     let group = d.group_objects(&[b, c]).unwrap();
     assert!(d.set_operation_members(cut, &[vec![group]], true).unwrap());
@@ -430,7 +431,6 @@ fn golden_document_v68() -> Document {
         json!({ format!("{member}:0"): {"start": 0} }),
         MOVE_START_POINT_COMMIT_LABEL,
     );
-    let cut_out = op(&d, mfg, "cut_out", "Cut-out 1", &[]);
     let e = rect(&d, 120.0);
     assert!(d.set_operation_members(cut_out, &[vec![e]], true).unwrap());
     assert!(

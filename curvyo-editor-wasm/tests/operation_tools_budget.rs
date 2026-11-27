@@ -161,8 +161,8 @@ fn criterion_26_unfolding_a_row_on_a_page_with_fifty_operations() {
     assert!(!TIMED || cost < BUDGET, "{cost:?}");
 }
 
-/// `specs/0139` criterion 25 (b), adrs L13: a selected 20-gon with 20 own tabs redraws its tab
-/// handles within 16 ms per pointer move.
+/// `specs/0139` criterion 25 (b), adrs L13: a selected 20-gon with 20 own tabs and a set start
+/// redraws its tab handles and start marker within 16 ms per pointer move.
 #[test]
 fn criterion_0139_25_the_tab_handles_of_a_selected_item_redraw_within_16_ms() {
     let d = Document::new(1);
@@ -210,6 +210,17 @@ fn criterion_0139_25_the_tab_handles_of_a_selected_item_redraw_within_16_ms() {
         &curvyo_document_core::member_key_text(&[path]),
         record.as_object(),
         curvyo_document_core::ADD_TAB_COMMIT_LABEL,
+    )
+    .unwrap();
+    let entry = serde_json::json!({ "0": { "start": 30_000_000 } });
+    d.write_operation_records(
+        cut,
+        &[(
+            curvyo_document_core::ItemRecord::Entry,
+            curvyo_document_core::member_key_text(&[path]),
+            entry.as_object().cloned(),
+        )],
+        curvyo_document_core::MOVE_START_POINT_COMMIT_LABEL,
     )
     .unwrap();
     let bytes = pack(&d, "budget").unwrap();

@@ -48,6 +48,7 @@
         "counter": 80,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "score",
@@ -74,6 +75,7 @@
         "options": {
           "hatch": null,
           "image": null,
+          "path": null,
           "tabs": null,
           "z_offset_mm": 0.0
         },
@@ -109,6 +111,7 @@
         "counter": 85,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 2,
       "kind": "engrave",
@@ -140,6 +143,7 @@
             "scan_angle_deg": 0.0
           },
           "image": null,
+          "path": null,
           "tabs": null,
           "z_offset_mm": 0.0
         },
@@ -175,6 +179,7 @@
         "counter": 91,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "engrave_outline",
@@ -210,6 +215,7 @@
             "scan_angle_deg": 0.0
           },
           "image": null,
+          "path": null,
           "tabs": null,
           "z_offset_mm": 0.0
         },
@@ -255,6 +261,7 @@
         "counter": 96,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "cut",
@@ -281,6 +288,13 @@
         "options": {
           "hatch": null,
           "image": null,
+          "path": {
+            "lead_in": "none",
+            "lead_in_mm": 1.0,
+            "lead_out": "none",
+            "lead_out_mm": 1.0,
+            "overcut_mm": 0.0
+          },
           "tabs": {
             "count": 0,
             "placed": null,
@@ -321,6 +335,7 @@
         "counter": 101,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "cut_out",
@@ -347,6 +362,13 @@
         "options": {
           "hatch": null,
           "image": null,
+          "path": {
+            "lead_in": "none",
+            "lead_in_mm": 1.0,
+            "lead_out": "none",
+            "lead_out_mm": 1.0,
+            "overcut_mm": 0.0
+          },
           "tabs": {
             "count": 0,
             "placed": null,
@@ -387,6 +409,7 @@
         "counter": 108,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 1,
       "kind": "cut",
@@ -410,6 +433,13 @@
         "options": {
           "hatch": null,
           "image": null,
+          "path": {
+            "lead_in": "none",
+            "lead_in_mm": 1.0,
+            "lead_out": "none",
+            "lead_out_mm": 1.0,
+            "overcut_mm": 0.0
+          },
           "tabs": {
             "count": 0,
             "placed": null,

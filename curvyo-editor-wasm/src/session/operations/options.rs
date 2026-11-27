@@ -6,8 +6,8 @@
 use curvyo_document_core::{NodeId, ProfileChange, SettingsStep, SettingsWrite};
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    CutEdit, CutLength, Dither, ImageEdit, ImageField, Interval, OptionEdit, Overscan, ScanAngle,
-    TabCount, ZOffset, edit_interval, read_options,
+    CutEdit, CutLength, Dither, ImageEdit, ImageField, Interval, OptionEdit, Overscan, PathField,
+    ScanAngle, TabCount, ZOffset, edit_interval, read_options,
 };
 
 use super::super::Session;
@@ -29,6 +29,8 @@ enum OptionField {
     TabCount,
     TabWidth,
     TabSkipInner,
+    /// The Path options group of a Cut or Cut-out row (`specs/0139` criterion 13).
+    Path(PathField),
 }
 
 impl OptionField {
@@ -52,7 +54,7 @@ impl OptionField {
             "tab_count" => Self::TabCount,
             "tab_width" => Self::TabWidth,
             "tab_skip_inner" => Self::TabSkipInner,
-            _ => return None,
+            _ => return PathField::of(name).map(Self::Path),
         })
     }
 
@@ -74,6 +76,7 @@ impl OptionField {
                 CutLength::typed_tab(value).map(|w| OptionEdit::Cut(CutEdit::TabWidth(w)))
             }
             Self::TabSkipInner => Ok(OptionEdit::Cut(CutEdit::SkipInner(value != 0.0))),
+            Self::Path(field) => field.typed(value).map(OptionEdit::Path),
         })
     }
 }
@@ -105,7 +108,9 @@ impl Session {
     /// `contrast`, `gamma`, `lowest_power`), or presses the toggle `option` (`crosshatch`,
     /// `bidirectional`, `invert`) on (`value` non-zero) or off (criteria 19, 20, 24; `specs/0123`
     /// criteria 11, 12); on a Cut or Cut-out `tab_count`, `tab_width` and the switch
-    /// `tab_skip_inner` (`specs/0139` criterion 1). One step "Edit
+    /// `tab_skip_inner` (`specs/0139` criterion 1), the Path options `lead_in` and `lead_out`
+    /// (the pill's segment index, 0 None, 1 Line, 2 Arc), `lead_in_mm`, `lead_out_mm` and
+    /// `overcut` (criterion 13). One step "Edit
     /// settings"; the whole `op_options` map is written. `Ok(false)` when nothing is written: the
     /// same value, a field the row does not show (a hatch option on a Cut, Z offset without a
     /// motorised Z axis, Interval with No settings, which waits in the draft), damaged settings or another page.

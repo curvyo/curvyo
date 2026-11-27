@@ -3,6 +3,7 @@ import { RotateCcw } from "lucide-react";
 import { OverrideRow } from "@/components/panel/CloneBlock";
 import { EntryField } from "@/components/panel/EntryField";
 import { OptionFieldView } from "@/components/panel/OperationOptionsPart";
+import { OperationItemPathRows } from "@/components/panel/OperationPathPart";
 import { TabsGlyph } from "@/components/panel/OperationGlyphs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { PanelSwitch } from "@/components/ui/switch";
@@ -45,9 +46,10 @@ export function OperationTabsGroup({ row, tools, onReturnFocus }: { row: Operati
 }
 
 /**
- * The item part of an unfolded Cut or Cut-out row (`specs/0139` criteria 5, 6, `ux-notes.md` 3):
- * the Tabs pill "Operation's | Own" with its readout for the selected items, and while a tab handle
- * is current its Width field with the reset to the operation's width.
+ * The item part of an unfolded Cut or Cut-out row (`specs/0139` criteria 5, 6, 19 to 21,
+ * `ux-notes.md` 3): the Tabs pill "Operation's | Own" with its readout for the selected items,
+ * while a tab handle is current its Width field with the reset to the operation's width, then the
+ * Path options, Start and Direction rows.
  */
 export function OperationItemPart({
   row,
@@ -121,6 +123,7 @@ export function OperationItemPart({
           ) : null}
         </div>
       ) : null}
+      <OperationItemPathRows row={row} tools={tools} onReturnFocus={onReturnFocus} />
     </div>
   );
 }

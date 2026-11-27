@@ -15,8 +15,12 @@ mod look;
 mod look_overlay;
 mod look_picture;
 mod options;
+pub(in crate::session) mod path_options;
+#[cfg(test)]
+mod path_options_tests;
 mod settings;
 mod settings_view;
+mod start_markers;
 mod tab_look;
 pub(in crate::session) mod tab_outlines;
 pub(in crate::session) mod tabs;

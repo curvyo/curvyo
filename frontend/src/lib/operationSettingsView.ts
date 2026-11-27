@@ -100,6 +100,36 @@ export interface OperationOptions {
   image: ImageSettings | null;
   /** The Tabs group of a Cut or Cut-out (`specs/0139` criteria 1, 2); `null` for every other kind. */
   tabs: TabsOptions | null;
+  /** The Path options group of a Cut or Cut-out (`specs/0139` criterion 13); `null` for every
+   * other kind. */
+  path: PathOptionValues | null;
+}
+
+/** A lead's shape. */
+export type LeadKind = "none" | "line" | "arc";
+
+/** Lead-in, lead-out and overcut of an operation or of an item's own block (`specs/0139`). */
+export interface PathOptionValues {
+  leadIn: LeadKind;
+  leadInMm: number;
+  leadOut: LeadKind;
+  leadOutMm: number;
+  overcutMm: number;
+}
+
+function asLead(value: unknown): LeadKind | undefined {
+  return value === "none" || value === "line" || value === "arc" ? value : undefined;
+}
+
+/** The path option values of the session's JSON, `null` when absent, `undefined` when malformed. */
+export function asPathOptions(value: unknown): PathOptionValues | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (!isObject(value)) return undefined;
+  const leadIn = asLead(value.lead_in);
+  const leadOut = asLead(value.lead_out);
+  if (leadIn === undefined || leadOut === undefined) return undefined;
+  if (!finite(value.lead_in_mm) || !finite(value.lead_out_mm) || !finite(value.overcut_mm)) return undefined;
+  return { leadIn, leadInMm: value.lead_in_mm, leadOut, leadOutMm: value.lead_out_mm, overcutMm: value.overcut_mm };
 }
 
 /** The operation's tabs (`specs/0139` criteria 1 to 3). */
@@ -398,8 +428,11 @@ function asOptions(value: unknown): OperationOptions | null | undefined {
   const hatch = asHatch(value.hatch);
   const image = asImage(value.image);
   const tabs = asTabs(value.tabs);
-  if (hatch === undefined || image === undefined || tabs === undefined || !finite(value.z_offset_mm)) return undefined;
-  return { hatch, zOffsetMm: value.z_offset_mm, image, tabs };
+  const path = asPathOptions(value.path);
+  if (hatch === undefined || image === undefined || tabs === undefined || path === undefined || !finite(value.z_offset_mm)) {
+    return undefined;
+  }
+  return { hatch, zOffsetMm: value.z_offset_mm, image, tabs, path };
 }
 
 function asPickChoices(value: unknown): PickChoice[] | null {

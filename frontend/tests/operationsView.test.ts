@@ -177,6 +177,7 @@ test("Interval, the hatch options and the Z offset capability decode (AC 19 to 2
     zOffsetMm: 1.5,
     image: null,
     tabs: null,
+    path: null,
   });
   const cut = decodeOperationsView(fixture("options_cut_z_hidden"))?.rows[0].settings;
   assert.equal(cut?.options?.hatch, null);
@@ -393,9 +394,31 @@ test("a Cut row carries the Tabs group and an Engrave row none (specs/0139 crite
   assert.ok(cut);
   assert.deepEqual(cut.rows[0]?.settings?.options?.tabs, { count: 0, widthMm: 0.5, skipInner: false, placed: null });
   assert.equal(cut.rows[0]?.itemTabs, null);
+  assert.deepEqual(cut.rows[0]?.settings?.options?.path, { leadIn: "none", leadInMm: 1, leadOut: "none", leadOutMm: 1, overcutMm: 0 });
+  assert.equal(cut.rows[0]?.itemPath, null);
   assert.equal(cut.tabsTool, null, "the Tabs toggle is hidden without a selected cut item");
   assert.equal(cut.tabChip, null);
   const engrave = decodeOperationsView(fixture("options_engrave"));
   assert.ok(engrave);
   assert.ok(engrave.rows.every((row) => row.settings?.options?.tabs == null));
+  assert.ok(engrave.rows.every((row) => row.settings?.options?.path == null));
+});
+
+test("the item part's path rows decode and a malformed one fails the view (specs/0139 criteria 19 to 21)", () => {
+  const raw = fixture("options_cut_z_hidden") as { rows: Record<string, unknown>[] };
+  const withPath = structuredClone(raw);
+  (withPath.rows[0] as Record<string, unknown>).item_tabs = { own: false, readout: "0 tabs" };
+  (withPath.rows[0] as Record<string, unknown>).item_path = {
+    options: { own: false, summary: "Lead-in None · Lead-out None · Overcut 0 mm", values: null },
+    start: { readout: "Set", set: true },
+    direction: { value: null },
+  };
+  const view = decodeOperationsView(withPath);
+  assert.deepEqual(view?.rows[0]?.itemPath, {
+    options: { own: false, summary: "Lead-in None · Lead-out None · Overcut 0 mm", values: null },
+    start: { readout: "Set", set: true },
+    direction: { value: null },
+  });
+  (withPath.rows[0] as Record<string, unknown>).item_path = { options: null, start: null, direction: { value: "sideways" } };
+  assert.equal(decodeOperationsView(withPath), null);
 });

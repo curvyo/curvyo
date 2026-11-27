@@ -110,3 +110,20 @@ export function TabsGlyph({ size = 16, pressed = false }: { size?: number; press
     </svg>
   );
 }
+
+/**
+ * The lead glyphs of the Path options group (`specs/0139` `ux-notes.md` 4.1): an edge at y 6 from
+ * x 2 to 14; Line adds a stub from (5, 13) up to the edge, Arc a quarter circle from (2, 13) to
+ * (6, 6) meeting the edge tangentially. `mirrored` puts the lead at the right (lead-out).
+ */
+export function LeadGlyph({ kind, mirrored = false, size = 16 }: { kind: "none" | "line" | "arc"; mirrored?: boolean; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden focusable={false} className="shrink-0">
+      <g transform={mirrored ? "matrix(-1 0 0 1 16 0)" : undefined}>
+        <line x1="2" y1="6" x2="14" y2="6" />
+        {kind === "line" ? <line x1="5" y1="13" x2="5" y2="6" /> : null}
+        {kind === "arc" ? <path d="M2 13 A4 7 0 0 1 6 6" /> : null}
+      </g>
+    </svg>
+  );
+}

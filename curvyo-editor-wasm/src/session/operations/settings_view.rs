@@ -169,6 +169,8 @@ pub struct OptionsView {
     pub image: Option<ImageSettingsView>,
     /// The Tabs group, Cut and Cut-out only (`specs/0139` criteria 1, 2).
     pub tabs: Option<TabsView>,
+    /// The Path options group, Cut and Cut-out only (`specs/0139` criterion 13).
+    pub path: Option<super::path_options::PathOptionsView>,
 }
 
 /// The Tabs group of a Cut or Cut-out row (`specs/0139` criteria 1 to 3).
@@ -204,6 +206,7 @@ fn options_view(
     placed: Option<String>,
 ) -> OptionsView {
     OptionsView {
+        path: cuts_through(kind).then(|| super::path_options::PathOptionsView::of(options.path)),
         tabs: cuts_through(kind).then(|| TabsView {
             count: options.cut.tab_count.get(),
             width_mm: options.cut.tab_width.mm(),

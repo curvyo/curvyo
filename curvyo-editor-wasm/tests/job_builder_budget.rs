@@ -3,8 +3,8 @@
 //! the thread clock already is): (a) 1,000 Cut items of 20 nodes plan in 100 ms; (b) a 200 x 200
 //! mm Engrave at 0.1 mm (2,000 lines, bidirectional) in 150 ms; (c) the same with Crosshatch in
 //! 300 ms; (d) the job, timeline and gate after a numbers edit on 50 operations and 1,000 items,
-//! plans cached, in 16 ms; and `specs/0139` criterion 25 (a): the 1,000 Cut items with four tabs
-//! each in 150 ms. Budgets are asserted in release builds; a debug build prints the times and
+//! plans cached, in 16 ms; and `specs/0139` criterion 25 (a): the 1,000 Cut items with four tabs,
+//! leads and an overcut each in 150 ms. Budgets are asserted in release builds; a debug build prints the times and
 //! checks the rest.
 
 #![allow(clippy::unwrap_used)]
@@ -197,8 +197,8 @@ fn a_thousand_cut_items_build_within_100_ms() {
     check("36 (a)", took, Duration::from_millis(100));
 }
 
-/// `specs/0139` criterion 25 (adrs L13), slice 1: the same 1,000 Cut items with Count 4 build
-/// within 150 ms (slice 2 adds Lead-in Arc, Lead-out Line and Overcut to this case).
+/// `specs/0139` criterion 25 (adrs L13): the same 1,000 Cut items with Count 4, Lead-in Arc
+/// 1 mm, Lead-out Line and Overcut 2 mm build within 150 ms, the leads check included.
 #[test]
 fn a_thousand_cut_items_with_four_tabs_build_within_150_ms() {
     let mut input = cut_page(1, 90.0);
@@ -208,11 +208,19 @@ fn a_thousand_cut_items_with_four_tabs_build_within_150_ms() {
     } = &mut input.blocks[0].source
     {
         options.cut.tab_count = curvyo_laser_core::settings::TabCount::new(4).unwrap();
+        options.path.lead_in = curvyo_laser_core::settings::LeadKind::Arc;
+        options.path.lead_out = curvyo_laser_core::settings::LeadKind::Line;
+        options.path.overcut = curvyo_laser_core::settings::Overcut::of_mm(2.0).unwrap();
     }
     let (built, took) = cpu_time::cpu_time_of(|| build_job(&input, &[], &mut PlanCache::default()));
     let plan = built.plans[0].as_ref().unwrap();
     assert_eq!(plan.marks.len(), 1_000);
     assert!(plan.marks.iter().all(|m| m.gaps.len() == 4));
+    assert!(
+        plan.marks
+            .iter()
+            .all(|m| !m.lead_in.is_empty() && !m.lead_out.is_empty())
+    );
     check("0139 25 (a)", took, Duration::from_millis(150));
 }
 

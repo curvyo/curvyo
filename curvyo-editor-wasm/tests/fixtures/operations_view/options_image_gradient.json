@@ -26,6 +26,7 @@
         "counter": 36,
         "peer": "1"
       },
+      "item_path": null,
       "item_tabs": null,
       "items": 2,
       "kind": "image",
@@ -132,6 +133,7 @@
               "value": 12.5
             }
           },
+          "path": null,
           "tabs": null,
           "z_offset_mm": 0.0
         },

@@ -1,6 +1,6 @@
 //! The edits of the tabs of the selected items (`specs/0139` criteria 5, 6, 12; `ux-notes.md` 4,
 //! 5.1, 7, 8): the Tabs tool's add, a handle's drag, delete and width, the Own and Operation's
-//! presses, each one step.
+//! presses, each one step; the pointer and keys hand on to the start markers.
 
 use curvyo_document_core::{
     ADD_TAB_COMMIT_LABEL, DELETE_TAB_COMMIT_LABEL, MOVE_TAB_COMMIT_LABEL, NodeId,
@@ -51,6 +51,9 @@ pub(in crate::session) struct TabsState {
     pub(super) tool: bool,
     pub(super) current: Option<Current>,
     pub(super) drag: Option<TabDrag>,
+    /// The current start marker and its drag (`specs/0139` criterion 19).
+    pub(super) start_current: Option<super::start_markers::StartRef>,
+    pub(super) start_drag: Option<super::start_markers::StartDrag>,
 }
 
 /// The width chip of the current tab (UX 5.1).
@@ -96,6 +99,7 @@ impl Session {
         self.operations.tabs.tool = on;
         if !on {
             self.operations.tabs.current = None;
+            self.operations.tabs.start_current = None;
         }
         true
     }
@@ -142,6 +146,7 @@ impl Session {
     /// press.
     pub(in crate::session) fn tab_press(&mut self, point: Point) -> bool {
         if let Some((outline, index)) = self.handle_at(point) {
+            self.operations.tabs.start_current = None;
             self.operations.tabs.current = Some(Current {
                 op: outline.op,
                 key: outline.key.clone(),
@@ -158,6 +163,9 @@ impl Session {
                 from: point,
                 live: false,
             });
+            return true;
+        }
+        if self.start_press(point) {
             return true;
         }
         if !self.tabs_tool() {
@@ -204,7 +212,7 @@ impl Session {
             return Some("pointer");
         }
         let point = self.pointer_position?;
-        if self.handle_at(point).is_some() {
+        if self.handle_at(point).is_some() || self.start_marker_hovered(point) {
             return Some("pointer");
         }
         (self.tabs_tool() && self.addable_at(point).is_some()).then_some("crosshair")
@@ -216,7 +224,7 @@ impl Session {
         let scale = self.view().scale();
         let alt = self.held.alt;
         let Some(drag) = self.operations.tabs.drag.as_mut() else {
-            return false;
+            return self.start_drag_move(point);
         };
         if !drag.live {
             if drag.from.vector_to(point).length() * scale < DEAD_ZONE_PX {
@@ -244,6 +252,9 @@ impl Session {
 
     /// The release of a tab drag: one step "Move tab" when it moved beyond the dead zone.
     pub(in crate::session) fn tab_drag_end(&mut self, point: Point) -> bool {
+        if self.operations.tabs.drag.is_none() {
+            return self.start_drag_end(point);
+        }
         if !self.tab_drag_move(point) {
             return false;
         }
@@ -266,12 +277,14 @@ impl Session {
 
     /// Escape or a lost pointer during a tab drag: nothing is written.
     pub(in crate::session) fn cancel_tab_drag(&mut self) -> bool {
-        self.operations.tabs.drag.take().is_some()
+        self.operations.tabs.drag.take().is_some() | self.cancel_start_drag()
     }
 
     /// The readout of a tab drag: "42.30 mm" along the path, " · node", " · limit".
     pub(in crate::session) fn tab_readout(&self) -> Option<super::super::shapes::LiveReadout> {
-        let drag = self.operations.tabs.drag.as_ref()?;
+        let Some(drag) = self.operations.tabs.drag.as_ref() else {
+            return self.start_readout();
+        };
         let mut text = format!("{:.2} mm", drag.centre / 1000.0);
         if drag.limited {
             text.push_str(" · limit");
@@ -323,13 +336,16 @@ impl Session {
         if input.dom_blocked || input.ctrl || input.alt {
             return None;
         }
-        (matches!(input.key, "Delete" | "Backspace") && self.delete_current_tab())
-            .then_some(super::super::keys::KeyOutcome::Deleted)
+        (matches!(input.key, "Delete" | "Backspace")
+            && (self.delete_current_tab() || self.delete_current_start()))
+        .then_some(super::super::keys::KeyOutcome::Deleted)
     }
 
     /// Escape: clears the current handle, else turns the Tabs tool off; whether it did either.
     pub(in crate::session) fn tabs_escape(&mut self) -> bool {
-        if self.operations.tabs.current.take().is_some() {
+        if self.operations.tabs.current.take().is_some()
+            | self.operations.tabs.start_current.take().is_some()
+        {
             return true;
         }
         std::mem::take(&mut self.operations.tabs.tool)

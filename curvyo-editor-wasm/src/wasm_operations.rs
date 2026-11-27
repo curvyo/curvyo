@@ -107,6 +107,37 @@ impl WasmSession {
         node(id).is_some_and(|id| self.session.set_selection_tabs_own(id, own))
     }
 
+    /// The Path options pill of operation `id` for the selected items (`specs/0139` criterion
+    /// 21): Own (`true`) or Operation's. Whether it wrote.
+    pub fn set_selection_path_own(&mut self, id: &str, own: bool) -> bool {
+        node(id).is_some_and(|id| self.session.set_selection_path_own(id, own))
+    }
+
+    /// Types `value` into the own path field `option` of the selected items in operation `id`
+    /// (`lead_in`, `lead_out` as the pill's segment index, `lead_in_mm`, `lead_out_mm`,
+    /// `overcut`): one step "Edit settings". The chip text, empty when taken.
+    pub fn edit_selection_path_option(&mut self, id: &str, option: &str, value: f64) -> String {
+        let Some(id) = node(id) else {
+            return String::new();
+        };
+        self.session
+            .edit_selection_path_option(id, option, value)
+            .err()
+            .unwrap_or_default()
+    }
+
+    /// The Automatic button of the item part of operation `id`: every selected closed outline
+    /// returns to Automatic, one step "Automatic start". Whether it wrote.
+    pub fn set_selection_start_automatic(&mut self, id: &str) -> bool {
+        node(id).is_some_and(|id| self.session.set_selection_start_automatic(id))
+    }
+
+    /// The Direction pick of the item part of operation `id` (`automatic`, `as_drawn`,
+    /// `reversed`): one step "Direction". Whether it wrote.
+    pub fn set_selection_direction(&mut self, id: &str, direction: &str) -> bool {
+        node(id).is_some_and(|id| self.session.set_selection_direction(id, direction))
+    }
+
     /// The Motorised Z axis switch of the active laser page's profile copy (`specs/0111`
     /// criterion 22). Whether it changed.
     pub fn set_motorised_z(&mut self, on: bool) -> bool {

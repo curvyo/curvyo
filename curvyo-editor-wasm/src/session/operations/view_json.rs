@@ -85,6 +85,9 @@ pub struct RowView {
     /// The Tabs row of the item part while selected items run in this unfolded Cut or Cut-out
     /// (`specs/0139` criterion 5, UX 3); `None` otherwise.
     pub item_tabs: Option<super::tabs::ItemTabsView>,
+    /// The Path options, Start and Direction rows of the item part (`specs/0139` criteria 19 to
+    /// 21, UX 3.2); `None` when `item_tabs` is.
+    pub item_path: Option<super::path_options::ItemPathView>,
     /// The source line of a test grid's derived row (`specs/0112` criterion 12); `None` for any
     /// other row.
     pub source: Option<SourceView>,
@@ -283,6 +286,9 @@ impl Session {
                     unfolded: unfolded == Some(op.id),
                     item_tabs: (unfolded == Some(op.id))
                         .then(|| self.item_tabs_view(op.id))
+                        .flatten(),
+                    item_path: (unfolded == Some(op.id))
+                        .then(|| self.item_path_view(op.id))
                         .flatten(),
                     settings: settings_view(self, op, &pick, &page),
                     source: source_view(self, op, &mut sources),

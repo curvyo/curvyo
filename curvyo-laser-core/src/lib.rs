@@ -250,7 +250,7 @@ pub mod settings {
         ScanAngle, ZOffset, hatches, read_options, scans,
     };
     pub use crate::operation_path_options::{
-        LeadKind, Overcut, PathEdit, PathOptions, read_own_path,
+        LeadKind, Overcut, PathEdit, PathField, PathOptions, read_own_path,
     };
     pub use crate::operation_settings::{
         Field, MaterialLink, Overrides, Role, SetOverride, SettingsDamage, SettingsRead,

@@ -7,8 +7,10 @@ use std::collections::HashMap;
 use curvyo_document_core::{NodeId, Point};
 use curvyo_laser_core::job::{BlockSource, PointUm, cut_out_outlines, cut_outlines};
 use curvyo_laser_core::operations::OperationKind;
-use curvyo_laser_core::settings::{CutLength, CutSettings, cuts_through};
-use curvyo_laser_core::tabs::{LeafTabs, Measured, TabSpan, automatic, outline_ref};
+use curvyo_laser_core::settings::{CutLength, CutSettings, PathOptions, cuts_through};
+use curvyo_laser_core::tabs::{
+    LeafPath, LeafTabs, Measured, OutlineEntry, TabSpan, automatic, outline_ref,
+};
 
 use super::super::Session;
 
@@ -34,8 +36,14 @@ pub(in crate::session) struct TabOutline {
     pub own: bool,
     /// The operation's cut settings.
     pub settings: CutSettings,
+    /// The operation's path options.
+    pub path: PathOptions,
     /// The page origin in document mm (page µm + origin = document).
     pub origin: Point,
+    /// The outline's set start (closed) or fixed direction (open); `None` for Automatic.
+    pub entry: Option<OutlineEntry>,
+    /// Where the job enters a closed outline, as an arc (the Automatic marker, C7).
+    pub entered: Option<f64>,
 }
 
 impl TabOutline {
@@ -154,19 +162,19 @@ fn key_outlines(
         return None;
     };
     let kind = block.kind.known().filter(|&k| cuts_through(k))?;
-    let (rings, tabs): (Rings, &LeafTabs) = if kind == OperationKind::CutOut {
+    let (rings, tabs, path): (Rings, &LeafTabs, &LeafPath) = if kind == OperationKind::CutOut {
         let item = block.cut_out.get(key.at)?;
         let margin = curvyo_document_core::Length::from_mm(margin.as_mm());
         let rings = cut_out_outlines(&item.leaves, margin)
             .into_iter()
             .map(|r| r.map(|p| (p, true)))
             .collect();
-        (rings, &item.cut)
+        (rings, &item.cut, &item.path)
     } else {
         let leaf = block.leaves.get(key.at)?;
-        (cut_outlines(&leaf.geometry), &leaf.cut)
+        (cut_outlines(&leaf.geometry), &leaf.cut, &leaf.path)
     };
-    if matches!(tabs, LeafTabs::Damaged) {
+    if matches!(tabs, LeafTabs::Damaged) || path.damaged {
         return None;
     }
     let plan = job.built.plans.get(at).and_then(Option::as_ref);
@@ -186,7 +194,7 @@ fn key_outlines(
             let placed = plan.is_some_and(|plan| {
                 plan.marks
                     .iter()
-                    .any(|m| m.node == key.node && m.outline == outline)
+                    .any(|m| m.node == key.node && m.outline == outline && !m.gaps.is_empty())
             });
             let spans = if placed || !settings.tab_skip_inner {
                 automatic(
@@ -206,7 +214,23 @@ fn key_outlines(
         } else {
             outline_ref(&key.below, index)
         };
+        let entry = path
+            .entry(outline)
+            .filter(|e| matches!(e, OutlineEntry::Start(_)) == measured.closed());
+        let entered = plan
+            .and_then(|plan| {
+                plan.starts
+                    .iter()
+                    .find(|s| s.node == key.node && s.outline == outline)
+            })
+            .filter(|_| measured.closed())
+            .map(|s| {
+                let at = s.at;
+                measured.nearest((um(at.x), um(at.y))).0
+            });
         out.push(TabOutline {
+            entry,
+            entered,
             op: key.op,
             key: key.key.clone(),
             reference,
@@ -215,8 +239,16 @@ fn key_outlines(
             widths,
             own: !matches!(tabs, LeafTabs::Operation),
             settings,
+            path: options.path,
             origin,
         });
     }
     Some(out)
+}
+
+fn um(value: i64) -> f64 {
+    #[allow(clippy::cast_precision_loss)]
+    // exact: page coordinates in µm are far below 2^53
+    let v = value as f64;
+    v
 }

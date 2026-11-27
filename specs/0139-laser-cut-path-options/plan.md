@@ -155,37 +155,54 @@ marker only while the Tabs tool is on) are applied.
 
 ## Tasks
 
-- [ ] 13. `operation_path_options.rs`: ranges, defaults, typed values with the chip texts,
+- [x] 13. `operation_path_options.rs`: ranges, defaults, typed values with the chip texts,
   `KeyOnKind` off Cut and Cut-out, write only when not default, the `path_own.` codec (AC 13,
   21, 22).
-- [ ] 14. `cut_entry_records.rs`: `entry.<key>` read and write, damage (not a map, unknown
+- [x] 14. `cut_entry_records.rs`: `entry.<key>` read and write, damage (not a map, unknown
   field, fraction out of range, unknown direction), `LeafPath` per outline reference (AC 19 to
   22).
-- [ ] 15. `job_cut_lead.rs`: waste side by depth and orientation, Line and Arc lead-in and
+- [x] 15. `job_cut_lead.rs`: waste side by depth and orientation, Line and Arc lead-in and
   lead-out, direction at a corner from the leaving and arriving segment (AC 14).
-- [ ] 16. Cut path step: overcut `min(d, L)` stopping at the first tab, none when a tab covers
+- [x] 16. Cut path step: overcut `min(d, L)` stopping at the first tab, none when a tab covers
   the closing point, lead-out after the overcut; tabs win; set start inside a tab moves to the
   tab's end; open Direction one entry; nearest order measured to the entry on the path; passes
   repeat (AC 15, 16, 19, 20, 9).
-- [ ] 17. Marks and starts for the Operations view and the markers; fingerprint (AC 19, L10,
+- [x] 17. Marks and starts for the Operations view and the markers; fingerprint (AC 19, L10,
   L12).
-- [ ] 18. Checks: `LeadsTouchCut` with its texts, damaged records run nothing (AC 18, 22).
-- [ ] 19. GRBL goldens `lead_in_line_outer`, `lead_in_arc_outer`, `lead_in_hole`,
+- [x] 18. Checks: `LeadsTouchCut` with its texts, damaged records run nothing (AC 18, 22).
+- [x] 19. GRBL goldens `lead_in_line_outer`, `lead_in_arc_outer`, `lead_in_hole`,
   `lead_out_arc`, `overcut_closed`, `overcut_stops_at_tab`, `path_options_passes`,
   `path_options_own_item`, `start_point_set`, `open_direction_reversed`, `tabs_leads_overcut`
   with a read-back of burn lengths and lead geometry; work area 4 b and Frame count leads; every
   existing golden unchanged (AC 14 to 17, 19, 20, 24).
-- [ ] 20. Document: the two registers, sweep and unassign, undo, format 68 with the refusal by
+- [x] 20. Document: the two registers, sweep and unassign, undo, format 68 with the refusal by
   older builds, the old tests' format numbers and the svg-core export goldens' `format_version`
   line, the two goldens (AC 22, 23).
-- [ ] 21. Session: records into the job input; Path options edits; item part (pill, own fields,
+- [x] 21. Session: records into the job input; Path options edits; item part (pill, own fields,
   Start and Automatic, Direction); start markers with drag, snap, tab stop and Delete; marks;
   Checks line (AC 13, 19 to 21, 23).
-- [ ] 22. Budgets: case a with Lead-in Arc, Lead-out Line, Overcut 2 mm within 150 ms; case b
+- [x] 22. Budgets: case a with Lead-in Arc, Lead-out Line, Overcut 2 mm within 150 ms; case b
   with start markers within 16 ms (AC 25).
-- [ ] 23. Frontend: Path options group, item part rows, no hint text (AC 13, 19 to 21).
-- [ ] 24. Docs: design-system rows for the start marker and the lead look; ADR Status notes
+- [x] 23. Frontend: Path options group, item part rows, no hint text (AC 13, 19 to 21).
+- [x] 24. Docs: design-system rows for the start marker and the lead look; ADR Status notes
   extended where slice 2 adds to them.
+
+## Deviations, slice 2 (Proposal, vetoable at the demo)
+
+- The start marker is a triangle drawn from plain triangles in the session's draw list (no new
+  render-core glyph); its hover look is the resting look. Tab, the arrows and Insert do not act on
+  markers (as slice 1's handles); no sr-only announcements.
+- Markers show on the item's first Cut or Cut-out of the run order, as slice 1's handles; the
+  item part edits the records of its unfolded row's operation.
+- Copies (Ctrl copy, Duplicate, Paste) keep no `path_own.` or `entry.` records, as slice 1.
+- A `path_own.<key>` register must hold all five values; a missing one reads as damage.
+- The leads check (criterion 18) tests each lead against the other burn paths of its block
+  through a grid of boxes, against its own outline only after the lead has left the 0.01 mm band
+  around its junction; the overcut, which lies on its own path, against the others only.
+- An outline of zero area gets no lead (no waste side); the own rows of several selected items
+  show the first own item's values.
+- The lead pills and the Direction pick are one small radiogroup component in
+  `OperationPathPart.tsx`, not an `OverrideRow` variant.
 
 ## Validation
 

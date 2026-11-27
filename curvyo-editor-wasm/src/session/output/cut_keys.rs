@@ -1,12 +1,12 @@
-//! Where the tabs of each leaf of a Cut or Cut-out block are stored (`specs/0139` criteria 4, 5;
-//! adrs L3, L7): the item's `tabs.<key>` record, read into the job input with its outline
-//! references.
+//! Where the records of each leaf of a Cut or Cut-out block are stored (`specs/0139` criteria
+//! 4, 5, 19 to 21; adrs L3, L7): the item's `tabs.<key>`, `path_own.<key>` and `entry.<key>`
+//! records, read into the job input with their outline references.
 
-use curvyo_document_core::{NodeId, OperationSnapshot};
+use curvyo_document_core::{ItemRecord, NodeId, OperationSnapshot};
 use curvyo_laser_core::job::{BlockInput, LeafGeometry};
 use curvyo_laser_core::operations::{LeafStatus, OperationKind};
 use curvyo_laser_core::settings::cuts_through;
-use curvyo_laser_core::tabs::{LeafTabs, below_target};
+use curvyo_laser_core::tabs::{LeafPath, LeafTabs, below_target};
 
 use super::super::Session;
 use super::super::operations::index::IndexedLeaf;
@@ -36,8 +36,9 @@ pub(in crate::session) struct CutKey {
 }
 
 impl Session {
-    /// Gives every leaf (or Cut-out item) of a Cut or Cut-out `block` the tabs of its item's
-    /// record in `op` (`specs/0139` criteria 4, 5; adrs L3, L7) and notes where they are stored.
+    /// Gives every leaf (or Cut-out item) of a Cut or Cut-out `block` the tabs, own path options
+    /// and entries of its item's records in `op` (`specs/0139` criteria 4, 5, 19 to 21; adrs L3,
+    /// L7) and notes where they are stored.
     pub(super) fn cut_tabs_into(
         &self,
         op: &OperationSnapshot,
@@ -53,6 +54,14 @@ impl Session {
             return;
         }
         let records = self.document.operation_tabs(op.id).unwrap_or_default();
+        let own = self
+            .document
+            .operation_records(op.id, ItemRecord::PathOwn)
+            .unwrap_or_default();
+        let entries = self
+            .document
+            .operation_records(op.id, ItemRecord::Entry)
+            .unwrap_or_default();
         let target_at = |at: usize| match &statuses[at] {
             LeafStatus::Assigned { assignment, .. } => Some(assignment.target.clone()),
             _ => None,
@@ -69,6 +78,7 @@ impl Session {
                 };
                 let key = curvyo_document_core::member_key_text(&target);
                 item.cut = LeafTabs::of_contours(records.get(&key));
+                item.path = LeafPath::of_contours(own.get(&key), entries.get(&key));
                 keys.push(CutKey {
                     op: op.id,
                     at,
@@ -95,6 +105,7 @@ impl Session {
                 LeafGeometry::Image { .. } => 1,
             };
             input.cut = LeafTabs::of(records.get(&key), &below, outlines);
+            input.path = LeafPath::of(own.get(&key), entries.get(&key), &below, outlines);
             keys.push(CutKey {
                 op: op.id,
                 at,

@@ -8,9 +8,11 @@
 
 import { asNumbersLines, type NumbersLine } from "./numbersLine.ts";
 import {
+  asPathOptions,
   decodePick,
   decodeSettings,
   type OperationSettings,
+  type PathOptionValues,
   type PickMaterial,
 } from "./operationSettingsView.ts";
 
@@ -68,6 +70,52 @@ export interface OperationRow {
   /** The Tabs row of the item part while selected items run in this unfolded Cut or Cut-out
    * (`specs/0139` criterion 5); `null` otherwise. */
   itemTabs: ItemTabs | null;
+  /** The Path options, Start and Direction rows of the item part (`specs/0139` criteria 19 to
+   * 21); `null` when `itemTabs` is. */
+  itemPath: ItemPath | null;
+}
+
+/** The path rows of the item part (`specs/0139` `ux-notes.md` 3.2 rows 2 to 4). */
+export interface ItemPath {
+  /** The Path options pill, only with a selected closed outline. */
+  options: { own: boolean | null; summary: string | null; values: PathOptionValues | null } | null;
+  /** The Start row, only with a selected closed outline. */
+  start: { readout: string; set: boolean } | null;
+  /** The Direction pick, only with a selected open outline; `value` `null` when mixed. */
+  direction: { value: Direction | null } | null;
+}
+
+/** An open path's direction. */
+export type Direction = "automatic" | "as_drawn" | "reversed";
+
+function asItemPath(value: unknown): ItemPath | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (!isObject(value)) return undefined;
+  let options: ItemPath["options"] = null;
+  if (value.options !== null && value.options !== undefined) {
+    const o = value.options;
+    if (!isObject(o)) return undefined;
+    if (o.own !== null && typeof o.own !== "boolean") return undefined;
+    if (o.summary !== null && typeof o.summary !== "string") return undefined;
+    const values = asPathOptions(o.values);
+    if (values === undefined) return undefined;
+    options = { own: o.own as boolean | null, summary: o.summary as string | null, values };
+  }
+  let start: ItemPath["start"] = null;
+  if (value.start !== null && value.start !== undefined) {
+    const t = value.start;
+    if (!isObject(t) || typeof t.readout !== "string" || typeof t.set !== "boolean") return undefined;
+    start = { readout: t.readout, set: t.set };
+  }
+  let direction: ItemPath["direction"] = null;
+  if (value.direction !== null && value.direction !== undefined) {
+    const d = value.direction;
+    if (!isObject(d)) return undefined;
+    const v = d.value;
+    if (v !== null && v !== "automatic" && v !== "as_drawn" && v !== "reversed") return undefined;
+    direction = { value: v as Direction | null };
+  }
+  return { options, start, direction };
 }
 
 /** The Tabs row of the item part: Own pressed, Operation's, or mixed (`null`). */
@@ -219,8 +267,10 @@ function asRow(value: unknown): OperationRow | null {
   const numbers = value.numbers === null ? null : (asNumbersLines(value.numbers) ?? undefined);
   const groupInPart = value.group_in_part === null ? null : typeof value.group_in_part === "string" ? value.group_in_part : undefined;
   const itemTabs = asItemTabs(value.item_tabs);
+  const itemPath = asItemPath(value.item_path);
   if (
     itemTabs === undefined ||
+    itemPath === undefined ||
     groupInPart === undefined ||
     run === undefined ||
     numbers === undefined ||
@@ -262,6 +312,7 @@ function asRow(value: unknown): OperationRow | null {
     numbers,
     accessibleName: value.accessible_name,
     itemTabs,
+    itemPath,
   };
 }
 
