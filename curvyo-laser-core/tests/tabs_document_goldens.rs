@@ -1,4 +1,4 @@
-//! The laser extension reads the format 66 goldens of `curvyo-document-core/tests/fixtures/`
+//! The laser extension reads the format 67 goldens of `curvyo-document-core/tests/fixtures/`
 //! (`specs/0139-laser-cut-path-options` criteria 1, 5, 6, 11; adrs L3, L6): the tab options,
 //! every own tabs record and every damage.
 
@@ -28,7 +28,7 @@ fn kind(op: &OperationSnapshot) -> OperationKind {
 
 #[test]
 fn the_golden_reads_the_tab_options_and_every_own_tabs_record() {
-    let d = golden("laser_path_options_v66.curvyo");
+    let d = golden("laser_path_options_v67.curvyo");
     let ops = operations(&d);
     let cut = read_options(ops[0].options.as_ref(), kind(&ops[0]))
         .unwrap()
@@ -67,7 +67,7 @@ fn the_golden_reads_the_tab_options_and_every_own_tabs_record() {
 
 #[test]
 fn every_damaged_record_and_option_reads_as_damage() {
-    let d = golden("laser_path_options_damaged_v66.curvyo");
+    let d = golden("laser_path_options_damaged_v67.curvyo");
     let ops = operations(&d);
     let expected = [
         RecordDamage::NotAMap,

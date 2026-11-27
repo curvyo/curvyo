@@ -36,7 +36,7 @@ As a maker cutting a part out of a sheet I want to leave small tabs so the part 
 
 ## What changes accepted behaviour
 
-- **Format:** `format_version` 66 (the next free number at merge; main wrote 65 on 2026-11-26). A build of 65 or lower would misread the new `op_options` keys and ignore item records, which would cut held parts loose, so older builds refuse the file with the newer-version message. A file of 65 or lower opens unchanged with the defaults; nothing is written on open (ADR L6).
+- **Format:** `format_version` 67 (the next free number at merge, after 66 of `0146`; main wrote 65 on 2026-11-26). A build of 65 or lower would misread the new `op_options` keys and ignore item records, which would cut held parts loose, so older builds refuse the file with the newer-version message. A file of 65 or lower opens unchanged with the defaults; nothing is written on open (ADR L6).
 - **Amendments made in the story PR (the implementer adds them, text from `adrs.md` L14):** `0029` criterion 22 ("a closed path with a set start point and an open path with a fixed direction have one entry; a closed path with tabs is entered at a burnt vertex or a piece start") and `0101` criterion 19 ("the direction of an open path may be fixed per item; tabs leave gaps in the output, the outline itself is unchanged"); Status notes on ADRs 0046, 0056 and 0064. Each amendment goes into the PR of the slice that builds it.
 - **Nothing else changes for a maker who does not use it:** with the defaults the job is byte-identical (criterion 24).
 

@@ -590,7 +590,7 @@ fn fixture(name: &str) -> Vec<u8> {
 fn c22_format_bump_and_the_good_golden_opens_with_every_kind() {
     // Superseded by 0135 slice 1 (2026-11-19).
     assert_eq!(
-        CURRENT_FORMAT_VERSION, 66,
+        CURRENT_FORMAT_VERSION, 67,
         "format 49, then 50 by `0123`, 51 by `0135`"
     );
     let name = "gradient_fill_v49.curvyo".to_owned();

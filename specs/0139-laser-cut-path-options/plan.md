@@ -26,7 +26,7 @@ and operation).
 - `curvyo-document-core`: `tabs.<key>` on the operation node (opaque plain value), read into
   `OperationSnapshot.tabs`, written by one command with the step label, removed with the membership
   key and by the dead-key sweep (L4); `format_version` 66; goldens
-  `laser_path_options_v66.curvyo`, `laser_path_options_damaged_v66.curvyo`.
+  `laser_path_options_v67.curvyo`, `laser_path_options_damaged_v67.curvyo`.
 - `curvyo-ui-core`: history names of the new steps.
 - `curvyo-editor-wasm`: the resolved `LeafCut` per leaf and Cut-out item into the job input; the
   options edits (Count, Width, Skip inner shapes); the item part's Tabs pill; the Tabs tool and

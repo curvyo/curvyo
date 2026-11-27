@@ -117,8 +117,8 @@ wrong laser output, the case ADR 0033 §7 and ADR 0065 §4 refuse by version. Ol
 the file with the newer-version message (criterion 11). No migration: a file of 65 or lower
 opens unchanged with the defaults and nothing is written on open. The `CURRENT_FORMAT_VERSION`
 doc comment gets the version paragraph. Goldens:
-`curvyo-document-core/tests/fixtures/laser_path_options_v66.curvyo` and
-`laser_path_options_damaged_v66.curvyo` as listed in the spec; the damaged cases are read by the
+`curvyo-document-core/tests/fixtures/laser_path_options_v67.curvyo` and
+`laser_path_options_damaged_v67.curvyo` as listed in the spec; the damaged cases are read by the
 laser-core codec in a laser-core test that opens the fixture through document-core (as
 `operation_options_damaged_v44.curvyo` is read today), each reads damaged and saves back byte
 for byte.
