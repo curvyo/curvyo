@@ -1,9 +1,11 @@
 # ADR 0091: Codes extension: QR codes as generated objects, encoder and decoder crates, traced outlines and the clear-area budget
 
-**Status:** Proposed 2026-11-26 by the architect. Not `needs-customer` as a whole: it adds an
-extension crate through the published route of ADR 0034 and ADR 0080 and changes no file format.
-**§8 (per-part paint for the Finder colour and the Background) is `needs-customer`** (document
-model, file format): spec question CODE-PAINT, default B (not in slice 1). Spec:
+**Status:** Accepted 2026-11-26 (architect) for slice 1, with the deviations recorded in the
+implementation notes at the end (they amend §1, §3 and §7 as written); proposed the same day. Not
+`needs-customer` as a whole: it adds an extension crate through the published route of ADR 0034 and
+ADR 0080 and changes no file format.
+**§8 (per-part paint for the Finder colour and the Background) stays `needs-customer`** (document
+model, file format): Frage 406 CODE-PAINT, default B taken (not in slice 1). Spec:
 [`0144`](../../specs/0144-qr-and-barcodes/specification.md) (Frage 319 A: a Code is a generator;
 Frage 321 B: slice 1 QR, slice 2 1D, slice 3 Data Matrix). Adds a crate to ADR 0011 §2; extends
 ADR 0080 §2 (two parameter kinds, one host rule) without amending its decisions.
@@ -222,6 +224,55 @@ Clear-area measurement in §5.
   §12.10 (box with the quiet zone) is not taken in slice 1. §12.3, §12.4 a, §12.5 and §12.6 are
   adopted. Schema elements of §12.9: Text and Percent are §3, the derived length exists, Colour
   comes with §8 A, the labelled choice and the two-row strip are presentation only.
+
+## Implementation notes (slice 1, 2026-11-26)
+
+- **Contract additions beyond §3:** `ShownWhen::Full { key }` (the Output row shows only at a Module fill of
+  100 %) and `Bound::DependentFor(subject)` ("the most error correction M allows", the house clamp form of
+  criterion 8; the subject is a static string per level). Source-breaking for an exhaustive `match`; recorded
+  in `curvyo-extension-core/CHANGELOG.md`.
+- **Content edit versus level edit (§3, made precise):** a Content edit or a plain regeneration that does not
+  fit at the stored level is refused (no parts, `content_empty` or `content_too_long`, the host keeps the
+  stored parts and stores the params); only an edit of Error correction lowers the level to the highest the
+  content fits (clamp "the most this content allows"); turning the logo on raises it silently. A resize of a
+  refused code is refused. The sentence says bytes always (the limit is the byte-mode capacity of version 40).
+- **§7 dependencies:** `rqrr` 0.11 is not dependency-free; its tree adds `g2p`, `g2gen` (a proc-macro on the
+  already locked `syn` 2), `g2poly` (all three 1.2.2, MIT/Apache-2.0) and `lru` 0.18.5 (MIT, on the already locked
+  `hashbrown` 0.17). All pass `cargo deny check` (architect, 2026-11-26); they stay test-only (`cargo tree -e
+  normal` of the crate shows only extension-core, document-core, `qrcode` and `thiserror`). `rqrr` never reads a circular outer finder, so Finder Outer has no Circle in slice 1 (lead decision;
+  Later after a phone check or a second decoder; a stored `circle` reads the default). The rounded finder
+  uses radii 1.5 (ring) and 0.75 (centre): the first try of 2.0 failed the decoder.
+- **§10 budget:** held; measured (release, thread CPU time, the session's edit with commit and canvas
+  view): version 10 3.8 ms Merged, 8.0 ms Dot; version 40 42 ms Merged, 94 ms Dot (the generator is 11 ms
+  of it; 6 % headroom at version 40 Dot). The No solution overlay costs nothing per frame: it reads the
+  parameters without the outline (`Document::generated_params`, additive) and keeps the answer per
+  parameter set, a commit of the session fills it. Saved file: version 10 40 KB Merged, 167 KB Dot;
+  version 40 518 KB Merged, 2.2 MB Dot (below the 3.5 MB estimate; no `technical-debt.md` entry, version
+  10 is under 0.5 MB).
+- **§1 modules as built:** `lib.rs`, `manifest.rs`, `grid.rs`, `qr/mod.rs` (params to `Generated`), `qr/schema.rs`
+  (the parameter groups), `qr/encode.rs` (the only file naming `qrcode`), `values.rs` (schema-checked reads and the
+  clamp list), `style.rs` (Merged or Separate, finders, clear area and Inverted put together), `shapes.rs` (the
+  module and finder shapes, which replaces `module_shape.rs`), `trace.rs`, `finder.rs`, `clear_area.rs`. There is no
+  `invert.rs`: Inverted is a few lines of `style.rs`.
+- **§3 where the refusal rule lives:** not in `instance::generate` but at the two host writers of an edit:
+  `instance::record_keeping` (used by `plan_value`, so the typing and drag preview and the commit inherit it) and
+  `plan_resize`, which answers `Refused` for a code without parts. Create and the ghost use defaults, which always
+  encode, and the box-from-source path places boxes only, so no writer can store `parts: []` (`read_record` would
+  then read the object as damaged). A later writer of a generated record (paste re-seed, a shared edit of several
+  objects, a regenerate on a settings change) must go through `record_keeping`.
+- **§3 which generators can refuse:** the host asks only a kind with a `ParamKind::Text` parameter whether it
+  refuses (`instance::can_refuse`), so the No solution overlay costs nothing for boxes and gears. This narrows the
+  contract rule: a later generator that can answer no parts without a text parameter needs that predicate widened
+  (for example a manifest flag) in its own ADR.
+- **§3 text limit:** `Param::accept` cuts a text over 8,192 bytes at a character boundary. That is the stored-size
+  guard, not a clamp of meaning: any text that long is past version 40 at every level and is refused anyway.
+- **`Document::generated_params`** (document-core, additive public read): the kind, seed and parameters of a
+  generated object without decoding its outline; it does not run the record checks `read_record` runs. Used by the
+  editor's No solution memo.
+- **The bar label** is "QR code" (the kind's label, as the lead asked), not "Code" (UX notes §1); the bar
+  sorts the segments by their text, so it reads Box, Box from path, Gear, QR code, Rounded box.
+- **Not built in slice 1:** the clear-area outline on the canvas while the code is selected (UX notes §6).
+  The ghost is the symbol square and the three outer finder edges (`Edit::Draft`).
 
 ## Customer question
 
