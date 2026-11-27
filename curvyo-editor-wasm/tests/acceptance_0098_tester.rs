@@ -159,6 +159,10 @@ fn ac1_the_kind_list_is_drawing_sketch_then_laser_with_glyph_and_word() {
             ("Drawing".into(), "PenTool".into()),
             ("Sketch".into(), "DraftingCompass".into()),
             ("Laser".into(), "Zap".into()),
+            // ADR 0097 §1 and `0159` UX C2: the other machine families follow the laser.
+            ("Plotter".into(), "Slice".into()),
+            ("Embroidery".into(), "Spool".into()),
+            ("CNC".into(), "Drill".into()),
         ]
     );
 }
@@ -775,7 +779,8 @@ fn ac18b_laser_switched_off_keeps_pages_shown_and_data_unchanged() {
         .collect();
     assert_eq!(
         kinds,
-        ["Drawing", "Sketch"],
+        // ADR 0097 §1: the other machine families stay.
+        ["Drawing", "Sketch", "Plotter", "Embroidery", "CNC"],
         "Laser absent from the Kind switch"
     );
     assert!(s.add_page_of_kind(LASER, None).is_none());

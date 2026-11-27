@@ -2,11 +2,14 @@
 //! before every closed path that contains it, then the nearest start to the head goes next, ties
 //! by stacking order, outline index and node index.
 
+use curvyo_geometry_core::{
+    NestPath, OrderUnit, PathEntry, nearest_order, path_parents, path_run, path_starts,
+};
+
 use crate::job_cut_ends::CutEnds;
 use crate::job_cut_path::{CutEntry, CutRun, TabGap, UnitCut};
 use crate::job_hatch::{HatchLines, Span};
 use crate::job_input::PointUm;
-use crate::job_nesting::parents;
 
 /// One thing to order: a flattened path, or the hatch of one area.
 #[derive(Debug, Clone, PartialEq)]
@@ -38,10 +41,8 @@ pub struct Unit {
 /// How the chosen unit is entered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Entry {
-    /// A closed path from node `n`, in its drawn direction.
-    Closed(usize),
-    /// An open path, reversed when its end was nearer.
-    Open { reversed: bool },
+    /// A path, closed from a node or open from its nearer end.
+    Path(PathEntry),
     /// A hatch, its first set by line order and direction.
     Hatch { reversed: bool, flipped: bool },
     /// A cut outline with tabs, by its entry `n` (adrs L7).
@@ -93,10 +94,6 @@ pub fn order(units: &[Unit], head: PointUm, bidirectional: bool) -> (Vec<Ordered
 /// [`order`] with the gaps and covered units of the cut outlines with tabs.
 pub(crate) fn order_all(units: &[Unit], head: PointUm, bidirectional: bool) -> Ordered {
     let parents = parents(units);
-    let mut pending = vec![0_usize; units.len()];
-    for parent in parents.iter().flatten() {
-        pending[*parent] += 1;
-    }
     let Prepared {
         runs,
         cut_entries,
@@ -115,42 +112,24 @@ pub(crate) fn order_all(units: &[Unit], head: PointUm, bidirectional: bool) -> O
             // A covered outline burns nothing and holds back no parent (criterion 10).
             covered.push(index);
             done[index] = true;
-            if let Some(parent) = parents[index] {
-                pending[parent] -= 1;
-            }
         }
     }
-    let mut head = head;
+    let order: Vec<OrderUnit> = units
+        .iter()
+        .enumerate()
+        .map(|(index, unit)| OrderUnit {
+            starts: candidates[index].iter().map(|c| c.0).collect(),
+            rank: (unit.stacking, unit.outline),
+            parent: parents[index],
+            done: done[index],
+        })
+        .collect();
     let mut out = Vec::new();
     let mut ends = Vec::new();
     let mut starts = Vec::new();
-    for _ in 0..units.len() {
-        let mut best: Option<(i128, u32, u32, usize, usize, Entry)> = None;
-        for (index, unit) in units.iter().enumerate() {
-            if done[index] || pending[index] > 0 {
-                continue;
-            }
-            for (tie, &(start, entry)) in candidates[index].iter().enumerate() {
-                let key = (
-                    head.distance_squared(start),
-                    unit.stacking,
-                    unit.outline,
-                    tie,
-                    index,
-                );
-                if best.is_none_or(|b| key < (b.0, b.1, b.2, b.3, b.4)) {
-                    best = Some((key.0, key.1, key.2, key.3, key.4, entry));
-                }
-            }
-        }
-        let Some((.., index, entry)) = best else {
-            break;
-        };
-        done[index] = true;
-        if let Some(parent) = parents[index] {
-            pending[parent] -= 1;
-        }
-        let end = if let (Entry::Cut(k), Some(run)) = (entry, &runs[index]) {
+    let head = nearest_order(&order, head, |index, tie| {
+        let entry = candidates[index][tie].1;
+        if let (Entry::Cut(k), Some(run)) = (entry, &runs[index]) {
             let (pieces, run_ends) = run.run(cut_entries[index][k]);
             if run.measured.closed()
                 && let Some(at) = run_ends.entered
@@ -169,14 +148,14 @@ pub(crate) fn order_all(units: &[Unit], head: PointUm, bidirectional: bool) -> O
             }
             end
         } else {
-            if let (UnitShape::Path { points, .. }, Entry::Closed(n)) = (&units[index].shape, entry)
+            if let (UnitShape::Path { points, .. }, Entry::Path(PathEntry::Closed(n))) =
+                (&units[index].shape, entry)
             {
                 starts.push((index, points[n]));
             }
             emit(&units[index].shape, index, entry, bidirectional, &mut out)
-        };
-        head = end.unwrap_or(head);
-    }
+        }
+    });
     let touching = crate::job_cut_checks::touching(&ends, &out);
     Ordered {
         paths: out,
@@ -269,24 +248,10 @@ fn prepare(units: &[Unit], parents: &[Option<usize>], bidirectional: bool) -> Pr
 /// The start points a unit may be entered at, in tie order.
 fn candidates(shape: &UnitShape, bidirectional: bool) -> Vec<(PointUm, Entry)> {
     match shape {
-        UnitShape::Path {
-            points,
-            closed: true,
-        } => points
-            .iter()
-            .enumerate()
-            .map(|(n, &p)| (p, Entry::Closed(n)))
+        UnitShape::Path { points, closed } => path_starts(points, *closed)
+            .into_iter()
+            .map(|(p, entry)| (p, Entry::Path(entry)))
             .collect(),
-        UnitShape::Path {
-            points,
-            closed: false,
-        } => match (points.first(), points.last()) {
-            (Some(&first), Some(&last)) => vec![
-                (first, Entry::Open { reversed: false }),
-                (last, Entry::Open { reversed: true }),
-            ],
-            _ => Vec::new(),
-        },
         UnitShape::Hatch(sets) => match sets.first() {
             Some(lines) if !lines.is_empty() => {
                 [(false, false), (false, true), (true, false), (true, true)]
@@ -337,21 +302,8 @@ fn emit(
     out: &mut Vec<OrderedPath>,
 ) -> Option<PointUm> {
     match (shape, entry) {
-        (UnitShape::Path { points, .. }, Entry::Closed(n)) => {
-            let mut path: Vec<PointUm> = points[n..].iter().chain(&points[..n]).copied().collect();
-            path.push(points[n]);
-            out.push(OrderedPath {
-                points: path,
-                unit,
-                hatch: false,
-            });
-            Some(points[n])
-        }
-        (UnitShape::Path { points, .. }, Entry::Open { reversed }) => {
-            let mut path = points.clone();
-            if reversed {
-                path.reverse();
-            }
+        (UnitShape::Path { points, .. }, Entry::Path(entry)) => {
+            let path = path_run(points, entry);
             let end = path.last().copied();
             out.push(OrderedPath {
                 points: path,
@@ -392,6 +344,19 @@ fn nearest_variant(lines: &HatchLines, head: Option<PointUm>, bidirectional: boo
         .filter(|spans| !spans.is_empty())
         .min_by_key(|spans| head.map_or(0, |h| h.distance_squared(spans[0].0)))
         .unwrap_or_default()
+}
+
+/// The innermost closed path that contains each unit (`curvyo-geometry-core`'s `path_parents`);
+/// hatches have none.
+pub(crate) fn parents(units: &[Unit]) -> Vec<Option<usize>> {
+    let nest: Vec<NestPath<'_>> = units
+        .iter()
+        .map(|unit| match &unit.shape {
+            UnitShape::Path { points, closed } => Some((points.as_slice(), *closed)),
+            UnitShape::Hatch(_) => None,
+        })
+        .collect();
+    path_parents(&nest)
 }
 
 #[cfg(test)]

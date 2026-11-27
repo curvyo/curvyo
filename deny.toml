@@ -123,6 +123,25 @@ name = "curvyo-render-core"
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-editor-wasm"
 
+# ADR 0097 decision 2: the cutting plotter, embroidery and CNC family crates.
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-cutter-core"
+
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-embroidery-core"
+
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-cnc-core"
+
+# ADR 0097 decision 7: the Ink/Stitch port stays GPL-3.0-or-later. Only this first-party crate;
+# the allow-list of ADR 0006 §2 is unchanged, so a third-party GPL crate still fails.
+[[licenses.exceptions]]
+allow = ["GPL-3.0-or-later"]
+name = "curvyo-inkstitch-core"
+
 # ADR 0085: the online library protocols crate.
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]

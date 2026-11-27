@@ -21,6 +21,10 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0098-page-kinds` criteria 3, 4 and 12.
     ("add_sketch_page", "Add sketch page"),
     ("add_output_page", "Add laser page"),
+    // ADR 0095 §1: Add page of the other machine families, "Add <word> page" as "Add laser page".
+    ("add_plotter_page", "Add plotter page"),
+    ("add_embroidery_page", "Add embroidery page"),
+    ("add_cnc_page", "Add CNC page"),
     ("delete_placement", "Delete placement"),
     ("delete_fixture", "Remove fixture"),
     ("set_fixture_visible", "Show or hide fixture"),

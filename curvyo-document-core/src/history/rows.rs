@@ -133,6 +133,10 @@ const DOCUMENT_LEVEL_LABELS: &[&str] = &[
     "add_page",
     "add_sketch_page",
     "add_output_page",
+    // ADR 0095 §1: Add page of the other machine families (`curvyo-*-core` `ADD_PAGE_COMMIT_LABEL`).
+    "add_plotter_page",
+    "add_embroidery_page",
+    "add_cnc_page",
     "delete_placement",
     "place_page",
     "delete_page",

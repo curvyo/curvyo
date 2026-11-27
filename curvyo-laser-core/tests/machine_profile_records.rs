@@ -278,7 +278,6 @@ fn every_damage_case_is_damaged_and_a_newer_record_is_newer() {
         "damaged_wrong_type.json",
         "damaged_out_of_range.json",
         "damaged_unknown_key.json",
-        "damaged_kind.json",
         "damaged_id_mismatch.json",
     ] {
         assert_eq!(read(case), Err(RecordError::Damaged), "{case}");
@@ -312,4 +311,24 @@ fn a_duplicated_built_in_reads_as_a_user_profile() {
         as_format_8(&text),
         "format 7 writes as format 8 with the pulse's defaults"
     );
+}
+
+/// ADR 0097 §4 (amends ADR 0038 decision 3): `kind` is read first. A profile of another known
+/// family, at any version, is skipped without a notice and never written; an unknown kind reads
+/// as newer.
+#[test]
+fn another_family_is_skipped_silently_and_an_unknown_kind_is_newer() {
+    assert_eq!(read("damaged_kind.json"), Err(RecordError::OtherFamily));
+    let laser = golden("generic_laser_copy.json");
+    let id = "0f0e0d0c-0b0a-4908-8706-050403020100";
+    let name = record_file_name(id);
+    let cutter = laser
+        .replacen("\"kind\": \"laser\"", "\"kind\": \"cutter\"", 1)
+        .replacen("\"format_version\": 7", "\"format_version\": 9", 1);
+    assert_eq!(read_record(&name, &cutter), Err(RecordError::OtherFamily));
+    let plasma = laser.replacen("\"kind\": \"laser\"", "\"kind\": \"plasma\"", 1);
+    assert_eq!(read_record(&name, &plasma), Err(RecordError::Newer));
+    let library = MachineProfiles::load(&[(name, cutter)]);
+    assert_eq!(library.load_notices(), Vec::<String>::new());
+    assert!(library.is_skipped(id) && library.find(id).is_none());
 }

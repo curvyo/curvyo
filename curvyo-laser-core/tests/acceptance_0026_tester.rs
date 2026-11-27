@@ -945,7 +945,9 @@ fn ac13_every_good_record_loads_and_each_bad_one_is_skipped_and_counted() {
             m.insert("max_feed_mm_per_min".into(), json!(200_000));
         }),
         bad(15, &|m| {
-            m.insert("kind".into(), json!("cnc"));
+            // ADR 0097: "cnc" is now a known family (skipped silently) and an unknown text kind
+            // reads as newer; a kind that is no text stays a damaged record.
+            m.insert("kind".into(), json!(7));
         }),
         bad(16, &|m| {
             m.insert("extra".into(), json!(1));

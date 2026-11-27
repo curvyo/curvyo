@@ -202,6 +202,8 @@ fn ac15_the_extension_crates_have_no_io_network_or_gcode() {
                     // ADR 0068 §1 (`specs/0123`): the working image and the gamma table, both
                     // pure and without I/O.
                     "curvyo-image-core",
+                    // ADR 0097 §3: the record envelope, merge and connection shared by the families.
+                    "curvyo-library-core",
                     "libm",
                     "serde",
                     "serde_json",

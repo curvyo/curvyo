@@ -41,8 +41,11 @@ mod offset_rebuild;
 mod outline_nesting;
 mod outline_touch;
 mod path_measure;
+mod path_nesting;
+mod path_order;
 mod pattern;
 mod point_fit;
+mod point_um;
 mod region_contact;
 mod segment;
 mod spiro;
@@ -82,11 +85,16 @@ pub use offset_pieces::miter_within_limit;
 pub use outline_nesting::{Nesting, outline_area_mm2, outline_has_area, outline_nesting};
 pub use outline_touch::{TOUCH_DISTANCE_MM, touching_outlines};
 pub use path_measure::{PathMeasure, PathSample};
+pub use path_nesting::{NestPath, path_parents};
+pub use path_order::{
+    OrderPath, OrderUnit, OrderedRun, PathEntry, nearest_order, order_paths, path_run, path_starts,
+};
 pub use pattern::{
     PATTERN_MAX_PIECES, PATTERN_MAX_WORK, PATTERN_NOTE_PIECES, PatternError, PatternFrame,
     PatternOutline, PatternPiece, pattern_pieces, pattern_pieces_of,
 };
 pub use point_fit::{FitError, PointPair, SimilarityFit, fit_similarity};
+pub use point_um::{PointUm, mm_of_um, um_of_mm};
 pub use segment::{
     BentHandles, Subdivision, bend_segment_handles, nearest_point_on_segment, segment_bounds,
     subdivide_at_parameter,

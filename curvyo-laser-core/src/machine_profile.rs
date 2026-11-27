@@ -6,14 +6,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::material::{Passes, PowerPercent, Settings};
 
+/// The connection of a profile and its parts, shared by every machine family (ADR 0097 §3).
+pub use curvyo_library_core::{BaudRate, Connection, MAX_CONNECTION_CHARS};
+
 /// The id of the built-in profile; not a UUID, so no record file can carry it.
 pub const GENERIC_LASER_ID: &str = "generic-laser";
 /// The name of the built-in profile and the name a damaged one reads as.
 pub const GENERIC_LASER_NAME: &str = "Generic laser";
 /// The longest profile name, in characters.
 pub const MAX_NAME_CHARS: usize = 60;
-/// The longest connector address or controller port, in characters.
-pub const MAX_CONNECTION_CHARS: usize = 200;
 /// The smallest work area side in mm (`0093`'s range, unchanged).
 pub const MIN_WORK_MM: f64 = 1.0;
 /// The largest work area side in mm.
@@ -168,10 +169,6 @@ bounded_integer!(
     PowerValue(u16), 1, 65_535, 1_000
 );
 bounded_integer!(
-    /// The serial baud rate of the controller.
-    BaudRate(u32), 1, 4_000_000, 115_200
-);
-bounded_integer!(
     /// The focus pulse's power in per mille of the max power: 1 to 50 (0.1 to 5 %), default 1 %
     /// (`specs/0118` 35 a, Frage 370 A).
     PulsePermille(u16), 1, 50, 10
@@ -281,17 +278,6 @@ impl Default for ProfileValues {
             focus_pulse: FocusPulse::default(),
         }
     }
-}
-
-/// How the profile reaches its machine: stored data only, read by `0064` (criterion 9).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Connection {
-    /// The connector's address, up to 200 characters.
-    pub connector_address: String,
-    /// The controller port (`/dev/ttyUSB0`, `COM3`), up to 200 characters.
-    pub controller_port: String,
-    /// The baud rate.
-    pub baud_rate: BaudRate,
 }
 
 /// One machine profile of the library (ADR 0038 §2).

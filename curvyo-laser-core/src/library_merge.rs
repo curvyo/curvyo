@@ -1,101 +1,34 @@
-//! What one incoming synced library record does to the local record of the same id (ADR 0062
-//! decision 5, `specs/0116-library-sync`).
+//! The laser's merge of one incoming synced machine or material record (ADR 0062 decision 5,
+//! `specs/0116-library-sync`): its readers' outcomes handed to the shared
+//! [`curvyo_library_core::merge_record`] (ADR 0097 §4).
+
+use curvyo_library_core::{MergeReason, RecordMerge, merge_record, record_file_name};
 
 use crate::machine_profile_file::{RecordError, read_record as read_machine};
 use crate::material_record_file::{RecordFileError, read_record as read_material};
-use crate::record_envelope::record_file_name;
-
-/// The suffix of a conflict copy's id (the feature-local rule of `specs/0116-library-sync`): the
-/// file `<uuid>.conflict.json` beside the record, the browser key `curvyo.machines/<id>.conflict`
-/// or `curvyo.materials/<id>.conflict`; readers ignore it as they ignore a folder-sync tool's
-/// copies (ADR 0038 §1), and deleting it is the maker's.
-pub const CONFLICT_SUFFIX: &str = ".conflict";
-
-/// Why the envelope gate (ADR 0055 §7) skipped a record text.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MergeReason {
-    /// Not a valid record of this format: skipped with a notice, never rewritten.
-    Damaged,
-    /// Written by a newer build: skipped with a notice, never rewritten (ADR 0004 §9).
-    Newer,
-    /// A material of the older format 1: skipped until its conversion is built.
-    Older,
-}
-
-/// The merge of one incoming library record against the local record of the same id.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RecordMerge {
-    /// The incoming text wins: it becomes the record; `loser`, when the local text existed,
-    /// becomes the conflict copy.
-    IncomingWins {
-        /// The losing local text, kept as the conflict copy.
-        loser: Option<String>,
-    },
-    /// The local text wins: it stays the record, the incoming text becomes the conflict copy,
-    /// and the winner is written back to the stream (ADR 0062 decision 5).
-    LocalWins {
-        /// The losing incoming text, kept as the conflict copy.
-        conflict: String,
-    },
-    /// The texts are byte-equal: nothing to do.
-    Same,
-    /// The incoming text was skipped by the envelope gate: the local record stays untouched,
-    /// never rewritten, with a notice of the reason.
-    SkipIncoming {
-        /// Why the text did not open.
-        reason: MergeReason,
-    },
-    /// The local text is from a newer build (ADR 0004 §9): it stays untouched and the incoming
-    /// text becomes the conflict copy, with a notice.
-    LocalNewer {
-        /// The incoming text, kept as the conflict copy.
-        conflict: String,
-    },
-}
-
-/// The id of `id`'s conflict copy.
-#[must_use]
-pub fn conflict_id(id: &str) -> String {
-    format!("{id}{CONFLICT_SUFFIX}")
-}
 
 /// Merges the incoming machine record `incoming` against `local`, the record file `id` holds.
 /// `modified` is read from the record texts themselves (ADR 0038 §2), never from a second
-/// field: newest wins, equal `modified` is broken by the bytewise-greater text, so every device
-/// picks the same winner (the feature-local rule of `specs/0116-library-sync`).
+/// field: newest wins, equal `modified` is broken by the bytewise-greater text.
 #[must_use]
 pub fn merge_machine_record(id: &str, incoming: &str, local: Option<&str>) -> RecordMerge {
     let name = record_file_name(id);
-    let incoming_modified = match read_machine(&name, incoming) {
-        Ok(profile) => profile.modified,
-        Err(RecordError::Newer) => {
-            return RecordMerge::SkipIncoming {
-                reason: MergeReason::Newer,
-            };
-        }
-        // A record of a format before 5 is never read into sets (ADR 0060 §3): it counts as
-        // unreadable here too.
-        Err(RecordError::Damaged | RecordError::Older) => {
-            return RecordMerge::SkipIncoming {
-                reason: MergeReason::Damaged,
-            };
-        }
+    let read = |text: &str| {
+        read_machine(&name, text)
+            .map(|profile| profile.modified)
+            .map_err(|error| match error {
+                RecordError::Newer => MergeReason::Newer,
+                RecordError::OtherFamily => MergeReason::OtherFamily,
+                // A record of a format before 5 is never read into sets (ADR 0060 §3): it counts
+                // as unreadable here too.
+                RecordError::Damaged | RecordError::Older => MergeReason::Damaged,
+            })
     };
-    let Some(local) = local else {
-        return RecordMerge::IncomingWins { loser: None };
-    };
-    if local == incoming {
-        return RecordMerge::Same;
-    }
-    match read_machine(&name, local) {
-        Ok(profile) => decide(incoming_modified, incoming, profile.modified, local),
-        Err(RecordError::Newer) => RecordMerge::LocalNewer {
-            conflict: incoming.to_owned(),
-        },
-        Err(RecordError::Damaged | RecordError::Older) => RecordMerge::IncomingWins {
-            loser: Some(local.to_owned()),
-        },
-    }
+    merge_record(
+        incoming,
+        read(incoming),
+        local.map(|local| (local, read(local))),
+    )
 }
 
 /// Merges the incoming material record `incoming` against `local`, the record file `id` holds,
@@ -103,58 +36,21 @@ pub fn merge_machine_record(id: &str, incoming: &str, local: Option<&str>) -> Re
 #[must_use]
 pub fn merge_material_record(id: &str, incoming: &str, local: Option<&str>) -> RecordMerge {
     let name = record_file_name(id);
-    let incoming_modified = match read_material(&name, incoming) {
-        Ok(material) => material.modified,
-        Err(RecordFileError::Newer) => {
-            return RecordMerge::SkipIncoming {
-                reason: MergeReason::Newer,
-            };
-        }
-        Err(RecordFileError::Older) => {
-            return RecordMerge::SkipIncoming {
-                reason: MergeReason::Older,
-            };
-        }
-        Err(RecordFileError::Damaged(_)) => {
-            return RecordMerge::SkipIncoming {
-                reason: MergeReason::Damaged,
-            };
-        }
+    let read = |text: &str| {
+        read_material(&name, text)
+            .map(|material| material.modified)
+            .map_err(|error| match error {
+                RecordFileError::Newer => MergeReason::Newer,
+                RecordFileError::OtherFamily => MergeReason::OtherFamily,
+                RecordFileError::Older => MergeReason::Older,
+                RecordFileError::Damaged(_) => MergeReason::Damaged,
+            })
     };
-    let Some(local) = local else {
-        return RecordMerge::IncomingWins { loser: None };
-    };
-    if local == incoming {
-        return RecordMerge::Same;
-    }
-    match read_material(&name, local) {
-        Ok(material) => decide(incoming_modified, incoming, material.modified, local),
-        Err(RecordFileError::Newer) => RecordMerge::LocalNewer {
-            conflict: incoming.to_owned(),
-        },
-        Err(RecordFileError::Older | RecordFileError::Damaged(_)) => RecordMerge::IncomingWins {
-            loser: Some(local.to_owned()),
-        },
-    }
-}
-
-/// The winner of two open record texts: newest `modified`, equal `modified` by the
-/// bytewise-greater text.
-fn decide<T: Ord>(
-    incoming_modified: T,
-    incoming: &str,
-    local_modified: T,
-    local: &str,
-) -> RecordMerge {
-    if (incoming_modified, incoming) > (local_modified, local) {
-        RecordMerge::IncomingWins {
-            loser: Some(local.to_owned()),
-        }
-    } else {
-        RecordMerge::LocalWins {
-            conflict: incoming.to_owned(),
-        }
-    }
+    merge_record(
+        incoming,
+        read(incoming),
+        local.map(|local| (local, read(local))),
+    )
 }
 
 #[cfg(test)]
@@ -165,7 +61,7 @@ mod tests {
     use crate::material::Thickness;
     use crate::material_record::Material;
     use crate::material_record_file::write_record as write_material;
-    use crate::record_envelope::{is_record_id, record_id};
+    use curvyo_library_core::{CONFLICT_SUFFIX, conflict_id, is_record_id, record_id};
 
     const ID: &str = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f";
     const OTHER: &str = "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c";
@@ -338,6 +234,34 @@ mod tests {
             merge_material_record(ID, &newer_material, Some(&material)),
             RecordMerge::SkipIncoming {
                 reason: MergeReason::Newer
+            }
+        );
+    }
+
+    /// ADR 0097 §4: an incoming record of another machine family, at that family's first version
+    /// 9, is that family's to merge: skipped here without a notice, the local text untouched.
+    #[test]
+    fn an_incoming_record_of_another_family_is_skipped_as_that_familys() {
+        let local = machine_text("ZQX-MACH-7731", 4);
+        let cutter = machine_text("ZQX-MACH-7731", 9)
+            .replacen("\"kind\": \"laser\"", "\"kind\": \"cutter\"", 1)
+            .replacen("\"format_version\": 8", "\"format_version\": 9", 1);
+        assert_eq!(
+            merge_machine_record(ID, &cutter, Some(&local)),
+            RecordMerge::SkipIncoming {
+                reason: MergeReason::OtherFamily
+            }
+        );
+        let material = material_text("ZQX-MAT-7731", 4);
+        let fabric = material_text("ZQX-MAT-7731", 9).replacen(
+            "\"kind\": \"laser\"",
+            "\"kind\": \"embroidery\"",
+            1,
+        );
+        assert_eq!(
+            merge_material_record(ID, &fabric, Some(&material)),
+            RecordMerge::SkipIncoming {
+                reason: MergeReason::OtherFamily
             }
         );
     }

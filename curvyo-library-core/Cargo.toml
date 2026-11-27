@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "The Curvyo online library protocols (ADR 0085): the sources file, the Git catalogue index, the Iconify requests and answers, and the hash check, as pure request and response functions (wasm-compatible)."
+description = "The per-user machine records of every family (ADR 0097 §4: envelope, kind, merge, connection) and the Curvyo online library protocols (ADR 0085): the sources file, the Git catalogue index, the Iconify requests and answers, and the hash check, as pure request and response functions (wasm-compatible)."
 
 [lints]
 workspace = true

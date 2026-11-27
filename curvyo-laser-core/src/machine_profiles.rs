@@ -62,6 +62,8 @@ impl MachineProfiles {
                         RecordError::Damaged => library.damaged += 1,
                         RecordError::Newer => library.newer += 1,
                         RecordError::Older => library.older += 1,
+                        // Another family's profile: its own library lists it (ADR 0097 §4).
+                        RecordError::OtherFamily => {}
                     }
                     library.skipped.push(id.to_owned());
                 }

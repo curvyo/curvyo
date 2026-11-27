@@ -68,12 +68,93 @@ fn ac1_the_kind_list_is_drawing_sketch_and_one_entry_per_enabled_extension() {
         .iter()
         .map(|e| e["id"].as_str().unwrap())
         .collect();
-    assert_eq!(ids, vec!["drawing", "sketch", "curvyo.laser"]);
+    assert_eq!(
+        ids,
+        vec![
+            "drawing",
+            "sketch",
+            "curvyo.laser",
+            "curvyo.cutter",
+            "curvyo.embroidery",
+            "curvyo.cnc"
+        ]
+    );
     assert_eq!(json["kinds"][2]["label"], "Laser");
     assert_eq!(json["kinds"][2]["icon"], "Zap");
     assert_eq!(json["active"], "vector");
     assert_eq!(json["page"]["word"], "Drawing");
     assert_eq!(session.manufacturing_view_json(), "null");
+}
+
+/// ADR 0095 §11 step G2: each machine family's Add page is one step named after its word, takes
+/// its default built-in's page size, writes no laser profile copy, and undo removes it.
+#[test]
+fn add_page_of_a_machine_family_is_one_named_step_of_its_builtin_size() {
+    for (process, word, label, name, width, height) in [
+        (
+            "curvyo.cutter",
+            "Plotter",
+            "add_plotter_page",
+            "Add plotter page",
+            304.8,
+            304.8,
+        ),
+        (
+            "curvyo.embroidery",
+            "Embroidery",
+            "add_embroidery_page",
+            "Add embroidery page",
+            190.0,
+            290.0,
+        ),
+        (
+            "curvyo.cnc",
+            "CNC",
+            "add_cnc_page",
+            "Add CNC page",
+            300.0,
+            300.0,
+        ),
+    ] {
+        let mut session = session_with_drawing();
+        let steps = session.history_len();
+        let page = session.add_page_of_kind(process, None).unwrap();
+        assert_eq!(session.history_len(), steps + 1, "{process}");
+        assert_eq!(session.active_page().id, page);
+        let active = session.active_page();
+        assert!(matches!(
+            &active.kind,
+            curvyo_document_core::PageKind::Output { process: p, .. } if p == process
+        ));
+        assert!(
+            (active.size.width.as_mm() - width).abs() < 0.01,
+            "{process}"
+        );
+        assert!(
+            (active.size.height.as_mm() - height).abs() < 0.01,
+            "{process}"
+        );
+        let own = session.document.own_steps();
+        let step = own.last().unwrap();
+        assert_eq!(step.label, label);
+        assert_eq!(curvyo_ui_core::operation_name(label), name);
+        let row = rows(&session)
+            .into_iter()
+            .find(|r| r["id"] == page.as_str())
+            .unwrap();
+        assert_eq!(row["name"], format!("{word} 1"));
+        assert_eq!(row["kindWord"], word);
+        let manufacturing = session.document.manufacturings();
+        assert_eq!(manufacturing.len(), 1);
+        assert!(
+            manufacturing[0].profile.is_none(),
+            "no laser copy on a {word} page"
+        );
+        assert_eq!(view(&session)["machine"], Value::Null);
+        let _ = session.frame_draw_list();
+        session.undo();
+        assert_eq!(session.document.manufacturings(), Vec::new());
+    }
 }
 
 #[test]
@@ -265,9 +346,12 @@ fn ac18_a_switched_off_extension_keeps_the_page_listed_as_laser_off_with_vector_
     assert_eq!(row["kindWord"], "Laser (off)");
     assert_eq!(row["kindOff"], true);
     let json = registry(&session);
-    assert_eq!(
-        json["kinds"].as_array().unwrap().len(),
-        2,
+    assert!(
+        json["kinds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|kind| kind["id"] != "curvyo.laser"),
         "Laser is absent"
     );
     assert_eq!(json["extensions"][0]["name"], "Laser workbench");

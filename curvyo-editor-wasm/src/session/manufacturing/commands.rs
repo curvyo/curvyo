@@ -2,7 +2,7 @@
 //! history step recorded like every other command; values are clamped by the extension's schema.
 
 use curvyo_document_core::{
-    ADD_OUTPUT_PAGE_COMMIT_LABEL, NewOutputPage, NodeId, PageCorner, ProfileChange,
+    ADD_OUTPUT_PAGE_COMMIT_LABEL, DocumentSize, NewOutputPage, NodeId, PageCorner, ProfileChange,
 };
 use curvyo_extension_core::WorkbenchContribution;
 use curvyo_laser_core::{ProfileCopy, write_copy};
@@ -26,6 +26,9 @@ impl Session {
         }
         let manifest = curvyo_ui_core::manifest(process)?;
         let workbench = manifest.workbench()?;
+        if let Some((label, size)) = family_page(process) {
+            return self.add_family_page(process, workbench.label, label, size);
+        }
         let picked = profile.and_then(|id| self.manufacturing.machine.profiles.find(id).cloned());
         let chosen = picked.is_some();
         let profile = picked.unwrap_or_else(|| self.initial_machine_profile());
@@ -74,6 +77,31 @@ impl Session {
         Some(page.id)
     }
 
+    /// Add page of a machine family other than the laser (ADR 0095 §11 step G2): "<word> N" of
+    /// the family's default built-in size, committed under the family's `label`, and no profile
+    /// copy yet (the family copy comes with its first slice).
+    fn add_family_page(
+        &mut self,
+        process: &str,
+        word: &str,
+        label: &str,
+        size: DocumentSize,
+    ) -> Option<String> {
+        let page = self.recording_unguarded(|this| {
+            this.document.batch(label, |d| {
+                d.add_output_page(NewOutputPage {
+                    process,
+                    label: word,
+                    profile: None,
+                    work_area: size,
+                })
+                .ok()
+            })
+        })?;
+        self.activate_page(&page.id);
+        Some(page.id)
+    }
+
     /// Deletes the placement `id` of the active laser page (`0098` criterion 12): only the
     /// reference goes, in one step.
     pub fn delete_placement(&mut self, id: NodeId) -> bool {
@@ -95,4 +123,24 @@ impl Session {
 /// The workbench contribution of the process `process`.
 pub(super) fn workbench_of(process: &str) -> Option<WorkbenchContribution> {
     curvyo_ui_core::manifest(process)?.workbench().cloned()
+}
+
+/// The commit label and page size of Add page with the machine family `process`; `None` for the
+/// laser and every process that is not one of the families of ADR 0095.
+fn family_page(process: &str) -> Option<(&'static str, DocumentSize)> {
+    match process {
+        curvyo_cutter_core::PROCESS_ID => Some((
+            curvyo_cutter_core::ADD_PAGE_COMMIT_LABEL,
+            curvyo_cutter_core::DEFAULT_BUILTIN.page_size(),
+        )),
+        curvyo_embroidery_core::PROCESS_ID => Some((
+            curvyo_embroidery_core::ADD_PAGE_COMMIT_LABEL,
+            curvyo_embroidery_core::DEFAULT_BUILTIN.page_size(),
+        )),
+        curvyo_cnc_core::PROCESS_ID => Some((
+            curvyo_cnc_core::ADD_PAGE_COMMIT_LABEL,
+            curvyo_cnc_core::DEFAULT_BUILTIN.page_size(),
+        )),
+        _ => None,
+    }
 }

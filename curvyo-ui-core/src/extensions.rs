@@ -11,8 +11,11 @@ use curvyo_extension_core::{Extension, GenerateRequest, Generated, Manifest, Not
 use serde::{Deserialize, Serialize};
 
 /// Every compiled-in extension, in list order.
-static EXTENSIONS: [&dyn Extension; 3] = [
+static EXTENSIONS: [&dyn Extension; 6] = [
     &curvyo_laser_core::LASER,
+    &curvyo_cutter_core::CUTTER,
+    &curvyo_embroidery_core::EMBROIDERY,
+    &curvyo_cnc_core::CNC,
     &curvyo_generators_core::GENERATORS,
     &curvyo_codes_core::CODES,
 ];
@@ -118,12 +121,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_laser_the_generators_and_the_codes_are_the_compiled_in_extensions() {
+    fn the_machine_families_the_generators_and_the_codes_are_the_compiled_in_extensions() {
         let ids: Vec<&str> = manifests().iter().map(|m| m.id).collect();
         assert_eq!(
             ids,
-            vec!["curvyo.laser", "curvyo.generators", "curvyo.codes"]
+            vec![
+                "curvyo.laser",
+                "curvyo.cutter",
+                "curvyo.embroidery",
+                "curvyo.cnc",
+                "curvyo.generators",
+                "curvyo.codes"
+            ]
         );
+        for family in ["curvyo.cutter", "curvyo.embroidery", "curvyo.cnc"] {
+            assert!(manifest(family).unwrap().workbench().is_some(), "{family}");
+        }
         assert!(manifest("curvyo.laser").is_some());
         assert!(manifest("example.cnc").is_none());
     }

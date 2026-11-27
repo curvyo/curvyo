@@ -27,6 +27,10 @@ curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }
 curvyo-generators-core = { path = "../curvyo-generators-core", version = "0.1.0" }
 curvyo-codes-core = { path = "../curvyo-codes-core", version = "0.1.0" }
+# The machine families of ADR 0097 §1, registered beside the laser.
+curvyo-cutter-core = { path = "../curvyo-cutter-core", version = "0.1.0" }
+curvyo-embroidery-core = { path = "../curvyo-embroidery-core", version = "0.1.0" }
+curvyo-cnc-core = { path = "../curvyo-cnc-core", version = "0.1.0" }
 kurbo.workspace = true
 serde.workspace = true
 # The stored trace settings of a part are a map of plain JSON values (ADR 0061 §5); the

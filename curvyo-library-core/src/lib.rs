@@ -1,4 +1,6 @@
-//! The protocols of the online template library (`specs/0138-template-library`, ADR 0085) as pure
+//! Two module groups. The per-user machine records shared by every machine family (ADR 0097 §4):
+//! their envelope, `kind`, merge and `connection` value. And the protocols of the online template
+//! library (`specs/0138-template-library`, ADR 0085) as pure
 //! functions: the text of the sources file, the catalogue index and its checks, the Iconify
 //! request builders and parsers, the hash check of a downloaded file, and the fuzzy matcher of the
 //! library browser (`specs/0152-library-browser`, ADR 0086) with its keyword file (`specs/0153`,
@@ -11,6 +13,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod catalogue;
+mod connection;
 mod error;
 mod fold;
 mod fold_table;
@@ -18,6 +21,9 @@ mod iconify;
 mod iconify_listing;
 mod iconify_tile;
 mod keywords;
+mod record_envelope;
+mod record_kind;
+mod record_merge;
 mod request;
 mod search;
 mod search_related;
@@ -29,6 +35,7 @@ pub use catalogue::{
     MAX_TEMPLATE_BYTES, MAX_TEMPLATES, SUPPORTED_CATALOGUE_FORMAT, TemplateEntry,
     font_licence_is_known, needs_credit,
 };
+pub use connection::{BaudRate, Connection, MAX_CONNECTION_CHARS};
 pub use error::{
     CatalogueError, Failure, IconifyError, KeywordsError, RequestError, SourcesError, VerifyError,
 };
@@ -42,6 +49,12 @@ pub use iconify::{
 pub use iconify_listing::{SetListing, parse_set_listing};
 pub use iconify_tile::{Rgb8, has_fixed_colour, icon_tile_svg};
 pub use keywords::{IconWords, KeywordSource, Keywords, MAX_KEYWORDS_BYTES, MAX_RELATED};
+pub use record_envelope::{
+    EnvelopeError, LibraryWrite, RECORD_SUFFIX, is_record_id, new_record_id, open, open_family,
+    pretty, record_file_name, record_id,
+};
+pub use record_kind::{Family, KindRead, record_kind};
+pub use record_merge::{CONFLICT_SUFFIX, MergeReason, RecordMerge, conflict_id, merge_record};
 pub use request::{
     READY_ADDRESS, READY_HOST, Request, SourceKind, base_address, host_of, is_ready,
 };

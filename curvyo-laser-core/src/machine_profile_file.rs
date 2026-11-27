@@ -51,6 +51,10 @@ pub enum RecordError {
     /// Of a format before 5: skipped, counted, left untouched, never read into sets (ADR 0060 §3).
     #[error("the record has an older format")]
     Older,
+    /// A profile of another machine family (ADR 0097 §4): that family's reader reads it; skipped
+    /// here without a notice and never written.
+    #[error("the record is of another machine family")]
+    OtherFamily,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -117,12 +121,14 @@ struct ChoiceJson {
 /// The profile the record file `file_name` holds.
 ///
 /// # Errors
-/// [`RecordError::Newer`] for a `format_version` above 8; [`RecordError::Older`] for formats 1
+/// [`RecordError::OtherFamily`] for a `kind` of another family this build knows, whatever its
+/// version (ADR 0097 §4); [`RecordError::Newer`] for a `format_version` above 8 or a `kind` this
+/// build does not know; [`RecordError::Older`] for formats 1
 /// to 4; [`RecordError::Damaged`] for a text over 256 KiB, a JSON or type error, a missing or
 /// unknown key (`fixtures` included; `air_assist` or `output_format` in a format 5 record, a
 /// default key in a format 5 or 6 record, a focus pulse key in a format 5 to 7 record), an
 /// `output_format` this build does not know, a value out of its range (a Default speed above the
-/// max feed among them), a kind other than `laser`, an id that differs from the file name, or
+/// max feed among them), a `kind` that is not text, an id that differs from the file name, or
 /// damaged fixture sets (ADR 0060 §2). A format 5 record reads air assist off and GRBL (ADR 0065
 /// §3); formats 5 and 6 read the built-in default pair, formats 5 to 7 the focus pulse's
 /// defaults. Nothing is written on read.
@@ -135,6 +141,7 @@ pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, Record
     )
     .map_err(|error| match error {
         EnvelopeError::Newer => RecordError::Newer,
+        EnvelopeError::OtherFamily(_) => RecordError::OtherFamily,
         EnvelopeError::TooLarge | EnvelopeError::NotJson | EnvelopeError::BadVersion => {
             RecordError::Damaged
         }

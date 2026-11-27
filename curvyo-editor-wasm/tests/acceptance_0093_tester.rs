@@ -280,7 +280,8 @@ fn ac11b_the_settings_file_switch_is_read_at_load() {
     add_laser(&mut s);
     s.load_extension_settings("disabled = [\"curvyo.laser\"]\n");
     assert_eq!(active(&s), "vector");
-    assert_eq!(workbenches(&s)["kinds"].as_array().unwrap().len(), 2);
+    // ADR 0097: Plotter, Embroidery and CNC stay beside Drawing and Sketch.
+    assert_eq!(workbenches(&s)["kinds"].as_array().unwrap().len(), 5);
     s.load_extension_settings("");
     assert_eq!(active(&s), "manufacturing");
 }

@@ -165,3 +165,25 @@ fn test_ids_and_owner_come_from_the_loaded_records() {
     let id = TestId::parse("7K2QX").unwrap();
     assert_eq!(library.test_owner(id).unwrap().id, ONE);
 }
+
+/// ADR 0097 §4: a material of another machine family is no row and no notice, and is never
+/// written by this library.
+#[test]
+fn a_material_of_another_family_is_skipped_silently() {
+    let laser_text = write_record(&material(ONE, "Birch"));
+    let fabric = write_record(&material(TWO, "Felt")).replacen(
+        "\"kind\": \"laser\"",
+        "\"kind\": \"embroidery\"",
+        1,
+    );
+    let library = Library::load(
+        &[
+            (record_file_name(ONE), laser_text),
+            (record_file_name(TWO), fabric),
+        ],
+        None,
+    );
+    assert_eq!(library.reads().len(), 1);
+    assert_eq!(library.notices, Vec::<String>::new());
+    assert!(library.skipped.iter().any(|id| id == TWO));
+}

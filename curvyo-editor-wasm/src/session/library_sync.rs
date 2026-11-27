@@ -265,7 +265,12 @@ impl Session {
             LibraryKind::Material => merge_material_record(id, text, local.as_deref()),
         };
         match merge {
-            RecordMerge::Same => false,
+            // Another machine family's record is its own merge's to take, with no notice (ADR
+            // 0095 §4).
+            RecordMerge::Same
+            | RecordMerge::SkipIncoming {
+                reason: MergeReason::OtherFamily,
+            } => false,
             RecordMerge::IncomingWins { loser } => {
                 self.library_write_local(kind, id, text);
                 let arrived = local.is_none();
@@ -287,7 +292,7 @@ impl Session {
                 let notice = match reason {
                     MergeReason::Damaged => texts::DAMAGED_NOTICE,
                     MergeReason::Newer => texts::NEWER_NOTICE,
-                    MergeReason::Older => texts::OLDER_NOTICE,
+                    MergeReason::Older | MergeReason::OtherFamily => texts::OLDER_NOTICE,
                 };
                 self.library.notices.push_back(notice.to_owned());
                 false

@@ -345,7 +345,8 @@ test("AC18b: the extension off takes Laser out of the kind list and the chip rea
   const list = JSON.parse(s.workbenches_json()) as WorkbenchList;
   assert.deepEqual(
     list.kinds.map((k) => k.label),
-    ["Drawing", "Sketch"],
+    // ADR 0097 §1: the other machine families stay.
+    ["Drawing", "Sketch", "Plotter", "Embroidery", "CNC"],
   );
   const row = (JSON.parse(s.pages_json()) as { id: string; kindWord: string }[]).find((r) => r.id === laser);
   assert.equal(row?.kindWord, "Laser (off)");

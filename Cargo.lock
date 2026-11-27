@@ -987,6 +987,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "curvyo-cnc-core"
+version = "0.1.0"
+dependencies = [
+ "curvyo-document-core",
+ "curvyo-extension-core",
+]
+
+[[package]]
 name = "curvyo-codes-core"
 version = "0.1.0"
 dependencies = [
@@ -1087,6 +1095,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "curvyo-cutter-core"
+version = "0.1.0"
+dependencies = [
+ "curvyo-document-core",
+ "curvyo-extension-core",
+]
+
+[[package]]
 name = "curvyo-document-core"
 version = "0.1.0"
 dependencies = [
@@ -1109,10 +1125,13 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "console_error_panic_hook",
+ "curvyo-cnc-core",
  "curvyo-connector-core",
  "curvyo-connector-io",
  "curvyo-crypto-core",
+ "curvyo-cutter-core",
  "curvyo-document-core",
+ "curvyo-embroidery-core",
  "curvyo-extension-core",
  "curvyo-geometry-core",
  "curvyo-image-core",
@@ -1139,6 +1158,14 @@ dependencies = [
  "web-sys",
  "wgpu",
  "zip",
+]
+
+[[package]]
+name = "curvyo-embroidery-core"
+version = "0.1.0"
+dependencies = [
+ "curvyo-document-core",
+ "curvyo-extension-core",
 ]
 
 [[package]]
@@ -1204,6 +1231,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "curvyo-inkstitch-core"
+version = "0.1.0"
+
+[[package]]
 name = "curvyo-laser-core"
 version = "0.1.0"
 dependencies = [
@@ -1211,6 +1242,7 @@ dependencies = [
  "curvyo-extension-core",
  "curvyo-geometry-core",
  "curvyo-image-core",
+ "curvyo-library-core",
  "libm",
  "serde",
  "serde_json",
@@ -1336,8 +1368,11 @@ dependencies = [
 name = "curvyo-ui-core"
 version = "0.1.0"
 dependencies = [
+ "curvyo-cnc-core",
  "curvyo-codes-core",
+ "curvyo-cutter-core",
  "curvyo-document-core",
+ "curvyo-embroidery-core",
  "curvyo-extension-core",
  "curvyo-generators-core",
  "curvyo-geometry-core",

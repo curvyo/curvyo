@@ -9,7 +9,9 @@ use crate::material::next_modified;
 use crate::material_preferences::{read_order, write_order};
 use crate::material_record::{Material, MaterialRead};
 use crate::material_record_edits::RecordRefusal;
-use crate::material_record_file::{MAX_RECORD_TEXT, load_record, write_record};
+use crate::material_record_file::{
+    MAX_RECORD_TEXT, RecordFileError, load_record, material_read, read_record, write_record,
+};
 use crate::record_envelope::{LibraryWrite, record_file_name, record_id};
 use crate::test_id::TestId;
 
@@ -82,7 +84,28 @@ fn name_hint(text: &str) -> Option<String> {
 }
 
 fn entry_of(file_name: &str, text: String) -> Entry {
-    let read = load_record(file_name, &text);
+    entry_read(file_name, text, load_record)
+}
+
+/// The entry of one record file found at load; `None` for a material of another machine family,
+/// which this library skips silently and never writes (ADR 0097 §4).
+fn loaded_entry(file_name: &str, text: String) -> Option<Entry> {
+    let result = read_record(file_name, &text);
+    if result == Err(RecordFileError::OtherFamily) {
+        return None;
+    }
+    Some(entry_read(file_name, text, |name, _| {
+        material_read(name, result)
+    }))
+}
+
+/// The entry of `text` with the read `read` makes of it.
+fn entry_read(
+    file_name: &str,
+    text: String,
+    read: impl FnOnce(&str, &str) -> MaterialRead,
+) -> Entry {
+    let read = read(file_name, &text);
     let name = match &read {
         MaterialRead::Loaded(_) => None,
         _ => name_hint(&text),
@@ -110,7 +133,10 @@ impl Library {
                 library.skipped.push(id.to_owned());
                 continue;
             }
-            let entry = entry_of(name, text.clone());
+            let Some(entry) = loaded_entry(name, text.clone()) else {
+                library.skipped.push(id.to_owned());
+                continue;
+            };
             let shown = entry.name.clone().unwrap_or_else(|| name.clone());
             match &entry.read {
                 MaterialRead::Damaged { reason, .. } => {

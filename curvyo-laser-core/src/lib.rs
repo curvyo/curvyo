@@ -50,7 +50,6 @@ mod job_gate_text;
 mod job_hatch;
 mod job_input;
 mod job_moves;
-mod job_nesting;
 mod job_numbers;
 mod job_order;
 mod job_plan;
@@ -313,6 +312,7 @@ pub mod library {
     };
 }
 
+pub use curvyo_library_core::{CONFLICT_SUFFIX, MergeReason, RecordMerge, conflict_id};
 pub use fixture_fit::{
     FIT_TOLERANCE, FitMatch, FitMode, SlotFit, fit_into_slot, fit_slot, slot_fit_matrix,
 };
@@ -337,10 +337,7 @@ pub use fixture_stored::{
 pub use grid_layout::{
     GridLayout, GridSpec, Lattice, Number, Tape, TapeEdge, TapeEdges, Tick, layout,
 };
-pub use library_merge::{
-    CONFLICT_SUFFIX, MergeReason, RecordMerge, conflict_id, merge_machine_record,
-    merge_material_record,
-};
+pub use library_merge::{merge_machine_record, merge_material_record};
 pub use machine_profile::{
     BaudRate, Connection, DefaultNumbers, FeedRate, FocusPulse, GENERIC_LASER_ID,
     GENERIC_LASER_NAME, Limited, MAX_CONNECTION_CHARS, MAX_NAME_CHARS, MAX_WORK_MM, MIN_WORK_MM,

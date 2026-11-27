@@ -54,6 +54,10 @@ pub enum RecordFileError {
     /// Format 1: skipped and never written until its conversion is built (plan Part F).
     #[error("Material has an older format.")]
     Older,
+    /// A material of another machine family (ADR 0097 §4): that family's reader reads it;
+    /// skipped here without a notice and never written.
+    #[error("Material of another machine family.")]
+    OtherFamily,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -141,11 +145,21 @@ pub(crate) fn damaged(reason: impl Into<String>) -> RecordFileError {
 /// The record file `file_name` as loaded: [`MaterialRead::Loaded`], or the reason it is skipped.
 #[must_use]
 pub fn load_record(file_name: &str, text: &str) -> MaterialRead {
+    material_read(file_name, read_record(file_name, text))
+}
+
+/// [`load_record`] of the read `result` of the record file `file_name`.
+pub(crate) fn material_read(
+    file_name: &str,
+    result: Result<Material, RecordFileError>,
+) -> MaterialRead {
     let id = record_id(file_name).unwrap_or(file_name).to_owned();
-    match read_record(file_name, text) {
+    match result {
         Ok(material) => MaterialRead::Loaded(material),
         Err(RecordFileError::Damaged(reason)) => MaterialRead::Damaged { id, reason },
-        Err(RecordFileError::Newer) => MaterialRead::Newer { id },
+        // A direct load of another family's record is left untouched as a newer one would be;
+        // the library skips it before it gets here.
+        Err(RecordFileError::Newer | RecordFileError::OtherFamily) => MaterialRead::Newer { id },
         Err(RecordFileError::Older) => MaterialRead::Older { id },
     }
 }
@@ -153,13 +167,16 @@ pub fn load_record(file_name: &str, text: &str) -> MaterialRead {
 /// The material the record file `file_name` holds.
 ///
 /// # Errors
-/// [`RecordFileError::Newer`] above format 4, [`RecordFileError::Older`] for format 1, and
+/// [`RecordFileError::OtherFamily`] for a `kind` of another family this build knows (ADR 0097 §4),
+/// [`RecordFileError::Newer`] above format 4 or for a `kind` this build does not know,
+/// [`RecordFileError::Older`] for format 1, and
 /// [`RecordFileError::Damaged`] with one reason for every damage of ADR 0055 §3 and ADR 0058 §6.
 /// Nothing is written on read.
 pub fn read_record(file_name: &str, text: &str) -> Result<Material, RecordFileError> {
     let (value, version) =
         open(text, MAX_RECORD_TEXT, 1, RECORD_FORMAT_VERSION).map_err(|error| match error {
             EnvelopeError::Newer => RecordFileError::Newer,
+            EnvelopeError::OtherFamily(_) => RecordFileError::OtherFamily,
             EnvelopeError::TooLarge => {
                 damaged(format!("The file is over {} KiB.", MAX_RECORD_TEXT / 1024))
             }

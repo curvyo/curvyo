@@ -59,7 +59,8 @@ test("AC1: a new project offers Drawing, Sketch and the output kind in the Kind 
   const l = list(s);
   assert.deepEqual(
     kindOptions(l).map((k) => k.label),
-    ["Drawing", "Sketch", "Laser"],
+    // ADR 0097 §1: the other machine families follow the laser.
+    ["Drawing", "Sketch", "Laser", "Plotter", "Embroidery", "CNC"],
   );
   assert.equal(activeKind(l), "vector");
   assert.equal(l.page.word, "Drawing");
@@ -99,7 +100,7 @@ test("AC11a: a dummy second kind appears through the same registry beside the re
   };
   assert.deepEqual(
     kindOptions(merged).map((k) => k.label),
-    ["Drawing", "Sketch", "Laser", "Dummy"],
+    ["Drawing", "Sketch", "Laser", "Plotter", "Embroidery", "CNC", "Dummy"],
   );
 });
 
@@ -118,7 +119,7 @@ test("AC11b: switched off, Laser leaves the Kind switch and the page stays as 'L
   const l = list(s);
   assert.deepEqual(
     kindOptions(l).map((k) => k.label),
-    ["Drawing", "Sketch"],
+    ["Drawing", "Sketch", "Plotter", "Embroidery", "CNC"],
   );
   assert.equal(activeKind(l), "vector");
   assert.equal(l.page.word, "Laser (off)");
