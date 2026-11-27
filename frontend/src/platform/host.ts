@@ -4,7 +4,7 @@
 // functions are served by a tiny in-page implementation, so `App` runs
 // the same code on both. Browser Open reads a picked file, Save downloads it
 // and counts as saved: the page cannot see whether the browser's own save prompt was cancelled.
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { Channel, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import {
   listen as tauriListen,
   type EventCallback,
@@ -213,6 +213,10 @@ function notInTheBrowser(command: string): never {
 
 const browserCommands: Record<string, (args?: Record<string, unknown>) => unknown> = {
   take_pending_open: () => null,
+  // The native pen reader exists in the desktop app only (ADR 0094): the probe says so.
+  pen_watch: () => false,
+  pen_unwatch: () => undefined,
+  pen_compression: () => undefined,
   pick_project: (args) => {
     forgetOpenDocument();
     return pickProject(String(args?.kind ?? "project"));
@@ -480,6 +484,14 @@ export function invoke<T>(
     // A guarded storage access that fails is a rejected command, not a throw.
     return Promise.reject(error);
   }
+}
+
+/** A Tauri channel the host fills with messages (the Pen probe's native samples, ADR 0094); only
+ * valid inside the desktop shell, so callers check `isTauri` first. */
+export function messageChannel<T>(onMessage: (message: T) => void): unknown {
+  const channel = new Channel<T>();
+  channel.onmessage = onMessage;
+  return channel;
 }
 
 /** Same contract as Tauri's `listen`. The browser has no host, so no event ever arrives. */
