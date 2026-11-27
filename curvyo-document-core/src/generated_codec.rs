@@ -11,6 +11,9 @@
 //!     parts          : [ part, ... ]   one part per piece (a gear one, a box one per plate)
 //!     part_keys      : [ "key", ... ]  (format 65) the part keys, parallel to `parts`, written whole
 //!                      with them; absent in an older file (no key, nothing to detach yet)
+//!     part_paints    : { "<part key>": { "fill": [r, g, b], "job": false } }  (format 70, ADR 0091
+//!                      "Per-part paint") written whole with `parts`; absent = every part in the
+//!                      object's style; `job` absent = true; keys are entries of `part_keys`
 //!       part         : [ subpath, ... ]   the outline and its holes
 //!       subpath      : [x0, y0, c1x, c1y, c2x, c2y, x, y, ...]   a start point, then cubics
 //!   generated_frame  : [a, b, c, d, e, f]   rotation, mirror and translation only
@@ -25,18 +28,21 @@
 //! Damage (refused at open): `generated` not a map; a `kind` that is not `<id>/<kind>`; a seed
 //! outside `u32`; `params` not a map; no part or an empty part; a subpath that is not `2 + 6n`
 //! finite numbers within ±1e7 (n at least 1); `part_keys` that is not a list of valid, distinct
-//! key strings as long as `parts` (ADR 0082 §10); a frame that is not six finite numbers or holds
+//! key strings as long as `parts` (ADR 0082 §10); `part_paints` that is not a map, names a key that
+//! is no entry of `part_keys` (or comes without `part_keys`), or holds an entry without a `fill` of
+//! three integers 0 to 255 or with a `job` that is not a bool; a frame that is not six finite numbers or holds
 //! scale or shear beyond 1e-9.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use loro::{LoroMap, LoroValue, ValueOrContainer};
 use serde_json::Value;
 
 use crate::affine::Affine;
 use crate::generated_outline::subpath_anchors;
+use crate::part_paint::PartPaint;
 use crate::path_codec::as_f64;
-use crate::path_model::{NodeId, SubpathSnapshot};
+use crate::path_model::{Color, NodeId, SubpathSnapshot};
 use crate::units::Vec2;
 
 /// The `shape` tag of a generated node.
@@ -70,26 +76,42 @@ pub struct GeneratedRecord {
     /// The key of each part, parallel to `parts` (ADR 0082 §10), unique; empty for a record
     /// written before format 65, which cannot detach a part until its next edit writes them.
     pub part_keys: Vec<String>,
+    /// The own paint of a part by its key (format 70, ADR 0091 "Per-part paint"); empty for every
+    /// part in the object's style.
+    pub part_paints: BTreeMap<String, PartPaint>,
 }
 
 impl GeneratedRecord {
+    /// Whether the part at `index` reaches machine jobs: every part but one painted `job: false`.
+    #[must_use]
+    pub fn part_runs_on_jobs(&self, index: usize) -> bool {
+        self.part_keys
+            .get(index)
+            .and_then(|key| self.part_paints.get(key))
+            .is_none_or(|paint| paint.job)
+    }
+
     /// The index of the part with key `key`, `None` when there is no such part.
     #[must_use]
     pub fn part_index(&self, key: &str) -> Option<usize> {
         self.part_keys.iter().position(|k| k == key)
     }
 
-    /// Whether the keys follow the rules: none, or one valid key per part, all distinct.
+    /// Whether the keys follow the rules: none, or one valid key per part, all distinct, and every
+    /// painted key names a part.
     #[must_use]
     pub(crate) fn keys_are_valid(&self) -> bool {
-        self.part_keys.is_empty()
-            || (self.part_keys.len() == self.parts.len()
-                && self.part_keys.iter().all(|k| crate::part_key::is_valid(k))
-                && self
-                    .part_keys
-                    .iter()
-                    .enumerate()
-                    .all(|(at, key)| !self.part_keys[..at].contains(key)))
+        self.part_paints
+            .keys()
+            .all(|key| self.part_index(key).is_some())
+            && (self.part_keys.is_empty()
+                || (self.part_keys.len() == self.parts.len()
+                    && self.part_keys.iter().all(|k| crate::part_key::is_valid(k))
+                    && self
+                        .part_keys
+                        .iter()
+                        .enumerate()
+                        .all(|(at, key)| !self.part_keys[..at].contains(key))))
     }
 }
 
@@ -222,7 +244,75 @@ fn record_value(record: &GeneratedRecord) -> LoroValue {
             .collect();
         map.insert("part_keys".to_owned(), LoroValue::List(keys.into()));
     }
+    if !record.part_paints.is_empty() {
+        let paints: HashMap<String, LoroValue> = record
+            .part_paints
+            .iter()
+            .map(|(key, paint)| (key.clone(), paint_value(*paint)))
+            .collect();
+        map.insert("part_paints".to_owned(), LoroValue::Map(paints.into()));
+    }
     LoroValue::Map(map.into())
+}
+
+/// One part paint as a map value; `job` is written only when it is false.
+fn paint_value(paint: PartPaint) -> LoroValue {
+    let mut entry: HashMap<String, LoroValue> = HashMap::new();
+    let Color { r, g, b } = paint.fill;
+    entry.insert(
+        "fill".to_owned(),
+        LoroValue::List(
+            [r, g, b]
+                .map(|channel| LoroValue::I64(i64::from(channel)))
+                .to_vec()
+                .into(),
+        ),
+    );
+    if !paint.job {
+        entry.insert("job".to_owned(), LoroValue::Bool(false));
+    }
+    LoroValue::Map(entry.into())
+}
+
+/// The paint a stored entry holds, `None` for any other shape.
+fn paint_from(value: &LoroValue) -> Option<PartPaint> {
+    let LoroValue::Map(entry) = value else {
+        return None;
+    };
+    let LoroValue::List(fill) = entry.get("fill")? else {
+        return None;
+    };
+    let channels = fill
+        .iter()
+        .map(|channel| match channel {
+            LoroValue::I64(n) => u8::try_from(*n).ok(),
+            _ => None,
+        })
+        .collect::<Option<Vec<u8>>>()?;
+    let [r, g, b] = channels[..] else {
+        return None;
+    };
+    let job = match entry.get("job") {
+        None => true,
+        Some(LoroValue::Bool(job)) => *job,
+        Some(_) => return None,
+    };
+    Some(PartPaint {
+        fill: Color { r, g, b },
+        job,
+    })
+}
+
+/// The part paints of the stored map, `None` for damage.
+fn paints_from(value: Option<&LoroValue>) -> Option<BTreeMap<String, PartPaint>> {
+    match value {
+        None => Some(BTreeMap::new()),
+        Some(LoroValue::Map(map)) => map
+            .iter()
+            .map(|(key, entry)| Some((key.clone(), paint_from(entry)?)))
+            .collect(),
+        Some(_) => None,
+    }
 }
 
 /// Writes the record register whole.
@@ -395,6 +485,7 @@ pub(crate) fn read_record(meta: &LoroMap) -> Option<GeneratedRecord> {
         params,
         parts,
         part_keys,
+        part_paints: paints_from(map.get("part_paints"))?,
     };
     // An empty list is a list that is not as long as the parts: damage, not "absent".
     let listed = matches!(map.get("part_keys"), Some(LoroValue::List(_)));
@@ -452,6 +543,7 @@ mod tests {
             params,
             parts: vec![vec![square()]],
             part_keys: vec!["gear".into()],
+            part_paints: BTreeMap::new(),
         }
     }
 

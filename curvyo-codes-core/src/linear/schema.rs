@@ -159,7 +159,7 @@ pub(crate) fn groups(symbology: Symbology) -> Vec<ParamGroup> {
         text_group(symbology),
         ParamGroup {
             label: "Colours",
-            params: vec![switch("inverted", "Inverted")],
+            params: crate::paint::rows(false),
         },
         advanced_group(symbology),
     ]

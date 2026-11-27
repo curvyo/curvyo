@@ -980,6 +980,7 @@ mod tests {
             spiro_transform: None,
             width_points: Vec::new(),
             rotation: Angle::from_radians(-0.25),
+            paint_runs: Vec::new(),
         });
         assert!((path.orientation().as_radians() + 0.25).abs() < 1e-12);
     }
@@ -1106,6 +1107,7 @@ mod tests {
             spiro_transform: None,
             width_points: Vec::new(),
             rotation: Angle::from_radians(0.0),
+            paint_runs: Vec::new(),
         };
         let moved = ObjectSnapshot::Path(path).translated(Vec2::new(1.0, 2.0));
         let ObjectSnapshot::Path(moved) = moved else {

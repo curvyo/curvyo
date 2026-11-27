@@ -283,7 +283,7 @@ fn criteria_8_22_a_profile_step_writes_its_fills_in_the_same_step() {
 
 #[test]
 fn criterion_28_this_build_writes_59_and_a_file_of_58_opens_unchanged() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 68);
+    assert_eq!(CURRENT_FORMAT_VERSION, 70);
     let bytes = std::fs::read(fixture_path("came_from_v58.curvyo")).unwrap();
     let d = unpack(2, &bytes).unwrap();
     assert_eq!(d.own_step_count(), 0);

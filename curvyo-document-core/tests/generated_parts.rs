@@ -33,6 +33,7 @@ fn record(keys: &[&str]) -> GeneratedRecord {
             .map(|(i, _)| vec![square(i as f64 * 10.0)])
             .collect(),
         part_keys: keys.iter().map(|k| (*k).to_owned()).collect(),
+        part_paints: std::collections::BTreeMap::new(),
     }
 }
 

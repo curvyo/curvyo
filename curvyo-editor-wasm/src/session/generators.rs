@@ -19,9 +19,6 @@ use serde_json::{Value, json};
 use super::object_cache::DocumentRead;
 use super::{Session, Tool};
 
-/// The kind the tool places until the maker picks another: Box, the first of the registry.
-const FIRST_KIND: &str = "curvyo.generators/box";
-
 /// The status when a resize of an object from a generator this version does not have is refused
 /// (UX notes §12).
 const UNKNOWN_RESIZE_NOTICE: &str =
@@ -59,7 +56,7 @@ mod source;
 #[derive(Debug, Default)]
 pub(super) struct GeneratorsState {
     /// The stored `<extension>/<kind>` the bar has pressed; empty until the first use.
-    kind: String,
+    pub(in crate::session) kind: String,
     /// The last kind of a family the session placed or switched to (the Code segment places it);
     /// empty until the first use.
     family_kind: String,
@@ -149,32 +146,47 @@ impl Session {
         Value::Array(kinds).to_string()
     }
 
-    /// The kind the tool places, the last choice of the session (Box at first); the first kind the
-    /// bar offers while that one is switched off.
+    /// The kind the tool has armed (`<extension>/<kind>`), empty while none is: entering the tool
+    /// arms nothing, a press on a segment arms it (`0151` slice 1). A kind switched off while armed
+    /// reads as none.
     #[must_use]
     pub fn generator_kind(&self) -> String {
-        let wanted = if self.generators.kind.is_empty() {
-            FIRST_KIND
+        if instance::find_kind(&self.manufacturing.extensions, &self.generators.kind).is_some() {
+            self.generators.kind.clone()
         } else {
-            &self.generators.kind
-        };
-        if instance::find_kind(&self.manufacturing.extensions, wanted).is_some() {
-            return wanted.to_owned();
+            String::new()
         }
-        instance::enabled_kinds(&self.manufacturing.extensions)
-            .first()
-            .map_or_else(
-                || wanted.to_owned(),
-                |found| format!("{}/{}", found.manifest.id, found.kind.id),
-            )
     }
 
-    /// The bar's choice. An unknown kind is ignored.
+    /// The bar's choice: arms `kind`, moving the arming from another. An unknown kind is ignored.
     pub fn set_generator_kind(&mut self, kind: &str) {
         if instance::find_kind(&self.manufacturing.extensions, kind).is_some() {
             kind.clone_into(&mut self.generators.kind);
             self.remember_family_kind(kind);
         }
+    }
+
+    /// A press on a segment of the bar: arms `kind`, or releases it when it is the armed one (or,
+    /// for the Code segment, of the armed family). `kind` is what the segment carries.
+    pub fn toggle_generator_kind(&mut self, kind: &str) {
+        let armed = self.generator_kind();
+        let family = |id: &str| {
+            instance::find_kind(&self.manufacturing.extensions, id)
+                .and_then(|found| found.kind.family)
+                .map(|family| family.id)
+        };
+        let same = !armed.is_empty()
+            && (armed == kind || family(&armed).is_some_and(|f| family(kind) == Some(f)));
+        if same {
+            self.generators.kind.clear();
+        } else {
+            self.set_generator_kind(kind);
+        }
+    }
+
+    /// Releases the armed generator, `true` when one was armed (the first step of Escape).
+    pub(in crate::session) fn disarm_generator(&mut self) -> bool {
+        !std::mem::take(&mut self.generators.kind).is_empty()
     }
 
     /// The pointer over the canvas with the tool active.
@@ -187,9 +199,10 @@ impl Session {
         let _ = self.place_generated_at(point);
     }
 
-    /// Places the chosen kind with its centre at `(x, y)` in document millimetres, selected, in
-    /// one step "Add gear" / "Add box", and returns to the Select tool (criterion 1, UX notes §2).
-    /// `false` when nothing was placed.
+    /// Places the armed kind with its centre at `(x, y)` in document millimetres, selected, in
+    /// one step "Add gear" / "Add box". The kind stays armed, so several can be placed (customer
+    /// decision 2026-11-27 **(Proposal)**, over `0151` criterion 5). `false` when nothing was
+    /// placed, which includes no kind armed.
     pub fn place_generated(&mut self, x: f64, y: f64) -> bool {
         self.place_generated_at(Point::new(x, y))
     }
@@ -243,6 +256,9 @@ impl Session {
             return self.pick_source(&kind, Some(at));
         }
         let kind = self.generator_kind();
+        if kind.is_empty() {
+            return false;
+        }
         // A kind with text waits for the included sans (ADR 0092 §3.4): nothing is written yet.
         if self.included_sans_loading(&kind) {
             return false;
@@ -258,7 +274,6 @@ impl Session {
             return false;
         };
         self.selection.set(&[id]);
-        self.set_tool(Tool::Select);
         true
     }
 
@@ -368,13 +383,17 @@ impl Session {
             _ => None,
         }
         .or_else(|| Some("Convert to paths".to_owned()));
+        let mut grounds = Vec::new();
         let converted = self.recording_named_guarded(name, |this| {
             let mut all = true;
             this.document.batch(
                 curvyo_document_core::CONVERT_GENERATED_COMMIT_LABEL,
                 |document| {
                     for id in &ids {
-                        all &= instance::convert(document, &mut this.minter, *id).is_ok();
+                        match instance::convert(document, &mut this.minter, *id) {
+                            Ok(ground) => grounds.extend(ground),
+                            Err(_) => all = false,
+                        }
                     }
                     all
                 },
@@ -384,6 +403,7 @@ impl Session {
         for id in &ids {
             leaves.extend(self.document.leaves_of(*id));
         }
+        leaves.extend(grounds);
         self.selection.set(&leaves);
         converted
     }

@@ -14,7 +14,7 @@ use curvyo_extension_core::{
 use crate::clear_area::{self, ClearArea, LogoShape};
 use crate::finder::FinderShape;
 use crate::grid::ModuleGrid;
-use crate::style::{ModuleShape, Style, draft, style};
+use crate::style::{ModuleShape, Style, draft, ground, style_parts};
 use crate::values::Values;
 
 pub use encode::{EcLevel, EncodeError, encode};
@@ -230,18 +230,35 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         Vec::new()
     };
     let drawn = style_of(&values, module, quiet, cleared);
-    let paths = if matches!(request.edit, Some(Edit::Draft)) {
-        draft(&grid, &drawn)
+    let ghost = matches!(request.edit, Some(Edit::Draft));
+    // The parts in draw order: Background, the code, the Finder colour (ADR 0091 P3); with both off
+    // the one part of slices 1 to 3.
+    let mut parts = Vec::new();
+    if ghost {
+        parts.push(Part {
+            key: Cow::Borrowed(PART),
+            paths: draft(&grid, &drawn),
+            paint: None,
+        });
     } else {
-        style(&grid, &drawn)
-    };
+        let (code, finders) = style_parts(&grid, &drawn);
+        let finder = crate::paint::finder(&values, finders.clone());
+        parts.extend(crate::paint::background(&values, ground(&grid, &drawn)));
+        let mut paths = code;
+        if finder.is_none() {
+            paths.extend(finders);
+        }
+        parts.push(Part {
+            key: Cow::Borrowed(PART),
+            paths,
+            paint: None,
+        });
+        parts.extend(finder);
+    }
     let (params, clamps): (StoredParams, Vec<Clamp>) = values.finish();
     Generated {
         params,
-        parts: vec![Part {
-            key: Cow::Borrowed(PART),
-            paths,
-        }],
+        parts,
         handles: Vec::new(),
         clamps,
         automatic: Vec::new(),

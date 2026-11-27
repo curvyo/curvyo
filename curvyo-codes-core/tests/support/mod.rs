@@ -100,6 +100,17 @@ pub fn paths(generated: &Generated) -> &[ClosedPath] {
     &generated.parts[0].paths
 }
 
+/// The outlines that reach a machine (every part but a `job: false` one), in part order: the ink the
+/// decoder test rasterises on the Background's ground.
+pub fn ink_paths(generated: &Generated) -> Vec<ClosedPath> {
+    generated
+        .parts
+        .iter()
+        .filter(|part| part.paint.is_none_or(|paint| paint.job))
+        .flat_map(|part| part.paths.iter().cloned())
+        .collect()
+}
+
 /// A subpath flattened to a polygon, the cubics cut into `steps` pieces.
 fn flatten(path: &ClosedPath, steps: usize) -> Vec<(f64, f64)> {
     let mut points = vec![(path.start.x, path.start.y)];
@@ -296,6 +307,36 @@ pub fn svg(paths: &[ClosedPath]) -> String {
     )
 }
 
+/// The SVG of a painted generation: one `<path>` per part in draw order, each with its `fill` when
+/// the part has a paint of its own (ADR 0091 P8); the view box is the union of the parts.
+pub fn svg_parts(generated: &Generated) -> String {
+    let all: Vec<ClosedPath> = generated
+        .parts
+        .iter()
+        .flat_map(|part| part.paths.iter().cloned())
+        .collect();
+    let frame = svg(&all);
+    let (head, _) = frame.split_once("<path").unwrap();
+    let mut out = head.to_owned();
+    for part in &generated.parts {
+        let one = svg(&part.paths);
+        let body = one.split_once("<path fill-rule=\"nonzero\"").unwrap().1;
+        let fill = part.paint.map_or(String::new(), |paint| {
+            format!(
+                " fill=\"#{:02x}{:02x}{:02x}\"",
+                paint.fill.r, paint.fill.g, paint.fill.b
+            )
+        });
+        let body = body.split_once("</svg>").unwrap().0;
+        out.push_str(&format!(
+            "<path data-part=\"{}\"{fill} fill-rule=\"nonzero\"{body}",
+            part.key
+        ));
+    }
+    out.push_str("</svg>\n");
+    out
+}
+
 /// The numbers in `text`, in order.
 fn numbers(text: &str) -> Vec<f64> {
     let mut found = Vec::new();
@@ -316,10 +357,19 @@ fn numbers(text: &str) -> Vec<f64> {
 /// Compares `paths` with the fixture `name`, number by number within 0.001 mm; with
 /// `UPDATE_GOLDEN=1` the fixture is written instead.
 pub fn assert_golden(name: &str, paths: &[ClosedPath]) {
+    assert_golden_text(name, &svg(paths));
+}
+
+/// [`assert_golden`] for the SVG of every part with its fill ([`svg_parts`]).
+pub fn assert_golden_parts(name: &str, generated: &Generated) {
+    assert_golden_text(name, &svg_parts(generated));
+}
+
+fn assert_golden_text(name: &str, now: &str) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures")
         .join(name);
-    let now = svg(paths);
+    let now = now.to_owned();
     if std::env::var_os("UPDATE_GOLDEN").is_some() {
         std::fs::write(&path, &now).unwrap();
         return;

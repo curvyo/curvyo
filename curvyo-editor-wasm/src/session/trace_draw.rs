@@ -156,6 +156,7 @@ fn wash_over(image: &ImageSnapshot) -> PathSnapshot {
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
+        paint_runs: Vec::new(),
     }
 }
 

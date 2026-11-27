@@ -370,6 +370,11 @@ pub struct PathSnapshot {
     /// Independently mergeable width points; empty means uniform width.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub width_points: Vec<crate::WidthPoint>,
+    /// The stretches of subpaths a generated part painted in its own colour (ADR 0091 "Per-part
+    /// paint"); empty for every other path. Never stored: a command that changes the subpaths
+    /// clears it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub paint_runs: Vec<crate::PaintRun>,
     /// This path's own cumulative rotation (`specs/0005-object-transform/
     /// adrs.md`: "used only to keep its selection box oriented on a later
     /// reselect... never consulted to render, hit-test, export or

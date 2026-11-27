@@ -24,6 +24,7 @@ pub(crate) fn affine_of(id: NodeId, f: &dyn Fn(&PathSnapshot) -> PathSnapshot) -
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: curvyo_document_core::Angle::from_radians(0.0),
+        paint_runs: Vec::new(),
     });
     let [o, x, y] = [0, 1, 2].map(|k| mapped.anchors[k].point);
     Affine::new(x.x - o.x, x.y - o.y, y.x - o.x, y.y - o.y, o.x, o.y)

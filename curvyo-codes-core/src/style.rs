@@ -74,6 +74,31 @@ pub struct Style {
 /// screen (a hole the other way round), meant for the non-zero rule.
 #[must_use]
 pub fn style(grid: &ModuleGrid, style: &Style) -> Vec<ClosedPath> {
+    let (mut paths, finders) = style_parts(grid, style);
+    paths.extend(finders);
+    paths
+}
+
+/// The rectangle of the symbol and its quiet zone, the Background (and an inverted code's ground).
+pub(crate) fn ground(grid: &ModuleGrid, style: &Style) -> ClosedPath {
+    let width = grid.width();
+    #[allow(clippy::cast_precision_loss)]
+    let (frame, low, high) = (
+        Frame {
+            half: width as f64 / 2.0,
+            module: style.module.as_mm(),
+        },
+        -f64::from(style.quiet),
+        width as f64 + f64::from(style.quiet),
+    );
+    rounded_rect(frame, (low, low), (high, high), 0.0)
+}
+
+/// [`style`] as the modules and the three finders apart, so a Finder colour can paint them as a
+/// part of their own; an inverted code holds its finders in the first list (they are holes of its
+/// ground and cannot be filled apart).
+#[must_use]
+pub(crate) fn style_parts(grid: &ModuleGrid, style: &Style) -> (Vec<ClosedPath>, Vec<ClosedPath>) {
     let width = grid.width();
     #[allow(clippy::cast_precision_loss)]
     let frame = Frame {
@@ -112,8 +137,9 @@ pub fn style(grid: &ModuleGrid, style: &Style) -> Vec<ClosedPath> {
             }
         }
     }
+    let mut finders = Vec::new();
     for origin in origins(width) {
-        paths.extend(finder(
+        finders.extend(finder(
             frame,
             origin,
             style.finder_outer,
@@ -121,8 +147,9 @@ pub fn style(grid: &ModuleGrid, style: &Style) -> Vec<ClosedPath> {
         ));
     }
     if !style.inverted {
-        return paths;
+        return (paths, finders);
     }
+    paths.extend(finders);
     #[allow(clippy::cast_precision_loss)]
     let (low, high) = (
         -f64::from(style.quiet),
@@ -130,7 +157,7 @@ pub fn style(grid: &ModuleGrid, style: &Style) -> Vec<ClosedPath> {
     );
     let mut inverted = vec![rounded_rect(frame, (low, low), (high, high), 0.0)];
     inverted.extend(paths.iter().map(reversed));
-    inverted
+    (inverted, Vec::new())
 }
 
 /// One module's outline; `whole` draws the full cell whatever the shape.

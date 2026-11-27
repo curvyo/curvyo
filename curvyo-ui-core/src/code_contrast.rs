@@ -26,6 +26,12 @@ pub fn contrast(a: Color, b: Color) -> f64 {
     (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
 }
 
+/// Whether the solid `colour` (a code's Finder colour) is below 3 : 1 against `background`.
+#[must_use]
+pub fn colour_is_low(colour: Color, background: Color) -> bool {
+    contrast(colour, background) < LOW
+}
+
 /// Whether the fill of a code is below 3 : 1 against `background`: for a gradient the worst stop,
 /// `false` for a fill that is off.
 #[must_use]

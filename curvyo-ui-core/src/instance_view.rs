@@ -223,7 +223,8 @@ pub fn value_from_number(param: &Param, number: f64) -> Option<ParamValue> {
         | ParamKind::Choice { .. }
         | ParamKind::Path
         | ParamKind::Text { .. }
-        | ParamKind::Font => None,
+        | ParamKind::Font
+        | ParamKind::Colour => None,
     }
 }
 
@@ -234,6 +235,15 @@ pub fn value_from_json(param: &Param, value: &Value) -> Option<ParamValue> {
         (ParamKind::Switch, Value::Bool(on)) => Some(ParamValue::Switch(*on)),
         (ParamKind::Choice { .. }, Value::String(id)) => Some(ParamValue::Choice(id.clone())),
         (ParamKind::Text { .. }, Value::String(text)) => Some(ParamValue::Text(text.clone())),
+        // `{ "r", "g", "b" }` as the view carries it, or `[r, g, b]`.
+        (ParamKind::Colour, Value::Object(map)) => {
+            let channel = |key: &str| map.get(key).cloned();
+            let rgb = Value::Array(vec![channel("r")?, channel("g")?, channel("b")?]);
+            ParamValue::from_stored(&serde_json::json!({ "rgb": rgb }))
+        }
+        (ParamKind::Colour, Value::Array(_)) => {
+            ParamValue::from_stored(&serde_json::json!({ "rgb": value }))
+        }
         (ParamKind::Font, Value::Null) => Some(ParamValue::Font(None)),
         (ParamKind::Font, Value::Object(_)) => {
             ParamValue::from_stored(&serde_json::json!({ "font": value }))

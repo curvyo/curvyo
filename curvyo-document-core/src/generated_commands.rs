@@ -309,7 +309,7 @@ impl Document {
         &self,
         id: NodeId,
         parts: &[Vec<(Vec<NewAnchor>, bool)>],
-    ) -> Result<(), GeneratedError> {
+    ) -> Result<Option<NodeId>, GeneratedError> {
         if parts.is_empty()
             || parts
                 .iter()
@@ -338,13 +338,29 @@ impl Document {
         {
             return Err(GeneratedError::AnchorIds);
         }
-        let single = match parts {
-            [only] => only.split_first(),
+        let record = generated_codec::read_record(&meta);
+        let part_keys = record
+            .as_ref()
+            .map(|record| record.part_keys.clone())
+            .unwrap_or_default();
+        let paints = record.map(|record| record.part_paints).unwrap_or_default();
+        let paint_of = |at: usize| {
+            part_keys
+                .get(at)
+                .filter(|_| part_keys.len() == parts.len())
+                .and_then(|key| paints.get(key))
+                .copied()
+        };
+        // A part that never reaches a job (a code's Background) becomes a path of its own below the
+        // node, so Convert never changes the job (ADR 0091 P7); the other parts convert as always.
+        let (aside, kept): (Vec<usize>, Vec<usize>) =
+            (0..parts.len()).partition(|at| paint_of(*at).is_some_and(|paint| !paint.job));
+        let single = match &kept[..] {
+            [only] => parts[*only].split_first(),
             _ => None,
         };
-        let part_keys = generated_codec::read_record(&meta)
-            .map(|record| record.part_keys)
-            .unwrap_or_default();
+        let style = crate::style_codec::read_style(&meta);
+        let parent = tree.parent(tree_id);
         generated_codec::strip(&meta);
         let mut moved_keys: Vec<(String, TreeID)> = Vec::new();
         if let Some((first, rest)) = single {
@@ -355,20 +371,42 @@ impl Document {
             // invariant: the node is a live leaf; a group marker is a plain bool insert.
             #[allow(clippy::unwrap_used)]
             meta.insert(crate::group_tree::KEY_GROUP, true).unwrap();
-            let style = crate::style_codec::read_style(&meta);
-            for (at, part) in parts.iter().enumerate() {
+            for &at in &kept {
                 // invariant: the node was just confirmed live and is now a group.
                 #[allow(clippy::unwrap_used)]
                 let child = tree.create(TreeParentId::Node(tree_id)).unwrap();
-                crate::replace::write_path_node(&tree, child, &style, part);
+                let child_style = paint_of(at).map_or_else(|| style.clone(), |p| p.apply(&style));
+                crate::replace::write_path_node(&tree, child, &child_style, &parts[at]);
                 if let Some(key) = part_keys.get(at).filter(|_| part_keys.len() == parts.len()) {
                     moved_keys.push((key.clone(), child));
                 }
             }
         }
+        // Each part that never reaches a job: a sibling path directly below the node, named
+        // "Background", filled, no stroke, no operation (so the job is what it was).
+        let mut ground = None;
+        for &at in &aside {
+            let (Some(paint), Some(parent)) = (paint_of(at), parent) else {
+                continue;
+            };
+            // invariant: the parent of a live node is live, and the fractional index is on.
+            #[allow(clippy::unwrap_used)]
+            let sibling = tree.create(parent).unwrap();
+            tree.enable_fractional_index(0);
+            #[allow(clippy::unwrap_used)]
+            tree.mov_before(sibling, tree_id).unwrap();
+            crate::replace::write_path_node(&tree, sibling, &paint.apply(&style), &parts[at]);
+            // invariant: the node was just created, so its meta map exists.
+            #[allow(clippy::unwrap_used)]
+            tree.get_meta(sibling)
+                .unwrap()
+                .insert(crate::node_registers::KEY_NAME, "Background")
+                .unwrap();
+            ground = Some(crate::group_tree::node_id(sibling));
+        }
         // ADR 0082 §10 Lifecycle: `member.<node>#<part>` follows the part to its new path.
         crate::generated_parts::rewrite_part_keys(&tree, tree_id, &moved_keys);
         self.commit_with_label(CONVERT_GENERATED_COMMIT_LABEL);
-        Ok(())
+        Ok(ground)
     }
 }

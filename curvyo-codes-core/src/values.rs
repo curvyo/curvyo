@@ -1,7 +1,7 @@
 //! The parameter values of one generation: read from the stored map through the schema (a missing
 //! or invalid one reads as its default, a number outside its bounds is clamped and reported).
 
-use curvyo_document_core::Length;
+use curvyo_document_core::{Color, Length};
 use curvyo_extension_core::{Bound, Clamp, Param, ParamKind, ParamValue, StoredParams};
 
 /// The values of one generation and the clamps they went through.
@@ -113,6 +113,11 @@ impl<'a> Values<'a> {
 
     pub(crate) fn switch(&self, key: &str) -> bool {
         self.value(key).switch().unwrap_or(false)
+    }
+
+    /// The colour `key`; black for a missing one.
+    pub(crate) fn colour(&self, key: &str) -> Color {
+        self.value(key).colour().unwrap_or(Color::BLACK)
     }
 
     pub(crate) fn choice(&self, key: &str) -> String {

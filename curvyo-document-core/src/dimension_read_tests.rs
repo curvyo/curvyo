@@ -29,6 +29,7 @@ fn path(n: i32, points: &[(f64, f64)], closed: bool) -> ObjectSnapshot {
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
+        paint_runs: Vec::new(),
     })
 }
 

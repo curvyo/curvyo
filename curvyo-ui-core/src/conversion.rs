@@ -96,6 +96,7 @@ pub fn primitive_as_path(
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: ObjectSnapshot::Primitive(primitive.clone()).orientation(),
+        paint_runs: Vec::new(),
     }
 }
 

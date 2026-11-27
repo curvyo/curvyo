@@ -21,6 +21,7 @@ pub fn outline_path(snapshot: &GeneratedSnapshot, style: Style) -> Option<PathSn
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: Angle::from_radians(snapshot.frame.b.atan2(snapshot.frame.a)),
+        paint_runs: Vec::new(),
     })
 }
 

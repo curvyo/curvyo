@@ -338,6 +338,7 @@ fn ac13_a_text_keeps_its_element_and_gets_the_fill() {
                     spiro_transform: None,
                     width_points: Vec::new(),
                     rotation: Angle::from_radians(0.0),
+                    paint_runs: Vec::new(),
                 };
                 glyphs.anchors = [(12.0, 30.0), (20.0, 20.0), (28.0, 30.0)]
                     .iter()

@@ -421,6 +421,7 @@ pub(crate) fn read_path_snapshot(id: NodeId, meta: &LoroMap) -> Option<PathSnaps
         curve_kind: crate::curve_kind::read(meta)?,
         spiro_transform: crate::spiro_transform::read(meta)?.map(Box::new),
         width_points: crate::width_profile::read(meta, read_closed(meta))?,
+        paint_runs: Vec::new(),
     })
 }
 

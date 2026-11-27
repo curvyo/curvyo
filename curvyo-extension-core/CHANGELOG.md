@@ -6,6 +6,11 @@ migration in that extension.
 
 ## Unreleased (`specs/0141-parametric-generators`, ADR 0080)
 
+- `specs/0144-qr-and-barcodes` slice 4, ADR 0091 "Per-part paint": `Part` gains `paint: Option<PartPaint>`
+  (`PartPaint { fill, job }` is a document-core type; part order is draw order). `ParamKind::Colour` and
+  `ParamValue::Colour(Color)`, stored `{"rgb": [r, g, b]}`; `ShownWhen::Off { key }`. Source-breaking for
+  code that builds a `Part` literal or matches `ParamKind`, `ParamValue` or `ShownWhen` exhaustively.
+
 - The `Extension` trait (`manifest`, `notice`, `generate`); the registry holds `&'static dyn Extension`.
 - `Contribution::Generator(GeneratorKind)` with `ParamGroup`s; the generator contract
   (`GenerateRequest`, `Edit`, `Generated`, `Part`, `ClosedPath`, `Cubic`, `Handle`, `Clamp`, `Seed`).

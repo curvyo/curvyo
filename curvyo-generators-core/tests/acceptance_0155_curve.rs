@@ -389,6 +389,7 @@ fn criterion_14_tab_and_slot_centres_agree_by_arc_length_at_five_thicknesses() {
         let hole = bounds(&Part {
             key: "ring".into(),
             paths: vec![plate.paths[1].clone()],
+            paint: None,
         });
         let c = (f64::midpoint(hole.0, hole.2), f64::midpoint(hole.1, hole.3));
         let angles: Vec<f64> = plate

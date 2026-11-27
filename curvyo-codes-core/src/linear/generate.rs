@@ -173,6 +173,7 @@ struct Frame<'a> {
     quiet: (f64, f64),
     adjust: f64,
     inverted: bool,
+    background: bool,
     text: bool,
     glyphs: Option<&'a GlyphTable>,
 }
@@ -187,6 +188,7 @@ impl Frame<'_> {
                 quiet: self.quiet,
                 adjust: self.adjust,
                 inverted: self.inverted,
+                background: self.background,
                 text: self.text.then_some(TextLayout {
                     size: Length::from_mm(sizes.text),
                     glyphs: self.glyphs,
@@ -347,6 +349,7 @@ pub(crate) fn generate(request: &GenerateRequest<'_>, symbology: Symbology) -> G
         quiet,
         adjust: f64::from(values.percent("bar_adjust")) / 100.0,
         inverted: values.switch("inverted"),
+        background: values.switch("background") && !ghost,
         text: text && !ghost,
         glyphs: request.glyphs,
     };
@@ -371,23 +374,30 @@ pub(crate) fn generate(request: &GenerateRequest<'_>, symbology: Symbology) -> G
             subject: None,
         });
     }
+    let background = drawn
+        .background
+        .and_then(|ground| crate::paint::background(&values, ground));
     let (params, clamps) = values.finish();
-    assembled(params, clamps, drawn.paths, warnings)
+    assembled(params, clamps, background, drawn.paths, warnings)
 }
 
 /// The result of a generation that drew the code.
 fn assembled(
     params: curvyo_extension_core::StoredParams,
     clamps: Vec<curvyo_extension_core::Clamp>,
+    background: Option<Part>,
     paths: Vec<curvyo_extension_core::ClosedPath>,
     warnings: Vec<Warning>,
 ) -> Generated {
+    let mut parts: Vec<Part> = background.into_iter().collect();
+    parts.push(Part {
+        key: Cow::Borrowed(PART),
+        paths,
+        paint: None,
+    });
     Generated {
         params,
-        parts: vec![Part {
-            key: Cow::Borrowed(PART),
-            paths,
-        }],
+        parts,
         handles: Vec::new(),
         clamps,
         automatic: Vec::new(),

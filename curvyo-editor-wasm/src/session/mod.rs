@@ -1058,6 +1058,10 @@ impl Session {
         if tool != Tool::Generators {
             self.generators.replace = None;
         }
+        // Entering the Generators tool arms nothing (`0151` slice 1); no last choice is kept.
+        if tool == Tool::Generators && self.tool != Tool::Generators {
+            self.generators.kind.clear();
+        }
         // Another tool cancels an open Find centre lines bar (`0117` UX notes §4).
         if tool != self.tool {
             self.centre_lines_close();

@@ -94,6 +94,11 @@ fn edge_style(view: ViewTransform) -> Style {
 
 /// Sets the look's style on `path`; Cut-out keeps only its outer outlines first.
 fn restyle_path(path: &mut PathSnapshot, look: OperationLook, style: Style) {
+    // A part that never reaches a job (a code's Background) gets no look, and the rest is one look
+    // (ADR 0091 P6).
+    if !path.paint_runs.is_empty() {
+        *path = path.job_path();
+    }
     if look == OperationLook::OuterLine {
         *path = outer_outlines(path);
     }
@@ -119,6 +124,7 @@ fn frame_of(image: &ImageSnapshot, style: Style) -> PathSnapshot {
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
+        paint_runs: Vec::new(),
     }
 }
 

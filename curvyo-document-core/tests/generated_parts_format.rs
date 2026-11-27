@@ -46,6 +46,7 @@ fn golden_bytes() -> Vec<u8> {
         params: serde_json::Map::new(),
         parts: vec![vec![square(0.0)], vec![square(10.0)], vec![square(20.0)]],
         part_keys: vec!["strip".into(), "base".into(), "lid".into()],
+        part_paints: std::collections::BTreeMap::new(),
     };
     let boxed = d.create_generated(&record, Affine::IDENTITY).unwrap();
     let new = NewOperation {

@@ -6,5 +6,5 @@
 
 #[test]
 fn c11_format_version_is_68() {
-    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 68);
+    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 70);
 }

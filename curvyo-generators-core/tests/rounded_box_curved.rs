@@ -140,6 +140,7 @@ fn the_path_box_rows_and_conditions_do_not_change() {
         match condition {
             ShownWhen::Is { key, .. }
             | ShownWhen::On { key }
+            | ShownWhen::Off { key }
             | ShownWhen::Full { key }
             | ShownWhen::Positive { key } => key == "top_shape",
             ShownWhen::AllOn { .. } => false,

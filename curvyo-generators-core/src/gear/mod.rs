@@ -136,6 +136,7 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         parts: vec![Part {
             key: "gear".into(),
             paths,
+            paint: None,
         }],
         handles,
         clamps,

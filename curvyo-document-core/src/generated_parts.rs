@@ -152,7 +152,10 @@ impl Document {
                 return Err(PartError::NoSuchPart);
             }
         }
-        if record.part_index(part_key).is_none() {
+        // A part that never reaches a job (a code's Background) has no operations to own.
+        if record.part_index(part_key).is_none()
+            || record.part_paints.get(part_key).is_some_and(|p| !p.job)
+        {
             return Err(PartError::NoSuchPart);
         }
         if operations.is_empty() {

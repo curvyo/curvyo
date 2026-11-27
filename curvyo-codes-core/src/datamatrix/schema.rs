@@ -14,7 +14,7 @@ pub(crate) fn groups() -> Vec<ParamGroup> {
         content(),
         size(24.0),
         modules(),
-        colours(),
+        colours(false),
         advanced(QUIET_DEFAULT),
     ]
 }

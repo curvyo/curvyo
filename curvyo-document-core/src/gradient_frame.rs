@@ -335,6 +335,7 @@ mod tests {
             spiro_transform: None,
             width_points: Vec::new(),
             rotation: turn,
+            paint_runs: Vec::new(),
         };
         let frame = path.gradient_box().unwrap();
         let (w, h) = frame.size();

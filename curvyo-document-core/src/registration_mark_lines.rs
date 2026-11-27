@@ -156,6 +156,7 @@ pub fn mark_path(mark: &RegistrationMarkSnapshot) -> PathSnapshot {
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
+        paint_runs: Vec::new(),
     }
 }
 

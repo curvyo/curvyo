@@ -3,7 +3,7 @@
 
 use curvyo_document_core::{
     CHANGE_PARAMETER_COMMIT_LABEL, Document, GeneratedRecord, GeneratedSnapshot, KEY_SUBJECT_KIND,
-    KEY_SUBJECT_PARAM, NodeId,
+    KEY_SUBJECT_PARAM, NodeId, ObjectSnapshot,
 };
 use curvyo_extension_core::{Edit, ParamValue};
 
@@ -109,6 +109,26 @@ pub fn plan_value(
     }
     let mut params = snapshot.record.params.clone();
     params.insert(key.to_owned(), value.to_stored());
+    // The Finder colour starts as the fill's colour (UX notes of `0144` §3): switching it on while
+    // its colour is still the schema's black writes the fill's colour in the same step.
+    if key == "finder_colour_on"
+        && matches!(value, ParamValue::Switch(true))
+        && params.get("finder_colour").is_none_or(|stored| {
+            ParamValue::from_stored(stored)
+                == Some(ParamValue::Colour(curvyo_document_core::Color::BLACK))
+        })
+        && let Some(ObjectSnapshot::Path(path)) = document.object(id)
+    {
+        let fill = &path.style.fill;
+        let colour = fill
+            .painted_gradient()
+            .and_then(|gradient| gradient.stops.as_slice().first().map(|stop| stop.colour))
+            .unwrap_or(fill.color);
+        params.insert(
+            "finder_colour".to_owned(),
+            ParamValue::Colour(colour).to_stored(),
+        );
+    }
     let generated = generate(
         &found,
         &params,
