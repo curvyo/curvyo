@@ -240,6 +240,7 @@ fn a_path_box_of_the_heart_with_400_slots_edits_within_300_ms_and_its_hover_with
             params: &params,
             seed: Seed(1),
             edit: None,
+            glyphs: None,
         },
     )
     .expect("the generators extension");

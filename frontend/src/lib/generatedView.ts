@@ -17,7 +17,9 @@ export type GeneratedKind =
   | { kind: "choice"; options: GeneratedOption[] }
   | { kind: "path" }
   | { kind: "text"; multiline: boolean }
-  | { kind: "percent"; min: number; max: number };
+  | { kind: "percent"; min: number; max: number }
+  | { kind: "ratio"; min: number; max: number; step: number; decimals: number }
+  | { kind: "font" };
 
 /** The span a number's slider is drawn on. */
 export interface GeneratedTrack {
@@ -45,9 +47,19 @@ export interface GeneratedRow {
   problem: string | null;
   /** The schema default of the row, for the reset slot. */
   defaultValue: number | boolean | string;
-  /** A number for a length, count, angle or percent; a boolean for a switch; an option id for a
-   * choice; the text of a text row. */
+  /** A number for a length, count, angle, percent or ratio; a boolean for a switch; an option id
+   * for a choice; the text of a text row; the face name of a font row. */
   value: number | boolean | string;
+}
+
+/** The Symbology group of a family of kinds (`specs/0144` criterion 20, ADR 0092 §2). */
+export interface GeneratedFamily {
+  /** The group's heading ("Symbology"). */
+  label: string;
+  /** The stored kind the object has now. */
+  current: string;
+  /** The kinds of the family in manifest order. */
+  kinds: { id: string; label: string }[];
 }
 
 /** One row of the Parts group (`specs/0147-rounded-box` criterion 15, UX notes §9). */
@@ -75,6 +87,12 @@ export interface GeneratedView {
   parts: GeneratedPart[];
   /** A code's fill is below 3 : 1 against the document background (`specs/0144` criterion 9). */
   contrastLow: boolean;
+  /** The Symbology group, `null` for a kind without a family. */
+  family: GeneratedFamily | null;
+  /** The face the text is set in is not loaded yet: the rows wait (ADR 0092 §3.4). */
+  loading: boolean;
+  /** The face the text names is missing on this computer (the Font row says so). */
+  fontMissing: boolean;
 }
 
 /** The decoder of `generated_panel_json`: `null` for no block. */
@@ -92,6 +110,9 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
     label?: unknown;
     known?: unknown;
     contrast_low?: unknown;
+    family?: GeneratedFamily | null;
+    loading?: unknown;
+    font_missing?: unknown;
     parts?: { key: string; name: string; detached?: boolean; operation?: string; can_detach?: boolean }[];
     rows?: {
       group: string;
@@ -116,6 +137,9 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
     label: view.label,
     known: true,
     contrastLow: view.contrast_low === true,
+    family: view.family ?? null,
+    loading: view.loading === true,
+    fontMissing: view.font_missing === true,
     parts: (view.parts ?? []).map((part) => ({
       key: part.key,
       name: part.name,
@@ -133,10 +157,19 @@ export function decodeGeneratedView(text: string): GeneratedView | null {
       state: typeof row.state === "string" ? row.state : null,
       limit: typeof row.limit?.value === "number" ? row.limit.value : null,
       problem: typeof row.problem === "string" ? row.problem : null,
-      defaultValue: (row.param.default?.value ?? row.value.value) as number | boolean | string,
-      value: row.value.value as number | boolean | string,
+      defaultValue: fontName(row.param.default?.value ?? row.value.value, row.param.kind),
+      value: fontName(row.value.value, row.param.kind),
     })),
   };
+}
+
+/** A font value (`null` or the stored face) as the name a row shows; any other value unchanged. */
+function fontName(value: unknown, kind: GeneratedKind): number | boolean | string {
+  if (kind.kind !== "font") {
+    return value as number | boolean | string;
+  }
+  const face = value as { family?: string; style?: string } | null;
+  return face?.family ? `${face.family} ${face.style ?? ""}`.trim() : "Source Sans 3 Regular";
 }
 
 /** The bar's kinds, from `generator_kinds_json`. */
@@ -151,6 +184,10 @@ export interface GeneratorKindEntry {
   source: boolean;
   /** The Lucide glyph name. */
   icon: string;
+  /** The family the entry stands for ("code"), `null` for a kind that stands alone. */
+  family?: string | null;
+  /** The kind it places waits for the included sans (ADR 0092 §3.4). */
+  loading?: boolean;
 }
 
 /** The decoder of `generator_kinds_json`. */
@@ -184,6 +221,9 @@ export function shownNumber(value: number, decimals: number): string {
 /** The unit inside the right edge of a row: millimetres whatever the display unit, degrees, a
  * percent sign, none for a count. */
 export function unitOf(kind: GeneratedKind): string | undefined {
+  if (kind.kind === "ratio") {
+    return ": 1";
+  }
   return kind.kind === "length" ? "mm" : kind.kind === "angle" ? "°" : kind.kind === "percent" ? "%" : undefined;
 }
 
@@ -199,7 +239,11 @@ export function rowText(row: GeneratedRow): string {
   if (typeof value !== "number") {
     return "";
   }
-  return kind.kind === "length" || kind.kind === "angle" ? shownNumber(value, kind.decimals) : String(value);
+  if (kind.kind === "length" || kind.kind === "angle" || kind.kind === "ratio") {
+    return shownNumber(value, kind.decimals);
+  }
+  // A signed percentage shows its plus: "+5", "0", "-5" (Bar width adjust).
+  return kind.kind === "percent" && kind.min < 0 && value > 0 ? `+${value}` : String(value);
 }
 
 /** A typed text as a number: a decimal comma is a point; `null` for anything else. */
@@ -218,7 +262,13 @@ export function rowRange(row: GeneratedRow): { now: number; min: number; max: nu
   if (typeof row.value !== "number") {
     return null;
   }
-  if (kind.kind === "length" || kind.kind === "count" || kind.kind === "angle" || kind.kind === "percent") {
+  if (
+    kind.kind === "length" ||
+    kind.kind === "count" ||
+    kind.kind === "angle" ||
+    kind.kind === "percent" ||
+    kind.kind === "ratio"
+  ) {
     return { now: row.value, min: kind.min, max: kind.max };
   }
   return null;
@@ -238,10 +288,12 @@ export function stepRowText(
     return null;
   }
   const { kind } = row;
-  const base = kind.kind === "count" ? 1 : kind.kind === "length" || kind.kind === "angle" ? kind.step : 1;
+  const base =
+    kind.kind === "count" ? 1 : kind.kind === "length" || kind.kind === "angle" || kind.kind === "ratio" ? kind.step : 1;
   const scale = shift ? 10 : ctrl && kind.kind !== "count" ? 0.1 : 1;
   const next = current + (key === "ArrowUp" ? 1 : -1) * base * scale;
-  const decimals = kind.kind === "length" || kind.kind === "angle" ? kind.decimals : 0;
+  const decimals =
+    kind.kind === "length" || kind.kind === "angle" || kind.kind === "ratio" ? kind.decimals : 0;
   return shownNumber(next, decimals);
 }
 
@@ -251,7 +303,11 @@ export type SliderGrid = "normal" | "coarse" | "fine";
 /** The smallest and largest value a number row may hold. */
 function bounds(row: GeneratedRow): { min: number; max: number } {
   const { kind } = row;
-  return kind.kind === "length" || kind.kind === "count" || kind.kind === "angle" || kind.kind === "percent"
+  return kind.kind === "length" ||
+    kind.kind === "count" ||
+    kind.kind === "angle" ||
+    kind.kind === "percent" ||
+    kind.kind === "ratio"
     ? { min: kind.min, max: kind.max }
     : { min: 0, max: 1 };
 }
@@ -282,7 +338,7 @@ function stepOf(row: GeneratedRow, grid: SliderGrid): number {
   if (kind.kind === "count") {
     return grid === "coarse" ? 10 : 1;
   }
-  const base = kind.kind === "length" || kind.kind === "angle" ? kind.step : 1;
+  const base = kind.kind === "length" || kind.kind === "angle" || kind.kind === "ratio" ? kind.step : 1;
   return base * (grid === "coarse" ? 10 : grid === "fine" ? 0.1 : 1);
 }
 
@@ -327,6 +383,9 @@ export function unitWordsOf(row: GeneratedRow): string {
   }
   if (row.kind.kind === "percent") {
     return "percent";
+  }
+  if (row.kind.kind === "ratio") {
+    return "to one";
   }
   return row.kind.kind === "length" ? "millimetres" : row.kind.kind === "angle" ? "degrees" : row.label.toLowerCase();
 }

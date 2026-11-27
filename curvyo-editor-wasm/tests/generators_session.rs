@@ -36,8 +36,9 @@ fn the_bar_offers_box_box_from_path_gear_qr_code_and_rounded_box_and_a_press_pla
         [
             "curvyo.generators/box",
             "curvyo.generators/path-box",
-            "curvyo.generators/gear",
+            // The Code segment (one for the whole family, slice 2) sorts before Gear.
             "curvyo.codes/qr",
+            "curvyo.generators/gear",
             "curvyo.generators/rounded-box"
         ]
     );

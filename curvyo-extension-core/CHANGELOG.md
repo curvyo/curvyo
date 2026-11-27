@@ -78,3 +78,18 @@ migration in that extension.
   `format_version` change: values are opaque to document-core.
 - Host rule: a generator that cannot encode its input answers `parts: []` plus a `Warning`; the host keeps the
   stored parts and writes the new params (ADR 0091 §3).
+
+## Unreleased (`specs/0144-qr-and-barcodes` slice 2, ADR 0092)
+
+- `Warning` gains `param: Option<&'static str>` (the row a lasting line stands under when the generator answers no
+  parts) and `subject: Option<&'static str>` (the words naming the cause); `GeneratorKind` gains `scanned: bool`
+  (the contrast check), `family: Option<Family>` (`Family { id, segment, label }`: one bar segment and a Symbology
+  group per family) and `resize: Resize` (`Proportional` or `Free`).
+- `ParamKind::Font` / `ParamValue::Font(Option<FontRef>)` (stored `{"font": null}` or `{"font": {"family", "style",
+  "face_hash", "face_index"}}`), `ParamKind::Ratio { min, max, step, decimals }` / `ParamValue::Ratio(f64)` (stored
+  `{"ratio": x}`); `ParamKind::Percent` bounds and `ParamValue::Percent` become `i32` (stored `{"pct": n}` unchanged,
+  a negative number now reads).
+- `GenerateRequest.glyphs: Option<&GlyphTable>` with `GlyphTable { glyphs }` and `Glyph { paths, advance }` (outlines
+  of one face at a size of 1 mm, built by the host); `Edit::Stretch { x, y }` for a `Resize::Free` kind.
+- Source-breaking for struct literals of `GenerateRequest`, `Warning` and `GeneratorKind` and for exhaustive matches
+  on `ParamKind`, `ParamValue` and `Edit`. No `format_version` change: values stay opaque to document-core.

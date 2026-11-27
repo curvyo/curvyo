@@ -1,7 +1,7 @@
 //! The QR code generator: stored parameters in, closed outlines out (ADR 0091 §3, §4, §5).
 
 mod encode;
-mod schema;
+pub(crate) mod schema;
 
 use std::borrow::Cow;
 
@@ -89,6 +89,7 @@ const fn subject(level: EcLevel) -> &'static str {
 /// The result when the content cannot be drawn: no parts (the host keeps the last ones), the
 /// parameters as typed, and the reason as a warning (the content itself is never in it).
 fn refused(values: Values<'_>, error: EncodeError) -> Generated {
+    let level = EcLevel::from_id(&values.choice("ec")).unwrap_or(EcLevel::M);
     let (params, _) = values.finish();
     let warning = match error {
         EncodeError::Empty => Warning {
@@ -96,12 +97,16 @@ fn refused(values: Values<'_>, error: EncodeError) -> Generated {
             pieces: Vec::new(),
             value: None,
             limit: None,
+            param: Some("content"),
+            subject: None,
         },
         EncodeError::TooLong { bytes, limit } => Warning {
             id: "content_too_long",
             pieces: Vec::new(),
             value: u32::try_from(bytes).ok().map(ParamValue::Count),
             limit: u32::try_from(limit).ok().map(ParamValue::Count),
+            param: Some("content"),
+            subject: Some(subject(level)),
         },
     };
     Generated {
@@ -117,7 +122,7 @@ fn refused(values: Values<'_>, error: EncodeError) -> Generated {
     }
 }
 
-fn clamped_module(values: &mut Values<'_>, module: f64) -> f64 {
+pub(crate) fn clamped_module(values: &mut Values<'_>, module: f64) -> f64 {
     let (min, max) = values.length_range("module_size");
     let clamped = module.clamp(min, max);
     if (clamped - module).abs() > 1e-12 {
@@ -137,7 +142,12 @@ fn clamped_module(values: &mut Values<'_>, module: f64) -> f64 {
 
 /// Module size and Width after the edit: Module size is the truth, Width is derived from it, unless
 /// Width was the field edited; both are written back. Returns the module size in mm.
-fn resolve_size(values: &mut Values<'_>, edit: Option<Edit<'_>>, width: usize, quiet: u32) -> f64 {
+pub(crate) fn resolve_size(
+    values: &mut Values<'_>,
+    edit: Option<Edit<'_>>,
+    width: usize,
+    quiet: u32,
+) -> f64 {
     #[allow(clippy::cast_precision_loss)]
     let total = (width + 2 * quiet as usize) as f64;
     let mut module = values.mm("module_size");
@@ -169,12 +179,12 @@ fn resolve_size(values: &mut Values<'_>, edit: Option<Edit<'_>>, width: usize, q
 fn clear_area_of(values: &mut Values<'_>, grid: &ModuleGrid, level: EcLevel) -> Vec<bool> {
     let asked = ClearArea {
         shape: LogoShape::from_id(&values.choice("logo_shape")).unwrap_or(LogoShape::Circle),
-        size: values.percent("logo_size"),
+        size: values.percent("logo_size").unsigned_abs(),
         margin: values.count("logo_margin"),
     };
     let area = clear_area::limited(grid, asked).unwrap_or(asked);
     if area.size != asked.size {
-        let value = ParamValue::Percent(area.size);
+        let value = ParamValue::Percent(i32::try_from(area.size).unwrap_or(i32::MAX));
         values.put("logo_size", &value);
         values.set_clamp("logo_size", value, Bound::DependentFor(subject(level)));
     }

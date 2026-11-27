@@ -20,6 +20,7 @@ fn generate(kind: &str, entries: &[(&str, ParamValue)]) -> Generated {
             params: &params,
             seed: Seed(1),
             edit: None::<Edit<'_>>,
+            glyphs: None,
         })
         .unwrap()
 }
@@ -100,6 +101,7 @@ fn a_path_box_names_its_walls_and_plates_with_unique_keys_that_fit_the_grammar()
             params: &params,
             seed: Seed(1),
             edit: None::<Edit<'_>>,
+            glyphs: None,
         })
         .unwrap();
     let all = keys(&result);

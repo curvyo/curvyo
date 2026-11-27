@@ -43,6 +43,7 @@ fn generate(kind: &str, stored: &StoredParams, edit: Option<Edit<'_>>) -> Genera
             params: stored,
             seed: Seed(7),
             edit,
+            glyphs: None,
         })
         .expect("the generator answers its own kind")
 }
@@ -254,6 +255,7 @@ fn criterion_8_every_declared_generator_kind_answers_at_its_defaults() {
                 params: &empty,
                 seed: Seed(0),
                 edit: None,
+                glyphs: None,
             })
             .unwrap_or_else(|| panic!("kind {kind} answers generate at its defaults"));
         assert!(
@@ -272,6 +274,7 @@ fn criterion_8_an_unknown_kind_is_not_generated() {
         params: &empty,
         seed: Seed(0),
         edit: None,
+        glyphs: None,
     });
     assert!(
         answer.is_none(),
@@ -304,6 +307,7 @@ fn criterion_7_the_seed_does_not_change_a_gear_or_a_box() {
                 params: &empty,
                 seed: Seed(1),
                 edit: None,
+                glyphs: None,
             })
             .unwrap();
         let b = GENERATORS
@@ -312,6 +316,7 @@ fn criterion_7_the_seed_does_not_change_a_gear_or_a_box() {
                 params: &empty,
                 seed: Seed(99_999),
                 edit: None,
+                glyphs: None,
             })
             .unwrap();
         assert_eq!(a, b, "{kind} ignores the seed");

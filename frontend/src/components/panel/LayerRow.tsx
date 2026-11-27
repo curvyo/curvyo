@@ -1,6 +1,7 @@
 import type { FixtureKind } from "@/lib/fixturesView";
 import { FixtureGlyph } from "@/components/workbench/FixtureGlyphs";
 import {
+  Barcode,
   Box,
   Crosshair,
   ChevronDown,
@@ -87,6 +88,13 @@ const GENERATOR_GLYPHS: Record<string, Glyph> = {
   "rounded box": SquareRoundCorner,
   "path box": Spline,
   "qr code": QrCode,
+  "data matrix": Grid3x3,
+  // Every 1D symbology (`specs/0144` UX notes §11.12).
+  "code 128": Barcode,
+  "code 39": Barcode,
+  "ean-13": Barcode,
+  "ean-8": Barcode,
+  "upc-a": Barcode,
 };
 
 /** The kind word of a fixture row as a glyph kind; anything unlisted is the unknown glyph. */

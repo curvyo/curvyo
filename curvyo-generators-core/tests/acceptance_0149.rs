@@ -139,6 +139,7 @@ fn build(params: &StoredParams, edit: Option<Edit<'_>>) -> Generated {
             params,
             seed: Seed(7),
             edit,
+            glyphs: None,
         })
         .expect("the path box answers its own kind")
 }

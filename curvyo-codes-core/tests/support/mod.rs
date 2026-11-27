@@ -10,6 +10,8 @@
     clippy::format_push_string
 )]
 
+pub mod glyphs;
+
 use curvyo_codes_core::CODES;
 use curvyo_extension_core::{
     ClosedPath, Edit, Extension, GenerateRequest, Generated, Param, ParamValue, Seed, StoredParams,
@@ -19,6 +21,43 @@ use curvyo_extension_core::{
 pub fn schema() -> Vec<Param> {
     let manifest = CODES.manifest();
     manifest.generators().next().expect("one kind").schema()
+}
+
+/// The schema of the kind `kind` (`qr`, `ean-13`, ...).
+pub fn schema_of(kind: &str) -> Vec<Param> {
+    let manifest = CODES.manifest();
+    manifest
+        .generators()
+        .find(|k| k.id == kind)
+        .expect("a kind of the codes")
+        .schema()
+}
+
+/// The stored parameters of a new object of `kind` with `overrides` applied.
+pub fn params_of(kind: &str, overrides: &[(&str, ParamValue)]) -> StoredParams {
+    let mut stored = Param::defaults(&schema_of(kind));
+    for (key, value) in overrides {
+        stored.insert((*key).to_owned(), value.to_stored());
+    }
+    stored
+}
+
+/// Generates `kind` from `params` after `edit`, with the glyph table when given.
+pub fn generate_kind(
+    kind: &str,
+    params: &StoredParams,
+    edit: Option<Edit<'_>>,
+    glyphs: Option<&curvyo_extension_core::GlyphTable>,
+) -> Generated {
+    CODES
+        .generate(&GenerateRequest {
+            kind,
+            params,
+            seed: Seed(0),
+            edit,
+            glyphs,
+        })
+        .expect("a kind of the codes")
 }
 
 /// The stored parameters of a new object with `overrides` applied.
@@ -38,6 +77,7 @@ pub fn generate_from(params: &StoredParams, edit: Option<Edit<'_>>) -> Generated
             params,
             seed: Seed(0),
             edit,
+            glyphs: None,
         })
         .expect("the qr kind")
 }
@@ -141,16 +181,27 @@ pub fn raster(
     light_ink: bool,
 ) -> (usize, usize, Vec<u8>) {
     let size = (width + 2 * border) * per_module;
-    #[allow(clippy::cast_precision_loss)]
     let scale = per_module as f64 / module;
-    #[allow(clippy::cast_precision_loss)]
     let shift = (width as f64 / 2.0 + border as f64) * per_module as f64;
+    raster_window(paths, scale, (shift, shift), (size, size), light_ink)
+}
+
+/// Renders the outlines into a `size` window: a point `(x, y)` in mm lands on the pixel
+/// `(x * scale + shift.0, y * scale + shift.1)`.
+pub fn raster_window(
+    paths: &[ClosedPath],
+    scale: f64,
+    shift: (f64, f64),
+    size: (usize, usize),
+    light_ink: bool,
+) -> (usize, usize, Vec<u8>) {
+    let (width, height) = size;
     let polygons: Vec<Vec<(f64, f64)>> = paths
         .iter()
         .map(|path| {
             flatten(path, 12)
                 .into_iter()
-                .map(|(x, y)| (x * scale + shift, y * scale + shift))
+                .map(|(x, y)| (x * scale + shift.0, y * scale + shift.1))
                 .collect()
         })
         .collect();
@@ -159,9 +210,8 @@ pub fn raster(
     } else {
         (0u8, 255u8)
     };
-    let mut pixels = vec![ground; size * size];
-    for row in 0..size {
-        #[allow(clippy::cast_precision_loss)]
+    let mut pixels = vec![ground; width * height];
+    for row in 0..height {
         let y = row as f64 + 0.5;
         let mut crossings: Vec<(f64, i32)> = Vec::new();
         for polygon in &polygons {
@@ -180,18 +230,17 @@ pub fn raster(
         for pair in crossings.windows(2) {
             winding += pair[0].1;
             if winding != 0 {
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let (from, to) = (
                     (pair[0].0 - 0.5).ceil().max(0.0) as usize,
-                    ((pair[1].0 - 0.5).floor() + 1.0).clamp(0.0, size as f64) as usize,
+                    ((pair[1].0 - 0.5).floor() + 1.0).clamp(0.0, width as f64) as usize,
                 );
-                for x in from..to.min(size) {
-                    pixels[row * size + x] = ink;
+                for x in from..to.min(width) {
+                    pixels[row * width + x] = ink;
                 }
             }
         }
     }
-    (size, size, pixels)
+    (width, height, pixels)
 }
 
 /// What the independent decoder (`rqrr`) reads in the bitmap, `None` when it finds no code.

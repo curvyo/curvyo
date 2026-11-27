@@ -53,6 +53,12 @@ impl WasmSession {
         self.session.cancel_generated_preview();
     }
 
+    /// The Symbology group's press: switches the selected code to the kind `kind` in one step
+    /// (`0144` criterion 20, ADR 0092 §2); `false` when nothing was switched.
+    pub fn switch_generated_kind(&mut self, kind: &str) -> bool {
+        self.session.switch_generated_kind(kind)
+    }
+
     /// Detach part `key` of the selected rounded box: it gets a copy of the box's operations of its
     /// own (`0147` criterion 15); one step "Detach part". `false` when nothing changes.
     pub fn detach_generated_part(&mut self, key: &str) -> bool {

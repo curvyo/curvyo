@@ -57,6 +57,8 @@ export interface GeneratorBlockApi {
   preview: (key: string, value: number | string) => void;
   /** Drops the preview of a stepped value (Escape, or the field left without a commit). */
   cancelPreview: () => void;
+  /** The Symbology group's press: switches the selected code to this kind in one step. */
+  switchKind: (kind: string) => void;
   /** Convert to paths. */
   convert: () => void;
   /** Replace outline: arms the pick of a new outline (`0149`). */
@@ -129,6 +131,14 @@ export function useGeneratorBlock(editor: GeneratorsEditor): GeneratorBlockApi {
     getSession()?.cancel_generated_preview();
     sync();
   }, [getSession, sync]);
+  const switchKind = useCallback(
+    (kind: string) => {
+      getSession()?.switch_generated_kind(kind);
+      setNotice(null);
+      sync();
+    },
+    [getSession, sync],
+  );
   const convert = useCallback(() => {
     getSession()?.convert_selected_generated();
     setNotice(null);
@@ -158,6 +168,7 @@ export function useGeneratorBlock(editor: GeneratorsEditor): GeneratorBlockApi {
     setValue,
     preview,
     cancelPreview,
+    switchKind,
     convert,
     replaceOutline,
     detachPart,

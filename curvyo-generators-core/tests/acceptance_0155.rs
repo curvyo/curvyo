@@ -158,6 +158,7 @@ fn rounded(w: f64, d: f64, r: f64, pattern: &str, kerf: f64) -> Generated {
             params: &stored,
             seed: Seed(1),
             edit: None,
+            glyphs: None,
         })
         .unwrap()
 }
@@ -216,6 +217,7 @@ fn path_box(path: ClosedPath, pattern: &str, kerf: f64) -> Generated {
             params: &stored,
             seed: Seed(1),
             edit: None,
+            glyphs: None,
         })
         .unwrap()
 }

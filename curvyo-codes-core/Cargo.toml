@@ -17,9 +17,16 @@ thiserror.workspace = true
 # without default features, builds for wasm32-unknown-unknown; `max_allowed_errors` and
 # `is_functional` are public, which the clear-area budget needs.
 qrcode = { version = "0.15", default-features = false }
+# The Data Matrix ECC 200 encoder (ADR 0091 §9, ADR 0092 notes of slice 3): Apache-2.0 OR MIT, `no_std`,
+# optimizing encoder; brings `arrayvec` (MIT OR Apache-2.0) and `flagset` (Apache-2.0).
+datamatrix = { version = "0.3", default-features = false }
 
 [dev-dependencies]
 # The independent decoder of the criterion 4 test (ADR 0091 §7): (MIT OR Apache-2.0) AND ISC; its
 # own dependencies are `g2p` and `lru`. Test-only, never in the product.
 rqrr = { version = "0.11", default-features = false }
+# The independent decoder of the 1D tests (ADR 0092 §1): Apache-2.0, a port of ZXing. Test-only, never in
+# the product (`cargo tree -e normal` shows none); only the one-dimensional readers are built. Its writers
+# are not used: their margins and their 2:1 Code 39 differ from the spec's module counts.
+rxing = { version = "0.9", default-features = false, features = ["encoding_rs", "decoders", "oned", "datamatrix"] }
 serde_json.workspace = true

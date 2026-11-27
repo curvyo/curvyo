@@ -32,7 +32,14 @@ fn say(param: &Param, value: &ParamValue) -> String {
             format!("{}°", shown(degrees.0, decimals))
         }
         (_, ParamValue::Count(count)) => count.to_string(),
+        (ParamKind::Percent { min, .. }, ParamValue::Percent(percent)) if min < 0 => {
+            // A signed percentage says its sign: "+30 %", "-5 %".
+            format!("{percent:+} %")
+        }
         (_, ParamValue::Percent(percent)) => format!("{percent} %"),
+        (ParamKind::Ratio { decimals, .. }, ParamValue::Ratio(ratio)) => {
+            format!("{} : 1", shown(*ratio, decimals))
+        }
         (ParamKind::Choice { options }, ParamValue::Choice(id)) => options
             .iter()
             .find(|option| option.id == id)
@@ -44,7 +51,8 @@ fn say(param: &Param, value: &ParamValue) -> String {
     }
 }
 
-/// A kind's label inside a sentence: "gear", "rounded box", but "QR code" keeps its acronym.
+/// A kind's label inside a sentence: "gear", "rounded box", but "QR code" keeps its acronym and
+/// "Code 128" its number, "Data Matrix" its second capital (a name, not a noun).
 #[must_use]
 pub fn noun(label: &str) -> String {
     let mut chars = label.chars();
@@ -52,6 +60,9 @@ pub fn noun(label: &str) -> String {
         (Some(first), Some(second)) if first.is_uppercase() && second.is_uppercase() => {
             label.to_owned()
         }
+        _ if label.chars().any(|c| c.is_ascii_digit()) => label.to_owned(),
+        // "Data Matrix" is a name of two capitalised words.
+        _ if label.chars().skip(1).any(char::is_uppercase) => label.to_owned(),
         _ => label.to_lowercase(),
     }
 }

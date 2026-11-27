@@ -33,6 +33,7 @@ fn generate(kind: &str, stored: &StoredParams, edit: Option<Edit<'_>>) -> Genera
             params: stored,
             seed: Seed(7),
             edit,
+            glyphs: None,
         })
         .unwrap()
 }
@@ -93,7 +94,8 @@ fn every_declared_kind_answers_at_its_defaults_and_is_closed() {
                 kind: "hinge",
                 params: &StoredParams::new(),
                 seed: Seed(0),
-                edit: None
+                edit: None,
+                glyphs: None,
             })
             .is_none()
     );

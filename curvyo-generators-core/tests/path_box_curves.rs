@@ -88,6 +88,7 @@ fn generate_path(path: ClosedPath, edit: Option<Edit<'_>>) -> Generated {
             params: &stored,
             seed: Seed(1),
             edit,
+            glyphs: None,
         })
         .unwrap()
 }
@@ -195,6 +196,7 @@ fn generate_with(path: ClosedPath, rest: &[(&str, ParamValue)]) -> Generated {
             params: &stored,
             seed: Seed(1),
             edit: None,
+            glyphs: None,
         })
         .unwrap()
 }

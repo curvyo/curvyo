@@ -1,7 +1,7 @@
 //! The parameter schema and typed values (ADR 0034 §4) and their stored encoding (ADR 0033 §3).
 
 use crate::extension::ClosedPath;
-use curvyo_document_core::Length;
+use curvyo_document_core::{FontKind, FontRef, Length};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
@@ -16,6 +16,8 @@ const CHOICE: &str = "choice";
 const PATH: &str = "path";
 const TEXT: &str = "text";
 const PCT: &str = "pct";
+const RATIO: &str = "ratio";
+const FONT: &str = "font";
 /// The most bytes a stored text may hold (a QR code at version 40 takes 2,953); longer text is
 /// cut at a character boundary by [`Param::accept`].
 const MAX_TEXT_BYTES: usize = 8192;
@@ -223,13 +225,27 @@ pub enum ParamKind {
         /// Whether the field takes line breaks (Enter inserts one).
         multiline: bool,
     },
-    /// A whole percentage within `min..=max` (ADR 0091 §3).
+    /// A whole percentage within `min..=max`, signed (ADR 0091 §3, ADR 0092 §2: Bar width adjust
+    /// runs from -30 to +30).
     Percent {
         /// The smallest value.
-        min: u32,
+        min: i32,
         /// The largest value.
-        max: u32,
+        max: i32,
     },
+    /// A unitless number within `min..=max`, shown with its decimals (Wide:narrow, ADR 0092 §2).
+    Ratio {
+        /// The smallest value.
+        min: f64,
+        /// The largest value.
+        max: f64,
+        /// One arrow-key step (Shift x10, Ctrl x0.1).
+        step: f64,
+        /// The decimals shown, trailing zeros trimmed.
+        decimals: u8,
+    },
+    /// An outline face of the maker's fonts, `None` for the included sans (ADR 0092 §3).
+    Font,
 }
 
 /// A typed parameter value.
@@ -251,7 +267,12 @@ pub enum ParamValue {
     /// A text, as `{"text": "..."}`.
     Text(String),
     /// A whole percentage, as `{"pct": n}`.
-    Percent(u32),
+    Percent(i32),
+    /// A unitless number, as `{"ratio": x}`.
+    Ratio(f64),
+    /// A font face, as `{"font": {"family", "style", "face_hash", "face_index"}}` or `{"font":
+    /// null}` for the included sans.
+    Font(Option<FontRef>),
 }
 
 impl ParamValue {
@@ -278,6 +299,8 @@ impl ParamValue {
             Self::Path(path) => (PATH, Value::from(path.flat())),
             Self::Text(text) => (TEXT, Value::from(text.as_str())),
             Self::Percent(percent) => (PCT, Value::from(*percent)),
+            Self::Ratio(ratio) => (RATIO, Value::from(*ratio)),
+            Self::Font(face) => (FONT, face.as_ref().map_or(Value::Null, font_to_stored)),
         };
         let mut map = Map::new();
         map.insert(key.to_owned(), value);
@@ -308,7 +331,12 @@ impl ParamValue {
             ON => Some(Self::Switch(inner.as_bool()?)),
             CHOICE => Some(Self::Choice(inner.as_str()?.to_owned())),
             TEXT => Some(Self::Text(inner.as_str()?.to_owned())),
-            PCT => Some(Self::Percent(u32::try_from(inner.as_u64()?).ok()?)),
+            PCT => Some(Self::Percent(i32::try_from(inner.as_i64()?).ok()?)),
+            RATIO => inner.as_f64().filter(|n| n.is_finite()).map(Self::Ratio),
+            FONT => match inner {
+                Value::Null => Some(Self::Font(None)),
+                other => font_from_stored(other).map(|face| Self::Font(Some(face))),
+            },
             PATH => {
                 let numbers: Option<Vec<f64>> = inner
                     .as_array()?
@@ -377,9 +405,27 @@ impl ParamValue {
 
     /// The percentage this value holds, if it is one.
     #[must_use]
-    pub const fn percent(&self) -> Option<u32> {
+    pub const fn percent(&self) -> Option<i32> {
         match self {
             Self::Percent(percent) => Some(*percent),
+            _ => None,
+        }
+    }
+
+    /// The unitless number this value holds, if it is one.
+    #[must_use]
+    pub const fn ratio(&self) -> Option<f64> {
+        match self {
+            Self::Ratio(ratio) => Some(*ratio),
+            _ => None,
+        }
+    }
+
+    /// The face this value names (`None` inside: the included sans), if it is a font value.
+    #[must_use]
+    pub const fn font(&self) -> Option<Option<&FontRef>> {
+        match self {
+            Self::Font(face) => Some(face.as_ref()),
             _ => None,
         }
     }
@@ -392,6 +438,29 @@ impl ParamValue {
             _ => None,
         }
     }
+}
+
+/// The stored form of a face: the four fields of a text's `FontRef` (an outline face).
+fn font_to_stored(face: &FontRef) -> Value {
+    let mut map = Map::new();
+    map.insert("family".to_owned(), Value::from(face.family.as_str()));
+    map.insert("style".to_owned(), Value::from(face.style.as_str()));
+    map.insert("face_hash".to_owned(), Value::from(face.face_hash.as_str()));
+    map.insert("face_index".to_owned(), Value::from(face.face_index));
+    Value::Object(map)
+}
+
+/// The face a stored `{"family", "style", "face_hash", "face_index"}` map names.
+fn font_from_stored(value: &Value) -> Option<FontRef> {
+    let map = value.as_object()?;
+    let text = |key: &str| map.get(key)?.as_str().map(str::to_owned);
+    Some(FontRef {
+        family: text("family")?,
+        style: text("style")?,
+        face_hash: text("face_hash")?,
+        face_index: u32::try_from(map.get("face_index")?.as_u64()?).ok()?,
+        kind: FontKind::Outline,
+    })
 }
 
 /// `text` cut to [`MAX_TEXT_BYTES`] at a character boundary.
@@ -476,6 +545,10 @@ impl Param {
             (ParamKind::Percent { min, max }, ParamValue::Percent(percent)) => {
                 Some(ParamValue::Percent(percent.clamp(min, max)))
             }
+            (ParamKind::Ratio { min, max, .. }, ParamValue::Ratio(ratio)) if ratio.is_finite() => {
+                Some(ParamValue::Ratio(ratio.clamp(min, max)))
+            }
+            (ParamKind::Font, font @ ParamValue::Font(_)) => Some(font),
             (ParamKind::Text { .. }, ParamValue::Text(text)) => {
                 Some(ParamValue::Text(cut_text(text)))
             }
@@ -779,6 +852,58 @@ mod tests {
         );
         stored.insert("fill".into(), ParamValue::Percent(90).to_stored());
         assert!(!ShownWhen::Full { key: "fill" }.holds(&schema, &stored));
+    }
+
+    #[test]
+    fn a_signed_percent_a_ratio_and_a_font_round_trip_through_the_stored_form() {
+        let adjust = ParamKind::Percent { min: -30, max: 30 };
+        let minus = ParamValue::Percent(-5);
+        assert_eq!(minus.to_stored(), serde_json::json!({"pct": -5}));
+        assert_eq!(ParamValue::from_stored(&minus.to_stored()), Some(minus));
+        let param = Param {
+            kind: adjust,
+            default: ParamValue::Percent(0),
+            ..spacing()
+        };
+        assert_eq!(
+            param.accept(ParamValue::Percent(-90)),
+            Some(ParamValue::Percent(-30))
+        );
+        let ratio = Param {
+            kind: ParamKind::Ratio {
+                min: 2.0,
+                max: 3.0,
+                step: 0.1,
+                decimals: 1,
+            },
+            default: ParamValue::Ratio(3.0),
+            ..spacing()
+        };
+        assert_eq!(
+            ratio.accept(ParamValue::Ratio(7.5)),
+            Some(ParamValue::Ratio(3.0))
+        );
+        assert_eq!(ratio.accept(ParamValue::Ratio(f64::NAN)), None);
+        assert_eq!(
+            ParamValue::from_stored(&serde_json::json!({"ratio": 2.5})),
+            Some(ParamValue::Ratio(2.5))
+        );
+        let none = ParamValue::Font(None);
+        assert_eq!(none.to_stored(), serde_json::json!({"font": null}));
+        assert_eq!(ParamValue::from_stored(&none.to_stored()), Some(none));
+        let face = ParamValue::Font(Some(curvyo_document_core::FontRef {
+            family: "Source Sans 3".into(),
+            style: "Regular".into(),
+            face_hash: "ab".repeat(32),
+            face_index: 0,
+            kind: curvyo_document_core::FontKind::Outline,
+        }));
+        assert_eq!(ParamValue::from_stored(&face.to_stored()), Some(face));
+        assert_eq!(
+            ParamValue::from_stored(&serde_json::json!({"font": {"family": "x"}})),
+            None,
+            "a face without its hash is no face"
+        );
     }
 
     fn square(side: f64) -> ClosedPath {

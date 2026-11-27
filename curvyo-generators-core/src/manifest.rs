@@ -1,6 +1,6 @@
 //! The generators' manifest: the kinds `gear` and `box` and their parameter groups.
 
-use curvyo_extension_core::{Contribution, GeneratorKind, Manifest, Source};
+use curvyo_extension_core::{Contribution, GeneratorKind, Manifest, Resize, Source};
 
 use crate::{boxes, gear, path_box, rounded_box};
 
@@ -30,6 +30,9 @@ pub fn manifest() -> Manifest {
                 icon: "Box",
                 groups: boxes::groups(),
                 source: None,
+                scanned: false,
+                family: None,
+                resize: Resize::Proportional,
             }),
             Contribution::Generator(GeneratorKind {
                 id: PATH_BOX,
@@ -40,6 +43,9 @@ pub fn manifest() -> Manifest {
                     param: "outline",
                     command: "Box from path",
                 }),
+                scanned: false,
+                family: None,
+                resize: Resize::Proportional,
             }),
             Contribution::Generator(GeneratorKind {
                 id: GEAR,
@@ -47,6 +53,9 @@ pub fn manifest() -> Manifest {
                 icon: "Cog",
                 groups: gear::groups(),
                 source: None,
+                scanned: false,
+                family: None,
+                resize: Resize::Proportional,
             }),
             Contribution::Generator(GeneratorKind {
                 id: ROUNDED_BOX,
@@ -54,6 +63,9 @@ pub fn manifest() -> Manifest {
                 icon: "SquareRoundCorner",
                 groups: rounded_box::groups(),
                 source: None,
+                scanned: false,
+                family: None,
+                resize: Resize::Proportional,
             }),
         ],
     }

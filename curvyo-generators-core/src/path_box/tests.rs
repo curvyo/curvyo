@@ -19,6 +19,7 @@ fn build(path: &ClosedPath, edit: Option<Edit<'_>>) -> Generated {
         params: &params,
         seed: Seed(1),
         edit,
+        glyphs: None,
     })
 }
 
@@ -334,6 +335,7 @@ fn the_heart_at_corner_angle_90_still_gets_the_hollow_on_a_lobe() {
         params: &params,
         seed: Seed(1),
         edit: None,
+        glyphs: None,
     });
     assert!(!ids(&g).contains(&"hollow_left_out"));
     let (plain, cut) = (curve_area(cover(&g, 1)).abs(), curve_area(lid(&g, 1)).abs());

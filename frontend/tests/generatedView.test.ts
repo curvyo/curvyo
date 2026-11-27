@@ -342,3 +342,78 @@ test("a percent row is a number with a percent sign, whole steps and its own bou
   assert.equal(stepValue(row, 90, 15, "normal"), 100, "held inside the bounds");
   assert.equal(stepRowText(row, "90", "ArrowUp", false, false), "91");
 });
+
+const ADJUST = {
+  group: "Advanced",
+  param: { key: "bar_adjust", label: "Bar width adjust", kind: { kind: "percent", min: -30, max: 30 } },
+  value: { kind: "percent", value: 5 },
+};
+const WIDE = {
+  group: "Size",
+  param: {
+    key: "wide_narrow",
+    label: "Wide:narrow",
+    kind: { kind: "ratio", min: 2, max: 3, step: 0.1, decimals: 1 },
+  },
+  value: { kind: "ratio", value: 2.5 },
+};
+const FONT = {
+  group: "Text",
+  param: { key: "font", label: "Font", kind: { kind: "font" }, default: { kind: "font", value: null } },
+  value: { kind: "font", value: null },
+};
+
+test("a signed percent shows its plus and steps across zero (Bar width adjust)", () => {
+  const view = decodeGeneratedView(json([ADJUST]));
+  assert.ok(view);
+  const [row] = view.rows;
+  assert.equal(rowText(row), "+5");
+  assert.equal(rowText({ ...row, value: -5 }), "-5");
+  assert.equal(rowText({ ...row, value: 0 }), "0");
+  assert.deepEqual(rowRange(row), { now: 5, min: -30, max: 30 });
+  assert.equal(stepValue(row, 0, -3, "normal"), -3);
+  assert.equal(stepValue(row, -29, -5, "normal"), -30, "held inside the bounds");
+  assert.equal(valueAt(row, 0, "normal"), -30);
+  assert.equal(parseNumber("-5"), -5);
+  assert.equal(parseNumber("+5"), 5);
+});
+
+test("a ratio row has one decimal, its own step and a ': 1' unit", () => {
+  const view = decodeGeneratedView(json([WIDE]));
+  assert.ok(view);
+  const [row] = view.rows;
+  assert.equal(unitOf(row.kind), ": 1");
+  assert.equal(rowText(row), "2.5");
+  assert.equal(stepRowText(row, "2.5", "ArrowUp", false, false), "2.6");
+  assert.equal(stepValue(row, 2.9, 3, "normal"), 3, "held at the maximum");
+});
+
+test("a font row shows the face name, the included sans for none", () => {
+  const view = decodeGeneratedView(json([FONT]));
+  assert.ok(view);
+  assert.equal(view.rows[0].value, "Source Sans 3 Regular");
+  const named = JSON.stringify({
+    id: "1",
+    label: "EAN-13",
+    known: true,
+    rows: [{ ...FONT, value: { kind: "font", value: { family: "Inter", style: "Bold", face_hash: "ab", face_index: 0 } } }],
+    family: { label: "Symbology", current: "curvyo.codes/ean-13", kinds: [{ id: "curvyo.codes/qr", label: "QR code" }] },
+    loading: true,
+    font_missing: true,
+  });
+  const decoded = decodeGeneratedView(named);
+  assert.ok(decoded);
+  assert.equal(decoded.rows[0].value, "Inter Bold");
+  assert.equal(decoded.family?.label, "Symbology");
+  assert.equal(decoded.loading, true);
+  assert.equal(decoded.fontMissing, true);
+});
+
+test("the Code segment is one entry that carries its family and its loading state", () => {
+  const kinds = decodeKinds(
+    JSON.stringify([{ id: "curvyo.codes/ean-13", label: "EAN-13", segment: "Code", source: false, icon: "Barcode", family: "code", loading: true }]),
+  );
+  assert.equal(kinds[0].segment, "Code");
+  assert.equal(kinds[0].family, "code");
+  assert.equal(kinds[0].loading, true);
+});

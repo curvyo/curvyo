@@ -73,20 +73,27 @@ pub struct InstanceView {
     pub parts: Vec<PartView>,
 }
 
-/// The sentence of the reason the content cannot be drawn, if the generator reported one.
-fn content_problem(generated: &curvyo_extension_core::Generated) -> Option<String> {
+/// The row the generator names for its reason it drew nothing, with the sentence of that reason
+/// (the content never appears in it).
+fn row_problem(
+    generated: &curvyo_extension_core::Generated,
+    label: &'static str,
+) -> Option<(&'static str, String)> {
+    let drew_nothing = generated.parts.is_empty();
     let warnings: Vec<_> = generated
         .warnings
         .iter()
-        .filter(|warning| crate::instance_warnings::is_content_problem(warning.id))
+        .filter(|warning| crate::instance_warnings::is_row_problem(warning, drew_nothing))
         .cloned()
         .collect();
+    let row = warnings.first()?.param?;
     crate::instance_warnings::sentences_in(
         &warnings,
-        crate::instance_warnings::Context::of(generated),
+        crate::instance_warnings::Context::of(generated, label),
     )
     .into_iter()
     .next()
+    .map(|sentence| (row, sentence))
 }
 
 /// The block of `snapshot`: its rows with their stored values, the hidden ones left out.
@@ -130,7 +137,9 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
         })
         .filter(|parts| parts.len() > 1)
         .unwrap_or_default();
-    let problem = generated.as_ref().and_then(content_problem);
+    let problem = generated
+        .as_ref()
+        .and_then(|generated| row_problem(generated, found.kind.label));
     let (used, states, limits) = generated
         .map(|generated| (generated.automatic, generated.states, generated.limits))
         .unwrap_or_default();
@@ -170,11 +179,10 @@ pub fn view(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Insta
                 .iter()
                 .find(|(key, _)| *key == param.key)
                 .map(|(_, value)| value.clone()),
-            problem: if param.key == "content" {
-                problem.clone()
-            } else {
-                None
-            },
+            problem: problem
+                .as_ref()
+                .filter(|(row, _)| *row == param.key)
+                .map(|(_, sentence)| sentence.clone()),
         })
         .collect();
     InstanceView {
@@ -204,13 +212,18 @@ pub fn value_from_number(param: &Param, number: f64) -> Option<ParamValue> {
             Some(ParamValue::Count(count))
         }
         ParamKind::Percent { .. } => {
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let percent = (number + 0.5).floor().clamp(0.0, f64::from(u32::MAX)) as u32;
+            #[allow(clippy::cast_possible_truncation)]
+            let percent = (number + 0.5)
+                .floor()
+                .clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32;
             Some(ParamValue::Percent(percent))
         }
-        ParamKind::Switch | ParamKind::Choice { .. } | ParamKind::Path | ParamKind::Text { .. } => {
-            None
-        }
+        ParamKind::Ratio { .. } => Some(ParamValue::Ratio(number)),
+        ParamKind::Switch
+        | ParamKind::Choice { .. }
+        | ParamKind::Path
+        | ParamKind::Text { .. }
+        | ParamKind::Font => None,
     }
 }
 
@@ -221,6 +234,10 @@ pub fn value_from_json(param: &Param, value: &Value) -> Option<ParamValue> {
         (ParamKind::Switch, Value::Bool(on)) => Some(ParamValue::Switch(*on)),
         (ParamKind::Choice { .. }, Value::String(id)) => Some(ParamValue::Choice(id.clone())),
         (ParamKind::Text { .. }, Value::String(text)) => Some(ParamValue::Text(text.clone())),
+        (ParamKind::Font, Value::Null) => Some(ParamValue::Font(None)),
+        (ParamKind::Font, Value::Object(_)) => {
+            ParamValue::from_stored(&serde_json::json!({ "font": value }))
+        }
         (_, Value::Number(number)) => value_from_number(param, number.as_f64()?),
         _ => None,
     }

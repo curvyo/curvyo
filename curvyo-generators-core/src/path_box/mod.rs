@@ -100,6 +100,8 @@ fn edited(request: &GenerateRequest<'_>) -> (StoredParams, Option<Warning>) {
         pieces: Vec::new(),
         value: Some(ParamValue::Length(Length::from_mm(wall))),
         limit: None,
+        param: None,
+        subject: None,
     });
     raw.insert(
         "outline".to_owned(),

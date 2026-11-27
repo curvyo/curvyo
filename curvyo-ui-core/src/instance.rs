@@ -6,18 +6,14 @@
 //! registry does not know or the maker switched off: that object is shown from its stored outline
 //! and refuses a change by number or a resize (ADR 0080 §5).
 
-use curvyo_document_core::{
-    Affine, CHANGE_PARAMETER_COMMIT_LABEL, Document, GeneratedRecord, GeneratedSnapshot,
-    KEY_SUBJECT_KIND, KEY_SUBJECT_PARAM, NodeId, ObjectSnapshot, Point, orthonormalised,
-};
+use curvyo_document_core::{Affine, Document, GeneratedRecord, GeneratedSnapshot, NodeId, Point};
 use curvyo_extension_core::{
-    Edit, GenerateRequest, Generated, GeneratorKind, Manifest, Param, ParamValue, Part,
-    ScaleFactor, Seed, StoredParams,
+    Edit, GenerateRequest, Generated, GeneratorKind, Manifest, Param, ParamKind, ParamValue, Part,
+    Seed, StoredParams,
 };
 
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::extensions::{ExtensionSettings, generate_object, manifests};
-use crate::instance_notice::notices;
 pub use crate::instance_notice::{clamp_notice, noun, shown};
 pub use crate::instance_resize::{ResizeView, resize_view};
 pub use crate::instance_view::{
@@ -142,6 +138,16 @@ pub(crate) fn generate(
     seed: u32,
     edit: Option<Edit<'_>>,
 ) -> Option<Generated> {
+    // The one funnel every writer goes through (ADR 0092 §3.3): a kind with a Font parameter gets
+    // the outlines of the face that parameter names, from the registry the session set.
+    let table = found
+        .kind
+        .params()
+        .find(|param| matches!(param.kind, ParamKind::Font))
+        .and_then(|param| match param.read(params) {
+            ParamValue::Font(font) => crate::code_glyphs::glyphs_for(font.as_ref()),
+            _ => None,
+        });
     generate_object(
         found.manifest.id,
         &GenerateRequest {
@@ -149,6 +155,7 @@ pub(crate) fn generate(
             params,
             seed: Seed(seed),
             edit,
+            glyphs: table.as_deref(),
         },
     )
 }
@@ -166,12 +173,14 @@ pub fn part_keys(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> 
 /// The warning sentences of the generated object `snapshot`, empty for an unknown kind.
 #[must_use]
 pub fn warning_notices(settings: &ExtensionSettings, snapshot: &GeneratedSnapshot) -> Vec<String> {
-    find_kind(settings, &snapshot.record.kind)
-        .and_then(|found| generate(&found, &snapshot.record.params, snapshot.record.seed, None))
+    let Some(found) = find_kind(settings, &snapshot.record.kind) else {
+        return Vec::new();
+    };
+    generate(&found, &snapshot.record.params, snapshot.record.seed, None)
         .map(|g| {
             crate::instance_warnings::sentences_in(
                 &g.warnings,
-                crate::instance_warnings::Context::of(&g),
+                crate::instance_warnings::Context::of(&g, found.kind.label),
             )
         })
         .unwrap_or_default()
@@ -277,281 +286,11 @@ pub fn place(
         .map_err(|_| InstanceError::Refused)
 }
 
-/// The object an instance command acts on: the clone of a sketch with its own values (`0099`), or
-/// a generated object (`0141`). The two arms share the field, the clamp notice and the preview;
-/// each has its own storage (`adrs.md` A7).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InstanceSource {
-    /// A linked clone of a sketch.
-    Sketch {
-        /// The clone.
-        clone: NodeId,
-    },
-    /// A generated object.
-    Generated {
-        /// The object.
-        node: NodeId,
-    },
-}
-
-/// Sets the parameter `key` of `source` to `value` in one commit "Change parameter": for a
-/// generated object the key of its schema, for a sketch clone the exposed key (`p:...` or `d:...`)
-/// with a length in millimetres or an angle in degrees.
-///
-/// # Errors
-/// As [`change_value`] for a generated object; for a sketch clone
-/// [`InstanceError::NoSuchObject`], [`InstanceError::WrongValue`] or [`InstanceError::Refused`].
-pub fn change_parameter(
-    document: &Document,
-    settings: &ExtensionSettings,
-    source: InstanceSource,
-    key: &str,
-    value: &ParamValue,
-) -> Result<Changed, InstanceError> {
-    match source {
-        InstanceSource::Generated { node } => change_value(document, settings, node, key, value),
-        InstanceSource::Sketch { clone } => {
-            let number = match value {
-                ParamValue::Length(length) => length.as_mm(),
-                ParamValue::Angle(degrees) => degrees.0,
-                _ => return Err(InstanceError::WrongValue),
-            };
-            crate::instance_sketch::change(document, &[clone], key, number, false, &[])
-        }
-    }
-}
-
-/// What a parameter edit changed.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Changed {
-    /// The notice sentences of the values the generator clamped, the edited field's first.
-    pub notices: Vec<String>,
-    /// Whether a commit was written (a value equal to the stored one writes nothing).
-    pub written: bool,
-    /// Whether the generator answered no parts for the new values: the stored outline is the
-    /// last valid one (`0144` criterion 13).
-    pub refused: bool,
-}
-
-/// What setting one parameter would write: the object as stored, the rebuilt record and the
-/// notices of the values the generator clamped.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ValuePlan {
-    /// The object as it is stored now.
-    pub snapshot: GeneratedSnapshot,
-    /// The record the generator rebuilt (the stored one when nothing changes).
-    pub record: GeneratedRecord,
-    /// The notice sentences of the clamps, the edited field's first.
-    pub notices: Vec<String>,
-    /// The words the generator gave to values at a limit that is a shape ("full round"), by
-    /// parameter.
-    pub states: Vec<(&'static str, &'static str)>,
-    /// Whether the generator answered no parts: the record keeps the stored outline.
-    pub refused: bool,
-}
-
-/// What setting the parameter `key` of the generated object `id` to `value` would give, without
-/// writing: the generator clamps and derives, the outline is rebuilt. A live preview and
-/// [`change_value`] share it.
-///
-/// # Errors
-/// [`InstanceError::NoSuchObject`], [`InstanceError::UnknownKind`] or [`InstanceError::WrongValue`].
-pub fn plan_value(
-    document: &Document,
-    settings: &ExtensionSettings,
-    id: NodeId,
-    key: &str,
-    value: &ParamValue,
-) -> Result<ValuePlan, InstanceError> {
-    let snapshot = document.generated(id).ok_or(InstanceError::NoSuchObject)?;
-    let found = find_kind(settings, &snapshot.record.kind).ok_or(InstanceError::UnknownKind)?;
-    let schema = found.kind.schema();
-    let param = schema
-        .iter()
-        .find(|param| param.key == key)
-        .ok_or(InstanceError::WrongValue)?;
-    if std::mem::discriminant(&param.default) != std::mem::discriminant(value) {
-        return Err(InstanceError::WrongValue);
-    }
-    let mut params = snapshot.record.params.clone();
-    params.insert(key.to_owned(), value.to_stored());
-    let generated = generate(
-        &found,
-        &params,
-        snapshot.record.seed,
-        Some(Edit::Param(key)),
-    )
-    .ok_or(InstanceError::UnknownKind)?;
-    let record = record_keeping(&snapshot.record, &generated);
-    let mut notices = notices(&found.kind, &generated.clamps);
-    // The reason content cannot be drawn stays under its field (`InstanceView`), not a notice.
-    let reported: Vec<_> = generated
-        .warnings
-        .iter()
-        .filter(|warning| !crate::instance_warnings::is_content_problem(warning.id))
-        .cloned()
-        .collect();
-    notices.extend(crate::instance_warnings::sentences_in(
-        &reported,
-        crate::instance_warnings::Context::of(&generated),
-    ));
-    Ok(ValuePlan {
-        snapshot,
-        record,
-        notices,
-        states: generated.states,
-        refused: generated.parts.is_empty(),
-    })
-}
-
-/// Sets the parameter `key` of the generated object `id` to `value`: the generator clamps and
-/// derives, the outline is rebuilt and one commit writes record and frame.
-///
-/// # Errors
-/// [`InstanceError::NoSuchObject`], [`InstanceError::UnknownKind`], [`InstanceError::WrongValue`]
-/// or [`InstanceError::Refused`].
-pub fn change_value(
-    document: &Document,
-    settings: &ExtensionSettings,
-    id: NodeId,
-    key: &str,
-    value: &ParamValue,
-) -> Result<Changed, InstanceError> {
-    let ValuePlan {
-        snapshot,
-        record,
-        notices,
-        refused,
-        ..
-    } = plan_value(document, settings, id, key, value)?;
-    if record == snapshot.record {
-        return Ok(Changed {
-            notices,
-            written: false,
-            refused,
-        });
-    }
-    document
-        .change_generated(
-            id,
-            &record,
-            snapshot.frame,
-            CHANGE_PARAMETER_COMMIT_LABEL,
-            &[
-                (KEY_SUBJECT_KIND, snapshot.record.kind.clone()),
-                (KEY_SUBJECT_PARAM, key.to_owned()),
-            ],
-        )
-        .map_err(|_| InstanceError::Refused)?;
-    Ok(Changed {
-        notices,
-        written: true,
-        refused,
-    })
-}
-
-/// A resize worked out but not yet written: the record and frame the generator gave.
-#[derive(Debug)]
-pub struct ResizePlan {
-    id: NodeId,
-    pub(crate) record: GeneratedRecord,
-    pub(crate) frame: Affine,
-    kind: String,
-    /// The factor the outline grew by.
-    pub(crate) factor: f64,
-    /// What the generator clamped (the gear's teeth at 6 or 200).
-    pub(crate) clamps: Vec<curvyo_extension_core::Clamp>,
-}
-
-/// Works out the resize of the generated object `result.id()` to the outline of `result` (a
-/// proportional resize of the Select tool, ADR 0080 §6): the generator scales its size parameters
-/// by the factor the outline grew by, and the frame follows the map. Writes nothing.
-///
-/// # Errors
-/// As [`change_value`]; [`InstanceError::Refused`] also for a result that is no affine image of
-/// the stored outline.
-pub fn plan_resize(
-    document: &Document,
-    settings: &ExtensionSettings,
-    result: &ObjectSnapshot,
-) -> Result<ResizePlan, InstanceError> {
-    let id = result.id();
-    let snapshot = document.generated(id).ok_or(InstanceError::NoSuchObject)?;
-    let found = find_kind(settings, &snapshot.record.kind).ok_or(InstanceError::UnknownKind)?;
-    let map = document
-        .generated_map(id, result)
-        .ok_or(InstanceError::Refused)?;
-    // Proportional only: the geometric mean of the two factors, whatever else the map holds.
-    // Snapped to a billionth: the fitted map carries rounding noise the numbers must not.
-    let factor = (map.determinant().abs().sqrt() * 1e9).round() / 1e9;
-    if !factor.is_finite() || factor < 1e-6 {
-        return Err(InstanceError::Refused);
-    }
-    let generated = generate(
-        &found,
-        &snapshot.record.params,
-        snapshot.record.seed,
-        Some(Edit::Scale(ScaleFactor(factor))),
-    )
-    .ok_or(InstanceError::UnknownKind)?;
-    // A code whose content cannot be drawn has nothing to scale: the resize is refused.
-    if generated.parts.is_empty() {
-        return Err(InstanceError::Refused);
-    }
-    Ok(ResizePlan {
-        id,
-        record: record_of(&snapshot.record.kind, snapshot.record.seed, &generated),
-        frame: orthonormalised(map.compose(snapshot.frame)),
-        kind: snapshot.record.kind,
-        factor,
-        clamps: generated.clamps,
-    })
-}
-
-/// Writes a [`ResizePlan`] as one commit of record and frame under `label`; called inside the
-/// gesture's batch.
-///
-/// # Errors
-/// [`InstanceError::Refused`] when the document refuses the write.
-pub fn apply_resize(
-    document: &Document,
-    plan: &ResizePlan,
-    label: &str,
-) -> Result<(), InstanceError> {
-    document
-        .change_generated(
-            plan.id,
-            &plan.record,
-            plan.frame,
-            label,
-            &[(KEY_SUBJECT_KIND, plan.kind.clone())],
-        )
-        .map_err(|_| InstanceError::Refused)
-}
-
-/// [`plan_resize`] then [`apply_resize`] for one object.
-///
-/// # Errors
-/// As [`plan_resize`] and [`apply_resize`].
-pub fn resize(
-    document: &Document,
-    settings: &ExtensionSettings,
-    result: &ObjectSnapshot,
-    label: &str,
-) -> Result<(), InstanceError> {
-    apply_resize(document, &plan_resize(document, settings, result)?, label)
-}
-
-/// Whether `result` resizes the generated object it belongs to (its outline is not the stored
-/// one moved, turned or flipped): that is the generator's business, not a transform.
-#[must_use]
-pub fn is_resize(document: &Document, result: &ObjectSnapshot) -> bool {
-    let Some(map) = document.generated_map(result.id(), result) else {
-        return document.generated(result.id()).is_some();
-    };
-    let unit = |x: f64, y: f64| (x * x + y * y - 1.0).abs() <= 1e-6;
-    !(unit(map.a, map.b) && unit(map.c, map.d) && (map.a * map.c + map.b * map.d).abs() <= 1e-6)
-}
+pub use crate::instance_scale::{ResizePlan, apply_resize, is_resize, plan_resize, resize};
+pub use crate::instance_switch::{Switched, switch_kind};
+pub use crate::instance_value::{
+    Changed, InstanceSource, ValuePlan, change_parameter, change_value, plan_value,
+};
 
 /// Converts the generated object `id` into plain paths in one commit (a gear becomes one path, a
 /// box a group of its plates, under the same id), with fresh anchor ids from `minter`. Works for an
