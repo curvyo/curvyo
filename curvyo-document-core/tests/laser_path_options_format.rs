@@ -1,5 +1,5 @@
-//! Format 66 (`specs/0139-laser-cut-path-options` slice 1, adrs L2 to L6): the goldens
-//! `laser_path_options_v66.curvyo` and `laser_path_options_damaged_v66.curvyo` read back every
+//! Format 67 (`specs/0139-laser-cut-path-options` slice 1, adrs L2 to L6): the goldens
+//! `laser_path_options_v67.curvyo` and `laser_path_options_damaged_v67.curvyo` read back every
 //! tab option and every own tabs record as plain values and save back unchanged; files of 65 and
 //! older open with no records; a file of the next format is refused. The laser extension's reading
 //! of the same goldens is in `curvyo-laser-core/tests/tabs_document_goldens.rs`.
@@ -273,11 +273,11 @@ fn open_unchanged(bytes: &[u8]) -> Document {
 
 #[test]
 fn the_golden_reads_back_every_tab_option_and_record() {
-    let bytes = read_or_write("laser_path_options_v66.curvyo", || {
+    let bytes = read_or_write("laser_path_options_v67.curvyo", || {
         pack(&golden_document(), "0.1.0").unwrap()
     });
-    assert_eq!(format_of(&bytes), 66);
-    assert_eq!(CURRENT_FORMAT_VERSION, 66);
+    assert_eq!(format_of(&bytes), 67);
+    assert_eq!(CURRENT_FORMAT_VERSION, 67);
     let d = open_unchanged(&bytes);
     let ops = d.operations(d.manufacturings()[0].id).unwrap();
     assert_eq!(
@@ -297,8 +297,8 @@ fn the_golden_reads_back_every_tab_option_and_record() {
 
 #[test]
 fn every_damaged_record_is_kept_and_saved_back_unchanged() {
-    let bytes = read_or_write("laser_path_options_damaged_v66.curvyo", damaged_bytes);
-    assert_eq!(format_of(&bytes), 66);
+    let bytes = read_or_write("laser_path_options_damaged_v67.curvyo", damaged_bytes);
+    assert_eq!(format_of(&bytes), 67);
     let d = open_unchanged(&bytes);
     let ops = d.operations(d.manufacturings()[0].id).unwrap();
     assert_eq!(ops.len(), 8);
@@ -338,8 +338,8 @@ fn older_files_open_with_no_records_and_a_newer_file_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 67,
-            supported: 66
+            found: 68,
+            supported: 67
         })
     ));
 }

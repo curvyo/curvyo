@@ -10,8 +10,7 @@ use std::io::{Cursor, Read};
 use std::path::PathBuf;
 
 use curvyo_document_core::{
-    CURRENT_FORMAT_VERSION, Document, DocumentSize, FixtureParams, NewOperation, NewOutputPage,
-    NodeId, pack, unpack,
+    Document, DocumentSize, FixtureParams, NewOperation, NewOutputPage, NodeId, pack, unpack,
 };
 use serde_json::{Map, Value, json};
 
@@ -163,7 +162,6 @@ fn write_on_request() {
 #[test]
 fn the_goldens_are_format_66_read_back_and_save_unchanged() {
     write_on_request();
-    assert_eq!(CURRENT_FORMAT_VERSION, 66);
     for (name, expected) in [(GOLDEN, golden_document()), (DAMAGED, damaged_document())] {
         let bytes = std::fs::read(fixture_path(name)).unwrap();
         let manifest: Value = serde_json::from_slice(&members(&bytes)["manifest.json"]).unwrap();
