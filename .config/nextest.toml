@@ -3,3 +3,13 @@
 [[profile.default.overrides]]
 filter = 'test(noisy_pieces)'
 slow-timeout = { period = "60s", terminate-after = 2 }
+
+# The connector tests over a real PTY or a real child process wait on wall-clock deadlines; when
+# several run at once on a loaded CI runner they miss them (`TimedOut`). They run one at a time;
+# nothing is skipped.
+[test-groups]
+connector-real-io = { max-threads = 1 }
+
+[[profile.default.overrides]]
+filter = '(package(curvyo-connector-io) & binary(~pty)) | (package(curvyo-connector-server) & binary(serial_and_exit))'
+test-group = 'connector-real-io'
