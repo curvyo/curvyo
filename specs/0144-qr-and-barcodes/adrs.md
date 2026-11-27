@@ -108,3 +108,48 @@ Customer questions carry a KURZ-ID only; the PO assigns the number.
   entries (glyph funnel fails open, 1D code keys in the host, no native-versus-wasm golden of the codes).
 - For the PO: UPC-A's first and last symbol characters have guard-length bars in the GS1 layout; the build
   extends the guard patterns only (criterion 11 Proposal).
+
+## Per-part paint (Finder colour, Background), 2026-11-27
+
+- [ADR 0091](../../docs/adr/0091-qr-and-barcode-codes-extension.md) section "Per-part paint" (new,
+  Proposed): Frage 406 CODE-PAINT **answered A by the customer on 2026-11-27**, superseding the default
+  B of slices 1 to 3; replaces the §8 sketch. `Part.paint: Option<PartPaint { fill, job }>`; the record
+  stores `part_paints` keyed by part key (absent = object style, written only when a part has a paint);
+  part order is draw order; `PathSnapshot.paint_runs` and `paint_groups()` split a painted code into
+  plain fills inside render-core's and svg-core's path painters (so no caller can miss the split);
+  `job_subpaths()` keeps `job: false` parts out of every machine job; Convert to paths converts the
+  other parts as today and puts the background as an unassigned sibling path below, so the job never
+  changes; `ParamKind::Colour`, `ShownWhen::Off`; Background on all seven kinds, Finder colour QR only
+  and ignored while Inverted; `format_version` the next free number at merge (69 is taken by
+  `story/machine-families`, expect 70), goldens `generated_part_paint_v<N>.curvyo` and
+  `generated_part_paint_damaged_v<N>.curvyo`, codes goldens `qr_background_finder.svg`,
+  `ean13_background.svg`, `datamatrix_10_background.svg`.
+- [ADR 0082](../../docs/adr/0082-generator-plate-joints-corner-rule-and-rounded-box.md) §10: part keys
+  `background` and `finder` join `code`; Lifecycle (a key whose part is off is kept and ignored) and
+  Detach part apply to `finder`; Detach refuses a `job: false` part.
+- [ADR 0081](../../docs/adr/0081-print-and-cut-registration-marks-and-fit.md) §1: the Background is
+  printed and exported, never burnt, like a registration mark.
+- [ADR 0080](../../docs/adr/0080-generated-objects-extension-trait-and-parametric-instances.md) §5, §6:
+  an unknown kind draws its paints from the record; Convert gives one path per part with its paint.
+- ADR 0091 §4 amended: the box includes the quiet zone while Background is on.
+
+### Spec changes the PO should take (Proposal unless a Frage is named)
+
+1. **Criterion 9:** Finder colour (QR, switch plus colour, starts as the fill's colour, hidden and
+   ignored while Inverted) and Background (every kind, switch plus colour, default white, one rectangle
+   of symbol plus quiet zone, for 1D with the text band) are in; record Frage 406 answered A.
+2. **Criterion 2:** with Background on, the box and W readout include the quiet zone (= Width).
+3. **Machines:** a Background never runs on any output page (no look, no Cut-out around it); switching
+   it on or off leaves the job unchanged; the finders run with the code's operation.
+4. **Detach part:** offered for Finder, not for Background.
+5. **Criterion 15:** Convert to paths gives the code as today (a path, or a group of code and finder)
+   with its colours, plus an unassigned "Background" path directly below it; the job before and after
+   is the same.
+6. **Criterion 16:** the `format_version` bump; an older build refuses the file; a damaged
+   `part_paints` is refused at open; older files open unchanged.
+7. **Criterion 19:** SVG export writes one path per part in draw order (goldens above).
+8. **Contrast line:** the light side is the Background when on.
+9. **Criterion 4:** a code with Background and Finder colour, and Inverted with Background, still decodes.
+10. **Criterion 17:** version 40 Dot with both on inside 100 ms.
+11. A clone's fill override recolours the modules only; the Symbology switch keeps Background and its
+    colour.

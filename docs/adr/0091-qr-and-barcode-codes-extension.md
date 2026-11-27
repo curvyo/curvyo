@@ -5,8 +5,9 @@
 implementation notes at the end (they amend §1, §3 and §7 as written); proposed the same day. Not
 `needs-customer` as a whole: it adds an extension crate through the published route of ADR 0034 and
 ADR 0080 and changes no file format.
-**§8 (per-part paint for the Finder colour and the Background) stays `needs-customer`** (document
-model, file format): Frage 406 CODE-PAINT, default B taken (not in slice 1). Spec:
+**§8 (per-part paint for the Finder colour and the Background) is decided A** (document model, file
+format; Frage 406 CODE-PAINT answered A by the customer on 2026-11-27, superseding the default B taken
+in slice 1): designed in the section "Per-part paint" below, Proposed 2026-11-27 (architect). Spec:
 [`0144`](../../specs/0144-qr-and-barcodes/specification.md) (Frage 319 A: a Code is a generator;
 Frage 321 B: slice 1 QR, slice 2 1D, slice 3 Data Matrix). Adds a crate to ADR 0011 §2; extends
 ADR 0080 §2 (two parameter kinds, one host rule) without amending its decisions.
@@ -171,7 +172,8 @@ Clear-area measurement in §5.
    L, M, Q, H, each module shape, Inverted, and the largest clear area per level at versions
    3, 5, 10. Slices 2 and 3: `rxing` (Apache-2.0, features above) as the decoder for 1D and Data
    Matrix, decided there with its `cargo deny` and `cargo tree` output in the PR.
-8. **Per-part paint (`needs-customer`, CODE-PAINT; not in slice 1 by default B).** A Finder
+8. **Per-part paint (CODE-PAINT; not in slice 1 by default B; answered A on 2026-11-27, built as
+   the section "Per-part paint" below, which replaces the sketch in this item).** A Finder
    colour and a Background cannot be expressed today: `generated_outline::outline` reads every
    part as one compound path with the node's one style, so a Background part would be filled in
    the code's colour and, under NonZero, cover the modules. Built as option A it would be:
@@ -275,9 +277,175 @@ Clear-area measurement in §5.
 - **Not built in slice 1:** the clear-area outline on the canvas while the code is selected (UX notes §6).
   The ghost is the symbol square and the three outer finder edges (`Edit::Draft`).
 
+## Per-part paint: Finder colour and Background (§8 option A, 2026-11-27)
+
+**Status:** Accepted 2026-11-27, built (implementation notes at the end of this section); was Proposed (architect), on Frage 406 CODE-PAINT answered **A** by the customer
+on 2026-11-27 (supersedes default B; built as its own slice, one PR, `story/codes-paint`). Written
+against `main` at `f439d6143` (`CURRENT_FORMAT_VERSION` 68). Everything not tied to a Frage is a
+**(Proposal)**.
+
+**In plain words (for the customer).** A QR code can have its three corner squares in their own
+colour and a coloured rectangle behind it. The file stores which piece of the code has which colour,
+so every Curvyo that opens it draws the same thing; an older Curvyo refuses the file instead of drawing
+a solid square. On a laser, cutter or other machine the background is never cut or engraved; the
+corner squares run with the code. Barcodes and Data Matrix get the Background too.
+
+### Options
+
+- **A. A paint per part key in the generated record (chosen).** The generator gives a part an own
+  solid colour and says whether it goes to machines; the host stores it with the parts. Reuses the
+  part keys of ADR 0082 §10 (grammar, damage checks, Detach part), merges with the parts as one
+  register, and a build without the codes extension still draws it from the record (ADR 0080 §5).
+- **B. Colours only in `params`.** No record change, but only the extension can read them: an unknown
+  kind, a clone in a build without codes, and every exporter would need the extension. Rejected.
+- **C. A style register per part key on the node (`fill.finder`, edited in the Style panel).** Needs a
+  part picker in the Style panel and a second style read path in every build, for two colours that
+  belong to the code's look like Finder shape. Rejected; ADR 0082 §10's keys stay the hook if a box
+  ever wants a colour per plate.
+- **D. A `backdrop` field beside `parts`.** The job would ignore it for free, but bounds, hit test,
+  Convert to paths and clones would each need it as a special case. Rejected.
+- **E. A list parallel to `parts`** (§8's sketch). Works, but writes an entry for every part of every
+  painted record and says nothing a key map does not. Rejected for the map below.
+
+### Decision
+
+P1. **Contract** (extension-core 0.x, `CHANGELOG.md`, source-breaking for struct literals of `Part`):
+   `Part` gains `paint: Option<PartPaint>` (`None` = the object's style, every box, gear and an unpainted
+   code). `PartPaint { fill: Color, job: bool }` is a document-core type (`Color` as in the style), used
+   unchanged by the contract, the record and the read pass. **Part order is draw order** (first part
+   bottom); under one compound path it never mattered, now a generator puts a `job: false` part first.
+   New parameter kind `ParamKind::Colour`, `ParamValue::Colour(Color)`, stored `{"rgb": [r, g, b]}`,
+   opaque to document-core (no bump of its own). New `ShownWhen::Off { key }` (the Finder colour rows
+   hide while Inverted is on).
+
+P2. **Record** (document-core, `generated_codec.rs`): `GeneratedRecord.part_paints`, stored as
+   `part_paints: { "<part key>": { "fill": [r, g, b], "job": false } }` inside the one `generated` map
+   value, written whole with `parts` and `part_keys` (so a paint never merges apart from its geometry).
+   Absent = every part in the object's style; written only when a part has a paint, so boxes, gears and
+   unpainted codes store exactly what they store today. `job` absent = true. Damage (refused at open,
+   as the other record checks): not a map; a key that is no entry of `part_keys`; `part_paints` without
+   `part_keys`; an entry without `fill` or with a colour that is not three integers 0 to 255; `job` not
+   a bool. Document-core knows no word "background" or "finder": only a colour and a machine flag.
+
+P3. **The codes generator** emits the parts only when switched on, so with both off the output is the
+   slice-1/2/3 output byte for byte and every existing golden stays:
+   - `background` (Switch, default off) + `background_colour` (Colour, default white, `ShownWhen::On`):
+     a part `background`, paint `{ fill, job: false }`, first in the list: the rectangle every kind
+     already builds as its Inverted ground (QR `style.rs`, Data Matrix `datamatrix/style.rs`, 1D
+     `linear/style.rs` with the text band). **All seven kinds** (cheap: the rectangle exists); the keys
+     are shared by the family, so the Symbology switch carries them (same meaning in every kind, unlike
+     `quiet_zone` in ADR 0092).
+   - `finder_colour_on` (Switch) + `finder_colour` (Colour; `ShownWhen::All[On, Off { inverted }]`):
+     **QR only (Proposal)**. A part `finder`, paint `{ fill, job: true }`, last in the list, holding the
+     three finders `finder.rs` already draws apart; the `code` part keeps the rest. While Inverted is on
+     the switch is ignored and the finders stay in `code`: inverted, they are holes of the ground
+     rectangle under NonZero and cannot be filled apart. Data Matrix draws its L edge inside the traced
+     modules, so a finder colour there needs a split first: later if asked.
+   - A part that comes and goes follows ADR 0082 §10 Lifecycle: an `N#finder` membership with the
+     switch off is kept and ignored. The schema default of `finder_colour` is black; the shell writes
+     the fill's colour (first gradient stop) in the same step as the first switch-on (UX notes §3).
+
+P4. **Read pass** (one place, `generated_outline::outline`): the outline stays the union of every part
+   as one compound path, so bounds, hit test, transforms, snapping, Align and `generated_map` need no
+   change. The box therefore **includes the quiet zone while Background is on** (amends §4 for that
+   case; UX notes §12.10 is then met). `PathSnapshot` gains `paint_runs: Vec<PaintRun>`
+   (`PaintRun { first: u32, count: u32, paint: PartPaint }`, subpath indices with the first outline as
+   0; empty and skipped in serde for every other path, as `width_points`). Indices survive every
+   transform, so clones, placed pages and previews carry them for free. A command that changes a
+   snapshot's subpaths clears them; `path_codec` never stores them. Cost: one `is_empty` per path when
+   off (the read is cached per document version, never per frame).
+
+P5. **Painting** goes through one pure function in document-core, `PathSnapshot::paint_groups()`: a
+   path with runs becomes several fills in part order, each with its style: an unpainted run the node's
+   style (a clone's fill override applies here only), a painted run the node's style with a solid fill
+   of its colour (fill opacity kept, fill on), a `job: false` run its fill only, no stroke. It is called
+   **inside the two painters**, render-core's path draw (`artwork.rs` `draw_path`) and svg-core's path
+   leaf writer, not by their callers: render-core has at least six artwork callers (canvas, greyed
+   views, placed pages, history preview, fixture looks, the laser gradient preview), and any caller that
+   skipped the split would draw a solid square. So every view, the SVG export and its PNG neighbour
+   inherit it; a path without runs takes today's code path. **Gradient box:** a node gradient keeps the
+   object's box of `gradient_frame.rs` (the union, the box the Select tool and the gradient handles
+   show), computed on the whole path before the split, so editor and painter agree; with Background on
+   that box includes the quiet zone (Proposal).
+
+P6. **Machine jobs: a `job: false` part never reaches any job** ("printed and exported, never burnt",
+   as a registration mark, ADR 0081 §1). One function `PathSnapshot::job_subpaths()` (document-core)
+   is the funnel for `output/leaf_geometry.rs` `leaf_geometry` (own items, clone members, placed
+   members) and the leaf counts of `operations/index.rs`; `part_geometry` and `split_parts` drop
+   `job: false` parts from their masks. So the Operations view never draws a look on it, Cut-out never
+   cuts around it, and switching Background on or off leaves the job unchanged. Every later machine
+   family (`story/machine-families`) builds its job through the same function. The `finder` part is ink:
+   it runs with the code's operations; Detach part works on it unchanged (an own engrave depth for the
+   finders). `Document::detach_part` refuses a `job: false` part (`PartError::NoSuchPart`; the UI lists
+   job parts only). The outline references of `tabs.<key>` and `entry.<key>` (formats 67, 68) index the
+   job geometry after `job_subpaths()`, so a background that comes and goes shifts none of them.
+
+P7. **Convert to paths** (ADR 0080 §6, one path per part): the parts other than `job: false` convert
+   exactly as today (one part: the node becomes that path; several: a group under the node's id), each
+   path with its `paint_groups` style, the node's memberships, its `tabs.`/`path_own.`/`entry.`
+   records and `rewrite_part_keys` untouched. The `background` part becomes a **new sibling path
+   directly below the node** in the same parent, filled, no stroke, named "Background", with no
+   membership, selected with the node. So **Convert never changes the job** for the node's own
+   operations. Under an ancestor group that has an operation the background path is an ordinary path
+   and runs with it, as any path would; the test states it. Rejected: the background as a child of the
+   group (it would inherit the code's operations and be engraved) and moving `member.N` to the children
+   (it orphans the per-item records of formats 67 and 68, which are keyed by the membership key).
+
+P8. **`format_version`: the next free number at merge** (69 is taken by `story/machine-families`, so
+   expect 70). A build that stops below it ignores `part_paints`, reads every part as one NonZero
+   compound path in the object's fill and draws (and engraves, on a laser page) a solid square over the
+   code, so this build's files are refused there by version through the existing container check; a
+   file of a lower version opens unchanged (no paints) and nothing is written on open. Goldens in
+   `curvyo-document-core/tests/fixtures/`: `generated_part_paint_v<N>.curvyo` (a QR with Background
+   and Finder colour, the finder detached into its own operation) and
+   `generated_part_paint_damaged_v<N>.curvyo` (a paint key with no part). Codes goldens
+   (`curvyo-codes-core/tests/fixtures/`, one `<path>` per part in draw order with its `fill`):
+   `qr_background_finder.svg`, `ean13_background.svg`, `datamatrix_10_background.svg`.
+
+P9. **Tests and budget.** The decoder test (§7) rasterises ink parts (unpainted and `job: true`) on the
+   `job: false` ground: QR with both on, QR Inverted with Background, EAN-13 and Data Matrix with
+   Background. `codes_cpu_time.rs` gains version 40 Dot Separate with both on, inside the same 100 ms
+   (§10 left 6 % headroom: one extra rectangle and a split of three finders cost no tracing).
+   A paint change while the content is refused is refused with it (§3: parts and paints are kept
+   together), so the colour shows once the content encodes again.
+
+P10. **Contrast line** (criterion 9, shell side): each dark colour (fill stops, Finder colour) against
+   the Background colour when it is on, otherwise the document background; hidden on laser pages.
+
+### Consequences
+
+- One record key, one snapshot field, one contract field, two parameter kinds' worth of contract
+  (`Colour`, `ShownWhen::Off`) and one `format_version`; render-core and svg-core change only in their path painter (one call each).
+- Every `PathSnapshot { .. }` literal gains `paint_runs: Vec::new()` (mechanical, as `width_points`).
+- The `background` part makes the code's box the visible rectangle while on; without it nothing about
+  the box changes.
+- Booleans, Offset and Stroke to path on a painted code see the union outline (the rectangle included),
+  as they would after Convert to paths.
+
+### Implementation notes (slice 4, 2026-11-27)
+
+- `format_version` **70** (69 is `story/machine-families`). `PartPaint` lives in document-core; the record
+  stores `part_paints` as written in P2 (`job` only when false).
+- P5, SVG: svg-core has no path knowledge of document-core, so the split is made where the export leaves are
+  built (`curvyo-ui-core/src/svg_export_parts.rs`, `painted_shape`: a group of one path per paint group, the
+  gradient box of the whole object); render-core's `draw_path` is as written. With "Strokes as paths" a
+  painted code keeps its plain stroke.
+- P6, the Operations view: `restyle_path` in render-core reads `PathSnapshot::job_path()` (no `job: false`
+  outline, no runs), so no look is drawn on a Background.
+- P7: `convert_generated` returns the Background path's id; the session selects it with the converted object.
+- Finder colour start (UX notes §3): switching `finder_colour_on` on while `finder_colour` still holds the
+  schema's black writes the fill's first colour in the same step (`instance_value::plan_value`); a maker who
+  chose black on purpose gets the fill's colour back (fill defaults to black).
+- Step names "Change finder colour" and "Change background" are the session's `set_generated_value` names.
+- Not built, left open: the shared colour picker under the active colour row and the eyedropper of UX
+  notes §3 (the block's Colour row is a swatch and a hex field), the check "Background and Finder colour
+  both below 3 : 1" shows through the one contrast line of P10.
+
 ## Customer question
 
 **CODE-PAINT: own colour for the corner squares and a background colour.** A: in the first QR
 slice (a file-format change, every view and export learns colours per piece). B: first slice
 with one fill colour or gradient for the whole code; corner colour and background as their own
 later slice (recommended). C: never; recolour by hand after Convert to paths. Default: B.
+**Answered A by the customer on 2026-11-27** (after slices 1 to 3 shipped with B): built as its own
+slice, section "Per-part paint".

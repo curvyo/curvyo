@@ -28,6 +28,13 @@ resize ("Module width 0.40 mm"), so a `Resize::Free` kind without them gets no p
 **Resolution:** the kind names its readout keys and its derived keys in the contract (for example
 `Resize::Free { x, y }` and `Param.derived`). Trigger: a second `Free` kind or a family other than codes.
 
+## Code keys of the two colours in the host (`0144` slice 4, 2026-11-27)
+
+Slice 4 adds to "1D code keys in the host": `generators/panel.rs` hides the rows `finder_colour_on`, `finder_colour`,
+`background` and `background_colour` on a laser page and names the steps "Change finder colour" and "Change background"
+from them; `instance_value.rs` starts `finder_colour` from the fill when `finder_colour_on` is switched on; the contrast line
+reads the part keys `background` and `finder`. Same remedy as there: a declared "colour group" in the manifest.
+
 ## No native-versus-wasm golden of the codes (`0144` slices 1 and 2, 2026-11-27)
 
 Criterion 1 asks for equal output native and `wasm32-unknown-unknown`; the codes goldens and the glyph table
