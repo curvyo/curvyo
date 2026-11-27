@@ -22,6 +22,7 @@ mod boolean_cleanup;
 mod boolean_grid;
 mod bspline;
 mod centre_line;
+mod cubic_fit;
 mod curve_chords;
 mod curve_contacts;
 mod curve_intersections;
@@ -49,6 +50,7 @@ mod spiro_approx;
 mod spiro_solver;
 mod stack_regions;
 mod stroke_dash;
+mod stroke_fit;
 mod stroke_loops;
 mod stroke_markers;
 mod stroke_outline;
@@ -93,6 +95,7 @@ pub use spiro::{
     SpiroControl, SpiroCubic, SpiroError, SpiroShape, evaluate_spiro, solve_spiro, spiro_cubics,
 };
 pub use stack_regions::StackError;
+pub use stroke_fit::{CORNER_DEGREES, FittedStroke, MIN_ACCURACY_MM, StrokeSample, fit_stroke};
 pub use stroke_outline::{StrokeOutlineError, StrokeShape, stroke_outline};
 pub use variable_stroke::{VariableStrokeError, variable_stroke_outline};
 pub use visible_region::{Visible, visible_regions};

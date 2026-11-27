@@ -2,11 +2,11 @@
 //! anchors or width points of a fit lie closer together than a share of the local width, they
 //! merge when the result stays within the setting's tolerance.
 
-use super::safe_fit::fit_to_cubic;
+use crate::cubic_fit::fit_to_cubic;
 use kurbo::simplify::SimplifyBezPath;
 use kurbo::{BezPath, CubicBez, ParamCurve, ParamCurveNearest, PathEl, PathSeg, Point};
 
-use super::profile::fits_values;
+use super::profile::{WidthBound, fits_values};
 use crate::medial_axis::AxisSample;
 
 /// The merge of one corner-free stretch of a fit: anchors closer than `distance` (mm) merge when
@@ -213,7 +213,7 @@ pub(super) fn merge_points(
                     chosen[i + 1],
                     values[i],
                     values[i + 1],
-                    merge.share,
+                    WidthBound::Share(merge.share),
                 )
             })
         };
