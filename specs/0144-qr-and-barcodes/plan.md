@@ -135,3 +135,39 @@ ADR 0092 "Implementation notes, slice 3". No `format_version` change (a new kind
 - [x] 6. CPU time of a 144 x 144 code: 19 ms Merged, 43 ms Dot, budget 100 ms (AC 17)
 - [x] 7. Docs: spec Done, ADR notes
 - [x] 8. Full gate once into `gate-0144c.txt` (nextest 18914 passed; one clippy lint in the new test fixed and clippy rerun green)
+
+---
+
+# Plan for slice 4 (Finder colour, Background; per-part paint)
+
+Branch `story/codes-paint` (with `0151` slice 1, one PR). Criteria 23 to 30 of `specification.md`, ADR 0091
+"Per-part paint" P1 to P10, UX notes section 3 and 7. `format_version` 70.
+
+## Affected crates/modules
+- `curvyo-document-core`: `part_paint.rs` (`PartPaint`, `PaintRun`, `paint_groups`, `painted_part`,
+  `job_subpaths`, `job_path`), `generated_codec.rs` (`part_paints`, damage rules), `generated_outline.rs` (runs),
+  `generated_parts.rs` (Detach refuses `job: false`), `generated_commands.rs` (Convert), `document.rs` (format 70).
+- `curvyo-extension-core`: `Part.paint`, `ParamKind::Colour`, `ParamValue::Colour`, `ShownWhen::Off`, CHANGELOG.
+- `curvyo-codes-core`: `paint.rs` (rows, Background and Finder parts), the style split, the three kinds.
+- `curvyo-render-core` (`draw_path`, Operations look), `curvyo-ui-core` (record, Convert, SVG export, contrast,
+  Finder colour start, Colour value from JSON), `curvyo-editor-wasm` (job funnel, panel rows, step names),
+  `frontend` (Colour row).
+- No new crate, no new dependency.
+
+## Tasks
+- [x] 1. Record `part_paints`, damage rules, goldens and `format_version` 70 (28)
+- [x] 2. `PathSnapshot.paint_runs`, `paint_groups`, `job_subpaths`; render-core and SVG painters (23, 27)
+- [x] 3. Job funnel: leaf geometry, part masks, leaf counts, the Operations look, Detach refusal (25)
+- [x] 4. Convert to paths: the Background as an unassigned sibling below (27)
+- [x] 5. Contract: `Part.paint`, `Colour`, `ShownWhen::Off` (23)
+- [x] 6. Codes: Background on seven kinds, Finder colour on QR, Inverted rules, goldens, decoder (23, 24, 29, 30)
+- [x] 7. Shell: Colour row, Finder colour start, laser page hiding, contrast line, step names (23, 25, 26)
+- [x] 8. CPU time of a version 40 Dot code with both colours (29, budget 100 ms)
+- [x] 9. Docs: spec, ADR notes, README
+- [x] 10. Full gate once into `gate-paint.txt` (nextest 19160 passed; clippy, doc, tsc, frontend tests green; CPU time of version 40 Dot with both colours measured alone in release)
+
+## Validation
+- `curvyo-document-core/tests/generated_part_paint_format.rs` and `generated_damage_tests.rs` (format, damage, runs);
+  `curvyo-codes-core/tests/paint.rs` (parts, goldens, decoder with the ink parts on the ground);
+  `curvyo-ui-core/tests/code_paint.rs` (Convert, SVG export, Finder colour start);
+  `curvyo-editor-wasm` `leaf_geometry` test (no Background in any job) and `tests/codes_cpu_time.rs`.
