@@ -22,6 +22,7 @@
         "counter": 26,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "engrave",
       "margin_mm": 0.0,
@@ -52,5 +53,7 @@
       "unfolded": true
     }
   ],
-  "select_bar_kinds": null
+  "select_bar_kinds": null,
+  "tab_chip": null,
+  "tabs_tool": null
 }

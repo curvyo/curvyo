@@ -124,6 +124,13 @@ pub fn gate(input: &JobInput, built: &Built, timeline: &Timeline, facts: &GateFa
             damaged += 1;
             continue;
         }
+        // Damaged own tabs: the items run nothing in that operation (`specs/0139` criterion 11).
+        if built.plans[index]
+            .as_ref()
+            .is_some_and(|plan| !plan.damaged.is_empty())
+        {
+            damaged += 1;
+        }
         if !built.runs[index] {
             continue;
         }
@@ -310,6 +317,14 @@ fn block_issues(
         let items = plan.no_contour.clone();
         let cause = Cause::CutOutNoContour { op };
         issues.push(issue(cause, items.len(), Targets::Items(items)));
+    }
+    if let Some(plan) = &built.plans[index]
+        && !plan.covered.is_empty()
+    {
+        let mut items = plan.covered.clone();
+        items.dedup();
+        let cause = Cause::CoveredByTabs { op };
+        issues.push(issue(cause, plan.covered.len(), Targets::Items(items)));
     }
 }
 

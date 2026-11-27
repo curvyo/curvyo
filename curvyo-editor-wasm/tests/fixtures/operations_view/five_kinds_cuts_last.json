@@ -48,6 +48,7 @@
         "counter": 80,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "score",
       "margin_mm": 0.0,
@@ -73,6 +74,7 @@
         "options": {
           "hatch": null,
           "image": null,
+          "tabs": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -107,6 +109,7 @@
         "counter": 85,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 2,
       "kind": "engrave",
       "margin_mm": 0.0,
@@ -137,6 +140,7 @@
             "scan_angle_deg": 0.0
           },
           "image": null,
+          "tabs": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -171,6 +175,7 @@
         "counter": 91,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "engrave_outline",
       "margin_mm": 0.0,
@@ -205,6 +210,7 @@
             "scan_angle_deg": 0.0
           },
           "image": null,
+          "tabs": null,
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -249,6 +255,7 @@
         "counter": 96,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "cut",
       "margin_mm": 0.0,
@@ -274,6 +281,12 @@
         "options": {
           "hatch": null,
           "image": null,
+          "tabs": {
+            "count": 0,
+            "placed": null,
+            "skip_inner": false,
+            "width_mm": 0.5
+          },
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -308,6 +321,7 @@
         "counter": 101,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "cut_out",
       "margin_mm": 2.0,
@@ -333,6 +347,12 @@
         "options": {
           "hatch": null,
           "image": null,
+          "tabs": {
+            "count": 0,
+            "placed": null,
+            "skip_inner": false,
+            "width_mm": 0.5
+          },
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -367,6 +387,7 @@
         "counter": 108,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "cut",
       "margin_mm": 0.0,
@@ -389,6 +410,12 @@
         "options": {
           "hatch": null,
           "image": null,
+          "tabs": {
+            "count": 0,
+            "placed": null,
+            "skip_inner": false,
+            "width_mm": 0.5
+          },
           "z_offset_mm": 0.0
         },
         "over_feed": null,
@@ -417,5 +444,7 @@
       "unfolded": false
     }
   ],
-  "select_bar_kinds": null
+  "select_bar_kinds": null,
+  "tab_chip": null,
+  "tabs_tool": null
 }

@@ -399,6 +399,7 @@ impl Session {
             .gradient_key(&input)
             .or_else(|| self.mode_key(&input))
             .or_else(|| self.fixture_key(&input))
+            .or_else(|| self.tab_key(&input))
         {
             return outcome;
         }
@@ -487,7 +488,10 @@ impl Session {
         if self.page_drag.take().is_some() {
             return true;
         }
-        if self.cancel_generator_knob_drag() || self.cancel_sketch_knob_drag() {
+        if self.cancel_generator_knob_drag()
+            || self.cancel_sketch_knob_drag()
+            || self.cancel_tab_drag()
+        {
             return true;
         }
         match self.tool {
@@ -548,6 +552,11 @@ impl Session {
     /// none was open.
     fn escape_entries_and_pickers(&mut self) -> Option<EscapeStep> {
         if self.width_escape() {
+            return Some(EscapeStep::ClearedState);
+        }
+        // A tab drag is cancelled first (`specs/0139` UX 5.1), then the current tab handle, then
+        // the Tabs tool (UX 7).
+        if self.cancel_tab_drag() || self.tabs_escape() {
             return Some(EscapeStep::ClearedState);
         }
         if self.workbench() == super::Workbench::Sketch {

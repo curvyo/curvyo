@@ -67,6 +67,46 @@ impl WasmSession {
         node(id).is_some_and(|id| self.session.set_operation_dither(id, mode))
     }
 
+    /// Whether the Tabs toggle shows in the Select bar and whether it is on (`specs/0139` UX 4.2),
+    /// as JSON `{ "shown": bool, "on": bool }`.
+    pub fn tabs_tool_state(&self) -> String {
+        format!(
+            "{{\"shown\":{},\"on\":{}}}",
+            self.session.tabs_tool_shown(),
+            self.session.tabs_tool()
+        )
+    }
+
+    /// Turns the Tabs tool on or off (no step). Whether it changed.
+    pub fn set_tabs_tool(&mut self, on: bool) -> bool {
+        self.session.set_tabs_tool(on)
+    }
+
+    /// The width chip of the current tab as JSON (`width_mm`, `own_width`, `at`), `""` without
+    /// one (`specs/0139` criterion 6).
+    pub fn current_tab_chip(&self) -> String {
+        self.session
+            .current_tab_chip()
+            .and_then(|chip| serde_json::to_string(&chip).ok())
+            .unwrap_or_default()
+    }
+
+    /// Types `mm` as the current tab's width, a value that is not finite returns it to the
+    /// operation's width: one step "Tab width". The chip text, empty when taken.
+    pub fn set_current_tab_width(&mut self, mm: f64) -> String {
+        let width = mm.is_finite().then_some(mm);
+        self.session
+            .set_current_tab_width(width)
+            .err()
+            .unwrap_or_default()
+    }
+
+    /// The Tabs pill of operation `id` for the selected items: Own (`true`) or Operation's.
+    /// Whether it wrote.
+    pub fn set_selection_tabs_own(&mut self, id: &str, own: bool) -> bool {
+        node(id).is_some_and(|id| self.session.set_selection_tabs_own(id, own))
+    }
+
     /// The Motorised Z axis switch of the active laser page's profile copy (`specs/0111`
     /// criterion 22). Whether it changed.
     pub fn set_motorised_z(&mut self, on: bool) -> bool {

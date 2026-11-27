@@ -176,6 +176,7 @@ test("Interval, the hatch options and the Z offset capability decode (AC 19 to 2
     hatch: { crosshatch: true, bidirectional: false, scanAngleDeg: 15, overscanPct: 5 },
     zOffsetMm: 1.5,
     image: null,
+    tabs: null,
   });
   const cut = decodeOperationsView(fixture("options_cut_z_hidden"))?.rows[0].settings;
   assert.equal(cut?.options?.hatch, null);
@@ -385,4 +386,16 @@ test("specs/0135 criteria 42, 43: the screen modes decode with Cell size or Line
   assert.equal(decodeOperationsView(raw), null, "an unknown screen field is refused");
   delete image.screen_fields;
   assert.equal(decodeOperationsView(raw), null, "the list is required");
+});
+
+test("a Cut row carries the Tabs group and an Engrave row none (specs/0139 criterion 1)", () => {
+  const cut = decodeOperationsView(fixture("options_cut_z_hidden"));
+  assert.ok(cut);
+  assert.deepEqual(cut.rows[0]?.settings?.options?.tabs, { count: 0, widthMm: 0.5, skipInner: false, placed: null });
+  assert.equal(cut.rows[0]?.itemTabs, null);
+  assert.equal(cut.tabsTool, null, "the Tabs toggle is hidden without a selected cut item");
+  assert.equal(cut.tabChip, null);
+  const engrave = decodeOperationsView(fixture("options_engrave"));
+  assert.ok(engrave);
+  assert.ok(engrave.rows.every((row) => row.settings?.options?.tabs == null));
 });

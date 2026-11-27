@@ -65,6 +65,35 @@ export interface OperationRow {
   numbers: NumbersLine[] | null;
   /** "Cut 1, run 3, 3 min 21 s" (the session's wording). */
   accessibleName: string;
+  /** The Tabs row of the item part while selected items run in this unfolded Cut or Cut-out
+   * (`specs/0139` criterion 5); `null` otherwise. */
+  itemTabs: ItemTabs | null;
+}
+
+/** The Tabs row of the item part: Own pressed, Operation's, or mixed (`null`). */
+export interface ItemTabs {
+  own: boolean | null;
+  /** "4 tabs", "Own tabs (3)", "Own tabs on 2 of 3 items". */
+  readout: string;
+}
+
+/** The width chip of the current tab handle (`specs/0139` criterion 6). */
+export interface TabChip {
+  widthMm: number;
+  ownWidth: boolean;
+}
+
+function asItemTabs(value: unknown): ItemTabs | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (!isObject(value) || typeof value.readout !== "string") return undefined;
+  if (value.own !== null && typeof value.own !== "boolean") return undefined;
+  return { own: value.own as boolean | null, readout: value.readout };
+}
+
+function asTabChip(value: unknown): TabChip | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (!isObject(value) || typeof value.width_mm !== "number" || typeof value.own_width !== "boolean") return undefined;
+  return { widthMm: value.width_mm, ownWidth: value.own_width };
 }
 
 /** Which grid and cell a derived row runs: "Birch 3 mm · K7Q2M column 3, row 2". */
@@ -101,6 +130,10 @@ export interface OperationsView {
   enteredGroup: EnteredGroup | null;
   /** The materials of this machine the Material pick lists. */
   pick: PickMaterial[];
+  /** The Tabs toggle of the Select bar (`specs/0139` UX 4.2): `null` while hidden, else on. */
+  tabsTool: boolean | null;
+  /** The width chip of the current tab handle; `null` without one. */
+  tabChip: TabChip | null;
 }
 
 type Json = Record<string, unknown>;
@@ -185,7 +218,9 @@ function asRow(value: unknown): OperationRow | null {
   const run = asRowRun(value.run);
   const numbers = value.numbers === null ? null : (asNumbersLines(value.numbers) ?? undefined);
   const groupInPart = value.group_in_part === null ? null : typeof value.group_in_part === "string" ? value.group_in_part : undefined;
+  const itemTabs = asItemTabs(value.item_tabs);
   if (
+    itemTabs === undefined ||
     groupInPart === undefined ||
     run === undefined ||
     numbers === undefined ||
@@ -226,6 +261,7 @@ function asRow(value: unknown): OperationRow | null {
     run,
     numbers,
     accessibleName: value.accessible_name,
+    itemTabs,
   };
 }
 
@@ -268,7 +304,11 @@ export function decodeOperationsView(value: unknown): OperationsView | null {
   const pick = decodePick(value.pick);
   const selectBarKinds = asKindButtons(value.select_bar_kinds);
   const enteredGroup = asEnteredGroup(value.entered_group);
+  const tabChip = asTabChip(value.tab_chip);
+  const tabsTool = value.tabs_tool === null || value.tabs_tool === undefined ? null : value.tabs_tool;
   if (
+    tabChip === undefined ||
+    (tabsTool !== null && typeof tabsTool !== "boolean") ||
     pick === null ||
     typeof value.operations_view !== "boolean" ||
     selectBarKinds === undefined ||
@@ -283,6 +323,8 @@ export function decodeOperationsView(value: unknown): OperationsView | null {
     selectBarKinds,
     enteredGroup,
     pick,
+    tabsTool: tabsTool as boolean | null,
+    tabChip,
   };
 }
 

@@ -114,6 +114,7 @@ fn leaf(n: u64, outlines: Vec<LeafOutline>) -> LeafInput {
         node: node(n),
         stacking: n as u32,
         geometry: LeafGeometry::Outlines(outlines),
+        cut: curvyo_laser_core::tabs::LeafTabs::default(),
     }
 }
 

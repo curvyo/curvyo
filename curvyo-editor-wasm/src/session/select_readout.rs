@@ -50,6 +50,7 @@ impl Session {
         if let Some(readout) = self
             .generator_knob_readout()
             .or_else(|| self.sketch_knob_readout())
+            .or_else(|| self.tab_readout())
         {
             return Some(readout);
         }

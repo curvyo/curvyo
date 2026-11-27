@@ -80,7 +80,7 @@ pub use fixture_look::{
 pub use fixture_overlay::{
     build_fixture_box, build_fixture_ghost, build_fixture_preview, build_slot_cue,
 };
-pub use glyphs::{DrawList, Vertex};
+pub use glyphs::{DrawList, Vertex, thick_line};
 pub use gradient_fill::{
     GradientSpan, STOP_TEXTURE_WIDTH, StopTexel, StopTexture, placed_gradient, stop_texels,
 };

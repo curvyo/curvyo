@@ -22,6 +22,7 @@
         "counter": 26,
         "peer": "1"
       },
+      "item_tabs": null,
       "items": 1,
       "kind": "cut",
       "margin_mm": 0.0,
@@ -47,6 +48,12 @@
         "options": {
           "hatch": null,
           "image": null,
+          "tabs": {
+            "count": 0,
+            "placed": null,
+            "skip_inner": false,
+            "width_mm": 0.5
+          },
           "z_offset_mm": 1.5
         },
         "over_feed": null,
@@ -75,5 +82,7 @@
       "unfolded": true
     }
   ],
-  "select_bar_kinds": null
+  "select_bar_kinds": null,
+  "tab_chip": null,
+  "tabs_tool": null
 }

@@ -163,6 +163,8 @@ export interface SelectToolbarProps {
     onPress: (kind: string, shift: boolean) => void;
     /** Escape on a kind button inside the entered group leaves it. */
     onLeaveGroup: () => void;
+    /** The Tabs toggle (`specs/0139` UX 4.2); absent while hidden. */
+    tabs?: { on: boolean; onToggle: (on: boolean) => void };
   };
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
@@ -949,6 +951,7 @@ export function SelectToolbar({
           <OperationKindGroup
             kinds={kindButtons}
             onPress={operationKinds.onPress}
+            tabs={operationKinds.tabs}
             onLeaveGroup={() => {
               operationKinds.onLeaveGroup();
               onReturnFocus();
@@ -997,7 +1000,7 @@ export function SelectToolbar({
       {kindButtons && operationKinds ? (
         <div className="group/row relative flex min-h-9 items-start">
           {bar.scaleSwitchesShown && <Divider />}
-          <OperationKindGroup kinds={kindButtons} onPress={operationKinds.onPress} />
+          <OperationKindGroup kinds={kindButtons} onPress={operationKinds.onPress} tabs={operationKinds.tabs} />
         </div>
       ) : null}
       {/* The Flip group: second, after the switches, in every selection state, so the first

@@ -154,6 +154,13 @@ pub const FREE_STEPS: &[&str] = &[
     "rename_material",
     "delete_material",
     "remove_missing_items",
+    // `specs/0139`: tabs are records of an operation node, never the objects' geometry.
+    "add_tab",
+    "move_tab",
+    "delete_tab",
+    "tab_width",
+    "own_tabs",
+    "operations_tabs",
     // `specs/0112-test-grid-and-materials`: the grid writes its group and its derived operations
     // from the tool bar and the Materials tab, never through the selected objects' handles; the
     // material steps write the root marker only.

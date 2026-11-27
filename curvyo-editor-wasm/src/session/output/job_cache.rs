@@ -37,6 +37,8 @@ pub(in crate::session) struct PageJob {
     /// The job its frame traces when a block has no power or speed, built once on the first
     /// read (`specs/0118` Frage 335 B).
     pub frame: OnceLock<super::frame::FrameJob>,
+    /// Where each cut leaf's tabs are stored (`specs/0139`).
+    pub cut_keys: Vec<super::cut_keys::CutKey>,
 }
 
 /// What a job was built from: equal keys give an equal job.
@@ -330,6 +332,7 @@ impl Session {
             gate,
             tab: OnceLock::new(),
             frame: OnceLock::new(),
+            cut_keys: page.cut_keys,
         }
     }
 }

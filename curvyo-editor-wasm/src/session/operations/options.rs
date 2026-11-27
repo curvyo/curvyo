@@ -6,8 +6,8 @@
 use curvyo_document_core::{NodeId, ProfileChange, SettingsStep, SettingsWrite};
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    Dither, ImageEdit, ImageField, Interval, OptionEdit, Overscan, ScanAngle, ZOffset,
-    edit_interval, read_options,
+    CutEdit, CutLength, Dither, ImageEdit, ImageField, Interval, OptionEdit, Overscan, ScanAngle,
+    TabCount, ZOffset, edit_interval, read_options,
 };
 
 use super::super::Session;
@@ -25,6 +25,10 @@ enum OptionField {
     Image(ImageField),
     /// The Invert toggle of the Image settings group.
     Invert,
+    /// The Tabs group of a Cut or Cut-out row (`specs/0139` criterion 1).
+    TabCount,
+    TabWidth,
+    TabSkipInner,
 }
 
 impl OptionField {
@@ -45,6 +49,9 @@ impl OptionField {
             "screen_size" => Self::Image(ImageField::ScreenSize),
             "screen_angle" => Self::Image(ImageField::ScreenAngle),
             "invert" => Self::Invert,
+            "tab_count" => Self::TabCount,
+            "tab_width" => Self::TabWidth,
+            "tab_skip_inner" => Self::TabSkipInner,
             _ => return None,
         })
     }
@@ -62,6 +69,11 @@ impl OptionField {
             Self::ZOffset => ZOffset::typed(value).map(OptionEdit::ZOffset),
             Self::Image(field) => field.typed(value).map(OptionEdit::Image),
             Self::Invert => Ok(OptionEdit::Image(ImageEdit::Invert(value != 0.0))),
+            Self::TabCount => TabCount::typed(value).map(|c| OptionEdit::Cut(CutEdit::TabCount(c))),
+            Self::TabWidth => {
+                CutLength::typed_tab(value).map(|w| OptionEdit::Cut(CutEdit::TabWidth(w)))
+            }
+            Self::TabSkipInner => Ok(OptionEdit::Cut(CutEdit::SkipInner(value != 0.0))),
         })
     }
 }
@@ -92,7 +104,8 @@ impl Session {
     /// `scan_angle`, `overscan`, `z_offset`; the Image settings `threshold`, `brightness`,
     /// `contrast`, `gamma`, `lowest_power`), or presses the toggle `option` (`crosshatch`,
     /// `bidirectional`, `invert`) on (`value` non-zero) or off (criteria 19, 20, 24; `specs/0123`
-    /// criteria 11, 12). One step "Edit
+    /// criteria 11, 12); on a Cut or Cut-out `tab_count`, `tab_width` and the switch
+    /// `tab_skip_inner` (`specs/0139` criterion 1). One step "Edit
     /// settings"; the whole `op_options` map is written. `Ok(false)` when nothing is written: the
     /// same value, a field the row does not show (a hatch option on a Cut, Z offset without a
     /// motorised Z axis, Interval with No settings, which waits in the draft), damaged settings or another page.

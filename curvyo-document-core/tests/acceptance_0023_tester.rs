@@ -619,6 +619,8 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
             // `0137-document-library` (format 58) is a later build: its goldens hold an imported
             // group with a name.
             || name.starts_with("came_from_")
+            // `0139-laser-cut-path-options` (format 66) is a later build: its golden holds a group.
+            || name.starts_with("laser_path_options_")
         {
             continue;
         }

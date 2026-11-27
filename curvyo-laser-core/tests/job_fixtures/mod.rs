@@ -162,6 +162,7 @@ impl Page {
                 node: self.id(),
                 stacking: u32::try_from(i).unwrap(),
                 geometry,
+                cut: curvyo_laser_core::tabs::LeafTabs::default(),
             })
             .collect();
         let ring = self.next_digit();
@@ -198,6 +199,7 @@ impl Page {
                 item: self.id(),
                 stacking: u32::try_from(i).unwrap(),
                 leaves,
+                cut: curvyo_laser_core::tabs::LeafTabs::default(),
             })
             .collect();
         let ring = self.next_digit();
@@ -227,6 +229,7 @@ impl Page {
                 node: self.id(),
                 stacking: 0,
                 geometry,
+                cut: curvyo_laser_core::tabs::LeafTabs::default(),
             })
             .collect();
         self.input.blocks.push(BlockInput {
@@ -291,6 +294,7 @@ pub fn options(
         overscan: Overscan::new(overscan).unwrap(),
         z_offset: ZOffset::from_mm(z).unwrap(),
         image: curvyo_laser_core::settings::ImageSettings::DEFAULT,
+        cut: curvyo_laser_core::settings::CutSettings::DEFAULT,
     }
 }
 

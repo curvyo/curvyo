@@ -124,6 +124,7 @@ fn page(pixels: &Arc<WorkingImage>, dither: Dither) -> JobInput {
                     asset: AssetHash::of(b"budget"),
                     pixels: Some(Arc::clone(pixels)),
                 },
+                cut: curvyo_laser_core::tabs::LeafTabs::default(),
             }],
             cut_out: Vec::new(),
         }],

@@ -106,6 +106,13 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("rename_material", "Rename material"),
     ("delete_material", "Delete material"),
     ("remove_missing_items", "Remove missing items"),
+    // `specs/0139-laser-cut-path-options` criterion 12: the tabs of an item in one operation.
+    ("add_tab", "Add tab"),
+    ("move_tab", "Move tab"),
+    ("delete_tab", "Delete tab"),
+    ("tab_width", "Tab width"),
+    ("own_tabs", "Own tabs"),
+    ("operations_tabs", "Back to the operation's"),
     // `specs/0112-test-grid-and-materials` plan.md (UX section 11): the grid object, the
     // Materials tab and its tests.
     ("place_test_grid", "Place test grid"),

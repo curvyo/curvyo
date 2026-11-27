@@ -334,6 +334,9 @@ impl Session {
             }
         }
         out.extend(dots);
+        if operations_view {
+            overlay.extend(self.tab_marks_overlay(view));
+        }
         self.chips_overlay(&mut overlay, rows, view);
         overlay.extend(self.frame_head_overlay(view).unwrap_or_default());
         Some((out, overlay))

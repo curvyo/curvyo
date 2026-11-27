@@ -98,6 +98,30 @@ export interface OperationOptions {
   /** The Image settings group of an Image operation, always (`specs/0123` criterion 11);
    * `null` for every other kind. */
   image: ImageSettings | null;
+  /** The Tabs group of a Cut or Cut-out (`specs/0139` criteria 1, 2); `null` for every other kind. */
+  tabs: TabsOptions | null;
+}
+
+/** The operation's tabs (`specs/0139` criteria 1 to 3). */
+export interface TabsOptions {
+  count: number;
+  widthMm: number;
+  skipInner: boolean;
+  /** "Placed: 3 per path", only when some path gets fewer than Count. */
+  placed: string | null;
+}
+
+function asTabs(value: unknown): TabsOptions | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (!isObject(value)) return undefined;
+  if (!Number.isInteger(value.count) || !finite(value.width_mm) || typeof value.skip_inner !== "boolean") return undefined;
+  if (value.placed !== null && typeof value.placed !== "string") return undefined;
+  return {
+    count: value.count as number,
+    widthMm: value.width_mm,
+    skipInner: value.skip_inner,
+    placed: value.placed as string | null,
+  };
 }
 
 /** The Dither modes in the strip's order (`specs/0123` criterion 11; the two screens of `specs/0135`
@@ -373,8 +397,9 @@ function asOptions(value: unknown): OperationOptions | null | undefined {
   if (!isObject(value)) return undefined;
   const hatch = asHatch(value.hatch);
   const image = asImage(value.image);
-  if (hatch === undefined || image === undefined || !finite(value.z_offset_mm)) return undefined;
-  return { hatch, zOffsetMm: value.z_offset_mm, image };
+  const tabs = asTabs(value.tabs);
+  if (hatch === undefined || image === undefined || tabs === undefined || !finite(value.z_offset_mm)) return undefined;
+  return { hatch, zOffsetMm: value.z_offset_mm, image, tabs };
 }
 
 function asPickChoices(value: unknown): PickChoice[] | null {

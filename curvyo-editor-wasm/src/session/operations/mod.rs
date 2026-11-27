@@ -17,6 +17,11 @@ mod look_picture;
 mod options;
 mod settings;
 mod settings_view;
+mod tab_look;
+pub(in crate::session) mod tab_outlines;
+pub(in crate::session) mod tabs;
+#[cfg(test)]
+mod tabs_tests;
 #[cfg(test)]
 mod tests;
 mod tools;
@@ -52,6 +57,8 @@ pub(in crate::session) struct OperationsState {
     tools: tools::OperationTools,
     /// The output page's leaves, for the drawing read they were built from (`index.rs`).
     leaves: index::LeafCache,
+    /// The Tabs tool and the current tab handle (`specs/0139`).
+    pub(in crate::session) tabs: tabs::TabsState,
 }
 
 /// The operations of the active laser page, in stored list order.
