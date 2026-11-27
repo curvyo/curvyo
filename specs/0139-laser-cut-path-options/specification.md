@@ -1,6 +1,6 @@
 # Laser cut path options: tabs that hold a part in, start and end of the cut, lead-in, lead-out and overcut
 
-Status: Slice 1 tabs Done (PR #519); slice 2 path options Ready. Fragen 414 and 415 stay open at their defaults and are applied, vetoable at the demo.
+Status: Done (slice 1 tabs PR #519; slice 2 path options PR #526). Fragen 414 and 415 stay open at their defaults and are applied, vetoable at the demo.
 Priority: Should
 Origin: Customer (2026-11-19, translated): (8) tabs or bridges that interrupt a cut so the part does not fall out, width adjustable; (10) advanced laser operation options (Z offset, start point, end point, lead-in, lead-out, overcut), assignable per operation or item. Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 Revision 2026-11-26: read against the code and specs as built (`0029` Done PR #371, `0101`, `0111`, `0123`, `0103`, `0118`, `0156`); criteria renumbered, tolerances in mm added, golden G-code fixtures listed, one new question (Frage 414). The decisions of 2026-11-19 (Fragen 279 A, 280 A, 281 A) are unchanged.
