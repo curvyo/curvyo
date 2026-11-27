@@ -218,6 +218,11 @@ for the cost of one `lib.rs`: doing it now is a speculative crate
    > laser-core` exists in `Cargo.toml` although the 2026-11-02 note lists only `editor-wasm →
    > extension-core`; recorded in `docs/technical-debt.md`, not changed by 0080.
 
+   > **Note 2026-11-26 ([ADR 0091](0091-qr-and-barcode-codes-extension.md) §1, spec `0144`):** new
+   > crate `curvyo-codes-core` (the third extension: QR codes as generated objects; `→
+   > extension-core, document-core, qrcode, thiserror`; dev-dependency `rqrr`), in the wasm32 list;
+   > `ui-core → codes-core`.
+
    **No `*-core` crate depends on `*-io`, on `*-app`, on `vecmanf-editor-wasm`
    or on the frontend, ever.** This is the `CLAUDE.md` §6 rule, and the crate
    graph is what enforces it.

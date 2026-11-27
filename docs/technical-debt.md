@@ -3003,3 +3003,13 @@ or a bug from an id with a part reaching a tree lookup.
 The Parts row of the Generator block does not highlight its part on the canvas on hover, and the
 part has no context-menu entry for Detach or Attach (UX notes §9 lets slice 3 leave both out). **Resolution:** build them only if
 the customer asks at the demo.
+
+## QR knowledge in the host (`0144` slice 1, 2026-11-26)
+
+The host knows the QR code in a few places: `instance_view::view` reads the row key `"content"` for the
+lasting reason line, `instance_warnings::Context::of` reads the key `"ec"` for the level letter, the
+contrast check in the session tests the kind prefix `curvyo.codes/`, and `instance.rs` (about 590 lines) and
+`session/generators.rs` (about 900 lines, over the limit before this slice) grew with them.
+**Resolution:** before slice 2 let a generator name its own problem row and sentence parameters in the
+contract (a `Warning` that carries its row key and its words' inputs, a manifest flag for the contrast
+check), and split `instance.rs` by arm. Trigger: slice 2 (1D barcodes and Data Matrix), the second code kind.

@@ -103,6 +103,12 @@ one. Box and Gear are that second one. Three facts shape the design:
      document-core; `ParamValue` and this codec move to document-core (re-exported by
      extension-core at its path) with `0099`'s revision, whose read pass decodes them (§6, §9).
    - Trigonometry through `libm`, never `f64::sin` (ADR 0029 §5), so two peers write equal outlines.
+
+   > **Note 2026-11-26 ([ADR 0091](0091-qr-and-barcode-codes-extension.md) §3):** `Generated` still has no
+   > error case, but `parts: []` now means a refusal (input that cannot be clamped, such as QR content that does
+   > not fit): the host keeps the stored parts and writes the new `params`. The contract also gains
+   > `ParamKind::Text` and `Percent`, `ShownWhen::Full` and `Bound::DependentFor`.
+
 3. **The crate `curvyo-generators-core`** (ADR 0034 §1): extension id `curvyo.generators`, kinds
    `gear` and `box`; modules `gear/` (involute flank, spokes and windows, bore and keyway), `boxes/`
    (finger edges, kerf and clearance, layout), `manifest.rs`. Edges: `→ extension-core,
