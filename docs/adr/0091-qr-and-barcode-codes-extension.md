@@ -1,6 +1,7 @@
 # ADR 0091: Codes extension: QR codes as generated objects, encoder and decoder crates, traced outlines and the clear-area budget
 
-**Status:** Accepted 2026-11-26 (architect) for slice 1, with the deviations recorded in the
+**Status:** Accepted 2026-11-26 (architect) for slice 1; §2 (switching in place), §3 (contract) and §9
+(1D encoders, human-readable text) extended for slice 2 by [ADR 0092](0092-codes-slice-2-1d-barcodes-symbology-switch-and-human-readable-text.md); with the deviations recorded in the
 implementation notes at the end (they amend §1, §3 and §7 as written); proposed the same day. Not
 `needs-customer` as a whole: it adds an extension crate through the published route of ADR 0034 and
 ADR 0080 and changes no file format.

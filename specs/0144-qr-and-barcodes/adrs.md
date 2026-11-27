@@ -59,3 +59,52 @@ Customer questions carry a KURZ-ID only; the PO assigns the number.
   §5. `cargo deny check` passes for every candidate with this repo's `deny.toml`.
 - 2026-11-26: Slice 2's human-readable text needs glyph outlines passed into a pure generator;
   ADR 0091 §9 defers that to a revision with slice 2.
+
+## Slice 2 (1D barcodes), 2026-11-27
+
+- [ADR 0092](../../docs/adr/0092-codes-slice-2-1d-barcodes-symbology-switch-and-human-readable-text.md)
+  (new, Proposed): own 1D encoders in `linear/` (Code 128, Code 39, EAN-13, EAN-8, UPC-A), goldens
+  from the standards, `rxing` 0.9 as the dev-only decoder (spiked: all five read, `cargo deny` passes);
+  kinds per symbology in one `Family` (one "Code" segment, a Symbology group, `switch_kind` keeps
+  values of equal key and lets an untouched default follow, UX notes §11.4); the human-readable text
+  from a `GlyphTable` the host builds with text-core (`ParamKind::Font`, outline faces, default the
+  included sans); `Resize::Free` and `Edit::Stretch` for the 1D edge handles (UX notes §11.10, QR
+  unchanged); `Warning.param` and `subject`, `GeneratorKind.scanned` and the `instance.rs` split
+  resolve the "QR knowledge in the host" debt; `ParamKind::Ratio`, `Percent` as `i32`; no
+  `format_version` change. §3.6 is `needs-customer`: CODE-FONT-EMBED (a code's font embedded like a
+  text's), default B (not in slice 2).
+- ADR 0091 §2, §3, §9: extended by ADR 0092, decision text unchanged.
+- ADR 0047 §2, §4: a code's font resolves as a text's (§4); embedding (§2) waits for CODE-FONT-EMBED.
+- ADR 0080 §6 and `0141` UX notes §8: proportional-only stays the rule for `Resize::Proportional`
+  kinds; 1D kinds are `Free`.
+
+### Spec changes the PO should take (from ADR 0092, all Proposal)
+
+1. **Criterion 11:** quiet zones per symbology (EAN-13 11 and 7, EAN-8 7 and 7, UPC-A 9 and 9, Code 128
+   and 39 10; check against the GS1 General Specifications), no Quiet zone row for EAN and UPC; the
+   guard bars reach into the text band; the font is an outline face, default Source Sans 3 Regular.
+2. **Criterion 3:** "Check digit corrected." without the digit (criterion 13: no content in a notice).
+3. **Criterion 14:** a 1D code resizes from edges and corners freely (edge x writes Module width and
+   text Size, edge y Bar height); QR stays proportional.
+4. **Criterion 16:** slice 2 changes no `format_version`; a slice-1 build opens a barcode as an
+   unknown kind with its stored outline.
+5. **Criterion 4:** the decoder reads the whole Bar width adjust range at 10 px per module (spiked
+   -50 to +50 %), so it is no scannability proof for the adjust; the demo includes a phone check.
+
+### Conflicts with UX notes revision 2 (for the lead)
+
+- §13.2 proposes `quiet_zone` shared by the 1D kinds; ADR 0092 §2 uses `bar_quiet_zone`, because QR's
+  shipped `quiet_zone` (in QR modules) would otherwise carry a changed value into Code 128, which
+  §11.4 says must not cross. Same behaviour as §11.4, other key.
+- §13.9 says "stored by name": the stored `Font` is a text's `FontRef` (name, style and file hash), so
+  ADR 0047 §4's match order (bytes, then name) applies.
+- §11.2 renames the shipped "QR code" segment to "Code" (accepted behaviour of PR #518): a Proposal
+  for the PO and the demo, not an architecture decision.
+- Edge resize (§11.10) amends `0141` §8 for the new 1D kinds only; QR, boxes and gears keep it.
+
+### Architect review, 2026-11-27
+
+- ADR 0092 accepted with the deviations and corrections of its "Architect review"; three technical-debt
+  entries (glyph funnel fails open, 1D code keys in the host, no native-versus-wasm golden of the codes).
+- For the PO: UPC-A's first and last symbol characters have guard-length bars in the GS1 layout; the build
+  extends the guard patterns only (criterion 11 Proposal).

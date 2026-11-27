@@ -9,6 +9,32 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 (each names its slice). An entry is removed when its resolution lands, or stays with the note that
 it is accepted for good.
 
+## A code's glyph funnel does not fail closed (`0144` slice 2, ADR 0092 review, 2026-11-27)
+
+`instance::generate` reads the glyph tables from the per-thread `GlyphRegistry` the session publishes.
+`code_glyphs::glyphs_for` answers the included sans for a face it does not hold, and a kind with a `Font`
+parameter and no table draws its code without text (only a `glyph_missing` notice). Today every writer
+publishes first, but a future writer that regenerates a code outside the selection would store wrong
+outlines under the stored `FontRef` without a refusal.
+**Resolution:** a write funnel (`plan_resize`, `plan_value`, `switch_kind`, `place`) refuses a `Font` kind
+whose named face is neither in the registry nor mapped there as missing, and the registry holds the included
+sans on every publish. Trigger: the next writer of generated objects, or slice 3.
+
+## 1D code keys in the host (`0144` slice 2, ADR 0092 review, 2026-11-27)
+
+`instance_resize::free_view` reads the keys `module_width` and `bar_height` for the live readout of a free
+resize ("Module width 0.40 mm"), so a `Resize::Free` kind without them gets no preview at all, and
+`instance_switch` treats the key `width` as derived. The gear's `GEAR` readout is the older case of the same.
+**Resolution:** the kind names its readout keys and its derived keys in the contract (for example
+`Resize::Free { x, y }` and `Param.derived`). Trigger: a second `Free` kind or a family other than codes.
+
+## No native-versus-wasm golden of the codes (`0144` slices 1 and 2, 2026-11-27)
+
+Criterion 1 asks for equal output native and `wasm32-unknown-unknown`; the codes goldens and the glyph table
+builder run natively only. Equality rests on the code using only IEEE basic operations (ADR 0092 review 1).
+**Resolution:** run the SVG goldens of `curvyo-codes-core` and one EAN-13 with text through the wasm build,
+as for the other `*-core` goldens once a wasm test runner is in CI.
+
 ## The copy kernel writes anchors more than once (`0154`, ADR 0088 decision 9, 2026-11-26)
 
 `objects::copy_subtree` (paste, duplicate, every import, the fill of `0154`) copies every register
@@ -3004,12 +3030,3 @@ The Parts row of the Generator block does not highlight its part on the canvas o
 part has no context-menu entry for Detach or Attach (UX notes §9 lets slice 3 leave both out). **Resolution:** build them only if
 the customer asks at the demo.
 
-## QR knowledge in the host (`0144` slice 1, 2026-11-26)
-
-The host knows the QR code in a few places: `instance_view::view` reads the row key `"content"` for the
-lasting reason line, `instance_warnings::Context::of` reads the key `"ec"` for the level letter, the
-contrast check in the session tests the kind prefix `curvyo.codes/`, and `instance.rs` (about 590 lines) and
-`session/generators.rs` (about 900 lines, over the limit before this slice) grew with them.
-**Resolution:** before slice 2 let a generator name its own problem row and sentence parameters in the
-contract (a `Warning` that carries its row key and its words' inputs, a manifest flag for the contrast
-check), and split `instance.rs` by arm. Trigger: slice 2 (1D barcodes and Data Matrix), the second code kind.
