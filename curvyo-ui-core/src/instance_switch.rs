@@ -90,6 +90,7 @@ pub fn switch_kind(
             params: generated.params,
             parts: snapshot.record.parts.clone(),
             part_keys: snapshot.record.part_keys.clone(),
+            part_paints: snapshot.record.part_paints.clone(),
         }
     } else {
         record_of(&kind, snapshot.record.seed, &generated)

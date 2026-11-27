@@ -46,6 +46,7 @@ fn frame_path(page: &curvyo_document_core::Page) -> ObjectSnapshot {
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: curvyo_document_core::Angle::from_radians(0.0),
+        paint_runs: Vec::new(),
     })
 }
 

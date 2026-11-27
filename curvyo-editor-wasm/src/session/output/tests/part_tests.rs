@@ -17,10 +17,11 @@ fn boxed() -> (Session, NodeId) {
     let mut s = Session::new(300_101);
     s.add_page_of_kind("curvyo.laser", None).unwrap();
     let page = s.active_manufacturing().unwrap().page.unwrap();
-    s.set_generator_kind("curvyo.generators/rounded-box");
     s.set_tool(Tool::Generators);
+    s.set_generator_kind("curvyo.generators/rounded-box");
     s.resize_viewport(1600.0, 900.0);
     assert!(s.place_generated(page.origin.x + 200.0, page.origin.y + 150.0));
+    s.set_tool(Tool::Select);
     let id = s.selected_generated()[0];
     assert!(s.press_operation_kind("cut", true).is_some());
     (s, id)

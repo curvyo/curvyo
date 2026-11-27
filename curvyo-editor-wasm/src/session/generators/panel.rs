@@ -48,6 +48,18 @@ impl Session {
             return "null".to_owned();
         };
         value["parts"] = Value::Array(rows);
+        // On a laser page colours are operations, not paints (`0144` criterion 25): the Finder
+        // colour and Background rows are hidden there and keep their stored values.
+        if !self.active_page().kind.is_drawing()
+            && let Some(rows) = value["rows"].as_array_mut()
+        {
+            rows.retain(|row| {
+                !matches!(
+                    row["param"]["key"].as_str(),
+                    Some("finder_colour_on" | "finder_colour" | "background" | "background_colour")
+                )
+            });
+        }
         value["contrast_low"] = Value::Bool(self.code_contrast_is_low(id, &snapshot.record.kind));
         value["family"] = self.family_json(&snapshot.record.kind);
         // The face the text is set in is not loaded yet, or missing on this computer (ADR 0092 §3).
@@ -80,7 +92,9 @@ impl Session {
     /// Whether the fill of the code `id` is below 3 : 1 against the document background, so the
     /// Colours group says "Low contrast, may not scan" (`0144` criterion 9). Never for another kind
     /// of object, on a page that is not a drawing page (colours there are operations, `0101`) or
-    /// while the background is not painted.
+    /// while there is no light side: the code's Background when on, else the document background
+    /// (criterion 26: the worst pair that is visible, the fill's worst stop and the Finder colour
+    /// each against it).
     fn code_contrast_is_low(&self, id: NodeId, kind: &str) -> bool {
         if !instance::find_kind(&self.manufacturing.extensions, kind)
             .is_some_and(|found| found.kind.scanned)
@@ -88,14 +102,27 @@ impl Session {
         {
             return false;
         }
-        let background = self.shown_background();
-        if background.paint == curvyo_document_core::BackgroundPaint::None {
-            return false;
-        }
+        let paints = self
+            .document
+            .generated(id)
+            .map(|snapshot| snapshot.record.part_paints)
+            .unwrap_or_default();
+        let light = if let Some(paint) = paints.get("background") {
+            paint.fill
+        } else {
+            let background = self.shown_background();
+            if background.paint == curvyo_document_core::BackgroundPaint::None {
+                return false;
+            }
+            background.color
+        };
         let Some(ObjectSnapshot::Path(path)) = self.document.object(id) else {
             return false;
         };
-        curvyo_ui_core::code_contrast::is_low(&path.style.fill, background.color)
+        curvyo_ui_core::code_contrast::is_low(&path.style.fill, light)
+            || paints.get("finder").is_some_and(|paint| {
+                curvyo_ui_core::code_contrast::colour_is_low(paint.fill, light)
+            })
     }
 
     /// A value typed or stepped into the row `key` of the block, as JSON text (`12.5`, `true` or
@@ -130,7 +157,16 @@ impl Session {
         else {
             return json!({"error": "not a value"}).to_string();
         };
+        // The two colours of a code keep their own step names (`0144` criterion 23).
+        let colour_step = match key {
+            "finder_colour_on" | "finder_colour" => Some("Change finder colour"),
+            "background" | "background_colour" => Some("Change background"),
+            _ => None,
+        };
         let name = self.kind_label(&snapshot.record.kind).map(|label| {
+            if let Some(step) = colour_step {
+                return step.to_owned();
+            }
             let field = found
                 .kind
                 .params()

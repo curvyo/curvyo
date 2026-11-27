@@ -157,6 +157,7 @@ fn leaf_of(
                 spiro_transform: None,
                 width_points: Vec::new(),
                 rotation: crate::units::Angle::from_radians(0.0),
+                paint_runs: Vec::new(),
             })
         }
         ObjectSnapshot::Text(text) => LeafSource::Text {

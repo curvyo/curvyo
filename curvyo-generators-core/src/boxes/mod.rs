@@ -177,6 +177,7 @@ fn layout(plates: &[Plate], spacing: f64, kerf: f64) -> (Vec<Part>, Vec<Point>) 
         parts.push(Part {
             key: key.into(),
             paths: vec![translated(&plate.outline(kerf), x, y)],
+            paint: None,
         });
         x += plate.width + spacing;
     }

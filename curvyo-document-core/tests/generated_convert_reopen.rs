@@ -31,6 +31,7 @@ fn record(kind: &str) -> GeneratedRecord {
         params,
         parts: vec![vec![square(0.0, 10.0)], vec![square(20.0, 6.0)]],
         part_keys: Vec::new(),
+        part_paints: std::collections::BTreeMap::new(),
     }
 }
 

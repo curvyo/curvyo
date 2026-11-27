@@ -666,8 +666,10 @@ impl Session {
             | Tool::Measure
             | Tool::Trace
             | Tool::TestGrid
-            | Tool::Pencil
-            | Tool::Generators => false,
+            | Tool::Pencil => false,
+            // An armed generator is released first, a second Escape leaves the tool; Replace
+            // outline goes back at once (`0151` slice 1).
+            Tool::Generators => self.generators.replace.is_none() && self.disarm_generator(),
             Tool::Node => self.node.clear_selection(),
             Tool::Select | Tool::Offset => {
                 let had = !self.selection.is_empty();

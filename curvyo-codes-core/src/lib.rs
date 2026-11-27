@@ -13,6 +13,7 @@ mod finder;
 mod grid;
 pub mod linear;
 mod manifest;
+mod paint;
 mod qr;
 mod rows;
 mod shapes;

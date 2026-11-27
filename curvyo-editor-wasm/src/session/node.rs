@@ -338,6 +338,7 @@ impl Session {
                     spiro_transform: None,
                     width_points: Vec::new(),
                     rotation: path.rotation,
+                    paint_runs: Vec::new(),
                 })
             })
             .collect()

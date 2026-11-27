@@ -1,7 +1,7 @@
 //! The parameter schema and typed values (ADR 0034 §4) and their stored encoding (ADR 0033 §3).
 
 use crate::extension::ClosedPath;
-use curvyo_document_core::{FontKind, FontRef, Length};
+use curvyo_document_core::{Color, FontKind, FontRef, Length};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
@@ -18,6 +18,7 @@ const TEXT: &str = "text";
 const PCT: &str = "pct";
 const RATIO: &str = "ratio";
 const FONT: &str = "font";
+const RGB: &str = "rgb";
 /// The most bytes a stored text may hold (a QR code at version 40 takes 2,953); longer text is
 /// cut at a character boundary by [`Param::accept`].
 const MAX_TEXT_BYTES: usize = 8192;
@@ -81,6 +82,11 @@ pub enum ShownWhen {
         /// The switch's key.
         key: &'static str,
     },
+    /// The switch `key` is off (the Finder colour rows hide while Inverted is on, ADR 0091 P1).
+    Off {
+        /// The switch's key.
+        key: &'static str,
+    },
     /// Every one of the switches `keys` is on (a row that needs two switches, as Ring thickness
     /// needs Lid and Lid seat).
     AllOn {
@@ -129,6 +135,7 @@ impl ShownWhen {
         };
         match self {
             Self::On { key } => matches!(value(key), Some(ParamValue::Switch(true))),
+            Self::Off { key } => matches!(value(key), Some(ParamValue::Switch(false))),
             Self::AllOn { keys } => keys
                 .iter()
                 .all(|key| matches!(value(key), Some(ParamValue::Switch(true)))),
@@ -246,6 +253,8 @@ pub enum ParamKind {
     },
     /// An outline face of the maker's fonts, `None` for the included sans (ADR 0092 §3).
     Font,
+    /// A solid colour, stored as `{"rgb": [r, g, b]}` (ADR 0091 P1); opaque to the document model.
+    Colour,
 }
 
 /// A typed parameter value.
@@ -273,6 +282,8 @@ pub enum ParamValue {
     /// A font face, as `{"font": {"family", "style", "face_hash", "face_index"}}` or `{"font":
     /// null}` for the included sans.
     Font(Option<FontRef>),
+    /// A solid colour, as `{"rgb": [r, g, b]}`.
+    Colour(Color),
 }
 
 impl ParamValue {
@@ -301,6 +312,7 @@ impl ParamValue {
             Self::Percent(percent) => (PCT, Value::from(*percent)),
             Self::Ratio(ratio) => (RATIO, Value::from(*ratio)),
             Self::Font(face) => (FONT, face.as_ref().map_or(Value::Null, font_to_stored)),
+            Self::Colour(Color { r, g, b }) => (RGB, Value::from(vec![*r, *g, *b])),
         };
         let mut map = Map::new();
         map.insert(key.to_owned(), value);
@@ -333,6 +345,17 @@ impl ParamValue {
             TEXT => Some(Self::Text(inner.as_str()?.to_owned())),
             PCT => Some(Self::Percent(i32::try_from(inner.as_i64()?).ok()?)),
             RATIO => inner.as_f64().filter(|n| n.is_finite()).map(Self::Ratio),
+            RGB => {
+                let channels: Option<Vec<u8>> = inner
+                    .as_array()?
+                    .iter()
+                    .map(|n| u8::try_from(n.as_u64()?).ok())
+                    .collect();
+                let [r, g, b] = channels?[..] else {
+                    return None;
+                };
+                Some(Self::Colour(Color { r, g, b }))
+            }
             FONT => match inner {
                 Value::Null => Some(Self::Font(None)),
                 other => font_from_stored(other).map(|face| Self::Font(Some(face))),
@@ -408,6 +431,15 @@ impl ParamValue {
     pub const fn percent(&self) -> Option<i32> {
         match self {
             Self::Percent(percent) => Some(*percent),
+            _ => None,
+        }
+    }
+
+    /// The colour this value holds, if it is one.
+    #[must_use]
+    pub const fn colour(&self) -> Option<Color> {
+        match self {
+            Self::Colour(colour) => Some(*colour),
             _ => None,
         }
     }
@@ -549,6 +581,7 @@ impl Param {
                 Some(ParamValue::Ratio(ratio.clamp(min, max)))
             }
             (ParamKind::Font, font @ ParamValue::Font(_)) => Some(font),
+            (ParamKind::Colour, colour @ ParamValue::Colour(_)) => Some(colour),
             (ParamKind::Text { .. }, ParamValue::Text(text)) => {
                 Some(ParamValue::Text(cut_text(text)))
             }

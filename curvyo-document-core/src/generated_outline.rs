@@ -65,6 +65,25 @@ pub(crate) fn outline(
     style: crate::style_model::Style,
 ) -> PathSnapshot {
     let mut subpaths: Vec<SubpathSnapshot> = Vec::new();
+    // One run per painted part, in part order (ADR 0091 P4); the indices count the first outline as 0.
+    let mut paint_runs: Vec<crate::PaintRun> = Vec::new();
+    let mut seen = 0_u32;
+    for (index, part) in snapshot.record.parts.iter().enumerate() {
+        let count = u32::try_from(part.len()).unwrap_or(u32::MAX);
+        let paint = snapshot
+            .record
+            .part_keys
+            .get(index)
+            .and_then(|key| snapshot.record.part_paints.get(key));
+        if let Some(paint) = paint {
+            paint_runs.push(crate::PaintRun {
+                first: seen,
+                count,
+                paint: *paint,
+            });
+        }
+        seen += count;
+    }
     for (ordinal, subpath) in snapshot.record.parts.iter().flatten().enumerate() {
         subpaths.push(SubpathSnapshot {
             closed: true,
@@ -89,5 +108,6 @@ pub(crate) fn outline(
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: Angle::from_radians(snapshot.frame.b.atan2(snapshot.frame.a)),
+        paint_runs,
     }
 }

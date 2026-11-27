@@ -321,7 +321,51 @@ impl<'t, 'a> Parts<'t, 'a> {
                 children: vec![pieces, region],
             });
         }
+        if let Some(path) = object
+            .drawn_path()
+            .filter(|path| !path.paint_runs.is_empty())
+        {
+            return Some(self.painted_shape(path, object, state));
+        }
         self.plain_shape(object, state)
+    }
+
+    /// A generated path whose parts have their own colours: a group of one path per paint, in part
+    /// order, each in its own fill (ADR 0091 P5). The gradient box is the whole object's.
+    fn painted_shape(
+        &self,
+        path: &curvyo_document_core::PathSnapshot,
+        object: &ObjectSnapshot,
+        state: ExportState,
+    ) -> ExportNode {
+        let children = path
+            .paint_groups()
+            .iter()
+            .map(|group| {
+                let part = path.painted_part(group);
+                let (style, shadow) = crate::svg_export_leaf::export_style(
+                    &part.style,
+                    crate::svg_export_leaf::svg_draws_markers(&part),
+                );
+                let style = crate::svg_export_gradient::with_gradient(
+                    style,
+                    &part.style.fill,
+                    object.gradient_box(),
+                    self.t,
+                );
+                leaf_node(
+                    ExportState::default(),
+                    crate::svg_export_leaf::path_kind(&part, self.t),
+                    style,
+                    shadow,
+                )
+            })
+            .collect();
+        ExportNode::Group {
+            state,
+            layer: false,
+            children,
+        }
     }
 
     /// [`Parts::shape`] without its pattern.

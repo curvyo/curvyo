@@ -25,6 +25,11 @@ impl WasmSession {
         self.session.set_generator_kind(kind);
     }
 
+    /// A press on a segment of the bar: arms the kind, or releases it when it is the armed one.
+    pub fn toggle_generator_kind(&mut self, kind: &str) {
+        self.session.toggle_generator_kind(kind);
+    }
+
     /// Places the chosen kind with its centre at the document point `(x, y)`; one step.
     pub fn place_generated(&mut self, x: f64, y: f64) -> bool {
         self.session.place_generated(x, y)

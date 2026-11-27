@@ -79,6 +79,40 @@ fn a_version_40_code_edits_within_100_ms() {
     measure(40, 2300, Duration::from_millis(100));
 }
 
+/// Slice 4 (ADR 0091 P9): version 40 Dot Separate with the Finder colour and the Background on edits
+/// within the same 100 ms (one more rectangle and a split of three finders, no tracing).
+#[test]
+fn a_version_40_dot_code_with_both_colours_edits_within_100_ms() {
+    let mut s = session();
+    s.set_generator_kind(QR);
+    assert!(s.place_generated(200.0, 200.0));
+    set(
+        &mut s,
+        "content",
+        &serde_json::to_string(&text(2300)).unwrap(),
+    );
+    set(&mut s, "module_shape", "\"dot\"");
+    set(&mut s, "background", "true");
+    set(
+        &mut s,
+        "background_colour",
+        "{\"r\": 250, \"g\": 240, \"b\": 200}",
+    );
+    set(&mut s, "finder_colour_on", "true");
+    set(&mut s, "finder_colour", "{\"r\": 200, \"g\": 0, \"b\": 0}");
+    let panel = s.generated_panel_json();
+    assert!(!panel.contains("Too long"), "{panel}");
+    let (_, took) = cpu_time_of(|| {
+        set(&mut s, "module_size", "1.5");
+        s.draw_list()
+    });
+    check(
+        "QR version 40, Dot Separate with both colours",
+        took,
+        Duration::from_millis(100),
+    );
+}
+
 const EAN13: &str = "curvyo.codes/ean-13";
 
 fn fonts_dir() -> std::path::PathBuf {

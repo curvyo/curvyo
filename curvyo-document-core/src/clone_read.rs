@@ -777,6 +777,7 @@ pub(crate) mod tests_support {
             spiro_transform: None,
             width_points: Vec::new(),
             rotation: Angle::from_radians(0.3),
+            paint_runs: Vec::new(),
         })
     }
 
@@ -963,6 +964,7 @@ mod tests {
                 spiro_transform: None,
                 width_points: Vec::new(),
                 rotation: Angle::from_radians(0.0),
+                paint_runs: Vec::new(),
             })
         };
         let mut leaves = vec![big(0)];

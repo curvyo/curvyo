@@ -770,7 +770,17 @@ impl DocumentVersion {
 /// version; a file of 67 or lower opens unchanged with every path Automatic and no lead. The
 /// records are opaque here, kept unchanged when damaged, and go with the membership key as the
 /// tabs do. Goldens: `laser_path_options_v68.curvyo`, `laser_path_options_damaged_v68.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 68;
+/// Version 70 (`specs/0144-qr-and-barcodes` slice 4, ADR 0091 "Per-part paint", customer Frage 406
+/// A; 69 is taken by `story/machine-families`): the record of a generated object may carry
+/// `part_paints`, a map from a part key to `{ "fill": [r, g, b], "job": false }` (`job` absent means
+/// true), written whole with `parts` and `part_keys`. A build that stops at 69 ignores it, reads every
+/// part as one compound path in the object's fill and would draw (and engrave) a solid square over a
+/// code, so this build's files are refused there by version; a file of 69 or lower opens unchanged
+/// with no part painted. Damage: `part_paints` that is not a map, names a key that is no entry of
+/// `part_keys` (or comes without `part_keys`), or holds an entry without a `fill` of three integers
+/// 0 to 255 or with a `job` that is not a bool refuses the file. Goldens:
+/// `generated_part_paint_v70.curvyo`, `generated_part_paint_damaged_v70.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 70;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

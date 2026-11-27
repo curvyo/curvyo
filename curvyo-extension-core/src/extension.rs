@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
-use curvyo_document_core::{Length, Point, Vec2};
+use curvyo_document_core::{Length, PartPaint, Point, Vec2};
 use serde::Serialize;
 
 use crate::manifest::Manifest;
@@ -168,6 +168,9 @@ pub struct Part {
     pub key: Cow<'static, str>,
     /// The outer outline and its holes.
     pub paths: Vec<ClosedPath>,
+    /// The part's own paint (ADR 0091 "Per-part paint"): `None` is the object's style, which every
+    /// box, gear and unpainted code uses. **Part order is draw order**, the first part at the bottom.
+    pub paint: Option<PartPaint>,
 }
 
 /// A drag handle of a length parameter, in the object's frame.

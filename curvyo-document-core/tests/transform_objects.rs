@@ -260,6 +260,7 @@ fn path_for(object: &ObjectSnapshot, first: u64, count: u64, rotation: Angle) ->
         spiro_transform: None,
         width_points: Vec::new(),
         rotation,
+        paint_runs: Vec::new(),
     })
 }
 

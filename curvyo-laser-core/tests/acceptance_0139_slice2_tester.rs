@@ -600,5 +600,5 @@ fn c24_defaults_add_nothing_to_the_output() {
 
 #[test]
 fn c_format_version_is_68() {
-    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 68);
+    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 70);
 }

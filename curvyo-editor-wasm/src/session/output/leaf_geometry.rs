@@ -59,6 +59,7 @@ pub(super) fn part_geometry(
         .iter()
         .enumerate()
         .filter(|(index, _)| *index < 64 && parts >> index & 1 == 1)
+        .filter(|(index, _)| snapshot.record.part_runs_on_jobs(*index))
         .flat_map(|(_, subpaths)| subpaths)
         .map(|sub| LeafOutline {
             anchors: sub
@@ -87,9 +88,10 @@ fn placed_gradient(object: &ObjectSnapshot, map: Affine) -> Option<PlacedGradien
     ))
 }
 
-/// The outlines of `path` mapped by `map`.
+/// The outlines of `path` that reach a job, mapped by `map`.
 fn path_outlines(path: &PathSnapshot, map: Affine) -> Vec<LeafOutline> {
-    path.subpaths()
+    // The funnel of every job: a `job: false` part is never burnt (ADR 0091 P6).
+    path.job_subpaths()
         .map(|sub| LeafOutline {
             anchors: sub
                 .anchors
@@ -144,5 +146,61 @@ mod tests {
         assert!(outlines[0].closed);
         let xs: Vec<f64> = outlines[0].anchors.iter().map(|a| a.0.x).collect();
         assert!(xs.iter().all(|x| (10.0..=30.0).contains(x)), "{xs:?}");
+    }
+
+    /// A generated code with a Background (job: false, first) and a Finder colour (job: true, last):
+    /// no job geometry holds the Background, whole or by parts (ADR 0091 P6).
+    #[test]
+    fn a_background_never_reaches_the_job_geometry() {
+        use curvyo_document_core::{Color, GeneratedRecord, PartPaint};
+        let square = |at: f64, side: f64| {
+            let (a, b) = (at, at + side);
+            vec![
+                a, a, a, a, b, a, b, a, b, a, b, b, b, b, a, b, a, b, a, b, a, b, a, a, a, a,
+            ]
+        };
+        let paint = |job| PartPaint {
+            fill: Color { r: 9, g: 9, b: 9 },
+            job,
+        };
+        let record = GeneratedRecord {
+            kind: "curvyo.codes/qr".into(),
+            seed: 1,
+            params: serde_json::Map::new(),
+            parts: vec![
+                vec![square(-2.0, 20.0)],
+                vec![square(0.0, 4.0), square(6.0, 4.0)],
+                vec![square(10.0, 4.0)],
+            ],
+            part_keys: vec!["background".into(), "code".into(), "finder".into()],
+            part_paints: [
+                ("background".to_owned(), paint(false)),
+                ("finder".to_owned(), paint(true)),
+            ]
+            .into_iter()
+            .collect(),
+        };
+        let d = Document::new(1);
+        let id = d.create_generated(&record, Affine::IDENTITY).unwrap();
+        let object = d.object(id).unwrap();
+        let Some(LeafGeometry::Outlines(whole)) = leaf_geometry(&object, Affine::IDENTITY) else {
+            panic!("outlines")
+        };
+        assert_eq!(
+            whole.len(),
+            3,
+            "the code's two and the finder, no Background"
+        );
+        let snapshot = d.generated(id).unwrap();
+        let Some(LeafGeometry::Outlines(by_mask)) =
+            part_geometry(&snapshot, 0b111, Affine::IDENTITY)
+        else {
+            panic!("outlines")
+        };
+        assert_eq!(by_mask.len(), 3);
+        assert!(
+            part_geometry(&snapshot, 0b001, Affine::IDENTITY).is_none(),
+            "the Background alone is no geometry"
+        );
     }
 }

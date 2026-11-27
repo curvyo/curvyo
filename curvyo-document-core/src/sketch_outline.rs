@@ -102,6 +102,7 @@ pub(crate) fn outline_scaled(
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: Angle::from_radians(placement.b.atan2(placement.a)),
+        paint_runs: Vec::new(),
     }
     .mapped(placement))
 }

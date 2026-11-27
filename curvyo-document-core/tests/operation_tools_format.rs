@@ -289,7 +289,7 @@ fn the_operation_tools_golden_reads_back_every_option_interval_copy_and_group_ke
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 68);
+    assert_eq!(CURRENT_FORMAT_VERSION, 70);
     let d = open_unchanged(&bytes);
     let mfgs = d.manufacturings();
     assert_eq!(mfgs.len(), 2);
@@ -404,8 +404,8 @@ fn a_file_of_a_newer_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 69,
-            supported: 68
+            found: 71,
+            supported: 70
         })
     ));
 }

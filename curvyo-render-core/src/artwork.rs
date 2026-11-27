@@ -223,6 +223,24 @@ fn draw_path(
     view: ViewTransform,
     budgets: &mut FrameBudgets,
 ) {
+    // A generated part painted in its own colour is one fill of its own, in part order (ADR 0091
+    // P5); the one place every view, the export preview and the laser gradient preview pass.
+    if !path.paint_runs.is_empty() {
+        for group in path.paint_groups() {
+            let outlines: Vec<OutlineRef<'_>> = path
+                .subpaths()
+                .skip(group.first)
+                .take(group.count)
+                .map(|subpath| OutlineRef {
+                    anchors: subpath.anchors,
+                    closed: subpath.closed,
+                })
+                .collect();
+            let shade = if group.own_style { gradient } else { None };
+            draw_object(list, &outlines, &group.style, shade, true, view, budgets);
+        }
+        return;
+    }
     let outlines: Vec<OutlineRef<'_>> = path
         .subpaths()
         .map(|subpath| OutlineRef {

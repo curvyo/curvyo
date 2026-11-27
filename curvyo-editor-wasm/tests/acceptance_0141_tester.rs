@@ -168,6 +168,7 @@ fn c7_an_unknown_kind_refuses_a_resize_but_moves_in_one_step() {
                 params: serde_json::Map::new(),
                 parts: vec![vec![square]],
                 part_keys: Vec::new(),
+                part_paints: std::collections::BTreeMap::new(),
             },
             Affine::IDENTITY,
         )
@@ -221,6 +222,7 @@ fn c4_teeth_below_six_is_clamped_with_a_notice_that_names_field_and_limit() {
     s.set_tool(Tool::Generators);
     s.set_generator_kind("curvyo.generators/gear");
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     let answer: Value = serde_json::from_str(&s.set_generated_value("teeth", "3")).unwrap();
     assert_eq!(answer["written"], true);
     let notice = answer["notices"][0].as_str().unwrap().to_owned();
@@ -237,6 +239,7 @@ fn c1_c6_history_labels_name_the_kind_and_the_field() {
     s.set_tool(Tool::Generators);
     s.set_generator_kind("curvyo.generators/box");
     assert!(s.place_generated(200.0, 50.0));
+    s.set_tool(Tool::Select);
     assert_eq!(newest_name(&mut s), "Add box");
     s.set_generated_value("inner_width", "60");
     let name = newest_name(&mut s);
@@ -256,6 +259,7 @@ fn c7_save_and_reopen_of_a_live_gear_keeps_panel_and_outline() {
     s.set_tool(Tool::Generators);
     s.set_generator_kind("curvyo.generators/gear");
     assert!(s.place_generated(100.0, 100.0));
+    s.set_tool(Tool::Select);
     s.set_generated_value("teeth", "30");
     s.set_generated_value("web", "\"spokes\"");
     let before_panel = s.generated_panel_json();
@@ -292,6 +296,7 @@ fn c4_a_dependent_value_is_clamped_with_a_notice_and_never_refused() {
     s.set_tool(Tool::Generators);
     s.set_generator_kind("curvyo.generators/gear");
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     let answer: Value = serde_json::from_str(&s.set_generated_value("bore", "500")).unwrap();
     assert!(
         answer["error"].is_null() || answer.get("error").is_none(),

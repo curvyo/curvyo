@@ -82,18 +82,25 @@ pub(crate) fn generate(request: &GenerateRequest<'_>) -> Generated {
         inverted: values.switch("inverted"),
         cleared: Vec::new(),
     };
-    let paths = if matches!(request.edit, Some(Edit::Draft)) {
-        style::draft(&grid, &drawn)
+    let (paths, background) = if matches!(request.edit, Some(Edit::Draft)) {
+        (style::draft(&grid, &drawn), None)
     } else {
-        style::style(&grid, &drawn)
+        let ground = crate::style::ground(&grid, &drawn);
+        (
+            style::style(&grid, &drawn),
+            crate::paint::background(&values, ground),
+        )
     };
     let (params, clamps): (StoredParams, Vec<Clamp>) = values.finish();
+    let mut parts: Vec<Part> = background.into_iter().collect();
+    parts.push(Part {
+        key: Cow::Borrowed(crate::qr::PART),
+        paths,
+        paint: None,
+    });
     Generated {
         params,
-        parts: vec![Part {
-            key: Cow::Borrowed(crate::qr::PART),
-            paths,
-        }],
+        parts,
         handles: Vec::new(),
         clamps,
         automatic: Vec::new(),

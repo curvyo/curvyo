@@ -12,6 +12,8 @@ use serde_json::Value;
 fn session() -> Session {
     let mut session = Session::open(2, &pack(&Document::new(1), "0.1.0").unwrap()).unwrap();
     session.set_tool(Tool::Generators);
+    // Entering the tool arms nothing (`0151` slice 1); these tests start with Box pressed.
+    session.set_generator_kind("curvyo.generators/box");
     session.resize_viewport(1600.0, 900.0);
     session
 }
@@ -45,11 +47,11 @@ fn the_bar_offers_box_box_from_path_gear_qr_code_and_rounded_box_and_a_press_pla
     assert_eq!(
         s.generator_kind(),
         "curvyo.generators/box",
-        "first use: Box"
+        "armed by the test"
     );
     s.set_generator_kind("curvyo.generators/gear");
     assert!(s.place_generated(120.0, 80.0));
-    assert_eq!(s.tool(), Tool::Select, "the tool returns to Select");
+    assert_eq!(s.tool(), Tool::Generators, "the tool stays (0151 slice 1)");
     let block = panel(&s);
     assert_eq!(block["label"], "Gear");
     assert_eq!(block["known"], true);
@@ -61,6 +63,7 @@ fn the_bar_offers_box_box_from_path_gear_qr_code_and_rounded_box_and_a_press_pla
 fn a_typed_value_is_clamped_with_a_notice_and_the_block_follows() {
     let mut s = session();
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     let answer: Value = serde_json::from_str(&s.set_generated_value("thickness", "0")).unwrap();
     assert_eq!(answer["written"], true);
     assert_eq!(
@@ -86,6 +89,7 @@ fn a_typed_value_is_clamped_with_a_notice_and_the_block_follows() {
 fn convert_to_paths_leaves_no_block_and_selects_the_plates() {
     let mut s = session();
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     assert!(s.convert_selected_generated());
     assert_eq!(s.generated_panel_json(), "null");
     assert!(
@@ -109,6 +113,7 @@ fn a_file_with_an_unknown_generator_opens_as_stored_and_says_so_once() {
                 params: serde_json::Map::new(),
                 parts: vec![vec![square]],
                 part_keys: Vec::new(),
+                part_paints: std::collections::BTreeMap::new(),
             },
             Affine::IDENTITY,
         )
@@ -136,8 +141,8 @@ fn the_bar_offers_no_kind_while_the_generators_extension_is_off() {
     );
     assert_eq!(
         s.generator_kind(),
-        "curvyo.codes/qr",
-        "the first kind the bar offers"
+        "",
+        "the armed Box is gone with its extension: none is armed, not the first of the bar"
     );
     s.set_extension_enabled("curvyo.codes", false);
     assert_eq!(
@@ -160,6 +165,7 @@ fn history_steps_are_named_after_the_kind_and_the_field() {
     let mut s = session();
     s.set_generator_kind("curvyo.generators/gear");
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     assert_eq!(newest_name(&mut s), "Add gear");
     s.set_generated_value("teeth", "30");
     assert_eq!(newest_name(&mut s), "Gear: Teeth");
@@ -169,6 +175,7 @@ fn history_steps_are_named_after_the_kind_and_the_field() {
     s.set_tool(Tool::Generators);
     s.set_generator_kind("curvyo.generators/box");
     assert!(s.place_generated(200.0, 50.0));
+    s.set_tool(Tool::Select);
     assert_eq!(newest_name(&mut s), "Add box");
     s.set_generated_value("thickness", "4");
     assert_eq!(newest_name(&mut s), "Box: Thickness");
@@ -181,6 +188,7 @@ fn the_top_shape_step_of_a_rounded_box_is_named_after_the_kind_and_the_field() {
     let mut s = session();
     s.set_generator_kind("curvyo.generators/rounded-box");
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     s.set_generated_value("top_shape", "\"curved\"");
     assert_eq!(newest_name(&mut s), "Rounded box: Top shape");
 }
@@ -190,6 +198,7 @@ fn the_object_history_names_the_steps_like_the_document_history() {
     let mut s = session();
     s.set_generator_kind("curvyo.generators/gear");
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     s.set_generated_value("teeth", "30");
     let rows: Value = serde_json::from_str(&s.object_history_rows_json(0, 5)).unwrap();
     let names: Vec<&str> = rows
@@ -207,9 +216,11 @@ fn a_generated_object_is_a_gear_or_a_box_row_in_the_layers_list() {
     let mut s = session();
     s.set_generator_kind("curvyo.generators/gear");
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     s.set_tool(Tool::Generators);
     s.set_generator_kind("curvyo.generators/box");
     assert!(s.place_generated(200.0, 50.0));
+    s.set_tool(Tool::Select);
     let view: Value = serde_json::from_str(&s.layers_view_json(0, 10)).unwrap();
     let rows = view["rows"].as_array().unwrap();
     let find = |word: &str| {
@@ -229,6 +240,7 @@ fn the_select_bar_offers_object_to_path_for_a_generated_object() {
     let mut s = session();
     s.set_generator_kind("curvyo.generators/gear");
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     assert!(s.select_bar_state().object_to_path);
 }
 
@@ -334,6 +346,7 @@ fn an_unknown_generator_refuses_a_resize_with_its_own_wording() {
                 params: serde_json::Map::new(),
                 parts: vec![vec![square]],
                 part_keys: Vec::new(),
+                part_paints: std::collections::BTreeMap::new(),
             },
             Affine::IDENTITY,
         )
@@ -448,6 +461,7 @@ fn enter_in_the_generators_tool_places_at_the_pointer() {
     assert_eq!(enter(&mut s), curvyo_editor_wasm::KeyOutcome::ToolChanged);
     assert_eq!(s.selected_object_count(), 1);
     assert_eq!(newest_name(&mut s), "Add gear");
+    s.set_tool(Tool::Select);
     s.escape();
     marquee(&mut s, Point::new(0.0, 0.0), Point::new(100.0, 100.0));
     assert_eq!(s.selected_object_count(), 0, "not at the origin");
@@ -588,9 +602,11 @@ fn a_mixed_selection_shows_no_block_and_the_node_bar_says_generated_objects_have
     let mut s = session();
     s.set_generator_kind("curvyo.generators/gear");
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     s.set_tool(Tool::Generators);
     s.set_generator_kind("curvyo.generators/box");
     assert!(s.place_generated(250.0, 50.0));
+    s.set_tool(Tool::Select);
     // A marquee around both.
     s.pointer_hover(Point::new(-300.0, -300.0), false, false);
     s.pointer_down(Point::new(-300.0, -300.0), false);
@@ -611,6 +627,7 @@ fn a_mixed_selection_shows_no_block_and_the_node_bar_says_generated_objects_have
 fn object_to_path_converts_a_generated_object_of_the_selection() {
     let mut s = session();
     assert!(s.place_generated(50.0, 50.0));
+    s.set_tool(Tool::Select);
     assert_ne!(s.generated_panel_json(), "null");
     let outcome = s.object_to_path();
     assert!(matches!(
@@ -633,6 +650,7 @@ fn the_corner_radius_knob_reads_r_and_says_full_round_at_the_limit() {
     let mut s = session();
     s.set_generator_kind("curvyo.generators/rounded-box");
     assert!(s.place_generated(300.0, 300.0));
+    s.set_tool(Tool::Select);
     let document = Document::new(1);
     let settings = curvyo_ui_core::ExtensionSettings::default();
     let id = curvyo_ui_core::instance::place(
@@ -755,6 +773,7 @@ fn a_spike_is_built_with_a_warning_notice_and_the_overlay_draws() {
     );
     s.set_generator_kind("curvyo.generators/path-box");
     assert!(s.place_generated(100.0 * tip.tan() / 2.0, -50.0));
+    s.set_tool(Tool::Select);
     let notice = s.take_generated_notice();
     assert!(notice.contains("very sharp"), "{notice}");
     let _ = s.draw_list();
@@ -782,6 +801,7 @@ fn replace_outline_picks_another_outline_in_one_step() {
     s.set_tool(Tool::Generators);
     s.set_generator_kind("curvyo.generators/path-box");
     assert!(s.place_generated(40.0, 0.0));
+    s.set_tool(Tool::Select);
     let before = panel(&s);
     assert!(s.begin_replace_outline());
     assert_eq!(s.tool(), Tool::Generators);

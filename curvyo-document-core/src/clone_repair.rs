@@ -34,7 +34,7 @@ impl Document {
         }
         self.value_followers(&changed, &handled)
             .into_iter()
-            .map(|follower| Fix::Unlink(follower.clone, follower.path, follower.opacity))
+            .map(|follower| Fix::Unlink(follower.clone, Box::new(follower.path), follower.opacity))
             .collect()
     }
 }
@@ -88,7 +88,7 @@ const REPAIR_ID_SPACE: u64 = 1 << 63;
 /// One decided repair, read before any write.
 enum Fix {
     Repoint(NodeId, CloneLink),
-    Unlink(NodeId, PathSnapshot, f64),
+    Unlink(NodeId, Box<PathSnapshot>, f64),
     /// A clone of a group, text, image or primitive: a copy of its root (ADR 0045 §5).
     Copy(Box<crate::clone_model::CloneSnapshot>),
 }
@@ -133,7 +133,7 @@ impl Document {
                 if let Some(read) = self.read_clone(clone) {
                     unlinked.push(crate::paths::tree_id_of(clone));
                     let opacity = crate::clone_write::source_opacity(tree, &read);
-                    fixes.push(Fix::Unlink(clone, *read.resolved, opacity));
+                    fixes.push(Fix::Unlink(clone, read.resolved, opacity));
                 }
             } else if !gone.contains(&node) {
                 fixes.push(Fix::Repoint(
@@ -151,7 +151,7 @@ impl Document {
                     fixes.push(Fix::Copy(Box::new(read)));
                 } else {
                     let opacity = crate::clone_write::source_opacity(tree, &read);
-                    fixes.push(Fix::Unlink(clone, *read.resolved, opacity));
+                    fixes.push(Fix::Unlink(clone, read.resolved, opacity));
                 }
             }
         }

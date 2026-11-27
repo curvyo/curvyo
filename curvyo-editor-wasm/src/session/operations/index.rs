@@ -301,6 +301,10 @@ fn split_parts(
     let mut rest = 0_u64;
     let mut parts = Vec::new();
     for (index, key) in snapshot.record.part_keys.iter().enumerate() {
+        // A part that never reaches a job (a code's Background) is in no mask (ADR 0091 P6).
+        if !snapshot.record.part_runs_on_jobs(index) {
+            continue;
+        }
         let bit = 1_u64 << index;
         match keys.iter().find(|k| k.as_str() == key.as_str()) {
             Some(found) => parts.push((*found, bit)),
@@ -497,8 +501,10 @@ fn shape_of(object: &ObjectSnapshot) -> LeafShape {
     }
 }
 
+/// The closed and open outlines of `path` that reach a job (a `job: false` part never does,
+/// ADR 0091 P6).
 fn path_counts(path: &PathSnapshot) -> (usize, usize) {
-    path.subpaths().fold(
+    path.job_subpaths().fold(
         (0, 0),
         |(c, o), sub| {
             if sub.closed { (c + 1, o) } else { (c, o + 1) }
@@ -524,6 +530,7 @@ mod split_tests {
                 params: serde_json::Map::new(),
                 parts: vec![vec![square]; count],
                 part_keys: (0..count).map(|i| format!("wall-{i}")).collect(),
+                part_paints: std::collections::BTreeMap::new(),
             },
             frame: Affine::IDENTITY,
         }

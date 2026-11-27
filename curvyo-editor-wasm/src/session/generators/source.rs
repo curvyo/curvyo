@@ -70,8 +70,8 @@ impl Session {
         {
             return false;
         }
-        self.generators.kind = snapshot.record.kind;
         self.set_tool(Tool::Generators);
+        self.generators.kind = snapshot.record.kind;
         self.generators.replace = Some(id);
         true
     }

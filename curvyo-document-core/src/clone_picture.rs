@@ -173,6 +173,7 @@ pub(crate) fn primitive_path(primitive: &PrimitiveSnapshot) -> PathSnapshot {
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
+        paint_runs: Vec::new(),
     }
 }
 
@@ -349,6 +350,7 @@ fn picture_clone(
         spiro_transform: None,
         width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
+        paint_runs: Vec::new(),
     };
     Some(crate::clone_model::CloneSnapshot::new(
         clone.id,

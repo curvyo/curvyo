@@ -17,6 +17,7 @@ fn session() -> Session {
     session.resize_viewport(1600.0, 900.0);
     session.set_generator_kind(QR);
     assert!(session.place_generated(200.0, 150.0));
+    session.set_tool(Tool::Select);
     session
 }
 

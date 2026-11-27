@@ -113,6 +113,11 @@ pub(crate) fn record_of(kind: &str, seed: u32, generated: &Generated) -> Generat
             })
             .collect(),
         part_keys: generated.parts.iter().map(|p| p.key.to_string()).collect(),
+        part_paints: generated
+            .parts
+            .iter()
+            .filter_map(|part| part.paint.map(|paint| (part.key.to_string(), paint)))
+            .collect(),
     }
 }
 
@@ -127,6 +132,7 @@ pub(crate) fn record_keeping(stored: &GeneratedRecord, generated: &Generated) ->
             params: generated.params.clone(),
             parts: stored.parts.clone(),
             part_keys: stored.part_keys.clone(),
+            part_paints: stored.part_paints.clone(),
         };
     }
     record_of(&stored.kind, stored.seed, generated)
@@ -296,13 +302,16 @@ pub use crate::instance_value::{
 /// box a group of its plates, under the same id), with fresh anchor ids from `minter`. Works for an
 /// unknown kind too: it only reads the stored outline.
 ///
+/// Returns the path a part that never reaches a job (a code's Background) became, if any: it sits
+/// directly below the converted object and is selected with it.
+///
 /// # Errors
 /// [`InstanceError::NoSuchObject`] or [`InstanceError::Refused`].
 pub fn convert(
     document: &Document,
     minter: &mut AnchorIdMinter,
     id: NodeId,
-) -> Result<(), InstanceError> {
+) -> Result<Option<NodeId>, InstanceError> {
     let snapshot = document.generated(id).ok_or(InstanceError::NoSuchObject)?;
     let parts: Vec<Vec<(Vec<curvyo_document_core::NewAnchor>, bool)>> = snapshot
         .outlines()

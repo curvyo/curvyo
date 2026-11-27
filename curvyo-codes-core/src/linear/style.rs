@@ -32,6 +32,8 @@ pub struct LinearStyle<'a> {
     pub adjust: f64,
     /// The ink is the spaces: one ground with the bars knocked out.
     pub inverted: bool,
+    /// A Background is on: [`Drawn::background`] holds its rectangle and the box reaches it.
+    pub background: bool,
     /// The human-readable text: its size in mm and the face's outlines; `None` for no text.
     pub text: Option<TextLayout<'a>>,
 }
@@ -54,6 +56,8 @@ pub struct Drawn {
     pub top: Length,
     /// The lowest y of the outlines (the box's bottom; descenders included).
     pub bottom: Length,
+    /// The Background's rectangle (the bars, the quiet zones and the text band), `None` while it is off.
+    pub background: Option<ClosedPath>,
     /// The text could not be set in full: the face lacks a character, or no face is there.
     pub missing: bool,
 }
@@ -271,30 +275,41 @@ pub fn draw(code: &LinearCode, style: &LinearStyle<'_>) -> Drawn {
             .fold(floor, f64::max)
     };
     let low = lowest(&text, lowest(&bars, bottom));
-    if style.inverted {
-        // One ground over the bars and the quiet zones; the bars and the text are knocked out.
-        let ground = rect(
+    let ground = || {
+        rect(
             x_of(-style.quiet.0),
             top - GROUND_PAD * m,
             x_of(code.width + style.quiet.1),
             low + GROUND_PAD * m,
-        );
-        ink.push(ground);
+        )
+    };
+    let background = style.background.then(ground);
+    if style.inverted {
+        // One ground over the bars and the quiet zones; the bars and the text are knocked out.
+        ink.push(ground());
         ink.extend(bars.drain(..).map(|b| reversed(&b)));
         ink.extend(text.iter().map(reversed));
         return Drawn {
             paths: ink,
             top: Length::from_mm(top - GROUND_PAD * m),
             bottom: Length::from_mm(low + GROUND_PAD * m),
+            background,
             missing,
         };
     }
     ink.append(&mut bars);
     ink.append(&mut text);
+    // The box reaches the Background's rectangle while it is on.
+    let pad = if style.background {
+        GROUND_PAD * m
+    } else {
+        0.0
+    };
     Drawn {
         paths: ink,
-        top: Length::from_mm(top),
-        bottom: Length::from_mm(low),
+        top: Length::from_mm(top - pad),
+        bottom: Length::from_mm(low + pad),
+        background,
         missing,
     }
 }

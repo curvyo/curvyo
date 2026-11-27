@@ -114,6 +114,7 @@ pub(crate) fn place(strips: &[Piece], plates: Vec<Piece>, kerf: f64, spacing: f6
                                 .map(|hole| translated(hole, offset.0, offset.1)),
                         )
                         .collect::<Vec<ClosedPath>>(),
+                    paint: None,
                 },
                 offset,
                 role: piece.role,

@@ -240,6 +240,7 @@ pub(crate) fn glyph_path(
         spiro_transform: None,
         width_points: Vec::new(),
         rotation,
+        paint_runs: Vec::new(),
     }
 }
 

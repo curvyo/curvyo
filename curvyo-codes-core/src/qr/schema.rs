@@ -96,16 +96,16 @@ pub(crate) fn groups() -> Vec<ParamGroup> {
             params: vec![choice("ec", "Error correction", LEVELS, "m")],
         },
         logo(),
-        colours(),
+        colours(true),
         advanced(4),
     ]
 }
 
-/// The Colours group: Inverted.
-pub(crate) fn colours() -> ParamGroup {
+/// The Colours group: Inverted, the Finder colour (QR only) and the Background.
+pub(crate) fn colours(finder: bool) -> ParamGroup {
     ParamGroup {
         label: "Colours",
-        params: vec![switch("inverted", "Inverted")],
+        params: crate::paint::rows(finder),
     }
 }
 
