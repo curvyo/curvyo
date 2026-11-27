@@ -50,6 +50,11 @@ mod online;
 mod online_state;
 mod online_token;
 #[cfg(target_os = "linux")]
+mod pen_input;
+#[cfg(not(target_os = "linux"))]
+#[path = "pen_input_none.rs"]
+mod pen_input;
+#[cfg(target_os = "linux")]
 mod preview_fonts;
 #[cfg(target_os = "linux")]
 mod preview_slot;
@@ -82,6 +87,9 @@ pub(crate) const CONNECTOR_EVENT: &str = "connector-event";
 #[allow(clippy::too_many_lines)]
 fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
+        pen_input::pen_watch,
+        pen_input::pen_unwatch,
+        pen_input::pen_compression,
         project::take_pending_open,
         project::pick_project,
         project::pick_import_files,
@@ -260,6 +268,9 @@ fn main() {
             // WebKitGTK hides a dragged file list from the page; the host keeps it for a drop.
             #[cfg(target_os = "linux")]
             native_file_lists::watch_drags(&handle);
+            // The pen's pressure, which WebKitGTK drops, read from GDK (ADR 0094).
+            #[cfg(target_os = "linux")]
+            pen_input::watch_pen(&handle);
             // A font folder an interrupted archive add left is removed at start (`0083`
             // criterion 12).
             if let Ok(dir) = fonts::fonts_dir(&handle) {
