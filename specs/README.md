@@ -19,7 +19,7 @@ assigned in the order the folders are created** and a row sits in the group of
 its state, so inside a group the numbers can be out of order (the order the
 lead starts the waiting ones is in "Proposed build order" below).
 
-The next free number is 0159; the next free Frage is 416 (the number history is in
+The next free number is 0164; the next free Frage is 452 (the number history is in
 "State of the list" below).
 
 Columns: **No.** = folder number. **MVP slice** = the label the same feature
@@ -233,6 +233,7 @@ prioritises them.
 
 The state lines as the product owner wrote them:
 
+State of this list: 2026-11-27: reserved for the machine families epic (`story/machine-families`): specs 0159 `cutting-plotter`, 0160 `embroidery`, 0161 `cnc-output`, 0162 and 0163 spare for its follow-ups; ADRs 0097 to 0104; Fragen 416 to 451 (416 to 433 answered 2026-11-27); next free number 0164, next free Frage 452.
 State of this list: 2026-11-27: 0158 `pen-display` slice 0 (Pen probe) built (PR #522, merged; the customer's measurement on the Kamvas open, ADR 0094 Proposed); slice 1 (Pressure Pencil) Ready, built without a tablet test ("go on, rework stacks up later"); slice 2 gets a criterion for the shared selection (Frage 409 A); R-INP-002 to R-INP-005 aligned with Fragen 408 to 413; Frage 414 (PEN-FREEHAND) answered A; next free number 0159, next free Frage 415.
 State of this list: 2026-11-26 (answers): 0158 `pen-display` Fragen 408 to 413 answered (408 A, 409 A, 410 C, 411 C, 412 A, 413 A fixed); next free number 0159, next free Frage 414.
 State of this list: 2026-11-26: 0158 `pen-display` drafted (Draft epic: pen probe, pressure Pencil, pen window, stroke quality, brushes, shape builder, handwriting; supersedes `0032`; Fragen 408 to 413 open, all with defaults; next free number 0159, next free Frage 414).
