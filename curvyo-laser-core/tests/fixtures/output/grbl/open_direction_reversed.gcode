@@ -1,0 +1,12 @@
+; Curvyo job: Laser 1
+; Machine: Diode 10 W
+; 1 Cut 1
+G21
+G90
+G17
+M5
+M4 S0
+G0 X120.000 Y20.000
+G1 X20.000 Y20.000 F600 S800
+M5
+G0 X0.000 Y0.000

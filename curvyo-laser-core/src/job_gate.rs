@@ -326,6 +326,18 @@ fn block_issues(
         let cause = Cause::CoveredByTabs { op };
         issues.push(issue(cause, plan.covered.len(), Targets::Items(items)));
     }
+    if let Some(plan) = &built.plans[index]
+        && !plan.leads_touch.is_empty()
+    {
+        let mut items: Vec<NodeId> = Vec::new();
+        for &node in &plan.leads_touch {
+            if !items.contains(&node) {
+                items.push(node);
+            }
+        }
+        let cause = Cause::LeadsTouchCut { op };
+        issues.push(issue(cause, plan.leads_touch.len(), Targets::Items(items)));
+    }
 }
 
 /// The block of a running fixture block that has no numbers (criterion 4 a); `None` for damage,

@@ -148,6 +148,7 @@ fn cut_page(operations: usize, power: f64) -> JobInput {
             stacking: u32::try_from(i).unwrap(),
             geometry: LeafGeometry::Outlines(vec![polygon(5.0 + col * 9.5, 5.0 + row * 11.5)]),
             cut: curvyo_laser_core::tabs::LeafTabs::default(),
+            path: curvyo_laser_core::tabs::LeafPath::default(),
         });
     }
     page(blocks)
@@ -163,6 +164,7 @@ fn engrave_page(crosshatch: bool) -> JobInput {
         z_offset: ZOffset::default(),
         image: curvyo_laser_core::settings::ImageSettings::DEFAULT,
         cut: curvyo_laser_core::settings::CutSettings::DEFAULT,
+        path: curvyo_laser_core::settings::PathOptions::DEFAULT,
     };
     page(vec![block(
         ids[0],
@@ -174,6 +176,7 @@ fn engrave_page(crosshatch: bool) -> JobInput {
             stacking: 0,
             geometry: LeafGeometry::Outlines(vec![square(50.0, 50.0, 200.0)]),
             cut: curvyo_laser_core::tabs::LeafTabs::default(),
+            path: curvyo_laser_core::tabs::LeafPath::default(),
         }],
     )])
 }

@@ -366,6 +366,7 @@ impl Session {
                     stacking,
                     geometry,
                     cut: curvyo_laser_core::tabs::LeafTabs::default(),
+                    path: curvyo_laser_core::tabs::LeafPath::default(),
                 });
                 continue;
             }
@@ -427,6 +428,7 @@ fn add_cut_out(
             stacking,
             leaves: vec![outlines],
             cut: curvyo_laser_core::tabs::LeafTabs::default(),
+            path: curvyo_laser_core::tabs::LeafPath::default(),
         });
     }
 }
@@ -496,6 +498,7 @@ fn fixture_blocks(runs: &[FixtureRun], to_page: Option<Affine>) -> Vec<BlockInpu
                         stacking,
                         leaves: vec![parts],
                         cut: curvyo_laser_core::tabs::LeafTabs::default(),
+                        path: curvyo_laser_core::tabs::LeafPath::default(),
                     });
                 } else {
                     block.leaves.push(LeafInput {
@@ -503,6 +506,7 @@ fn fixture_blocks(runs: &[FixtureRun], to_page: Option<Affine>) -> Vec<BlockInpu
                         stacking,
                         geometry: LeafGeometry::Outlines(parts),
                         cut: curvyo_laser_core::tabs::LeafTabs::default(),
+                        path: curvyo_laser_core::tabs::LeafPath::default(),
                     });
                 }
             }

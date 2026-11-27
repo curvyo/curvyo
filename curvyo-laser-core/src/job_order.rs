@@ -2,6 +2,7 @@
 //! before every closed path that contains it, then the nearest start to the head goes next, ties
 //! by stacking order, outline index and node index.
 
+use crate::job_cut_ends::CutEnds;
 use crate::job_cut_path::{CutEntry, CutRun, TabGap, UnitCut};
 use crate::job_hatch::{HatchLines, Span};
 use crate::job_input::PointUm;
@@ -72,6 +73,12 @@ pub(crate) struct Ordered {
     /// How many automatic tabs each outline that follows the operation gets (criterion 2's
     /// placed line); an inner outline under Skip inner shapes is left out.
     pub placed: Vec<usize>,
+    /// The leads, overcut and start of each entered cut outline, by unit index.
+    pub ends: Vec<(usize, CutEnds)>,
+    /// Where each closed path was entered (its first burnt point), by unit index (C7).
+    pub starts: Vec<(usize, PointUm)>,
+    /// One unit index per lead or overcut that comes within 0.01 mm of a cut (criterion 18).
+    pub touching: Vec<usize>,
 }
 
 /// The ordered burn paths of `units` from `head`, and where the head stands at the end.
@@ -115,6 +122,8 @@ pub(crate) fn order_all(units: &[Unit], head: PointUm, bidirectional: bool) -> O
     }
     let mut head = head;
     let mut out = Vec::new();
+    let mut ends = Vec::new();
+    let mut starts = Vec::new();
     for _ in 0..units.len() {
         let mut best: Option<(i128, u32, u32, usize, usize, Entry)> = None;
         for (index, unit) in units.iter().enumerate() {
@@ -141,30 +150,63 @@ pub(crate) fn order_all(units: &[Unit], head: PointUm, bidirectional: bool) -> O
         if let Some(parent) = parents[index] {
             pending[parent] -= 1;
         }
-        let end = match (entry, &runs[index]) {
-            (Entry::Cut(k), Some(run)) => {
-                let mut end = None;
-                for points in run.pieces(cut_entries[index][k]) {
-                    end = points.last().copied();
-                    out.push(OrderedPath {
-                        points,
-                        unit: index,
-                        hatch: false,
-                    });
-                }
-                end
+        let end = if let (Entry::Cut(k), Some(run)) = (entry, &runs[index]) {
+            let (pieces, run_ends) = run.run(cut_entries[index][k]);
+            if run.measured.closed()
+                && let Some(at) = run_ends.entered
+            {
+                starts.push((index, at));
             }
-            _ => emit(&units[index].shape, index, entry, bidirectional, &mut out),
+            ends.push((index, run_ends));
+            let mut end = None;
+            for points in pieces {
+                end = points.last().copied();
+                out.push(OrderedPath {
+                    points,
+                    unit: index,
+                    hatch: false,
+                });
+            }
+            end
+        } else {
+            if let (UnitShape::Path { points, .. }, Entry::Closed(n)) = (&units[index].shape, entry)
+            {
+                starts.push((index, points[n]));
+            }
+            emit(&units[index].shape, index, entry, bidirectional, &mut out)
         };
         head = end.unwrap_or(head);
     }
+    let touching = crate::job_cut_checks::touching(&ends, &out);
     Ordered {
         paths: out,
         exit: head,
         gaps,
         covered,
         placed,
+        ends,
+        starts,
+        touching,
     }
+}
+
+/// The nesting depth of each unit: how many closed paths of the block contain it.
+fn depths(parents: &[Option<usize>]) -> Vec<usize> {
+    parents
+        .iter()
+        .map(|&parent| {
+            let mut depth = 0;
+            let mut at = parent;
+            while let Some(p) = at {
+                depth += 1;
+                at = parents[p];
+                if depth > parents.len() {
+                    break;
+                }
+            }
+            depth
+        })
+        .collect()
 }
 
 /// The tab runs of the cut units and every unit's entries.
@@ -179,16 +221,23 @@ struct Prepared {
 /// unit, a cut outline with tabs by its burnt vertices and piece starts (adrs L7).
 fn prepare(units: &[Unit], parents: &[Option<usize>], bidirectional: bool) -> Prepared {
     let mut placed = Vec::new();
+    let depth = depths(parents);
     let runs: Vec<Option<CutRun>> = units
         .iter()
         .zip(parents)
-        .map(|(unit, parent)| {
+        .zip(depth)
+        .map(|((unit, parent), depth)| {
             let cut = unit.cut.as_ref()?;
             let spans = cut.spans(parent.is_some());
-            if cut.own.is_none() && !(parent.is_some() && cut.settings.tab_skip_inner) {
+            if cut.own.is_none()
+                && cut.settings.tab_count.get() > 0
+                && !(parent.is_some() && cut.settings.tab_skip_inner)
+            {
                 placed.push(spans.len());
             }
-            CutRun::new(cut.measured.clone(), spans)
+            let mut run = CutRun::new(cut.measured.clone(), spans, cut.path, cut.entry)?;
+            run.depth = depth;
+            Some(run)
         })
         .collect();
     let mut cut_entries: Vec<Vec<CutEntry>> = vec![Vec::new(); units.len()];

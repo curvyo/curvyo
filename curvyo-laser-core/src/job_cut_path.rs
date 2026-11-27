@@ -1,12 +1,15 @@
 //! The burnt pieces of one cut outline with tabs (`specs/0139` criteria 8 to 10, adrs L7, L8,
 //! L12): where it may be entered, the pieces in run order from an entry and the marks of its gaps.
 
+use crate::cut_entry_records::{Direction, OutlineEntry};
+use crate::cut_item_records::PathFraction;
 use crate::cut_tabs::{Measured, TabSpan, automatic};
 use crate::job_input::PointUm;
 use crate::operation_cut_options::CutSettings;
+use crate::operation_path_options::PathOptions;
 
 /// A stretch shorter than this (µm of arc) is no piece: it rounds onto one point.
-const SPECK: f64 = 0.5;
+pub(crate) const SPECK: f64 = 0.5;
 
 /// The tabs of one outline unit before the order knows its parent.
 #[derive(Debug, Clone, PartialEq)]
@@ -17,6 +20,10 @@ pub(crate) struct UnitCut {
     pub own: Option<Vec<TabSpan>>,
     /// The operation's cut settings.
     pub settings: CutSettings,
+    /// The lead-in, lead-out and overcut that run (the item's own or the operation's).
+    pub path: PathOptions,
+    /// The outline's set start or fixed direction, `None` for Automatic (Frage 414 A).
+    pub entry: Option<OutlineEntry>,
 }
 
 impl UnitCut {
@@ -48,11 +55,17 @@ pub struct TabGap {
     pub direction: (i32, i32),
 }
 
-/// An outline whose tabs are resolved: its arcs, its tab spans and its burnt stretches.
+/// An outline whose tabs, path options and entry are resolved.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CutRun {
-    measured: Measured,
-    spans: Vec<TabSpan>,
+    pub(crate) measured: Measured,
+    pub(crate) spans: Vec<TabSpan>,
+    /// The path options; inert on an open outline (criterion 13).
+    pub(crate) path: PathOptions,
+    /// A set start (closed) or a fixed direction (open).
+    pub(crate) entry: Option<OutlineEntry>,
+    /// The nesting depth among the closed paths of the block: even is a part edge, odd a hole.
+    pub(crate) depth: usize,
 }
 
 /// How a cut run is entered.
@@ -65,9 +78,25 @@ pub(crate) enum CutEntry {
 }
 
 impl CutRun {
-    /// The run of `measured` with `spans`; `None` without a tab (today's code path, criterion 24).
-    pub(crate) fn new(measured: Measured, spans: Vec<TabSpan>) -> Option<Self> {
-        (!spans.is_empty()).then_some(Self { measured, spans })
+    /// The run of `measured` with `spans`, `path` and `entry`; `None` without a tab, a lead, an
+    /// overcut or an entry (today's code path, criterion 24). Leads and overcut only apply to a
+    /// closed outline, a start only to a closed one, a direction only to an open one.
+    pub(crate) fn new(
+        measured: Measured,
+        spans: Vec<TabSpan>,
+        path: PathOptions,
+        entry: Option<OutlineEntry>,
+    ) -> Option<Self> {
+        let closed = measured.closed();
+        let path = if closed { path } else { PathOptions::DEFAULT };
+        let entry = entry.filter(|entry| matches!(entry, OutlineEntry::Start(_)) == closed);
+        (!spans.is_empty() || !path.is_inert() || entry.is_some()).then_some(Self {
+            measured,
+            spans,
+            path,
+            entry,
+            depth: 0,
+        })
     }
 
     /// The burnt stretches in arc order from the outline's first point; on a closed outline a
@@ -77,7 +106,7 @@ impl CutRun {
     }
 
     /// The burnt stretches of the outline as arcs relative to `entry` (0 to its length).
-    fn stretches_from(&self, entry: f64) -> Vec<(f64, f64)> {
+    pub(crate) fn stretches_from(&self, entry: f64) -> Vec<(f64, f64)> {
         let length = self.measured.length();
         let mut cut: Vec<(f64, f64)> = Vec::new();
         for span in &self.spans {
@@ -126,9 +155,22 @@ impl CutRun {
         })
     }
 
-    /// The entries in tie order (adrs L7, L10): a closed outline's burnt vertices that are no
-    /// piece start (else the middle of each piece), so every tab is one gap between two pieces;
-    /// an open one's first burnt point forward and last reversed.
+    /// The arc where a set start at `at` begins to burn: the start itself, or the end of the tab
+    /// that covers it (criterion 19).
+    pub(crate) fn start_arc(&self, at: PathFraction) -> f64 {
+        let m = &self.measured;
+        let arc = m.arc_of(at);
+        let covering = self.spans.iter().find(|span| {
+            let d = (arc - span.start()).rem_euclid(m.length());
+            d < span.width - SPECK
+        });
+        covering.map_or(arc, |span| m.wrap(span.end()))
+    }
+
+    /// The entries in tie order (adrs L7, L10): a set start or a fixed direction is the one
+    /// entry; else a closed outline's burnt vertices that are no piece start (else the middle of
+    /// each piece), so every tab is one gap between two pieces, every vertex without tabs; an open
+    /// one's first burnt point forward and last reversed.
     pub(crate) fn entries(&self) -> Vec<(PointUm, CutEntry)> {
         let stretches = self.stretches();
         if stretches.is_empty() {
@@ -138,10 +180,25 @@ impl CutRun {
         if !m.closed() {
             let first = stretches[0].0;
             let last = stretches[stretches.len() - 1].1;
-            return vec![
-                (m.point_um(first), CutEntry::Open { reversed: false }),
-                (m.point_um(last), CutEntry::Open { reversed: true }),
-            ];
+            let forward = (m.point_um(first), CutEntry::Open { reversed: false });
+            let back = (m.point_um(last), CutEntry::Open { reversed: true });
+            return match self.entry {
+                Some(OutlineEntry::Direction(Direction::AsDrawn)) => vec![forward],
+                Some(OutlineEntry::Direction(Direction::Reversed)) => vec![back],
+                _ => vec![forward, back],
+            };
+        }
+        if let Some(OutlineEntry::Start(at)) = self.entry {
+            let arc = self.start_arc(at);
+            return vec![(m.point_um(arc), CutEntry::Closed(arc))];
+        }
+        if self.spans.is_empty() {
+            return m
+                .vertex_arcs()
+                .iter()
+                .zip(m.points())
+                .map(|(&arc, &p)| (p, CutEntry::Closed(arc)))
+                .collect();
         }
         let out: Vec<(PointUm, CutEntry)> = m
             .vertex_arcs()
@@ -201,15 +258,16 @@ impl CutRun {
         }
     }
 
-    /// The outline from arc `a` to arc `b` (b ≥ a; past the length wraps on a closed outline),
-    /// its ends interpolated and every vertex between, rounded to µm with repeats removed.
-    fn polyline(&self, a: f64, b: f64) -> Vec<PointUm> {
+    /// The outline from arc `a` to arc `b` (b ≥ a; past the length wraps on a closed outline, up
+    /// to three laps for an overcut), its ends interpolated and every vertex between, rounded to
+    /// µm with repeats removed.
+    pub(crate) fn polyline(&self, a: f64, b: f64) -> Vec<PointUm> {
         let m = &self.measured;
         let length = m.length();
         let mut out = vec![m.point_um(a)];
         let arcs = m.vertex_arcs();
         let n = arcs.len();
-        let laps: &[f64] = if m.closed() { &[0.0, 1.0] } else { &[0.0] };
+        let laps: &[f64] = if m.closed() { &[0.0, 1.0, 2.0] } else { &[0.0] };
         for &lap in laps {
             let base = lap * length;
             for (i, &arc) in arcs.iter().enumerate() {
@@ -272,9 +330,11 @@ mod tests {
             measured: Measured::new(points, closed),
             own: None,
             settings: settings(count, width),
+            path: PathOptions::DEFAULT,
+            entry: None,
         };
         let spans = unit.spans(false);
-        CutRun::new(unit.measured, spans).unwrap()
+        CutRun::new(unit.measured, spans, unit.path, unit.entry).unwrap()
     }
 
     fn length(piece: &[PointUm]) -> f64 {
@@ -345,9 +405,54 @@ mod tests {
                 centre: 2_000.0,
                 width: 4_000.0,
             }],
+            PathOptions::DEFAULT,
+            None,
         )
         .unwrap();
         assert!(covered.covered());
         assert_eq!(covered.entries(), Vec::new());
+    }
+
+    fn square() -> Measured {
+        Measured::new(
+            vec![
+                PointUm::new(0, 0),
+                PointUm::new(40_000, 0),
+                PointUm::new(40_000, 40_000),
+                PointUm::new(0, 40_000),
+            ],
+            true,
+        )
+    }
+
+    #[test]
+    fn a_set_start_or_a_fixed_direction_is_the_one_entry_and_defaults_take_no_run() {
+        assert_eq!(
+            CutRun::new(square(), Vec::new(), PathOptions::DEFAULT, None),
+            None
+        );
+        let start = OutlineEntry::Start(PathFraction::new(62_500_000).unwrap());
+        let set = CutRun::new(square(), Vec::new(), PathOptions::DEFAULT, Some(start)).unwrap();
+        assert_eq!(set.entries().len(), 1);
+        assert_eq!(set.entries()[0].0, PointUm::new(10_000, 0));
+        // A direction on a closed outline and a start on an open one are ignored.
+        let reversed = OutlineEntry::Direction(Direction::Reversed);
+        assert_eq!(
+            CutRun::new(square(), Vec::new(), PathOptions::DEFAULT, Some(reversed)),
+            None
+        );
+        let line = Measured::new(vec![PointUm::new(0, 0), PointUm::new(9_000, 0)], false);
+        let open = CutRun::new(line, Vec::new(), PathOptions::DEFAULT, Some(reversed)).unwrap();
+        assert_eq!(
+            open.entries(),
+            [(PointUm::new(9_000, 0), CutEntry::Open { reversed: true })]
+        );
+        // A start inside a tab begins at the tab's end.
+        let tab = TabSpan {
+            centre: 10_000.0,
+            width: 2_000.0,
+        };
+        let covered = CutRun::new(square(), vec![tab], PathOptions::DEFAULT, Some(start)).unwrap();
+        assert_eq!(covered.entries()[0].0, PointUm::new(11_000, 0));
     }
 }

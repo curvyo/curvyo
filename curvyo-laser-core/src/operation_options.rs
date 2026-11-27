@@ -10,6 +10,9 @@ use crate::operation_image_options::{
     IMAGE_KEYS, ImageEdit, ImageSettings, read_image_key, write_image_keys,
 };
 use crate::operation_kind::OperationKind;
+use crate::operation_path_options::{
+    PATH_KEYS, PathEdit, PathOptions, read_path_key, write_path_keys,
+};
 use crate::steps::{exact_steps, rounded_steps, typed_steps};
 
 /// The chip text of a typed value that is no number (UX section 10).
@@ -200,6 +203,8 @@ pub struct OperationOptions {
     pub image: ImageSettings,
     /// The cut path settings (Cut and Cut-out only, `specs/0139` adrs L2).
     pub cut: CutSettings,
+    /// Lead-in, lead-out and overcut (Cut and Cut-out only, `specs/0139` criterion 13).
+    pub path: PathOptions,
 }
 
 impl Default for OperationOptions {
@@ -212,6 +217,7 @@ impl Default for OperationOptions {
             z_offset: ZOffset::default(),
             image: ImageSettings::DEFAULT,
             cut: CutSettings::DEFAULT,
+            path: PathOptions::DEFAULT,
         }
     }
 }
@@ -250,6 +256,8 @@ pub enum OptionEdit {
     Image(ImageEdit),
     /// One of the cut path settings (Cut and Cut-out only, `specs/0139` criterion 1).
     Cut(CutEdit),
+    /// One of the path options (Cut and Cut-out only, `specs/0139` criterion 13).
+    Path(PathEdit),
 }
 
 const KEY_CROSSHATCH: &str = "crosshatch";
@@ -280,7 +288,7 @@ fn key_on_kind(key: &str, kind: OperationKind) -> bool {
         scans(kind)
     } else if IMAGE_KEYS.contains(&key) {
         kind == OperationKind::Image
-    } else if CUT_KEYS.contains(&key) {
+    } else if CUT_KEYS.contains(&key) || PATH_KEYS.contains(&key) {
         cuts_through(kind)
     } else {
         true
@@ -317,6 +325,7 @@ pub fn read_options(
         }
         if read_image_key(&mut options.image, key, value)?
             || read_cut_key(&mut options.cut, key, value)?
+            || read_path_key(&mut options.path, key, value)?
         {
             continue;
         }
@@ -363,6 +372,9 @@ impl OperationOptions {
         if cuts_through(kind) && self.cut != CutSettings::DEFAULT {
             write_cut_keys(self.cut, &mut map);
         }
+        if cuts_through(kind) && self.path != PathOptions::DEFAULT {
+            write_path_keys(self.path, &mut map);
+        }
         map.insert(KEY_Z_OFFSET.to_owned(), json!(self.z_offset.mm()));
         Value::Object(map)
     }
@@ -382,6 +394,7 @@ impl OperationOptions {
                 next.image = next.image.with(edit);
             }
             OptionEdit::Cut(edit) if cuts_through(kind) => next.cut = next.cut.with(edit),
+            OptionEdit::Path(edit) if cuts_through(kind) => next.path = next.path.with(edit),
             _ => return None,
         }
         (next != *self).then_some(next)

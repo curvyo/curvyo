@@ -299,6 +299,14 @@ pub fn check_text(issue: &Issue, names: &Names) -> CheckText {
                 " are covered by tabs and cut nothing.",
             ),
         ),
+        Cause::LeadsTouchCut { .. } => CheckText::led(
+            format!("{count} {}", verb(count, "lead", "leads")),
+            verb(
+                count,
+                " crosses or touches a cut.",
+                " cross or touch a cut.",
+            ),
+        ),
         Cause::StaleResults { item } => CheckText {
             before: format!("{count} stored AI {} of ", verb(count, "result", "results")),
             button: names.item(*item).to_owned(),

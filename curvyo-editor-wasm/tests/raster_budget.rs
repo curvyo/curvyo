@@ -125,6 +125,7 @@ fn page(pixels: &Arc<WorkingImage>, dither: Dither) -> JobInput {
                     pixels: Some(Arc::clone(pixels)),
                 },
                 cut: curvyo_laser_core::tabs::LeafTabs::default(),
+                path: curvyo_laser_core::tabs::LeafPath::default(),
             }],
             cut_out: Vec::new(),
         }],

@@ -8,22 +8,20 @@ use std::sync::Arc;
 use curvyo_document_core::{AssetHash, NodeId, Tolerance};
 use curvyo_geometry_core::Outline;
 
-use crate::cut_item_records::LeafTabs;
-use crate::job_cut_path::TabGap;
 use crate::job_fingerprint::plan_fingerprint;
 pub use crate::job_flatten::FLATTEN_MM;
 use crate::job_flatten::{dedupe, flat};
 use crate::job_hatch::hatch;
-use crate::job_input::{BlockInput, BlockSource, LeafGeometry, LeafOutline, PointUm};
+use crate::job_input::{BlockInput, LeafGeometry, LeafOutline, PointUm};
 use crate::job_numbers::BlockNumbers;
 use crate::job_order::{Unit, UnitShape, order_all};
-use crate::job_plan_cuts::{Cuts, block_cut, leaf_damaged, own_tabs_overlap, unit_cut};
+pub use crate::job_plan_cuts::{CutMark, CutStart};
+use crate::job_plan_cuts::{Cuts, cut_out_units, leaf_damaged, unit_cut};
 use crate::job_raster_items::{
     RasterCaches, RasterLeaf, frame_outline, prepare_raster, raster_leaf, raster_sweeps,
 };
 use crate::job_raster_rows::Sweep;
 use crate::job_raster_work::SweepCache;
-use crate::operation_cut_options::CutSettings;
 use crate::operation_cut_out::cut_out_contours;
 use crate::operation_kind::OperationKind;
 use crate::operation_kind_run::{LeafShape, Lines, kind_run};
@@ -64,18 +62,6 @@ pub struct PlannedRun {
     pub sweeps: Vec<PlannedSweep>,
 }
 
-/// The tab gaps of one cut outline for the Operations view (`specs/0139` criterion 7), from the
-/// same pieces the moves are made of (adrs L12).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CutMark {
-    /// The leaf or Cut-out item.
-    pub node: NodeId,
-    /// The outline's index in its leaf (the contour index of a Cut-out item).
-    pub outline: u32,
-    /// Its gaps.
-    pub gaps: Vec<TabGap>,
-}
-
 /// The plan of one block.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Plan {
@@ -85,7 +71,8 @@ pub struct Plan {
     pub exit: PointUm,
     /// The Cut-out items that gave no closed contour (they run nothing; a warn).
     pub no_contour: Vec<NodeId>,
-    /// The tab gaps of every cut outline with tabs (`specs/0139` criterion 7).
+    /// The marks of every cut outline that takes the cut path step (`specs/0139` criteria 7,
+    /// 14, 15, 19).
     pub marks: Vec<CutMark>,
     /// The leaf (or item) of each outline its tabs cover whole (criterion 10), once per outline.
     pub covered: Vec<NodeId>,
@@ -93,6 +80,10 @@ pub struct Plan {
     pub damaged: Vec<NodeId>,
     /// How many automatic tabs each outline that follows the operation gets (criterion 2).
     pub placed: Vec<usize>,
+    /// Where the job enters each closed outline of a Cut or Cut-out block (criterion 19, C7).
+    pub starts: Vec<CutStart>,
+    /// The leaf (or item) of each lead or overcut that touches a cut (criterion 18).
+    pub leads_touch: Vec<NodeId>,
 }
 
 /// The plan of `block` with `numbers`, entered from `entry`.
@@ -113,10 +104,7 @@ fn plan_with(
     let mut outline = Vec::new();
     let mut raster = Vec::new();
     let mut no_contour = Vec::new();
-    let mut cuts = Cuts {
-        settings: block_cut(block, numbers),
-        ..Cuts::default()
-    };
+    let mut cuts = Cuts::of(block, numbers);
     if kind == OperationKind::CutOut {
         cut_out_units(block, &mut main, &mut no_contour, &mut cuts);
     } else {
@@ -169,6 +157,8 @@ fn plan_with(
         covered: cuts.covered,
         damaged: cuts.damaged,
         placed: cuts.placed,
+        starts: cuts.starts,
+        leads_touch: cuts.leads_touch,
     }
 }
 
@@ -186,12 +176,34 @@ fn ordered(
     let (nodes, units): (Vec<NodeId>, Vec<Unit>) = list.into_iter().unzip();
     let ordered = order_all(&units, *head, bidirectional);
     *head = ordered.exit;
+    let mut ends = ordered.ends;
     cuts.marks
-        .extend(ordered.gaps.into_iter().map(|(unit, gaps)| CutMark {
-            node: nodes[unit],
-            outline: units[unit].outline,
-            gaps,
+        .extend(ordered.gaps.into_iter().map(|(unit, gaps)| {
+            let end = ends
+                .iter_mut()
+                .find(|(at, _)| *at == unit)
+                .map(|(_, end)| std::mem::take(end))
+                .unwrap_or_default();
+            CutMark {
+                node: nodes[unit],
+                outline: units[unit].outline,
+                gaps,
+                lead_in: end.lead_in,
+                overcut: end.overcut,
+                lead_out: end.lead_out,
+                start: end.start,
+            }
         }));
+    if cuts.settings.is_some() {
+        cuts.starts
+            .extend(ordered.starts.iter().map(|&(unit, at)| CutStart {
+                node: nodes[unit],
+                outline: units[unit].outline,
+                at,
+            }));
+    }
+    cuts.leads_touch
+        .extend(ordered.touching.iter().map(|&unit| nodes[unit]));
     cuts.covered
         .extend(ordered.covered.iter().map(|&unit| nodes[unit]));
     cuts.placed.extend(ordered.placed);
@@ -206,7 +218,7 @@ fn ordered(
         .collect()
 }
 
-type Units = Vec<(NodeId, Unit)>;
+pub(crate) type Units = Vec<(NodeId, Unit)>;
 
 /// The units of one leaf: in an Image block an image or a gradient-filled leaf into `raster`
 /// and nothing else (`specs/0123` criteria 1 to 3, 48); in every other block its lines into
@@ -226,7 +238,7 @@ fn leaf_units<'a>(
         return;
     }
     let (shape, outlines) = leaf_shape(&leaf.geometry);
-    if cuts.settings.is_some() && leaf_damaged(&leaf.cut, &outlines, cuts.settings) {
+    if cuts.settings.is_some() && leaf_damaged(&leaf.cut, &leaf.path, &outlines, cuts.settings) {
         cuts.damaged.push(leaf.node);
         return;
     }
@@ -247,7 +259,7 @@ fn leaf_units<'a>(
         } else {
             &mut *main
         };
-        push_line(into, leaf, index, item, cuts.settings);
+        push_line(into, leaf, index, item, cuts);
     }
     if run.area
         && let Some(unit) = hatch_unit(&outlines, numbers, stacking)
@@ -256,19 +268,19 @@ fn leaf_units<'a>(
     }
 }
 
-/// Pushes outline `item` (number `index`) of `leaf` as a line unit, with its tabs when the
-/// block takes them.
+/// Pushes outline `item` (number `index`) of `leaf` as a line unit, with its cut path step when
+/// the block takes one.
 fn push_line(
     into: &mut Units,
     leaf: &crate::job_input::LeafInput,
     index: usize,
     item: &LeafOutline,
-    settings: Option<CutSettings>,
+    cuts: &Cuts,
 ) {
     if let Some(points) = flat(item) {
         let closed = item.closed && points.len() >= 3;
         let outline = index_u32(index);
-        let cut = unit_cut(settings, &leaf.cut, outline, &points, closed);
+        let cut = unit_cut(cuts, &leaf.cut, &leaf.path, outline, &points, closed);
         into.push((
             leaf.node,
             Unit {
@@ -363,56 +375,7 @@ fn hatch_unit(outlines: &[LeafOutline], numbers: &BlockNumbers, stacking: u32) -
     })
 }
 
-/// The contour units of the Cut-out items; an item with no contour is listed in `no_contour`.
-fn cut_out_units(
-    block: &BlockInput,
-    main: &mut Units,
-    no_contour: &mut Vec<NodeId>,
-    cuts: &mut Cuts,
-) {
-    let margin = match &block.source {
-        BlockSource::Operation { margin, .. } => *margin,
-        BlockSource::Fixture { .. } => curvyo_document_core::Length::from_mm(0.0),
-    };
-    for item in &block.cut_out {
-        let rings: Vec<(Vec<PointUm>, bool)> = cut_out_outlines(&item.leaves, margin)
-            .into_iter()
-            .map(|points| (points.unwrap_or_default(), true))
-            .collect();
-        if matches!(item.cut, LeafTabs::Damaged)
-            || own_tabs_overlap(cuts.settings, &item.cut, &rings)
-        {
-            cuts.damaged.push(item.item);
-            continue;
-        }
-        let mut any = false;
-        for (index, (points, _)) in rings.into_iter().enumerate() {
-            if points.len() < 3 {
-                continue;
-            }
-            any = true;
-            let outline = index_u32(index);
-            let cut = unit_cut(cuts.settings, &item.cut, outline, &points, true);
-            main.push((
-                item.item,
-                Unit {
-                    shape: UnitShape::Path {
-                        points,
-                        closed: true,
-                    },
-                    stacking: item.stacking,
-                    outline,
-                    cut,
-                },
-            ));
-        }
-        if !any {
-            no_contour.push(item.item);
-        }
-    }
-}
-
-fn index_u32(index: usize) -> u32 {
+pub(crate) fn index_u32(index: usize) -> u32 {
     u32::try_from(index).unwrap_or(u32::MAX)
 }
 

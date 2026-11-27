@@ -10,6 +10,7 @@
     allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)
 )]
 
+mod cut_entry_records;
 mod cut_item_records;
 mod cut_tabs;
 mod fixture_fit;
@@ -33,6 +34,9 @@ mod image_dither;
 mod image_preset;
 mod job_anchor;
 mod job_build;
+mod job_cut_checks;
+mod job_cut_ends;
+mod job_cut_lead;
 mod job_cut_path;
 mod job_effects;
 mod job_fingerprint;
@@ -92,6 +96,7 @@ mod operation_kind_run;
 mod operation_naming;
 mod operation_nearest;
 mod operation_options;
+mod operation_path_options;
 mod operation_sequence;
 mod operation_settings;
 mod operation_settings_edit;
@@ -218,6 +223,7 @@ pub mod job {
 /// The tabs of cut paths (`specs/0139-laser-cut-path-options` slice 1): the own tabs of an item
 /// in one operation, their outline references, the automatic placement and the handle rules.
 pub mod tabs {
+    pub use crate::cut_entry_records::{Direction, Entries, LeafPath, OutlineEntry, read_entries};
     pub use crate::cut_item_records::{
         LeafTabs, OwnTab, OwnTabs, PathFraction, RecordDamage, below_target, outline_ref,
         read_own_tabs,
@@ -242,6 +248,9 @@ pub mod settings {
     pub use crate::operation_options::{
         ENTER_NUMBER, ENTER_WHOLE_NUMBER, OperationOptions, OptionEdit, OptionsDamage, Overscan,
         ScanAngle, ZOffset, hatches, read_options, scans,
+    };
+    pub use crate::operation_path_options::{
+        LeadKind, Overcut, PathEdit, PathOptions, read_own_path,
     };
     pub use crate::operation_settings::{
         Field, MaterialLink, Overrides, Role, SetOverride, SettingsDamage, SettingsRead,
