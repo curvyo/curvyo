@@ -1,6 +1,6 @@
 # Pen display: draw with a pen on a second window, with pressure, brushes and shape recognition
 
-Status: Draft (epic overview; Fragen 408 to 413 answered 2026-11-26; slice 0 measures the delay of the native route of Frage 408 A; model and session known, driver and desktop still open)
+Status: In progress (epic, not Done). Slice 0 built (PR #522, merged 2026-11-27; the customer's measurement on the Kamvas is still open, ADR 0094 stays Proposed). Slice 1 Ready 2026-11-27, to be built "dry" (the customer cannot test on the tablet for now: "go on, rework stacks up later"). Slices 2 to 6 are drafts. Fragen 408 to 413 answered 2026-11-26; Frage 414 answered A, default A
 Priority: Should
 Origin: Customer request 2026-11-26 (translated): "I own a Huion Kamvas pen display. I want a separate window for the tablet that can optionally stay in sync with the drawing window on the big screen but has its own position and zoom, so I can draw relaxed on the tablet; maybe its own views there (fewer tools, a smaller property panel). The pen with pressure sensitivity. Brushes become relevant: calligraphy, variable stroke width, path optimisation on the go. A shape builder: draw a rectangle with the pen and it becomes a rectangle ('gestures'). If possible, write text by hand with the pen. Think about what else is useful, compare with competitors and make a plan." Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 Supersedes: `0032-pen-tablet-input` (absorbed by slice 1; 0032 stays as a folder and history, see Links).
@@ -36,7 +36,7 @@ Researched 2026-11-26 (sources in the lead's notes; "research 2026-11-26").
 
 ## Slices (Proposal; each ends in something the customer can try)
 
-0. **Pen probe** (measures the native route chosen in Frage 408 A).
+0. **Pen probe** (measures the native route chosen in Frage 408 A). **Built, PR #522 (2026-11-27).** The customer's measurement on the Kamvas (ADR 0094 decision 8) is still open.
 1. **Pressure Pencil**.
 2. **Pen window**.
 3. **Stroke quality on the go**.
@@ -47,6 +47,8 @@ Researched 2026-11-26 (sources in the lead's notes; "research 2026-11-26").
 Order: 0, then 1 and 2 (either order after 0; 2 needs an ADR first, so 1 starts while the architect works), then 3, 4, 5, 6. The customer can stop after any slice.
 
 ### Slice 0: Pen probe
+
+Status: Built (PR #522, merged 2026-11-27); criteria 1 to 5 are covered by tests and the gate. Open: the customer runs the probe on the Kamvas 13 (X11 and Wayland) and sends the "Copy report" numbers; until then ADR 0094 stays Proposed and Frage 408 stays at default A. Slice 1 is built without waiting for it.
 
 A diagnostics page showing, live, pointer type, pressure, tilt, eraser end, barrel button and event rate, in the app and in a browser build, so the input route is chosen on the real Kamvas, not guessed. Why first: **blocker risk.** WebKitGTK (the Tauri webview on Linux, ADR 0001) does not deliver pen pressure (WebKit bug 268458, still NEW); Chromium and Firefox on Linux mostly do but vary by driver, compositor and model; tilt is unreliable (research 2026-11-26).
 
@@ -59,14 +61,40 @@ Draft criteria:
 
 ### Slice 1: Pressure Pencil
 
-Pen pressure and the coalesced samples between frames go into the session (today the wasm pointer API has no pressure field and the frontend reads no pressure or coalesced events). A Pencil stroke becomes a fitted curve with a width profile derived from pressure (the ADR 0053 model, centre line plus profile points on normalised arc length). This replaces the 0032 decision to store a filled outline (Frage 410). The Pencil is the Freehand mode of `0110`, not a second tool **(Proposal)**.
+Status: Ready 2026-11-27 (built "dry": the customer cannot test on the tablet for now and said to go on, rework stacks up later; ADR 0094 stays Proposed, so the native route may change before the demo with a pen).
 
-Draft criteria:
-1. Given a pen with pressure, when drawing a stroke with light then firm pressure, then the stroke is one path whose width grows along it, editable with the width diamonds of `0110`, and its centre line is a fitted Bézier (no per-sample nodes; node count at most 1 per 3 mm of a smooth stroke **(Proposal)**).
-2. Given the setting Pressure curve (Soft, Linear, Firm) and Min and Max width in mm, then the same stroke gets a visibly different profile and the result is identical after save and reopen.
-3. Given the pen's eraser end, when it touches the canvas, then it erases (default: like the Eraser tool; the erase-to-next-crossing behaviour is slice 3).
-4. Given a mouse or a pen without pressure, then speed-simulated pressure (slow wide, fast thin) is available as an option, default off, and plain Freehand behaviour is unchanged otherwise.
-5. Given an old build opens the file, then the width profile is ignored and the centre line shows (format impact decided by the architect, ADR 0053 already covers the profile).
+**What it is.** A new rail tool, the Pencil (key `P`, design system rows "Pencil tool" and "Pencil bar", written for `0032`, **(Proposal)** reused), that turns the pen's samples into one path: a fitted Bézier centre line plus a width profile on its normalised arc length (ADR 0053). That is the same object a Pen path with a width profile is today, so Node tool, width diamonds (`0110` criterion 4), width profile buttons (`0110` criterion 5), Stroke to path and machine output work on it unchanged (Frage 410 C replaces the 0032 decision to store a filled outline). Pressure and the coalesced samples between frames reach the session as batches of the `PenSample` record of slice 0 (native on Linux, ADR 0094 decisions 3 to 5; Pointer Events with coalesced events on Windows, macOS and the browser build, decision 6). A mouse or a pen without pressure draws a uniform stroke; the pressure is simulated from speed only when "Simulate pressure" is on.
+
+**Reused from `0032` (it stays as history):** the has-pressure rule (criterion 3), the pressure smoothing and the three curves (criterion 9), the default widths, preview and Escape rules (criteria 11, 12), the touch rule (criterion 4), the glyph, key and cursor rows of the design system. **Not reused:** the closed filled outline (Frage 410 C), the pressure readout (slice 0 shows it), Pointer-Events-only input.
+
+**Decided by the customer:** Frage 410 C (centre line plus editable width profile), curves Soft/Linear/Firm and Min/Max width, mouse or pen without pressure uniform unless "Simulate pressure", fitted curve with a Smoothing value, batches of `PenSample`, eraser end erases. **Everything else here is a Proposal**, vetoable at the demo: own rail tool, Freehand mode untouched (Frage 414), eraser deletes whole objects, the numbers.
+
+Words: **sample** = one `PenSample`; **stroke** = the samples from the first with phase contact and end tip to the last contact; **has pressure** = the rule of `0032` criterion 3 applied to the `Pressure` of the stroke's samples (some sample not 0 and not 0.5); **centre line** = the fitted Bézier. The acceptance tests feed batches of `PenSample` to the session and need no tablet; the frontend tests feed Pointer Events to the route that builds the same records.
+
+Acceptance criteria:
+1. Given the Pencil and a stroke with pressure rising from 0.1 to 0.9 over 100 mm, when the last contact sample arrives, then exactly one new open path exists with a Bézier centre line and a width profile that is narrower at the start than at the end; it is selected, the tool stays the Pencil, and exactly one commit is made, one undo step named "Pencil stroke".
+2. Given 2000 samples along a smooth S-curve 150 mm long, then the centre line lies within the Smoothing tolerance of every sample (0.4 mm at the default 40 %; architect, ADR 0095), has at most 1 node per 3 mm (at most 50) and no node per sample, and the release is processed in under 200 ms thread CPU time in a release build **(Proposal)**.
+3. Given the pressure samples of a stroke, then the width at a sample is Min + (Max - Min) x curve(smoothed pressure) with the smoothing and curves of `0032` criterion 9 (mean of the sample and the two before it; Soft p^0.5, Linear p, Firm p squared); tests: pressures 0.2, 0.2, 1.0, 0.2, 0.2 smooth to 0.2, 0.2, 0.467, 0.467, 0.467 (+/-0.001); smoothed 0.25 gives 0.5 with Soft, 0.25 with Linear, 0.0625 with Firm.
+4. Given the same stroke drawn with Soft, Linear and Firm, then the three width profiles differ (Soft widest, Firm narrowest at mid pressure), and Min and Max width set the narrowest and widest profile width in mm (defaults 0.2 and 2, ranges 0.05 to 20 and 0.1 to 50, Max never below Min, as `0032` criterion 14).
+5. Given a finished stroke, then its profile has no more width points than needed to stay within 5 percent of Max - Min of the sampled widths **(Proposal)** and is stored on normalised arc length; after save and reopen the path, its centre line and its profile are identical (ADR 0053, no format change).
+6. Given a finished stroke, when it is selected with the Node tool, then its nodes and width diamonds are the ones of `0110` (add, drag, Delete a diamond; one drag one undo step) and the Style panel's profile buttons (Uniform, Taper start, Taper end, Taper both) work on it as on a Pen path.
+7. Given a stroke without pressure (a mouse, or a pen whose samples are all 0 or all 0.5), then the path has a centre line and no width profile and its width is the current stroke width; "Simulate pressure" is off by default and a mouse behaves as a plain freehand line.
+8. Given "Simulate pressure" is on and a stroke without pressure, then the width follows the speed from the sample times: pressure = clamp(1 - v / 300 mm/s, 0, 1) **(Proposal)**, then the same curves and Min/Max; tests: constant speed gives a constant width, a stroke half as fast gives a wider width than the faster one, fast and slow parts of one stroke give a wider slow part. Given a stroke with pressure, then the option is ignored.
+9. Given the Smoothing value (the scale and default of the Pen's Freehand slider, `0110` criterion 1), then the same samples with a higher value never give more nodes, with 0 the centre line stays within 0.1 mm of every sample, and the value applies from the next stroke (session setting, not saved in the document).
+10. Given a stroke in progress, then the canvas shows the blue preview with the variable width (the hollow outline, design-system row "Live preview outline"; a 1.5 px line for a stroke without pressure and without simulation), updated at least once per animation frame for strokes up to 2000 samples, and on release the object lies within the Smoothing tolerance plus 5 % of Max − Min of the last preview (the preview shows the raw samples; the live fitted curve is slice 3; architect, ADR 0095).
+11. Given a batch with hover samples (phase hover or out), then they move the pointer as a mouse move does and start nothing; given samples of one stroke spread over several batches, then the stroke equals the same samples in one batch; given a touch pointer, then the Pencil ignores it; given samples with barrel bits or tilt, then they are carried and change nothing.
+12. Given the pen's eraser end (end eraser, contact), then objects whose line comes within the 8 px hit rule of `0014` of its path are deleted when it lifts (hidden and locked objects are not touched), in one undo step named "Erase", with the Pencil active; no stroke is created; the hovering eraser end highlights what it would delete as the hover box does **(Proposal)**. Partial erasing up to the next crossing is slice 3.
+13. Given a new stroke, then it takes the current stroke style and the operation of the current layer or page as a new Pen path does, and its fill is None; the profile widths come from Min and Max, not from the style's stroke width.
+14. Given a Pencil stroke in a job, then machine output follows the centre line and ignores the width (ADR 0053, `0110` criterion 6): the job geometry equals that of the same path without a profile; Stroke to path makes the closed outline; SVG export follows the visible outline as for any variable stroke.
+15. Given Escape during a stroke, then it is cancelled and nothing is written; given fewer than 2 samples or a length below 0.1 mm, then nothing is created and no commit is made (`0032` criterion 12).
+16. Given the Pen's Freehand mode, then it behaves exactly as before and all its tests pass unchanged (Frage 414 A).
+17. Given any input, then no pressure samples, device names or tilt are stored in the document or sent anywhere; only the fitted centre line and profile are kept (R-SYS-007).
+
+Edge cases: a stroke that never leaves 0 pressure with a pen (has no pressure, criterion 7); pressure that jumps from 0 to 1 between two samples (smoothed, criterion 3); a stroke of one batch of 256 samples with dropped ones (ADR 0094 decision 4: the fit uses what arrived, the stroke is still one path); a closed loop (stays an open path; closing is slice 3 or later); a stroke released after the pen left the window (the last contact sample ends it); two strokes within one frame (two paths, two undo steps); an eraser end that touches nothing (no commit); a pen on a hidden or locked layer (nothing is created, a notice as for the Pen).
+
+Out of scope for slice 1: tilt effects, a stabiliser and live curve fit while drawing (slice 3), continuing or redrawing a stroke (slice 3), erasing part of a stroke (slice 3), shape recognition (slice 5), brushes and calligraphy outlines (slice 4), the second window and Pen layout (slice 2), pressure calibration, barrel and express-key bindings, touch drawing, removing the Pen's Freehand mode (Frage 414).
+
+**UX and architect, to do before the build starts (not blockers for the criteria):** UX notes for the Pencil rail slot (the rail has changed since `0032`: Text and others took slots) and the Pencil bar (Smoothing, Simulate pressure, Min, Max, Curve; the `0032` rule "hidden until a pen was seen" does not hold because a mouse needs Smoothing and Simulate pressure) **(Proposal)**; architect to confirm the fit routine and profile reduction place (no new crate expected) and to put the session-side record in `adrs.md`.
 
 ### Slice 2: Pen window
 
@@ -78,6 +106,7 @@ Draft criteria:
 3. Given the pen window is closed and reopened, or the app is restarted, then it is offered again as the pen window with its last size, and a window dragged to the pen display keeps that place where the compositor allows it.
 4. Given the pen window is active, then the fixed Pen layout (Frage 413 A, not configurable) shows Pencil, Select, Node, Eraser, Undo and Redo (curated list **(Proposal)**, the UX notes fix the final set), a slim strip for colour, width and Smoothing, and a toggle that hides everything except the canvas.
 5. Given the main window shows the frame of the pen window's view, when the pen window pans or zooms, then the frame follows in the same frame.
+6. Given an object selected in one window (Frage 409 A, selection shared), then it is selected in the other window too, in the same frame as far as the 200 ms of criterion 1 allow; given a different tool or view in each window, then neither changes the other's (tool and view are per window); given Delete in one window, then the other window's selection is empty and one Ctrl+Z restores both.
 
 ### Slice 3: Stroke quality on the go
 
@@ -148,6 +177,12 @@ B is ruled out in practice (a second window in a browser seems too hard to the c
 
 **Frage 413 (PEN-LAYOUT): Answered A, fixed.** The Pen layout is one fixed, curated layout. The customer does not want it configurable at all (slice 2, criterion 4).
 
+**Frage 414 (PEN-FREEHAND): Answered A** (customer, 2026-11-27: both stay for now). Slice 1 adds the Pencil as its own rail tool. The Pen's Freehand mode (`0110`) draws a similar line without pressure. What happens to it is the customer's call (removing accepted behaviour).
+- A (default): keep both for now; the Freehand mode is untouched and revisited after the demo of slice 1.
+- B: remove the Freehand mode from the Pen bar once the Pencil ships (one tool for freehand).
+- C: the Freehand button switches to the Pencil tool.
+Recommendation: A, nothing is lost and the demo shows which one is used. Without an answer slice 1 is built as A.
+
 ## Out of scope
 
 - Painting and raster brushes (no pixel layers); a general stylus API for plugins.
@@ -166,3 +201,10 @@ Requirements: R-INP-001 (absorbed), R-INP-002 to R-INP-005, R-EDIT-050 (variable
 Specs: `specs/0032-pen-tablet-input/` (superseded by this epic; its code is on `origin/story/pen-tablet-input`: Schneider fit, variable outline, Pencil tool, pressure curves, reusable for slice 1), `specs/0110-pen-modes-variable-stroke/`, `specs/0033-stroke-brushes/`, `specs/0088-trace-recognition/`, `specs/0091-trace-text-recognition/`.
 ADRs: 0001 (Tauri 2, WebKitGTK), 0009 and 0031 (sync), 0053 (centre line and width profile); new ADRs needed: input route (Frage 408) and the pen window mechanism (needs-architect).
 PR: none yet.
+
+**Frage 415 (PEN-WINDOW-MECH): Answered A** (customer, 2026-11-27) (ADR 0096, `needs-customer`; slice 2 only, slice 1 does not depend on it). How the pen window holds the document:
+- A: a second window with its own copy of the document, kept equal locally all the time; undo per window, saving and recovery in the main window only, pictures twice in memory, no pen window in the browser build
+- B: one document drawing into both windows; a trial first, then a large rebuild; one shared undo stack
+- C: the document moves into the app process; a very large rebuild, the browser build goes away
+
+Recommendation: A. Default: A.
