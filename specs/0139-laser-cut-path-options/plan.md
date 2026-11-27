@@ -63,7 +63,7 @@ and operation).
 - [x] 10. Budgets: job of 1,000 Cut items of 20 nodes with Count 4 within 150 ms; handle redraw of
   a 20-node item with 20 tabs within 16 ms (AC 25; slice 2 adds leads and overcut to case a).
 - [x] 11. Frontend: Tabs group (Count, Width, placed line, Skip inner shapes), item part Tabs
-  row, Tabs toggle (Frage 410 C needs no start marker in this slice), capsule handles, width chip,
+  row, Tabs toggle (Frage 415 C needs no start marker in this slice), capsule handles, width chip,
   Operations view bars; no hint text (AC 1, 2, 5, 6, 7).
 - [x] 12. Docs: amendments `0029` 22 and `0101` 19, Status notes of ADR 0046, 0056, 0064, the
   `CURRENT_FORMAT_VERSION` paragraph, design-system rows (ux-notes 13, tab rows only).
@@ -108,3 +108,90 @@ and operation).
   newer-version check.
 - Thread CPU time budgets in `curvyo-editor-wasm/tests/`.
 - Full gate of `CLAUDE.md` §7 once at the end.
+
+# Plan addendum, slice 2: path options (start and end, lead-in, lead-out, overcut)
+
+Implementer, 2026-11-27. Criteria 13 to 23, 24, 25 (a and b with leads and markers), the path
+goldens, `format_version` 68 (the next free number after slice 1's 67). Where `ux-notes.md` and
+`adrs.md` disagree the ADR wins: start and direction records are per item and operation
+(`entry.<key>` on the operation node, the item part shows the values of its row's operation), and
+a start marker never rests inside a tab (it stops at the tab's edge; a later tab over a set start
+moves the burn start to that tab's end). Frage 414 A (Automatic until set) and 415 C (an Automatic
+marker only while the Tabs tool is on) are applied.
+
+## Affected crates/modules
+
+- `curvyo-laser-core`:
+  - `operation_path_options.rs` (new): `LeadKind`, `Overcut`, `PathOptions`, `PathEdit`, the five
+    `op_options` keys `lead_in`, `lead_in_mm`, `lead_out`, `lead_out_mm`, `overcut_mm` on `cut`
+    and `cut_out` only (L2), written only when one differs from its default; the
+    `path_own.<key>` register codec (all five values, damage as L3). `CutLength` gains the lead
+    range (one type, two ranges, L2). `OperationOptions.path` (a field beside `cut`, so the
+    slice 1 literals of `CutSettings` stay as they are).
+  - `cut_entry_records.rs` (new): `Direction`, `OutlineEntry`, the `entry.<key>` register codec
+    and its damage, `LeafPath` (an item's own path options and entries resolved per outline).
+  - `job_cut_lead.rs` (new): waste side from the nesting depth and the exact `i128` shoelace
+    sign, Line and Arc leads (quarter circle by bisection, `+ - * / sqrt` only), L9.
+  - `job_cut_path.rs`, `job_plan_cuts.rs`, `job_order.rs`, `job_plan.rs`: a unit takes the cut
+    path step when it has tabs, a lead or overcut on a closed outline, or an entry; candidates of
+    L7 (one for a set start or a fixed direction; every vertex for an Automatic closed outline
+    without tabs); overcut and leads around the pieces (L8); `CutMark` gains the lead, overcut
+    and start polylines; `Plan.starts` (where each cut outline is really entered, for the
+    Automatic marker, C7) and `Plan.leads_touch`.
+  - `job_cut_checks.rs` (new): the lead-touches-a-cut count of L11; `Cause::LeadsTouchCut` and
+    its texts in `job_gate_text.rs`; damaged `path_own.`/`entry.` records in `DamagedSettings`.
+  - `job_input.rs`, `job_fingerprint.rs`: `LeafInput.path`, `CutOutItem.path`, hashed (L10).
+- `curvyo-document-core`: the `path_own.` and `entry.` registers beside `tabs.` (read, written
+  in one step, swept and removed with the membership, L4); `format_version` 68 with its
+  paragraph; goldens `laser_path_options_v68.curvyo`, `laser_path_options_damaged_v68.curvyo`.
+- `curvyo-ui-core`: history names "Own path options", "Back to the operation's", "Move start
+  point", "Automatic start", "Direction".
+- `curvyo-editor-wasm`: the records into the job input; the Path options edits of the lower part;
+  the item part's Path options pill, own fields, Start readout with Automatic, Direction pill;
+  start markers (drag, Delete, Automatic only while the Tabs tool is on); Operations view lead,
+  overcut and chevron marks from `Plan.marks`; the Checks line; budget cases.
+- `frontend`: the Path options group (Lead-in and Lead-out pills with length, Overcut), the item
+  part rows, the glyphs; no hint text.
+
+## Tasks
+
+- [ ] 13. `operation_path_options.rs`: ranges, defaults, typed values with the chip texts,
+  `KeyOnKind` off Cut and Cut-out, write only when not default, the `path_own.` codec (AC 13,
+  21, 22).
+- [ ] 14. `cut_entry_records.rs`: `entry.<key>` read and write, damage (not a map, unknown
+  field, fraction out of range, unknown direction), `LeafPath` per outline reference (AC 19 to
+  22).
+- [ ] 15. `job_cut_lead.rs`: waste side by depth and orientation, Line and Arc lead-in and
+  lead-out, direction at a corner from the leaving and arriving segment (AC 14).
+- [ ] 16. Cut path step: overcut `min(d, L)` stopping at the first tab, none when a tab covers
+  the closing point, lead-out after the overcut; tabs win; set start inside a tab moves to the
+  tab's end; open Direction one entry; nearest order measured to the entry on the path; passes
+  repeat (AC 15, 16, 19, 20, 9).
+- [ ] 17. Marks and starts for the Operations view and the markers; fingerprint (AC 19, L10,
+  L12).
+- [ ] 18. Checks: `LeadsTouchCut` with its texts, damaged records run nothing (AC 18, 22).
+- [ ] 19. GRBL goldens `lead_in_line_outer`, `lead_in_arc_outer`, `lead_in_hole`,
+  `lead_out_arc`, `overcut_closed`, `overcut_stops_at_tab`, `path_options_passes`,
+  `path_options_own_item`, `start_point_set`, `open_direction_reversed`, `tabs_leads_overcut`
+  with a read-back of burn lengths and lead geometry; work area 4 b and Frame count leads; every
+  existing golden unchanged (AC 14 to 17, 19, 20, 24).
+- [ ] 20. Document: the two registers, sweep and unassign, undo, format 68 with the refusal by
+  older builds, the old tests' format numbers and the svg-core export goldens' `format_version`
+  line, the two goldens (AC 22, 23).
+- [ ] 21. Session: records into the job input; Path options edits; item part (pill, own fields,
+  Start and Automatic, Direction); start markers with drag, snap, tab stop and Delete; marks;
+  Checks line (AC 13, 19 to 21, 23).
+- [ ] 22. Budgets: case a with Lead-in Arc, Lead-out Line, Overcut 2 mm within 150 ms; case b
+  with start markers within 16 ms (AC 25).
+- [ ] 23. Frontend: Path options group, item part rows, no hint text (AC 13, 19 to 21).
+- [ ] 24. Docs: design-system rows for the start marker and the lead look; ADR Status notes
+  extended where slice 2 adds to them.
+
+## Validation
+
+- Unit tests first in each new laser-core module with the spec's numbers (2 mm below the side,
+  1 mm inside the hole, 65 mm and 59 mm burn).
+- GRBL goldens read back by the reader of `tabs_goldens.rs` (extended for lead lengths), every
+  existing golden re-run unchanged (AC 24).
+- Document goldens of format 68: read, saved back byte for byte; a 67 build's refusal.
+- Full gate of `CLAUDE.md` §7 once at the end, into a file.

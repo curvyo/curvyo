@@ -5,7 +5,7 @@ slices. **No new ADR, no new crate, no new dependency.** One `format_version` bu
 story (L6). The decisions below are amendments by note to the ADRs listed first, in the same way
 `0111` (ADR 0056 §6) and `0118` slice 2d (adrs P7, P8) changed the operation and profile
 registers. Everything below is a **(Proposal)** unless it quotes an ADR, a criterion or a
-customer answer (Fragen 279 A, 280 A, 281 A; 407 A as the default).
+customer answer (Fragen 279 A, 280 A, 281 A; 414 A as the default).
 
 ## ADRs this feature depends on or amends
 
@@ -71,7 +71,7 @@ without a new key form.
   values `lead_in`, `lead_in_mm`, `lead_out`, `lead_out_mm`, `overcut_mm`, ranges as L2.
 - `entry.<key>`: **start points and directions** (criteria 19, 20): a map from an outline
   reference to `{ "start": <ppb> }` (closed) or `{ "direction": "as_drawn" | "reversed" }`
-  (open). Missing = Automatic (Frage 407 A); Automatic deletes the entry, the last one deletes
+  (open). Missing = Automatic (Frage 414 A); Automatic deletes the entry, the last one deletes
   the register.
 - **Outline reference:** `"<n>"` when the target is the leaf itself (n = the outline's index in
   the leaf, a compound path's subpath), `"<path>:<n>"` for a leaf below the target (`<path>` the
