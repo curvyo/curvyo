@@ -4,6 +4,7 @@ import { createSketchPresentation, type SketchPresentation } from "@/lib/sketchP
 import { type DropBadgeKind, decodeDragAnswer } from "@/lib/dragAnswer";
 import { type SketchView } from "@/lib/sketchView";
 import { viewTool } from "@/lib/viewTool";
+import { usePencilFeed } from "@/hooks/usePencilFeed";
 
 /** The wheel delta one press of the View card's Zoom stands for (one notch of a mouse wheel). */
 const ZOOM_STEP_DELTA = 100;
@@ -89,7 +90,8 @@ export type Tool =
   | "trace"
   | "measure"
   | "test-grid"
-  | "generators";
+  | "generators"
+  | "pencil";
 
 /** The polygon/star tool-options bar's mode toggle (acceptance criteria
  * 11 vs. 12). */
@@ -1299,6 +1301,22 @@ export function useEditorSession(
   const history = useHistory(getSession, syncFromSession, containerRef, onHistoryStarted);
   // `showNotice` is stable (a callback without dependencies), so the render loop may keep it.
   const showNoticeRef = useRef(history.showNotice);
+  // The Pencil's samples (`specs/0158-pen-display` slice 1): fed by the canvas handlers, flushed
+  // by the render loop before each frame.
+  const pencil = usePencilFeed(canvasRef, tool === "pencil");
+  const pencilRef = useRef(pencil);
+  useEffect(() => {
+    pencilRef.current = pencil;
+  }, [pencil]);
+  const afterPencilFlushRef = useRef((session: WasmSession, ended: boolean) => {
+    // A hidden or locked target layer refuses the stroke with the Pen's notice (`0050` crit. 23).
+    const layerNotice = parseLayerNotice(session.take_layer_notice());
+    if (layerNotice) {
+      showNoticeRef.current(layerNotice.text, undefined, "canvas", layerNotice.kind);
+    }
+    setCursorHint(session.cursor_hint());
+    if (ended) syncFromSessionRef.current();
+  });
   // Where the maker last pressed anywhere in the window (canvas, panel or bar): a refusal shows
   // beside it (UX review U8).
   const lastWindowPressRef = useRef<{ x: number; y: number } | null>(null);
@@ -1696,6 +1714,9 @@ export function useEditorSession(
       const session = sessionRef.current;
       let state: Float64Array | null = null;
       if (session) {
+        // One `pen_samples` call per frame, before the frame is drawn (ADR 0095 decision 2).
+        const flushed = pencilRef.current.flush(session);
+        if (flushed) afterPencilFlushRef.current(session, flushed.ended);
         const stateStart = perfStart();
         state = session.frame_state();
         perfSpan("loop: frame_state", stateStart);
@@ -2453,6 +2474,34 @@ export function useEditorSession(
         return;
       }
 
+      // The Pencil takes its gesture as samples, never as `pointer_down` (ADR 0095 decision 2);
+      // touch is ignored (criterion 11).
+      if (session.tool() === "pencil" && !sketchWorkbenchRef.current) {
+        if (event.pointerType !== "touch" && event.button === 0) {
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {
+            // Not capturable (a synthetic event): the stroke still works over the canvas.
+          }
+        }
+        if (event.pointerType !== "touch") {
+          pencilRef.current.pointer({
+            type: "pointerdown",
+            pointerType: event.pointerType,
+            clientX: event.clientX,
+            clientY: event.clientY,
+            pressure: event.pressure,
+            tiltX: event.tiltX,
+            tiltY: event.tiltY,
+            buttons: event.buttons,
+            timeStamp: event.timeStamp,
+            button: event.button,
+          });
+        }
+        event.preventDefault();
+        return;
+      }
+
       // Sketch secondary events cancel a pending step and never enter primary creation.
       if (event.button === 2 && sketchWorkbenchRef.current) {
         if (session.sketch_secondary_press()) event.preventDefault();
@@ -2607,6 +2656,23 @@ export function useEditorSession(
         perfSpan("pointermove handler (pan)", moveStart);
         return;
       }
+      if (session?.tool() === "pencil" && !sketchWorkbenchRef.current) {
+        const native = event.nativeEvent;
+        pencilRef.current.pointer({
+          type: "pointermove",
+          pointerType: event.pointerType,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          pressure: event.pressure,
+          tiltX: event.tiltX,
+          tiltY: event.tiltY,
+          buttons: event.buttons,
+          timeStamp: event.timeStamp,
+          button: event.button,
+          getCoalescedEvents: native.getCoalescedEvents ? () => native.getCoalescedEvents() : undefined,
+        });
+        return;
+      }
       // A held-back second press that moves beyond the drag threshold is a drag, never a
       // double-click: the session gets the press now, at its own place, then this move.
       const withheld = doubleClickPressRef.current;
@@ -2680,6 +2746,26 @@ export function useEditorSession(
         return;
       }
       if (event.button === 2 && sketchWorkbenchRef.current) return;
+      if (session.tool() === "pencil" && !sketchWorkbenchRef.current && !panningRef.current) {
+        try {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        } catch {
+          // Not captured: nothing to release.
+        }
+        pencilRef.current.pointer({
+          type: "pointerup",
+          pointerType: event.pointerType,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          pressure: 0,
+          tiltX: event.tiltX,
+          tiltY: event.tiltY,
+          buttons: event.buttons,
+          timeStamp: event.timeStamp,
+          button: event.button,
+        });
+        return;
+      }
       // The Measure tool ignores the secondary button (customer feedback on PR #243); the Pen
       // took its secondary press whole at the press.
       if (event.button === 2 && (session.tool() === "measure" || session.tool() === "pen")) return;
@@ -2826,6 +2912,7 @@ export function useEditorSession(
 
   const onPointerCancel = useCallback(() => {
     markPressRef.current = null;
+    pencilRef.current.reset();
     sessionRef.current?.pointer_cancelled();
     setLiveReadout(null);
     setCursorHint("default");

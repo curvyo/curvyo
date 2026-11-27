@@ -41,6 +41,9 @@
  */
 
 const SIZE = 24;
+/** Lucide's `Eraser` outline (24 unit grid). */
+const ERASER_GLYPH =
+  "m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21M22 21H7M5 11l9 9";
 const HOTSPOT = SIZE / 2;
 
 /** An SVG drawn white-under-black so it reads on any background. */
@@ -120,6 +123,24 @@ export function cursorForHint(hint: string): string | undefined {
   }
   if (hint === "crosshair") {
     return "crosshair";
+  }
+  if (hint === "pencil-eraser") {
+    // The Pencil's eraser end (`specs/0158-pen-display` UX notes §5): a 16 px circle, the 8 px
+    // hit reach as its radius, 1 px black over a white halo, and a 12 px eraser at its lower
+    // right; the hotspot is the centre.
+    const ring =
+      `<circle cx="9" cy="9" r="8" fill="none" stroke="white" stroke-width="3"/>` +
+      `<circle cx="9" cy="9" r="8" fill="none" stroke="black" stroke-width="1"/>`;
+    const eraser =
+      `<g transform="translate(14 14) scale(0.5)" fill="none" stroke-linecap="round" stroke-linejoin="round">` +
+      `<path d="${ERASER_GLYPH}" stroke="white" stroke-width="5"/>` +
+      `<path d="${ERASER_GLYPH}" stroke="black" stroke-width="2"/></g>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE + 2}" height="${SIZE + 2}" viewBox="0 0 ${SIZE + 2} ${SIZE + 2}">` +
+        ring +
+        eraser +
+        `</svg>`,
+    )}") 9 9, crosshair`;
   }
   if (hint === "arrow") {
     // The pick mode of Box from path: the arrow, not the placing tools' crosshair (`0149`).
