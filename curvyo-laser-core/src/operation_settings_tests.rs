@@ -231,7 +231,7 @@ fn an_interval_out_of_place_or_range_is_damage() {
     );
 }
 
-/// `specs/0146` criterion 17 (ADR 0090 decision 7): `pick` is stored for the three picks after
+/// `specs/0146` criterion 17 (ADR 0093 decision 7): `pick` is stored for the three picks after
 /// Best and absent for Best; `"best"`, an unknown word and a number are a bad link, and a link
 /// without the key follows Best.
 #[test]

@@ -1,4 +1,4 @@
-# ADR 0092: Material test picks: four pick kinds on the test and in the material, the pick kind in the operation's material link, round Engrave cells; material record format 5, project format next free
+# ADR 0093: Material test picks: four pick kinds on the test and in the material, the pick kind in the operation's material link, round Engrave cells; material record format 5, project format next free
 
 **Status:** Proposed 2026-11-26 by the architect, `needs-customer` (persistence: material record format 5; document model: a new key in the operation's material link and a project `format_version`), accepted with the story PR as ADR 0057 and 0058 were. Built on the spec's defaults Frage 312 A (four kinds, at most one cell per kind per test), 313 A (each linked operation says which pick it follows, default Best, live), 314 A (a hatched circle of the cell's diameter, old grids keep squares until edited), 315 A (Cut and Score stay squares), 316 A (view-only frames on the selected grid). Amends [ADR 0058](0058-material-records-shared-across-lasers.md) §2 and §6 (record shape, set source rule, record text limit), [ADR 0054](0054-laser-settings-and-test-grids-in-the-project-file.md) §1 and §2 (the link gains `pick`, which set runs), [ADR 0057](0057-test-grid-object-with-derived-operations.md) §1 (the Engrave cell's shape) and [ADR 0062](0062-synced-per-user-libraries.md) decision 6 as amended by `0116` P2 (the synced material text cap); notes go on each. [ADR 0062](0062-synced-per-user-libraries.md) decision 5 (merge) is unchanged. Spec: [`0146`](../../specs/0146-material-test-picks/specification.md). Feature notes: [`0146` adrs.md](../../specs/0146-material-test-picks/adrs.md). Choices marked (Proposal) are the architect's, vetoable at the demo.
 
@@ -23,7 +23,7 @@ Today a test holds one `best` cell, and judging writes the laser's set of the te
 
 **Where the pick kind lives in the project**
 
-- **A. A key `pick` inside the atomic `material` map of `op_settings` (chosen).** A merge can never pair one peer's material with the other peer's pick. With `pick` absent meaning Best, an operation that follows Best stays byte-identical to format 64.
+- **A. A key `pick` inside the atomic `material` map of `op_settings` (chosen).** A merge can never pair one peer's material with the other peer's pick. With `pick` absent meaning Best, an operation that follows Best stays byte-identical to format 65.
 - **B. Its own register on the operation node.** Two peers changing the material and the pick at once could keep one's material with the other's pick, for example a Deepest pick on a material that has none. Rejected.
 
 **Sync of picks marked on two devices (spec criterion 12)**
@@ -33,7 +33,7 @@ Today a test holds one `best` cell, and judging writes the laser's set of the te
 
 **Format numbers**
 
-- **A. Material record format 5 and project format next free at merge, 65 on today's main (chosen).** Criterion 11 asks that an older build leaves a record with picks untouched as newer, which only a bump gives. The `material` map refuses unknown keys, so a build of 64 would read every pick-linked operation as Damaged settings. Version 61 took a bump for exactly that reason. In-place changes so far happened only inside the story that had introduced the number (ADR 0069 record format 3, ADR 0072 format 51 and record format 4), and 4 and 64 belong to merged stories.
+- **A. Material record format 5 and project format next free at merge, 66 on today's main (chosen).** Criterion 11 asks that an older build leaves a record with picks untouched as newer, which only a bump gives. The `material` map refuses unknown keys, so a build of 65 would read every pick-linked operation as Damaged settings. Version 61 took a bump for exactly that reason. In-place changes so far happened only inside the story that had introduced the number (ADR 0069 record format 3, ADR 0072 format 51 and record format 4), and 4 and 64 belong to merged stories.
 - **B. Material format 4 and project format 64 in place.** An older build would call a record with picks damaged, not newer, and a format-64 build of last week would show Damaged settings without a version notice. Rejected.
 
 **The round cell**
@@ -80,9 +80,9 @@ Today a test holds one `best` cell, and judging writes the laser's set of the te
 8. **Which numbers run** (amends ADR 0054 §2). `material_run` takes the main set from `Material::pick_set(profile, kind, pick)`. Best is `set_for`, and the others are the `picks` entry. A missing pick set is the "set missing" state, with the kind's word in the line ("Material has no Fastest set for this laser, using stored numbers."). The outline of Engrave + Outline follows the same pick: the Score set of that pick, else the Engrave set of that pick (the main numbers), which is today's fallback applied per pick (Proposal). The refresh guard, the overrides and the multi-row apply are unchanged:
    - Choosing a pick kind, also the one already set, writes the link with that kind, the numbers as last seen and no overrides in one step "Use pick" (spec criteria 13, 14).
    - The grid's labels operation and the derived cell operations keep their links and numbers. Their links never carry `pick` (spec criterion 16).
-9. **Project `format_version` next free at merge, 65 on today's main.** A build of 64 reads a link with `pick` as Damaged settings, so this build's files are refused there by version. A file of 64 or lower opens unchanged, and every link in it follows Best. No migration. Goldens in `curvyo-document-core/tests/fixtures/`:
-   - `material_pick_v65.curvyo`: four operations linked to Best, Second best, Fastest and Deepest, one with an override, plus a test grid whose labels row carries no pick;
-   - `material_pick_damaged_v65.curvyo`: `pick` `"best"`, `"cleanest"` and `3`. Each reads Damaged settings and saves back unchanged.
+9. **Project `format_version` next free at merge, 66 on today's main.** A build of 65 reads a link with `pick` as Damaged settings, so this build's files are refused there by version. A file of 65 or lower opens unchanged, and every link in it follows Best. No migration. Goldens in `curvyo-document-core/tests/fixtures/`:
+   - `material_pick_v66.curvyo`: four operations linked to Best, Second best, Fastest and Deepest, one with an override, plus a test grid whose labels row carries no pick;
+   - `material_pick_damaged_v66.curvyo`: `pick` `"best"`, `"cleanest"` and `3`. Each reads Damaged settings and saves back unchanged.
 10. **Round Engrave cells** (amends ADR 0057 §1; spec criteria 18 to 22). `curvyo-laser-core/src/test_cell_fill.rs` becomes "what a test grid's cell looks like". Beside `cell_style` it gains `cell_shape(test, min, side) -> Shape`:
     - an Engrave recipe gets `Shape::Ellipse` centred on the cell's square with rx = ry = side / 2, no arc;
     - every other kind gets the `Rect` of today.

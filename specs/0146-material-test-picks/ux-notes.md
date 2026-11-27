@@ -141,7 +141,7 @@ The Differs line, the "Material 60" lines and Reset to material work as built; "
 
 ### 5.3 Press
 
-- A press on any kind, **also the pressed one**, is one step **"Use pick"**: it writes the link with that kind and the numbers as last seen and clears every typed number (criterion 14, ADR 0092 §7; the rule of picking the linked material again in `0028` 8.2). No arming: undo is one press away, and the Reset rule already behaves so.
+- A press on any kind, **also the pressed one**, is one step **"Use pick"**: it writes the link with that kind and the numbers as last seen and clears every typed number (criterion 14, ADR 0093 §7; the rule of picking the linked material again in `0028` 8.2). No arming: undo is one press away, and the Reset rule already behaves so.
 - Focus stays on the pressed cell. No notice (no success notice).
 - An operation stored without a kind shows Best pressed (criterion 15).
 
@@ -247,4 +247,4 @@ The Differs line, the "Material 60" lines and Reset to material work as built; "
 
 ## Links
 
-Spec: `specs/0146-material-test-picks/specification.md`. ADR: `docs/adr/0092-material-test-picks-and-round-engrave-cells.md` (`specs/0146-material-test-picks/adrs.md`). Built notes revised: `specs/0112-test-grid-and-materials/ux-notes.md`, `specs/0028-material-test-library/ux-notes.md` 8.2 and 8.4. Design system: `docs/design-system.md` "Color tokens" (`--pick-*`) and "Material test picks (`0146`, draft 2026-11-26)".
+Spec: `specs/0146-material-test-picks/specification.md`. ADR: `docs/adr/0093-material-test-picks-and-round-engrave-cells.md` (`specs/0146-material-test-picks/adrs.md`). Built notes revised: `specs/0112-test-grid-and-materials/ux-notes.md`, `specs/0028-material-test-library/ux-notes.md` 8.2 and 8.4. Design system: `docs/design-system.md` "Color tokens" (`--pick-*`) and "Material test picks (`0146`, draft 2026-11-26)".

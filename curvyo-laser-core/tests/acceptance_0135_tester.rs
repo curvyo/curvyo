@@ -815,7 +815,7 @@ fn c51_c52_the_format_4_picture_record_round_trips_and_its_image_set_holds_no_ad
     let v: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(v["format_version"], 4);
     let m = read_record("0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c.json", &text).unwrap();
-    // Superseded by 0146 (ADR 0090): written back as format 5, nothing else differs.
+    // Superseded by 0146 (ADR 0093): written back as format 5, nothing else differs.
     assert_eq!(
         write_record(&m),
         text.replacen("\"format_version\": 4,", "\"format_version\": 5,", 1),

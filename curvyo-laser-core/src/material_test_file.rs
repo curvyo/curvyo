@@ -95,7 +95,7 @@ pub(crate) fn read_tests(
 }
 
 /// The marks of a test: each inside the recipe's counts; the three picks after Best exist from
-/// format 5 only (ADR 0090 decision 5).
+/// format 5 only (ADR 0093 decision 5).
 fn read_marks(
     test: &TestJson,
     id: TestId,

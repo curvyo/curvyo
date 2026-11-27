@@ -105,7 +105,7 @@ impl Material {
     }
 
     /// Writes `set` as the laser's pick set of `kind` (Second best, Fastest or Deepest). It is no
-    /// history entry (ADR 0090 decision 2); the caller raises `modified`.
+    /// history entry (ADR 0093 decision 2); the caller raises `modified`.
     fn write_pick_set(
         &mut self,
         machine: &MachineTie,

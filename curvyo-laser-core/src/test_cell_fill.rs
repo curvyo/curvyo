@@ -1,5 +1,5 @@
 //! What the cells of a test grid are drawn with (`specs/0123` criteria 44, 45; ADR 0069 §8,
-//! §13; `specs/0146` criterion 18, ADR 0090 decision 10): an outline for Cut and Score, a filled
+//! §13; `specs/0146` criterion 18, ADR 0093 decision 10): an outline for Cut and Score, a filled
 //! circle for Engrave, a black-to-white Gradient rectangle for Image.
 
 use curvyo_document_core::{

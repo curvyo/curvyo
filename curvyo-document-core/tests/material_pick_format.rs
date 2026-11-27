@@ -1,4 +1,4 @@
-//! Format 65 (`specs/0146-material-test-picks` criterion 17; ADR 0090 decision 9): an operation's
+//! Format 66 (`specs/0146-material-test-picks` criterion 17; ADR 0093 decision 9): an operation's
 //! `material` link may carry `pick`. The document core keeps it as plain values, so the goldens
 //! read back and save unchanged, damaged links included; the laser extension's reading is in
 //! `curvyo-laser-core/tests/material_pick_0146.rs`. `CURVYO_WRITE_FIXTURES=1` rewrites them.
@@ -15,8 +15,8 @@ use curvyo_document_core::{
 };
 use serde_json::{Map, Value, json};
 
-const GOLDEN: &str = "material_pick_v65.curvyo";
-const DAMAGED: &str = "material_pick_damaged_v65.curvyo";
+const GOLDEN: &str = "material_pick_v66.curvyo";
+const DAMAGED: &str = "material_pick_damaged_v66.curvyo";
 const MATERIAL: &str = "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c";
 
 fn fixture_path(name: &str) -> PathBuf {
@@ -161,13 +161,13 @@ fn write_on_request() {
 }
 
 #[test]
-fn the_goldens_are_format_65_read_back_and_save_unchanged() {
+fn the_goldens_are_format_66_read_back_and_save_unchanged() {
     write_on_request();
-    assert_eq!(CURRENT_FORMAT_VERSION, 65);
+    assert_eq!(CURRENT_FORMAT_VERSION, 66);
     for (name, expected) in [(GOLDEN, golden_document()), (DAMAGED, damaged_document())] {
         let bytes = std::fs::read(fixture_path(name)).unwrap();
         let manifest: Value = serde_json::from_slice(&members(&bytes)["manifest.json"]).unwrap();
-        assert_eq!(manifest["format_version"], 65, "{name}");
+        assert_eq!(manifest["format_version"], 66, "{name}");
         let d = unpack(2, &bytes).unwrap();
         assert_eq!(d.own_step_count(), 0, "opening writes no step");
         assert_eq!(settings(&d), settings(&expected), "{name}");

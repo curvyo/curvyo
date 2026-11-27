@@ -1,5 +1,5 @@
 //! Acceptance tests for `specs/0146-material-test-picks` (criteria 2, 3, 10, 11, 23), written
-//! black-box from the specification and ADR 0090 before the implementation was read. They use
+//! black-box from the specification and ADR 0093 before the implementation was read. They use
 //! only the public record API: records are JSON text in, `Material` and `write_record` out.
 #![allow(clippy::expect_used, clippy::too_many_lines, clippy::unwrap_used)]
 
@@ -83,7 +83,7 @@ fn damaged_reason(text: &str) -> String {
     }
 }
 
-// ---- Criterion 1, 6 (order), ADR 0090 decision 1: the four kinds ----
+// ---- Criterion 1, 6 (order), ADR 0093 decision 1: the four kinds ----
 
 #[test]
 fn four_pick_kinds_in_order_with_stored_names() {
@@ -236,7 +236,7 @@ fn record_of_600_kib_is_accepted_and_700_kib_is_refused() {
     assert!(damaged_reason(&too_big).contains("640 KiB"));
 }
 
-// ---- Criterion 23 (ADR 0090 decision 5): damage cases, each read as Damaged ----
+// ---- Criterion 23 (ADR 0093 decision 5): damage cases, each read as Damaged ----
 
 #[test]
 fn valid_format_5_pick_control_loads() {

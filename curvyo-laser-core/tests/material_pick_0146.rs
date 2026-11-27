@@ -1,5 +1,5 @@
 //! The laser extension reads the format 65 goldens of `curvyo-document-core/tests/fixtures/`
-//! (`specs/0146-material-test-picks` criteria 13 to 15, 17; ADR 0090 decisions 7 to 9): a link
+//! (`specs/0146-material-test-picks` criteria 13 to 15, 17; ADR 0093 decisions 7 to 9): a link
 //! follows the pick it stores, absent means Best, and `"best"`, an unknown word and a number are
 //! Damaged settings (a bad link).
 
@@ -37,7 +37,7 @@ fn reads(name: &str) -> Vec<(String, SettingsRead)> {
 
 #[test]
 fn each_link_follows_the_pick_it_stores_and_a_missing_key_means_best() {
-    let picks: Vec<(String, PickKind, bool)> = reads("material_pick_v65.curvyo")
+    let picks: Vec<(String, PickKind, bool)> = reads("material_pick_v66.curvyo")
         .into_iter()
         .map(|(name, read)| {
             let SettingsRead::Stored(stored) = read else {
@@ -63,7 +63,7 @@ fn each_link_follows_the_pick_it_stores_and_a_missing_key_means_best() {
 
 #[test]
 fn a_bad_pick_is_damaged_settings() {
-    for (name, read) in reads("material_pick_damaged_v65.curvyo") {
+    for (name, read) in reads("material_pick_damaged_v66.curvyo") {
         assert_eq!(
             read,
             SettingsRead::Damaged(SettingsDamage::BadLink),

@@ -24,7 +24,7 @@ pub struct MaterialLink {
     /// The record's `modified` the numbers were taken from (the refresh guard).
     pub modified: u64,
     /// Which pick of the material the operation follows; stored only when it is not Best
-    /// (`specs/0146`, ADR 0090 decision 7).
+    /// (`specs/0146`, ADR 0093 decision 7).
     pub pick: PickKind,
 }
 
