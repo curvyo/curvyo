@@ -26,8 +26,9 @@ pub const PX_PER_MM_AT_100: f64 = 96.0 / 25.4;
 
 /// A distance on screen in CSS pixels (`specs/0090-grid`, `adrs.md` decision 3): a newtype so a
 /// screen threshold is never confused with a document length.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub(crate) struct ScreenPx(pub f64);
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub struct ScreenPx(pub f64);
 
 impl ScreenPx {
     /// The CSS-pixel value.

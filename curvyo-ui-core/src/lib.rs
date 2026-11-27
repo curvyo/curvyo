@@ -158,6 +158,7 @@ mod pattern_output;
 mod pen_constraint;
 mod pen_entry;
 mod pen_entry_text;
+mod pen_sample;
 mod pen_target;
 pub use evaluate_path::{
     EvaluatePathError, SPIRO_TOLERANCE, evaluate_bspline_nodes, evaluate_object, evaluate_path,
@@ -542,6 +543,10 @@ pub use pen_entry_text::{
     PEN_ENTRY_GROUP_NAME, PEN_ENTRY_LENGTH_NOT_POSITIVE, PEN_ENTRY_OPENED_SENTENCE,
     pen_entry_added_sentence, pen_entry_label, pen_entry_name, pen_entry_notice, pen_entry_suffix,
 };
+pub use pen_sample::{
+    PEN_BATCH_LIMIT, PenBatch, PenBatcher, PenEnd, PenPhase, PenSample, Pressure, RawKind,
+    RawPenEvent, RawSource, Tilt, TimeUnwrap, event_age_ms,
+};
 pub use pen_target::{EndNode, EndNodeIndex, PenTarget, continuation_of, pen_target};
 pub use pen_tool::{
     ClosingPreview, Continuation, PenMode, PenTool, PointerUpOutcome as PenPointerUpOutcome,
@@ -718,7 +723,7 @@ pub use uniform_map::map_uniform;
 pub use units::{SelectedUnit, Units};
 pub use value_scale::{FieldShown, Grid, ValueField, ValueScale};
 /// The Trace tool's settings schema (criterion 6), passed through for the host.
-pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, SavedView, Viewport, Zoom};
+pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, SavedView, ScreenPx, Viewport, Zoom};
 pub use weld_plan::{
     WELD_COMMIT_LABEL, WeldAvailability, WeldPlan, WeldRefusal, plan_weld, weld_availability,
 };
