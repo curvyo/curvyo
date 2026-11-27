@@ -760,7 +760,17 @@ impl DocumentVersion {
 /// a damaged one makes its item run nothing and is kept unchanged. They go with the membership
 /// key (unassign, delete, the dead-key sweep). Goldens: `laser_path_options_v67.curvyo`,
 /// `laser_path_options_damaged_v67.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 67;
+/// Version 68 (`specs/0139-laser-cut-path-options` slice 2, `adrs.md` L2 to L6): the `op_options`
+/// of a Cut or Cut-out operation may hold `lead_in`, `lead_in_mm`, `lead_out`, `lead_out_mm` and
+/// `overcut_mm`, and an operation node may hold `path_own.<key>` (an item's own lead-in, lead-out
+/// and overcut, a plain map of those five values) and `entry.<key>` (an item's start points and
+/// directions, a plain map from an outline reference to `{ start }` or `{ direction }`). A build
+/// that stops at 67 reads the new `op_options` keys as damaged settings and ignores the records,
+/// which would enter a held part at a wrong place, so this build's files are refused there by
+/// version; a file of 67 or lower opens unchanged with every path Automatic and no lead. The
+/// records are opaque here, kept unchanged when damaged, and go with the membership key as the
+/// tabs do. Goldens: `laser_path_options_v68.curvyo`, `laser_path_options_damaged_v68.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 68;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

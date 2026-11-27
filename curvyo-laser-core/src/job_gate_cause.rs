@@ -148,6 +148,12 @@ pub enum Cause {
         /// The operation.
         op: NodeId,
     },
+    /// `specs/0139` criterion 18: leads or overcuts that cross or touch a cut of their
+    /// operation; they still burn. The count is the leads'.
+    LeadsTouchCut {
+        /// The operation.
+        op: NodeId,
+    },
 }
 
 impl Cause {
@@ -184,6 +190,7 @@ impl Cause {
             Self::BrokenAdjustments { .. } => 26,
             Self::StaleResults { .. } => 27,
             Self::CoveredByTabs { .. } => 28,
+            Self::LeadsTouchCut { .. } => 29,
         }
     }
 

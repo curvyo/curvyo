@@ -1,9 +1,11 @@
-//! Format 67 (`specs/0139-laser-cut-path-options` slice 1, adrs L2 to L6): the goldens
-//! `laser_path_options_v67.curvyo` and `laser_path_options_damaged_v67.curvyo` read back every
-//! tab option and every own tabs record as plain values and save back unchanged; files of 65 and
-//! older open with no records; a file of the next format is refused. The laser extension's reading
-//! of the same goldens is in `curvyo-laser-core/tests/tabs_document_goldens.rs`.
-//! `CURVYO_WRITE_FIXTURES=1` rewrites the two goldens of this file only.
+//! Formats 67 and 68 (`specs/0139-laser-cut-path-options` slices 1 and 2, adrs L2 to L6): the
+//! goldens `laser_path_options_v67.curvyo` and `laser_path_options_damaged_v67.curvyo` read back
+//! every tab option and every own tabs record, `laser_path_options_v68.curvyo` and
+//! `laser_path_options_damaged_v68.curvyo` every path option, own path options and entry, as plain
+//! values, and save back unchanged; older files open with no records; a file of the next format
+//! is refused. The laser extension's reading of the same goldens is in
+//! `curvyo-laser-core/tests/tabs_document_goldens.rs`. `CURVYO_WRITE_FIXTURES=1` rewrites the
+//! goldens of the current format only.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -12,8 +14,9 @@ use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
 use curvyo_document_core::{
-    ADD_TAB_COMMIT_LABEL, CURRENT_FORMAT_VERSION, Document, DocumentSize, NewOperation,
-    NewOutputPage, NodeId, OpenError, Point, RectBounds, member_key_text, pack, unpack,
+    ADD_TAB_COMMIT_LABEL, AnchorId, CURRENT_FORMAT_VERSION, Document, DocumentSize, ItemRecord,
+    MOVE_START_POINT_COMMIT_LABEL, NewAnchor, NewOperation, NewOutputPage, NodeId,
+    OWN_PATH_OPTIONS_COMMIT_LABEL, OpenError, Point, RectBounds, member_key_text, pack, unpack,
 };
 use loro::{LoroDoc, LoroValue, TreeParentId};
 use serde_json::{Map, Value, json};
@@ -25,7 +28,7 @@ fn fixture_path(name: &str) -> PathBuf {
 }
 
 fn read_or_write(name: &str, build: impl Fn() -> Vec<u8>) -> Vec<u8> {
-    if std::env::var_os("CURVYO_WRITE_FIXTURES").is_some() {
+    if std::env::var_os("CURVYO_WRITE_FIXTURES").is_some() && name.contains("_v68") {
         std::fs::write(fixture_path(name), build()).unwrap();
     }
     std::fs::read(fixture_path(name)).unwrap()
@@ -277,7 +280,6 @@ fn the_golden_reads_back_every_tab_option_and_record() {
         pack(&golden_document(), "0.1.0").unwrap()
     });
     assert_eq!(format_of(&bytes), 67);
-    assert_eq!(CURRENT_FORMAT_VERSION, 67);
     let d = open_unchanged(&bytes);
     let ops = d.operations(d.manufacturings()[0].id).unwrap();
     assert_eq!(
@@ -318,12 +320,23 @@ fn older_files_open_with_no_records_and_a_newer_file_is_refused() {
     for name in [
         "operation_tools_v44.curvyo",
         "generated_part_ops_v65.curvyo",
+        "laser_path_options_v67.curvyo",
     ] {
         let bytes = std::fs::read(fixture_path(name)).unwrap();
         let opened = open_unchanged(&bytes);
         for manufacturing in opened.manufacturings() {
             for operation in opened.operations(manufacturing.id).unwrap() {
-                assert!(opened.operation_tabs(operation.id).unwrap().is_empty());
+                if !name.contains("_v67") {
+                    assert_eq!(opened.operation_tabs(operation.id).unwrap().len(), 0);
+                }
+                for family in [ItemRecord::PathOwn, ItemRecord::Entry] {
+                    assert!(
+                        opened
+                            .operation_records(operation.id, family)
+                            .unwrap()
+                            .is_empty()
+                    );
+                }
             }
         }
     }
@@ -338,8 +351,196 @@ fn older_files_open_with_no_records_and_a_newer_file_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 68,
-            supported: 67
+            found: 69,
+            supported: 68
         })
     ));
+}
+
+fn record(d: &Document, op: NodeId, target: NodeId, family: ItemRecord, value: Value, label: &str) {
+    let key = member_key_text(&[target]);
+    assert!(
+        d.write_operation_records(op, &[(family, key, Some(map(value)))], label)
+            .unwrap()
+    );
+}
+
+/// Slice 2: a Cut with Lead-in Arc 2 mm, Lead-out Line and Overcut 1.5 mm; an item with own path
+/// options and a set start; an open line with a fixed direction; a group whose record names its
+/// member's outline; a Cut-out item with a set start on its contour.
+#[allow(clippy::many_single_char_names)] // the items of the golden
+fn golden_document_v68() -> Document {
+    let d = Document::new(1);
+    let mfg = laser(&d);
+    let a = rect(&d, 0.0);
+    let cut = op(&d, mfg, "cut", "Cut 1", &[vec![a]]);
+    assert!(
+        d.write_operation_options(
+            cut,
+            &map(
+                json!({"lead_in": "arc", "lead_in_mm": 2.0, "lead_out": "line",
+                        "lead_out_mm": 1.0, "overcut_mm": 1.5})
+            ),
+        )
+        .unwrap()
+    );
+    record(
+        &d,
+        cut,
+        a,
+        ItemRecord::PathOwn,
+        json!({"lead_in": "line", "lead_in_mm": 0.5, "lead_out": "none", "lead_out_mm": 1.0,
+               "overcut_mm": 0.0}),
+        OWN_PATH_OPTIONS_COMMIT_LABEL,
+    );
+    record(
+        &d,
+        cut,
+        a,
+        ItemRecord::Entry,
+        json!({"0": {"start": 250_000_000}}),
+        MOVE_START_POINT_COMMIT_LABEL,
+    );
+    let l = d.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 60.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(50.0, 60.0)),
+        ],
+        false,
+    );
+    assert!(d.set_operation_members(cut, &[vec![l]], true).unwrap());
+    record(
+        &d,
+        cut,
+        l,
+        ItemRecord::Entry,
+        json!({"0": {"direction": "reversed"}}),
+        curvyo_document_core::DIRECTION_COMMIT_LABEL,
+    );
+    let b = rect(&d, 40.0);
+    let c = rect(&d, 80.0);
+    let group = d.group_objects(&[b, c]).unwrap();
+    assert!(d.set_operation_members(cut, &[vec![group]], true).unwrap());
+    let member = member_key_text(&[c]);
+    record(
+        &d,
+        cut,
+        group,
+        ItemRecord::Entry,
+        json!({ format!("{member}:0"): {"start": 0} }),
+        MOVE_START_POINT_COMMIT_LABEL,
+    );
+    let cut_out = op(&d, mfg, "cut_out", "Cut-out 1", &[]);
+    let e = rect(&d, 120.0);
+    assert!(d.set_operation_members(cut_out, &[vec![e]], true).unwrap());
+    assert!(
+        d.write_operation_options(cut_out, &map(json!({"overcut_mm": 2.0})))
+            .unwrap()
+    );
+    record(
+        &d,
+        cut_out,
+        e,
+        ItemRecord::Entry,
+        json!({"0": {"start": 500_000_000}}),
+        MOVE_START_POINT_COMMIT_LABEL,
+    );
+    d
+}
+
+/// The damaged slice 2 records, one operation each: own path options not a map, out of range,
+/// with a missing value; an entry not a map, a start outside 0 to 1, an unknown direction.
+fn damaged_records_v68() -> Vec<(ItemRecord, Value)> {
+    let own = |overcut: f64| {
+        json!({"lead_in": "none", "lead_in_mm": 1.0, "lead_out": "none", "lead_out_mm": 1.0,
+               "overcut_mm": overcut})
+    };
+    vec![
+        (ItemRecord::PathOwn, json!({"lead_in": ["arc"]})),
+        (ItemRecord::PathOwn, own(10.5)),
+        (ItemRecord::PathOwn, json!({"lead_in": "line"})),
+        (ItemRecord::Entry, json!({"0": 3})),
+        (
+            ItemRecord::Entry,
+            json!({"0": {"start": 1_000_000_000_u64}}),
+        ),
+        (ItemRecord::Entry, json!({"0": {"direction": "sideways"}})),
+    ]
+}
+
+fn damaged_document_v68() -> Document {
+    let d = Document::new(1);
+    let mfg = laser(&d);
+    for (n, (family, value)) in damaged_records_v68().into_iter().enumerate() {
+        let x = 30.0 * f64::from(u32::try_from(n).unwrap());
+        let item = rect(&d, x);
+        let cut = op(&d, mfg, "cut", &format!("Damaged {}", n + 1), &[vec![item]]);
+        let label = if n % 2 == 0 {
+            OWN_PATH_OPTIONS_COMMIT_LABEL
+        } else {
+            MOVE_START_POINT_COMMIT_LABEL
+        };
+        record(&d, cut, item, family, value, label);
+    }
+    let options = op(&d, mfg, "cut", "Damaged options", &[]);
+    assert!(
+        d.write_operation_options(
+            options,
+            &map(json!({"lead_in": "spiral", "overcut_mm": 10.01}))
+        )
+        .unwrap()
+    );
+    let scored = op(&d, mfg, "score", "Damaged kind", &[]);
+    assert!(
+        d.write_operation_options(scored, &map(json!({"lead_out": "line"})))
+            .unwrap()
+    );
+    d
+}
+
+#[test]
+fn the_v68_golden_reads_back_every_path_option_and_record() {
+    let bytes = read_or_write("laser_path_options_v68.curvyo", || {
+        pack(&golden_document_v68(), "0.1.0").unwrap()
+    });
+    assert_eq!(format_of(&bytes), 68);
+    assert_eq!(CURRENT_FORMAT_VERSION, 68);
+    let d = open_unchanged(&bytes);
+    let ops = d.operations(d.manufacturings()[0].id).unwrap();
+    assert_eq!(
+        ops[0].options,
+        Some(
+            json!({"lead_in": "arc", "lead_in_mm": 2.0, "lead_out": "line",
+                    "lead_out_mm": 1.0, "overcut_mm": 1.5})
+        )
+    );
+    let own = d.operation_records(ops[0].id, ItemRecord::PathOwn).unwrap();
+    assert_eq!(own.len(), 1);
+    let entries = d.operation_records(ops[0].id, ItemRecord::Entry).unwrap();
+    assert_eq!(entries.len(), 3, "the item, the line and the group");
+    let line = entries
+        .values()
+        .find(|v| v["0"].get("direction").is_some())
+        .unwrap();
+    assert_eq!(line, &json!({"0": {"direction": "reversed"}}));
+    let cut_out = d.operation_records(ops[1].id, ItemRecord::Entry).unwrap();
+    assert_eq!(
+        cut_out.values().next(),
+        Some(&json!({"0": {"start": 500_000_000}}))
+    );
+}
+
+#[test]
+fn every_damaged_v68_record_is_kept_and_saved_back_unchanged() {
+    let bytes = read_or_write("laser_path_options_damaged_v68.curvyo", || {
+        pack(&damaged_document_v68(), "0.1.0").unwrap()
+    });
+    assert_eq!(format_of(&bytes), 68);
+    let d = open_unchanged(&bytes);
+    let ops = d.operations(d.manufacturings()[0].id).unwrap();
+    assert_eq!(ops.len(), 8);
+    for (op, (family, value)) in ops.iter().zip(damaged_records_v68()) {
+        let stored = d.operation_records(op.id, family).unwrap();
+        assert_eq!(stored.values().next(), Some(&value), "{}", op.name);
+    }
 }

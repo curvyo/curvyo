@@ -161,6 +161,11 @@ pub const FREE_STEPS: &[&str] = &[
     "tab_width",
     "own_tabs",
     "operations_tabs",
+    "own_path_options",
+    "operations_path_options",
+    "move_start_point",
+    "automatic_start",
+    "direction",
     // `specs/0112-test-grid-and-materials`: the grid writes its group and its derived operations
     // from the tool bar and the Materials tab, never through the selected objects' handles; the
     // material steps write the root marker only.

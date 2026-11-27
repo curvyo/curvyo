@@ -24,7 +24,8 @@ impl Hasher for Fnv {
 }
 
 /// The key of the plan of `block` with `numbers`: kind, interval, the hatch options, the Image
-/// settings, the cut path settings and every leaf's tabs (`specs/0139` adrs L10), the Cut-out margin and every leaf's node, stacking order, coordinates, asset and
+/// settings, the cut path settings and path options and every leaf's tabs, own path options and entries
+/// (`specs/0139` adrs L10), the Cut-out margin and every leaf's node, stacking order, coordinates, asset and
 /// gradient. Power, speed, passes, overscan
 /// and the Z offset do not change a plan and are left out.
 #[must_use]
@@ -38,6 +39,7 @@ pub fn plan_fingerprint(block: &BlockInput, numbers: &BlockNumbers) -> u64 {
     numbers.options.scan_angle.hash(&mut fnv);
     numbers.options.image.hash(&mut fnv);
     numbers.options.cut.hash(&mut fnv);
+    numbers.options.path.hash(&mut fnv);
     if let BlockSource::Operation { margin, .. } = &block.source {
         margin.as_mm().to_bits().hash(&mut fnv);
     }
@@ -47,12 +49,14 @@ pub fn plan_fingerprint(block: &BlockInput, numbers: &BlockNumbers) -> u64 {
         leaf.stacking.hash(&mut fnv);
         geometry_hash(&leaf.geometry, &mut fnv);
         leaf.cut.hash(&mut fnv);
+        leaf.path.hash(&mut fnv);
     }
     block.cut_out.len().hash(&mut fnv);
     for item in &block.cut_out {
         item.item.hash(&mut fnv);
         item.stacking.hash(&mut fnv);
         item.cut.hash(&mut fnv);
+        item.path.hash(&mut fnv);
         item.leaves.len().hash(&mut fnv);
         for leaf in &item.leaves {
             outlines_hash(leaf, &mut fnv);

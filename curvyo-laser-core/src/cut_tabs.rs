@@ -176,6 +176,33 @@ impl Measured {
         }
     }
 
+    /// The unit direction of the outline arriving at `arc` (the segment that ends there; at a
+    /// closed outline's first point, its closing segment), for a lead-out (criterion 14).
+    #[must_use]
+    pub fn tangent_before(&self, arc: f64) -> (f64, f64) {
+        if self.points.len() < 2 {
+            return (1.0, 0.0);
+        }
+        let mut arc = self.wrap(arc);
+        if self.closed && arc <= 0.0 {
+            arc = self.length();
+        }
+        let last = self.at.len().saturating_sub(2);
+        let i = self
+            .at
+            .partition_point(|&v| v < arc)
+            .saturating_sub(1)
+            .min(last);
+        let (a, b) = (self.vertex(i), self.vertex(i + 1));
+        let (dx, dy) = (as_f64(b.x - a.x), as_f64(b.y - a.y));
+        let norm = (dx * dx + dy * dy).sqrt();
+        if norm > 0.0 {
+            (dx / norm, dy / norm)
+        } else {
+            (1.0, 0.0)
+        }
+    }
+
     /// The arc of the point of the outline nearest to `p` (µm) and its squared distance.
     #[must_use]
     #[allow(clippy::many_single_char_names)] // the usual names of a projection onto a segment

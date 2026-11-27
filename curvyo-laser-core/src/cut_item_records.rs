@@ -77,6 +77,9 @@ pub enum RecordDamage {
     BadWidth,
     /// Two tabs that overlap (also two at one position).
     Overlap,
+    /// A lead kind, lead length, overcut or direction outside its values (`specs/0139`
+    /// criterion 22).
+    BadValue,
 }
 
 /// The own tabs of one item in one operation, by outline reference (adrs L3). An outline that is

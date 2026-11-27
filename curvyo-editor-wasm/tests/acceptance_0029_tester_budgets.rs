@@ -124,6 +124,7 @@ fn c36a_a_thousand_cut_items_of_20_nodes_build_within_100_ms_cold() {
                 20,
             )]),
             cut: curvyo_laser_core::tabs::LeafTabs::default(),
+            path: curvyo_laser_core::tabs::LeafPath::default(),
         })
         .collect();
     let v = json!({"main": {"power_pct": 60.0, "speed_mm_min": 3000, "passes": 1}});
@@ -174,6 +175,7 @@ fn engrave(crosshatch: bool) -> JobInput {
                 closed: true,
             }]),
             cut: curvyo_laser_core::tabs::LeafTabs::default(),
+            path: curvyo_laser_core::tabs::LeafPath::default(),
         }],
         cut_out: Vec::new(),
     }])

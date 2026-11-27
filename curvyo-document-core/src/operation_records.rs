@@ -1,5 +1,6 @@
 //! The records an operation keeps for one of its items (`specs/0139` adrs L3, L4): the
-//! `tabs.<key>` registers, keyed by the item's membership key text and opaque here.
+//! `tabs.<key>`, `path_own.<key>` and `entry.<key>` registers, keyed by the item's membership key
+//! text and opaque here.
 
 use std::collections::BTreeMap;
 
@@ -17,8 +18,41 @@ use crate::path_model::NodeId;
 /// `member.` of the item's membership key.
 pub(crate) const TABS_PREFIX: &str = "tabs.";
 
-/// The record prefixes that live and die with a membership key (slice 2 adds its own).
-const RECORD_PREFIXES: [&str; 1] = [TABS_PREFIX];
+/// The prefix of an item's own path options in one operation (`specs/0139` criterion 21).
+pub(crate) const PATH_OWN_PREFIX: &str = "path_own.";
+/// The prefix of an item's start points and directions in one operation (criteria 19, 20).
+pub(crate) const ENTRY_PREFIX: &str = "entry.";
+
+/// The record prefixes that live and die with a membership key.
+const RECORD_PREFIXES: [&str; 3] = [TABS_PREFIX, PATH_OWN_PREFIX, ENTRY_PREFIX];
+
+/// One record write: its family, the item's membership key text and the value (`None` removes).
+pub type RecordWrite = (
+    ItemRecord,
+    String,
+    Option<serde_json::Map<String, serde_json::Value>>,
+);
+
+/// One family of item records on an operation node (`specs/0139` adrs L3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ItemRecord {
+    /// `tabs.<key>`: own tabs.
+    Tabs,
+    /// `path_own.<key>`: own lead-in, lead-out and overcut.
+    PathOwn,
+    /// `entry.<key>`: start points and directions.
+    Entry,
+}
+
+impl ItemRecord {
+    const fn prefix(self) -> &'static str {
+        match self {
+            Self::Tabs => TABS_PREFIX,
+            Self::PathOwn => PATH_OWN_PREFIX,
+            Self::Entry => ENTRY_PREFIX,
+        }
+    }
+}
 
 /// The label of a tab added by the Tabs tool (`specs/0139` criterion 12).
 pub const ADD_TAB_COMMIT_LABEL: &str = "add_tab";
@@ -32,6 +66,16 @@ pub const TAB_WIDTH_COMMIT_LABEL: &str = "tab_width";
 pub const OWN_TABS_COMMIT_LABEL: &str = "own_tabs";
 /// The label of the Operation's press of the Tabs pill.
 pub const OPERATIONS_TABS_COMMIT_LABEL: &str = "operations_tabs";
+/// The label of the Own press of the Path options pill (`specs/0139` criterion 23).
+pub const OWN_PATH_OPTIONS_COMMIT_LABEL: &str = "own_path_options";
+/// The label of the Operation's press of the Path options pill.
+pub const OPERATIONS_PATH_OPTIONS_COMMIT_LABEL: &str = "operations_path_options";
+/// The label of a start marker drag.
+pub const MOVE_START_POINT_COMMIT_LABEL: &str = "move_start_point";
+/// The label of the Automatic button or Delete on a set start marker.
+pub const AUTOMATIC_START_COMMIT_LABEL: &str = "automatic_start";
+/// The label of the Direction pick of an open path.
+pub const DIRECTION_COMMIT_LABEL: &str = "direction";
 
 /// The membership key text of the target `path` (what follows `member.`), the `<key>` of its
 /// records in an operation.
@@ -53,10 +97,24 @@ impl Document {
         &self,
         id: NodeId,
     ) -> Result<BTreeMap<String, serde_json::Value>, OperationError> {
+        self.operation_records(id, ItemRecord::Tabs)
+    }
+
+    /// The item records of family `family` of the operation `id`, by key text, as plain values
+    /// (a register that holds no plain value reads as `null`, damaged for the laser extension).
+    ///
+    /// # Errors
+    /// [`OperationError::NoSuchOperation`].
+    pub fn operation_records(
+        &self,
+        id: NodeId,
+        family: ItemRecord,
+    ) -> Result<BTreeMap<String, serde_json::Value>, OperationError> {
         let meta = self.operation_meta(id)?;
+        let prefix = family.prefix();
         let mut out = BTreeMap::new();
         meta.for_each(|key, value| {
-            let Some(text) = key.strip_prefix(TABS_PREFIX) else {
+            let Some(text) = key.strip_prefix(prefix) else {
                 return;
             };
             let value = match value {
@@ -98,19 +156,39 @@ impl Document {
         writes: &[(String, Option<serde_json::Map<String, serde_json::Value>>)],
         label: &str,
     ) -> Result<bool, OperationError> {
+        let writes: Vec<RecordWrite> = writes
+            .iter()
+            .map(|(key, value)| (ItemRecord::Tabs, key.clone(), value.clone()))
+            .collect();
+        self.write_operation_records(id, &writes, label)
+    }
+
+    /// Writes (`Some`) or removes (`None`) item records of any family of the operation `id` in
+    /// one history step `label` (`specs/0139` criteria 12, 23): each write names its family, the
+    /// item's membership key text and the value. `Ok(false)` and nothing written when every
+    /// record is already so.
+    ///
+    /// # Errors
+    /// As [`Document::write_operation_tabs`]; nothing is written then.
+    pub fn write_operation_records(
+        &self,
+        id: NodeId,
+        writes: &[RecordWrite],
+        label: &str,
+    ) -> Result<bool, OperationError> {
         let meta = self.operation_meta(id)?;
         if grid_switch(&meta) != Some(false) {
             return Err(OperationError::GridRow);
         }
         if writes
             .iter()
-            .any(|(key, _)| meta.get(&format!("{MEMBER_PREFIX}{key}")).is_none())
+            .any(|(_, key, _)| meta.get(&format!("{MEMBER_PREFIX}{key}")).is_none())
         {
             return Err(OperationError::NoSuchTarget);
         }
         let mut changed = false;
-        for (key, value) in writes {
-            let record = format!("{TABS_PREFIX}{key}");
+        for (family, key, value) in writes {
+            let record = format!("{}{key}", family.prefix());
             let stored = if let Some(ValueOrContainer::Value(value)) = meta.get(&record) {
                 json_of(&value)
             } else {
@@ -247,11 +325,50 @@ mod tests {
         let back = unpack(2, &pack(&d, "tabs").unwrap()).unwrap();
         assert_eq!(back.operation_tabs(op).unwrap().len(), 1);
         undo(&d);
-        assert!(d.operation_tabs(op).unwrap().is_empty());
+        assert_eq!(d.operation_tabs(op).unwrap().len(), 0);
         assert_eq!(
             d.write_operation_tabs(op, "9:9", Some(&record()), ADD_TAB_COMMIT_LABEL),
             Err(OperationError::NoSuchTarget)
         );
+    }
+
+    #[test]
+    fn the_three_families_are_written_in_one_step_and_go_with_the_membership() {
+        let (d, op, rect) = page_with_cut();
+        let key = member_key_text(&[rect]);
+        let entry = json!({ "0": { "start": 5 } }).as_object().unwrap().clone();
+        let writes = vec![
+            (ItemRecord::Tabs, key.clone(), Some(record())),
+            (ItemRecord::Entry, key.clone(), Some(entry.clone())),
+        ];
+        assert!(
+            d.write_operation_records(op, &writes, MOVE_START_POINT_COMMIT_LABEL)
+                .unwrap()
+        );
+        assert_eq!(
+            d.own_steps().last().unwrap().label,
+            MOVE_START_POINT_COMMIT_LABEL
+        );
+        assert_eq!(
+            d.operation_records(op, ItemRecord::Entry)
+                .unwrap()
+                .get(&key),
+            Some(&serde_json::Value::Object(entry))
+        );
+        assert!(
+            d.operation_records(op, ItemRecord::PathOwn)
+                .unwrap()
+                .is_empty()
+        );
+        d.set_operation_members(op, &[vec![rect]], false).unwrap();
+        assert!(
+            d.operation_records(op, ItemRecord::Entry)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(d.operation_tabs(op).unwrap().len(), 0);
+        undo(&d);
+        assert_eq!(d.operation_records(op, ItemRecord::Entry).unwrap().len(), 1);
     }
 
     #[test]
@@ -261,7 +378,7 @@ mod tests {
         d.write_operation_tabs(op, &key, Some(&record()), ADD_TAB_COMMIT_LABEL)
             .unwrap();
         d.set_operation_members(op, &[vec![rect]], false).unwrap();
-        assert!(d.operation_tabs(op).unwrap().is_empty());
+        assert_eq!(d.operation_tabs(op).unwrap().len(), 0);
         undo(&d);
         assert_eq!(
             d.operation_tabs(op).unwrap().len(),
@@ -269,7 +386,7 @@ mod tests {
             "undo brings it back"
         );
         d.delete_objects(&[rect]).unwrap();
-        assert!(d.operation_tabs(op).unwrap().is_empty());
+        assert_eq!(d.operation_tabs(op).unwrap().len(), 0);
         undo(&d);
         assert_eq!(d.operation_tabs(op).unwrap().len(), 1);
     }

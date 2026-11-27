@@ -47,7 +47,8 @@ impl TabCount {
     }
 }
 
-/// A length of a cut path setting in hundredths of a millimetre: a tab width (0.10 to 20.00 mm).
+/// A length of a cut path setting in hundredths of a millimetre: a tab width or a lead length
+/// (both 0.10 to 20.00 mm, adrs L2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CutLength(u16);
 
@@ -60,6 +61,13 @@ impl CutLength {
     pub const DEFAULT_TAB: Self = Self(50);
     /// The chip text of a typed tab width out of range (UX section 10).
     pub const TAB_RANGE_TEXT: &'static str = "Width is 0.10 to 20.00 mm.";
+
+    /// The default lead length, 1.00 mm (`specs/0139` criterion 13, Proposal).
+    pub const DEFAULT_LEAD: Self = Self(100);
+    /// The chip text of a typed lead-in length out of range (UX section 10).
+    pub const LEAD_IN_RANGE_TEXT: &'static str = "Lead-in is 0.10 to 20.00 mm.";
+    /// The chip text of a typed lead-out length out of range (UX section 10).
+    pub const LEAD_OUT_RANGE_TEXT: &'static str = "Lead-out is 0.10 to 20.00 mm.";
 
     /// A tab width of `hundredths` hundredths of a millimetre, `None` outside 0.10 to 20.00 mm.
     #[must_use]
@@ -81,6 +89,16 @@ impl CutLength {
     /// # Errors
     /// The chip text.
     pub fn typed_tab(mm: f64) -> Result<Self, &'static str> {
+        Self::typed(mm, Self::TAB_RANGE_TEXT)
+    }
+
+    /// A typed lead length (same range as a tab width), rounded to 0.01 mm; `range` is the chip
+    /// text of a value out of range ([`Self::LEAD_IN_RANGE_TEXT`] or
+    /// [`Self::LEAD_OUT_RANGE_TEXT`]).
+    ///
+    /// # Errors
+    /// The chip text.
+    pub fn typed(mm: f64, range: &'static str) -> Result<Self, &'static str> {
         if !mm.is_finite() {
             return Err(ENTER_NUMBER);
         }
@@ -91,7 +109,7 @@ impl CutLength {
             f64::from(Self::TAB_MAX),
         )
         .and_then(Self::tab)
-        .ok_or(Self::TAB_RANGE_TEXT)
+        .ok_or(range)
     }
 
     /// Hundredths of a millimetre.
@@ -299,9 +317,9 @@ mod tests {
             Err(OptionsDamage::WrongType)
         );
         assert_eq!(
-            read(json!({ "lead_in": "line" })),
+            read(json!({ "tab_lead": "line" })),
             Err(OptionsDamage::UnknownKey),
-            "slice 2 keys are unknown to this build"
+            "a key this build does not know"
         );
         let absent = read_options(None, OperationKind::Cut).unwrap();
         assert_eq!(absent.cut, CutSettings::DEFAULT);

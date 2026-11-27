@@ -7,6 +7,7 @@ use curvyo_document_core::{AssetHash, DocumentSize, Length, NodeId, PlacedGradie
 use curvyo_geometry_core::OutlineTriple;
 use curvyo_image_core::WorkingImage;
 
+use crate::cut_entry_records::LeafPath;
 use crate::cut_item_records::LeafTabs;
 use crate::image_adjust_resolve::AdjustRegisters;
 use crate::machine_profile::ProfileValues;
@@ -126,6 +127,8 @@ pub struct LeafInput {
     pub geometry: LeafGeometry,
     /// Its tabs in a Cut block (`specs/0139` criteria 4, 5); every other block ignores them.
     pub cut: LeafTabs,
+    /// Its own path options and entries in a Cut block (`specs/0139` criteria 19 to 21).
+    pub path: LeafPath,
 }
 
 /// One item of a Cut-out block: the leaves whose union's outer contour runs (criterion 16).
@@ -139,6 +142,8 @@ pub struct CutOutItem {
     pub leaves: Vec<Vec<LeafOutline>>,
     /// Its tabs by contour index (`specs/0139` criterion 4).
     pub cut: LeafTabs,
+    /// Its own path options and entries by contour index (`specs/0139` criteria 19, 21).
+    pub path: LeafPath,
 }
 
 /// Where a block's numbers come from.

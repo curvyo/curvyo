@@ -113,6 +113,12 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("tab_width", "Tab width"),
     ("own_tabs", "Own tabs"),
     ("operations_tabs", "Back to the operation's"),
+    // `specs/0139` criterion 23: the path options, start points and directions of an item.
+    ("own_path_options", "Own path options"),
+    ("operations_path_options", "Back to the operation's"),
+    ("move_start_point", "Move start point"),
+    ("automatic_start", "Automatic start"),
+    ("direction", "Direction"),
     // `specs/0112-test-grid-and-materials` plan.md (UX section 11): the grid object, the
     // Materials tab and its tests.
     ("place_test_grid", "Place test grid"),
