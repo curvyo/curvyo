@@ -1,6 +1,6 @@
 # ADR 0092: Codes slice 2: 1D barcodes, the Symbology switch, glyph tables for the human-readable text, free resize and the code's host contract
 
-**Status:** Proposed 2026-11-27 (architect). Extends [ADR 0091](0091-qr-and-barcode-codes-extension.md)
+**Status:** Accepted 2026-11-27 (architect, review of `story/barcodes` at `ee446ba6a`) with the deviations recorded under "Architect review" at the end (registry instead of an argument, cap-height glyph unit, no Code 128 set A, plus three corrections of this text). Extends [ADR 0091](0091-qr-and-barcode-codes-extension.md)
 §2 (switching symbology in place), §3 (contract additions) and §9 (1D encoders, human-readable text),
 whose decision text stays as accepted; amends `0141` UX notes §8 and ADR 0080 §6 ("generated objects
 resize proportionally only") for kinds that declare free resize. **§3.6 (embedding a code's font) is
@@ -199,8 +199,122 @@ the spec's module counts, so goldens come from the standards.
 
 ## Customer question
 
-**CODE-FONT-EMBED: should a barcode's font travel in the file like a text's?** A: yes, the file
+**Answered A by the customer, 2026-11-27** (see "Frage 407 answered" at the end). **CODE-FONT-EMBED: should a barcode's font travel in the file like a text's?** A: yes, the file
 carries the font of a code's digits as it does for a text (the document reads one more place). B:
 not in this slice; the code always looks as saved, and only an edit on a computer without that font
 redraws the digits in the included font. C: as A, with a file-format change. Recommendation: A.
 Default: B.
+
+## Implementation notes (2026-11-27, slice 2 built)
+
+The decisions above held. What the build added or did differently, all **(Proposal)**:
+
+- **The glyph input is a registry the session sets, not a signature.** `instance::generate` stays the one
+  funnel and reads the tables from a per-thread `GlyphRegistry` (`curvyo-ui-core/src/code_glyphs.rs`) that the
+  session publishes before every write, as it already does for the active extension settings
+  (`set_active_extension_settings`). It avoids a new argument on the 70 callers; the request still carries a plain
+  `GlyphTable`, so the generators stay pure. A face missing on this computer maps to the table of the included
+  sans, the stored `FontRef` is never rewritten.
+- **One glyph unit is the face's cap height** (a text's Size is a cap height, `0074`), not an em: a code's text
+  Size means what the Text bar's Size means. `glyph_table` raises nothing (the engine hands cubics) and
+  normalises the winding by nesting.
+- **Code 128 uses sets B and C only.** Spec criterion 22 allows printable ASCII, which set B holds entirely, so
+  set A (control characters) is never reached; the shortest switching is a small search over B and C with a tie
+  staying in the current set (`EXAMPLE-01` stays 145 modules).
+- **Warning ids and words.** Besides the ids of §5 there is `too_many_characters` ("Too long for Code 128: 92
+  characters, at most 80."); `not_encodable` carries the accepted characters in `Warning.subject`, the host
+  words "{label} takes {subject} only."; a `Warning` that names a row is the lasting line only while the
+  generator answers no parts, otherwise an ordinary notice (`check_digit_corrected`, `glyph_missing`).
+  `noun()` keeps a label with a digit ("Code 128") like an acronym.
+- **EAN and UPC digit places** (GS1 layout, GS1 General Specifications): leading digit centred 4.5 modules left
+  of the first bar, UPC-A's trailing digit 4.5 modules right of the last; the digits stand under their 7-module
+  characters. **UPC-A's quiet zones of 9 and 9 modules are from memory and not verified against the document**
+  (the tester or the architect checks before the demo; a deviation changes the two numbers in
+  `linear/ean.rs` only). Only the three guard patterns reach into the text band.
+- **An inverted 1D code's ground** reaches 2 modules above and below what it holds, and the quiet zones to the
+  left and right (`GROUND_PAD`).
+- **Free resize.** `plan_resize` for a `Free` kind reads the factors in frame-local axes; one factor along both
+  is `Edit::Scale`, two are `Edit::Stretch`; the frame is shifted so the point of the old box the drag left
+  fixed keeps its relative place in the regenerated box (edge: 0 or 1, centre 0.5), and an axis the drag did not
+  touch is not shifted, so the bars' centre stays. The live drag draws the regenerated outline with the readout
+  of UX notes §11.10 ("Module width 0.40 mm", "Bar height 22.0 mm", the box for a corner).
+- **Dependencies.** `rxing` 0.9.4 dev-only (`default-features = false`, `encoding_rs`, `decoders`, `oned`): the
+  lockfile gains `rxing`, `rxing-one-d-proc-derive`, `codepage-437`, `core_detect`, `csv`, `csv-core`,
+  `encoding_rs`, `multiversion_no_op`, `ryu`, `simdutf8`; `cargo deny check` passes with the existing
+  `deny.toml`, `cargo tree -e normal` shows none of them.
+- **CODE-FONT-EMBED stays at its default B**: nothing in `curvyo-document-core` changed, no `format_version`
+  change (the nested `{"font": {...}}` value is stored by the existing params codec).
+
+## Architect review (2026-11-27, `story/barcodes` at `ee446ba6a`)
+
+The decisions hold; accepted with these deviations and corrections, all **(Proposal)**:
+
+1. **Glyph registry (deviation, accepted).** A per-thread `GlyphRegistry` the session publishes in
+   `recording_unguarded`, `generated_panel_json`, placing and switching, as `set_active_extension_settings`
+   does. Deterministic: a table is a function of the face bytes (`BTreeMap`, only `+ - * /`, no
+   transcendental float operations), so equal params and face give equal outlines native and wasm; the
+   registry's `HashMap` is only looked up. Every write that regenerates a code has the code in
+   `selected_generated()` (a group's selection holds its leaves) or forces the publish, and the
+   Loading font gate covers rows, handles, the size entry, the switch and the Fonts pick (which waits for
+   the face like the Text bar's). Undo, redo and sync apply stored records and never regenerate. The
+   remaining weakness: `glyphs_for` answers the included sans for any face it does not hold, and a `Font`
+   kind with no table at all draws without text, so a future writer that skips the publish stores wrong
+   geometry silently. Follow-up (technical debt "A code's glyph funnel does not fail closed").
+2. **Glyph unit is the cap height (deviation, accepted):** a code's text Size means the Text bar's Size.
+3. **Code 128 sets B and C only (deviation, accepted):** criterion 22 allows printable ASCII only.
+4. **Correction of §3.3:** the No solution memo keys on the params only and the ghost memo on the kind;
+   both are right because a refusal depends on the content alone (an absent glyph is a notice, not a
+   refusal) and the ghost has no text.
+5. **Correction of §3.5:** no wasm test of an EAN-13 with text was added; native-versus-wasm equality
+   rests on the argument in 1 (technical debt "No native-versus-wasm golden of the codes").
+6. **Correction of Consequences:** the lock gains ten crates (`rxing`, `rxing-one-d-proc-derive`,
+   `codepage-437`, `core_detect`, `csv`, `csv-core`, `encoding_rs`, `multiversion_no_op`, `ryu`,
+   `simdutf8`), dev only (`cargo tree -e normal` has none, `cargo deny check` passes), no second `syn`.
+7. **§5 is resolved in part:** `instance_resize::free_view` reads `module_width` and `bar_height` for the
+   live readout and `instance_switch` treats `width` as derived, so the host still knows 1D keys
+   (technical debt "1D code keys in the host").
+8. **Quiet zones** (EAN-13 11 and 7, EAN-8 7 and 7, UPC-A 9 and 9 X; Code 128 and Code 39 10 X) agree with
+   the GS1 General Specifications, ISO/IEC 15417 and ISO/IEC 16388 from the architect's knowledge, not
+   checked against the documents: high confidence for EAN, UPC and Code 128, medium-high for Code 39
+   (10 X is the ISO minimum, some application standards ask for more). Not in the build: GS1 extends the
+   bars of UPC-A's first and last symbol characters (the number system and check digits, printed outside)
+   to guard length; `linear/ean.rs` extends the three guard patterns only.
+
+## Implementation notes, slice 3 (2026-11-27, Data Matrix, PR #523)
+
+No new ADR; ADR 0091 §9 already chose the crate. All **(Proposal)**, vetoable at the demo.
+
+1. **Encoder `datamatrix` 0.3.3** (Apache-2.0 OR MIT, `no_std`, optimizing encoder; `arrayvec` MIT OR
+   Apache-2.0, `flagset` Apache-2.0; `cargo deny check` passes). Only `datamatrix/encode.rs` names it;
+   `SymbolList::default().enforce_square()` picks the smallest of the 24 squares, 10 x 10 to 144 x 144,
+   and the crate picks the encodation modes. Text that is not Latin-1 gets an initial UTF-8 ECI (some
+   readers ignore it: a Latin-1 text is stored without one). The limit a refusal names is 1555 bytes,
+   the most 144 x 144 holds of plain characters (measured; digits pack to 3116). `rxing` gets its `datamatrix` feature as a dev-dependency (the
+   decoder of the round trip test, criterion 4); `cargo tree -e normal` shows no `rxing`.
+2. **Kind `curvyo.codes/data-matrix`**, label "Data Matrix", icon `Grid3x3`, family `code`, manifest
+   order second (after QR), `Resize::Proportional`. No `format_version` change (a new kind is additive,
+   ADR 0091 §12). It reuses the QR schema rows (`Content`, `Size`, `Modules`, `Colours`, `Advanced`) with
+   Quiet zone 1; the keys equal the QR keys, so a Symbology switch between QR and Data Matrix carries
+   Content, Module size, the module style and Inverted.
+3. **Drawing.** A symbol region's L finder (left column and bottom row), clock edge (top row and right
+   column) and, from 32 x 32, the alignment patterns between regions are function cells: their dark
+   cells are always solid squares and never rounded, shrunk or turned into dots. A Square Merged code
+   is one trace of all dark cells; with Rounded the data modules are traced rounded and the function
+   cells separately; Separate draws one shape per data module. Inverted cuts every dark cell, function
+   cells included, out of one rectangle of symbol plus quiet zone, as QR.
+4. **Not in slice 3:** rectangular sizes (Later), GS1 mode, a Shape row, a Finder group.
+5. **Error text:** "Too long for a Data Matrix: 1700 bytes, at most 1555." (the QR sentence without the
+   "at error correction" cause; `instance_notice::noun` keeps a label with a second capital).
+
+## Frage 407 answered (2026-11-27): CODE-FONT-EMBED A
+
+The customer chose A: a barcode's human-readable-text font travels in the file like a text's. Built as §3.6 A
+describes, and it supersedes "stays at its default B" in the slice 2 notes: `curvyo-document-core/src/font_assets.rs`
+`Document::used_fonts` also reads the stored `{"font": {family, style, face_hash, face_index}}` value of every
+generated object's parameters (a `null` Font, the included sans, names no file). `embed_used_fonts`,
+`refresh_document_fonts` (the Document Fonts block) and `prune_assets` follow from `used_fonts` unchanged, so a code's
+face is embedded on save, listed, found again on a device without it and kept by the asset wipe. No `format_version`
+change (the nested value was already stored by the params codec; an older build drops the asset on its next save,
+ADR 0047 §1). A face whose licence forbids embedding stays out, as for a text. Tests: `document_fonts_tests.rs`
+(an EAN-13 in Great Vibes embeds it, reopens with the same stored digits and redraws the same digits after an edit on
+a device with no fonts; a QR code embeds nothing).

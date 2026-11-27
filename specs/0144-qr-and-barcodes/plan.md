@@ -52,3 +52,86 @@ revision 1. No `format_version` change.
 - `tests/acceptance_0144.rs`: the numbers of criteria 2, 5 to 8, 10, 13, 14, 16, 18.
 - `cargo build -p curvyo-codes-core --target wasm32-unknown-unknown` (CI's core-wasm32 job does the same).
 - CPU time (thread time) in `curvyo-editor-wasm/tests/codes_cpu_time.rs`, asserted in release.
+
+---
+
+# Plan for slice 2 (1D barcodes)
+
+Branch `story/barcodes` (the same branch as slice 1's follow-up docs; no PR of its own for the invisible
+steps). Criteria 3, 4, 11, 14, 16 and 19 to 22 of `specification.md`, ADR 0092, UX notes revision 2
+(section 11), Frage 407 default B (no font embedding; answered A on 2026-11-27, built in the slice 3 follow-up, no `format_version` change; a change found
+unavoidable stops the work). Slice 1 task 11 (the full gate) was run on the PR #518 tree, not on this one.
+
+## Affected crates/modules
+- `curvyo-extension-core`: `Warning.param` / `subject`, `GeneratorKind.scanned` / `family` / `resize`,
+  `Family`, `Resize`, `ParamKind::Font` / `Ratio`, `ParamValue::Font` / `Ratio`, `Percent` as `i32`,
+  `GlyphTable`, `Glyph`, `GenerateRequest.glyphs`, `Edit::Stretch`, `CHANGELOG.md`.
+- `curvyo-codes-core`: `linear/{mod,code128,code39,ean,style,schema}.rs`, manifest (five kinds), tests
+  (`tests/support/glyphs.rs`, `linear_golden.rs`, `linear_decoder.rs`, `acceptance_0144_slice2.rs`).
+- `curvyo-ui-core`: `instance_switch.rs` (`switch_kind`), `code_glyphs.rs` (table from text-core), the glyph
+  input, `plan_resize` with two factors, the handle layout for `Free` kinds, sentences.
+- `curvyo-editor-wasm`: the face cache and "Loading font..." gate, the family segment, `switch_generated_kind`,
+  `session/generators/{panel,source}.rs` (the split), CPU-time test for a 1D code with text.
+- `frontend`: the Code segment, the Symbology strip, Ratio, signed Percent and Font rows.
+
+## Decisions fixed here (all Proposal)
+- **Lasting line vs. notice.** A warning that names a row (`Warning.param`) is the lasting line under that row
+  only while the generator answers no parts (the stored outline is kept); with parts it is an ordinary 3 s notice
+  (`check_digit_corrected`, `glyph_missing`). The host no longer lists ids.
+- **Sentence inputs.** `Warning.subject` carries the cause words ("error correction M", "A to Z, 0 to 9 ..."),
+  the kind's label is the host's. QR keeps "Too long for a QR code at error correction M: n bytes, at most m."
+  byte for byte (id `content_too_long`, unit bytes); the 1D kinds use `too_many_characters`
+  ("Too long for Code 128: 92 characters, at most 80."), `wrong_length`, `digits_only`, `not_encodable`.
+  `noun()` keeps a label that holds a digit ("Code 128") like an acronym.
+- **Glyph input.** The session sets the face tables on the thread before every write, as it sets the active
+  extension settings (`set_active_extension_settings`, the same precedent), so `instance::generate` stays the one
+  funnel and no signature of the 70 callers changes.
+- **Code 39 at 2.5 : 1 has fractional widths**: run widths are `f64` modules.
+- **Code 128 switching** is a shortest-path search over the three sets; a tie keeps the current set.
+- **UPC-A quiet zones 9 / 9 are unverified** (from memory, spec criterion 11): flagged in the report.
+
+## Tasks
+- [x] 1. Refactor: `Warning.param` / `subject`, `GeneratorKind.scanned`; `instance.rs` split by arm;
+  `session/generators.rs` split (panel, source); QR sentences byte-identical (criteria 13, 16)
+- [x] 2. Contract: Ratio, Font, signed Percent, glyph table, Stretch, family, resize, changelog (11, 14, 21)
+- [x] 3. Encoders with goldens from the standards: Code 128, Code 39, EAN-13, EAN-8, UPC-A (3, 19)
+- [x] 4. Run list to outlines, bar width adjust, text layout, schema, defaults, normalisation, warnings (11, 21, 22)
+- [x] 5. Decoder round trip with `rxing` (dev only), every symbol value of Code 128 and every Code 39 character (4)
+- [x] 6. Host: `switch_kind`, family segment, glyph table builder and cache, Loading font gate (20, 21)
+- [x] 7. Stretch: handle layout, `plan_resize` with two factors, Size chip (14)
+- [x] 8. Session: CPU-time budget for a 1D code with text (17); `curvyo-codes-core` builds for `wasm32-unknown-unknown`, there is no wasm run of the determinism test (1)
+- [x] 9. Frontend: Symbology strip, Ratio, signed Percent, Font rows, bar glyph (5, 11, 20)
+- [x] 10. Docs: ADR 0092 Accepted, spec status, index, changelog, technical debt entry removed
+- [ ] 11. Full gate once into `gate-0144b.txt`
+
+## Validation
+- `curvyo-codes-core/tests/linear_golden.rs` (module counts and the standards' tables; five SVG fixtures
+  within 0.001 mm), `linear_decoder.rs` (10 px per module, `rxing`, all of criterion 4's symbologies),
+  `acceptance_0144_slice2.rs` (criteria 3, 11, 21, 22 numbers).
+- `cargo deny check`; `cargo tree -e normal -p curvyo-codes-core` shows no `rxing`.
+- CPU time (thread time) in `curvyo-editor-wasm/tests/`, asserted in release.
+
+---
+
+# Plan for slice 3 (Data Matrix)
+
+Same branch `story/barcodes`, same PR #523. Criteria 3, 4, 12, 17 and 19 of `specification.md`, UX notes 11.14,
+ADR 0092 "Implementation notes, slice 3". No `format_version` change (a new kind is additive).
+
+## Affected crates/modules
+- `curvyo-codes-core`: `datamatrix/{mod,encode,schema,style}.rs`, manifest (kind `data-matrix` after QR), the QR
+  schema rows made shareable (`content`, `size`, `modules`, `colours`, `advanced(quiet)`), tests `datamatrix.rs`.
+- `curvyo-ui-core`: `noun("Data Matrix")`; `curvyo-editor-wasm`: session and CPU-time tests; `frontend`: `Grid3x3`
+  glyph (bar and Layers), the Symbology strip in rows of 2, 3 and 2 (`ToggleGroup` `rows`).
+- Dependency: `datamatrix` 0.3.3, **Apache-2.0 OR MIT** (permissive, passes `cargo deny`; `no_std`; brings
+  `arrayvec` MIT OR Apache-2.0 and `flagset` Apache-2.0); `rxing` gets its `datamatrix` feature, dev only.
+
+## Tasks
+- [x] 1. Encoder: smallest square 10 x 10 to 144 x 144, function cells, limit (AC 3, 12)
+- [x] 2. Drawing: module styles on data modules, solid L finder, clock and alignment patterns, Merged, Inverted (AC 12)
+- [x] 3. Decoder round trip with `rxing`, sizes 10 to 32 in four styles, Inverted (AC 4)
+- [x] 4. Golden `datamatrix_10.svg` (AC 19)
+- [x] 5. Manifest, host wording, Symbology strip, glyphs (AC 12, 20)
+- [x] 6. CPU time of a 144 x 144 code: 19 ms Merged, 43 ms Dot, budget 100 ms (AC 17)
+- [x] 7. Docs: spec Done, ADR notes
+- [x] 8. Full gate once into `gate-0144c.txt` (nextest 18914 passed; one clippy lint in the new test fixed and clippy rerun green)
