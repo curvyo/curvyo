@@ -21,7 +21,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0098-page-kinds` criteria 3, 4 and 12.
     ("add_sketch_page", "Add sketch page"),
     ("add_output_page", "Add laser page"),
-    // ADR 0095 §1: Add page of the other machine families, "Add <word> page" as "Add laser page".
+    // ADR 0097 §1: Add page of the other machine families, "Add <word> page" as "Add laser page".
     ("add_plotter_page", "Add plotter page"),
     ("add_embroidery_page", "Add embroidery page"),
     ("add_cnc_page", "Add CNC page"),
@@ -154,6 +154,14 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0160-embroidery`: the embroidery page's hoop and speed.
     ("set_hoop", "Set hoop"),
     ("edit_embroidery_speed", "Edit speed"),
+    // `specs/0161-cnc-output`: the CNC page's stock, tools and machine fields.
+    ("edit_stock", "Edit stock"),
+    ("add_tool", "Add tool"),
+    ("edit_tool", "Edit tool"),
+    ("remove_tool", "Remove tool"),
+    ("edit_z_travel", "Edit Z travel"),
+    ("edit_spindle_max", "Edit spindle max"),
+    ("edit_safe_height", "Edit safe height"),
     ("edit_default_pressure", "Edit default pressure"),
     ("edit_max_speed", "Edit max speed"),
     ("edit_laser_mode", "Edit laser mode"),

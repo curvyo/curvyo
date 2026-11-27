@@ -89,7 +89,7 @@ fn ac20_the_current_format_is_41() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 70);
+    assert_eq!(CURRENT_FORMAT_VERSION, 71);
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn ac20_golden_v41_saves_as_format_41() {
                 // since `specs/0028-material-test-library`, 44 since `specs/0111`, 45 since `specs/0114`,
                 // 46 since `specs/0112`.
                 assert!(
-                    t.contains("\"format_version\": 70") || t.contains("\"format_version\":70"),
+                    t.contains("\"format_version\": 71") || t.contains("\"format_version\":71"),
                     "the manifest says 46"
                 );
                 seen = true;
@@ -218,7 +218,7 @@ fn ac20_a_format_42_file_is_refused() {
     .unwrap();
     // Superseded by `0110` (format 42), `0028` (format 43), `0111` (format 44), `0114` (format
     // 45), `0112` (format 46) and `0113` (format 47): the next number is refused.
-    let future = with_format(&bytes, 71);
+    let future = with_format(&bytes, 72);
     assert!(
         unpack(8, &future).is_err(),
         "a file of a later format is refused, not read"

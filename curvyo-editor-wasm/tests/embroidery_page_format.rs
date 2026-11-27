@@ -3,7 +3,7 @@
 //! embroidery page's process, profile copy, active hoop and its Running stitch and Tatami fill
 //! operations with their numbers and threads, and reads them back unchanged; the damaged one (an
 //! unknown hoop kind, a row spacing out of range) reads as the defaults with a notice and is not
-//! rewritten; a build of format 68 refuses both. `CURVYO_WRITE_FIXTURES=1` rewrites the goldens.
+//! rewritten; a build of format 69 refuses both. `CURVYO_WRITE_FIXTURES=1` rewrites the goldens.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
@@ -132,7 +132,7 @@ fn opened(bytes: &[u8]) -> (Session, Value) {
 
 #[test]
 fn the_golden_reads_back_its_page_hoop_and_operations() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 70);
+    assert_eq!(CURRENT_FORMAT_VERSION, 71);
     let bytes = read_or_write("embroidery_page_v70.curvyo", build);
     let (s, view) = opened(&bytes);
     assert_eq!(view["profile"]["name"], "W6 EU7");
@@ -187,7 +187,7 @@ fn the_damaged_golden_reads_the_defaults_with_a_notice() {
 }
 
 #[test]
-fn a_build_of_format_68_refuses_the_goldens() {
+fn a_build_of_format_69_refuses_the_goldens() {
     for name in [
         "embroidery_page_v70.curvyo",
         "embroidery_page_damaged_v70.curvyo",
@@ -196,8 +196,8 @@ fn a_build_of_format_68_refuses_the_goldens() {
         let manifest = read_manifest(&bytes);
         assert_eq!(manifest["format_version"], 70, "{name}");
         assert!(
-            manifest["format_version"].as_u64().unwrap() > 68,
-            "newer than 68"
+            manifest["format_version"].as_u64().unwrap() > 69,
+            "newer than 69"
         );
     }
 }

@@ -4,6 +4,8 @@ import type { EditorSession } from "@/hooks/useEditorSession";
 import { storeExtensions } from "@/lib/extensionsFile";
 import { flushMachineWrites } from "@/lib/machineProfilesFile";
 import { flushMaterialWrites } from "@/lib/materialsFile";
+import { linkStore } from "@/hooks/useLinkEntry";
+import type { CncView } from "@/lib/cncView";
 import type { EmbroideryView } from "@/lib/embroideryView";
 import type { PlotterView } from "@/lib/plotterView";
 import { NO_WORKBENCHES, type WorkbenchList } from "@/workbenches/registry";
@@ -31,6 +33,8 @@ export interface ManufacturingView {
   plotter?: PlotterView | null;
   /** The embroidery page's own view (`specs/0160`), present on an embroidery page only. */
   embroidery?: EmbroideryView | null;
+  /** The CNC page's own view (`specs/0161`), present on a CNC page only. */
+  cnc?: CncView | null;
 }
 
 /** A corner of the output page, as stored. */
@@ -129,6 +133,11 @@ export function useWorkbenches(editor: EditorSession) {
     const session = getSession();
     return session ? (JSON.parse(session.embroidery_profiles_json()) as MachineProfileRow[]) : [];
   }, [getSession, syncRevision]);
+  const cncProfiles = useMemo<MachineProfileRow[]>(() => {
+    void syncRevision;
+    const session = getSession();
+    return session ? (JSON.parse(session.cnc_profiles_json()) as MachineProfileRow[]) : [];
+  }, [getSession, syncRevision]);
   const plotterProfiles = useMemo<MachineProfileRow[]>(() => {
     void syncRevision;
     const session = getSession();
@@ -143,8 +152,7 @@ export function useWorkbenches(editor: EditorSession) {
     familyProfiles: {
       "curvyo.cutter": plotterProfiles,
       "curvyo.embroidery": embroideryProfiles,
-      // Its machine list comes with its slice (`0161`).
-      "curvyo.cnc": [],
+      "curvyo.cnc": cncProfiles,
     } as Record<string, MachineProfileRow[]>,
     /** The commands of a plotter page (`specs/0159`); each returns what the session says. */
     plotter: {
@@ -183,6 +191,32 @@ export function useWorkbenches(editor: EditorSession) {
         return [hue, saturation, value] as const;
       },
       rgbOf: (hue: number, saturation: number, value: number) => getSession()?.hsv_colour(hue, saturation, value) ?? 0,
+    },
+    /** The commands of a CNC page (`specs/0161`); each returns what the session says. */
+    cnc: {
+      pick: (id: string) => run((session) => session.pick_cnc_profile(id)) ?? false,
+      saveAs: () => run((session) => session.save_cnc_profile(randomBytes(), Date.now())) ?? "",
+      setConnector: (address: string) => run((session) => session.set_cnc_connector(address, Date.now())) ?? "",
+      setMachine: (field: string, text: string) => run((session) => session.set_cnc_machine_value(field, text)) ?? "",
+      setStock: (field: string, text: string) => run((session) => session.edit_cnc_stock(field, text)) ?? "",
+      addTool: () => run((session) => session.add_cnc_tool(randomBytes())) ?? "",
+      setTool: (id: string, field: string, text: string) => run((session) => session.edit_cnc_tool(id, field, text)) ?? "",
+      removeTool: (id: string) => run((session) => session.remove_cnc_tool(id)) ?? false,
+      press: (side: string, shift: boolean) => run((session) => session.press_cnc_profile(side, shift)) ?? "",
+      removeSelection: (id: string) => run((session) => session.remove_selection_from_cnc_operation(id)) ?? false,
+      remove: (id: string) => run((session) => session.delete_cnc_operation(id)) ?? false,
+      setNumber: (id: string, field: string, text: string) => run((session) => session.edit_cnc_setting(id, field, text)) ?? "",
+      play: (seconds: number) => {
+        run((session) => session.set_cnc_play(seconds));
+      },
+      /** Send to machine: the bytes Export writes go to the page's connector (`0125`, `0161` 19). */
+      send: () => {
+        const job = getSession()?.cnc_send_job();
+        if (!job) return;
+        const { bytes, name, profile_id: profile, address } = job;
+        job.free();
+        void linkStore.sendPage(profile, address, { token: Date.now(), name, bytes, start: false }, () => sync());
+      },
     },
     /** Add page with the Kind switch (`specs/0098` criteria 1 to 4); the new page's id. */
     addPage: (kind: string, profile: string) => {

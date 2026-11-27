@@ -27,10 +27,13 @@ vectrace.workspace = true
 # The extension contract: manifests and parameter values to the front end (ADR 0034 §2).
 curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }
-# The machine families of ADR 0095: their built-in profiles size a new output page.
+# The machine families of ADR 0097: their built-in profiles size a new output page.
 curvyo-cutter-core = { path = "../curvyo-cutter-core", version = "0.1.0" }
 curvyo-embroidery-core = { path = "../curvyo-embroidery-core", version = "0.1.0" }
 curvyo-cnc-core = { path = "../curvyo-cnc-core", version = "0.1.0" }
+# The virtual GRBL's planner gives the CNC Toolpath view its time (`specs/0161` adrs.md CN5); pure,
+# builds for wasm32.
+curvyo-connector-core = { path = "../curvyo-connector-core", version = "0.1.0" }
 # The working images of the canvas, decoded from the assets (ADR 0017 §5).
 curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
 # The AI steps' model runs in the worker and the pinned model list (ADR 0075 decision 3).
@@ -70,7 +73,6 @@ naga = { version = "30", default-features = false, features = ["wgsl-in", "glsl-
 # (`specs/0125-send-to-machine` S17); internal path crates and `tempfile`, native tests only, no
 # edge in the production or wasm build.
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-curvyo-connector-core = { path = "../curvyo-connector-core", version = "0.1.0" }
 curvyo-connector-io = { path = "../curvyo-connector-io", version = "0.1.0" }
 tempfile = "3"
 

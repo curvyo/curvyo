@@ -793,7 +793,18 @@ impl DocumentVersion {
 /// unknown hoop kind reads as the profile's first hoop, a value out of its range as its default,
 /// with a notice; nothing is rewritten on read. Goldens (in `curvyo-editor-wasm`):
 /// `embroidery_page_v70.curvyo`, `embroidery_page_damaged_v70.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 70;
+/// Version 71 (`specs/0161-cnc-output` slice 1, ADR 0097 §6, `adrs.md` CN2, Frage 431 A): an
+/// output page of process `curvyo.cnc` (a CNC page) holds a CNC profile copy in `mfg_profile`, its
+/// stock as a job fixture of kind `curvyo.cnc/stock` (`width_mm`, `height_mm`, `thickness_mm`,
+/// `material`), its tool list as the atomic register `x.curvyo.cnc.tools`, and operations of
+/// `op_kind` `profile` with `op_options` `{ side, depth_mm, tool, direction }` and the typed feeds
+/// in `op_settings`, all opaque here and read by the CNC extension. A build that stops at 70 would
+/// open such a page without its stock, tools or numbers, so this build's files are refused there
+/// by version; a file of 70 or lower opens unchanged. Damage (read by the extension): a tool
+/// diameter of 0 or a depth beyond the stock reads as the default, with a notice; nothing is
+/// rewritten on read. Goldens (in `curvyo-editor-wasm`): `cnc_page_v71.curvyo`,
+/// `cnc_page_damaged_v71.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 71;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

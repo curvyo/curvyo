@@ -83,6 +83,24 @@ impl Document {
         Ok((meta, key))
     }
 
+    /// Writes the process register `x.<process>.<field>` of the manufacturing `id` as the plain
+    /// value `value`, one atomic register (`None` deletes it), in one step `label` (ADR 0033 §3;
+    /// the CNC tool list of `specs/0161-cnc-output` `adrs.md` CN2). `Ok(false)` when it is
+    /// already stored.
+    ///
+    /// # Errors
+    /// [`OperationError::NoSuchManufacturing`] when `id` names no live manufacturing.
+    pub fn set_process_register(
+        &self,
+        id: NodeId,
+        field: &str,
+        value: Option<&serde_json::Value>,
+        label: &str,
+    ) -> Result<bool, OperationError> {
+        let value = value.map(crate::manufacturing_codec::loro_of);
+        self.write_output_register(id, field, value, label)
+    }
+
     /// Writes `value` (`None` deletes the register) in one step `label`; `Ok(false)` when it is
     /// already stored.
     fn write_output_register(

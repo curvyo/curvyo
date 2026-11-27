@@ -78,6 +78,8 @@ mod wasm_centre_lines;
 #[cfg(target_arch = "wasm32")]
 mod wasm_clone;
 #[cfg(target_arch = "wasm32")]
+mod wasm_cnc;
+#[cfg(target_arch = "wasm32")]
 mod wasm_combine;
 #[cfg(target_arch = "wasm32")]
 mod wasm_connector_text;

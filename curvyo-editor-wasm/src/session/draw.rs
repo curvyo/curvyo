@@ -300,6 +300,10 @@ impl Session {
         if let Some(toolpath) = self.embroidery_toolpath(view) {
             list.extend(toolpath);
         }
+        // A CNC page's tool centre paths over its items (`specs/0161` criterion 11).
+        if let Some(toolpath) = self.cnc_toolpath(view) {
+            list.extend(toolpath);
+        }
         // The dimensions over the artwork, following a drag in the same frame (`0070`).
         list.extend(self.dimension_layer(&artwork_objects));
         list.extend(self.kept_point_list());

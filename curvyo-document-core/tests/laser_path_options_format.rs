@@ -351,8 +351,8 @@ fn older_files_open_with_no_records_and_a_newer_file_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 71,
-            supported: 70
+            found: 72,
+            supported: 71
         })
     ));
 }
@@ -504,7 +504,7 @@ fn the_v68_golden_reads_back_every_path_option_and_record() {
         pack(&golden_document_v68(), "0.1.0").unwrap()
     });
     assert_eq!(format_of(&bytes), 68);
-    assert_eq!(CURRENT_FORMAT_VERSION, 70);
+    assert_eq!(CURRENT_FORMAT_VERSION, 71);
     let d = open_unchanged(&bytes);
     let ops = d.operations(d.manufacturings()[0].id).unwrap();
     assert_eq!(

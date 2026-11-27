@@ -257,6 +257,7 @@ impl Session {
             self.output.toolpath.insert(manufacturing);
             self.output.play = super::play::PlayState::default();
             self.manufacturing.embroidery.play = None;
+            self.manufacturing.cnc.play = None;
         }
         true
     }

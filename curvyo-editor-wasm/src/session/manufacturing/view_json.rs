@@ -78,6 +78,7 @@ impl Session {
         let manufacturing = self.document.manufacturing(kind.manufacturing()?)?;
         if let Some(name) = Self::plotter_machine_name(&manufacturing)
             .or_else(|| Self::embroidery_machine_name(&manufacturing))
+            .or_else(|| Self::cnc_machine_name(&manufacturing))
         {
             return Some(name);
         }
@@ -163,6 +164,9 @@ impl Session {
         if let Some(embroidery) = self.embroidery_view() {
             return self.family_view_json("embroidery", &embroidery);
         }
+        if let Some(cnc) = self.cnc_view() {
+            return self.family_view_json("cnc", &cnc);
+        }
         let Some(manufacturing) = self.active_manufacturing() else {
             return "null".to_owned();
         };
@@ -211,7 +215,7 @@ impl Session {
     }
 
     /// The view of an output page of another machine family: its name, process and status line
-    /// and the family's own view under its key (`plotter`, `embroidery`); no laser Machine block.
+    /// and the family's own view under its key (`plotter`, `embroidery`, `cnc`); no laser Machine block.
     fn family_view_json(&self, key: &str, family: &Value) -> String {
         let Some(manufacturing) = self.active_output_page() else {
             return "null".to_owned();

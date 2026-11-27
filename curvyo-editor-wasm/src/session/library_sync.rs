@@ -113,6 +113,14 @@ impl Session {
                 curvyo_embroidery_core::write_record(profile),
             ));
         }
+        // And the CNC profiles (`0161` criterion 2).
+        for profile in &self.manufacturing.cnc.profiles {
+            items.push((
+                LibraryKind::Machine,
+                profile.id.clone(),
+                curvyo_cnc_core::write_record(profile),
+            ));
+        }
         for read in self.materials.library().listed() {
             if matches!(read, MaterialRead::Loaded(_))
                 && let Some(text) = self.materials.library().text(read.id())
@@ -255,6 +263,12 @@ impl Session {
                     .find(id)
                     .map(curvyo_embroidery_core::write_record)
             })
+            .or_else(|| {
+                self.manufacturing
+                    .cnc
+                    .find(id)
+                    .map(curvyo_cnc_core::write_record)
+            })
     }
 
     /// A synced item's name from the local record that holds it now, for its notice.
@@ -275,6 +289,12 @@ impl Session {
                 .or_else(|| {
                     self.manufacturing
                         .embroidery
+                        .find(id)
+                        .map(|profile| profile.values.name.clone())
+                })
+                .or_else(|| {
+                    self.manufacturing
+                        .cnc
                         .find(id)
                         .map(|profile| profile.values.name.clone())
                 }),
@@ -300,7 +320,7 @@ impl Session {
             LibraryKind::Machine => self.machine_record_text(id),
             LibraryKind::Material => self.materials.library().text(id).map(str::to_owned),
         };
-        // The merge is the family's whose `kind` the incoming record names (ADR 0095 §4).
+        // The merge is the family's whose `kind` the incoming record names (ADR 0097 §4).
         let merge = match kind {
             LibraryKind::Machine if is_cutter_record(text) => {
                 curvyo_cutter_core::merge_cutter_record(id, text, local.as_deref())
@@ -308,12 +328,15 @@ impl Session {
             LibraryKind::Machine if is_embroidery_record(text) => {
                 curvyo_embroidery_core::merge_embroidery_record(id, text, local.as_deref())
             }
+            LibraryKind::Machine if is_cnc_record(text) => {
+                curvyo_cnc_core::merge_cnc_record(id, text, local.as_deref())
+            }
             LibraryKind::Machine => merge_machine_record(id, text, local.as_deref()),
             LibraryKind::Material => merge_material_record(id, text, local.as_deref()),
         };
         match merge {
             // Another machine family's record is its own merge's to take, with no notice (ADR
-            // 0095 §4).
+            // 0097 §4).
             RecordMerge::Same
             | RecordMerge::SkipIncoming {
                 reason: MergeReason::OtherFamily,
@@ -370,6 +393,10 @@ impl Session {
                     curvyo_embroidery_core::read_record(&record_file_name(id), text)
                 {
                     self.manufacturing.embroidery.put(profile);
+                } else if let Ok(profile) =
+                    curvyo_cnc_core::read_record(&record_file_name(id), text)
+                {
+                    self.manufacturing.cnc.put(profile);
                 }
                 self.manufacturing.machine.queue(LibraryWrite::Write {
                     id: id.to_owned(),
@@ -436,7 +463,14 @@ impl Session {
                             profile.values.name.clone_from(&name);
                             (curvyo_embroidery_core::write_record(&profile), Some(name))
                         }
-                        Err(_) => (loser.to_owned(), None),
+                        Err(_) => match curvyo_cnc_core::read_record(&file, loser) {
+                            Ok(mut profile) => {
+                                let name = texts::conflict_copy_name(&profile.values.name);
+                                profile.values.name.clone_from(&name);
+                                (curvyo_cnc_core::write_record(&profile), Some(name))
+                            }
+                            Err(_) => (loser.to_owned(), None),
+                        },
                     },
                 },
             },
@@ -473,6 +507,12 @@ impl Session {
                         let at = embroidery.iter().position(|p| p.id == id)?;
                         embroidery.remove(at);
                         Some(LibraryWrite::Remove { id: id.to_owned() })
+                    })
+                    .or_else(|| {
+                        let cnc = &mut self.manufacturing.cnc.profiles;
+                        let at = cnc.iter().position(|p| p.id == id)?;
+                        cnc.remove(at);
+                        Some(LibraryWrite::Remove { id: id.to_owned() })
                     });
                 let Some(write) = write else {
                     return;
@@ -504,15 +544,21 @@ impl Session {
     }
 }
 
-/// Whether `text` is a record of kind `cutter` (ADR 0095 §4: the merge follows the kind).
+/// Whether `text` is a record of kind `cutter` (ADR 0097 §4: the merge follows the kind).
 pub(in crate::session) fn is_cutter_record(text: &str) -> bool {
     serde_json::from_str::<serde_json::Value>(text)
         .is_ok_and(|value| value.get("kind").and_then(serde_json::Value::as_str) == Some("cutter"))
 }
 
-/// Whether `text` is a record of kind `embroidery` (ADR 0095 §4: the merge follows the kind).
+/// Whether `text` is a record of kind `embroidery` (ADR 0097 §4: the merge follows the kind).
 pub(in crate::session) fn is_embroidery_record(text: &str) -> bool {
     serde_json::from_str::<serde_json::Value>(text).is_ok_and(|value| {
         value.get("kind").and_then(serde_json::Value::as_str) == Some("embroidery")
     })
+}
+
+/// Whether `text` is a record of kind `cnc` (ADR 0097 §4: the merge follows the kind).
+pub(in crate::session) fn is_cnc_record(text: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(text)
+        .is_ok_and(|value| value.get("kind").and_then(serde_json::Value::as_str) == Some("cnc"))
 }

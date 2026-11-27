@@ -128,7 +128,7 @@ fn opened(bytes: &[u8]) -> (Session, Value) {
 
 #[test]
 fn the_golden_reads_back_its_page_mat_and_operations() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 70);
+    assert_eq!(CURRENT_FORMAT_VERSION, 71);
     let bytes = read_or_write("plotter_page_v69.curvyo", build);
     let (s, view) = opened(&bytes);
     assert_eq!(view["profile"]["name"], "Cricut Maker 3");
@@ -178,7 +178,7 @@ fn the_damaged_golden_reads_the_defaults_with_a_notice() {
 }
 
 #[test]
-fn a_build_of_format_67_refuses_the_goldens() {
+fn a_build_of_format_68_refuses_the_goldens() {
     for name in ["plotter_page_v69.curvyo", "plotter_page_damaged_v69.curvyo"] {
         let bytes = std::fs::read(fixture_path(name)).unwrap();
         let manifest = read_manifest(&bytes);

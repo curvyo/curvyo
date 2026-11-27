@@ -85,6 +85,7 @@ impl Session {
         self.manufacturing.plotter = super::super::plotter::PlotterLibrary::load(entries);
         self.manufacturing.embroidery.profiles =
             super::super::embroidery::EmbroideryState::load(entries);
+        self.manufacturing.cnc.profiles = super::super::cnc::CncState::load(entries);
         self.align_fixture_pages(None);
     }
 

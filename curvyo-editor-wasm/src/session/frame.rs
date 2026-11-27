@@ -42,6 +42,7 @@ impl Session {
         self.add_fixture_lists(&pages, &mut grids);
         self.add_mat_lists(&pages, &mut grids);
         self.add_hoop_lists(&pages, &mut grids);
+        self.add_stock_lists(&pages, &mut grids);
         let mut list = build_page_areas_with_grids(
             &pages,
             background,

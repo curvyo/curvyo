@@ -122,8 +122,12 @@ impl Session {
     /// has an unfinished path.
     pub(super) fn resize_document_to(&mut self, wanted: DocumentSize) -> SizeOutcome {
         self.recording_unguarded(|this| -> SizeOutcome {
-            // An embroidery page is its largest hoop plus 20 mm, not editable (`0160` criterion 1).
-            if this.pen_path_unfinished() || this.active_embroidery().is_some() {
+            // An embroidery page is its largest hoop plus 20 mm, a CNC page its work area; neither
+            // is editable (`0160`, `0161` criterion 1).
+            if this.pen_path_unfinished()
+                || this.active_embroidery().is_some()
+                || this.active_cnc().is_some()
+            {
                 return SizeOutcome::Unchanged;
             }
             if this.document.pages().len() > 1 {

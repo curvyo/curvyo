@@ -201,6 +201,14 @@ pub const FREE_STEPS: &[&str] = &[
     // `specs/0160-embroidery`: the embroidery page's hoop and speed.
     "set_hoop",
     "edit_embroidery_speed",
+    // `specs/0161-cnc-output`: the CNC page's stock, tools and machine fields.
+    "edit_stock",
+    "add_tool",
+    "edit_tool",
+    "remove_tool",
+    "edit_z_travel",
+    "edit_spindle_max",
+    "edit_safe_height",
     "edit_default_pressure",
     "edit_max_speed",
     "edit_laser_mode",

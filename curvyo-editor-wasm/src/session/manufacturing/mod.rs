@@ -33,11 +33,13 @@ pub(super) struct ManufacturingState {
     pub(super) plotter: super::plotter::PlotterLibrary,
     /// The maker's embroidery profiles and the simulation's position (`specs/0160-embroidery`).
     pub(super) embroidery: super::embroidery::EmbroideryState,
+    /// The maker's CNC profiles, the play position and the sends (`specs/0161-cnc-output`).
+    pub(super) cnc: super::cnc::CncState,
 }
 
 impl Session {
     /// The manufacturing of the active laser page, `None` on another page, on an output page of
-    /// another machine family (ADR 0095: the laser's tools leave those pages) or when it is gone.
+    /// another machine family (ADR 0097: the laser's tools leave those pages) or when it is gone.
     pub(in crate::session) fn active_manufacturing(&self) -> Option<ManufacturingSnapshot> {
         self.active_output_page()
             .filter(|m| m.process == curvyo_laser_core::PROCESS_ID)

@@ -376,7 +376,7 @@ fn s16_a_listed_send_commits_and_the_format_stays() {
     // `0141`'s and 55 `0121`'s.
     assert_eq!(
         curvyo_document_core::CURRENT_FORMAT_VERSION,
-        70,
+        71,
         "no format_version change (60 is `0145` slice 3's, 61 `0118` slice 2c's, 62 `0099` slice 1's, 63 `0118` slice 2d's, 64 `0099` slice 2's, 65 `0147` slice 3's, 66 `0146`, 67 `0139` slice 1's, 68 `0139` slice 2's, 69 `0159` slice 1's, 70 `0160` slice 1's)"
     );
 }

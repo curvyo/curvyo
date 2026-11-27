@@ -133,7 +133,7 @@ const DOCUMENT_LEVEL_LABELS: &[&str] = &[
     "add_page",
     "add_sketch_page",
     "add_output_page",
-    // ADR 0095 §1: Add page of the other machine families (`curvyo-*-core` `ADD_PAGE_COMMIT_LABEL`).
+    // ADR 0097 §1: Add page of the other machine families (`curvyo-*-core` `ADD_PAGE_COMMIT_LABEL`).
     "add_plotter_page",
     "add_embroidery_page",
     "add_cnc_page",
@@ -202,6 +202,14 @@ const DOCUMENT_LEVEL_LABELS: &[&str] = &[
     // `specs/0160-embroidery`: the embroidery page's hoop and speed.
     "set_hoop",
     "edit_embroidery_speed",
+    // `specs/0161-cnc-output`: the CNC page's stock, tools and machine fields.
+    "edit_stock",
+    "add_tool",
+    "edit_tool",
+    "remove_tool",
+    "edit_z_travel",
+    "edit_spindle_max",
+    "edit_safe_height",
     "edit_default_pressure",
     "edit_max_speed",
     "edit_laser_mode",

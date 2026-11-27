@@ -2,6 +2,7 @@ import { TriangleAlert } from "lucide-react";
 
 import { InlinePickList } from "@/components/InlinePickList";
 import { MachineBlock } from "@/components/workbench/MachineBlock";
+import { CncPanel } from "@/components/workbench/CncPanel";
 import { EmbroideryPanel } from "@/components/workbench/EmbroideryPanel";
 import { PlotterPanel } from "@/components/workbench/PlotterPanel";
 import type { OutputApi } from "@/hooks/useOutput";
@@ -51,6 +52,18 @@ export function ManifestTab({ contribution, pages, view, workbenches, unit, libr
       <EmbroideryPanel
         view={view.embroidery}
         api={workbenches.embroidery}
+        onExport={() => void output?.exportJob()}
+        onToggleToolpath={(page) => output?.toggleRoute(page)}
+        onSelectItems={(ids) => output?.selectItems(ids)}
+        onReturnFocus={onReturnFocus}
+      />
+    );
+  }
+  if (view.cnc) {
+    return (
+      <CncPanel
+        view={view.cnc}
+        api={workbenches.cnc}
         onExport={() => void output?.exportJob()}
         onToggleToolpath={(page) => output?.toggleRoute(page)}
         onSelectItems={(ids) => output?.selectItems(ids)}

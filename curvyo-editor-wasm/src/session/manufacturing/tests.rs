@@ -86,9 +86,9 @@ fn ac1_the_kind_list_is_drawing_sketch_and_one_entry_per_enabled_extension() {
     assert_eq!(session.manufacturing_view_json(), "null");
 }
 
-/// ADR 0095 §11 step G2: each machine family's Add page is one step named after its word, takes
+/// ADR 0097 §11 step G2: each machine family's Add page is one step named after its word, takes
 /// its default built-in's page size, writes no laser profile copy (the plotter its cutter copy,
-/// `0159`, embroidery its own, `0160`), and undo removes it.
+/// `0159`, embroidery and CNC their own, `0160`, `0161`), and undo removes it.
 #[test]
 fn add_page_of_a_machine_family_is_one_named_step_of_its_builtin_size() {
     for (process, word, label, name, width, height) in [
@@ -158,10 +158,10 @@ fn add_page_of_a_machine_family_is_one_named_step_of_its_builtin_size() {
             assert_eq!(copy.copy.values.name, "W6 EU7");
             assert_eq!(copy.damaged, 0);
         } else {
-            assert!(
-                manufacturing[0].profile.is_none(),
-                "no laser copy on a {word} page"
-            );
+            // `0161` criterion 2: the CNC page holds the Generic GRBL router's copy.
+            let copy = curvyo_cnc_core::read_copy(manufacturing[0].profile.as_ref());
+            assert_eq!(copy.copy.values.name, "Generic GRBL router");
+            assert_eq!(copy.damaged, 0);
         }
         assert_eq!(view(&session)["machine"], Value::Null);
         let _ = session.frame_draw_list();

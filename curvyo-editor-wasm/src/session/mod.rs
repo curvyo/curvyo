@@ -42,6 +42,7 @@ mod clone_tests;
 mod clone_view;
 mod clones;
 mod close_path;
+mod cnc;
 mod colour_pick;
 mod combine;
 mod context;
