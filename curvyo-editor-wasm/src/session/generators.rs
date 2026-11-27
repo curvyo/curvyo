@@ -5,6 +5,8 @@
 //! `curvyo_ui_core::instance`; this is the glue to the session's selection and history.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use curvyo_document_core::{GeneratedRecord, NodeId, ObjectSnapshot, Point, ViewTransform};
 use curvyo_render_core::DrawList;
@@ -12,6 +14,7 @@ use curvyo_ui_core::instance::{self, InstanceError};
 use curvyo_ui_core::instance_source;
 use serde_json::{Value, json};
 
+use super::object_cache::DocumentRead;
 use super::{Session, Tool};
 
 /// The kind the tool places until the maker picks another: Box, the first of the registry.
@@ -35,10 +38,13 @@ struct Preview {
     frame: curvyo_document_core::Affine,
     /// Drawn as the blue outline over the committed object (a handle drag) instead of in place.
     overlay: bool,
+    /// The generator answered no parts: the preview draws the last valid outline.
+    refused: bool,
 }
 
 mod handles;
 mod parts;
+mod refusal;
 
 /// The Generators tool's state.
 #[derive(Debug, Default)]
@@ -59,6 +65,12 @@ pub(super) struct GeneratorsState {
     preview: Option<Preview>,
     /// The defaults of the chosen kind, for the ghost: generated once per kind.
     ghost: RefCell<Option<(String, GeneratedRecord)>>,
+    /// The generated objects whose stored parameters cannot be drawn (their stored outline is the
+    /// last valid one), worked out once per read of the document (`0144` criterion 13).
+    unsolved: RefCell<Option<(Arc<DocumentRead>, Vec<NodeId>)>>,
+    /// Whether the generator refuses the parameters last seen of an object (a pure function of
+    /// them): a commit of this session fills it, so the frame after it generates nothing again.
+    refusals: RefCell<HashMap<NodeId, (curvyo_extension_core::StoredParams, bool)>>,
 }
 
 /// The render tone of an overlay tone.
@@ -93,14 +105,24 @@ impl Session {
         Value::Array(kinds).to_string()
     }
 
-    /// The kind the tool places, the last choice of the session (Box at first).
+    /// The kind the tool places, the last choice of the session (Box at first); the first kind the
+    /// bar offers while that one is switched off.
     #[must_use]
     pub fn generator_kind(&self) -> String {
-        if self.generators.kind.is_empty() {
-            FIRST_KIND.to_owned()
+        let wanted = if self.generators.kind.is_empty() {
+            FIRST_KIND
         } else {
-            self.generators.kind.clone()
+            &self.generators.kind
+        };
+        if instance::find_kind(&self.manufacturing.extensions, wanted).is_some() {
+            return wanted.to_owned();
         }
+        instance::enabled_kinds(&self.manufacturing.extensions)
+            .first()
+            .map_or_else(
+                || wanted.to_owned(),
+                |found| format!("{}/{}", found.manifest.id, found.kind.id),
+            )
     }
 
     /// The bar's choice. An unknown kind is ignored.
@@ -178,7 +200,7 @@ impl Session {
         let kind = self.generator_kind();
         let name = self
             .kind_label(&kind)
-            .map(|label| format!("Add {}", label.to_lowercase()));
+            .map(|label| format!("Add {}", instance::noun(label)));
         let placed: Option<NodeId> = self.recording_named_guarded(name, |this| {
             instance::place(&this.document, &this.manufacturing.extensions, &kind, at).ok()
         });
@@ -328,7 +350,7 @@ impl Session {
     fn build_from_source(&mut self, kind: &str, source: NodeId) -> String {
         let name = self
             .kind_label(kind)
-            .map(|label| format!("Add {}", label.to_lowercase()));
+            .map(|label| format!("Add {}", instance::noun(label)));
         let outcome = self.recording_named_guarded(name, |this| {
             Some(instance_source::place_from_source(
                 &this.document,
@@ -467,7 +489,26 @@ impl Session {
             return "null".to_owned();
         };
         value["parts"] = Value::Array(rows);
+        value["contrast_low"] = Value::Bool(self.code_contrast_is_low(id, &snapshot.record.kind));
         value.to_string()
+    }
+
+    /// Whether the fill of the code `id` is below 3 : 1 against the document background, so the
+    /// Colours group says "Low contrast, may not scan" (`0144` criterion 9). Never for another kind
+    /// of object, on a page that is not a drawing page (colours there are operations, `0101`) or
+    /// while the background is not painted.
+    fn code_contrast_is_low(&self, id: NodeId, kind: &str) -> bool {
+        if !kind.starts_with("curvyo.codes/") || !self.active_page().kind.is_drawing() {
+            return false;
+        }
+        let background = self.shown_background();
+        if background.paint == curvyo_document_core::BackgroundPaint::None {
+            return false;
+        }
+        let Some(ObjectSnapshot::Path(path)) = self.document.object(id) else {
+            return false;
+        };
+        curvyo_ui_core::code_contrast::is_low(&path.style.fill, background.color)
     }
 
     /// A value typed or stepped into the row `key` of the block, as JSON text (`12.5`, `true` or
@@ -523,7 +564,17 @@ impl Session {
             ))
         });
         match outcome {
-            Some(Ok(changed)) => json!({"written": changed.written, "notices": changed.notices}),
+            Some(Ok(changed)) => {
+                // The frame after this commit generates nothing again to know the answer.
+                if let Some(found) = self.document.generated_params(id) {
+                    let params = found.params;
+                    self.generators
+                        .refusals
+                        .borrow_mut()
+                        .insert(id, (params, changed.refused));
+                }
+                json!({"written": changed.written, "notices": changed.notices})
+            }
             Some(Err(InstanceError::UnknownKind)) => json!({"error": "unknown generator"}),
             _ => json!({"error": "refused"}),
         }
@@ -571,6 +622,7 @@ impl Session {
                     record: plan.record,
                     frame: plan.snapshot.frame,
                     overlay: false,
+                    refused: plan.refused,
                 });
                 json!({"notices": plan.notices}).to_string()
             }

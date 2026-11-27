@@ -301,6 +301,7 @@ impl Session {
         list.extend(self.generators_preview_overlay(view));
         list.extend(self.instance_preview_overlay(view));
         list.extend(Self::no_solution_overlay(&artwork_objects, view));
+        list.extend(self.generated_no_solution_overlay(&artwork_objects, view));
         list.extend(self.path_box_marks_list(view));
         // The Node tool draws the nodes and handles of its editing set only (customer 2026-10-26).
         let control_paths: Vec<_> = paths.iter().map(super::node::control_view).collect();

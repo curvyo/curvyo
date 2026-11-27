@@ -168,6 +168,9 @@ pub struct Context {
     /// The wall thickness: a limit equal to it belongs to a concave stretch, twice it to a
     /// convex one.
     pub wall: curvyo_document_core::Length,
+    /// The error-correction letter of a QR code (`M`), for the sentence of content that is too
+    /// long.
+    pub level: char,
 }
 
 impl Default for Context {
@@ -178,6 +181,7 @@ impl Default for Context {
             seat: true,
             hollow: true,
             wall: curvyo_document_core::Length::from_mm(3.0),
+            level: 'M',
         }
     }
 }
@@ -205,8 +209,35 @@ impl Context {
                 .and_then(curvyo_extension_core::ParamValue::from_stored)
                 .and_then(|value| value.length())
                 .unwrap_or_else(|| curvyo_document_core::Length::from_mm(3.0)),
+            level: generated
+                .params
+                .get("ec")
+                .and_then(curvyo_extension_core::ParamValue::from_stored)
+                .and_then(|value| value.choice().and_then(|id| id.chars().next()))
+                .map_or('M', |letter| letter.to_ascii_uppercase()),
         }
     }
+}
+
+/// Whether the warning `id` says the content of a code cannot be drawn (it stays under the field).
+#[must_use]
+pub fn is_content_problem(id: &str) -> bool {
+    matches!(id, "content_empty" | "content_too_long")
+}
+
+/// "Too long for a QR code at error correction M: 2412 bytes, at most 2331."
+fn too_long(group: &[&Warning], level: char) -> String {
+    let count = |value: Option<&curvyo_extension_core::ParamValue>| {
+        value
+            .and_then(curvyo_extension_core::ParamValue::count)
+            .unwrap_or(0)
+    };
+    let warning = group.first();
+    format!(
+        "Too long for a QR code at error correction {level}: {} bytes, at most {}.",
+        count(warning.and_then(|w| w.value.as_ref())),
+        count(warning.and_then(|w| w.limit.as_ref()))
+    )
 }
 
 /// One sentence per warning id, in the order the ids first appear.
@@ -254,6 +285,8 @@ pub fn sentences_in(warnings: &[Warning], context: Context) -> Vec<String> {
                         .to_owned()
                 }
                 "tab_window" => windows(&group),
+                "content_empty" => "Enter a text to encode.".to_owned(),
+                "content_too_long" => too_long(&group, context.level),
                 "unknown_joint_pattern" => {
                     "The Joint pattern is not known here; Even is used.".to_owned()
                 }
@@ -355,6 +388,7 @@ mod tests {
             seat,
             hollow,
             wall: curvyo_document_core::Length::from_mm(3.0),
+            level: 'M',
         }
     }
 

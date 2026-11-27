@@ -318,6 +318,39 @@ fn part_from(value: &LoroValue) -> Option<Vec<Vec<f64>>> {
     list.iter().map(subpath_from).collect()
 }
 
+/// What a generated object says about itself without its outline (`Document::generated_params`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct GeneratedParams {
+    /// `<extension id>/<kind>`.
+    pub kind: String,
+    /// The seed.
+    pub seed: u32,
+    /// The stored parameter values.
+    pub params: serde_json::Map<String, Value>,
+}
+
+/// The kind, seed and parameters of the record register, without decoding its outline: what a caller
+/// that only asks "which generator, with which numbers" needs, at the cost of two map reads.
+pub(crate) fn read_kind_params(meta: &LoroMap) -> Option<GeneratedParams> {
+    let LoroValue::Map(map) = value_of(meta, KEY_GENERATED)? else {
+        return None;
+    };
+    let LoroValue::String(kind) = map.get("kind")? else {
+        return None;
+    };
+    let LoroValue::I64(seed) = map.get("seed")? else {
+        return None;
+    };
+    let Value::Object(params) = loro_to_json(map.get("params")?) else {
+        return None;
+    };
+    Some(GeneratedParams {
+        kind: kind.to_string(),
+        seed: u32::try_from(*seed).ok()?,
+        params,
+    })
+}
+
 /// The record register when every rule of the module header holds.
 pub(crate) fn read_record(meta: &LoroMap) -> Option<GeneratedRecord> {
     let LoroValue::Map(map) = value_of(meta, KEY_GENERATED)? else {

@@ -137,9 +137,10 @@ fn criterion_21_curved_hides_the_flat_rows_and_keeps_their_values() {
 fn the_path_box_rows_and_conditions_do_not_change() {
     fn mentions_top_shape(condition: ShownWhen) -> bool {
         match condition {
-            ShownWhen::Is { key, .. } | ShownWhen::On { key } | ShownWhen::Positive { key } => {
-                key == "top_shape"
-            }
+            ShownWhen::Is { key, .. }
+            | ShownWhen::On { key }
+            | ShownWhen::Full { key }
+            | ShownWhen::Positive { key } => key == "top_shape",
             ShownWhen::AllOn { .. } => false,
             ShownWhen::All { .. } | ShownWhen::Any { .. } => true,
         }

@@ -1,0 +1,25 @@
+[package]
+name = "curvyo-codes-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The codes extension (ADR 0091): QR codes as live generated objects, pure functions from a text and style parameters to closed outlines."
+
+[lints]
+workspace = true
+
+[dependencies]
+curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
+curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+thiserror.workspace = true
+# The QR encoder (ADR 0091 §Options): MIT OR Apache-2.0, passively maintained, no dependencies
+# without default features, builds for wasm32-unknown-unknown; `max_allowed_errors` and
+# `is_functional` are public, which the clear-area budget needs.
+qrcode = { version = "0.15", default-features = false }
+
+[dev-dependencies]
+# The independent decoder of the criterion 4 test (ADR 0091 §7): (MIT OR Apache-2.0) AND ISC; its
+# own dependencies are `g2p` and `lru`. Test-only, never in the product.
+rqrr = { version = "0.11", default-features = false }
+serde_json.workspace = true

@@ -404,7 +404,7 @@ pub use format_library_file::{
     MAX_USER_FILE_BYTES, MAX_USER_FORMATS, MAX_USER_GROUPS, USER_FILE_FORMAT, describe_error,
 };
 pub use format_library_import::ImportReport;
-pub use generated_codec::{GeneratedRecord, GeneratedSnapshot, orthonormalised};
+pub use generated_codec::{GeneratedParams, GeneratedRecord, GeneratedSnapshot, orthonormalised};
 pub use generated_commands::{
     ADD_GENERATED_COMMIT_LABEL, CHANGE_PARAMETER_COMMIT_LABEL, CONVERT_GENERATED_COMMIT_LABEL,
     GeneratedError, KEY_SUBJECT_KIND, KEY_SUBJECT_PARAM,

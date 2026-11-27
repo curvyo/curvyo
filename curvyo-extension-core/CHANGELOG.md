@@ -68,3 +68,13 @@ migration in that extension.
   with when it differs from `default` (`Param::defaults` writes `initial` first; `Param::read` is unchanged, so a
   stored object without the key reads `default`). Serialised only when set. Source-breaking for code that builds a
   `Param` literal.
+
+## Unreleased (`specs/0144-qr-and-barcodes`, ADR 0091)
+
+- `ParamKind::Text { multiline }` / `ParamValue::Text` (stored `{"text": "..."}`, at most 8,192 bytes) and
+  `ParamKind::Percent { min, max }` / `ParamValue::Percent` (stored `{"pct": n}`); `ShownWhen::Full { key }`
+  (a percentage at its maximum); `Bound::DependentFor(subject)` ("the most error correction M allows").
+  Source-breaking for an exhaustive `match` on `ParamKind`, `ParamValue`, `ShownWhen` or `Bound`. No
+  `format_version` change: values are opaque to document-core.
+- Host rule: a generator that cannot encode its input answers `parts: []` plus a `Warning`; the host keeps the
+  stored parts and writes the new params (ADR 0091 §3).

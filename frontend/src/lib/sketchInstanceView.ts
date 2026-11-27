@@ -106,6 +106,7 @@ export function asGeneratedRow(row: SketchInstanceRow): GeneratedRow {
     limit: null,
     state: null,
     used: null,
+    problem: null,
     defaultValue: row.sketchValue,
     value: row.value ?? row.sketchValue,
   };
