@@ -1,4 +1,4 @@
-//! Acceptance test for `specs/0146-material-test-picks` criterion 20 (ADR 0090 decision 10): the
+//! Acceptance test for `specs/0146-material-test-picks` criterion 20 (ADR 0093 decision 10): the
 //! round Engrave mark is the ellipse outline with equal radii, within 0.03 % of the radius of the
 //! exact circle and 0.1 % of its area. Written black-box from the specification.
 #![allow(clippy::many_single_char_names, clippy::cast_precision_loss)]

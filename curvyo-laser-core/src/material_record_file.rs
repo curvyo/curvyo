@@ -29,14 +29,14 @@ use crate::test_id::TestId;
 /// `"selected"` and an axis on `strength`; a record of format 2 or 3 reads as is and is written
 /// back as format 4 at its next save, one holding either is damaged.
 ///
-/// Format 5 (`specs/0146`, ADR 0090 decision 2) lets a test carry the marks `second_best`,
+/// Format 5 (`specs/0146`, ADR 0093 decision 2) lets a test carry the marks `second_best`,
 /// `fastest` and `deepest` beside `best`, and a laser entry the `picks` sets after `sets`; a
 /// record of format 2 to 4 reads as is and is written back as format 5 at its next save, one
 /// holding either is damaged.
 pub const RECORD_FORMAT_VERSION: u64 = 5;
 /// The oldest record format this build reads; format 1 is skipped as older.
 const OLDEST_READ_FORMAT: u64 = 2;
-/// The largest record text that is read or written (ADR 0058 §6, 640 KiB since ADR 0090
+/// The largest record text that is read or written (ADR 0058 §6, 640 KiB since ADR 0093
 /// decision 6).
 pub const MAX_RECORD_TEXT: usize = 640 * 1024;
 /// The only machine family a material is for.

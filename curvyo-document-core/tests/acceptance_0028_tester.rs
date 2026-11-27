@@ -161,7 +161,7 @@ fn settings_survive_a_pack_round_trip_and_reopen_writes_no_step() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 65);
+    assert_eq!(CURRENT_FORMAT_VERSION, 66);
 }
 
 // ---- format 41 ----------------------------------------------------------------------------------

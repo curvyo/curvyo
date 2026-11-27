@@ -266,7 +266,7 @@ impl SetKind {
     }
 }
 
-/// The four picks a maker marks on a test (`specs/0146`, ADR 0090 decision 1), in display order.
+/// The four picks a maker marks on a test (`specs/0146`, ADR 0093 decision 1), in display order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PickKind {
     /// The main choice; its set is the laser's set of the kind.

@@ -219,7 +219,7 @@ fn clone_of(d: &Document, id: NodeId) -> CloneSnapshot {
 /// coupled own values, the mark and the chain read back and save back unchanged.
 #[test]
 fn the_golden_reads_back_the_groups_and_marks_and_saves_back_unchanged() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 65);
+    assert_eq!(CURRENT_FORMAT_VERSION, 66);
     let bytes = stored(GOLDEN);
     assert_eq!(manifest_format(&bytes), 64);
     let d = unpack(2, &bytes).unwrap();

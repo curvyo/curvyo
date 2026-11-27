@@ -41,7 +41,7 @@ pub struct LaserSets {
     pub machine: MachineTie,
     /// At most one set per kind.
     pub sets: BTreeMap<SetKind, Set>,
-    /// The pick sets of Second best, Fastest and Deepest per kind (ADR 0090 decision 2); Best is
+    /// The pick sets of Second best, Fastest and Deepest per kind (ADR 0093 decision 2); Best is
     /// the entry in `sets`. Their source is always a test.
     pub picks: BTreeMap<(SetKind, PickKind), Set>,
 }
@@ -206,7 +206,7 @@ impl Material {
     }
 
     /// The set `pick` of `kind` for the laser `profile_id`: Best is [`Self::set_for`], the others
-    /// the laser's `picks` entry (ADR 0090 decision 8).
+    /// the laser's `picks` entry (ADR 0093 decision 8).
     #[must_use]
     pub fn pick_set(&self, profile_id: &str, kind: SetKind, pick: PickKind) -> Option<&Set> {
         match pick {

@@ -9,7 +9,7 @@
 
 **Note ([`specs/0150` adrs.md](../../specs/0150-operation-always-has-numbers/adrs.md), needs-customer, proposed 2026-11-24, accepted with the `0150` story PR):** §1 and §2: an absent `op_settings` no longer means No settings; it reads as own numbers from the copy's default pair (`SettingsRead::None` and `SettingsState::NoSettings` go). §3: three more writes store those numbers: the `add_operation` commit, a step that changes the copy's pair (before the change), and a save of a changed project in the reserved commit `refresh_material_numbers`; nothing is written on open (decisions 3 to 5).
 
-**Note ([ADR 0092](0092-material-test-picks-and-round-engrave-cells.md), proposed 2026-11-26, spec `0146`, accepted with the story PR):** §1: `material` may hold `pick` (`second_best`, `fastest`, `deepest`; absent = Best; any other value is a bad link). §2: the main set (and the outline's Score or Engrave set) is the material's set of that pick, and a missing pick set is the stored state. Project format next free at merge (65 today).
+**Note ([ADR 0093](0093-material-test-picks-and-round-engrave-cells.md), proposed 2026-11-26, spec `0146`, accepted with the story PR):** §1: `material` may hold `pick` (`second_best`, `fastest`, `deepest`; absent = Best; any other value is a bad link). §2: the main set (and the outline's Score or Engrave set) is the material's set of that pick, and a missing pick set is the stored state. Project format next free at merge (65 today).
 
 ## Context
 

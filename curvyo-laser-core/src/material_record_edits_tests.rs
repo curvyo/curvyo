@@ -466,7 +466,7 @@ fn a_pick_set_survives_its_deleted_test_and_reads_back() {
     assert_eq!(kept.source, SetSource::Test(id("7K2QX")));
 }
 
-/// Criterion 5 and ADR 0090 decision 3: a recipe change drops the marks outside the new grid and
+/// Criterion 5 and ADR 0093 decision 3: a recipe change drops the marks outside the new grid and
 /// keeps the pick sets.
 #[test]
 fn a_smaller_recipe_drops_marks_outside_it() {

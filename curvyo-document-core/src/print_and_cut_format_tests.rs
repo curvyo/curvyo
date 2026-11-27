@@ -281,8 +281,8 @@ fn a_build_of_format_54_refuses_the_golden() {
     assert!(matches!(
         unpack(3, &newer),
         Err(OpenError::FormatTooNew {
-            found: 66,
-            supported: 65
+            found: 67,
+            supported: 66
         })
     ));
 }

@@ -1,4 +1,4 @@
-//! Material record format 5 (`specs/0146-material-test-picks` criteria 10, 11, 23; ADR 0090
+//! Material record format 5 (`specs/0146-material-test-picks` criteria 10, 11, 23; ADR 0093
 //! decisions 2, 4, 5): marks on tests, pick sets per laser, the damage rules and the 640 KiB limit.
 
 #![allow(clippy::unwrap_used)]
@@ -97,7 +97,7 @@ fn an_older_record_has_best_only() {
     assert!(material.lasers.iter().all(|l| l.picks.is_empty()));
 }
 
-/// Criterion 23: each damage of ADR 0090 decision 5 names its reason.
+/// Criterion 23: each damage of ADR 0093 decision 5 names its reason.
 #[test]
 fn every_pick_damage_skips_the_record_with_its_reason() {
     let cases = [
@@ -158,7 +158,7 @@ fn a_format_6_record_is_newer() {
     assert_eq!(read("newer_format.json"), Err(RecordFileError::Newer));
 }
 
-/// Criterion 11 and ADR 0090 decision 6: every mark and every pick set of the old maximum fits
+/// Criterion 11 and ADR 0093 decision 6: every mark and every pick set of the old maximum fits
 /// the 640 KiB limit and reads back byte for byte.
 #[test]
 fn the_maximal_record_with_every_pick_fits_640_kib() {

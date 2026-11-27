@@ -2270,7 +2270,7 @@ fn c41_the_format_50_golden_opens_engraves_and_round_trips() {
     let bytes = golden_project("raster_engraving_v50.curvyo");
     let d = unpack(9, &bytes).unwrap();
     // Superseded by 0135 slice 1 (2026-11-19): format 51 (ADR 0072 §8).
-    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 65);
+    assert_eq!(curvyo_document_core::CURRENT_FORMAT_VERSION, 66);
     let page = d
         .pages()
         .into_iter()
@@ -2558,7 +2558,7 @@ fn c45_an_engrave_grid_is_unchanged_and_the_record_keeps_the_image_grids_dither(
         .and_then(|w| w["text"].as_str().map(str::to_owned))
         .unwrap_or_else(|| panic!("{writes}"));
     let rec: Value = serde_json::from_str(&text).unwrap();
-    // Superseded by 0135 slice 1 (2026-11-19): material record format 4 (ADR 0072 §6). Superseded by 0146 (ADR 0090): format 5.
+    // Superseded by 0135 slice 1 (2026-11-19): material record format 4 (ADR 0072 §6). Superseded by 0146 (ADR 0093): format 5.
     assert_eq!(rec["format_version"], 5);
     let t = rec["tests"]
         .as_array()

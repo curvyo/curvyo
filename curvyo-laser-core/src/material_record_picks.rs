@@ -1,5 +1,5 @@
 //! The stored form of a laser entry's pick sets: their JSON shape, read with the damage rules of
-//! ADR 0090 decision 5, and written back in canonical order.
+//! ADR 0093 decision 5, and written back in canonical order.
 
 use std::collections::BTreeMap;
 
@@ -54,7 +54,7 @@ impl PickSetsJson {
 }
 
 /// Whether a set of `kind` sourced from the test `id` fits: a test that is not in the record is a
-/// deleted test (valid, ADR 0090 decision 4), one that is must have the laser and the kind.
+/// deleted test (valid, ADR 0093 decision 4), one that is must have the laser and the kind.
 pub(crate) fn source_fits(
     tests: &[TestRecord],
     id: crate::test_id::TestId,

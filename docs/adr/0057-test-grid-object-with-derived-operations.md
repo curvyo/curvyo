@@ -6,7 +6,7 @@ Note 2026-11-20: §1 amended by [ADR 0072](0072-image-adjustments-on-the-image-o
 
 **Note (ADR 0069 §13, with the `0123` story, 2026-11-19):** §1: a recipe's kind may be `image` (an Image grid: every cell the black-to-white gradient rectangle, derived `image` operations with `op_options.dither`, the Interval parameter offered) and carries `dither` (the six binary modes; absent Floyd-Steinberg), valid only with `kind: "image"`; there is no `fill` key, and `fill` or `dither` on an Engrave recipe is damage.
 
-**Note ([ADR 0092](0092-material-test-picks-and-round-engrave-cells.md), proposed 2026-11-26, spec `0146`, accepted with the story PR):** §1: an Engrave grid's cell is an ellipse primitive (rx = ry = Cell size / 2) centred on its square, written at the next regeneration. Older grids keep their rect cells until then. Pitch, labels, ids and format are unchanged.
+**Note ([ADR 0093](0093-material-test-picks-and-round-engrave-cells.md), proposed 2026-11-26, spec `0146`, accepted with the story PR):** §1: an Engrave grid's cell is an ellipse primitive (rx = ry = Cell size / 2) centred on its square, written at the next regeneration. Older grids keep their rect cells until then. Pitch, labels, ids and format are unchanged.
 
 ## Context
 

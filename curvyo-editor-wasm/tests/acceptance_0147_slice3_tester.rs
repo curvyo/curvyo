@@ -221,18 +221,22 @@ fn criterion_15_attach_part_returns_the_lid_in_one_step_and_refuses_a_second() {
 }
 
 #[test]
-fn criterion_8_pack_writes_format_65_and_a_newer_file_is_refused_with_format_too_new() {
+fn criterion_8_pack_writes_format_66_and_a_newer_file_is_refused_with_format_too_new() {
     let mut s = boxed_in_cut(15_007);
     assert!(s.detach_selected_part("lid"));
     let bytes = s.pack("0.1.0").unwrap();
-    assert_eq!(format_of(&bytes), 65, "format_version 65 with part keys");
+    assert_eq!(
+        format_of(&bytes),
+        66,
+        "format_version 66 (65 added the part keys)"
+    );
     assert!(unpack(2, &bytes).is_ok());
 
     let mut files = members(&bytes);
     for (name, content) in &mut files {
         if name == "manifest.json" {
             let mut manifest: Value = serde_json::from_slice(content).unwrap();
-            manifest["format_version"] = serde_json::json!(66);
+            manifest["format_version"] = serde_json::json!(67);
             *content = serde_json::to_vec(&manifest).unwrap();
         }
     }
@@ -240,11 +244,11 @@ fn criterion_8_pack_writes_format_65_and_a_newer_file_is_refused_with_format_too
         matches!(
             Session::open(15_008, &zip_of(&files)),
             Err(OpenError::FormatTooNew {
-                found: 66,
-                supported: 65
+                found: 67,
+                supported: 66
             })
         ),
-        "a file of 66 gets FormatTooNew"
+        "a file of 67 gets FormatTooNew"
     );
 }
 
@@ -256,8 +260,8 @@ fn criterion_8_a_file_of_64_opens_unchanged_and_saves_back() {
     let s = Session::open(15_009, &bytes).expect("a file of 64 opens");
     assert_eq!(
         format_of(&s.pack("0.1.0").unwrap()),
-        65,
-        "saved as 65 by this build"
+        66,
+        "saved as 66 by this build"
     );
 }
 
