@@ -48,580 +48,582 @@
 <line class="grid" x1="56" y1="40.0" x2="624" y2="40.0"/>
 <text class="muted" x="48" y="44.0" text-anchor="end">32</text>
 <text class="muted" x="56.0" y="270" text-anchor="middle">10-20</text>
-<text class="muted" x="128.8" y="270" text-anchor="middle">10-29</text>
-<text class="muted" x="201.5" y="270" text-anchor="middle">11-04</text>
-<text class="muted" x="274.3" y="270" text-anchor="middle">11-09</text>
-<text class="muted" x="347.1" y="270" text-anchor="middle">11-12</text>
-<text class="muted" x="419.8" y="270" text-anchor="middle">11-18</text>
-<text class="muted" x="492.6" y="270" text-anchor="middle">11-20</text>
-<text class="muted" x="565.4" y="270" text-anchor="middle">11-25</text>
+<text class="muted" x="128.5" y="270" text-anchor="middle">10-29</text>
+<text class="muted" x="201.0" y="270" text-anchor="middle">11-04</text>
+<text class="muted" x="273.5" y="270" text-anchor="middle">11-09</text>
+<text class="muted" x="346.0" y="270" text-anchor="middle">11-12</text>
+<text class="muted" x="418.6" y="270" text-anchor="middle">11-18</text>
+<text class="muted" x="491.1" y="270" text-anchor="middle">11-20</text>
+<text class="muted" x="563.6" y="270" text-anchor="middle">11-25</text>
 <text class="muted" x="624.0" y="270" text-anchor="middle">11-27</text>
-<polyline class="raw line" points="56.0,186.5 58.0,171.9 60.0,171.4 62.1,170.7 64.1,171.2 66.1,170.5 68.1,170.5 70.1,170.5 72.2,170.5 74.2,170.1 76.2,170.1 78.2,169.9 80.3,169.9 82.3,169.4 84.3,169.4 86.3,169.4 88.3,169.1 90.4,168.8 92.4,168.7 94.4,167.5 96.4,167.5 98.4,167.5 100.5,163.2 102.5,163.1 104.5,162.0 106.5,161.9 108.6,161.9 110.6,161.2 112.6,161.2 114.6,161.0 116.6,160.9 118.7,160.9 120.7,160.7 122.7,160.7 124.7,160.7 126.7,160.7 128.8,160.7 130.8,160.2 132.8,159.7 134.8,159.5 136.9,158.8 138.9,158.8 140.9,158.8 142.9,157.7 144.9,157.7 147.0,157.3 149.0,157.3 151.0,155.9 153.0,138.8 155.0,138.8 157.1,138.8 159.1,138.6 161.1,138.6 163.1,138.2 165.2,137.8 167.2,137.6 169.2,136.5 171.2,135.7 173.2,135.7 175.3,112.9 177.3,112.9 179.3,111.3 181.3,109.9 183.3,109.7 185.4,109.7 187.4,105.0 189.4,103.7 191.4,103.7 193.5,103.7 195.5,103.5 197.5,103.5 199.5,103.5 201.5,103.5 203.6,103.5 205.6,99.4 207.6,98.4 209.6,98.4 211.6,98.4 213.7,98.1 215.7,98.1 217.7,97.8 219.7,95.1 221.8,95.1 223.8,95.1 225.8,95.1 227.8,95.1 229.8,95.1 231.9,95.1 233.9,95.0 235.9,95.0 237.9,95.0 239.9,94.6 242.0,94.6 244.0,94.6 246.0,94.6 248.0,94.4 250.0,92.8 252.1,92.8 254.1,92.8 256.1,92.8 258.1,92.8 260.2,92.8 262.2,93.3 264.2,92.1 266.2,92.1 268.2,92.2 270.3,91.7 272.3,91.7 274.3,91.7 276.3,92.0 278.3,92.0 280.4,92.0 282.4,91.9 284.4,91.9 286.4,90.9 288.5,90.9 290.5,90.9 292.5,90.9 294.5,90.9 296.5,90.9 298.6,90.7 300.6,90.7 302.6,90.7 304.6,89.2 306.6,89.2 308.7,89.2 310.7,89.2 312.7,89.2 314.7,89.2 316.8,89.2 318.8,89.2 320.8,89.2 322.8,89.2 324.8,89.2 326.9,89.2 328.9,89.2 330.9,88.3 332.9,88.3 334.9,88.3 337.0,86.0 339.0,83.3 341.0,83.3 343.0,83.3 345.1,83.3 347.1,83.4 349.1,83.0 351.1,83.0 353.1,82.3 355.2,82.4 357.2,80.3 359.2,80.3 361.2,80.3 363.2,80.0 365.3,80.0 367.3,80.0 369.3,80.0 371.3,80.0 373.4,80.0 375.4,80.0 377.4,80.0 379.4,78.6 381.4,78.6 383.5,78.6 385.5,78.6 387.5,78.5 389.5,75.0 391.5,73.6 393.6,73.6 395.6,73.6 397.6,73.6 399.6,73.4 401.7,73.4 403.7,73.4 405.7,73.4 407.7,73.4 409.7,73.4 411.8,73.4 413.8,73.2 415.8,73.2 417.8,72.0 419.8,72.0 421.9,72.0 423.9,72.0 425.9,71.9 427.9,71.9 430.0,71.9 432.0,71.9 434.0,71.9 436.0,71.9 438.0,71.9 440.1,71.9 442.1,71.9 444.1,71.9 446.1,71.9 448.1,71.9 450.2,71.9 452.2,71.9 454.2,71.9 456.2,71.9 458.2,70.7 460.3,70.7 462.3,70.7 464.3,70.7 466.3,70.7 468.4,70.7 470.4,70.7 472.4,70.2 474.4,70.2 476.4,70.2 478.5,70.2 480.5,70.2 482.5,70.2 484.5,70.2 486.5,68.2 488.6,68.2 490.6,67.0 492.6,67.0 494.6,67.0 496.7,66.5 498.7,66.5 500.7,66.5 502.7,66.4 504.7,66.4 506.8,65.3 508.8,65.3 510.8,65.3 512.8,65.3 514.8,65.3 516.9,64.6 518.9,64.6 520.9,64.6 522.9,63.3 525.0,63.3 527.0,63.3 529.0,62.4 531.0,62.4 533.0,62.4 535.1,62.3 537.1,62.3 539.1,62.3 541.1,62.1 543.1,61.5 545.2,61.5 547.2,61.5 549.2,59.4 551.2,59.4 553.3,59.4 555.3,59.4 557.3,59.3 559.3,58.6 561.3,58.3 563.4,58.3 565.4,58.2 567.4,58.0 569.4,57.6 571.4,57.6 573.5,57.6 575.5,57.6 577.5,56.4 579.5,54.3 581.6,54.3 583.6,54.3 585.6,54.3 587.6,54.1 589.6,54.1 591.7,54.0 593.7,53.7 595.7,53.3 597.7,52.8 599.7,52.8 601.8,52.8 603.8,52.6 605.8,52.6 607.8,51.6 609.9,51.6 611.9,50.1 613.9,50.0 615.9,50.0 617.9,50.0 620.0,50.0 622.0,50.0 624.0,48.9"/>
+<polyline class="raw line" points="56.0,186.5 58.0,171.9 60.0,171.4 62.0,170.7 64.1,171.2 66.1,170.5 68.1,170.5 70.1,170.5 72.1,170.5 74.1,170.1 76.1,170.1 78.2,169.9 80.2,169.9 82.2,169.4 84.2,169.4 86.2,169.4 88.2,169.1 90.2,168.8 92.3,168.7 94.3,167.5 96.3,167.5 98.3,167.5 100.3,163.2 102.3,163.1 104.3,162.0 106.4,161.9 108.4,161.9 110.4,161.2 112.4,161.2 114.4,161.0 116.4,160.9 118.4,160.9 120.5,160.7 122.5,160.7 124.5,160.7 126.5,160.7 128.5,160.7 130.5,160.2 132.5,159.7 134.6,159.5 136.6,158.8 138.6,158.8 140.6,158.8 142.6,157.7 144.6,157.7 146.6,157.3 148.7,157.3 150.7,155.9 152.7,138.8 154.7,138.8 156.7,138.8 158.7,138.6 160.7,138.6 162.8,138.2 164.8,137.8 166.8,137.6 168.8,136.5 170.8,135.7 172.8,135.7 174.8,112.9 176.9,112.9 178.9,111.3 180.9,109.9 182.9,109.7 184.9,109.7 186.9,105.0 188.9,103.7 191.0,103.7 193.0,103.7 195.0,103.5 197.0,103.5 199.0,103.5 201.0,103.5 203.0,103.5 205.0,99.4 207.1,98.4 209.1,98.4 211.1,98.4 213.1,98.1 215.1,98.1 217.1,97.8 219.1,95.1 221.2,95.1 223.2,95.1 225.2,95.1 227.2,95.1 229.2,95.1 231.2,95.1 233.2,95.0 235.3,95.0 237.3,95.0 239.3,94.6 241.3,94.6 243.3,94.6 245.3,94.6 247.3,94.4 249.4,92.8 251.4,92.8 253.4,92.8 255.4,92.8 257.4,92.8 259.4,92.8 261.4,93.3 263.5,92.1 265.5,92.1 267.5,92.2 269.5,91.7 271.5,91.7 273.5,91.7 275.5,92.0 277.6,92.0 279.6,92.0 281.6,91.9 283.6,91.9 285.6,90.9 287.6,90.9 289.6,90.9 291.7,90.9 293.7,90.9 295.7,90.9 297.7,90.7 299.7,90.7 301.7,90.7 303.7,89.2 305.8,89.2 307.8,89.2 309.8,89.2 311.8,89.2 313.8,89.2 315.8,89.2 317.8,89.2 319.9,89.2 321.9,89.2 323.9,89.2 325.9,89.2 327.9,89.2 329.9,88.3 331.9,88.3 334.0,88.3 336.0,86.0 338.0,83.3 340.0,83.3 342.0,83.3 344.0,83.3 346.0,83.4 348.1,83.0 350.1,83.0 352.1,82.3 354.1,82.4 356.1,80.3 358.1,80.3 360.1,80.3 362.2,80.0 364.2,80.0 366.2,80.0 368.2,80.0 370.2,80.0 372.2,80.0 374.2,80.0 376.3,80.0 378.3,78.6 380.3,78.6 382.3,78.6 384.3,78.6 386.3,78.5 388.3,75.0 390.4,73.6 392.4,73.6 394.4,73.6 396.4,73.6 398.4,73.4 400.4,73.4 402.4,73.4 404.5,73.4 406.5,73.4 408.5,73.4 410.5,73.4 412.5,73.2 414.5,73.2 416.5,72.0 418.6,72.0 420.6,72.0 422.6,72.0 424.6,71.9 426.6,71.9 428.6,71.9 430.6,71.9 432.7,71.9 434.7,71.9 436.7,71.9 438.7,71.9 440.7,71.9 442.7,71.9 444.7,71.9 446.8,71.9 448.8,71.9 450.8,71.9 452.8,71.9 454.8,71.9 456.8,70.7 458.8,70.7 460.9,70.7 462.9,70.7 464.9,70.7 466.9,70.7 468.9,70.7 470.9,70.2 472.9,70.2 475.0,70.2 477.0,70.2 479.0,70.2 481.0,70.2 483.0,70.2 485.0,68.2 487.0,68.2 489.0,67.0 491.1,67.0 493.1,67.0 495.1,66.5 497.1,66.5 499.1,66.5 501.1,66.4 503.1,66.4 505.2,65.3 507.2,65.3 509.2,65.3 511.2,65.3 513.2,65.3 515.2,64.6 517.2,64.6 519.3,64.6 521.3,63.3 523.3,63.3 525.3,63.3 527.3,62.4 529.3,62.4 531.3,62.4 533.4,62.3 535.4,62.3 537.4,62.3 539.4,62.1 541.4,61.5 543.4,61.5 545.4,61.5 547.5,59.4 549.5,59.4 551.5,59.4 553.5,59.4 555.5,59.3 557.5,58.6 559.5,58.3 561.6,58.3 563.6,58.2 565.6,58.0 567.6,57.6 569.6,57.6 571.6,57.6 573.6,57.6 575.7,56.4 577.7,54.3 579.7,54.3 581.7,54.3 583.7,54.3 585.7,54.1 587.7,54.1 589.8,54.0 591.8,53.7 593.8,53.3 595.8,52.8 597.8,52.8 599.8,52.8 601.8,52.6 603.9,52.6 605.9,51.6 607.9,51.6 609.9,50.1 611.9,50.0 613.9,50.0 615.9,50.0 618.0,50.0 620.0,50.0 622.0,48.9 624.0,48.9"/>
 <circle class="raw" cx="56.0" cy="186.5" r="4"><title>2026-10-20 4ece1b1 (main): raw 10,373,991 bytes</title></circle>
 <circle class="raw" cx="58.0" cy="171.9" r="4"><title>2026-10-24 3ff03cf (main): raw 12,670,295 bytes</title></circle>
 <circle class="raw hollow" cx="60.0" cy="171.4" r="4"><title>2026-10-24 5cb7a0a (story/text-kerning): raw 12,763,446 bytes</title></circle>
-<circle class="raw hollow" cx="62.1" cy="170.7" r="4"><title>2026-10-24 3082c82 (story/text-on-path): raw 12,866,733 bytes</title></circle>
+<circle class="raw hollow" cx="62.0" cy="170.7" r="4"><title>2026-10-24 3082c82 (story/text-on-path): raw 12,866,733 bytes</title></circle>
 <circle class="raw" cx="64.1" cy="171.2" r="4"><title>2026-10-24 29a258c (main): raw 12,788,467 bytes</title></circle>
 <circle class="raw" cx="66.1" cy="170.5" r="4"><title>2026-10-25 63aa7d1 (main): raw 12,897,126 bytes</title></circle>
 <circle class="raw" cx="68.1" cy="170.5" r="4"><title>2026-10-25 d3204ba (main): raw 12,898,630 bytes</title></circle>
 <circle class="raw" cx="70.1" cy="170.5" r="4"><title>2026-10-25 cd9a835 (main): raw 12,898,630 bytes</title></circle>
-<circle class="raw" cx="72.2" cy="170.5" r="4"><title>2026-10-25 6be85ac (main): raw 12,898,630 bytes</title></circle>
-<circle class="raw" cx="74.2" cy="170.1" r="4"><title>2026-10-25 d979b24 (main): raw 12,962,974 bytes</title></circle>
-<circle class="raw" cx="76.2" cy="170.1" r="4"><title>2026-10-25 7046e12 (main): raw 12,962,974 bytes</title></circle>
+<circle class="raw" cx="72.1" cy="170.5" r="4"><title>2026-10-25 6be85ac (main): raw 12,898,630 bytes</title></circle>
+<circle class="raw" cx="74.1" cy="170.1" r="4"><title>2026-10-25 d979b24 (main): raw 12,962,974 bytes</title></circle>
+<circle class="raw" cx="76.1" cy="170.1" r="4"><title>2026-10-25 7046e12 (main): raw 12,962,974 bytes</title></circle>
 <circle class="raw" cx="78.2" cy="169.9" r="4"><title>2026-10-26 6374518 (main): raw 12,992,697 bytes</title></circle>
-<circle class="raw" cx="80.3" cy="169.9" r="4"><title>2026-10-26 a1ccf09 (main): raw 12,992,697 bytes</title></circle>
-<circle class="raw" cx="82.3" cy="169.4" r="4"><title>2026-10-26 ee0f2ab (main): raw 13,079,364 bytes</title></circle>
-<circle class="raw" cx="84.3" cy="169.4" r="4"><title>2026-10-26 8f2e4f3 (main): raw 13,079,364 bytes</title></circle>
-<circle class="raw" cx="86.3" cy="169.4" r="4"><title>2026-10-26 99eb1c7 (main): raw 13,079,364 bytes</title></circle>
-<circle class="raw" cx="88.3" cy="169.1" r="4"><title>2026-10-26 cf0865c (main): raw 13,122,224 bytes</title></circle>
-<circle class="raw" cx="90.4" cy="168.8" r="4"><title>2026-10-26 4219c87 (main): raw 13,173,378 bytes</title></circle>
-<circle class="raw" cx="92.4" cy="168.7" r="4"><title>2026-10-26 8b3628b (main): raw 13,178,183 bytes</title></circle>
-<circle class="raw" cx="94.4" cy="167.5" r="4"><title>2026-10-26 d5e3a0b (main): raw 13,378,939 bytes</title></circle>
-<circle class="raw" cx="96.4" cy="167.5" r="4"><title>2026-10-27 53dd79d (main): raw 13,378,939 bytes</title></circle>
-<circle class="raw" cx="98.4" cy="167.5" r="4"><title>2026-10-27 b30718b (main): raw 13,380,269 bytes</title></circle>
-<circle class="raw" cx="100.5" cy="163.2" r="4"><title>2026-10-27 e3f48e4 (main): raw 14,059,581 bytes</title></circle>
-<circle class="raw" cx="102.5" cy="163.1" r="4"><title>2026-10-27 41ee911 (main): raw 14,064,244 bytes</title></circle>
-<circle class="raw" cx="104.5" cy="162.0" r="4"><title>2026-10-27 704eaab (main): raw 14,240,936 bytes</title></circle>
-<circle class="raw" cx="106.5" cy="161.9" r="4"><title>2026-10-27 ed98d6e (main): raw 14,265,958 bytes</title></circle>
-<circle class="raw" cx="108.6" cy="161.9" r="4"><title>2026-10-27 fd6baf5 (main): raw 14,265,958 bytes</title></circle>
-<circle class="raw" cx="110.6" cy="161.2" r="4"><title>2026-10-28 7068fc8 (main): raw 14,366,647 bytes</title></circle>
-<circle class="raw" cx="112.6" cy="161.2" r="4"><title>2026-10-28 da69bef (main): raw 14,366,647 bytes</title></circle>
-<circle class="raw" cx="114.6" cy="161.0" r="4"><title>2026-10-28 8494275 (main): raw 14,396,832 bytes</title></circle>
-<circle class="raw" cx="116.6" cy="160.9" r="4"><title>2026-10-29 5801a69 (main): raw 14,411,532 bytes</title></circle>
-<circle class="raw" cx="118.7" cy="160.9" r="4"><title>2026-10-29 439ccf3 (main): raw 14,411,546 bytes</title></circle>
-<circle class="raw" cx="120.7" cy="160.7" r="4"><title>2026-10-29 a8fa241 (main): raw 14,450,779 bytes</title></circle>
-<circle class="raw" cx="122.7" cy="160.7" r="4"><title>2026-10-29 3d883bb (main): raw 14,450,779 bytes</title></circle>
-<circle class="raw" cx="124.7" cy="160.7" r="4"><title>2026-10-29 faeb6f0 (main): raw 14,450,779 bytes</title></circle>
-<circle class="raw" cx="126.7" cy="160.7" r="4"><title>2026-10-29 d6df9c7 (main): raw 14,450,779 bytes</title></circle>
-<circle class="raw" cx="128.8" cy="160.7" r="4"><title>2026-10-29 db776a0 (main): raw 14,450,779 bytes</title></circle>
-<circle class="raw" cx="130.8" cy="160.2" r="4"><title>2026-10-30 6e3f913 (main): raw 14,529,447 bytes</title></circle>
-<circle class="raw" cx="132.8" cy="159.7" r="4"><title>2026-10-30 4cb8df3 (main): raw 14,614,406 bytes</title></circle>
-<circle class="raw" cx="134.8" cy="159.5" r="4"><title>2026-10-30 8043943 (main): raw 14,645,104 bytes</title></circle>
-<circle class="raw" cx="136.9" cy="158.8" r="4"><title>2026-10-30 3b58ab4 (main): raw 14,750,177 bytes</title></circle>
-<circle class="raw" cx="138.9" cy="158.8" r="4"><title>2026-10-30 abf845f (main): raw 14,755,669 bytes</title></circle>
-<circle class="raw" cx="140.9" cy="158.8" r="4"><title>2026-10-31 54c74cc (main): raw 14,755,669 bytes</title></circle>
-<circle class="raw" cx="142.9" cy="157.7" r="4"><title>2026-10-31 59595a9 (main): raw 14,927,427 bytes</title></circle>
-<circle class="raw" cx="144.9" cy="157.7" r="4"><title>2026-10-31 d8b79e6 (main): raw 14,927,427 bytes</title></circle>
-<circle class="raw" cx="147.0" cy="157.3" r="4"><title>2026-10-31 5ddddab (main): raw 14,980,819 bytes</title></circle>
-<circle class="raw" cx="149.0" cy="157.3" r="4"><title>2026-10-31 31abead (main): raw 14,980,819 bytes</title></circle>
-<circle class="raw" cx="151.0" cy="155.9" r="4"><title>2026-10-31 cfb204d (main): raw 15,217,217 bytes</title></circle>
-<circle class="raw" cx="153.0" cy="138.8" r="4"><title>2026-10-31 974867d (main): raw 17,917,155 bytes</title></circle>
-<circle class="raw" cx="155.0" cy="138.8" r="4"><title>2026-11-01 6497bb8 (main): raw 17,917,155 bytes</title></circle>
-<circle class="raw" cx="157.1" cy="138.8" r="4"><title>2026-11-01 b7b45fa (main): raw 17,917,155 bytes</title></circle>
-<circle class="raw" cx="159.1" cy="138.6" r="4"><title>2026-11-01 75d5493 (main): raw 17,951,378 bytes</title></circle>
-<circle class="raw" cx="161.1" cy="138.6" r="4"><title>2026-11-01 0e42d62 (main): raw 17,950,084 bytes</title></circle>
-<circle class="raw" cx="163.1" cy="138.2" r="4"><title>2026-11-01 c52d775 (main): raw 18,012,858 bytes</title></circle>
-<circle class="raw" cx="165.2" cy="137.8" r="4"><title>2026-11-01 2f12de8 (main): raw 18,082,658 bytes</title></circle>
-<circle class="raw" cx="167.2" cy="137.6" r="4"><title>2026-11-01 b218736 (main): raw 18,102,554 bytes</title></circle>
-<circle class="raw" cx="169.2" cy="136.5" r="4"><title>2026-11-01 d4ae045 (main): raw 18,275,146 bytes</title></circle>
-<circle class="raw" cx="171.2" cy="135.7" r="4"><title>2026-11-02 8a84e70 (main): raw 18,409,073 bytes</title></circle>
-<circle class="raw" cx="173.2" cy="135.7" r="4"><title>2026-11-02 595d18b (main): raw 18,409,073 bytes</title></circle>
-<circle class="raw" cx="175.3" cy="112.9" r="4"><title>2026-11-02 e77fb42 (main): raw 22,019,127 bytes</title></circle>
-<circle class="raw" cx="177.3" cy="112.9" r="4"><title>2026-11-02 105b981 (main): raw 22,019,127 bytes</title></circle>
-<circle class="raw" cx="179.3" cy="111.3" r="4"><title>2026-11-02 94f55ce (main): raw 22,269,412 bytes</title></circle>
-<circle class="raw" cx="181.3" cy="109.9" r="4"><title>2026-11-03 4ea207b (main): raw 22,493,785 bytes</title></circle>
-<circle class="raw" cx="183.3" cy="109.7" r="4"><title>2026-11-03 49716eb (main): raw 22,517,559 bytes</title></circle>
-<circle class="raw" cx="185.4" cy="109.7" r="4"><title>2026-11-03 f60a197 (main): raw 22,526,828 bytes</title></circle>
-<circle class="raw" cx="187.4" cy="105.0" r="4"><title>2026-11-03 850eca9 (main): raw 23,260,734 bytes</title></circle>
-<circle class="raw" cx="189.4" cy="103.7" r="4"><title>2026-11-03 70ca3c4 (main): raw 23,468,635 bytes</title></circle>
-<circle class="raw" cx="191.4" cy="103.7" r="4"><title>2026-11-03 903ba36 (main): raw 23,468,635 bytes</title></circle>
-<circle class="raw" cx="193.5" cy="103.7" r="4"><title>2026-11-03 bfff3f7 (main): raw 23,468,635 bytes</title></circle>
-<circle class="raw" cx="195.5" cy="103.5" r="4"><title>2026-11-03 ab5ee2d (main): raw 23,506,946 bytes</title></circle>
-<circle class="raw" cx="197.5" cy="103.5" r="4"><title>2026-11-04 e3c7f19 (main): raw 23,506,946 bytes</title></circle>
-<circle class="raw" cx="199.5" cy="103.5" r="4"><title>2026-11-04 9decd61 (main): raw 23,506,946 bytes</title></circle>
-<circle class="raw" cx="201.5" cy="103.5" r="4"><title>2026-11-04 5c9be54 (main): raw 23,506,946 bytes</title></circle>
-<circle class="raw" cx="203.6" cy="103.5" r="4"><title>2026-11-04 5009778 (main): raw 23,506,946 bytes</title></circle>
-<circle class="raw" cx="205.6" cy="99.4" r="4"><title>2026-11-04 caabb49 (main): raw 24,156,425 bytes</title></circle>
-<circle class="raw" cx="207.6" cy="98.4" r="4"><title>2026-11-04 d32a78b (main): raw 24,314,974 bytes</title></circle>
-<circle class="raw" cx="209.6" cy="98.4" r="4"><title>2026-11-04 9a4001a (main): raw 24,314,974 bytes</title></circle>
-<circle class="raw" cx="211.6" cy="98.4" r="4"><title>2026-11-04 72c5d27 (main): raw 24,314,974 bytes</title></circle>
-<circle class="raw" cx="213.7" cy="98.1" r="4"><title>2026-11-04 d1275c7 (main): raw 24,353,366 bytes</title></circle>
-<circle class="raw" cx="215.7" cy="98.1" r="4"><title>2026-11-04 ed68b00 (main): raw 24,353,366 bytes</title></circle>
-<circle class="raw" cx="217.7" cy="97.8" r="4"><title>2026-11-05 8dd8116 (main): raw 24,412,273 bytes</title></circle>
-<circle class="raw" cx="219.7" cy="95.1" r="4"><title>2026-11-05 cfe399a (main): raw 24,832,464 bytes</title></circle>
-<circle class="raw" cx="221.8" cy="95.1" r="4"><title>2026-11-05 8c68850 (main): raw 24,832,464 bytes</title></circle>
-<circle class="raw" cx="223.8" cy="95.1" r="4"><title>2026-11-05 b1b9d35 (main): raw 24,833,787 bytes</title></circle>
-<circle class="raw" cx="225.8" cy="95.1" r="4"><title>2026-11-05 94b5ceb (main): raw 24,838,608 bytes</title></circle>
-<circle class="raw" cx="227.8" cy="95.1" r="4"><title>2026-11-05 edf7e24 (main): raw 24,838,608 bytes</title></circle>
-<circle class="raw" cx="229.8" cy="95.1" r="4"><title>2026-11-05 21bc909 (main): raw 24,838,608 bytes</title></circle>
-<circle class="raw" cx="231.9" cy="95.1" r="4"><title>2026-11-05 9bb96c3 (main): raw 24,841,184 bytes</title></circle>
-<circle class="raw" cx="233.9" cy="95.0" r="4"><title>2026-11-05 dfd760f (main): raw 24,852,100 bytes</title></circle>
-<circle class="raw" cx="235.9" cy="95.0" r="4"><title>2026-11-06 fb2bc9b (main): raw 24,852,082 bytes</title></circle>
-<circle class="raw" cx="237.9" cy="95.0" r="4"><title>2026-11-06 a4ee1e5 (main): raw 24,852,082 bytes</title></circle>
-<circle class="raw" cx="239.9" cy="94.6" r="4"><title>2026-11-06 d27ad61 (main): raw 24,908,041 bytes</title></circle>
-<circle class="raw" cx="242.0" cy="94.6" r="4"><title>2026-11-06 bedbec0 (main): raw 24,908,041 bytes</title></circle>
-<circle class="raw" cx="244.0" cy="94.6" r="4"><title>2026-11-06 b0a0215 (main): raw 24,908,041 bytes</title></circle>
-<circle class="raw" cx="246.0" cy="94.6" r="4"><title>2026-11-06 5b3fb21 (main): raw 24,908,041 bytes</title></circle>
-<circle class="raw" cx="248.0" cy="94.4" r="4"><title>2026-11-06 a3b6eea (main): raw 24,942,856 bytes</title></circle>
-<circle class="raw" cx="250.0" cy="92.8" r="4"><title>2026-11-06 2f58d8d (main): raw 25,194,765 bytes</title></circle>
-<circle class="raw" cx="252.1" cy="92.8" r="4"><title>2026-11-06 b5a1cc4 (main): raw 25,194,765 bytes</title></circle>
-<circle class="raw" cx="254.1" cy="92.8" r="4"><title>2026-11-07 9ca3ebb (main): raw 25,194,765 bytes</title></circle>
-<circle class="raw" cx="256.1" cy="92.8" r="4"><title>2026-11-09 88560aa (main): raw 25,194,765 bytes</title></circle>
-<circle class="raw" cx="258.1" cy="92.8" r="4"><title>2026-11-09 23bc6c9 (main): raw 25,194,765 bytes</title></circle>
-<circle class="raw" cx="260.2" cy="92.8" r="4"><title>2026-11-09 6d06a75 (main): raw 25,194,765 bytes</title></circle>
-<circle class="raw" cx="262.2" cy="93.3" r="4"><title>2026-11-09 c48e3e1 (main): raw 25,121,949 bytes</title></circle>
-<circle class="raw" cx="264.2" cy="92.1" r="4"><title>2026-11-09 5903835 (main): raw 25,315,711 bytes</title></circle>
-<circle class="raw" cx="266.2" cy="92.1" r="4"><title>2026-11-09 98e10c8 (main): raw 25,315,711 bytes</title></circle>
-<circle class="raw" cx="268.2" cy="92.2" r="4"><title>2026-11-09 dabd827 (main): raw 25,287,717 bytes</title></circle>
-<circle class="raw" cx="270.3" cy="91.7" r="4"><title>2026-11-09 225228c (main): raw 25,367,278 bytes</title></circle>
-<circle class="raw" cx="272.3" cy="91.7" r="4"><title>2026-11-09 edc0281 (main): raw 25,367,278 bytes</title></circle>
-<circle class="raw" cx="274.3" cy="91.7" r="4"><title>2026-11-09 7b4d70d (main): raw 25,367,278 bytes</title></circle>
-<circle class="raw" cx="276.3" cy="92.0" r="4"><title>2026-11-09 fcc5223 (main): raw 25,318,229 bytes</title></circle>
-<circle class="raw" cx="278.3" cy="92.0" r="4"><title>2026-11-09 0ca5709 (main): raw 25,318,229 bytes</title></circle>
-<circle class="raw" cx="280.4" cy="92.0" r="4"><title>2026-11-10 168b27c (main): raw 25,316,564 bytes</title></circle>
-<circle class="raw" cx="282.4" cy="91.9" r="4"><title>2026-11-10 1dae910 (main): raw 25,332,600 bytes</title></circle>
-<circle class="raw" cx="284.4" cy="91.9" r="4"><title>2026-11-10 c37e4fc (main): raw 25,333,311 bytes</title></circle>
-<circle class="raw" cx="286.4" cy="90.9" r="4"><title>2026-11-10 ab64cdb (main): raw 25,498,254 bytes</title></circle>
-<circle class="raw" cx="288.5" cy="90.9" r="4"><title>2026-11-10 4e21245 (main): raw 25,498,254 bytes</title></circle>
-<circle class="raw" cx="290.5" cy="90.9" r="4"><title>2026-11-10 8087e11 (main): raw 25,498,254 bytes</title></circle>
-<circle class="raw" cx="292.5" cy="90.9" r="4"><title>2026-11-10 2acafb5 (main): raw 25,498,254 bytes</title></circle>
-<circle class="raw" cx="294.5" cy="90.9" r="4"><title>2026-11-10 8a9990e (main): raw 25,498,254 bytes</title></circle>
-<circle class="raw" cx="296.5" cy="90.9" r="4"><title>2026-11-10 3d935bd (main): raw 25,494,660 bytes</title></circle>
-<circle class="raw" cx="298.6" cy="90.7" r="4"><title>2026-11-10 09c68aa (main): raw 25,532,084 bytes</title></circle>
-<circle class="raw" cx="300.6" cy="90.7" r="4"><title>2026-11-11 aa3bdb2 (main): raw 25,532,084 bytes</title></circle>
-<circle class="raw" cx="302.6" cy="90.7" r="4"><title>2026-11-11 c56eb0e (main): raw 25,532,084 bytes</title></circle>
-<circle class="raw" cx="304.6" cy="89.2" r="4"><title>2026-11-11 8c1dceb (main): raw 25,765,154 bytes</title></circle>
-<circle class="raw" cx="306.6" cy="89.2" r="4"><title>2026-11-11 dc89020 (main): raw 25,765,154 bytes</title></circle>
-<circle class="raw" cx="308.7" cy="89.2" r="4"><title>2026-11-11 583dc76 (main): raw 25,765,154 bytes</title></circle>
-<circle class="raw" cx="310.7" cy="89.2" r="4"><title>2026-11-11 fa2ab40 (main): raw 25,763,956 bytes</title></circle>
-<circle class="raw" cx="312.7" cy="89.2" r="4"><title>2026-11-11 42935b2 (main): raw 25,763,956 bytes</title></circle>
-<circle class="raw" cx="314.7" cy="89.2" r="4"><title>2026-11-11 79c9687 (main): raw 25,763,956 bytes</title></circle>
-<circle class="raw" cx="316.8" cy="89.2" r="4"><title>2026-11-11 6ba61fb (main): raw 25,763,956 bytes</title></circle>
-<circle class="raw" cx="318.8" cy="89.2" r="4"><title>2026-11-11 e44a7bf (main): raw 25,763,956 bytes</title></circle>
-<circle class="raw" cx="320.8" cy="89.2" r="4"><title>2026-11-11 75971b3 (main): raw 25,763,956 bytes</title></circle>
-<circle class="raw" cx="322.8" cy="89.2" r="4"><title>2026-11-11 e73884a (main): raw 25,763,956 bytes</title></circle>
-<circle class="raw" cx="324.8" cy="89.2" r="4"><title>2026-11-11 3ff38b1 (main): raw 25,763,956 bytes</title></circle>
-<circle class="raw" cx="326.9" cy="89.2" r="4"><title>2026-11-11 dd31db0 (main): raw 25,763,956 bytes</title></circle>
-<circle class="raw" cx="328.9" cy="89.2" r="4"><title>2026-11-11 127a2d4 (main): raw 25,766,502 bytes</title></circle>
-<circle class="raw" cx="330.9" cy="88.3" r="4"><title>2026-11-11 02c4b1e (main): raw 25,909,220 bytes</title></circle>
-<circle class="raw" cx="332.9" cy="88.3" r="4"><title>2026-11-11 54f241c (main): raw 25,909,220 bytes</title></circle>
-<circle class="raw" cx="334.9" cy="88.3" r="4"><title>2026-11-11 c523363 (main): raw 25,909,220 bytes</title></circle>
-<circle class="raw" cx="337.0" cy="86.0" r="4"><title>2026-11-11 7adfd78 (main): raw 26,267,267 bytes</title></circle>
-<circle class="raw" cx="339.0" cy="83.3" r="4"><title>2026-11-12 0995779 (main): raw 26,693,802 bytes</title></circle>
-<circle class="raw" cx="341.0" cy="83.3" r="4"><title>2026-11-12 df059b9 (main): raw 26,693,802 bytes</title></circle>
-<circle class="raw" cx="343.0" cy="83.3" r="4"><title>2026-11-12 38b12b6 (main): raw 26,693,802 bytes</title></circle>
-<circle class="raw" cx="345.1" cy="83.3" r="4"><title>2026-11-12 cf02604 (main): raw 26,696,892 bytes</title></circle>
-<circle class="raw" cx="347.1" cy="83.4" r="4"><title>2026-11-12 7ab2fee (main): raw 26,689,102 bytes</title></circle>
-<circle class="raw" cx="349.1" cy="83.0" r="4"><title>2026-11-12 c0a7235 (main): raw 26,746,422 bytes</title></circle>
-<circle class="raw" cx="351.1" cy="83.0" r="4"><title>2026-11-12 4180767 (main): raw 26,746,422 bytes</title></circle>
-<circle class="raw" cx="353.1" cy="82.3" r="4"><title>2026-11-13 482ec37 (main): raw 26,862,580 bytes</title></circle>
-<circle class="raw" cx="355.2" cy="82.4" r="4"><title>2026-11-13 f782d79 (main): raw 26,841,434 bytes</title></circle>
-<circle class="raw" cx="357.2" cy="80.3" r="4"><title>2026-11-13 dfc6f87 (main): raw 27,177,648 bytes</title></circle>
-<circle class="raw" cx="359.2" cy="80.3" r="4"><title>2026-11-13 8dc2acb (main): raw 27,177,648 bytes</title></circle>
-<circle class="raw" cx="361.2" cy="80.3" r="4"><title>2026-11-13 c2bb524 (main): raw 27,177,648 bytes</title></circle>
-<circle class="raw" cx="363.2" cy="80.0" r="4"><title>2026-11-13 e213da8 (main): raw 27,221,470 bytes</title></circle>
-<circle class="raw" cx="365.3" cy="80.0" r="4"><title>2026-11-13 ac1f011 (main): raw 27,221,445 bytes</title></circle>
-<circle class="raw" cx="367.3" cy="80.0" r="4"><title>2026-11-14 b36e11a (main): raw 27,221,445 bytes</title></circle>
-<circle class="raw" cx="369.3" cy="80.0" r="4"><title>2026-11-14 bfcebee (main): raw 27,221,408 bytes</title></circle>
-<circle class="raw" cx="371.3" cy="80.0" r="4"><title>2026-11-15 a1506a1 (main): raw 27,221,408 bytes</title></circle>
-<circle class="raw" cx="373.4" cy="80.0" r="4"><title>2026-11-15 b0b8a2f (main): raw 27,221,408 bytes</title></circle>
-<circle class="raw" cx="375.4" cy="80.0" r="4"><title>2026-11-15 db7aa11 (main): raw 27,221,408 bytes</title></circle>
-<circle class="raw" cx="377.4" cy="80.0" r="4"><title>2026-11-15 f96657e (main): raw 27,221,408 bytes</title></circle>
-<circle class="raw" cx="379.4" cy="78.6" r="4"><title>2026-11-16 1b1e0da (main): raw 27,445,628 bytes</title></circle>
-<circle class="raw" cx="381.4" cy="78.6" r="4"><title>2026-11-16 79b481e (main): raw 27,445,628 bytes</title></circle>
-<circle class="raw" cx="383.5" cy="78.6" r="4"><title>2026-11-16 80beb8b (main): raw 27,445,628 bytes</title></circle>
-<circle class="raw" cx="385.5" cy="78.6" r="4"><title>2026-11-16 fb39e97 (main): raw 27,445,628 bytes</title></circle>
-<circle class="raw" cx="387.5" cy="78.5" r="4"><title>2026-11-17 3c223e8 (main): raw 27,461,124 bytes</title></circle>
-<circle class="raw" cx="389.5" cy="75.0" r="4"><title>2026-11-17 3587a70 (main): raw 28,014,187 bytes</title></circle>
-<circle class="raw" cx="391.5" cy="73.6" r="4"><title>2026-11-17 0b6e894 (main): raw 28,243,827 bytes</title></circle>
-<circle class="raw" cx="393.6" cy="73.6" r="4"><title>2026-11-17 0a07d48 (main): raw 28,243,827 bytes</title></circle>
-<circle class="raw" cx="395.6" cy="73.6" r="4"><title>2026-11-18 cd5a26b (main): raw 28,243,827 bytes</title></circle>
-<circle class="raw" cx="397.6" cy="73.6" r="4"><title>2026-11-18 f360ac2 (main): raw 28,243,827 bytes</title></circle>
-<circle class="raw" cx="399.6" cy="73.4" r="4"><title>2026-11-18 cf07970 (main): raw 28,260,884 bytes</title></circle>
-<circle class="raw" cx="401.7" cy="73.4" r="4"><title>2026-11-18 4e2aa97 (main): raw 28,260,884 bytes</title></circle>
-<circle class="raw" cx="403.7" cy="73.4" r="4"><title>2026-11-18 a85e8de (main): raw 28,268,719 bytes</title></circle>
-<circle class="raw" cx="405.7" cy="73.4" r="4"><title>2026-11-18 1a57c50 (main): raw 28,268,719 bytes</title></circle>
-<circle class="raw" cx="407.7" cy="73.4" r="4"><title>2026-11-18 7026b8e (main): raw 28,268,719 bytes</title></circle>
-<circle class="raw" cx="409.7" cy="73.4" r="4"><title>2026-11-18 91a7ab4 (main): raw 28,268,719 bytes</title></circle>
-<circle class="raw" cx="411.8" cy="73.4" r="4"><title>2026-11-18 ae96988 (main): raw 28,268,915 bytes</title></circle>
-<circle class="raw" cx="413.8" cy="73.2" r="4"><title>2026-11-18 cca91b7 (main): raw 28,300,568 bytes</title></circle>
-<circle class="raw" cx="415.8" cy="73.2" r="4"><title>2026-11-18 03e2600 (main): raw 28,301,897 bytes</title></circle>
-<circle class="raw" cx="417.8" cy="72.0" r="4"><title>2026-11-18 7ccab26 (main): raw 28,493,233 bytes</title></circle>
-<circle class="raw" cx="419.8" cy="72.0" r="4"><title>2026-11-18 41f608d (main): raw 28,493,233 bytes</title></circle>
-<circle class="raw" cx="421.9" cy="72.0" r="4"><title>2026-11-18 636c22a (main): raw 28,493,233 bytes</title></circle>
-<circle class="raw" cx="423.9" cy="72.0" r="4"><title>2026-11-18 dabef9f (main): raw 28,495,071 bytes</title></circle>
-<circle class="raw" cx="425.9" cy="71.9" r="4"><title>2026-11-19 4948006 (main): raw 28,500,833 bytes</title></circle>
-<circle class="raw" cx="427.9" cy="71.9" r="4"><title>2026-11-19 54a48f1 (main): raw 28,500,833 bytes</title></circle>
-<circle class="raw" cx="430.0" cy="71.9" r="4"><title>2026-11-19 217ab6e (main): raw 28,500,833 bytes</title></circle>
-<circle class="raw" cx="432.0" cy="71.9" r="4"><title>2026-11-19 5258676 (main): raw 28,500,833 bytes</title></circle>
-<circle class="raw" cx="434.0" cy="71.9" r="4"><title>2026-11-19 14b8e42 (main): raw 28,504,758 bytes</title></circle>
-<circle class="raw" cx="436.0" cy="71.9" r="4"><title>2026-11-19 38e35e0 (main): raw 28,504,758 bytes</title></circle>
-<circle class="raw" cx="438.0" cy="71.9" r="4"><title>2026-11-19 761ba7c (main): raw 28,504,758 bytes</title></circle>
-<circle class="raw" cx="440.1" cy="71.9" r="4"><title>2026-11-19 cb88dc3 (main): raw 28,504,758 bytes</title></circle>
-<circle class="raw" cx="442.1" cy="71.9" r="4"><title>2026-11-19 cd4a8fe (main): raw 28,504,758 bytes</title></circle>
-<circle class="raw" cx="444.1" cy="71.9" r="4"><title>2026-11-19 289b98b (main): raw 28,505,989 bytes</title></circle>
-<circle class="raw" cx="446.1" cy="71.9" r="4"><title>2026-11-19 7c289c5 (main): raw 28,505,989 bytes</title></circle>
-<circle class="raw" cx="448.1" cy="71.9" r="4"><title>2026-11-19 56f870e (main): raw 28,505,989 bytes</title></circle>
-<circle class="raw" cx="450.2" cy="71.9" r="4"><title>2026-11-19 88ce077 (main): raw 28,505,989 bytes</title></circle>
-<circle class="raw" cx="452.2" cy="71.9" r="4"><title>2026-11-19 070d71d (main): raw 28,505,961 bytes</title></circle>
-<circle class="raw" cx="454.2" cy="71.9" r="4"><title>2026-11-19 82adfcd (main): raw 28,505,961 bytes</title></circle>
-<circle class="raw" cx="456.2" cy="71.9" r="4"><title>2026-11-19 e3c6997 (main): raw 28,508,254 bytes</title></circle>
-<circle class="raw" cx="458.2" cy="70.7" r="4"><title>2026-11-19 d5f32a8 (main): raw 28,693,372 bytes</title></circle>
-<circle class="raw" cx="460.3" cy="70.7" r="4"><title>2026-11-19 42b02c1 (main): raw 28,693,372 bytes</title></circle>
-<circle class="raw" cx="462.3" cy="70.7" r="4"><title>2026-11-19 0f3ebd5 (main): raw 28,693,372 bytes</title></circle>
-<circle class="raw" cx="464.3" cy="70.7" r="4"><title>2026-11-19 9593d90 (main): raw 28,693,372 bytes</title></circle>
-<circle class="raw" cx="466.3" cy="70.7" r="4"><title>2026-11-19 9634014 (main): raw 28,693,372 bytes</title></circle>
-<circle class="raw" cx="468.4" cy="70.7" r="4"><title>2026-11-20 e672ded (main): raw 28,703,110 bytes</title></circle>
-<circle class="raw" cx="470.4" cy="70.7" r="4"><title>2026-11-20 585c87b (main): raw 28,703,110 bytes</title></circle>
-<circle class="raw" cx="472.4" cy="70.2" r="4"><title>2026-11-20 7bea084 (main): raw 28,776,008 bytes</title></circle>
-<circle class="raw" cx="474.4" cy="70.2" r="4"><title>2026-11-20 bfaeae2 (main): raw 28,777,804 bytes</title></circle>
-<circle class="raw" cx="476.4" cy="70.2" r="4"><title>2026-11-20 3e288c1 (main): raw 28,777,804 bytes</title></circle>
-<circle class="raw" cx="478.5" cy="70.2" r="4"><title>2026-11-20 35b77cd (main): raw 28,777,804 bytes</title></circle>
-<circle class="raw" cx="480.5" cy="70.2" r="4"><title>2026-11-20 673c445 (main): raw 28,778,429 bytes</title></circle>
-<circle class="raw" cx="482.5" cy="70.2" r="4"><title>2026-11-20 fb646b2 (main): raw 28,778,429 bytes</title></circle>
-<circle class="raw" cx="484.5" cy="70.2" r="4"><title>2026-11-20 3365fdb (main): raw 28,778,429 bytes</title></circle>
-<circle class="raw" cx="486.5" cy="68.2" r="4"><title>2026-11-20 8f2c61d (main): raw 29,092,612 bytes</title></circle>
-<circle class="raw" cx="488.6" cy="68.2" r="4"><title>2026-11-20 6ce419a (main): raw 29,092,612 bytes</title></circle>
-<circle class="raw" cx="490.6" cy="67.0" r="4"><title>2026-11-20 ee7ac51 (main): raw 29,276,789 bytes</title></circle>
-<circle class="raw" cx="492.6" cy="67.0" r="4"><title>2026-11-20 cf50e9f (main): raw 29,276,789 bytes</title></circle>
-<circle class="raw" cx="494.6" cy="67.0" r="4"><title>2026-11-20 4ab7f6e (main): raw 29,276,789 bytes</title></circle>
-<circle class="raw" cx="496.7" cy="66.5" r="4"><title>2026-11-21 3c93eae (main): raw 29,365,844 bytes</title></circle>
-<circle class="raw" cx="498.7" cy="66.5" r="4"><title>2026-11-21 6303dc1 (main): raw 29,365,844 bytes</title></circle>
-<circle class="raw" cx="500.7" cy="66.5" r="4"><title>2026-11-21 b0dd9ef (main): raw 29,365,844 bytes</title></circle>
-<circle class="raw" cx="502.7" cy="66.4" r="4"><title>2026-11-21 66e83e6 (main): raw 29,368,729 bytes</title></circle>
-<circle class="raw" cx="504.7" cy="66.4" r="4"><title>2026-11-23 af70b30 (main): raw 29,368,729 bytes</title></circle>
-<circle class="raw" cx="506.8" cy="65.3" r="4"><title>2026-11-23 15c6336 (main): raw 29,552,036 bytes</title></circle>
-<circle class="raw" cx="508.8" cy="65.3" r="4"><title>2026-11-23 1cd4f59 (main): raw 29,552,036 bytes</title></circle>
-<circle class="raw" cx="510.8" cy="65.3" r="4"><title>2026-11-23 930d099 (main): raw 29,552,103 bytes</title></circle>
-<circle class="raw" cx="512.8" cy="65.3" r="4"><title>2026-11-23 b260112 (main): raw 29,552,103 bytes</title></circle>
-<circle class="raw" cx="514.8" cy="65.3" r="4"><title>2026-11-23 858187f (main): raw 29,552,103 bytes</title></circle>
-<circle class="raw" cx="516.9" cy="64.6" r="4"><title>2026-11-23 086b80d (main): raw 29,655,258 bytes</title></circle>
-<circle class="raw" cx="518.9" cy="64.6" r="4"><title>2026-11-23 df896f4 (main): raw 29,655,258 bytes</title></circle>
-<circle class="raw" cx="520.9" cy="64.6" r="4"><title>2026-11-23 ba669e0 (main): raw 29,655,258 bytes</title></circle>
-<circle class="raw" cx="522.9" cy="63.3" r="4"><title>2026-11-23 6992e32 (main): raw 29,872,988 bytes</title></circle>
-<circle class="raw" cx="525.0" cy="63.3" r="4"><title>2026-11-23 1f574e5 (main): raw 29,872,988 bytes</title></circle>
-<circle class="raw" cx="527.0" cy="63.3" r="4"><title>2026-11-23 ff72c40 (main): raw 29,872,988 bytes</title></circle>
-<circle class="raw" cx="529.0" cy="62.4" r="4"><title>2026-11-24 4fdf384 (main): raw 30,003,242 bytes</title></circle>
-<circle class="raw" cx="531.0" cy="62.4" r="4"><title>2026-11-24 fc51778 (main): raw 30,003,242 bytes</title></circle>
-<circle class="raw" cx="533.0" cy="62.4" r="4"><title>2026-11-24 52961b1 (main): raw 30,003,242 bytes</title></circle>
-<circle class="raw" cx="535.1" cy="62.3" r="4"><title>2026-11-24 88e8056 (main): raw 30,021,843 bytes</title></circle>
-<circle class="raw" cx="537.1" cy="62.3" r="4"><title>2026-11-24 4f4dc85 (main): raw 30,021,843 bytes</title></circle>
-<circle class="raw" cx="539.1" cy="62.3" r="4"><title>2026-11-24 7d0e6a2 (main): raw 30,021,843 bytes</title></circle>
-<circle class="raw" cx="541.1" cy="62.1" r="4"><title>2026-11-24 96f3a67 (main): raw 30,051,800 bytes</title></circle>
-<circle class="raw" cx="543.1" cy="61.5" r="4"><title>2026-11-24 e08cae5 (main): raw 30,144,187 bytes</title></circle>
-<circle class="raw" cx="545.2" cy="61.5" r="4"><title>2026-11-24 f93a000 (main): raw 30,144,187 bytes</title></circle>
-<circle class="raw" cx="547.2" cy="61.5" r="4"><title>2026-11-24 8830632 (main): raw 30,153,987 bytes</title></circle>
-<circle class="raw" cx="549.2" cy="59.4" r="4"><title>2026-11-24 a1cd6e9 (main): raw 30,489,881 bytes</title></circle>
-<circle class="raw" cx="551.2" cy="59.4" r="4"><title>2026-11-24 522cb0e (main): raw 30,489,881 bytes</title></circle>
-<circle class="raw" cx="553.3" cy="59.4" r="4"><title>2026-11-24 9d11ad6 (main): raw 30,489,881 bytes</title></circle>
-<circle class="raw" cx="555.3" cy="59.4" r="4"><title>2026-11-24 adc686e (main): raw 30,489,881 bytes</title></circle>
-<circle class="raw" cx="557.3" cy="59.3" r="4"><title>2026-11-25 0aa0da3 (main): raw 30,498,454 bytes</title></circle>
-<circle class="raw" cx="559.3" cy="58.6" r="4"><title>2026-11-25 9a9b68c (main): raw 30,604,421 bytes</title></circle>
-<circle class="raw" cx="561.3" cy="58.3" r="4"><title>2026-11-25 73e751b (main): raw 30,662,816 bytes</title></circle>
-<circle class="raw" cx="563.4" cy="58.3" r="4"><title>2026-11-25 64b51ba (main): raw 30,662,816 bytes</title></circle>
-<circle class="raw" cx="565.4" cy="58.2" r="4"><title>2026-11-25 598a0b2 (main): raw 30,676,720 bytes</title></circle>
-<circle class="raw" cx="567.4" cy="58.0" r="4"><title>2026-11-25 5bb82ea (main): raw 30,705,486 bytes</title></circle>
-<circle class="raw" cx="569.4" cy="57.6" r="4"><title>2026-11-25 38612c8 (main): raw 30,773,909 bytes</title></circle>
-<circle class="raw" cx="571.4" cy="57.6" r="4"><title>2026-11-25 473836f (main): raw 30,773,909 bytes</title></circle>
-<circle class="raw" cx="573.5" cy="57.6" r="4"><title>2026-11-25 24abbe2 (main): raw 30,773,909 bytes</title></circle>
-<circle class="raw" cx="575.5" cy="57.6" r="4"><title>2026-11-25 2d41e94 (main): raw 30,773,909 bytes</title></circle>
-<circle class="raw" cx="577.5" cy="56.4" r="4"><title>2026-11-25 5d3a140 (main): raw 30,961,108 bytes</title></circle>
-<circle class="raw" cx="579.5" cy="54.3" r="4"><title>2026-11-25 02fedc5 (main): raw 31,296,548 bytes</title></circle>
-<circle class="raw" cx="581.6" cy="54.3" r="4"><title>2026-11-25 f06fd29 (main): raw 31,296,548 bytes</title></circle>
-<circle class="raw" cx="583.6" cy="54.3" r="4"><title>2026-11-25 0f52276 (main): raw 31,296,548 bytes</title></circle>
-<circle class="raw" cx="585.6" cy="54.3" r="4"><title>2026-11-25 7a1ceeb (main): raw 31,296,548 bytes</title></circle>
-<circle class="raw" cx="587.6" cy="54.1" r="4"><title>2026-11-25 f5799d0 (main): raw 31,324,378 bytes</title></circle>
-<circle class="raw" cx="589.6" cy="54.1" r="4"><title>2026-11-25 2acdf8d (main): raw 31,324,378 bytes</title></circle>
-<circle class="raw" cx="591.7" cy="54.0" r="4"><title>2026-11-26 3fe709e (main): raw 31,342,346 bytes</title></circle>
-<circle class="raw" cx="593.7" cy="53.7" r="4"><title>2026-11-26 42615dc (main): raw 31,381,122 bytes</title></circle>
-<circle class="raw" cx="595.7" cy="53.3" r="4"><title>2026-11-26 c7a85d6 (main): raw 31,449,842 bytes</title></circle>
-<circle class="raw" cx="597.7" cy="52.8" r="4"><title>2026-11-26 3e607cd (main): raw 31,532,273 bytes</title></circle>
-<circle class="raw" cx="599.7" cy="52.8" r="4"><title>2026-11-26 86913d1 (main): raw 31,536,167 bytes</title></circle>
-<circle class="raw" cx="601.8" cy="52.8" r="4"><title>2026-11-26 70719da (main): raw 31,536,167 bytes</title></circle>
-<circle class="raw" cx="603.8" cy="52.6" r="4"><title>2026-11-26 1192062 (main): raw 31,554,092 bytes</title></circle>
-<circle class="raw" cx="605.8" cy="52.6" r="4"><title>2026-11-26 d1a73cd (main): raw 31,560,563 bytes</title></circle>
-<circle class="raw" cx="607.8" cy="51.6" r="4"><title>2026-11-26 9e1320f (main): raw 31,724,498 bytes</title></circle>
-<circle class="raw" cx="609.9" cy="51.6" r="4"><title>2026-11-26 6a95763 (main): raw 31,724,498 bytes</title></circle>
-<circle class="raw" cx="611.9" cy="50.1" r="4"><title>2026-11-26 fd5c552 (main): raw 31,963,037 bytes</title></circle>
-<circle class="raw" cx="613.9" cy="50.0" r="4"><title>2026-11-26 2a25268 (main): raw 31,966,574 bytes</title></circle>
-<circle class="raw" cx="615.9" cy="50.0" r="4"><title>2026-11-26 223f165 (main): raw 31,966,574 bytes</title></circle>
-<circle class="raw" cx="617.9" cy="50.0" r="4"><title>2026-11-27 bb261ce (main): raw 31,966,574 bytes</title></circle>
-<circle class="raw" cx="620.0" cy="50.0" r="4"><title>2026-11-27 31c8e87 (main): raw 31,966,574 bytes</title></circle>
-<circle class="raw" cx="622.0" cy="50.0" r="4"><title>2026-11-27 b07eb49 (main): raw 31,966,574 bytes</title></circle>
-<circle class="raw" cx="624.0" cy="48.9" r="4"><title>2026-11-27 e0a47fa (main): raw 32,147,670 bytes</title></circle>
+<circle class="raw" cx="80.2" cy="169.9" r="4"><title>2026-10-26 a1ccf09 (main): raw 12,992,697 bytes</title></circle>
+<circle class="raw" cx="82.2" cy="169.4" r="4"><title>2026-10-26 ee0f2ab (main): raw 13,079,364 bytes</title></circle>
+<circle class="raw" cx="84.2" cy="169.4" r="4"><title>2026-10-26 8f2e4f3 (main): raw 13,079,364 bytes</title></circle>
+<circle class="raw" cx="86.2" cy="169.4" r="4"><title>2026-10-26 99eb1c7 (main): raw 13,079,364 bytes</title></circle>
+<circle class="raw" cx="88.2" cy="169.1" r="4"><title>2026-10-26 cf0865c (main): raw 13,122,224 bytes</title></circle>
+<circle class="raw" cx="90.2" cy="168.8" r="4"><title>2026-10-26 4219c87 (main): raw 13,173,378 bytes</title></circle>
+<circle class="raw" cx="92.3" cy="168.7" r="4"><title>2026-10-26 8b3628b (main): raw 13,178,183 bytes</title></circle>
+<circle class="raw" cx="94.3" cy="167.5" r="4"><title>2026-10-26 d5e3a0b (main): raw 13,378,939 bytes</title></circle>
+<circle class="raw" cx="96.3" cy="167.5" r="4"><title>2026-10-27 53dd79d (main): raw 13,378,939 bytes</title></circle>
+<circle class="raw" cx="98.3" cy="167.5" r="4"><title>2026-10-27 b30718b (main): raw 13,380,269 bytes</title></circle>
+<circle class="raw" cx="100.3" cy="163.2" r="4"><title>2026-10-27 e3f48e4 (main): raw 14,059,581 bytes</title></circle>
+<circle class="raw" cx="102.3" cy="163.1" r="4"><title>2026-10-27 41ee911 (main): raw 14,064,244 bytes</title></circle>
+<circle class="raw" cx="104.3" cy="162.0" r="4"><title>2026-10-27 704eaab (main): raw 14,240,936 bytes</title></circle>
+<circle class="raw" cx="106.4" cy="161.9" r="4"><title>2026-10-27 ed98d6e (main): raw 14,265,958 bytes</title></circle>
+<circle class="raw" cx="108.4" cy="161.9" r="4"><title>2026-10-27 fd6baf5 (main): raw 14,265,958 bytes</title></circle>
+<circle class="raw" cx="110.4" cy="161.2" r="4"><title>2026-10-28 7068fc8 (main): raw 14,366,647 bytes</title></circle>
+<circle class="raw" cx="112.4" cy="161.2" r="4"><title>2026-10-28 da69bef (main): raw 14,366,647 bytes</title></circle>
+<circle class="raw" cx="114.4" cy="161.0" r="4"><title>2026-10-28 8494275 (main): raw 14,396,832 bytes</title></circle>
+<circle class="raw" cx="116.4" cy="160.9" r="4"><title>2026-10-29 5801a69 (main): raw 14,411,532 bytes</title></circle>
+<circle class="raw" cx="118.4" cy="160.9" r="4"><title>2026-10-29 439ccf3 (main): raw 14,411,546 bytes</title></circle>
+<circle class="raw" cx="120.5" cy="160.7" r="4"><title>2026-10-29 a8fa241 (main): raw 14,450,779 bytes</title></circle>
+<circle class="raw" cx="122.5" cy="160.7" r="4"><title>2026-10-29 3d883bb (main): raw 14,450,779 bytes</title></circle>
+<circle class="raw" cx="124.5" cy="160.7" r="4"><title>2026-10-29 faeb6f0 (main): raw 14,450,779 bytes</title></circle>
+<circle class="raw" cx="126.5" cy="160.7" r="4"><title>2026-10-29 d6df9c7 (main): raw 14,450,779 bytes</title></circle>
+<circle class="raw" cx="128.5" cy="160.7" r="4"><title>2026-10-29 db776a0 (main): raw 14,450,779 bytes</title></circle>
+<circle class="raw" cx="130.5" cy="160.2" r="4"><title>2026-10-30 6e3f913 (main): raw 14,529,447 bytes</title></circle>
+<circle class="raw" cx="132.5" cy="159.7" r="4"><title>2026-10-30 4cb8df3 (main): raw 14,614,406 bytes</title></circle>
+<circle class="raw" cx="134.6" cy="159.5" r="4"><title>2026-10-30 8043943 (main): raw 14,645,104 bytes</title></circle>
+<circle class="raw" cx="136.6" cy="158.8" r="4"><title>2026-10-30 3b58ab4 (main): raw 14,750,177 bytes</title></circle>
+<circle class="raw" cx="138.6" cy="158.8" r="4"><title>2026-10-30 abf845f (main): raw 14,755,669 bytes</title></circle>
+<circle class="raw" cx="140.6" cy="158.8" r="4"><title>2026-10-31 54c74cc (main): raw 14,755,669 bytes</title></circle>
+<circle class="raw" cx="142.6" cy="157.7" r="4"><title>2026-10-31 59595a9 (main): raw 14,927,427 bytes</title></circle>
+<circle class="raw" cx="144.6" cy="157.7" r="4"><title>2026-10-31 d8b79e6 (main): raw 14,927,427 bytes</title></circle>
+<circle class="raw" cx="146.6" cy="157.3" r="4"><title>2026-10-31 5ddddab (main): raw 14,980,819 bytes</title></circle>
+<circle class="raw" cx="148.7" cy="157.3" r="4"><title>2026-10-31 31abead (main): raw 14,980,819 bytes</title></circle>
+<circle class="raw" cx="150.7" cy="155.9" r="4"><title>2026-10-31 cfb204d (main): raw 15,217,217 bytes</title></circle>
+<circle class="raw" cx="152.7" cy="138.8" r="4"><title>2026-10-31 974867d (main): raw 17,917,155 bytes</title></circle>
+<circle class="raw" cx="154.7" cy="138.8" r="4"><title>2026-11-01 6497bb8 (main): raw 17,917,155 bytes</title></circle>
+<circle class="raw" cx="156.7" cy="138.8" r="4"><title>2026-11-01 b7b45fa (main): raw 17,917,155 bytes</title></circle>
+<circle class="raw" cx="158.7" cy="138.6" r="4"><title>2026-11-01 75d5493 (main): raw 17,951,378 bytes</title></circle>
+<circle class="raw" cx="160.7" cy="138.6" r="4"><title>2026-11-01 0e42d62 (main): raw 17,950,084 bytes</title></circle>
+<circle class="raw" cx="162.8" cy="138.2" r="4"><title>2026-11-01 c52d775 (main): raw 18,012,858 bytes</title></circle>
+<circle class="raw" cx="164.8" cy="137.8" r="4"><title>2026-11-01 2f12de8 (main): raw 18,082,658 bytes</title></circle>
+<circle class="raw" cx="166.8" cy="137.6" r="4"><title>2026-11-01 b218736 (main): raw 18,102,554 bytes</title></circle>
+<circle class="raw" cx="168.8" cy="136.5" r="4"><title>2026-11-01 d4ae045 (main): raw 18,275,146 bytes</title></circle>
+<circle class="raw" cx="170.8" cy="135.7" r="4"><title>2026-11-02 8a84e70 (main): raw 18,409,073 bytes</title></circle>
+<circle class="raw" cx="172.8" cy="135.7" r="4"><title>2026-11-02 595d18b (main): raw 18,409,073 bytes</title></circle>
+<circle class="raw" cx="174.8" cy="112.9" r="4"><title>2026-11-02 e77fb42 (main): raw 22,019,127 bytes</title></circle>
+<circle class="raw" cx="176.9" cy="112.9" r="4"><title>2026-11-02 105b981 (main): raw 22,019,127 bytes</title></circle>
+<circle class="raw" cx="178.9" cy="111.3" r="4"><title>2026-11-02 94f55ce (main): raw 22,269,412 bytes</title></circle>
+<circle class="raw" cx="180.9" cy="109.9" r="4"><title>2026-11-03 4ea207b (main): raw 22,493,785 bytes</title></circle>
+<circle class="raw" cx="182.9" cy="109.7" r="4"><title>2026-11-03 49716eb (main): raw 22,517,559 bytes</title></circle>
+<circle class="raw" cx="184.9" cy="109.7" r="4"><title>2026-11-03 f60a197 (main): raw 22,526,828 bytes</title></circle>
+<circle class="raw" cx="186.9" cy="105.0" r="4"><title>2026-11-03 850eca9 (main): raw 23,260,734 bytes</title></circle>
+<circle class="raw" cx="188.9" cy="103.7" r="4"><title>2026-11-03 70ca3c4 (main): raw 23,468,635 bytes</title></circle>
+<circle class="raw" cx="191.0" cy="103.7" r="4"><title>2026-11-03 903ba36 (main): raw 23,468,635 bytes</title></circle>
+<circle class="raw" cx="193.0" cy="103.7" r="4"><title>2026-11-03 bfff3f7 (main): raw 23,468,635 bytes</title></circle>
+<circle class="raw" cx="195.0" cy="103.5" r="4"><title>2026-11-03 ab5ee2d (main): raw 23,506,946 bytes</title></circle>
+<circle class="raw" cx="197.0" cy="103.5" r="4"><title>2026-11-04 e3c7f19 (main): raw 23,506,946 bytes</title></circle>
+<circle class="raw" cx="199.0" cy="103.5" r="4"><title>2026-11-04 9decd61 (main): raw 23,506,946 bytes</title></circle>
+<circle class="raw" cx="201.0" cy="103.5" r="4"><title>2026-11-04 5c9be54 (main): raw 23,506,946 bytes</title></circle>
+<circle class="raw" cx="203.0" cy="103.5" r="4"><title>2026-11-04 5009778 (main): raw 23,506,946 bytes</title></circle>
+<circle class="raw" cx="205.0" cy="99.4" r="4"><title>2026-11-04 caabb49 (main): raw 24,156,425 bytes</title></circle>
+<circle class="raw" cx="207.1" cy="98.4" r="4"><title>2026-11-04 d32a78b (main): raw 24,314,974 bytes</title></circle>
+<circle class="raw" cx="209.1" cy="98.4" r="4"><title>2026-11-04 9a4001a (main): raw 24,314,974 bytes</title></circle>
+<circle class="raw" cx="211.1" cy="98.4" r="4"><title>2026-11-04 72c5d27 (main): raw 24,314,974 bytes</title></circle>
+<circle class="raw" cx="213.1" cy="98.1" r="4"><title>2026-11-04 d1275c7 (main): raw 24,353,366 bytes</title></circle>
+<circle class="raw" cx="215.1" cy="98.1" r="4"><title>2026-11-04 ed68b00 (main): raw 24,353,366 bytes</title></circle>
+<circle class="raw" cx="217.1" cy="97.8" r="4"><title>2026-11-05 8dd8116 (main): raw 24,412,273 bytes</title></circle>
+<circle class="raw" cx="219.1" cy="95.1" r="4"><title>2026-11-05 cfe399a (main): raw 24,832,464 bytes</title></circle>
+<circle class="raw" cx="221.2" cy="95.1" r="4"><title>2026-11-05 8c68850 (main): raw 24,832,464 bytes</title></circle>
+<circle class="raw" cx="223.2" cy="95.1" r="4"><title>2026-11-05 b1b9d35 (main): raw 24,833,787 bytes</title></circle>
+<circle class="raw" cx="225.2" cy="95.1" r="4"><title>2026-11-05 94b5ceb (main): raw 24,838,608 bytes</title></circle>
+<circle class="raw" cx="227.2" cy="95.1" r="4"><title>2026-11-05 edf7e24 (main): raw 24,838,608 bytes</title></circle>
+<circle class="raw" cx="229.2" cy="95.1" r="4"><title>2026-11-05 21bc909 (main): raw 24,838,608 bytes</title></circle>
+<circle class="raw" cx="231.2" cy="95.1" r="4"><title>2026-11-05 9bb96c3 (main): raw 24,841,184 bytes</title></circle>
+<circle class="raw" cx="233.2" cy="95.0" r="4"><title>2026-11-05 dfd760f (main): raw 24,852,100 bytes</title></circle>
+<circle class="raw" cx="235.3" cy="95.0" r="4"><title>2026-11-06 fb2bc9b (main): raw 24,852,082 bytes</title></circle>
+<circle class="raw" cx="237.3" cy="95.0" r="4"><title>2026-11-06 a4ee1e5 (main): raw 24,852,082 bytes</title></circle>
+<circle class="raw" cx="239.3" cy="94.6" r="4"><title>2026-11-06 d27ad61 (main): raw 24,908,041 bytes</title></circle>
+<circle class="raw" cx="241.3" cy="94.6" r="4"><title>2026-11-06 bedbec0 (main): raw 24,908,041 bytes</title></circle>
+<circle class="raw" cx="243.3" cy="94.6" r="4"><title>2026-11-06 b0a0215 (main): raw 24,908,041 bytes</title></circle>
+<circle class="raw" cx="245.3" cy="94.6" r="4"><title>2026-11-06 5b3fb21 (main): raw 24,908,041 bytes</title></circle>
+<circle class="raw" cx="247.3" cy="94.4" r="4"><title>2026-11-06 a3b6eea (main): raw 24,942,856 bytes</title></circle>
+<circle class="raw" cx="249.4" cy="92.8" r="4"><title>2026-11-06 2f58d8d (main): raw 25,194,765 bytes</title></circle>
+<circle class="raw" cx="251.4" cy="92.8" r="4"><title>2026-11-06 b5a1cc4 (main): raw 25,194,765 bytes</title></circle>
+<circle class="raw" cx="253.4" cy="92.8" r="4"><title>2026-11-07 9ca3ebb (main): raw 25,194,765 bytes</title></circle>
+<circle class="raw" cx="255.4" cy="92.8" r="4"><title>2026-11-09 88560aa (main): raw 25,194,765 bytes</title></circle>
+<circle class="raw" cx="257.4" cy="92.8" r="4"><title>2026-11-09 23bc6c9 (main): raw 25,194,765 bytes</title></circle>
+<circle class="raw" cx="259.4" cy="92.8" r="4"><title>2026-11-09 6d06a75 (main): raw 25,194,765 bytes</title></circle>
+<circle class="raw" cx="261.4" cy="93.3" r="4"><title>2026-11-09 c48e3e1 (main): raw 25,121,949 bytes</title></circle>
+<circle class="raw" cx="263.5" cy="92.1" r="4"><title>2026-11-09 5903835 (main): raw 25,315,711 bytes</title></circle>
+<circle class="raw" cx="265.5" cy="92.1" r="4"><title>2026-11-09 98e10c8 (main): raw 25,315,711 bytes</title></circle>
+<circle class="raw" cx="267.5" cy="92.2" r="4"><title>2026-11-09 dabd827 (main): raw 25,287,717 bytes</title></circle>
+<circle class="raw" cx="269.5" cy="91.7" r="4"><title>2026-11-09 225228c (main): raw 25,367,278 bytes</title></circle>
+<circle class="raw" cx="271.5" cy="91.7" r="4"><title>2026-11-09 edc0281 (main): raw 25,367,278 bytes</title></circle>
+<circle class="raw" cx="273.5" cy="91.7" r="4"><title>2026-11-09 7b4d70d (main): raw 25,367,278 bytes</title></circle>
+<circle class="raw" cx="275.5" cy="92.0" r="4"><title>2026-11-09 fcc5223 (main): raw 25,318,229 bytes</title></circle>
+<circle class="raw" cx="277.6" cy="92.0" r="4"><title>2026-11-09 0ca5709 (main): raw 25,318,229 bytes</title></circle>
+<circle class="raw" cx="279.6" cy="92.0" r="4"><title>2026-11-10 168b27c (main): raw 25,316,564 bytes</title></circle>
+<circle class="raw" cx="281.6" cy="91.9" r="4"><title>2026-11-10 1dae910 (main): raw 25,332,600 bytes</title></circle>
+<circle class="raw" cx="283.6" cy="91.9" r="4"><title>2026-11-10 c37e4fc (main): raw 25,333,311 bytes</title></circle>
+<circle class="raw" cx="285.6" cy="90.9" r="4"><title>2026-11-10 ab64cdb (main): raw 25,498,254 bytes</title></circle>
+<circle class="raw" cx="287.6" cy="90.9" r="4"><title>2026-11-10 4e21245 (main): raw 25,498,254 bytes</title></circle>
+<circle class="raw" cx="289.6" cy="90.9" r="4"><title>2026-11-10 8087e11 (main): raw 25,498,254 bytes</title></circle>
+<circle class="raw" cx="291.7" cy="90.9" r="4"><title>2026-11-10 2acafb5 (main): raw 25,498,254 bytes</title></circle>
+<circle class="raw" cx="293.7" cy="90.9" r="4"><title>2026-11-10 8a9990e (main): raw 25,498,254 bytes</title></circle>
+<circle class="raw" cx="295.7" cy="90.9" r="4"><title>2026-11-10 3d935bd (main): raw 25,494,660 bytes</title></circle>
+<circle class="raw" cx="297.7" cy="90.7" r="4"><title>2026-11-10 09c68aa (main): raw 25,532,084 bytes</title></circle>
+<circle class="raw" cx="299.7" cy="90.7" r="4"><title>2026-11-11 aa3bdb2 (main): raw 25,532,084 bytes</title></circle>
+<circle class="raw" cx="301.7" cy="90.7" r="4"><title>2026-11-11 c56eb0e (main): raw 25,532,084 bytes</title></circle>
+<circle class="raw" cx="303.7" cy="89.2" r="4"><title>2026-11-11 8c1dceb (main): raw 25,765,154 bytes</title></circle>
+<circle class="raw" cx="305.8" cy="89.2" r="4"><title>2026-11-11 dc89020 (main): raw 25,765,154 bytes</title></circle>
+<circle class="raw" cx="307.8" cy="89.2" r="4"><title>2026-11-11 583dc76 (main): raw 25,765,154 bytes</title></circle>
+<circle class="raw" cx="309.8" cy="89.2" r="4"><title>2026-11-11 fa2ab40 (main): raw 25,763,956 bytes</title></circle>
+<circle class="raw" cx="311.8" cy="89.2" r="4"><title>2026-11-11 42935b2 (main): raw 25,763,956 bytes</title></circle>
+<circle class="raw" cx="313.8" cy="89.2" r="4"><title>2026-11-11 79c9687 (main): raw 25,763,956 bytes</title></circle>
+<circle class="raw" cx="315.8" cy="89.2" r="4"><title>2026-11-11 6ba61fb (main): raw 25,763,956 bytes</title></circle>
+<circle class="raw" cx="317.8" cy="89.2" r="4"><title>2026-11-11 e44a7bf (main): raw 25,763,956 bytes</title></circle>
+<circle class="raw" cx="319.9" cy="89.2" r="4"><title>2026-11-11 75971b3 (main): raw 25,763,956 bytes</title></circle>
+<circle class="raw" cx="321.9" cy="89.2" r="4"><title>2026-11-11 e73884a (main): raw 25,763,956 bytes</title></circle>
+<circle class="raw" cx="323.9" cy="89.2" r="4"><title>2026-11-11 3ff38b1 (main): raw 25,763,956 bytes</title></circle>
+<circle class="raw" cx="325.9" cy="89.2" r="4"><title>2026-11-11 dd31db0 (main): raw 25,763,956 bytes</title></circle>
+<circle class="raw" cx="327.9" cy="89.2" r="4"><title>2026-11-11 127a2d4 (main): raw 25,766,502 bytes</title></circle>
+<circle class="raw" cx="329.9" cy="88.3" r="4"><title>2026-11-11 02c4b1e (main): raw 25,909,220 bytes</title></circle>
+<circle class="raw" cx="331.9" cy="88.3" r="4"><title>2026-11-11 54f241c (main): raw 25,909,220 bytes</title></circle>
+<circle class="raw" cx="334.0" cy="88.3" r="4"><title>2026-11-11 c523363 (main): raw 25,909,220 bytes</title></circle>
+<circle class="raw" cx="336.0" cy="86.0" r="4"><title>2026-11-11 7adfd78 (main): raw 26,267,267 bytes</title></circle>
+<circle class="raw" cx="338.0" cy="83.3" r="4"><title>2026-11-12 0995779 (main): raw 26,693,802 bytes</title></circle>
+<circle class="raw" cx="340.0" cy="83.3" r="4"><title>2026-11-12 df059b9 (main): raw 26,693,802 bytes</title></circle>
+<circle class="raw" cx="342.0" cy="83.3" r="4"><title>2026-11-12 38b12b6 (main): raw 26,693,802 bytes</title></circle>
+<circle class="raw" cx="344.0" cy="83.3" r="4"><title>2026-11-12 cf02604 (main): raw 26,696,892 bytes</title></circle>
+<circle class="raw" cx="346.0" cy="83.4" r="4"><title>2026-11-12 7ab2fee (main): raw 26,689,102 bytes</title></circle>
+<circle class="raw" cx="348.1" cy="83.0" r="4"><title>2026-11-12 c0a7235 (main): raw 26,746,422 bytes</title></circle>
+<circle class="raw" cx="350.1" cy="83.0" r="4"><title>2026-11-12 4180767 (main): raw 26,746,422 bytes</title></circle>
+<circle class="raw" cx="352.1" cy="82.3" r="4"><title>2026-11-13 482ec37 (main): raw 26,862,580 bytes</title></circle>
+<circle class="raw" cx="354.1" cy="82.4" r="4"><title>2026-11-13 f782d79 (main): raw 26,841,434 bytes</title></circle>
+<circle class="raw" cx="356.1" cy="80.3" r="4"><title>2026-11-13 dfc6f87 (main): raw 27,177,648 bytes</title></circle>
+<circle class="raw" cx="358.1" cy="80.3" r="4"><title>2026-11-13 8dc2acb (main): raw 27,177,648 bytes</title></circle>
+<circle class="raw" cx="360.1" cy="80.3" r="4"><title>2026-11-13 c2bb524 (main): raw 27,177,648 bytes</title></circle>
+<circle class="raw" cx="362.2" cy="80.0" r="4"><title>2026-11-13 e213da8 (main): raw 27,221,470 bytes</title></circle>
+<circle class="raw" cx="364.2" cy="80.0" r="4"><title>2026-11-13 ac1f011 (main): raw 27,221,445 bytes</title></circle>
+<circle class="raw" cx="366.2" cy="80.0" r="4"><title>2026-11-14 b36e11a (main): raw 27,221,445 bytes</title></circle>
+<circle class="raw" cx="368.2" cy="80.0" r="4"><title>2026-11-14 bfcebee (main): raw 27,221,408 bytes</title></circle>
+<circle class="raw" cx="370.2" cy="80.0" r="4"><title>2026-11-15 a1506a1 (main): raw 27,221,408 bytes</title></circle>
+<circle class="raw" cx="372.2" cy="80.0" r="4"><title>2026-11-15 b0b8a2f (main): raw 27,221,408 bytes</title></circle>
+<circle class="raw" cx="374.2" cy="80.0" r="4"><title>2026-11-15 db7aa11 (main): raw 27,221,408 bytes</title></circle>
+<circle class="raw" cx="376.3" cy="80.0" r="4"><title>2026-11-15 f96657e (main): raw 27,221,408 bytes</title></circle>
+<circle class="raw" cx="378.3" cy="78.6" r="4"><title>2026-11-16 1b1e0da (main): raw 27,445,628 bytes</title></circle>
+<circle class="raw" cx="380.3" cy="78.6" r="4"><title>2026-11-16 79b481e (main): raw 27,445,628 bytes</title></circle>
+<circle class="raw" cx="382.3" cy="78.6" r="4"><title>2026-11-16 80beb8b (main): raw 27,445,628 bytes</title></circle>
+<circle class="raw" cx="384.3" cy="78.6" r="4"><title>2026-11-16 fb39e97 (main): raw 27,445,628 bytes</title></circle>
+<circle class="raw" cx="386.3" cy="78.5" r="4"><title>2026-11-17 3c223e8 (main): raw 27,461,124 bytes</title></circle>
+<circle class="raw" cx="388.3" cy="75.0" r="4"><title>2026-11-17 3587a70 (main): raw 28,014,187 bytes</title></circle>
+<circle class="raw" cx="390.4" cy="73.6" r="4"><title>2026-11-17 0b6e894 (main): raw 28,243,827 bytes</title></circle>
+<circle class="raw" cx="392.4" cy="73.6" r="4"><title>2026-11-17 0a07d48 (main): raw 28,243,827 bytes</title></circle>
+<circle class="raw" cx="394.4" cy="73.6" r="4"><title>2026-11-18 cd5a26b (main): raw 28,243,827 bytes</title></circle>
+<circle class="raw" cx="396.4" cy="73.6" r="4"><title>2026-11-18 f360ac2 (main): raw 28,243,827 bytes</title></circle>
+<circle class="raw" cx="398.4" cy="73.4" r="4"><title>2026-11-18 cf07970 (main): raw 28,260,884 bytes</title></circle>
+<circle class="raw" cx="400.4" cy="73.4" r="4"><title>2026-11-18 4e2aa97 (main): raw 28,260,884 bytes</title></circle>
+<circle class="raw" cx="402.4" cy="73.4" r="4"><title>2026-11-18 a85e8de (main): raw 28,268,719 bytes</title></circle>
+<circle class="raw" cx="404.5" cy="73.4" r="4"><title>2026-11-18 1a57c50 (main): raw 28,268,719 bytes</title></circle>
+<circle class="raw" cx="406.5" cy="73.4" r="4"><title>2026-11-18 7026b8e (main): raw 28,268,719 bytes</title></circle>
+<circle class="raw" cx="408.5" cy="73.4" r="4"><title>2026-11-18 91a7ab4 (main): raw 28,268,719 bytes</title></circle>
+<circle class="raw" cx="410.5" cy="73.4" r="4"><title>2026-11-18 ae96988 (main): raw 28,268,915 bytes</title></circle>
+<circle class="raw" cx="412.5" cy="73.2" r="4"><title>2026-11-18 cca91b7 (main): raw 28,300,568 bytes</title></circle>
+<circle class="raw" cx="414.5" cy="73.2" r="4"><title>2026-11-18 03e2600 (main): raw 28,301,897 bytes</title></circle>
+<circle class="raw" cx="416.5" cy="72.0" r="4"><title>2026-11-18 7ccab26 (main): raw 28,493,233 bytes</title></circle>
+<circle class="raw" cx="418.6" cy="72.0" r="4"><title>2026-11-18 41f608d (main): raw 28,493,233 bytes</title></circle>
+<circle class="raw" cx="420.6" cy="72.0" r="4"><title>2026-11-18 636c22a (main): raw 28,493,233 bytes</title></circle>
+<circle class="raw" cx="422.6" cy="72.0" r="4"><title>2026-11-18 dabef9f (main): raw 28,495,071 bytes</title></circle>
+<circle class="raw" cx="424.6" cy="71.9" r="4"><title>2026-11-19 4948006 (main): raw 28,500,833 bytes</title></circle>
+<circle class="raw" cx="426.6" cy="71.9" r="4"><title>2026-11-19 54a48f1 (main): raw 28,500,833 bytes</title></circle>
+<circle class="raw" cx="428.6" cy="71.9" r="4"><title>2026-11-19 217ab6e (main): raw 28,500,833 bytes</title></circle>
+<circle class="raw" cx="430.6" cy="71.9" r="4"><title>2026-11-19 5258676 (main): raw 28,500,833 bytes</title></circle>
+<circle class="raw" cx="432.7" cy="71.9" r="4"><title>2026-11-19 14b8e42 (main): raw 28,504,758 bytes</title></circle>
+<circle class="raw" cx="434.7" cy="71.9" r="4"><title>2026-11-19 38e35e0 (main): raw 28,504,758 bytes</title></circle>
+<circle class="raw" cx="436.7" cy="71.9" r="4"><title>2026-11-19 761ba7c (main): raw 28,504,758 bytes</title></circle>
+<circle class="raw" cx="438.7" cy="71.9" r="4"><title>2026-11-19 cb88dc3 (main): raw 28,504,758 bytes</title></circle>
+<circle class="raw" cx="440.7" cy="71.9" r="4"><title>2026-11-19 cd4a8fe (main): raw 28,504,758 bytes</title></circle>
+<circle class="raw" cx="442.7" cy="71.9" r="4"><title>2026-11-19 289b98b (main): raw 28,505,989 bytes</title></circle>
+<circle class="raw" cx="444.7" cy="71.9" r="4"><title>2026-11-19 7c289c5 (main): raw 28,505,989 bytes</title></circle>
+<circle class="raw" cx="446.8" cy="71.9" r="4"><title>2026-11-19 56f870e (main): raw 28,505,989 bytes</title></circle>
+<circle class="raw" cx="448.8" cy="71.9" r="4"><title>2026-11-19 88ce077 (main): raw 28,505,989 bytes</title></circle>
+<circle class="raw" cx="450.8" cy="71.9" r="4"><title>2026-11-19 070d71d (main): raw 28,505,961 bytes</title></circle>
+<circle class="raw" cx="452.8" cy="71.9" r="4"><title>2026-11-19 82adfcd (main): raw 28,505,961 bytes</title></circle>
+<circle class="raw" cx="454.8" cy="71.9" r="4"><title>2026-11-19 e3c6997 (main): raw 28,508,254 bytes</title></circle>
+<circle class="raw" cx="456.8" cy="70.7" r="4"><title>2026-11-19 d5f32a8 (main): raw 28,693,372 bytes</title></circle>
+<circle class="raw" cx="458.8" cy="70.7" r="4"><title>2026-11-19 42b02c1 (main): raw 28,693,372 bytes</title></circle>
+<circle class="raw" cx="460.9" cy="70.7" r="4"><title>2026-11-19 0f3ebd5 (main): raw 28,693,372 bytes</title></circle>
+<circle class="raw" cx="462.9" cy="70.7" r="4"><title>2026-11-19 9593d90 (main): raw 28,693,372 bytes</title></circle>
+<circle class="raw" cx="464.9" cy="70.7" r="4"><title>2026-11-19 9634014 (main): raw 28,693,372 bytes</title></circle>
+<circle class="raw" cx="466.9" cy="70.7" r="4"><title>2026-11-20 e672ded (main): raw 28,703,110 bytes</title></circle>
+<circle class="raw" cx="468.9" cy="70.7" r="4"><title>2026-11-20 585c87b (main): raw 28,703,110 bytes</title></circle>
+<circle class="raw" cx="470.9" cy="70.2" r="4"><title>2026-11-20 7bea084 (main): raw 28,776,008 bytes</title></circle>
+<circle class="raw" cx="472.9" cy="70.2" r="4"><title>2026-11-20 bfaeae2 (main): raw 28,777,804 bytes</title></circle>
+<circle class="raw" cx="475.0" cy="70.2" r="4"><title>2026-11-20 3e288c1 (main): raw 28,777,804 bytes</title></circle>
+<circle class="raw" cx="477.0" cy="70.2" r="4"><title>2026-11-20 35b77cd (main): raw 28,777,804 bytes</title></circle>
+<circle class="raw" cx="479.0" cy="70.2" r="4"><title>2026-11-20 673c445 (main): raw 28,778,429 bytes</title></circle>
+<circle class="raw" cx="481.0" cy="70.2" r="4"><title>2026-11-20 fb646b2 (main): raw 28,778,429 bytes</title></circle>
+<circle class="raw" cx="483.0" cy="70.2" r="4"><title>2026-11-20 3365fdb (main): raw 28,778,429 bytes</title></circle>
+<circle class="raw" cx="485.0" cy="68.2" r="4"><title>2026-11-20 8f2c61d (main): raw 29,092,612 bytes</title></circle>
+<circle class="raw" cx="487.0" cy="68.2" r="4"><title>2026-11-20 6ce419a (main): raw 29,092,612 bytes</title></circle>
+<circle class="raw" cx="489.0" cy="67.0" r="4"><title>2026-11-20 ee7ac51 (main): raw 29,276,789 bytes</title></circle>
+<circle class="raw" cx="491.1" cy="67.0" r="4"><title>2026-11-20 cf50e9f (main): raw 29,276,789 bytes</title></circle>
+<circle class="raw" cx="493.1" cy="67.0" r="4"><title>2026-11-20 4ab7f6e (main): raw 29,276,789 bytes</title></circle>
+<circle class="raw" cx="495.1" cy="66.5" r="4"><title>2026-11-21 3c93eae (main): raw 29,365,844 bytes</title></circle>
+<circle class="raw" cx="497.1" cy="66.5" r="4"><title>2026-11-21 6303dc1 (main): raw 29,365,844 bytes</title></circle>
+<circle class="raw" cx="499.1" cy="66.5" r="4"><title>2026-11-21 b0dd9ef (main): raw 29,365,844 bytes</title></circle>
+<circle class="raw" cx="501.1" cy="66.4" r="4"><title>2026-11-21 66e83e6 (main): raw 29,368,729 bytes</title></circle>
+<circle class="raw" cx="503.1" cy="66.4" r="4"><title>2026-11-23 af70b30 (main): raw 29,368,729 bytes</title></circle>
+<circle class="raw" cx="505.2" cy="65.3" r="4"><title>2026-11-23 15c6336 (main): raw 29,552,036 bytes</title></circle>
+<circle class="raw" cx="507.2" cy="65.3" r="4"><title>2026-11-23 1cd4f59 (main): raw 29,552,036 bytes</title></circle>
+<circle class="raw" cx="509.2" cy="65.3" r="4"><title>2026-11-23 930d099 (main): raw 29,552,103 bytes</title></circle>
+<circle class="raw" cx="511.2" cy="65.3" r="4"><title>2026-11-23 b260112 (main): raw 29,552,103 bytes</title></circle>
+<circle class="raw" cx="513.2" cy="65.3" r="4"><title>2026-11-23 858187f (main): raw 29,552,103 bytes</title></circle>
+<circle class="raw" cx="515.2" cy="64.6" r="4"><title>2026-11-23 086b80d (main): raw 29,655,258 bytes</title></circle>
+<circle class="raw" cx="517.2" cy="64.6" r="4"><title>2026-11-23 df896f4 (main): raw 29,655,258 bytes</title></circle>
+<circle class="raw" cx="519.3" cy="64.6" r="4"><title>2026-11-23 ba669e0 (main): raw 29,655,258 bytes</title></circle>
+<circle class="raw" cx="521.3" cy="63.3" r="4"><title>2026-11-23 6992e32 (main): raw 29,872,988 bytes</title></circle>
+<circle class="raw" cx="523.3" cy="63.3" r="4"><title>2026-11-23 1f574e5 (main): raw 29,872,988 bytes</title></circle>
+<circle class="raw" cx="525.3" cy="63.3" r="4"><title>2026-11-23 ff72c40 (main): raw 29,872,988 bytes</title></circle>
+<circle class="raw" cx="527.3" cy="62.4" r="4"><title>2026-11-24 4fdf384 (main): raw 30,003,242 bytes</title></circle>
+<circle class="raw" cx="529.3" cy="62.4" r="4"><title>2026-11-24 fc51778 (main): raw 30,003,242 bytes</title></circle>
+<circle class="raw" cx="531.3" cy="62.4" r="4"><title>2026-11-24 52961b1 (main): raw 30,003,242 bytes</title></circle>
+<circle class="raw" cx="533.4" cy="62.3" r="4"><title>2026-11-24 88e8056 (main): raw 30,021,843 bytes</title></circle>
+<circle class="raw" cx="535.4" cy="62.3" r="4"><title>2026-11-24 4f4dc85 (main): raw 30,021,843 bytes</title></circle>
+<circle class="raw" cx="537.4" cy="62.3" r="4"><title>2026-11-24 7d0e6a2 (main): raw 30,021,843 bytes</title></circle>
+<circle class="raw" cx="539.4" cy="62.1" r="4"><title>2026-11-24 96f3a67 (main): raw 30,051,800 bytes</title></circle>
+<circle class="raw" cx="541.4" cy="61.5" r="4"><title>2026-11-24 e08cae5 (main): raw 30,144,187 bytes</title></circle>
+<circle class="raw" cx="543.4" cy="61.5" r="4"><title>2026-11-24 f93a000 (main): raw 30,144,187 bytes</title></circle>
+<circle class="raw" cx="545.4" cy="61.5" r="4"><title>2026-11-24 8830632 (main): raw 30,153,987 bytes</title></circle>
+<circle class="raw" cx="547.5" cy="59.4" r="4"><title>2026-11-24 a1cd6e9 (main): raw 30,489,881 bytes</title></circle>
+<circle class="raw" cx="549.5" cy="59.4" r="4"><title>2026-11-24 522cb0e (main): raw 30,489,881 bytes</title></circle>
+<circle class="raw" cx="551.5" cy="59.4" r="4"><title>2026-11-24 9d11ad6 (main): raw 30,489,881 bytes</title></circle>
+<circle class="raw" cx="553.5" cy="59.4" r="4"><title>2026-11-24 adc686e (main): raw 30,489,881 bytes</title></circle>
+<circle class="raw" cx="555.5" cy="59.3" r="4"><title>2026-11-25 0aa0da3 (main): raw 30,498,454 bytes</title></circle>
+<circle class="raw" cx="557.5" cy="58.6" r="4"><title>2026-11-25 9a9b68c (main): raw 30,604,421 bytes</title></circle>
+<circle class="raw" cx="559.5" cy="58.3" r="4"><title>2026-11-25 73e751b (main): raw 30,662,816 bytes</title></circle>
+<circle class="raw" cx="561.6" cy="58.3" r="4"><title>2026-11-25 64b51ba (main): raw 30,662,816 bytes</title></circle>
+<circle class="raw" cx="563.6" cy="58.2" r="4"><title>2026-11-25 598a0b2 (main): raw 30,676,720 bytes</title></circle>
+<circle class="raw" cx="565.6" cy="58.0" r="4"><title>2026-11-25 5bb82ea (main): raw 30,705,486 bytes</title></circle>
+<circle class="raw" cx="567.6" cy="57.6" r="4"><title>2026-11-25 38612c8 (main): raw 30,773,909 bytes</title></circle>
+<circle class="raw" cx="569.6" cy="57.6" r="4"><title>2026-11-25 473836f (main): raw 30,773,909 bytes</title></circle>
+<circle class="raw" cx="571.6" cy="57.6" r="4"><title>2026-11-25 24abbe2 (main): raw 30,773,909 bytes</title></circle>
+<circle class="raw" cx="573.6" cy="57.6" r="4"><title>2026-11-25 2d41e94 (main): raw 30,773,909 bytes</title></circle>
+<circle class="raw" cx="575.7" cy="56.4" r="4"><title>2026-11-25 5d3a140 (main): raw 30,961,108 bytes</title></circle>
+<circle class="raw" cx="577.7" cy="54.3" r="4"><title>2026-11-25 02fedc5 (main): raw 31,296,548 bytes</title></circle>
+<circle class="raw" cx="579.7" cy="54.3" r="4"><title>2026-11-25 f06fd29 (main): raw 31,296,548 bytes</title></circle>
+<circle class="raw" cx="581.7" cy="54.3" r="4"><title>2026-11-25 0f52276 (main): raw 31,296,548 bytes</title></circle>
+<circle class="raw" cx="583.7" cy="54.3" r="4"><title>2026-11-25 7a1ceeb (main): raw 31,296,548 bytes</title></circle>
+<circle class="raw" cx="585.7" cy="54.1" r="4"><title>2026-11-25 f5799d0 (main): raw 31,324,378 bytes</title></circle>
+<circle class="raw" cx="587.7" cy="54.1" r="4"><title>2026-11-25 2acdf8d (main): raw 31,324,378 bytes</title></circle>
+<circle class="raw" cx="589.8" cy="54.0" r="4"><title>2026-11-26 3fe709e (main): raw 31,342,346 bytes</title></circle>
+<circle class="raw" cx="591.8" cy="53.7" r="4"><title>2026-11-26 42615dc (main): raw 31,381,122 bytes</title></circle>
+<circle class="raw" cx="593.8" cy="53.3" r="4"><title>2026-11-26 c7a85d6 (main): raw 31,449,842 bytes</title></circle>
+<circle class="raw" cx="595.8" cy="52.8" r="4"><title>2026-11-26 3e607cd (main): raw 31,532,273 bytes</title></circle>
+<circle class="raw" cx="597.8" cy="52.8" r="4"><title>2026-11-26 86913d1 (main): raw 31,536,167 bytes</title></circle>
+<circle class="raw" cx="599.8" cy="52.8" r="4"><title>2026-11-26 70719da (main): raw 31,536,167 bytes</title></circle>
+<circle class="raw" cx="601.8" cy="52.6" r="4"><title>2026-11-26 1192062 (main): raw 31,554,092 bytes</title></circle>
+<circle class="raw" cx="603.9" cy="52.6" r="4"><title>2026-11-26 d1a73cd (main): raw 31,560,563 bytes</title></circle>
+<circle class="raw" cx="605.9" cy="51.6" r="4"><title>2026-11-26 9e1320f (main): raw 31,724,498 bytes</title></circle>
+<circle class="raw" cx="607.9" cy="51.6" r="4"><title>2026-11-26 6a95763 (main): raw 31,724,498 bytes</title></circle>
+<circle class="raw" cx="609.9" cy="50.1" r="4"><title>2026-11-26 fd5c552 (main): raw 31,963,037 bytes</title></circle>
+<circle class="raw" cx="611.9" cy="50.0" r="4"><title>2026-11-26 2a25268 (main): raw 31,966,574 bytes</title></circle>
+<circle class="raw" cx="613.9" cy="50.0" r="4"><title>2026-11-26 223f165 (main): raw 31,966,574 bytes</title></circle>
+<circle class="raw" cx="615.9" cy="50.0" r="4"><title>2026-11-27 bb261ce (main): raw 31,966,574 bytes</title></circle>
+<circle class="raw" cx="618.0" cy="50.0" r="4"><title>2026-11-27 31c8e87 (main): raw 31,966,574 bytes</title></circle>
+<circle class="raw" cx="620.0" cy="50.0" r="4"><title>2026-11-27 b07eb49 (main): raw 31,966,574 bytes</title></circle>
+<circle class="raw" cx="622.0" cy="48.9" r="4"><title>2026-11-27 e0a47fa (main): raw 32,147,670 bytes</title></circle>
+<circle class="raw" cx="624.0" cy="48.9" r="4"><title>2026-11-27 ff363fe (main): raw 32,147,670 bytes</title></circle>
 <text class="ink" x="634.0" y="52.9">raw 30.66</text>
-<polyline class="gz line" points="56.0,230.5 58.0,225.4 60.0,225.3 62.1,225.0 64.1,225.3 66.1,225.0 68.1,225.0 70.1,225.0 72.2,225.0 74.2,224.9 76.2,224.9 78.2,224.8 80.3,224.8 82.3,224.7 84.3,224.7 86.3,224.7 88.3,224.6 90.4,224.4 92.4,224.4 94.4,223.9 96.4,223.9 98.4,223.9 100.5,222.5 102.5,222.5 104.5,222.1 106.5,222.0 108.6,222.0 110.6,221.8 112.6,221.8 114.6,221.7 116.6,221.7 118.7,221.7 120.7,221.7 122.7,221.7 124.7,221.7 126.7,221.7 128.8,221.7 130.8,221.5 132.8,221.3 134.8,221.2 136.9,221.0 138.9,221.0 140.9,221.0 142.9,220.6 144.9,220.6 147.0,220.5 149.0,220.5 151.0,220.0 153.0,215.4 155.0,215.4 157.1,215.4 159.1,215.4 161.1,215.4 163.1,215.2 165.2,215.1 167.2,215.0 169.2,214.6 171.2,214.3 173.2,214.3 175.3,208.1 177.3,208.1 179.3,207.6 181.3,207.1 183.3,207.1 185.4,207.0 187.4,205.7 189.4,205.4 191.4,205.4 193.5,205.4 195.5,205.3 197.5,205.3 199.5,205.3 201.5,205.3 203.6,205.3 205.6,204.1 207.6,203.8 209.6,203.8 211.6,203.8 213.7,203.7 215.7,203.7 217.7,203.6 219.7,202.9 221.8,202.9 223.8,202.8 225.8,202.8 227.8,202.8 229.8,202.8 231.9,202.8 233.9,202.8 235.9,202.8 237.9,202.8 239.9,202.7 242.0,202.7 244.0,202.7 246.0,202.7 248.0,202.6 250.0,202.1 252.1,202.1 254.1,202.1 256.1,202.1 258.1,202.1 260.2,202.1 262.2,202.2 264.2,201.9 266.2,201.9 268.2,201.9 270.3,201.8 272.3,201.8 274.3,201.8 276.3,201.9 278.3,201.9 280.4,201.9 282.4,201.8 284.4,201.8 286.4,201.5 288.5,201.5 290.5,201.5 292.5,201.5 294.5,201.5 296.5,201.5 298.6,201.4 300.6,201.4 302.6,201.4 304.6,200.8 306.6,200.8 308.7,200.8 310.7,200.8 312.7,200.8 314.7,200.8 316.8,200.8 318.8,200.8 320.8,200.8 322.8,200.8 324.8,200.8 326.9,200.8 328.9,200.8 330.9,200.5 332.9,200.5 334.9,200.5 337.0,199.7 339.0,198.8 341.0,198.8 343.0,198.8 345.1,198.7 347.1,198.7 349.1,198.6 351.1,198.6 353.1,198.3 355.2,198.4 357.2,197.6 359.2,197.6 361.2,197.6 363.2,197.6 365.3,197.6 367.3,197.6 369.3,197.6 371.3,197.6 373.4,197.6 375.4,197.6 377.4,197.6 379.4,197.0 381.4,197.0 383.5,197.0 385.5,197.0 387.5,197.0 389.5,195.7 391.5,195.3 393.6,195.3 395.6,195.3 397.6,195.3 399.6,195.2 401.7,195.2 403.7,195.2 405.7,195.2 407.7,195.2 409.7,195.2 411.8,195.2 413.8,195.1 415.8,195.1 417.8,194.7 419.8,194.7 421.9,194.7 423.9,194.7 425.9,194.6 427.9,194.6 430.0,194.6 432.0,194.6 434.0,194.6 436.0,194.6 438.0,194.6 440.1,194.6 442.1,194.6 444.1,194.6 446.1,194.6 448.1,194.6 450.2,194.6 452.2,194.6 454.2,194.6 456.2,194.6 458.2,194.3 460.3,194.3 462.3,194.3 464.3,194.3 466.3,194.3 468.4,194.2 470.4,194.2 472.4,194.1 474.4,194.1 476.4,194.1 478.5,194.1 480.5,194.1 482.5,194.1 484.5,194.1 486.5,193.4 488.6,193.4 490.6,193.0 492.6,193.0 494.6,193.0 496.7,192.8 498.7,192.8 500.7,192.8 502.7,192.8 504.7,192.8 506.8,192.4 508.8,192.4 510.8,192.4 512.8,192.4 514.8,192.4 516.9,192.3 518.9,192.3 520.9,192.3 522.9,191.8 525.0,191.8 527.0,191.8 529.0,191.5 531.0,191.5 533.0,191.5 535.1,191.5 537.1,191.5 539.1,191.5 541.1,191.4 543.1,191.2 545.2,191.2 547.2,191.2 549.2,190.5 551.2,190.5 553.3,190.5 555.3,190.5 557.3,190.5 559.3,190.2 561.3,190.2 563.4,190.2 565.4,190.1 567.4,190.1 569.4,189.9 571.4,189.9 573.5,189.9 575.5,189.9 577.5,189.5 579.5,188.8 581.6,188.8 583.6,188.8 585.6,188.8 587.6,188.8 589.6,188.8 591.7,188.7 593.7,188.6 595.7,188.4 597.7,188.2 599.7,188.2 601.8,188.2 603.8,188.2 605.8,188.2 607.8,187.8 609.9,187.8 611.9,187.2 613.9,187.2 615.9,187.2 617.9,187.2 620.0,187.2 622.0,187.2 624.0,186.9"/>
+<polyline class="gz line" points="56.0,230.5 58.0,225.4 60.0,225.3 62.0,225.0 64.1,225.3 66.1,225.0 68.1,225.0 70.1,225.0 72.1,225.0 74.1,224.9 76.1,224.9 78.2,224.8 80.2,224.8 82.2,224.7 84.2,224.7 86.2,224.7 88.2,224.6 90.2,224.4 92.3,224.4 94.3,223.9 96.3,223.9 98.3,223.9 100.3,222.5 102.3,222.5 104.3,222.1 106.4,222.0 108.4,222.0 110.4,221.8 112.4,221.8 114.4,221.7 116.4,221.7 118.4,221.7 120.5,221.7 122.5,221.7 124.5,221.7 126.5,221.7 128.5,221.7 130.5,221.5 132.5,221.3 134.6,221.2 136.6,221.0 138.6,221.0 140.6,221.0 142.6,220.6 144.6,220.6 146.6,220.5 148.7,220.5 150.7,220.0 152.7,215.4 154.7,215.4 156.7,215.4 158.7,215.4 160.7,215.4 162.8,215.2 164.8,215.1 166.8,215.0 168.8,214.6 170.8,214.3 172.8,214.3 174.8,208.1 176.9,208.1 178.9,207.6 180.9,207.1 182.9,207.1 184.9,207.0 186.9,205.7 188.9,205.4 191.0,205.4 193.0,205.4 195.0,205.3 197.0,205.3 199.0,205.3 201.0,205.3 203.0,205.3 205.0,204.1 207.1,203.8 209.1,203.8 211.1,203.8 213.1,203.7 215.1,203.7 217.1,203.6 219.1,202.9 221.2,202.9 223.2,202.8 225.2,202.8 227.2,202.8 229.2,202.8 231.2,202.8 233.2,202.8 235.3,202.8 237.3,202.8 239.3,202.7 241.3,202.7 243.3,202.7 245.3,202.7 247.3,202.6 249.4,202.1 251.4,202.1 253.4,202.1 255.4,202.1 257.4,202.1 259.4,202.1 261.4,202.2 263.5,201.9 265.5,201.9 267.5,201.9 269.5,201.8 271.5,201.8 273.5,201.8 275.5,201.9 277.6,201.9 279.6,201.9 281.6,201.8 283.6,201.8 285.6,201.5 287.6,201.5 289.6,201.5 291.7,201.5 293.7,201.5 295.7,201.5 297.7,201.4 299.7,201.4 301.7,201.4 303.7,200.8 305.8,200.8 307.8,200.8 309.8,200.8 311.8,200.8 313.8,200.8 315.8,200.8 317.8,200.8 319.9,200.8 321.9,200.8 323.9,200.8 325.9,200.8 327.9,200.8 329.9,200.5 331.9,200.5 334.0,200.5 336.0,199.7 338.0,198.8 340.0,198.8 342.0,198.8 344.0,198.7 346.0,198.7 348.1,198.6 350.1,198.6 352.1,198.3 354.1,198.4 356.1,197.6 358.1,197.6 360.1,197.6 362.2,197.6 364.2,197.6 366.2,197.6 368.2,197.6 370.2,197.6 372.2,197.6 374.2,197.6 376.3,197.6 378.3,197.0 380.3,197.0 382.3,197.0 384.3,197.0 386.3,197.0 388.3,195.7 390.4,195.3 392.4,195.3 394.4,195.3 396.4,195.3 398.4,195.2 400.4,195.2 402.4,195.2 404.5,195.2 406.5,195.2 408.5,195.2 410.5,195.2 412.5,195.1 414.5,195.1 416.5,194.7 418.6,194.7 420.6,194.7 422.6,194.7 424.6,194.6 426.6,194.6 428.6,194.6 430.6,194.6 432.7,194.6 434.7,194.6 436.7,194.6 438.7,194.6 440.7,194.6 442.7,194.6 444.7,194.6 446.8,194.6 448.8,194.6 450.8,194.6 452.8,194.6 454.8,194.6 456.8,194.3 458.8,194.3 460.9,194.3 462.9,194.3 464.9,194.3 466.9,194.2 468.9,194.2 470.9,194.1 472.9,194.1 475.0,194.1 477.0,194.1 479.0,194.1 481.0,194.1 483.0,194.1 485.0,193.4 487.0,193.4 489.0,193.0 491.1,193.0 493.1,193.0 495.1,192.8 497.1,192.8 499.1,192.8 501.1,192.8 503.1,192.8 505.2,192.4 507.2,192.4 509.2,192.4 511.2,192.4 513.2,192.4 515.2,192.3 517.2,192.3 519.3,192.3 521.3,191.8 523.3,191.8 525.3,191.8 527.3,191.5 529.3,191.5 531.3,191.5 533.4,191.5 535.4,191.5 537.4,191.5 539.4,191.4 541.4,191.2 543.4,191.2 545.4,191.2 547.5,190.5 549.5,190.5 551.5,190.5 553.5,190.5 555.5,190.5 557.5,190.2 559.5,190.2 561.6,190.2 563.6,190.1 565.6,190.1 567.6,189.9 569.6,189.9 571.6,189.9 573.6,189.9 575.7,189.5 577.7,188.8 579.7,188.8 581.7,188.8 583.7,188.8 585.7,188.8 587.7,188.8 589.8,188.7 591.8,188.6 593.8,188.4 595.8,188.2 597.8,188.2 599.8,188.2 601.8,188.2 603.9,188.2 605.9,187.8 607.9,187.8 609.9,187.2 611.9,187.2 613.9,187.2 615.9,187.2 618.0,187.2 620.0,187.2 622.0,186.9 624.0,186.9"/>
 <circle class="gz" cx="56.0" cy="230.5" r="4"><title>2026-10-20 4ece1b1 (main): gzip -9 3,405,489 bytes</title></circle>
 <circle class="gz" cx="58.0" cy="225.4" r="4"><title>2026-10-24 3ff03cf (main): gzip -9 4,202,645 bytes</title></circle>
 <circle class="gz hollow" cx="60.0" cy="225.3" r="4"><title>2026-10-24 5cb7a0a (story/text-kerning): gzip -9 4,227,451 bytes</title></circle>
-<circle class="gz hollow" cx="62.1" cy="225.0" r="4"><title>2026-10-24 3082c82 (story/text-on-path): gzip -9 4,268,422 bytes</title></circle>
+<circle class="gz hollow" cx="62.0" cy="225.0" r="4"><title>2026-10-24 3082c82 (story/text-on-path): gzip -9 4,268,422 bytes</title></circle>
 <circle class="gz" cx="64.1" cy="225.3" r="4"><title>2026-10-24 29a258c (main): gzip -9 4,232,978 bytes</title></circle>
 <circle class="gz" cx="66.1" cy="225.0" r="4"><title>2026-10-25 63aa7d1 (main): gzip -9 4,275,845 bytes</title></circle>
 <circle class="gz" cx="68.1" cy="225.0" r="4"><title>2026-10-25 d3204ba (main): gzip -9 4,275,705 bytes</title></circle>
 <circle class="gz" cx="70.1" cy="225.0" r="4"><title>2026-10-25 cd9a835 (main): gzip -9 4,275,705 bytes</title></circle>
-<circle class="gz" cx="72.2" cy="225.0" r="4"><title>2026-10-25 6be85ac (main): gzip -9 4,275,705 bytes</title></circle>
-<circle class="gz" cx="74.2" cy="224.9" r="4"><title>2026-10-25 d979b24 (main): gzip -9 4,295,831 bytes</title></circle>
-<circle class="gz" cx="76.2" cy="224.9" r="4"><title>2026-10-25 7046e12 (main): gzip -9 4,295,831 bytes</title></circle>
+<circle class="gz" cx="72.1" cy="225.0" r="4"><title>2026-10-25 6be85ac (main): gzip -9 4,275,705 bytes</title></circle>
+<circle class="gz" cx="74.1" cy="224.9" r="4"><title>2026-10-25 d979b24 (main): gzip -9 4,295,831 bytes</title></circle>
+<circle class="gz" cx="76.1" cy="224.9" r="4"><title>2026-10-25 7046e12 (main): gzip -9 4,295,831 bytes</title></circle>
 <circle class="gz" cx="78.2" cy="224.8" r="4"><title>2026-10-26 6374518 (main): gzip -9 4,308,490 bytes</title></circle>
-<circle class="gz" cx="80.3" cy="224.8" r="4"><title>2026-10-26 a1ccf09 (main): gzip -9 4,308,490 bytes</title></circle>
-<circle class="gz" cx="82.3" cy="224.7" r="4"><title>2026-10-26 ee0f2ab (main): gzip -9 4,328,804 bytes</title></circle>
-<circle class="gz" cx="84.3" cy="224.7" r="4"><title>2026-10-26 8f2e4f3 (main): gzip -9 4,328,804 bytes</title></circle>
-<circle class="gz" cx="86.3" cy="224.7" r="4"><title>2026-10-26 99eb1c7 (main): gzip -9 4,328,804 bytes</title></circle>
-<circle class="gz" cx="88.3" cy="224.6" r="4"><title>2026-10-26 cf0865c (main): gzip -9 4,343,306 bytes</title></circle>
-<circle class="gz" cx="90.4" cy="224.4" r="4"><title>2026-10-26 4219c87 (main): gzip -9 4,363,343 bytes</title></circle>
-<circle class="gz" cx="92.4" cy="224.4" r="4"><title>2026-10-26 8b3628b (main): gzip -9 4,366,095 bytes</title></circle>
-<circle class="gz" cx="94.4" cy="223.9" r="4"><title>2026-10-26 d5e3a0b (main): gzip -9 4,442,173 bytes</title></circle>
-<circle class="gz" cx="96.4" cy="223.9" r="4"><title>2026-10-27 53dd79d (main): gzip -9 4,442,173 bytes</title></circle>
-<circle class="gz" cx="98.4" cy="223.9" r="4"><title>2026-10-27 b30718b (main): gzip -9 4,443,005 bytes</title></circle>
-<circle class="gz" cx="100.5" cy="222.5" r="4"><title>2026-10-27 e3f48e4 (main): gzip -9 4,672,553 bytes</title></circle>
-<circle class="gz" cx="102.5" cy="222.5" r="4"><title>2026-10-27 41ee911 (main): gzip -9 4,674,174 bytes</title></circle>
-<circle class="gz" cx="104.5" cy="222.1" r="4"><title>2026-10-27 704eaab (main): gzip -9 4,735,673 bytes</title></circle>
-<circle class="gz" cx="106.5" cy="222.0" r="4"><title>2026-10-27 ed98d6e (main): gzip -9 4,745,475 bytes</title></circle>
-<circle class="gz" cx="108.6" cy="222.0" r="4"><title>2026-10-27 fd6baf5 (main): gzip -9 4,745,475 bytes</title></circle>
-<circle class="gz" cx="110.6" cy="221.8" r="4"><title>2026-10-28 7068fc8 (main): gzip -9 4,783,587 bytes</title></circle>
-<circle class="gz" cx="112.6" cy="221.8" r="4"><title>2026-10-28 da69bef (main): gzip -9 4,783,587 bytes</title></circle>
-<circle class="gz" cx="114.6" cy="221.7" r="4"><title>2026-10-28 8494275 (main): gzip -9 4,794,704 bytes</title></circle>
-<circle class="gz" cx="116.6" cy="221.7" r="4"><title>2026-10-29 5801a69 (main): gzip -9 4,797,193 bytes</title></circle>
-<circle class="gz" cx="118.7" cy="221.7" r="4"><title>2026-10-29 439ccf3 (main): gzip -9 4,797,027 bytes</title></circle>
-<circle class="gz" cx="120.7" cy="221.7" r="4"><title>2026-10-29 a8fa241 (main): gzip -9 4,799,148 bytes</title></circle>
-<circle class="gz" cx="122.7" cy="221.7" r="4"><title>2026-10-29 3d883bb (main): gzip -9 4,799,148 bytes</title></circle>
-<circle class="gz" cx="124.7" cy="221.7" r="4"><title>2026-10-29 faeb6f0 (main): gzip -9 4,799,148 bytes</title></circle>
-<circle class="gz" cx="126.7" cy="221.7" r="4"><title>2026-10-29 d6df9c7 (main): gzip -9 4,799,148 bytes</title></circle>
-<circle class="gz" cx="128.8" cy="221.7" r="4"><title>2026-10-29 db776a0 (main): gzip -9 4,799,148 bytes</title></circle>
-<circle class="gz" cx="130.8" cy="221.5" r="4"><title>2026-10-30 6e3f913 (main): gzip -9 4,827,992 bytes</title></circle>
-<circle class="gz" cx="132.8" cy="221.3" r="4"><title>2026-10-30 4cb8df3 (main): gzip -9 4,856,290 bytes</title></circle>
-<circle class="gz" cx="134.8" cy="221.2" r="4"><title>2026-10-30 8043943 (main): gzip -9 4,868,842 bytes</title></circle>
-<circle class="gz" cx="136.9" cy="221.0" r="4"><title>2026-10-30 3b58ab4 (main): gzip -9 4,904,685 bytes</title></circle>
-<circle class="gz" cx="138.9" cy="221.0" r="4"><title>2026-10-30 abf845f (main): gzip -9 4,906,498 bytes</title></circle>
-<circle class="gz" cx="140.9" cy="221.0" r="4"><title>2026-10-31 54c74cc (main): gzip -9 4,906,498 bytes</title></circle>
-<circle class="gz" cx="142.9" cy="220.6" r="4"><title>2026-10-31 59595a9 (main): gzip -9 4,962,984 bytes</title></circle>
-<circle class="gz" cx="144.9" cy="220.6" r="4"><title>2026-10-31 d8b79e6 (main): gzip -9 4,962,984 bytes</title></circle>
-<circle class="gz" cx="147.0" cy="220.5" r="4"><title>2026-10-31 5ddddab (main): gzip -9 4,982,197 bytes</title></circle>
-<circle class="gz" cx="149.0" cy="220.5" r="4"><title>2026-10-31 31abead (main): gzip -9 4,982,197 bytes</title></circle>
-<circle class="gz" cx="151.0" cy="220.0" r="4"><title>2026-10-31 cfb204d (main): gzip -9 5,057,735 bytes</title></circle>
-<circle class="gz" cx="153.0" cy="215.4" r="4"><title>2026-10-31 974867d (main): gzip -9 5,789,917 bytes</title></circle>
-<circle class="gz" cx="155.0" cy="215.4" r="4"><title>2026-11-01 6497bb8 (main): gzip -9 5,789,917 bytes</title></circle>
-<circle class="gz" cx="157.1" cy="215.4" r="4"><title>2026-11-01 b7b45fa (main): gzip -9 5,789,917 bytes</title></circle>
-<circle class="gz" cx="159.1" cy="215.4" r="4"><title>2026-11-01 75d5493 (main): gzip -9 5,799,770 bytes</title></circle>
-<circle class="gz" cx="161.1" cy="215.4" r="4"><title>2026-11-01 0e42d62 (main): gzip -9 5,799,870 bytes</title></circle>
-<circle class="gz" cx="163.1" cy="215.2" r="4"><title>2026-11-01 c52d775 (main): gzip -9 5,822,601 bytes</title></circle>
-<circle class="gz" cx="165.2" cy="215.1" r="4"><title>2026-11-01 2f12de8 (main): gzip -9 5,845,024 bytes</title></circle>
-<circle class="gz" cx="167.2" cy="215.0" r="4"><title>2026-11-01 b218736 (main): gzip -9 5,853,359 bytes</title></circle>
-<circle class="gz" cx="169.2" cy="214.6" r="4"><title>2026-11-01 d4ae045 (main): gzip -9 5,917,273 bytes</title></circle>
-<circle class="gz" cx="171.2" cy="214.3" r="4"><title>2026-11-02 8a84e70 (main): gzip -9 5,966,834 bytes</title></circle>
-<circle class="gz" cx="173.2" cy="214.3" r="4"><title>2026-11-02 595d18b (main): gzip -9 5,966,834 bytes</title></circle>
-<circle class="gz" cx="175.3" cy="208.1" r="4"><title>2026-11-02 e77fb42 (main): gzip -9 6,945,656 bytes</title></circle>
-<circle class="gz" cx="177.3" cy="208.1" r="4"><title>2026-11-02 105b981 (main): gzip -9 6,945,656 bytes</title></circle>
-<circle class="gz" cx="179.3" cy="207.6" r="4"><title>2026-11-02 94f55ce (main): gzip -9 7,033,132 bytes</title></circle>
-<circle class="gz" cx="181.3" cy="207.1" r="4"><title>2026-11-03 4ea207b (main): gzip -9 7,103,450 bytes</title></circle>
-<circle class="gz" cx="183.3" cy="207.1" r="4"><title>2026-11-03 49716eb (main): gzip -9 7,112,645 bytes</title></circle>
-<circle class="gz" cx="185.4" cy="207.0" r="4"><title>2026-11-03 f60a197 (main): gzip -9 7,117,190 bytes</title></circle>
-<circle class="gz" cx="187.4" cy="205.7" r="4"><title>2026-11-03 850eca9 (main): gzip -9 7,321,673 bytes</title></circle>
-<circle class="gz" cx="189.4" cy="205.4" r="4"><title>2026-11-03 70ca3c4 (main): gzip -9 7,380,911 bytes</title></circle>
-<circle class="gz" cx="191.4" cy="205.4" r="4"><title>2026-11-03 903ba36 (main): gzip -9 7,380,911 bytes</title></circle>
-<circle class="gz" cx="193.5" cy="205.4" r="4"><title>2026-11-03 bfff3f7 (main): gzip -9 7,380,911 bytes</title></circle>
-<circle class="gz" cx="195.5" cy="205.3" r="4"><title>2026-11-03 ab5ee2d (main): gzip -9 7,396,551 bytes</title></circle>
-<circle class="gz" cx="197.5" cy="205.3" r="4"><title>2026-11-04 e3c7f19 (main): gzip -9 7,396,551 bytes</title></circle>
-<circle class="gz" cx="199.5" cy="205.3" r="4"><title>2026-11-04 9decd61 (main): gzip -9 7,396,551 bytes</title></circle>
-<circle class="gz" cx="201.5" cy="205.3" r="4"><title>2026-11-04 5c9be54 (main): gzip -9 7,396,551 bytes</title></circle>
-<circle class="gz" cx="203.6" cy="205.3" r="4"><title>2026-11-04 5009778 (main): gzip -9 7,396,551 bytes</title></circle>
-<circle class="gz" cx="205.6" cy="204.1" r="4"><title>2026-11-04 caabb49 (main): gzip -9 7,585,532 bytes</title></circle>
-<circle class="gz" cx="207.6" cy="203.8" r="4"><title>2026-11-04 d32a78b (main): gzip -9 7,624,743 bytes</title></circle>
-<circle class="gz" cx="209.6" cy="203.8" r="4"><title>2026-11-04 9a4001a (main): gzip -9 7,624,743 bytes</title></circle>
-<circle class="gz" cx="211.6" cy="203.8" r="4"><title>2026-11-04 72c5d27 (main): gzip -9 7,624,743 bytes</title></circle>
-<circle class="gz" cx="213.7" cy="203.7" r="4"><title>2026-11-04 d1275c7 (main): gzip -9 7,640,072 bytes</title></circle>
-<circle class="gz" cx="215.7" cy="203.7" r="4"><title>2026-11-04 ed68b00 (main): gzip -9 7,640,072 bytes</title></circle>
-<circle class="gz" cx="217.7" cy="203.6" r="4"><title>2026-11-05 8dd8116 (main): gzip -9 7,658,725 bytes</title></circle>
-<circle class="gz" cx="219.7" cy="202.9" r="4"><title>2026-11-05 cfe399a (main): gzip -9 7,777,558 bytes</title></circle>
-<circle class="gz" cx="221.8" cy="202.9" r="4"><title>2026-11-05 8c68850 (main): gzip -9 7,777,558 bytes</title></circle>
-<circle class="gz" cx="223.8" cy="202.8" r="4"><title>2026-11-05 b1b9d35 (main): gzip -9 7,779,627 bytes</title></circle>
-<circle class="gz" cx="225.8" cy="202.8" r="4"><title>2026-11-05 94b5ceb (main): gzip -9 7,780,962 bytes</title></circle>
-<circle class="gz" cx="227.8" cy="202.8" r="4"><title>2026-11-05 edf7e24 (main): gzip -9 7,780,962 bytes</title></circle>
-<circle class="gz" cx="229.8" cy="202.8" r="4"><title>2026-11-05 21bc909 (main): gzip -9 7,780,962 bytes</title></circle>
-<circle class="gz" cx="231.9" cy="202.8" r="4"><title>2026-11-05 9bb96c3 (main): gzip -9 7,782,347 bytes</title></circle>
-<circle class="gz" cx="233.9" cy="202.8" r="4"><title>2026-11-05 dfd760f (main): gzip -9 7,787,348 bytes</title></circle>
-<circle class="gz" cx="235.9" cy="202.8" r="4"><title>2026-11-06 fb2bc9b (main): gzip -9 7,786,941 bytes</title></circle>
-<circle class="gz" cx="237.9" cy="202.8" r="4"><title>2026-11-06 a4ee1e5 (main): gzip -9 7,786,941 bytes</title></circle>
-<circle class="gz" cx="239.9" cy="202.7" r="4"><title>2026-11-06 d27ad61 (main): gzip -9 7,808,767 bytes</title></circle>
-<circle class="gz" cx="242.0" cy="202.7" r="4"><title>2026-11-06 bedbec0 (main): gzip -9 7,808,767 bytes</title></circle>
-<circle class="gz" cx="244.0" cy="202.7" r="4"><title>2026-11-06 b0a0215 (main): gzip -9 7,808,767 bytes</title></circle>
-<circle class="gz" cx="246.0" cy="202.7" r="4"><title>2026-11-06 5b3fb21 (main): gzip -9 7,808,767 bytes</title></circle>
-<circle class="gz" cx="248.0" cy="202.6" r="4"><title>2026-11-06 a3b6eea (main): gzip -9 7,823,375 bytes</title></circle>
-<circle class="gz" cx="250.0" cy="202.1" r="4"><title>2026-11-06 2f58d8d (main): gzip -9 7,890,346 bytes</title></circle>
-<circle class="gz" cx="252.1" cy="202.1" r="4"><title>2026-11-06 b5a1cc4 (main): gzip -9 7,890,346 bytes</title></circle>
-<circle class="gz" cx="254.1" cy="202.1" r="4"><title>2026-11-07 9ca3ebb (main): gzip -9 7,890,346 bytes</title></circle>
-<circle class="gz" cx="256.1" cy="202.1" r="4"><title>2026-11-09 88560aa (main): gzip -9 7,890,346 bytes</title></circle>
-<circle class="gz" cx="258.1" cy="202.1" r="4"><title>2026-11-09 23bc6c9 (main): gzip -9 7,890,346 bytes</title></circle>
-<circle class="gz" cx="260.2" cy="202.1" r="4"><title>2026-11-09 6d06a75 (main): gzip -9 7,890,346 bytes</title></circle>
-<circle class="gz" cx="262.2" cy="202.2" r="4"><title>2026-11-09 c48e3e1 (main): gzip -9 7,874,679 bytes</title></circle>
-<circle class="gz" cx="264.2" cy="201.9" r="4"><title>2026-11-09 5903835 (main): gzip -9 7,932,885 bytes</title></circle>
-<circle class="gz" cx="266.2" cy="201.9" r="4"><title>2026-11-09 98e10c8 (main): gzip -9 7,932,885 bytes</title></circle>
-<circle class="gz" cx="268.2" cy="201.9" r="4"><title>2026-11-09 dabd827 (main): gzip -9 7,923,289 bytes</title></circle>
-<circle class="gz" cx="270.3" cy="201.8" r="4"><title>2026-11-09 225228c (main): gzip -9 7,951,314 bytes</title></circle>
-<circle class="gz" cx="272.3" cy="201.8" r="4"><title>2026-11-09 edc0281 (main): gzip -9 7,951,314 bytes</title></circle>
-<circle class="gz" cx="274.3" cy="201.8" r="4"><title>2026-11-09 7b4d70d (main): gzip -9 7,951,314 bytes</title></circle>
-<circle class="gz" cx="276.3" cy="201.9" r="4"><title>2026-11-09 fcc5223 (main): gzip -9 7,933,734 bytes</title></circle>
-<circle class="gz" cx="278.3" cy="201.9" r="4"><title>2026-11-09 0ca5709 (main): gzip -9 7,933,734 bytes</title></circle>
-<circle class="gz" cx="280.4" cy="201.9" r="4"><title>2026-11-10 168b27c (main): gzip -9 7,933,611 bytes</title></circle>
-<circle class="gz" cx="282.4" cy="201.8" r="4"><title>2026-11-10 1dae910 (main): gzip -9 7,939,068 bytes</title></circle>
-<circle class="gz" cx="284.4" cy="201.8" r="4"><title>2026-11-10 c37e4fc (main): gzip -9 7,939,050 bytes</title></circle>
-<circle class="gz" cx="286.4" cy="201.5" r="4"><title>2026-11-10 ab64cdb (main): gzip -9 7,993,651 bytes</title></circle>
-<circle class="gz" cx="288.5" cy="201.5" r="4"><title>2026-11-10 4e21245 (main): gzip -9 7,993,651 bytes</title></circle>
-<circle class="gz" cx="290.5" cy="201.5" r="4"><title>2026-11-10 8087e11 (main): gzip -9 7,993,651 bytes</title></circle>
-<circle class="gz" cx="292.5" cy="201.5" r="4"><title>2026-11-10 2acafb5 (main): gzip -9 7,993,651 bytes</title></circle>
-<circle class="gz" cx="294.5" cy="201.5" r="4"><title>2026-11-10 8a9990e (main): gzip -9 7,993,651 bytes</title></circle>
-<circle class="gz" cx="296.5" cy="201.5" r="4"><title>2026-11-10 3d935bd (main): gzip -9 7,993,144 bytes</title></circle>
-<circle class="gz" cx="298.6" cy="201.4" r="4"><title>2026-11-10 09c68aa (main): gzip -9 8,005,798 bytes</title></circle>
-<circle class="gz" cx="300.6" cy="201.4" r="4"><title>2026-11-11 aa3bdb2 (main): gzip -9 8,005,798 bytes</title></circle>
-<circle class="gz" cx="302.6" cy="201.4" r="4"><title>2026-11-11 c56eb0e (main): gzip -9 8,005,798 bytes</title></circle>
-<circle class="gz" cx="304.6" cy="200.8" r="4"><title>2026-11-11 8c1dceb (main): gzip -9 8,099,587 bytes</title></circle>
-<circle class="gz" cx="306.6" cy="200.8" r="4"><title>2026-11-11 dc89020 (main): gzip -9 8,099,587 bytes</title></circle>
-<circle class="gz" cx="308.7" cy="200.8" r="4"><title>2026-11-11 583dc76 (main): gzip -9 8,099,587 bytes</title></circle>
-<circle class="gz" cx="310.7" cy="200.8" r="4"><title>2026-11-11 fa2ab40 (main): gzip -9 8,099,142 bytes</title></circle>
-<circle class="gz" cx="312.7" cy="200.8" r="4"><title>2026-11-11 42935b2 (main): gzip -9 8,099,142 bytes</title></circle>
-<circle class="gz" cx="314.7" cy="200.8" r="4"><title>2026-11-11 79c9687 (main): gzip -9 8,099,142 bytes</title></circle>
-<circle class="gz" cx="316.8" cy="200.8" r="4"><title>2026-11-11 6ba61fb (main): gzip -9 8,099,142 bytes</title></circle>
-<circle class="gz" cx="318.8" cy="200.8" r="4"><title>2026-11-11 e44a7bf (main): gzip -9 8,099,142 bytes</title></circle>
-<circle class="gz" cx="320.8" cy="200.8" r="4"><title>2026-11-11 75971b3 (main): gzip -9 8,099,142 bytes</title></circle>
-<circle class="gz" cx="322.8" cy="200.8" r="4"><title>2026-11-11 e73884a (main): gzip -9 8,099,142 bytes</title></circle>
-<circle class="gz" cx="324.8" cy="200.8" r="4"><title>2026-11-11 3ff38b1 (main): gzip -9 8,099,142 bytes</title></circle>
-<circle class="gz" cx="326.9" cy="200.8" r="4"><title>2026-11-11 dd31db0 (main): gzip -9 8,099,142 bytes</title></circle>
-<circle class="gz" cx="328.9" cy="200.8" r="4"><title>2026-11-11 127a2d4 (main): gzip -9 8,098,324 bytes</title></circle>
-<circle class="gz" cx="330.9" cy="200.5" r="4"><title>2026-11-11 02c4b1e (main): gzip -9 8,147,901 bytes</title></circle>
-<circle class="gz" cx="332.9" cy="200.5" r="4"><title>2026-11-11 54f241c (main): gzip -9 8,147,901 bytes</title></circle>
-<circle class="gz" cx="334.9" cy="200.5" r="4"><title>2026-11-11 c523363 (main): gzip -9 8,147,901 bytes</title></circle>
-<circle class="gz" cx="337.0" cy="199.7" r="4"><title>2026-11-11 7adfd78 (main): gzip -9 8,277,536 bytes</title></circle>
-<circle class="gz" cx="339.0" cy="198.8" r="4"><title>2026-11-12 0995779 (main): gzip -9 8,426,019 bytes</title></circle>
-<circle class="gz" cx="341.0" cy="198.8" r="4"><title>2026-11-12 df059b9 (main): gzip -9 8,426,019 bytes</title></circle>
-<circle class="gz" cx="343.0" cy="198.8" r="4"><title>2026-11-12 38b12b6 (main): gzip -9 8,426,019 bytes</title></circle>
-<circle class="gz" cx="345.1" cy="198.7" r="4"><title>2026-11-12 cf02604 (main): gzip -9 8,428,245 bytes</title></circle>
-<circle class="gz" cx="347.1" cy="198.7" r="4"><title>2026-11-12 7ab2fee (main): gzip -9 8,428,517 bytes</title></circle>
-<circle class="gz" cx="349.1" cy="198.6" r="4"><title>2026-11-12 c0a7235 (main): gzip -9 8,449,440 bytes</title></circle>
-<circle class="gz" cx="351.1" cy="198.6" r="4"><title>2026-11-12 4180767 (main): gzip -9 8,449,440 bytes</title></circle>
-<circle class="gz" cx="353.1" cy="198.3" r="4"><title>2026-11-13 482ec37 (main): gzip -9 8,494,320 bytes</title></circle>
-<circle class="gz" cx="355.2" cy="198.4" r="4"><title>2026-11-13 f782d79 (main): gzip -9 8,486,326 bytes</title></circle>
-<circle class="gz" cx="357.2" cy="197.6" r="4"><title>2026-11-13 dfc6f87 (main): gzip -9 8,604,229 bytes</title></circle>
-<circle class="gz" cx="359.2" cy="197.6" r="4"><title>2026-11-13 8dc2acb (main): gzip -9 8,604,229 bytes</title></circle>
-<circle class="gz" cx="361.2" cy="197.6" r="4"><title>2026-11-13 c2bb524 (main): gzip -9 8,604,229 bytes</title></circle>
-<circle class="gz" cx="363.2" cy="197.6" r="4"><title>2026-11-13 e213da8 (main): gzip -9 8,616,586 bytes</title></circle>
-<circle class="gz" cx="365.3" cy="197.6" r="4"><title>2026-11-13 ac1f011 (main): gzip -9 8,617,013 bytes</title></circle>
-<circle class="gz" cx="367.3" cy="197.6" r="4"><title>2026-11-14 b36e11a (main): gzip -9 8,617,013 bytes</title></circle>
-<circle class="gz" cx="369.3" cy="197.6" r="4"><title>2026-11-14 bfcebee (main): gzip -9 8,617,238 bytes</title></circle>
-<circle class="gz" cx="371.3" cy="197.6" r="4"><title>2026-11-15 a1506a1 (main): gzip -9 8,617,238 bytes</title></circle>
-<circle class="gz" cx="373.4" cy="197.6" r="4"><title>2026-11-15 b0b8a2f (main): gzip -9 8,617,238 bytes</title></circle>
-<circle class="gz" cx="375.4" cy="197.6" r="4"><title>2026-11-15 db7aa11 (main): gzip -9 8,617,238 bytes</title></circle>
-<circle class="gz" cx="377.4" cy="197.6" r="4"><title>2026-11-15 f96657e (main): gzip -9 8,617,238 bytes</title></circle>
-<circle class="gz" cx="379.4" cy="197.0" r="4"><title>2026-11-16 1b1e0da (main): gzip -9 8,697,690 bytes</title></circle>
-<circle class="gz" cx="381.4" cy="197.0" r="4"><title>2026-11-16 79b481e (main): gzip -9 8,697,690 bytes</title></circle>
-<circle class="gz" cx="383.5" cy="197.0" r="4"><title>2026-11-16 80beb8b (main): gzip -9 8,697,690 bytes</title></circle>
-<circle class="gz" cx="385.5" cy="197.0" r="4"><title>2026-11-16 fb39e97 (main): gzip -9 8,697,690 bytes</title></circle>
-<circle class="gz" cx="387.5" cy="197.0" r="4"><title>2026-11-17 3c223e8 (main): gzip -9 8,709,117 bytes</title></circle>
-<circle class="gz" cx="389.5" cy="195.7" r="4"><title>2026-11-17 3587a70 (main): gzip -9 8,904,229 bytes</title></circle>
-<circle class="gz" cx="391.5" cy="195.3" r="4"><title>2026-11-17 0b6e894 (main): gzip -9 8,982,072 bytes</title></circle>
-<circle class="gz" cx="393.6" cy="195.3" r="4"><title>2026-11-17 0a07d48 (main): gzip -9 8,982,072 bytes</title></circle>
-<circle class="gz" cx="395.6" cy="195.3" r="4"><title>2026-11-18 cd5a26b (main): gzip -9 8,982,072 bytes</title></circle>
-<circle class="gz" cx="397.6" cy="195.3" r="4"><title>2026-11-18 f360ac2 (main): gzip -9 8,982,072 bytes</title></circle>
-<circle class="gz" cx="399.6" cy="195.2" r="4"><title>2026-11-18 cf07970 (main): gzip -9 8,988,975 bytes</title></circle>
-<circle class="gz" cx="401.7" cy="195.2" r="4"><title>2026-11-18 4e2aa97 (main): gzip -9 8,988,975 bytes</title></circle>
-<circle class="gz" cx="403.7" cy="195.2" r="4"><title>2026-11-18 a85e8de (main): gzip -9 8,989,907 bytes</title></circle>
-<circle class="gz" cx="405.7" cy="195.2" r="4"><title>2026-11-18 1a57c50 (main): gzip -9 8,989,907 bytes</title></circle>
-<circle class="gz" cx="407.7" cy="195.2" r="4"><title>2026-11-18 7026b8e (main): gzip -9 8,989,907 bytes</title></circle>
-<circle class="gz" cx="409.7" cy="195.2" r="4"><title>2026-11-18 91a7ab4 (main): gzip -9 8,989,907 bytes</title></circle>
-<circle class="gz" cx="411.8" cy="195.2" r="4"><title>2026-11-18 ae96988 (main): gzip -9 8,990,326 bytes</title></circle>
-<circle class="gz" cx="413.8" cy="195.1" r="4"><title>2026-11-18 cca91b7 (main): gzip -9 8,999,553 bytes</title></circle>
-<circle class="gz" cx="415.8" cy="195.1" r="4"><title>2026-11-18 03e2600 (main): gzip -9 9,000,411 bytes</title></circle>
-<circle class="gz" cx="417.8" cy="194.7" r="4"><title>2026-11-18 7ccab26 (main): gzip -9 9,073,300 bytes</title></circle>
-<circle class="gz" cx="419.8" cy="194.7" r="4"><title>2026-11-18 41f608d (main): gzip -9 9,073,300 bytes</title></circle>
-<circle class="gz" cx="421.9" cy="194.7" r="4"><title>2026-11-18 636c22a (main): gzip -9 9,073,300 bytes</title></circle>
-<circle class="gz" cx="423.9" cy="194.7" r="4"><title>2026-11-18 dabef9f (main): gzip -9 9,074,782 bytes</title></circle>
-<circle class="gz" cx="425.9" cy="194.6" r="4"><title>2026-11-19 4948006 (main): gzip -9 9,077,187 bytes</title></circle>
-<circle class="gz" cx="427.9" cy="194.6" r="4"><title>2026-11-19 54a48f1 (main): gzip -9 9,077,187 bytes</title></circle>
-<circle class="gz" cx="430.0" cy="194.6" r="4"><title>2026-11-19 217ab6e (main): gzip -9 9,077,187 bytes</title></circle>
-<circle class="gz" cx="432.0" cy="194.6" r="4"><title>2026-11-19 5258676 (main): gzip -9 9,077,187 bytes</title></circle>
-<circle class="gz" cx="434.0" cy="194.6" r="4"><title>2026-11-19 14b8e42 (main): gzip -9 9,078,127 bytes</title></circle>
-<circle class="gz" cx="436.0" cy="194.6" r="4"><title>2026-11-19 38e35e0 (main): gzip -9 9,078,127 bytes</title></circle>
-<circle class="gz" cx="438.0" cy="194.6" r="4"><title>2026-11-19 761ba7c (main): gzip -9 9,078,127 bytes</title></circle>
-<circle class="gz" cx="440.1" cy="194.6" r="4"><title>2026-11-19 cb88dc3 (main): gzip -9 9,078,127 bytes</title></circle>
-<circle class="gz" cx="442.1" cy="194.6" r="4"><title>2026-11-19 cd4a8fe (main): gzip -9 9,078,127 bytes</title></circle>
-<circle class="gz" cx="444.1" cy="194.6" r="4"><title>2026-11-19 289b98b (main): gzip -9 9,079,017 bytes</title></circle>
-<circle class="gz" cx="446.1" cy="194.6" r="4"><title>2026-11-19 7c289c5 (main): gzip -9 9,079,017 bytes</title></circle>
-<circle class="gz" cx="448.1" cy="194.6" r="4"><title>2026-11-19 56f870e (main): gzip -9 9,079,017 bytes</title></circle>
-<circle class="gz" cx="450.2" cy="194.6" r="4"><title>2026-11-19 88ce077 (main): gzip -9 9,079,017 bytes</title></circle>
-<circle class="gz" cx="452.2" cy="194.6" r="4"><title>2026-11-19 070d71d (main): gzip -9 9,078,867 bytes</title></circle>
-<circle class="gz" cx="454.2" cy="194.6" r="4"><title>2026-11-19 82adfcd (main): gzip -9 9,078,867 bytes</title></circle>
-<circle class="gz" cx="456.2" cy="194.6" r="4"><title>2026-11-19 e3c6997 (main): gzip -9 9,080,167 bytes</title></circle>
-<circle class="gz" cx="458.2" cy="194.3" r="4"><title>2026-11-19 d5f32a8 (main): gzip -9 9,140,286 bytes</title></circle>
-<circle class="gz" cx="460.3" cy="194.3" r="4"><title>2026-11-19 42b02c1 (main): gzip -9 9,140,286 bytes</title></circle>
-<circle class="gz" cx="462.3" cy="194.3" r="4"><title>2026-11-19 0f3ebd5 (main): gzip -9 9,140,286 bytes</title></circle>
-<circle class="gz" cx="464.3" cy="194.3" r="4"><title>2026-11-19 9593d90 (main): gzip -9 9,140,286 bytes</title></circle>
-<circle class="gz" cx="466.3" cy="194.3" r="4"><title>2026-11-19 9634014 (main): gzip -9 9,140,286 bytes</title></circle>
-<circle class="gz" cx="468.4" cy="194.2" r="4"><title>2026-11-20 e672ded (main): gzip -9 9,142,723 bytes</title></circle>
-<circle class="gz" cx="470.4" cy="194.2" r="4"><title>2026-11-20 585c87b (main): gzip -9 9,142,723 bytes</title></circle>
-<circle class="gz" cx="472.4" cy="194.1" r="4"><title>2026-11-20 7bea084 (main): gzip -9 9,167,736 bytes</title></circle>
-<circle class="gz" cx="474.4" cy="194.1" r="4"><title>2026-11-20 bfaeae2 (main): gzip -9 9,168,415 bytes</title></circle>
-<circle class="gz" cx="476.4" cy="194.1" r="4"><title>2026-11-20 3e288c1 (main): gzip -9 9,168,415 bytes</title></circle>
-<circle class="gz" cx="478.5" cy="194.1" r="4"><title>2026-11-20 35b77cd (main): gzip -9 9,168,415 bytes</title></circle>
-<circle class="gz" cx="480.5" cy="194.1" r="4"><title>2026-11-20 673c445 (main): gzip -9 9,167,688 bytes</title></circle>
-<circle class="gz" cx="482.5" cy="194.1" r="4"><title>2026-11-20 fb646b2 (main): gzip -9 9,167,688 bytes</title></circle>
-<circle class="gz" cx="484.5" cy="194.1" r="4"><title>2026-11-20 3365fdb (main): gzip -9 9,167,688 bytes</title></circle>
-<circle class="gz" cx="486.5" cy="193.4" r="4"><title>2026-11-20 8f2c61d (main): gzip -9 9,275,787 bytes</title></circle>
-<circle class="gz" cx="488.6" cy="193.4" r="4"><title>2026-11-20 6ce419a (main): gzip -9 9,275,787 bytes</title></circle>
-<circle class="gz" cx="490.6" cy="193.0" r="4"><title>2026-11-20 ee7ac51 (main): gzip -9 9,333,075 bytes</title></circle>
-<circle class="gz" cx="492.6" cy="193.0" r="4"><title>2026-11-20 cf50e9f (main): gzip -9 9,333,075 bytes</title></circle>
-<circle class="gz" cx="494.6" cy="193.0" r="4"><title>2026-11-20 4ab7f6e (main): gzip -9 9,333,075 bytes</title></circle>
-<circle class="gz" cx="496.7" cy="192.8" r="4"><title>2026-11-21 3c93eae (main): gzip -9 9,367,574 bytes</title></circle>
-<circle class="gz" cx="498.7" cy="192.8" r="4"><title>2026-11-21 6303dc1 (main): gzip -9 9,367,574 bytes</title></circle>
-<circle class="gz" cx="500.7" cy="192.8" r="4"><title>2026-11-21 b0dd9ef (main): gzip -9 9,367,574 bytes</title></circle>
-<circle class="gz" cx="502.7" cy="192.8" r="4"><title>2026-11-21 66e83e6 (main): gzip -9 9,367,316 bytes</title></circle>
-<circle class="gz" cx="504.7" cy="192.8" r="4"><title>2026-11-23 af70b30 (main): gzip -9 9,367,316 bytes</title></circle>
-<circle class="gz" cx="506.8" cy="192.4" r="4"><title>2026-11-23 15c6336 (main): gzip -9 9,426,785 bytes</title></circle>
-<circle class="gz" cx="508.8" cy="192.4" r="4"><title>2026-11-23 1cd4f59 (main): gzip -9 9,426,785 bytes</title></circle>
-<circle class="gz" cx="510.8" cy="192.4" r="4"><title>2026-11-23 930d099 (main): gzip -9 9,426,969 bytes</title></circle>
-<circle class="gz" cx="512.8" cy="192.4" r="4"><title>2026-11-23 b260112 (main): gzip -9 9,426,969 bytes</title></circle>
-<circle class="gz" cx="514.8" cy="192.4" r="4"><title>2026-11-23 858187f (main): gzip -9 9,426,969 bytes</title></circle>
-<circle class="gz" cx="516.9" cy="192.3" r="4"><title>2026-11-23 086b80d (main): gzip -9 9,456,169 bytes</title></circle>
-<circle class="gz" cx="518.9" cy="192.3" r="4"><title>2026-11-23 df896f4 (main): gzip -9 9,456,169 bytes</title></circle>
-<circle class="gz" cx="520.9" cy="192.3" r="4"><title>2026-11-23 ba669e0 (main): gzip -9 9,456,169 bytes</title></circle>
-<circle class="gz" cx="522.9" cy="191.8" r="4"><title>2026-11-23 6992e32 (main): gzip -9 9,525,316 bytes</title></circle>
-<circle class="gz" cx="525.0" cy="191.8" r="4"><title>2026-11-23 1f574e5 (main): gzip -9 9,525,316 bytes</title></circle>
-<circle class="gz" cx="527.0" cy="191.8" r="4"><title>2026-11-23 ff72c40 (main): gzip -9 9,525,316 bytes</title></circle>
-<circle class="gz" cx="529.0" cy="191.5" r="4"><title>2026-11-24 4fdf384 (main): gzip -9 9,571,539 bytes</title></circle>
-<circle class="gz" cx="531.0" cy="191.5" r="4"><title>2026-11-24 fc51778 (main): gzip -9 9,571,539 bytes</title></circle>
-<circle class="gz" cx="533.0" cy="191.5" r="4"><title>2026-11-24 52961b1 (main): gzip -9 9,571,539 bytes</title></circle>
-<circle class="gz" cx="535.1" cy="191.5" r="4"><title>2026-11-24 88e8056 (main): gzip -9 9,577,876 bytes</title></circle>
-<circle class="gz" cx="537.1" cy="191.5" r="4"><title>2026-11-24 4f4dc85 (main): gzip -9 9,577,876 bytes</title></circle>
-<circle class="gz" cx="539.1" cy="191.5" r="4"><title>2026-11-24 7d0e6a2 (main): gzip -9 9,577,876 bytes</title></circle>
-<circle class="gz" cx="541.1" cy="191.4" r="4"><title>2026-11-24 96f3a67 (main): gzip -9 9,588,058 bytes</title></circle>
-<circle class="gz" cx="543.1" cy="191.2" r="4"><title>2026-11-24 e08cae5 (main): gzip -9 9,617,451 bytes</title></circle>
-<circle class="gz" cx="545.2" cy="191.2" r="4"><title>2026-11-24 f93a000 (main): gzip -9 9,617,451 bytes</title></circle>
-<circle class="gz" cx="547.2" cy="191.2" r="4"><title>2026-11-24 8830632 (main): gzip -9 9,619,749 bytes</title></circle>
-<circle class="gz" cx="549.2" cy="190.5" r="4"><title>2026-11-24 a1cd6e9 (main): gzip -9 9,729,872 bytes</title></circle>
-<circle class="gz" cx="551.2" cy="190.5" r="4"><title>2026-11-24 522cb0e (main): gzip -9 9,729,872 bytes</title></circle>
-<circle class="gz" cx="553.3" cy="190.5" r="4"><title>2026-11-24 9d11ad6 (main): gzip -9 9,729,872 bytes</title></circle>
-<circle class="gz" cx="555.3" cy="190.5" r="4"><title>2026-11-24 adc686e (main): gzip -9 9,729,872 bytes</title></circle>
-<circle class="gz" cx="557.3" cy="190.5" r="4"><title>2026-11-25 0aa0da3 (main): gzip -9 9,732,888 bytes</title></circle>
-<circle class="gz" cx="559.3" cy="190.2" r="4"><title>2026-11-25 9a9b68c (main): gzip -9 9,775,063 bytes</title></circle>
-<circle class="gz" cx="561.3" cy="190.2" r="4"><title>2026-11-25 73e751b (main): gzip -9 9,788,089 bytes</title></circle>
-<circle class="gz" cx="563.4" cy="190.2" r="4"><title>2026-11-25 64b51ba (main): gzip -9 9,788,089 bytes</title></circle>
-<circle class="gz" cx="565.4" cy="190.1" r="4"><title>2026-11-25 598a0b2 (main): gzip -9 9,795,414 bytes</title></circle>
-<circle class="gz" cx="567.4" cy="190.1" r="4"><title>2026-11-25 5bb82ea (main): gzip -9 9,804,589 bytes</title></circle>
-<circle class="gz" cx="569.4" cy="189.9" r="4"><title>2026-11-25 38612c8 (main): gzip -9 9,829,807 bytes</title></circle>
-<circle class="gz" cx="571.4" cy="189.9" r="4"><title>2026-11-25 473836f (main): gzip -9 9,829,807 bytes</title></circle>
-<circle class="gz" cx="573.5" cy="189.9" r="4"><title>2026-11-25 24abbe2 (main): gzip -9 9,829,807 bytes</title></circle>
-<circle class="gz" cx="575.5" cy="189.9" r="4"><title>2026-11-25 2d41e94 (main): gzip -9 9,829,807 bytes</title></circle>
-<circle class="gz" cx="577.5" cy="189.5" r="4"><title>2026-11-25 5d3a140 (main): gzip -9 9,891,074 bytes</title></circle>
-<circle class="gz" cx="579.5" cy="188.8" r="4"><title>2026-11-25 02fedc5 (main): gzip -9 9,998,035 bytes</title></circle>
-<circle class="gz" cx="581.6" cy="188.8" r="4"><title>2026-11-25 f06fd29 (main): gzip -9 9,998,035 bytes</title></circle>
-<circle class="gz" cx="583.6" cy="188.8" r="4"><title>2026-11-25 0f52276 (main): gzip -9 9,998,035 bytes</title></circle>
-<circle class="gz" cx="585.6" cy="188.8" r="4"><title>2026-11-25 7a1ceeb (main): gzip -9 9,998,035 bytes</title></circle>
-<circle class="gz" cx="587.6" cy="188.8" r="4"><title>2026-11-25 f5799d0 (main): gzip -9 10,008,920 bytes</title></circle>
-<circle class="gz" cx="589.6" cy="188.8" r="4"><title>2026-11-25 2acdf8d (main): gzip -9 10,008,920 bytes</title></circle>
-<circle class="gz" cx="591.7" cy="188.7" r="4"><title>2026-11-26 3fe709e (main): gzip -9 10,015,524 bytes</title></circle>
-<circle class="gz" cx="593.7" cy="188.6" r="4"><title>2026-11-26 42615dc (main): gzip -9 10,029,639 bytes</title></circle>
-<circle class="gz" cx="595.7" cy="188.4" r="4"><title>2026-11-26 c7a85d6 (main): gzip -9 10,058,981 bytes</title></circle>
-<circle class="gz" cx="597.7" cy="188.2" r="4"><title>2026-11-26 3e607cd (main): gzip -9 10,091,133 bytes</title></circle>
-<circle class="gz" cx="599.7" cy="188.2" r="4"><title>2026-11-26 86913d1 (main): gzip -9 10,091,996 bytes</title></circle>
-<circle class="gz" cx="601.8" cy="188.2" r="4"><title>2026-11-26 70719da (main): gzip -9 10,091,996 bytes</title></circle>
-<circle class="gz" cx="603.8" cy="188.2" r="4"><title>2026-11-26 1192062 (main): gzip -9 10,098,791 bytes</title></circle>
-<circle class="gz" cx="605.8" cy="188.2" r="4"><title>2026-11-26 d1a73cd (main): gzip -9 10,103,189 bytes</title></circle>
-<circle class="gz" cx="607.8" cy="187.8" r="4"><title>2026-11-26 9e1320f (main): gzip -9 10,153,579 bytes</title></circle>
-<circle class="gz" cx="609.9" cy="187.8" r="4"><title>2026-11-26 6a95763 (main): gzip -9 10,153,579 bytes</title></circle>
-<circle class="gz" cx="611.9" cy="187.2" r="4"><title>2026-11-26 fd5c552 (main): gzip -9 10,256,817 bytes</title></circle>
-<circle class="gz" cx="613.9" cy="187.2" r="4"><title>2026-11-26 2a25268 (main): gzip -9 10,258,934 bytes</title></circle>
-<circle class="gz" cx="615.9" cy="187.2" r="4"><title>2026-11-26 223f165 (main): gzip -9 10,258,934 bytes</title></circle>
-<circle class="gz" cx="617.9" cy="187.2" r="4"><title>2026-11-27 bb261ce (main): gzip -9 10,258,934 bytes</title></circle>
-<circle class="gz" cx="620.0" cy="187.2" r="4"><title>2026-11-27 31c8e87 (main): gzip -9 10,258,934 bytes</title></circle>
-<circle class="gz" cx="622.0" cy="187.2" r="4"><title>2026-11-27 b07eb49 (main): gzip -9 10,259,012 bytes</title></circle>
-<circle class="gz" cx="624.0" cy="186.9" r="4"><title>2026-11-27 e0a47fa (main): gzip -9 10,302,251 bytes</title></circle>
+<circle class="gz" cx="80.2" cy="224.8" r="4"><title>2026-10-26 a1ccf09 (main): gzip -9 4,308,490 bytes</title></circle>
+<circle class="gz" cx="82.2" cy="224.7" r="4"><title>2026-10-26 ee0f2ab (main): gzip -9 4,328,804 bytes</title></circle>
+<circle class="gz" cx="84.2" cy="224.7" r="4"><title>2026-10-26 8f2e4f3 (main): gzip -9 4,328,804 bytes</title></circle>
+<circle class="gz" cx="86.2" cy="224.7" r="4"><title>2026-10-26 99eb1c7 (main): gzip -9 4,328,804 bytes</title></circle>
+<circle class="gz" cx="88.2" cy="224.6" r="4"><title>2026-10-26 cf0865c (main): gzip -9 4,343,306 bytes</title></circle>
+<circle class="gz" cx="90.2" cy="224.4" r="4"><title>2026-10-26 4219c87 (main): gzip -9 4,363,343 bytes</title></circle>
+<circle class="gz" cx="92.3" cy="224.4" r="4"><title>2026-10-26 8b3628b (main): gzip -9 4,366,095 bytes</title></circle>
+<circle class="gz" cx="94.3" cy="223.9" r="4"><title>2026-10-26 d5e3a0b (main): gzip -9 4,442,173 bytes</title></circle>
+<circle class="gz" cx="96.3" cy="223.9" r="4"><title>2026-10-27 53dd79d (main): gzip -9 4,442,173 bytes</title></circle>
+<circle class="gz" cx="98.3" cy="223.9" r="4"><title>2026-10-27 b30718b (main): gzip -9 4,443,005 bytes</title></circle>
+<circle class="gz" cx="100.3" cy="222.5" r="4"><title>2026-10-27 e3f48e4 (main): gzip -9 4,672,553 bytes</title></circle>
+<circle class="gz" cx="102.3" cy="222.5" r="4"><title>2026-10-27 41ee911 (main): gzip -9 4,674,174 bytes</title></circle>
+<circle class="gz" cx="104.3" cy="222.1" r="4"><title>2026-10-27 704eaab (main): gzip -9 4,735,673 bytes</title></circle>
+<circle class="gz" cx="106.4" cy="222.0" r="4"><title>2026-10-27 ed98d6e (main): gzip -9 4,745,475 bytes</title></circle>
+<circle class="gz" cx="108.4" cy="222.0" r="4"><title>2026-10-27 fd6baf5 (main): gzip -9 4,745,475 bytes</title></circle>
+<circle class="gz" cx="110.4" cy="221.8" r="4"><title>2026-10-28 7068fc8 (main): gzip -9 4,783,587 bytes</title></circle>
+<circle class="gz" cx="112.4" cy="221.8" r="4"><title>2026-10-28 da69bef (main): gzip -9 4,783,587 bytes</title></circle>
+<circle class="gz" cx="114.4" cy="221.7" r="4"><title>2026-10-28 8494275 (main): gzip -9 4,794,704 bytes</title></circle>
+<circle class="gz" cx="116.4" cy="221.7" r="4"><title>2026-10-29 5801a69 (main): gzip -9 4,797,193 bytes</title></circle>
+<circle class="gz" cx="118.4" cy="221.7" r="4"><title>2026-10-29 439ccf3 (main): gzip -9 4,797,027 bytes</title></circle>
+<circle class="gz" cx="120.5" cy="221.7" r="4"><title>2026-10-29 a8fa241 (main): gzip -9 4,799,148 bytes</title></circle>
+<circle class="gz" cx="122.5" cy="221.7" r="4"><title>2026-10-29 3d883bb (main): gzip -9 4,799,148 bytes</title></circle>
+<circle class="gz" cx="124.5" cy="221.7" r="4"><title>2026-10-29 faeb6f0 (main): gzip -9 4,799,148 bytes</title></circle>
+<circle class="gz" cx="126.5" cy="221.7" r="4"><title>2026-10-29 d6df9c7 (main): gzip -9 4,799,148 bytes</title></circle>
+<circle class="gz" cx="128.5" cy="221.7" r="4"><title>2026-10-29 db776a0 (main): gzip -9 4,799,148 bytes</title></circle>
+<circle class="gz" cx="130.5" cy="221.5" r="4"><title>2026-10-30 6e3f913 (main): gzip -9 4,827,992 bytes</title></circle>
+<circle class="gz" cx="132.5" cy="221.3" r="4"><title>2026-10-30 4cb8df3 (main): gzip -9 4,856,290 bytes</title></circle>
+<circle class="gz" cx="134.6" cy="221.2" r="4"><title>2026-10-30 8043943 (main): gzip -9 4,868,842 bytes</title></circle>
+<circle class="gz" cx="136.6" cy="221.0" r="4"><title>2026-10-30 3b58ab4 (main): gzip -9 4,904,685 bytes</title></circle>
+<circle class="gz" cx="138.6" cy="221.0" r="4"><title>2026-10-30 abf845f (main): gzip -9 4,906,498 bytes</title></circle>
+<circle class="gz" cx="140.6" cy="221.0" r="4"><title>2026-10-31 54c74cc (main): gzip -9 4,906,498 bytes</title></circle>
+<circle class="gz" cx="142.6" cy="220.6" r="4"><title>2026-10-31 59595a9 (main): gzip -9 4,962,984 bytes</title></circle>
+<circle class="gz" cx="144.6" cy="220.6" r="4"><title>2026-10-31 d8b79e6 (main): gzip -9 4,962,984 bytes</title></circle>
+<circle class="gz" cx="146.6" cy="220.5" r="4"><title>2026-10-31 5ddddab (main): gzip -9 4,982,197 bytes</title></circle>
+<circle class="gz" cx="148.7" cy="220.5" r="4"><title>2026-10-31 31abead (main): gzip -9 4,982,197 bytes</title></circle>
+<circle class="gz" cx="150.7" cy="220.0" r="4"><title>2026-10-31 cfb204d (main): gzip -9 5,057,735 bytes</title></circle>
+<circle class="gz" cx="152.7" cy="215.4" r="4"><title>2026-10-31 974867d (main): gzip -9 5,789,917 bytes</title></circle>
+<circle class="gz" cx="154.7" cy="215.4" r="4"><title>2026-11-01 6497bb8 (main): gzip -9 5,789,917 bytes</title></circle>
+<circle class="gz" cx="156.7" cy="215.4" r="4"><title>2026-11-01 b7b45fa (main): gzip -9 5,789,917 bytes</title></circle>
+<circle class="gz" cx="158.7" cy="215.4" r="4"><title>2026-11-01 75d5493 (main): gzip -9 5,799,770 bytes</title></circle>
+<circle class="gz" cx="160.7" cy="215.4" r="4"><title>2026-11-01 0e42d62 (main): gzip -9 5,799,870 bytes</title></circle>
+<circle class="gz" cx="162.8" cy="215.2" r="4"><title>2026-11-01 c52d775 (main): gzip -9 5,822,601 bytes</title></circle>
+<circle class="gz" cx="164.8" cy="215.1" r="4"><title>2026-11-01 2f12de8 (main): gzip -9 5,845,024 bytes</title></circle>
+<circle class="gz" cx="166.8" cy="215.0" r="4"><title>2026-11-01 b218736 (main): gzip -9 5,853,359 bytes</title></circle>
+<circle class="gz" cx="168.8" cy="214.6" r="4"><title>2026-11-01 d4ae045 (main): gzip -9 5,917,273 bytes</title></circle>
+<circle class="gz" cx="170.8" cy="214.3" r="4"><title>2026-11-02 8a84e70 (main): gzip -9 5,966,834 bytes</title></circle>
+<circle class="gz" cx="172.8" cy="214.3" r="4"><title>2026-11-02 595d18b (main): gzip -9 5,966,834 bytes</title></circle>
+<circle class="gz" cx="174.8" cy="208.1" r="4"><title>2026-11-02 e77fb42 (main): gzip -9 6,945,656 bytes</title></circle>
+<circle class="gz" cx="176.9" cy="208.1" r="4"><title>2026-11-02 105b981 (main): gzip -9 6,945,656 bytes</title></circle>
+<circle class="gz" cx="178.9" cy="207.6" r="4"><title>2026-11-02 94f55ce (main): gzip -9 7,033,132 bytes</title></circle>
+<circle class="gz" cx="180.9" cy="207.1" r="4"><title>2026-11-03 4ea207b (main): gzip -9 7,103,450 bytes</title></circle>
+<circle class="gz" cx="182.9" cy="207.1" r="4"><title>2026-11-03 49716eb (main): gzip -9 7,112,645 bytes</title></circle>
+<circle class="gz" cx="184.9" cy="207.0" r="4"><title>2026-11-03 f60a197 (main): gzip -9 7,117,190 bytes</title></circle>
+<circle class="gz" cx="186.9" cy="205.7" r="4"><title>2026-11-03 850eca9 (main): gzip -9 7,321,673 bytes</title></circle>
+<circle class="gz" cx="188.9" cy="205.4" r="4"><title>2026-11-03 70ca3c4 (main): gzip -9 7,380,911 bytes</title></circle>
+<circle class="gz" cx="191.0" cy="205.4" r="4"><title>2026-11-03 903ba36 (main): gzip -9 7,380,911 bytes</title></circle>
+<circle class="gz" cx="193.0" cy="205.4" r="4"><title>2026-11-03 bfff3f7 (main): gzip -9 7,380,911 bytes</title></circle>
+<circle class="gz" cx="195.0" cy="205.3" r="4"><title>2026-11-03 ab5ee2d (main): gzip -9 7,396,551 bytes</title></circle>
+<circle class="gz" cx="197.0" cy="205.3" r="4"><title>2026-11-04 e3c7f19 (main): gzip -9 7,396,551 bytes</title></circle>
+<circle class="gz" cx="199.0" cy="205.3" r="4"><title>2026-11-04 9decd61 (main): gzip -9 7,396,551 bytes</title></circle>
+<circle class="gz" cx="201.0" cy="205.3" r="4"><title>2026-11-04 5c9be54 (main): gzip -9 7,396,551 bytes</title></circle>
+<circle class="gz" cx="203.0" cy="205.3" r="4"><title>2026-11-04 5009778 (main): gzip -9 7,396,551 bytes</title></circle>
+<circle class="gz" cx="205.0" cy="204.1" r="4"><title>2026-11-04 caabb49 (main): gzip -9 7,585,532 bytes</title></circle>
+<circle class="gz" cx="207.1" cy="203.8" r="4"><title>2026-11-04 d32a78b (main): gzip -9 7,624,743 bytes</title></circle>
+<circle class="gz" cx="209.1" cy="203.8" r="4"><title>2026-11-04 9a4001a (main): gzip -9 7,624,743 bytes</title></circle>
+<circle class="gz" cx="211.1" cy="203.8" r="4"><title>2026-11-04 72c5d27 (main): gzip -9 7,624,743 bytes</title></circle>
+<circle class="gz" cx="213.1" cy="203.7" r="4"><title>2026-11-04 d1275c7 (main): gzip -9 7,640,072 bytes</title></circle>
+<circle class="gz" cx="215.1" cy="203.7" r="4"><title>2026-11-04 ed68b00 (main): gzip -9 7,640,072 bytes</title></circle>
+<circle class="gz" cx="217.1" cy="203.6" r="4"><title>2026-11-05 8dd8116 (main): gzip -9 7,658,725 bytes</title></circle>
+<circle class="gz" cx="219.1" cy="202.9" r="4"><title>2026-11-05 cfe399a (main): gzip -9 7,777,558 bytes</title></circle>
+<circle class="gz" cx="221.2" cy="202.9" r="4"><title>2026-11-05 8c68850 (main): gzip -9 7,777,558 bytes</title></circle>
+<circle class="gz" cx="223.2" cy="202.8" r="4"><title>2026-11-05 b1b9d35 (main): gzip -9 7,779,627 bytes</title></circle>
+<circle class="gz" cx="225.2" cy="202.8" r="4"><title>2026-11-05 94b5ceb (main): gzip -9 7,780,962 bytes</title></circle>
+<circle class="gz" cx="227.2" cy="202.8" r="4"><title>2026-11-05 edf7e24 (main): gzip -9 7,780,962 bytes</title></circle>
+<circle class="gz" cx="229.2" cy="202.8" r="4"><title>2026-11-05 21bc909 (main): gzip -9 7,780,962 bytes</title></circle>
+<circle class="gz" cx="231.2" cy="202.8" r="4"><title>2026-11-05 9bb96c3 (main): gzip -9 7,782,347 bytes</title></circle>
+<circle class="gz" cx="233.2" cy="202.8" r="4"><title>2026-11-05 dfd760f (main): gzip -9 7,787,348 bytes</title></circle>
+<circle class="gz" cx="235.3" cy="202.8" r="4"><title>2026-11-06 fb2bc9b (main): gzip -9 7,786,941 bytes</title></circle>
+<circle class="gz" cx="237.3" cy="202.8" r="4"><title>2026-11-06 a4ee1e5 (main): gzip -9 7,786,941 bytes</title></circle>
+<circle class="gz" cx="239.3" cy="202.7" r="4"><title>2026-11-06 d27ad61 (main): gzip -9 7,808,767 bytes</title></circle>
+<circle class="gz" cx="241.3" cy="202.7" r="4"><title>2026-11-06 bedbec0 (main): gzip -9 7,808,767 bytes</title></circle>
+<circle class="gz" cx="243.3" cy="202.7" r="4"><title>2026-11-06 b0a0215 (main): gzip -9 7,808,767 bytes</title></circle>
+<circle class="gz" cx="245.3" cy="202.7" r="4"><title>2026-11-06 5b3fb21 (main): gzip -9 7,808,767 bytes</title></circle>
+<circle class="gz" cx="247.3" cy="202.6" r="4"><title>2026-11-06 a3b6eea (main): gzip -9 7,823,375 bytes</title></circle>
+<circle class="gz" cx="249.4" cy="202.1" r="4"><title>2026-11-06 2f58d8d (main): gzip -9 7,890,346 bytes</title></circle>
+<circle class="gz" cx="251.4" cy="202.1" r="4"><title>2026-11-06 b5a1cc4 (main): gzip -9 7,890,346 bytes</title></circle>
+<circle class="gz" cx="253.4" cy="202.1" r="4"><title>2026-11-07 9ca3ebb (main): gzip -9 7,890,346 bytes</title></circle>
+<circle class="gz" cx="255.4" cy="202.1" r="4"><title>2026-11-09 88560aa (main): gzip -9 7,890,346 bytes</title></circle>
+<circle class="gz" cx="257.4" cy="202.1" r="4"><title>2026-11-09 23bc6c9 (main): gzip -9 7,890,346 bytes</title></circle>
+<circle class="gz" cx="259.4" cy="202.1" r="4"><title>2026-11-09 6d06a75 (main): gzip -9 7,890,346 bytes</title></circle>
+<circle class="gz" cx="261.4" cy="202.2" r="4"><title>2026-11-09 c48e3e1 (main): gzip -9 7,874,679 bytes</title></circle>
+<circle class="gz" cx="263.5" cy="201.9" r="4"><title>2026-11-09 5903835 (main): gzip -9 7,932,885 bytes</title></circle>
+<circle class="gz" cx="265.5" cy="201.9" r="4"><title>2026-11-09 98e10c8 (main): gzip -9 7,932,885 bytes</title></circle>
+<circle class="gz" cx="267.5" cy="201.9" r="4"><title>2026-11-09 dabd827 (main): gzip -9 7,923,289 bytes</title></circle>
+<circle class="gz" cx="269.5" cy="201.8" r="4"><title>2026-11-09 225228c (main): gzip -9 7,951,314 bytes</title></circle>
+<circle class="gz" cx="271.5" cy="201.8" r="4"><title>2026-11-09 edc0281 (main): gzip -9 7,951,314 bytes</title></circle>
+<circle class="gz" cx="273.5" cy="201.8" r="4"><title>2026-11-09 7b4d70d (main): gzip -9 7,951,314 bytes</title></circle>
+<circle class="gz" cx="275.5" cy="201.9" r="4"><title>2026-11-09 fcc5223 (main): gzip -9 7,933,734 bytes</title></circle>
+<circle class="gz" cx="277.6" cy="201.9" r="4"><title>2026-11-09 0ca5709 (main): gzip -9 7,933,734 bytes</title></circle>
+<circle class="gz" cx="279.6" cy="201.9" r="4"><title>2026-11-10 168b27c (main): gzip -9 7,933,611 bytes</title></circle>
+<circle class="gz" cx="281.6" cy="201.8" r="4"><title>2026-11-10 1dae910 (main): gzip -9 7,939,068 bytes</title></circle>
+<circle class="gz" cx="283.6" cy="201.8" r="4"><title>2026-11-10 c37e4fc (main): gzip -9 7,939,050 bytes</title></circle>
+<circle class="gz" cx="285.6" cy="201.5" r="4"><title>2026-11-10 ab64cdb (main): gzip -9 7,993,651 bytes</title></circle>
+<circle class="gz" cx="287.6" cy="201.5" r="4"><title>2026-11-10 4e21245 (main): gzip -9 7,993,651 bytes</title></circle>
+<circle class="gz" cx="289.6" cy="201.5" r="4"><title>2026-11-10 8087e11 (main): gzip -9 7,993,651 bytes</title></circle>
+<circle class="gz" cx="291.7" cy="201.5" r="4"><title>2026-11-10 2acafb5 (main): gzip -9 7,993,651 bytes</title></circle>
+<circle class="gz" cx="293.7" cy="201.5" r="4"><title>2026-11-10 8a9990e (main): gzip -9 7,993,651 bytes</title></circle>
+<circle class="gz" cx="295.7" cy="201.5" r="4"><title>2026-11-10 3d935bd (main): gzip -9 7,993,144 bytes</title></circle>
+<circle class="gz" cx="297.7" cy="201.4" r="4"><title>2026-11-10 09c68aa (main): gzip -9 8,005,798 bytes</title></circle>
+<circle class="gz" cx="299.7" cy="201.4" r="4"><title>2026-11-11 aa3bdb2 (main): gzip -9 8,005,798 bytes</title></circle>
+<circle class="gz" cx="301.7" cy="201.4" r="4"><title>2026-11-11 c56eb0e (main): gzip -9 8,005,798 bytes</title></circle>
+<circle class="gz" cx="303.7" cy="200.8" r="4"><title>2026-11-11 8c1dceb (main): gzip -9 8,099,587 bytes</title></circle>
+<circle class="gz" cx="305.8" cy="200.8" r="4"><title>2026-11-11 dc89020 (main): gzip -9 8,099,587 bytes</title></circle>
+<circle class="gz" cx="307.8" cy="200.8" r="4"><title>2026-11-11 583dc76 (main): gzip -9 8,099,587 bytes</title></circle>
+<circle class="gz" cx="309.8" cy="200.8" r="4"><title>2026-11-11 fa2ab40 (main): gzip -9 8,099,142 bytes</title></circle>
+<circle class="gz" cx="311.8" cy="200.8" r="4"><title>2026-11-11 42935b2 (main): gzip -9 8,099,142 bytes</title></circle>
+<circle class="gz" cx="313.8" cy="200.8" r="4"><title>2026-11-11 79c9687 (main): gzip -9 8,099,142 bytes</title></circle>
+<circle class="gz" cx="315.8" cy="200.8" r="4"><title>2026-11-11 6ba61fb (main): gzip -9 8,099,142 bytes</title></circle>
+<circle class="gz" cx="317.8" cy="200.8" r="4"><title>2026-11-11 e44a7bf (main): gzip -9 8,099,142 bytes</title></circle>
+<circle class="gz" cx="319.9" cy="200.8" r="4"><title>2026-11-11 75971b3 (main): gzip -9 8,099,142 bytes</title></circle>
+<circle class="gz" cx="321.9" cy="200.8" r="4"><title>2026-11-11 e73884a (main): gzip -9 8,099,142 bytes</title></circle>
+<circle class="gz" cx="323.9" cy="200.8" r="4"><title>2026-11-11 3ff38b1 (main): gzip -9 8,099,142 bytes</title></circle>
+<circle class="gz" cx="325.9" cy="200.8" r="4"><title>2026-11-11 dd31db0 (main): gzip -9 8,099,142 bytes</title></circle>
+<circle class="gz" cx="327.9" cy="200.8" r="4"><title>2026-11-11 127a2d4 (main): gzip -9 8,098,324 bytes</title></circle>
+<circle class="gz" cx="329.9" cy="200.5" r="4"><title>2026-11-11 02c4b1e (main): gzip -9 8,147,901 bytes</title></circle>
+<circle class="gz" cx="331.9" cy="200.5" r="4"><title>2026-11-11 54f241c (main): gzip -9 8,147,901 bytes</title></circle>
+<circle class="gz" cx="334.0" cy="200.5" r="4"><title>2026-11-11 c523363 (main): gzip -9 8,147,901 bytes</title></circle>
+<circle class="gz" cx="336.0" cy="199.7" r="4"><title>2026-11-11 7adfd78 (main): gzip -9 8,277,536 bytes</title></circle>
+<circle class="gz" cx="338.0" cy="198.8" r="4"><title>2026-11-12 0995779 (main): gzip -9 8,426,019 bytes</title></circle>
+<circle class="gz" cx="340.0" cy="198.8" r="4"><title>2026-11-12 df059b9 (main): gzip -9 8,426,019 bytes</title></circle>
+<circle class="gz" cx="342.0" cy="198.8" r="4"><title>2026-11-12 38b12b6 (main): gzip -9 8,426,019 bytes</title></circle>
+<circle class="gz" cx="344.0" cy="198.7" r="4"><title>2026-11-12 cf02604 (main): gzip -9 8,428,245 bytes</title></circle>
+<circle class="gz" cx="346.0" cy="198.7" r="4"><title>2026-11-12 7ab2fee (main): gzip -9 8,428,517 bytes</title></circle>
+<circle class="gz" cx="348.1" cy="198.6" r="4"><title>2026-11-12 c0a7235 (main): gzip -9 8,449,440 bytes</title></circle>
+<circle class="gz" cx="350.1" cy="198.6" r="4"><title>2026-11-12 4180767 (main): gzip -9 8,449,440 bytes</title></circle>
+<circle class="gz" cx="352.1" cy="198.3" r="4"><title>2026-11-13 482ec37 (main): gzip -9 8,494,320 bytes</title></circle>
+<circle class="gz" cx="354.1" cy="198.4" r="4"><title>2026-11-13 f782d79 (main): gzip -9 8,486,326 bytes</title></circle>
+<circle class="gz" cx="356.1" cy="197.6" r="4"><title>2026-11-13 dfc6f87 (main): gzip -9 8,604,229 bytes</title></circle>
+<circle class="gz" cx="358.1" cy="197.6" r="4"><title>2026-11-13 8dc2acb (main): gzip -9 8,604,229 bytes</title></circle>
+<circle class="gz" cx="360.1" cy="197.6" r="4"><title>2026-11-13 c2bb524 (main): gzip -9 8,604,229 bytes</title></circle>
+<circle class="gz" cx="362.2" cy="197.6" r="4"><title>2026-11-13 e213da8 (main): gzip -9 8,616,586 bytes</title></circle>
+<circle class="gz" cx="364.2" cy="197.6" r="4"><title>2026-11-13 ac1f011 (main): gzip -9 8,617,013 bytes</title></circle>
+<circle class="gz" cx="366.2" cy="197.6" r="4"><title>2026-11-14 b36e11a (main): gzip -9 8,617,013 bytes</title></circle>
+<circle class="gz" cx="368.2" cy="197.6" r="4"><title>2026-11-14 bfcebee (main): gzip -9 8,617,238 bytes</title></circle>
+<circle class="gz" cx="370.2" cy="197.6" r="4"><title>2026-11-15 a1506a1 (main): gzip -9 8,617,238 bytes</title></circle>
+<circle class="gz" cx="372.2" cy="197.6" r="4"><title>2026-11-15 b0b8a2f (main): gzip -9 8,617,238 bytes</title></circle>
+<circle class="gz" cx="374.2" cy="197.6" r="4"><title>2026-11-15 db7aa11 (main): gzip -9 8,617,238 bytes</title></circle>
+<circle class="gz" cx="376.3" cy="197.6" r="4"><title>2026-11-15 f96657e (main): gzip -9 8,617,238 bytes</title></circle>
+<circle class="gz" cx="378.3" cy="197.0" r="4"><title>2026-11-16 1b1e0da (main): gzip -9 8,697,690 bytes</title></circle>
+<circle class="gz" cx="380.3" cy="197.0" r="4"><title>2026-11-16 79b481e (main): gzip -9 8,697,690 bytes</title></circle>
+<circle class="gz" cx="382.3" cy="197.0" r="4"><title>2026-11-16 80beb8b (main): gzip -9 8,697,690 bytes</title></circle>
+<circle class="gz" cx="384.3" cy="197.0" r="4"><title>2026-11-16 fb39e97 (main): gzip -9 8,697,690 bytes</title></circle>
+<circle class="gz" cx="386.3" cy="197.0" r="4"><title>2026-11-17 3c223e8 (main): gzip -9 8,709,117 bytes</title></circle>
+<circle class="gz" cx="388.3" cy="195.7" r="4"><title>2026-11-17 3587a70 (main): gzip -9 8,904,229 bytes</title></circle>
+<circle class="gz" cx="390.4" cy="195.3" r="4"><title>2026-11-17 0b6e894 (main): gzip -9 8,982,072 bytes</title></circle>
+<circle class="gz" cx="392.4" cy="195.3" r="4"><title>2026-11-17 0a07d48 (main): gzip -9 8,982,072 bytes</title></circle>
+<circle class="gz" cx="394.4" cy="195.3" r="4"><title>2026-11-18 cd5a26b (main): gzip -9 8,982,072 bytes</title></circle>
+<circle class="gz" cx="396.4" cy="195.3" r="4"><title>2026-11-18 f360ac2 (main): gzip -9 8,982,072 bytes</title></circle>
+<circle class="gz" cx="398.4" cy="195.2" r="4"><title>2026-11-18 cf07970 (main): gzip -9 8,988,975 bytes</title></circle>
+<circle class="gz" cx="400.4" cy="195.2" r="4"><title>2026-11-18 4e2aa97 (main): gzip -9 8,988,975 bytes</title></circle>
+<circle class="gz" cx="402.4" cy="195.2" r="4"><title>2026-11-18 a85e8de (main): gzip -9 8,989,907 bytes</title></circle>
+<circle class="gz" cx="404.5" cy="195.2" r="4"><title>2026-11-18 1a57c50 (main): gzip -9 8,989,907 bytes</title></circle>
+<circle class="gz" cx="406.5" cy="195.2" r="4"><title>2026-11-18 7026b8e (main): gzip -9 8,989,907 bytes</title></circle>
+<circle class="gz" cx="408.5" cy="195.2" r="4"><title>2026-11-18 91a7ab4 (main): gzip -9 8,989,907 bytes</title></circle>
+<circle class="gz" cx="410.5" cy="195.2" r="4"><title>2026-11-18 ae96988 (main): gzip -9 8,990,326 bytes</title></circle>
+<circle class="gz" cx="412.5" cy="195.1" r="4"><title>2026-11-18 cca91b7 (main): gzip -9 8,999,553 bytes</title></circle>
+<circle class="gz" cx="414.5" cy="195.1" r="4"><title>2026-11-18 03e2600 (main): gzip -9 9,000,411 bytes</title></circle>
+<circle class="gz" cx="416.5" cy="194.7" r="4"><title>2026-11-18 7ccab26 (main): gzip -9 9,073,300 bytes</title></circle>
+<circle class="gz" cx="418.6" cy="194.7" r="4"><title>2026-11-18 41f608d (main): gzip -9 9,073,300 bytes</title></circle>
+<circle class="gz" cx="420.6" cy="194.7" r="4"><title>2026-11-18 636c22a (main): gzip -9 9,073,300 bytes</title></circle>
+<circle class="gz" cx="422.6" cy="194.7" r="4"><title>2026-11-18 dabef9f (main): gzip -9 9,074,782 bytes</title></circle>
+<circle class="gz" cx="424.6" cy="194.6" r="4"><title>2026-11-19 4948006 (main): gzip -9 9,077,187 bytes</title></circle>
+<circle class="gz" cx="426.6" cy="194.6" r="4"><title>2026-11-19 54a48f1 (main): gzip -9 9,077,187 bytes</title></circle>
+<circle class="gz" cx="428.6" cy="194.6" r="4"><title>2026-11-19 217ab6e (main): gzip -9 9,077,187 bytes</title></circle>
+<circle class="gz" cx="430.6" cy="194.6" r="4"><title>2026-11-19 5258676 (main): gzip -9 9,077,187 bytes</title></circle>
+<circle class="gz" cx="432.7" cy="194.6" r="4"><title>2026-11-19 14b8e42 (main): gzip -9 9,078,127 bytes</title></circle>
+<circle class="gz" cx="434.7" cy="194.6" r="4"><title>2026-11-19 38e35e0 (main): gzip -9 9,078,127 bytes</title></circle>
+<circle class="gz" cx="436.7" cy="194.6" r="4"><title>2026-11-19 761ba7c (main): gzip -9 9,078,127 bytes</title></circle>
+<circle class="gz" cx="438.7" cy="194.6" r="4"><title>2026-11-19 cb88dc3 (main): gzip -9 9,078,127 bytes</title></circle>
+<circle class="gz" cx="440.7" cy="194.6" r="4"><title>2026-11-19 cd4a8fe (main): gzip -9 9,078,127 bytes</title></circle>
+<circle class="gz" cx="442.7" cy="194.6" r="4"><title>2026-11-19 289b98b (main): gzip -9 9,079,017 bytes</title></circle>
+<circle class="gz" cx="444.7" cy="194.6" r="4"><title>2026-11-19 7c289c5 (main): gzip -9 9,079,017 bytes</title></circle>
+<circle class="gz" cx="446.8" cy="194.6" r="4"><title>2026-11-19 56f870e (main): gzip -9 9,079,017 bytes</title></circle>
+<circle class="gz" cx="448.8" cy="194.6" r="4"><title>2026-11-19 88ce077 (main): gzip -9 9,079,017 bytes</title></circle>
+<circle class="gz" cx="450.8" cy="194.6" r="4"><title>2026-11-19 070d71d (main): gzip -9 9,078,867 bytes</title></circle>
+<circle class="gz" cx="452.8" cy="194.6" r="4"><title>2026-11-19 82adfcd (main): gzip -9 9,078,867 bytes</title></circle>
+<circle class="gz" cx="454.8" cy="194.6" r="4"><title>2026-11-19 e3c6997 (main): gzip -9 9,080,167 bytes</title></circle>
+<circle class="gz" cx="456.8" cy="194.3" r="4"><title>2026-11-19 d5f32a8 (main): gzip -9 9,140,286 bytes</title></circle>
+<circle class="gz" cx="458.8" cy="194.3" r="4"><title>2026-11-19 42b02c1 (main): gzip -9 9,140,286 bytes</title></circle>
+<circle class="gz" cx="460.9" cy="194.3" r="4"><title>2026-11-19 0f3ebd5 (main): gzip -9 9,140,286 bytes</title></circle>
+<circle class="gz" cx="462.9" cy="194.3" r="4"><title>2026-11-19 9593d90 (main): gzip -9 9,140,286 bytes</title></circle>
+<circle class="gz" cx="464.9" cy="194.3" r="4"><title>2026-11-19 9634014 (main): gzip -9 9,140,286 bytes</title></circle>
+<circle class="gz" cx="466.9" cy="194.2" r="4"><title>2026-11-20 e672ded (main): gzip -9 9,142,723 bytes</title></circle>
+<circle class="gz" cx="468.9" cy="194.2" r="4"><title>2026-11-20 585c87b (main): gzip -9 9,142,723 bytes</title></circle>
+<circle class="gz" cx="470.9" cy="194.1" r="4"><title>2026-11-20 7bea084 (main): gzip -9 9,167,736 bytes</title></circle>
+<circle class="gz" cx="472.9" cy="194.1" r="4"><title>2026-11-20 bfaeae2 (main): gzip -9 9,168,415 bytes</title></circle>
+<circle class="gz" cx="475.0" cy="194.1" r="4"><title>2026-11-20 3e288c1 (main): gzip -9 9,168,415 bytes</title></circle>
+<circle class="gz" cx="477.0" cy="194.1" r="4"><title>2026-11-20 35b77cd (main): gzip -9 9,168,415 bytes</title></circle>
+<circle class="gz" cx="479.0" cy="194.1" r="4"><title>2026-11-20 673c445 (main): gzip -9 9,167,688 bytes</title></circle>
+<circle class="gz" cx="481.0" cy="194.1" r="4"><title>2026-11-20 fb646b2 (main): gzip -9 9,167,688 bytes</title></circle>
+<circle class="gz" cx="483.0" cy="194.1" r="4"><title>2026-11-20 3365fdb (main): gzip -9 9,167,688 bytes</title></circle>
+<circle class="gz" cx="485.0" cy="193.4" r="4"><title>2026-11-20 8f2c61d (main): gzip -9 9,275,787 bytes</title></circle>
+<circle class="gz" cx="487.0" cy="193.4" r="4"><title>2026-11-20 6ce419a (main): gzip -9 9,275,787 bytes</title></circle>
+<circle class="gz" cx="489.0" cy="193.0" r="4"><title>2026-11-20 ee7ac51 (main): gzip -9 9,333,075 bytes</title></circle>
+<circle class="gz" cx="491.1" cy="193.0" r="4"><title>2026-11-20 cf50e9f (main): gzip -9 9,333,075 bytes</title></circle>
+<circle class="gz" cx="493.1" cy="193.0" r="4"><title>2026-11-20 4ab7f6e (main): gzip -9 9,333,075 bytes</title></circle>
+<circle class="gz" cx="495.1" cy="192.8" r="4"><title>2026-11-21 3c93eae (main): gzip -9 9,367,574 bytes</title></circle>
+<circle class="gz" cx="497.1" cy="192.8" r="4"><title>2026-11-21 6303dc1 (main): gzip -9 9,367,574 bytes</title></circle>
+<circle class="gz" cx="499.1" cy="192.8" r="4"><title>2026-11-21 b0dd9ef (main): gzip -9 9,367,574 bytes</title></circle>
+<circle class="gz" cx="501.1" cy="192.8" r="4"><title>2026-11-21 66e83e6 (main): gzip -9 9,367,316 bytes</title></circle>
+<circle class="gz" cx="503.1" cy="192.8" r="4"><title>2026-11-23 af70b30 (main): gzip -9 9,367,316 bytes</title></circle>
+<circle class="gz" cx="505.2" cy="192.4" r="4"><title>2026-11-23 15c6336 (main): gzip -9 9,426,785 bytes</title></circle>
+<circle class="gz" cx="507.2" cy="192.4" r="4"><title>2026-11-23 1cd4f59 (main): gzip -9 9,426,785 bytes</title></circle>
+<circle class="gz" cx="509.2" cy="192.4" r="4"><title>2026-11-23 930d099 (main): gzip -9 9,426,969 bytes</title></circle>
+<circle class="gz" cx="511.2" cy="192.4" r="4"><title>2026-11-23 b260112 (main): gzip -9 9,426,969 bytes</title></circle>
+<circle class="gz" cx="513.2" cy="192.4" r="4"><title>2026-11-23 858187f (main): gzip -9 9,426,969 bytes</title></circle>
+<circle class="gz" cx="515.2" cy="192.3" r="4"><title>2026-11-23 086b80d (main): gzip -9 9,456,169 bytes</title></circle>
+<circle class="gz" cx="517.2" cy="192.3" r="4"><title>2026-11-23 df896f4 (main): gzip -9 9,456,169 bytes</title></circle>
+<circle class="gz" cx="519.3" cy="192.3" r="4"><title>2026-11-23 ba669e0 (main): gzip -9 9,456,169 bytes</title></circle>
+<circle class="gz" cx="521.3" cy="191.8" r="4"><title>2026-11-23 6992e32 (main): gzip -9 9,525,316 bytes</title></circle>
+<circle class="gz" cx="523.3" cy="191.8" r="4"><title>2026-11-23 1f574e5 (main): gzip -9 9,525,316 bytes</title></circle>
+<circle class="gz" cx="525.3" cy="191.8" r="4"><title>2026-11-23 ff72c40 (main): gzip -9 9,525,316 bytes</title></circle>
+<circle class="gz" cx="527.3" cy="191.5" r="4"><title>2026-11-24 4fdf384 (main): gzip -9 9,571,539 bytes</title></circle>
+<circle class="gz" cx="529.3" cy="191.5" r="4"><title>2026-11-24 fc51778 (main): gzip -9 9,571,539 bytes</title></circle>
+<circle class="gz" cx="531.3" cy="191.5" r="4"><title>2026-11-24 52961b1 (main): gzip -9 9,571,539 bytes</title></circle>
+<circle class="gz" cx="533.4" cy="191.5" r="4"><title>2026-11-24 88e8056 (main): gzip -9 9,577,876 bytes</title></circle>
+<circle class="gz" cx="535.4" cy="191.5" r="4"><title>2026-11-24 4f4dc85 (main): gzip -9 9,577,876 bytes</title></circle>
+<circle class="gz" cx="537.4" cy="191.5" r="4"><title>2026-11-24 7d0e6a2 (main): gzip -9 9,577,876 bytes</title></circle>
+<circle class="gz" cx="539.4" cy="191.4" r="4"><title>2026-11-24 96f3a67 (main): gzip -9 9,588,058 bytes</title></circle>
+<circle class="gz" cx="541.4" cy="191.2" r="4"><title>2026-11-24 e08cae5 (main): gzip -9 9,617,451 bytes</title></circle>
+<circle class="gz" cx="543.4" cy="191.2" r="4"><title>2026-11-24 f93a000 (main): gzip -9 9,617,451 bytes</title></circle>
+<circle class="gz" cx="545.4" cy="191.2" r="4"><title>2026-11-24 8830632 (main): gzip -9 9,619,749 bytes</title></circle>
+<circle class="gz" cx="547.5" cy="190.5" r="4"><title>2026-11-24 a1cd6e9 (main): gzip -9 9,729,872 bytes</title></circle>
+<circle class="gz" cx="549.5" cy="190.5" r="4"><title>2026-11-24 522cb0e (main): gzip -9 9,729,872 bytes</title></circle>
+<circle class="gz" cx="551.5" cy="190.5" r="4"><title>2026-11-24 9d11ad6 (main): gzip -9 9,729,872 bytes</title></circle>
+<circle class="gz" cx="553.5" cy="190.5" r="4"><title>2026-11-24 adc686e (main): gzip -9 9,729,872 bytes</title></circle>
+<circle class="gz" cx="555.5" cy="190.5" r="4"><title>2026-11-25 0aa0da3 (main): gzip -9 9,732,888 bytes</title></circle>
+<circle class="gz" cx="557.5" cy="190.2" r="4"><title>2026-11-25 9a9b68c (main): gzip -9 9,775,063 bytes</title></circle>
+<circle class="gz" cx="559.5" cy="190.2" r="4"><title>2026-11-25 73e751b (main): gzip -9 9,788,089 bytes</title></circle>
+<circle class="gz" cx="561.6" cy="190.2" r="4"><title>2026-11-25 64b51ba (main): gzip -9 9,788,089 bytes</title></circle>
+<circle class="gz" cx="563.6" cy="190.1" r="4"><title>2026-11-25 598a0b2 (main): gzip -9 9,795,414 bytes</title></circle>
+<circle class="gz" cx="565.6" cy="190.1" r="4"><title>2026-11-25 5bb82ea (main): gzip -9 9,804,589 bytes</title></circle>
+<circle class="gz" cx="567.6" cy="189.9" r="4"><title>2026-11-25 38612c8 (main): gzip -9 9,829,807 bytes</title></circle>
+<circle class="gz" cx="569.6" cy="189.9" r="4"><title>2026-11-25 473836f (main): gzip -9 9,829,807 bytes</title></circle>
+<circle class="gz" cx="571.6" cy="189.9" r="4"><title>2026-11-25 24abbe2 (main): gzip -9 9,829,807 bytes</title></circle>
+<circle class="gz" cx="573.6" cy="189.9" r="4"><title>2026-11-25 2d41e94 (main): gzip -9 9,829,807 bytes</title></circle>
+<circle class="gz" cx="575.7" cy="189.5" r="4"><title>2026-11-25 5d3a140 (main): gzip -9 9,891,074 bytes</title></circle>
+<circle class="gz" cx="577.7" cy="188.8" r="4"><title>2026-11-25 02fedc5 (main): gzip -9 9,998,035 bytes</title></circle>
+<circle class="gz" cx="579.7" cy="188.8" r="4"><title>2026-11-25 f06fd29 (main): gzip -9 9,998,035 bytes</title></circle>
+<circle class="gz" cx="581.7" cy="188.8" r="4"><title>2026-11-25 0f52276 (main): gzip -9 9,998,035 bytes</title></circle>
+<circle class="gz" cx="583.7" cy="188.8" r="4"><title>2026-11-25 7a1ceeb (main): gzip -9 9,998,035 bytes</title></circle>
+<circle class="gz" cx="585.7" cy="188.8" r="4"><title>2026-11-25 f5799d0 (main): gzip -9 10,008,920 bytes</title></circle>
+<circle class="gz" cx="587.7" cy="188.8" r="4"><title>2026-11-25 2acdf8d (main): gzip -9 10,008,920 bytes</title></circle>
+<circle class="gz" cx="589.8" cy="188.7" r="4"><title>2026-11-26 3fe709e (main): gzip -9 10,015,524 bytes</title></circle>
+<circle class="gz" cx="591.8" cy="188.6" r="4"><title>2026-11-26 42615dc (main): gzip -9 10,029,639 bytes</title></circle>
+<circle class="gz" cx="593.8" cy="188.4" r="4"><title>2026-11-26 c7a85d6 (main): gzip -9 10,058,981 bytes</title></circle>
+<circle class="gz" cx="595.8" cy="188.2" r="4"><title>2026-11-26 3e607cd (main): gzip -9 10,091,133 bytes</title></circle>
+<circle class="gz" cx="597.8" cy="188.2" r="4"><title>2026-11-26 86913d1 (main): gzip -9 10,091,996 bytes</title></circle>
+<circle class="gz" cx="599.8" cy="188.2" r="4"><title>2026-11-26 70719da (main): gzip -9 10,091,996 bytes</title></circle>
+<circle class="gz" cx="601.8" cy="188.2" r="4"><title>2026-11-26 1192062 (main): gzip -9 10,098,791 bytes</title></circle>
+<circle class="gz" cx="603.9" cy="188.2" r="4"><title>2026-11-26 d1a73cd (main): gzip -9 10,103,189 bytes</title></circle>
+<circle class="gz" cx="605.9" cy="187.8" r="4"><title>2026-11-26 9e1320f (main): gzip -9 10,153,579 bytes</title></circle>
+<circle class="gz" cx="607.9" cy="187.8" r="4"><title>2026-11-26 6a95763 (main): gzip -9 10,153,579 bytes</title></circle>
+<circle class="gz" cx="609.9" cy="187.2" r="4"><title>2026-11-26 fd5c552 (main): gzip -9 10,256,817 bytes</title></circle>
+<circle class="gz" cx="611.9" cy="187.2" r="4"><title>2026-11-26 2a25268 (main): gzip -9 10,258,934 bytes</title></circle>
+<circle class="gz" cx="613.9" cy="187.2" r="4"><title>2026-11-26 223f165 (main): gzip -9 10,258,934 bytes</title></circle>
+<circle class="gz" cx="615.9" cy="187.2" r="4"><title>2026-11-27 bb261ce (main): gzip -9 10,258,934 bytes</title></circle>
+<circle class="gz" cx="618.0" cy="187.2" r="4"><title>2026-11-27 31c8e87 (main): gzip -9 10,258,934 bytes</title></circle>
+<circle class="gz" cx="620.0" cy="187.2" r="4"><title>2026-11-27 b07eb49 (main): gzip -9 10,259,012 bytes</title></circle>
+<circle class="gz" cx="622.0" cy="186.9" r="4"><title>2026-11-27 e0a47fa (main): gzip -9 10,302,251 bytes</title></circle>
+<circle class="gz" cx="624.0" cy="186.9" r="4"><title>2026-11-27 ff363fe (main): gzip -9 10,302,251 bytes</title></circle>
 <text class="ink" x="634.0" y="190.9">gzip -9 9.82</text>
 </svg>
