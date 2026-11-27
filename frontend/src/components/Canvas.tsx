@@ -234,7 +234,8 @@ export function Canvas({
                   editor.tool === "polygon-star" ||
                   editor.tool === "measure" ||
                   editor.tool === "test-grid" ||
-                  editor.tool === "generators" ||
+                  // The crosshair only while a generator is armed (`0151` slice 1).
+                  (editor.tool === "generators" && (editor.getSession()?.generator_kind() ?? "") !== "") ||
                   editor.tool === "pencil"
                 ? // The creation tools and Measure show their crosshair everywhere, over
                   // existing objects too (`unified-object-editing` criterion 25, customer

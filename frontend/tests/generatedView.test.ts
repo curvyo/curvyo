@@ -6,6 +6,8 @@ import { test } from "node:test";
 
 import {
   canvasNoticeLook,
+  colourHex,
+  parseColourText,
   decodeGeneratedView,
   decodeKinds,
   parseNumber,
@@ -416,4 +418,32 @@ test("the Code segment is one entry that carries its family and its loading stat
   assert.equal(kinds[0].segment, "Code");
   assert.equal(kinds[0].family, "code");
   assert.equal(kinds[0].loading, true);
+});
+
+// `specs/0144-qr-and-barcodes` slice 4: a colour row shows `#RRGGBB` and takes typed hex text.
+test("a colour value shows as #RRGGBB and typed hex text reads back", () => {
+  assert.equal(colourHex({ r: 250, g: 240, b: 200 }), "#FAF0C8");
+  assert.equal(colourHex(null), "#000000");
+  assert.deepEqual(parseColourText("#faf0c8"), [250, 240, 200]);
+  assert.deepEqual(parseColourText("f00"), [255, 0, 0]);
+  assert.equal(parseColourText("#12345"), null);
+  assert.equal(parseColourText("red"), null);
+});
+
+test("a colour row decodes with its value as hex", () => {
+  const view = decodeGeneratedView(
+    JSON.stringify({
+      label: "QR code",
+      known: true,
+      rows: [
+        {
+          group: "Colours",
+          param: { key: "background_colour", label: "Background", kind: { kind: "colour" }, default: { value: { r: 255, g: 255, b: 255 } } },
+          value: { kind: "colour", value: { r: 10, g: 20, b: 30 } },
+        },
+      ],
+    }),
+  );
+  assert.equal(view?.rows[0].value, "#0A141E");
+  assert.equal(view?.rows[0].defaultValue, "#FFFFFF");
 });

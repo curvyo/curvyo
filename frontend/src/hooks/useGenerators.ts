@@ -17,9 +17,10 @@ const NOTICE_MS = 3000;
 /** The Generators bar: the kinds and the chosen one (`specs/0141` UX notes §1). */
 export interface GeneratorKindsApi {
   kinds: GeneratorKindEntry[];
-  /** `<extension>/<kind>`, the last choice of the session. */
+  /** `<extension>/<kind>` of the armed segment, empty while none is armed (`specs/0151` slice 1). */
   kind: string;
-  setKind: (kind: string) => void;
+  /** A press on a segment: arms it, or releases it when it is the armed one. */
+  toggleKind: (kind: string) => void;
 }
 
 /** The Generators bar's state. */
@@ -34,14 +35,14 @@ export function useGeneratorKinds(editor: GeneratorsEditor): GeneratorKindsApi {
     void syncRevision;
     return getSession()?.generator_kind() ?? "";
   }, [getSession, syncRevision]);
-  const setKind = useCallback(
+  const toggleKind = useCallback(
     (next: string) => {
-      getSession()?.set_generator_kind(next);
+      getSession()?.toggle_generator_kind(next);
       sync();
     },
     [getSession, sync],
   );
-  return { kinds, kind, setKind };
+  return { kinds, kind, toggleKind };
 }
 
 /** The Generator block of the Style tab (`specs/0141` UX notes §3, §6, §11, §12). */
@@ -52,7 +53,7 @@ export interface GeneratorBlockApi {
    * for three seconds. */
   notice: { key: string; text: string } | null;
   /** A number, switch or choice into a row; `"committed"`, `"unchanged"` or `"invalid:<code>"`. */
-  setValue: (key: string, value: number | boolean | string) => string;
+  setValue: (key: string, value: number | boolean | string | [number, number, number]) => string;
   /** A value stepped or typed into a row, drawn on the canvas without writing (UX notes §7). */
   preview: (key: string, value: number | string) => void;
   /** Drops the preview of a stepped value (Escape, or the field left without a commit). */
@@ -92,7 +93,7 @@ export function useGeneratorBlock(editor: GeneratorsEditor): GeneratorBlockApi {
   }, [getSession, syncRevision, showHistoryNotice]);
 
   const setValue = useCallback(
-    (key: string, value: number | boolean | string): string => {
+    (key: string, value: number | boolean | string | [number, number, number]): string => {
       const session = getSession();
       if (!session) {
         return "invalid:number";
