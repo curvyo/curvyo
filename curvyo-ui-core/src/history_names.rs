@@ -151,6 +151,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("set_mat", "Set mat"),
     ("set_grip", "Set grip"),
     ("set_mat_grid", "Mat grid"),
+    // `specs/0160-embroidery`: the embroidery page's hoop and speed.
+    ("set_hoop", "Set hoop"),
+    ("edit_embroidery_speed", "Edit speed"),
     ("edit_default_pressure", "Edit default pressure"),
     ("edit_max_speed", "Edit max speed"),
     ("edit_laser_mode", "Edit laser mode"),

@@ -4,6 +4,7 @@ import type { EditorSession } from "@/hooks/useEditorSession";
 import { storeExtensions } from "@/lib/extensionsFile";
 import { flushMachineWrites } from "@/lib/machineProfilesFile";
 import { flushMaterialWrites } from "@/lib/materialsFile";
+import type { EmbroideryView } from "@/lib/embroideryView";
 import type { PlotterView } from "@/lib/plotterView";
 import { NO_WORKBENCHES, type WorkbenchList } from "@/workbenches/registry";
 
@@ -28,6 +29,8 @@ export interface ManufacturingView {
   }[];
   /** The plotter page's own view (`specs/0159`), present on a plotter page only. */
   plotter?: PlotterView | null;
+  /** The embroidery page's own view (`specs/0160`), present on an embroidery page only. */
+  embroidery?: EmbroideryView | null;
 }
 
 /** A corner of the output page, as stored. */
@@ -121,6 +124,11 @@ export function useWorkbenches(editor: EditorSession) {
     const session = getSession();
     return session ? (JSON.parse(session.machine_profiles_json()) as MachineProfileRow[]) : [];
   }, [getSession, syncRevision]);
+  const embroideryProfiles = useMemo<MachineProfileRow[]>(() => {
+    void syncRevision;
+    const session = getSession();
+    return session ? (JSON.parse(session.embroidery_profiles_json()) as MachineProfileRow[]) : [];
+  }, [getSession, syncRevision]);
   const plotterProfiles = useMemo<MachineProfileRow[]>(() => {
     void syncRevision;
     const session = getSession();
@@ -134,8 +142,8 @@ export function useWorkbenches(editor: EditorSession) {
     /** The machine lists of the other families' kinds, by process (`specs/0159` criterion 2). */
     familyProfiles: {
       "curvyo.cutter": plotterProfiles,
-      // Their machine lists come with their slices (`0160`, `0161`).
-      "curvyo.embroidery": [],
+      "curvyo.embroidery": embroideryProfiles,
+      // Its machine list comes with its slice (`0161`).
       "curvyo.cnc": [],
     } as Record<string, MachineProfileRow[]>,
     /** The commands of a plotter page (`specs/0159`); each returns what the session says. */
@@ -153,6 +161,28 @@ export function useWorkbenches(editor: EditorSession) {
       /** `pressure`, `speed` or `passes`; the field message or "". */
       setNumber: (id: string, field: string, text: string) =>
         run((session) => session.edit_plotter_setting(id, field, text)) ?? "",
+    },
+    /** The commands of an embroidery page (`specs/0160`); each returns what the session says. */
+    embroidery: {
+      pick: (id: string) => run((session) => session.pick_embroidery_profile(id)) ?? false,
+      saveAs: () => run((session) => session.save_embroidery_profile(randomBytes(), Date.now())) ?? "",
+      setSpeed: (text: string) => run((session) => session.set_embroidery_speed(text)) ?? "",
+      setHoop: (key: string) => run((session) => session.set_embroidery_hoop(key)) ?? false,
+      press: (kind: string, shift: boolean) => run((session) => session.press_embroidery_kind(kind, shift)) ?? "",
+      removeSelection: (id: string) => run((session) => session.remove_selection_from_embroidery_operation(id)) ?? false,
+      remove: (id: string) => run((session) => session.delete_embroidery_operation(id)) ?? false,
+      setNumber: (id: string, field: string, text: string) =>
+        run((session) => session.edit_embroidery_setting(id, field, text)) ?? "",
+      setThread: (id: string, hex: string) => run((session) => session.set_embroidery_thread(id, hex)) ?? false,
+      /** The simulation's position (session state, no step). */
+      play: (position: number) => {
+        run((session) => session.set_embroidery_play(position));
+      },
+      hsvOf: (rgb: number) => {
+        const [hue, saturation, value] = getSession()?.colour_hsv(rgb) ?? [-1, 0, 0];
+        return [hue, saturation, value] as const;
+      },
+      rgbOf: (hue: number, saturation: number, value: number) => getSession()?.hsv_colour(hue, saturation, value) ?? 0,
     },
     /** Add page with the Kind switch (`specs/0098` criteria 1 to 4); the new page's id. */
     addPage: (kind: string, profile: string) => {

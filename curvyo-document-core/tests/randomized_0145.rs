@@ -417,7 +417,7 @@ fn damaged_registers_are_refused_and_a_large_value_is_limited_on_use() {
 /// Criterion 26: this build writes format 62 (`0118` slice 2d) and refuses a newer file; the golden is 60.
 #[test]
 fn the_format_is_60_and_a_newer_file_is_refused() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 69);
+    assert_eq!(CURRENT_FORMAT_VERSION, 70);
     let bytes = pack(&golden_document(), "t").unwrap();
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes.clone())).unwrap();
     let mut manifest = Vec::new();
@@ -427,7 +427,7 @@ fn the_format_is_60_and_a_newer_file_is_refused() {
         .read_to_end(&mut manifest)
         .unwrap();
     let manifest: serde_json::Value = serde_json::from_slice(&manifest).unwrap();
-    assert_eq!(manifest["format_version"].as_u64().unwrap(), 69);
+    assert_eq!(manifest["format_version"].as_u64().unwrap(), 70);
     let golden = std::fs::read(fixture_path()).unwrap();
     let mut archive = zip::ZipArchive::new(Cursor::new(golden)).unwrap();
     let mut manifest = Vec::new();

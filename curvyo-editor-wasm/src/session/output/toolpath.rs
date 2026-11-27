@@ -256,6 +256,7 @@ impl Session {
         if !self.output.toolpath.remove(&manufacturing) {
             self.output.toolpath.insert(manufacturing);
             self.output.play = super::play::PlayState::default();
+            self.manufacturing.embroidery.play = None;
         }
         true
     }

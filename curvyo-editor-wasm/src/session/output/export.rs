@@ -118,6 +118,20 @@ impl Session {
     /// The job file of the active laser page for the save dialog (criterion 27), `None` while a
     /// block disables Export or on another page. Nothing is written to the project.
     pub fn export_job(&mut self, project_file: &str) -> Option<ExportedJob> {
+        // An embroidery page writes its DST and records nothing (`specs/0160` criterion 14).
+        if let Some(embroidery) = self.embroidery_export() {
+            let exports = &mut self.output.exports;
+            let token = exports.next;
+            exports.next = exports.next.wrapping_add(1);
+            exports.pending.insert(token, ExportEffects::default());
+            return Some(ExportedJob {
+                name: job_file_name(project_file, &embroidery.page, embroidery.extension),
+                bytes: embroidery.bytes,
+                file_type: embroidery.file_type,
+                extension: embroidery.extension,
+                token,
+            });
+        }
         // A plotter page writes its own file and records nothing (`specs/0159` UX C16).
         if let Some(plotter) = self.plotter_export() {
             let exports = &mut self.output.exports;

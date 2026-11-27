@@ -60,6 +60,7 @@ mod edit_context;
 #[cfg(test)]
 mod edit_context_tests;
 mod edit_context_view;
+mod embroidery;
 mod file_chord;
 mod fixtures;
 mod flip;

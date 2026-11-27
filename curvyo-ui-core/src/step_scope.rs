@@ -198,6 +198,9 @@ pub const FREE_STEPS: &[&str] = &[
     "set_mat",
     "set_grip",
     "set_mat_grid",
+    // `specs/0160-embroidery`: the embroidery page's hoop and speed.
+    "set_hoop",
+    "edit_embroidery_speed",
     "edit_default_pressure",
     "edit_max_speed",
     "edit_laser_mode",

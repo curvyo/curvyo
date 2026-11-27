@@ -92,6 +92,8 @@ mod wasm_document;
 #[cfg(target_arch = "wasm32")]
 mod wasm_edit_context;
 #[cfg(target_arch = "wasm32")]
+mod wasm_embroidery;
+#[cfg(target_arch = "wasm32")]
 mod wasm_font_library;
 #[cfg(target_arch = "wasm32")]
 mod wasm_formats;

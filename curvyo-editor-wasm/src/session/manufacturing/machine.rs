@@ -83,6 +83,8 @@ impl Session {
     pub fn load_machine_profiles(&mut self, entries: &[(String, String)]) {
         self.manufacturing.machine.profiles = MachineProfiles::load(entries);
         self.manufacturing.plotter = super::super::plotter::PlotterLibrary::load(entries);
+        self.manufacturing.embroidery.profiles =
+            super::super::embroidery::EmbroideryState::load(entries);
         self.align_fixture_pages(None);
     }
 

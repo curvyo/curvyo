@@ -852,7 +852,7 @@ fn ac19_the_format_stays_37_until_0100_bumps_it_to_38() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 69);
+    assert_eq!(CURRENT_FORMAT_VERSION, 70);
 }
 
 fn criterion_19_project() -> (Document, Vec<NodeId>) {

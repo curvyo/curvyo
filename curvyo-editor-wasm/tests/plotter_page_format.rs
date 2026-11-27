@@ -128,7 +128,7 @@ fn opened(bytes: &[u8]) -> (Session, Value) {
 
 #[test]
 fn the_golden_reads_back_its_page_mat_and_operations() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 69);
+    assert_eq!(CURRENT_FORMAT_VERSION, 70);
     let bytes = read_or_write("plotter_page_v69.curvyo", build);
     let (s, view) = opened(&bytes);
     assert_eq!(view["profile"]["name"], "Cricut Maker 3");

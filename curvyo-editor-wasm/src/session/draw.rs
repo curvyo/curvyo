@@ -296,6 +296,10 @@ impl Session {
         if let Some(toolpath) = self.plotter_toolpath(view) {
             list.extend(toolpath);
         }
+        // An embroidery page's simulation over its items (`specs/0160` criteria 12, 13).
+        if let Some(toolpath) = self.embroidery_toolpath(view) {
+            list.extend(toolpath);
+        }
         // The dimensions over the artwork, following a drag in the same frame (`0070`).
         list.extend(self.dimension_layer(&artwork_objects));
         list.extend(self.kept_point_list());

@@ -29,6 +29,9 @@ impl Session {
         if process == curvyo_cutter_core::PROCESS_ID {
             return self.add_plotter_page(profile);
         }
+        if process == curvyo_embroidery_core::PROCESS_ID {
+            return self.add_embroidery_page(profile);
+        }
         if let Some((label, size)) = family_page(process) {
             return self.add_family_page(process, workbench.label, label, size);
         }
@@ -132,10 +135,6 @@ pub(super) fn workbench_of(process: &str) -> Option<WorkbenchContribution> {
 /// laser and every process that is not one of the families of ADR 0095.
 fn family_page(process: &str) -> Option<(&'static str, DocumentSize)> {
     match process {
-        curvyo_embroidery_core::PROCESS_ID => Some((
-            curvyo_embroidery_core::ADD_PAGE_COMMIT_LABEL,
-            curvyo_embroidery_core::DEFAULT_BUILTIN.page_size(),
-        )),
         curvyo_cnc_core::PROCESS_ID => Some((
             curvyo_cnc_core::ADD_PAGE_COMMIT_LABEL,
             curvyo_cnc_core::DEFAULT_BUILTIN.page_size(),

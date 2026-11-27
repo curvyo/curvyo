@@ -781,7 +781,19 @@ impl DocumentVersion {
 /// unknown mat kind reads as the 12 x 12 in `StandardGrip` mat, a value out of its range as its
 /// default, with a notice; nothing is rewritten on read. Goldens (in `curvyo-editor-wasm`):
 /// `plotter_page_v69.curvyo`, `plotter_page_damaged_v69.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 69;
+/// Version 70 (`specs/0160-embroidery` slice 1, ADR 0097 §6, `adrs.md` EM5, Frage 431 A): an
+/// output page of process `curvyo.embroidery` (an embroidery page) holds an embroidery profile
+/// copy in `mfg_profile`, its hoops as job fixtures of kind `curvyo.embroidery/hoop-150x250` and
+/// `curvyo.embroidery/hoop-100x100` (one `active`), and operations of `op_kind` `running`,
+/// `tatami` or `satin` with `op_settings` `{ stitch_length_mm, repeats }`, `{ angle_deg,
+/// row_spacing_mm, max_stitch_mm }` or `{ zigzag_spacing_mm }` and the thread `thread_colour`
+/// ("#RRGGBB"), all opaque here and read by the embroidery extension. A build that stops at 69
+/// would open such a page without its hoop, stitches or numbers, so this build's files are refused
+/// there by version; a file of 69 or lower opens unchanged. Damage (read by the extension): an
+/// unknown hoop kind reads as the profile's first hoop, a value out of its range as its default,
+/// with a notice; nothing is rewritten on read. Goldens (in `curvyo-editor-wasm`):
+/// `embroidery_page_v70.curvyo`, `embroidery_page_damaged_v70.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 70;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

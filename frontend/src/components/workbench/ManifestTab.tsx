@@ -2,6 +2,7 @@ import { TriangleAlert } from "lucide-react";
 
 import { InlinePickList } from "@/components/InlinePickList";
 import { MachineBlock } from "@/components/workbench/MachineBlock";
+import { EmbroideryPanel } from "@/components/workbench/EmbroideryPanel";
 import { PlotterPanel } from "@/components/workbench/PlotterPanel";
 import type { OutputApi } from "@/hooks/useOutput";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
@@ -38,6 +39,18 @@ export function ManifestTab({ contribution, pages, view, workbenches, unit, libr
       <PlotterPanel
         view={view.plotter}
         api={workbenches.plotter}
+        onExport={() => void output?.exportJob()}
+        onToggleToolpath={(page) => output?.toggleRoute(page)}
+        onSelectItems={(ids) => output?.selectItems(ids)}
+        onReturnFocus={onReturnFocus}
+      />
+    );
+  }
+  if (view.embroidery) {
+    return (
+      <EmbroideryPanel
+        view={view.embroidery}
+        api={workbenches.embroidery}
         onExport={() => void output?.exportJob()}
         onToggleToolpath={(page) => output?.toggleRoute(page)}
         onSelectItems={(ids) => output?.selectItems(ids)}

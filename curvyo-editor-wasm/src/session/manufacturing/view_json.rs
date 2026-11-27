@@ -76,7 +76,9 @@ impl Session {
     #[must_use]
     pub fn machine_name_of(&self, kind: &PageKind) -> Option<String> {
         let manufacturing = self.document.manufacturing(kind.manufacturing()?)?;
-        if let Some(name) = Self::plotter_machine_name(&manufacturing) {
+        if let Some(name) = Self::plotter_machine_name(&manufacturing)
+            .or_else(|| Self::embroidery_machine_name(&manufacturing))
+        {
             return Some(name);
         }
         let read = curvyo_laser_core::read_copy(
@@ -156,7 +158,10 @@ impl Session {
     #[must_use]
     pub fn manufacturing_view_json(&self) -> String {
         if let Some(plotter) = self.plotter_view() {
-            return self.family_view_json(&plotter);
+            return self.family_view_json("plotter", &plotter);
+        }
+        if let Some(embroidery) = self.embroidery_view() {
+            return self.family_view_json("embroidery", &embroidery);
         }
         let Some(manufacturing) = self.active_manufacturing() else {
             return "null".to_owned();
@@ -206,8 +211,8 @@ impl Session {
     }
 
     /// The view of an output page of another machine family: its name, process and status line
-    /// and the family's own view under its key (`plotter`); no laser Machine block.
-    fn family_view_json(&self, plotter: &Value) -> String {
+    /// and the family's own view under its key (`plotter`, `embroidery`); no laser Machine block.
+    fn family_view_json(&self, key: &str, family: &Value) -> String {
         let Some(manufacturing) = self.active_output_page() else {
             return "null".to_owned();
         };
@@ -223,14 +228,14 @@ impl Session {
             "process": manufacturing.process,
             "status": format!(
                 "{} · {:.1} × {:.1} mm",
-                plotter["profile"]["name"].as_str().unwrap_or_default(),
+                family["profile"]["name"].as_str().unwrap_or_default(),
                 area.width.as_mm(),
                 area.height.as_mm()
             ),
             "machine": Value::Null,
             "notices": {},
             "fixtures": [],
-            "plotter": plotter,
+            key: family,
         })
         .to_string()
     }

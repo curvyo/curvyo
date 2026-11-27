@@ -31,6 +31,8 @@ pub(super) struct ManufacturingState {
     pub(super) machine: machine::MachineState,
     /// The maker's cutter profiles (`specs/0159-cutting-plotter` criterion 2).
     pub(super) plotter: super::plotter::PlotterLibrary,
+    /// The maker's embroidery profiles and the simulation's position (`specs/0160-embroidery`).
+    pub(super) embroidery: super::embroidery::EmbroideryState,
 }
 
 impl Session {

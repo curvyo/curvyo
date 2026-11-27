@@ -239,7 +239,7 @@ fn c8_slice2_saves_format_52_and_the_crop_golden_opens_and_saves_back() {
     let d = Document::new(1);
     let id = image(&d);
     set_steps(&d, id, vec![crop(10, 10, 20, 20, true)]);
-    assert_eq!(format_of(&pack(&d, "0.1.0").unwrap()), 69);
+    assert_eq!(format_of(&pack(&d, "0.1.0").unwrap()), 70);
 
     let golden = std::fs::read(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))

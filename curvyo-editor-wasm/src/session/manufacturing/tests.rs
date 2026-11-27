@@ -88,7 +88,7 @@ fn ac1_the_kind_list_is_drawing_sketch_and_one_entry_per_enabled_extension() {
 
 /// ADR 0095 §11 step G2: each machine family's Add page is one step named after its word, takes
 /// its default built-in's page size, writes no laser profile copy (the plotter its cutter copy,
-/// `0159`), and undo removes it.
+/// `0159`, embroidery its own, `0160`), and undo removes it.
 #[test]
 fn add_page_of_a_machine_family_is_one_named_step_of_its_builtin_size() {
     for (process, word, label, name, width, height) in [
@@ -151,6 +151,11 @@ fn add_page_of_a_machine_family_is_one_named_step_of_its_builtin_size() {
             // `0159` criterion 2: the plotter page holds the Cricut Maker 3's cutter copy.
             let copy = curvyo_cutter_core::read_copy(manufacturing[0].profile.as_ref());
             assert_eq!(copy.copy.values.name, "Cricut Maker 3");
+            assert_eq!(copy.damaged, 0);
+        } else if process == "curvyo.embroidery" {
+            // `0160` criterion 2: the embroidery page holds the W6 EU7's copy.
+            let copy = curvyo_embroidery_core::read_copy(manufacturing[0].profile.as_ref());
+            assert_eq!(copy.copy.values.name, "W6 EU7");
             assert_eq!(copy.damaged, 0);
         } else {
             assert!(
