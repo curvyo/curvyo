@@ -78,6 +78,8 @@ export interface LaserBlock {
   sets: MaterialSet[];
   /** The kinds without a set, one "+ <kind> set" button each. */
   missing: SetKind[];
+  /** The pick lines of a missing kind that has picks, under its "+ <kind> set" button. */
+  missingPicks: { kind: SetKind; otherPicks: OtherPick[] }[];
 }
 
 /** One test row. */
@@ -246,12 +248,22 @@ function set(value: unknown): MaterialSet | null {
   };
 }
 
+function missingPick(value: unknown): LaserBlock["missingPicks"][number] | null {
+  if (!isObject(value)) return null;
+  const kind = asSetKind(value.kind);
+  const others = otherPicks(value.other_picks);
+  return kind === null || others === null ? null : { kind, otherPicks: others };
+}
+
 function block(value: unknown): LaserBlock | null {
   if (!isObject(value) || !Array.isArray(value.sets) || !Array.isArray(value.missing)) return null;
   const one = laser(value.laser);
   const sets = value.sets.map(set);
   const missing = value.missing.map(asSetKind);
+  const missingPicks = Array.isArray(value.missing_picks) ? value.missing_picks.map(missingPick) : null;
   if (
+    missingPicks === null ||
+    missingPicks.some((m) => m === null) ||
     one === null ||
     typeof value.this_page !== "boolean" ||
     typeof value.open !== "boolean" ||
@@ -260,7 +272,10 @@ function block(value: unknown): LaserBlock | null {
   ) {
     return null;
   }
-  return { laser: one, thisPage: value.this_page, open: value.open, sets: sets as MaterialSet[], missing: missing as SetKind[] };
+  return { laser: one, thisPage: value.this_page, open: value.open, sets: sets as MaterialSet[],
+    missing: missing as SetKind[],
+    missingPicks: missingPicks as LaserBlock["missingPicks"],
+  };
 }
 
 function testRow(value: unknown): TestRow | null {

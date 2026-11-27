@@ -13,8 +13,8 @@ use super::super::Session;
 
 use super::view_types::{
     AxisView, CellView, LaserBlockView, LaserView, MaterialBodyView, MaterialRowView,
-    MaterialsView, OtherPickView, PickView, PlaceView, SetKindView, SetView, TestDetailView,
-    TestRowView,
+    MaterialsView, MissingPicksView, OtherPickView, PickView, PlaceView, SetKindView, SetView,
+    TestDetailView, TestRowView,
 };
 
 /// The set rows of a laser in the tab's order, Image last (`specs/0123` Frage 270 B).
@@ -293,6 +293,17 @@ impl Session {
                 .into_iter()
                 .filter(|kind| !laser.sets.contains_key(kind))
                 .map(SetKindView::from)
+                .collect(),
+            missing_picks: KINDS
+                .into_iter()
+                .filter(|kind| !laser.sets.contains_key(kind))
+                .filter_map(|kind| {
+                    let other_picks = other_picks(kind, laser);
+                    (!other_picks.is_empty()).then(|| MissingPicksView {
+                        kind: kind.into(),
+                        other_picks,
+                    })
+                })
                 .collect(),
         }
     }

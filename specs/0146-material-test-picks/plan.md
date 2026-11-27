@@ -51,5 +51,6 @@ full gate of CLAUDE.md section 7.
   (UX 8, "+ <Kind> set" case): the wasm view lists picks only under an existing main set; (3) the CPU budgets
   of criterion 24 are asserted in release builds only (`tests/acceptance_0146_budget.rs`), measure with
   `cargo test --release`; (4) dark values of the pick tokens (no dark theme yet).
+- Built after the PR in `fix/material-picks-leftovers`: (1), (2) and the damaged-pick-field reason of criterion 23 (the reason now names the field path); (3) and (4) stay as listed.
 - At PR time the lead sets `specification.md` Status to `Done (PR #n)`, fills "PR:" in its Links and the
   `specs/README.md` row; the design-system rows "Material test picks (`0146`, draft)" become final then.

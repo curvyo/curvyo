@@ -2,6 +2,7 @@
 //! laser as steps, the test record that follows a grid, judging, note, photo bytes, deleting with
 //! retired ids, the journal's undo and redo with photo bytes, the per-laser tie.
 
+use super::view_types::SetKindView;
 use curvyo_laser_core::grids::TestId;
 use curvyo_laser_core::library::{MAX_RECORD_TEXT, MaterialRead};
 
@@ -553,4 +554,33 @@ fn criterion_8_the_selected_grid_reports_its_picks_for_the_canvas() {
         s.pick_marks().is_empty(),
         "it disappears when the grid is not selected"
     );
+}
+
+/// `specs/0146` criterion 9: a kind with picks but no main set (its Best set deleted) lists its
+/// pick lines under that kind's "+ Cut set" button.
+#[test]
+fn criterion_9_pick_lines_of_a_kind_without_a_main_set_sit_under_its_add_button() {
+    let (mut s, birch, group) = birch_grid();
+    let id = recipe_of(&s, group).id.to_string();
+    s.unfold_material(Some(&birch));
+    s.open_material_test(Some(&id));
+    s.mark_pick(&birch, &id, "best", 2, 1, &random(3)).unwrap();
+    s.mark_pick(&birch, &id, "fastest", 3, 3, &random(4))
+        .unwrap();
+    let laser = s.active_profile_id().unwrap();
+    let body = s.materials_view().unwrap().unfolded.unwrap();
+    assert!(
+        body.lasers[0].missing_picks.is_empty(),
+        "a main set holds them"
+    );
+    s.delete_material_set(&birch, &laser, "cut", &random(5))
+        .unwrap();
+    let body = s.materials_view().unwrap().unfolded.unwrap();
+    let block = &body.lasers[0];
+    assert!(block.sets.is_empty() && block.missing.contains(&SetKindView::Cut));
+    let lines = &block.missing_picks;
+    assert_eq!(lines.len(), 1);
+    assert_eq!(lines[0].kind, SetKindView::Cut);
+    assert_eq!(lines[0].other_picks[0].pick, "fastest");
+    assert_eq!(lines[0].other_picks[0].source, format!("Test {id}"));
 }

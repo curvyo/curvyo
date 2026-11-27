@@ -220,6 +220,14 @@ fn materials_view_fixtures() {
         "test_with_picks.json",
         &materials_view(&s),
     );
+    // The Cut set deleted: its picks keep their lines, under "+ Cut set" (UX notes 8).
+    s.delete_material_set(&birch, "generic-laser", "cut", &[12; 16])
+        .unwrap();
+    pin(
+        "materials_view",
+        "picks_without_main_set.json",
+        &materials_view(&s),
+    );
 
     let (mut s, birch, test) = crate::birch();
     s.unfold_material(Some(&birch));

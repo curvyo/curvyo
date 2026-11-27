@@ -131,3 +131,31 @@ fn squares_become_circles_at_the_regenerating_commit_and_undo_restores_them() {
     let _ = s.undo();
     assert_eq!(items(&s, group), before);
 }
+
+/// How many drawn copies of the page's items are a `--engrave-hatch` outline without a fill.
+fn edge_copies(s: &Session) -> usize {
+    let hatch = curvyo_render_core::OP_ENGRAVE_HATCH;
+    let objects = s.render_objects();
+    let (looked, _) = s.operation_looked_artwork(&objects, s.view()).unwrap();
+    looked
+        .iter()
+        .filter(|object| {
+            let style = object.style();
+            let colour = style.stroke.color;
+            style.stroke.enabled
+                && !style.fill.enabled
+                && (colour.r, colour.g, colour.b) == (hatch.r, hatch.g, hatch.b)
+        })
+        .count()
+}
+
+/// UX notes 7.2, P8: each Engrave circle cell is also drawn with the 1 px `--engrave-hatch` edge
+/// on screen; a Cut grid's squares are not.
+#[test]
+fn engrave_circle_cells_get_the_screen_edge_and_a_cut_grid_does_not() {
+    let mut s = laser_with_fonts();
+    engrave_grid(&mut s);
+    assert_eq!(edge_copies(&s), 9);
+    s.set_test_grid_kind("cut").unwrap();
+    assert_eq!(edge_copies(&s), 0);
+}

@@ -20,7 +20,7 @@ import {
   setHeadingName,
   type SetField,
 } from "@/lib/materialRows";
-import type { Laser, LaserBlock, MaterialSet } from "@/lib/materialsView";
+import type { Laser, LaserBlock, MaterialSet, OtherPick } from "@/lib/materialsView";
 import type { SetKind } from "@/lib/operationSettingsView";
 import { CHIP_IS_MESSAGE, outcomeOf, stepText, typedNumber } from "@/lib/settingsFieldText";
 
@@ -33,6 +33,22 @@ interface LaserSetsProps {
   api: MaterialsApi;
   arm: DeleteArm;
   onReturnFocus: () => void;
+}
+
+/** The read-only pick lines of a kind, two lines each (UX notes 8). */
+function PickLines({ picks }: { picks: OtherPick[] }) {
+  return picks.map((other) => (
+    <div key={other.pick} className="ml-2 flex flex-col text-xs text-[var(--toolbar-icon)]">
+      <div className="flex h-5 items-center gap-1">
+        <span style={{ color: PICK_COLOUR[other.pick] }} className="flex shrink-0">
+          <PickGlyph kind={other.pick} size={12} />
+        </span>
+        <span>{PICK_LABEL[other.pick]}</span>
+        <span className="min-w-0 flex-1 truncate text-right text-[11px] text-[var(--panel-muted-fg)]">{other.source}</span>
+      </div>
+      <span className="h-4 pl-4 tabular-nums">{other.numbers}</span>
+    </div>
+  ));
 }
 
 /** One set: the kind heading with its source and armed trash, and its fields (UX 7.4 item 3). */
@@ -100,18 +116,7 @@ function SetFields({ materialId, laser, set, api, arm, onReturnFocus }: LaserSet
         {field(fields[1], 112)}
       </div>
       {fields.slice(2).map((name) => field(name, 228))}
-      {set.otherPicks.map((other) => (
-        <div key={other.pick} className="ml-2 flex flex-col text-xs text-[var(--toolbar-icon)]">
-          <div className="flex h-5 items-center gap-1">
-            <span style={{ color: PICK_COLOUR[other.pick] }} className="flex shrink-0">
-              <PickGlyph kind={other.pick} size={12} />
-            </span>
-            <span>{PICK_LABEL[other.pick]}</span>
-            <span className="min-w-0 flex-1 truncate text-right text-[11px] text-[var(--panel-muted-fg)]">{other.source}</span>
-          </div>
-          <span className="h-4 pl-4 tabular-nums">{other.numbers}</span>
-        </div>
-      ))}
+      <PickLines picks={set.otherPicks} />
     </div>
   );
 }
@@ -150,8 +155,8 @@ export function LaserSets(props: LaserSetsProps) {
             <SetFields key={set.kind} {...props} laser={block.laser} set={set} />
           ))}
           {block.missing.map((kind: SetKind) => (
+            <div key={kind} className="flex flex-col gap-1">
             <button
-              key={kind}
               type="button"
               onClick={(event) => {
                 // The pressed button leaves: the focus goes to the new set's Power (UX 7.4 item 4).
@@ -168,6 +173,8 @@ export function LaserSets(props: LaserSetsProps) {
               <OperationGlyph kind={kind} size={14} />
               {KIND_WORD[kind]} set
             </button>
+            <PickLines picks={block.missingPicks.find((m) => m.kind === kind)?.otherPicks ?? []} />
+            </div>
           ))}
         </div>
       ) : null}

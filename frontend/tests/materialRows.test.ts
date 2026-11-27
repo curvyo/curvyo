@@ -43,6 +43,7 @@ test("every Rust state decodes, and nothing else is in the folder", () => {
     "empty",
     "format1_record",
     "image_set",
+    "picks_without_main_set",
     "test_with_photo",
     "test_with_picks",
     "test_without_photo",
@@ -50,6 +51,15 @@ test("every Rust state decodes, and nothing else is in the folder", () => {
     "typed_set",
   ]);
   for (const name of names) assert.ok(decodeMaterialsText(raw(name)), name);
+});
+
+test("a kind with picks but no main set keeps its pick lines for the add button", () => {
+  const body = decodeMaterialsText(raw("picks_without_main_set"))?.unfolded;
+  assert.ok(body);
+  const [cut] = body.lasers[0].missingPicks;
+  assert.equal(cut.kind, "cut");
+  assert.deepEqual(cut.otherPicks.map((p) => p.pick), ["second_best", "fastest", "deepest"]);
+  assert.deepEqual(body.lasers[0].sets.filter((s) => s.kind === "cut"), []);
 });
 
 test("two lasers: the page's laser first and open, sets, missing kinds and tests newest first", () => {
