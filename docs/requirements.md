@@ -143,6 +143,14 @@ to it instead of restating it.
 |---|---|---|---|
 | R-MFG-CUT-001 | Generate HPGL (or the plotter's native command set) output for cut and draw/pen operations from the same vector file used for other machines. | Must | Customer |
 | R-MFG-CUT-002 | Support registration-mark-based alignment for print-then-cut workflows. | Could | Proposal |
+| R-MFG-CUT-003 | Plotter output page with machine profiles (Cricut Maker 3, generic HPGL cutter; later Silhouette, Graphtec) and mats as fixtures (12 x 12 in, 12 x 24 in, grips), with the mat's printed 1 in grid drawn on the page and switchable, matched to a photo of the customer's mat. Draft. `specs/0159-cutting-plotter/` | Should | Customer (2026-11-27, Fragen 417 A, 419 A) |
+| R-MFG-CUT-004 | Plotter operations as tools: Cut and Draw first; then Score/Crease, Perforate, Deboss, Engrave, Wavy, Foil; per tool pressure, speed, passes, blade offset, overcut; tool change as a pause. Draft. `specs/0159-cutting-plotter/` | Should | Customer (2026-11-27) |
+| R-MFG-CUT-005 | Export for Cricut Design Space: SVG at mat size and mat origin, one group per operation, so parts import at their drawn size. Draft. `specs/0159-cutting-plotter/` | Should | Customer (2026-11-27) |
+| R-MFG-CUT-006 | GPGL output for Silhouette Cameo 4/5, Portrait and Graphtec, golden files only (no hardware). Draft. `specs/0159-cutting-plotter/` | Could | Customer (2026-11-27, Frage 417 A) |
+| R-MFG-CUT-007 | CutcutGo G-code output for Cricut machines with that firmware, tested against golden files and the virtual GRBL (R-MFG-CNC-007) only, never on hardware. Draft. `specs/0159-cutting-plotter/` | Could | Customer (2026-11-27, Frage 416 B) |
+| R-MFG-CUT-008 | Research the Cricut Maker 3 host protocol from the customer's USB captures, time-boxed, with an honest exit: if it fails, Design Space SVG stays the route; nothing of Cricut's is shipped. Draft. `specs/0159-cutting-plotter/` | Could | Customer (2026-11-27, Frage 416 B) |
+| R-MFG-CUT-009 | Cutter material library per material and tool (pressure, speed, passes) with a test cut, synced (R-MAT-005). Draft. `specs/0159-cutting-plotter/` | Should | Customer (2026-11-27, Frage 418 A) |
+| R-MFG-CUT-010 | Send HPGL/GPGL jobs to open plotters over USB or serial through the connector (R-MFG-011); weed lines and weeding boxes, kiss-cut versus cut-through. Draft. `specs/0159-cutting-plotter/` | Could | Customer (2026-11-27) |
 
 ## 7. Manufacturing — embroidery
 
@@ -153,6 +161,13 @@ to it instead of restating it.
 | R-MFG-EMB-003 | Stitch simulation/preview before export. | Should | Proposal |
 | R-MFG-EMB-004 | Satin stitch from one path with a variable stroke width (from R-VEC-006), not from a filled area. | Should | Customer (2026-11-03) |
 | R-MFG-EMB-005 | Show the direction of paths and reverse a path's direction. Stitch order and start/end depend on it; it is probably needed only for embroidery, so it may live in the embroidery workbench. | Should | Customer (2026-11-03) |
+| R-MFG-EMB-006 | Embroidery output page with machine profiles (first the W6 EU7) and hoops as fixtures (150 x 250 mm and 100 x 100 mm until confirmed); stitches outside the sewing field block the export. Draft. `specs/0160-embroidery/` | Should | Customer (2026-11-27, Frage 420) |
+| R-MFG-EMB-007 | Stitch types as operations, ported from Ink/Stitch into a GPL-3 crate with attribution: running, tatami fill and simple satin first; then bean, manual, zigzag, E-stitch, ripple, satin columns with underlay and pull compensation, contour, guided, meander, circular and gradient fills, patterns. Draft. `specs/0160-embroidery/` | Should | Customer (2026-11-27, Frage 421 C) |
+| R-MFG-EMB-008 | Stitch order: lock stitches, trims versus jumps, colour changes, travel, start and end points, stitch direction. Draft. `specs/0160-embroidery/` | Should | Customer (2026-11-27, Frage 423 A) |
+| R-MFG-EMB-009 | Embroidery formats: DST first (the W6 EU7 reads it); then write and read JEF, EXP, PES/PEC, VP3, XXX, U01; golden files each. Extends R-MFG-EMB-002. Draft. `specs/0160-embroidery/` | Should | Customer (2026-11-27, Fragen 420, 424 A) |
+| R-MFG-EMB-010 | Embroidery lettering from the normal font library (TrueType, single-line fonts, Ink/Stitch fonts where their licence allows); no separate font UI in the embroidery view. Draft. `specs/0160-embroidery/` | Should | Customer (2026-11-27, Fragen 422 C, 423) |
+| R-MFG-EMB-011 | Fabric library (density, underlay, pull compensation, stabiliser), synced (R-MAT-005). Draft. `specs/0160-embroidery/` | Should | Customer (2026-11-27, Frage 418 A) |
+| R-MFG-EMB-012 | Stitch simulation with play, speed, stitch count, thread length and time from the same stitch list as the file. Extends R-MFG-EMB-003, R-MFG-009. Draft. `specs/0160-embroidery/` | Should | Customer (2026-11-27) |
 
 ## 8. Manufacturing — CNC mill
 
@@ -161,6 +176,12 @@ to it instead of restating it.
 | R-MFG-CNC-001 | Generate 2.5D toolpaths (profile, pocket, drill) from vector geometry with configurable tool diameter and depth. | Should | Customer |
 | R-MFG-CNC-002 | V-carve text and vector art using a Voronoi-diagram-based approach (the brief names OpenVoronoi as a reference), including choice of V-bit angle and max depth. | Should | Customer |
 | R-MFG-CNC-003 | Export standard G-code for 2.5D/V-carve jobs. | Should | Customer |
+| R-MFG-CNC-004 | CNC output page with a machine profile (work area, spindle range, Z travel), stock (size, thickness, material) and a tool list (flat end mill first; ball, V-bit, drill later). Draft. `specs/0161-cnc-output/` | Should | Customer (2026-11-27) |
+| R-MFG-CNC-005 | G-code dialects: GRBL first, then grblHAL, Mach3, Mach4, LinuxCNC; golden files per dialect. Draft. `specs/0161-cnc-output/` | Should | Customer (2026-11-27, Frage 425 A) |
+| R-MFG-CNC-006 | Tool changes: grouping by tool, change order, manual change with pause and probe. Draft. `specs/0161-cnc-output/` | Should | Customer (2026-11-27) |
+| R-MFG-CNC-007 | A virtual GRBL 1.1 controller in Rust on a pseudo-terminal that the connector drives like a real machine, rejects what real GRBL rejects and computes planner time. Draft. `specs/0161-cnc-output/` | Should | Customer (2026-11-27, Frage 426 C) |
+| R-MFG-CNC-008 | Material simulation: a 2.5D height map of removed material with play, scrub and warnings, and a 3D view. Extends R-MFG-009. Draft. `specs/0161-cnc-output/` | Should | Customer (2026-11-27, Frage 426 C) |
+| R-MFG-CNC-009 | CNC tool library with feeds per material, synced (R-MAT-005); tabs on profiles (reuses R-MFG-LASER-005's tabs). Draft. `specs/0161-cnc-output/` | Should | Customer (2026-11-27, Frage 418 A) |
 
 ## 9. Material management
 

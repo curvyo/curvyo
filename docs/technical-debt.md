@@ -440,6 +440,10 @@ Resolution below now moves built code, not a design.
 `curvyo-laser-core` keeps only the laser fields. The file formats of ADR 0038 and ADR 0055 do
 not change by the move.
 
+**Update 2026-11-27 (ADR 0097):** the second, third and fourth family arrive together; the move is
+scheduled as ADR 0097 step G3 (groundwork before the three thin MVPs, whose profiles are copied and
+edited), with the merge taking read outcomes instead of calling the laser readers.
+
 ## One 0020 tester test takes about five minutes in a debug build (2026-11-03)
 
 `acceptance_0020_tester_more::c30_a_step_of_hundreds_of_objects_asks_for_the_busy_state_and_undoes_in_one_press`

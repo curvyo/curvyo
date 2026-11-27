@@ -13,6 +13,8 @@ exists. Spec: `specs/0026-machine-profile` criteria 2, 3, 4, 9, 10, 13, 14, 15.
 
 **Note ([`specs/0150` adrs.md](../../specs/0150-operation-always-has-numbers/adrs.md), needs-customer, proposed 2026-11-24, accepted with the `0150` story PR):** §2: the profile values gain the default pair `default_power_pct` (10 %) and `default_speed_mm_min` (1,000 mm/min, never above max feed), and the profile record becomes format 7; formats 5 and 6 read the built-in pair and are not rewritten on read (decisions 1, 2).
 
+**Note ([ADR 0097](0097-cutting-plotter-embroidery-and-cnc-families.md), proposed 2026-11-27, `needs-customer` MF-REC-KIND):** §2/§3/§7: `kind` takes `cutter`, `embroidery` and `cnc` too; a new kind's first `format_version` is one above the directory's highest, then each kind counts on its own; a record of another known family is skipped silently instead of being damage; at its step G3 the envelope and the merge move to `curvyo-library-core`, the file format unchanged.
+
 ## Context
 
 A machine profile describes one physical laser (bed, origin corner, limits, how to reach it) and

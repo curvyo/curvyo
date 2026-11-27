@@ -4,6 +4,8 @@
 
 **Note:** amended by the 0111 redesign: materials shared across lasers.
 
+**Note ([ADR 0097](0097-cutting-plotter-embroidery-and-cnc-families.md), proposed 2026-11-27):** §7: `record_envelope` moves to `curvyo-library-core` at 0097 step G3; cutter materials and embroidery fabrics are material records with their own `kind` (0097 decision 4).
+
 **Note (ADR 0060, accepted 2026-11-16, PR #365):** §9: the library undo journal also holds machine profile records (`{ record kind, id, before, after }`, one 16 MiB budget) so Fixtures tab edits are undo steps of the open project.
 
 ## Context

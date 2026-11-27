@@ -11,6 +11,8 @@ second sealed stream); carries the record texts of [ADR 0038](0038-machine-profi
 sharing, and a library never reaches another maker. Choices marked (Proposal) are the architect's,
 vetoable at the demo.
 
+**Note ([ADR 0097](0097-cutting-plotter-embroidery-and-cnc-families.md), proposed 2026-11-27):** decision 10: the merge's home is `curvyo-library-core` (`record_merge`, taking the read outcomes) from 0097 step G3, not `curvyo-sync-core`; CNC tools add a `tools` map (0097 decision 5, `needs-customer`).
+
 **Note ([ADR 0093](0093-material-test-picks-and-round-engrave-cells.md), proposed 2026-11-26, spec `0146`):** decision 5 unchanged: material picks ride the record text, newest `modified` wins, the loser is kept as a conflict copy. Decision 6 (as amended by `0116` P2): the material text cap follows the record limit to 640 KiB.
 
 ## Context

@@ -2,6 +2,8 @@
 
 **Status:** Accepted (customer sign-off, 2026-10-02)
 
+**Note ([ADR 0097](0097-cutting-plotter-embroidery-and-cnc-families.md), proposed 2026-11-27):** §1 and §2 unchanged; the Ink/Stitch port `curvyo-inkstitch-core` is GPL-3.0-or-later (Frage 421 C) with its own `deny.toml` exception. §3: while it is in the app, the owner alone can no longer relicense or dual-license Curvyo; removing the crate restores that. Accepted by the customer (Frage 430 A, 2026-11-27: Curvyo stays AGPL for good).
+
 The customer decided: *"AGPL-3.0, good catch on the hosted-fork loophole.
 There will be no paid plugins."* This revision changes the Decision from
 GPL-3.0-or-later to AGPL-3.0-or-later and reworks the consequences, which have

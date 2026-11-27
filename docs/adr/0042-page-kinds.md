@@ -11,6 +11,7 @@ and in the plane, workbench derived, no switcher, no Add manufacturing);
 [ADR 0026](0026-parametric-sketch-nodes-and-workbench.md) "Page ownership revision" (only sketch
 pages own a sketch). Spec: `specs/0098-page-kinds`.
 Note 2026-11-06: §1, §3 and §4 amended by [ADR 0043](0043-sketch-pages-content-by-ownership.md) (proposed): Convert to paths on a sketch page writes `kind` from `"sketch"` to `"drawing"` (the only second write); a sketch page's content is its sketch by ownership.
+Note 2026-11-27: §6 is amended for plotter pages by `specs/0159-cutting-plotter/adrs.md` PL11 (ADR 0097): a plotter output page takes the size of its active mat's printed field, and "Set mat" resizes it in one step.
 
 Note 2026-11-09: Consequences ("moving a placement off its laser page has to be decided there", "group clones (`0100`)") answered by [ADR 0045](0045-clones-of-groups-texts-images-and-movable-placed-pages.md) (proposed, `needs-customer`, spec `0100`): a placement stays on its own laser page by ownership; clones of groups are decided there.
 
