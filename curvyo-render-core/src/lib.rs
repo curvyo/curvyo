@@ -99,7 +99,7 @@ pub use offset_preview::{
 };
 pub use operation_hatch::{HATCH_LINES_PER_OBJECT, flatten, hatch_list, object_polygons};
 pub use operation_look::{OperationLook, look_style};
-pub use operation_object::{outer_outlines, restyled};
+pub use operation_object::{engrave_cell_edge, outer_outlines, restyled};
 pub use operation_symbol::{CHIP_CAP, ChipItem, Glyph, chips_list};
 pub use origin_marker::{ORIGIN_MARKER_MIN_PAGE_PX, build_origin_marker};
 pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};

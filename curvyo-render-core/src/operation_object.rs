@@ -5,8 +5,9 @@
 use std::sync::Arc;
 
 use curvyo_document_core::{
-    AnchorId, AnchorSnapshot, Angle, FontKind, ImageSnapshot, NewAnchor, ObjectSnapshot,
-    PathSnapshot, Point, Style, SubpathSnapshot, ViewTransform,
+    AnchorId, AnchorSnapshot, Angle, Color, DashPattern, Fill, FontKind, ImageSnapshot, Length,
+    LineCap, NewAnchor, ObjectSnapshot, Opacity, PathSnapshot, Point, Shape, Stroke, Style,
+    SubpathSnapshot, ViewTransform,
 };
 
 use crate::operation_look::{OperationLook, look_style};
@@ -49,6 +50,46 @@ pub fn restyled(
         }
     }
     Some(copy)
+}
+
+/// The 1 px edge of a test grid's Engrave circle cell (`specs/0146` UX notes 7.2, P8): a copy of
+/// the circle with a solid `--engrave-hatch` outline and no fill, drawn over its hatch. Screen
+/// only, never output. `None` for anything that is not a full ellipse primitive (the old square
+/// cells keep their look).
+#[must_use]
+pub fn engrave_cell_edge(object: &ObjectSnapshot, view: ViewTransform) -> Option<ObjectSnapshot> {
+    let ObjectSnapshot::Primitive(primitive) = object else {
+        return None;
+    };
+    if !matches!(primitive.shape, Shape::Ellipse { arc: None, .. }) {
+        return None;
+    }
+    let mut copy = primitive.clone();
+    copy.style = edge_style(view);
+    Some(ObjectSnapshot::Primitive(copy))
+}
+
+fn edge_style(view: ViewTransform) -> Style {
+    let hatch = crate::theme::OP_ENGRAVE_HATCH;
+    Style {
+        stroke: Stroke {
+            enabled: true,
+            width: Length::from_mm(1.0 / view.scale()),
+            color: Color {
+                r: hatch.r,
+                g: hatch.g,
+                b: hatch.b,
+            },
+            dash: DashPattern::solid(),
+            cap: LineCap::Butt,
+            ..Stroke::default()
+        },
+        fill: Fill {
+            enabled: false,
+            opacity: Opacity::OPAQUE,
+            ..Fill::default()
+        },
+    }
 }
 
 /// Sets the look's style on `path`; Cut-out keeps only its outer outlines first.
@@ -252,5 +293,62 @@ mod tests {
             !text.style.fill.enabled,
             "a hatched look has no fill of its own"
         );
+    }
+
+    fn primitive(shape: Shape) -> ObjectSnapshot {
+        use curvyo_document_core::Angle;
+        let d = Document::new(1);
+        let id = d.create_primitive(shape, Angle::from_radians(0.0));
+        d.object(id).unwrap()
+    }
+
+    fn circle(arc: Option<curvyo_document_core::EllipseArc>) -> Shape {
+        use curvyo_document_core::{Curve, EllipseFrame, Length, Rounded};
+        Shape::Ellipse {
+            frame: EllipseFrame {
+                center: Point::new(5.0, 5.0),
+                rx: Length::from_mm(5.0),
+                ry: Length::from_mm(5.0),
+            },
+            arc,
+            curve: Curve::ELLIPSE_DEFAULT,
+            rounded: Rounded::ZERO,
+        }
+    }
+
+    /// UX notes 7.2: the edge is a 1 px screen-space outline in `--engrave-hatch`, no fill.
+    #[test]
+    fn the_engrave_cell_edge_is_one_screen_pixel_in_the_hatch_colour() {
+        let view = ViewTransform::new(4.0, Point::new(0.0, 0.0));
+        let edge = engrave_cell_edge(&primitive(circle(None)), view).unwrap();
+        let ObjectSnapshot::Primitive(edge) = edge else {
+            panic!("a circle stays a primitive")
+        };
+        let hatch = crate::theme::OP_ENGRAVE_HATCH;
+        assert!(edge.style.stroke.enabled && !edge.style.fill.enabled);
+        assert_eq!(
+            (
+                edge.style.stroke.color.r,
+                edge.style.stroke.color.g,
+                edge.style.stroke.color.b
+            ),
+            (hatch.r, hatch.g, hatch.b)
+        );
+        assert!((edge.style.stroke.width.as_mm() * 4.0 - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_square_or_a_path_has_no_engrave_cell_edge() {
+        let square = primitive(Shape::Rect {
+            bounds: curvyo_document_core::RectBounds::from_corners(
+                Point::new(0.0, 0.0),
+                Point::new(10.0, 10.0),
+            ),
+            corner_radii: curvyo_document_core::CornerRadii::uniform(
+                curvyo_document_core::Length::from_mm(0.0),
+            ),
+        });
+        assert!(engrave_cell_edge(&square, ViewTransform::identity()).is_none());
+        assert!(engrave_cell_edge(&path_with(vec![]), ViewTransform::identity()).is_none());
     }
 }
