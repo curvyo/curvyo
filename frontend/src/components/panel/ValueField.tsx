@@ -70,6 +70,8 @@ interface ValueFieldProps {
   width?: number;
   /** No reserved reset slot at the right end (a bar field without reset, the Trace bar). */
   noResetSlot?: boolean;
+  /** 48 px high instead of 28 px: the Pen strip's pen targets (`specs/0158-pen-display` UX 10.3). */
+  tall?: boolean;
   /** The gesture help line of the tooltip when it is not the panel's. */
   help?: string;
   /** Escape during a press or drag: the caller drops what the drag changed. */
@@ -147,6 +149,7 @@ export function ValueField({
   narrow = false,
   width,
   noResetSlot = false,
+  tall = false,
   help = HELP,
   onCancel,
   messages,
@@ -237,7 +240,7 @@ export function ValueField({
     setEdgeBroken(edgeCrossesText(edgeAt * box.width, spans));
   }, [edgeAt, label, text, unitText, mixed, typing]);
   return (
-    <div className="relative h-7" style={{ width: fieldWidth }}>
+    <div className={`relative ${tall ? "h-12" : "h-7"}`} style={{ width: fieldWidth }}>
       {typing ? (
         <>
           <EntryField
@@ -286,7 +289,7 @@ export function ValueField({
             aria-keyshortcuts={pageSteps ? "Control+Backspace Enter F2 PageUp PageDown" : "Control+Backspace Enter F2"}
             onKeyDown={onKeyDown}
             {...handlers}
-            className={`relative h-7 w-full cursor-ew-resize overflow-hidden rounded-[5px] border ${following ? "border-[var(--toolbar-icon)]" : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]"} bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
+            className={`relative ${tall ? "h-12" : "h-7"} w-full cursor-ew-resize overflow-hidden rounded-[5px] border ${following ? "border-[var(--toolbar-icon)]" : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]"} bg-white outline-none hover:border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
             style={{ touchAction: "pan-y" }}
           >
             {!mixed && bar > barFrom && (

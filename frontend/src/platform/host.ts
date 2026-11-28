@@ -26,9 +26,15 @@ import { browserPhotoCommands, indexedDbPhotoStore } from "@/lib/materialPhotoSt
 import { browserWorkspaceCommands, forgetOpenDocument, saveOpenDocument } from "@/platform/browserWorkspaces";
 import { detectPlatform, type PlatformKind } from "@/lib/platformKind";
 import type { OpenPayload, SaveOutcome } from "@/lib/projectState";
+import { NOT_AVAILABLE_IN_THIS_WINDOW, roleOf, windowAllows, type WindowRole } from "@/lib/windowRole";
+
+export { NOT_AVAILABLE_IN_THIS_WINDOW, type WindowRole };
 
 /** True inside the Tauri desktop shell, false in a plain browser. */
 export const isTauri = "__TAURI_INTERNALS__" in window;
+
+/** This page's role. */
+export const WINDOW_ROLE: WindowRole = roleOf(window.location?.search ?? "", isTauri);
 
 /** The build and system the page runs on: which file chords exist and how they are named. */
 export const PLATFORM: PlatformKind = detectPlatform(navigator.platform, isTauri);
@@ -217,6 +223,17 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   pen_watch: () => false,
   pen_unwatch: () => undefined,
   pen_compression: () => undefined,
+  // No pen window in the browser build (`specs/0158-pen-display` slice 2a criterion 1): the
+  // route answers "not available" without an error.
+  pen_window_open: () => {
+    throw NOT_AVAILABLE_IN_THIS_WINDOW;
+  },
+  pen_window_close: () => undefined,
+  pen_window_flags: () => undefined,
+  bridge_watch: () => {
+    throw NOT_AVAILABLE_IN_THIS_WINDOW;
+  },
+  bridge_send: () => undefined,
   pick_project: (args) => {
     forgetOpenDocument();
     return pickProject(String(args?.kind ?? "project"));
@@ -469,6 +486,10 @@ export function invoke<T>(
   args?: Record<string, unknown>,
   bytes?: Uint8Array,
 ): Promise<T> {
+  // The pen page's host layer refuses what its window may not call, before the IPC.
+  if (!windowAllows(WINDOW_ROLE, command)) {
+    return Promise.reject(NOT_AVAILABLE_IN_THIS_WINDOW);
+  }
   if (isTauri) {
     return bytes
       ? tauriInvoke<T>(command, bytes, { headers: { [ARGS_HEADER]: asciiJson(args ?? {}) } })
@@ -499,7 +520,9 @@ export function listen<T>(
   event: string,
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> {
-  if (isTauri) {
+  // The pen window has no capability: it cannot listen, and the main window's events are not
+  // its own (ADR 0096 A8).
+  if (isTauri && WINDOW_ROLE === "main") {
     return tauriListen<T>(event, handler);
   }
   return Promise.resolve(() => undefined);
@@ -526,3 +549,47 @@ export function downloadJobFile(name: string, bytes: Uint8Array): void {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+/** Opens the pen window, or raises the open one; `true` when it was made now. The browser build
+ * has none and answers "not available" (`specs/0158-pen-display` slice 2a criterion 1). */
+export function openPenWindow(): Promise<boolean> {
+  if (!isTauri) {
+    return Promise.reject(NOT_AVAILABLE_IN_THIS_WINDOW);
+  }
+  return invoke<boolean>("pen_window_open");
+}
+
+/** Closes the pen window (Close of the project). */
+export function closePenWindow(): Promise<void> {
+  if (!isTauri) {
+    return Promise.resolve();
+  }
+  return invoke<void>("pen_window_close");
+}
+
+/** The bytes of a channel message: raw bytes arrive as an `ArrayBuffer`, anything else as a
+ * number array. */
+export function channelBytes(message: unknown): Uint8Array {
+  if (message instanceof ArrayBuffer) return new Uint8Array(message);
+  if (message instanceof Uint8Array) return message;
+  return Uint8Array.from(Array.isArray(message) ? (message as number[]) : []);
+}
+
+/** The link between the two windows of one project (ADR 0096 A5): this page's channel for the
+ * other window's bundles, and the send of one bundle as a raw body. */
+export const bridge = {
+  watch(onMessage: (bytes: Uint8Array) => void): Promise<void> {
+    if (!isTauri) {
+      return Promise.reject(NOT_AVAILABLE_IN_THIS_WINDOW);
+    }
+    const channel = new Channel<unknown>();
+    channel.onmessage = (message) => onMessage(channelBytes(message));
+    return invoke<void>("bridge_watch", { onMessage: channel });
+  },
+  send(bytes: Uint8Array): Promise<void> {
+    if (!isTauri || !windowAllows(WINDOW_ROLE, "bridge_send")) {
+      return Promise.resolve();
+    }
+    return invoke<void>("bridge_send", {}, bytes);
+  },
+};

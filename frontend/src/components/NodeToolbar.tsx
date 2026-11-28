@@ -159,6 +159,9 @@ interface NodeToolbarProps {
   centreLines?: React.ReactNode;
   /** Edit width (`specs/0115` criterion 4), last in the bar; renders nothing when not offered. */
   widthEdit?: React.ReactNode;
+  /** The pen window's subset (`specs/0158-pen-display` UX 10.3): 48 px buttons, no Delete node
+   * (the rail's Delete does it). */
+  pen?: boolean;
 }
 
 /**
@@ -178,7 +181,9 @@ export function NodeToolbar({
   selectionCount,
   centreLines,
   widthEdit,
+  pen = false,
 }: NodeToolbarProps) {
+  const size = pen ? "size-12" : "size-7";
   const { notice, show } = useActionNotice(tool, selectionCount, () => {});
   // Join and Split say what they did to a compound path (`specs/0055-compound-path-node-
   // editing/` UX notes): the result stays one object, which looks the same as before.
@@ -250,7 +255,7 @@ export function NodeToolbar({
               aria-label={kind.label}
               disabled={!kind.enabled(state)}
               onClick={() => actions.convertSelected(kind.key)}
-              className="flex size-7 items-center justify-center text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+              className={`flex ${size} items-center justify-center text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40`}
             >
               {kind.icon}
             </button>
@@ -261,9 +266,9 @@ export function NodeToolbar({
       <div className="mx-1 h-5 w-px bg-border" aria-hidden />
 
       <div className="relative flex items-center gap-1">
-        {OTHER_ACTIONS.map((action) =>
+        {OTHER_ACTIONS.filter((action) => !(pen && action.key === "delete")).map((action) =>
           action.key === "join" ? (
-            <JoinButton key={action.key} state={state} action={action} actions={actions} />
+            <JoinButton key={action.key} state={state} action={action} actions={actions} size={size} />
           ) : (
           <Tooltip key={action.key} side="bottom" content={<BarTip label={action.label} />}>
             <button
@@ -271,7 +276,7 @@ export function NodeToolbar({
               aria-label={action.label}
               disabled={!action.enabled(state)}
               onClick={() => action.run(actions)}
-              className="flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+              className={`flex ${size} items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40`}
             >
               {action.icon}
             </button>
@@ -320,10 +325,12 @@ function JoinButton({
   state,
   action,
   actions,
+  size,
 }: {
   state: NodeToolbarState;
   action: (typeof OTHER_ACTIONS)[number];
   actions: NodeActions;
+  size: string;
 }) {
   const enabled = action.enabled(state);
   const reason = enabled ? null : joinReasonLines(state);
@@ -353,7 +360,7 @@ function JoinButton({
         }}
         // The dimming is on the icon only, so the focus ring keeps its contrast on a disabled
         // Join (UX review of 2026-10-14, finding 3).
-        className={`flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
+        className={`flex ${size} items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
           enabled ? "hover:bg-[var(--editor-accent-hover)]" : ""
         }`}
       >

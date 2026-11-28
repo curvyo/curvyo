@@ -7,6 +7,8 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "re
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import { type PenProbeApi, usePenProbe } from "@/hooks/usePenProbe";
 import { closePenProbe, openPenProbe, usePenProbeOpen } from "@/lib/penProbeStore";
+import { PEN_WINDOW_LABELS, pressPenWindow, setPenViewShown, usePenViewShown, usePenWindowState } from "@/lib/penWindowStore";
+import { isTauri } from "@/platform/host";
 
 const BUTTON =
   "h-7 shrink-0 rounded-[5px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9 border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
@@ -135,9 +137,57 @@ function Actions({ probe }: { probe: PenProbeApi }) {
 /** The File tab's entry to the page (**Proposal**, `specs/0158-pen-display/plan.md`). */
 export function PenProbeButton() {
   return (
-    <button type="button" onClick={openPenProbe} className={`${BUTTON} mt-4 w-[118px]`}>
+    <button type="button" onClick={openPenProbe} className={`${BUTTON} mt-2 w-[118px]`}>
       Pen probe…
     </button>
+  );
+}
+
+/** The File tab's Pen display section (`specs/0158-pen-display` slice 2a criterion 1, 2b criterion
+ * 6, UX 9.1, 10.5): the pen window's one button, whose label is its state, the "Show pen view"
+ * switch while the pen window is open, then the Pen probe. Desktop only. */
+export function PenDisplaySection() {
+  const state = usePenWindowState();
+  const viewShown = usePenViewShown();
+  return (
+    <section aria-label="Pen display" className="mt-4 flex flex-col">
+      {isTauri ? (
+        <button
+          type="button"
+          onClick={pressPenWindow}
+          aria-busy={state === "opening" ? true : undefined}
+          className={`${BUTTON} w-[244px]`}
+        >
+          {PEN_WINDOW_LABELS[state]}
+        </button>
+      ) : null}
+      {isTauri && state === "open" ? (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={viewShown}
+          onClick={() => setPenViewShown(!viewShown)}
+          className="mt-2 flex h-6 w-[244px] items-center gap-2 rounded-[5px] text-left text-xs text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9"
+        >
+          <span
+            aria-hidden
+            className={`relative inline-block h-[14px] w-6 shrink-0 rounded-full border ${
+              viewShown
+                ? "border-[var(--toolbar-icon-active-bg)] bg-[var(--toolbar-icon-active-bg)]"
+                : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent"
+            }`}
+          >
+            <span
+              className={`absolute top-[2px] h-2 w-2 rounded-full transition-[left] motion-reduce:transition-none ${
+                viewShown ? "left-[12px] bg-[var(--toolbar-icon-active-fg)]" : "left-[2px] bg-[var(--toolbar-icon)]"
+              }`}
+            />
+          </span>
+          Show pen view
+        </button>
+      ) : null}
+      <PenProbeButton />
+    </section>
   );
 }
 
