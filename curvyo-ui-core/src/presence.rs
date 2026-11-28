@@ -46,6 +46,11 @@ pub struct PresencePayload {
     /// `ux-notes.md` section 7); empty for a document shared on its own.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub list_peer: String,
+    /// The Loro peer id of this device's pen window as decimal text (`specs/0158-pen-display`
+    /// slice 2a criterion 17, ADR 0096 A7), so that collaborators name its steps "`<label>` (pen
+    /// window)"; empty without a pen window. Older builds ignore it.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub pen_peer: String,
 }
 
 impl PresencePayload {
@@ -59,6 +64,12 @@ impl PresencePayload {
     #[must_use]
     pub fn list_peer_id(&self) -> Option<u64> {
         self.list_peer.parse().ok()
+    }
+
+    /// The pen window's peer id, if the text is one.
+    #[must_use]
+    pub fn pen_peer_id(&self) -> Option<u64> {
+        self.pen_peer.parse().ok()
     }
 
     /// The payload as it may be drawn: `None` for another version; the label cut to
@@ -97,7 +108,25 @@ mod tests {
             drag: Some([f64::NAN, 1.0]),
             document: String::new(),
             list_peer: String::new(),
+            pen_peer: String::new(),
         }
+    }
+
+    /// An older build's payload, without `pen_peer`, still reads; a payload without a pen
+    /// window writes no `pen_peer` key.
+    #[test]
+    fn the_pen_peer_is_optional_both_ways() {
+        let mut plain = payload();
+        plain.drag = None;
+        let text = serde_json::to_string(&plain).unwrap();
+        assert!(!text.contains("pen_peer"));
+        let read: PresencePayload = serde_json::from_str(&text).unwrap();
+        assert_eq!(read.pen_peer_id(), None);
+        let mut with_pen = plain;
+        with_pen.pen_peer = "12345".to_owned();
+        let read: PresencePayload =
+            serde_json::from_str(&serde_json::to_string(&with_pen).unwrap()).unwrap();
+        assert_eq!(read.pen_peer_id(), Some(12345));
     }
 
     #[test]
