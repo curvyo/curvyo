@@ -100,8 +100,45 @@ fn push_marks(list: &mut DrawList, c: Point, field: Rect, px: f64) {
     }
 }
 
+/// The frame's outer and inner corner radii and its mounting tab (depth, length) in mm (UX E2).
+const OUTER_RADIUS_MM: f64 = 14.0;
+const INNER_RADIUS_MM: f64 = 10.0;
+const TAB_MM: (f64, f64) = (16.0, 40.0);
+/// The points of each quarter corner of the frame.
+const CORNER_STEPS: u32 = 8;
+
+/// The outline of `rect` with corners of `radius`, clockwise from the top-left corner's left end,
+/// [`CORNER_STEPS`] + 1 points per corner, so two such loops pair point for point.
+fn rounded_loop((left, top, width, height): Rect, radius: f64) -> Vec<Point> {
+    use std::f64::consts::{FRAC_PI_2, PI};
+    let centres = [
+        (Point::new(left + radius, top + radius), PI),
+        (Point::new(left + width - radius, top + radius), 1.5 * PI),
+        (
+            Point::new(left + width - radius, top + height - radius),
+            0.0,
+        ),
+        (Point::new(left + radius, top + height - radius), FRAC_PI_2),
+    ];
+    let mut out = Vec::new();
+    for (centre, start) in centres {
+        for k in 0..=CORNER_STEPS {
+            let a = start + f64::from(k) * FRAC_PI_2 / f64::from(CORNER_STEPS);
+            out.push(centre.translated(Vec2::new(radius * a.cos(), radius * a.sin())));
+        }
+    }
+    out
+}
+
+fn push_loop(list: &mut DrawList, points: &[Point], width: f64) {
+    for (i, &p) in points.iter().enumerate() {
+        list.extend(thick_line(p, points[(i + 1) % points.len()], width, INK));
+    }
+}
+
 /// The hoop `hoop` centred on `page`, first-wins order: template marks, field edge, frame
-/// outlines, frame band (UX 3, E2; corners square in slice 1). `px` is one device pixel in mm.
+/// outlines, the rounded frame band and the mounting tab on the left (UX 3, E2). `px` is one
+/// device pixel in mm.
 fn hoop_list(hoop: HoopSize, page: &Page, px: f64) -> DrawList {
     let mut list = DrawList::default();
     let (w, h) = hoop.field_mm();
@@ -126,20 +163,40 @@ fn hoop_list(hoop: HoopSize, page: &Page, px: f64) -> DrawList {
         inner.2 + 2.0 * band,
         inner.3 + 2.0 * band,
     );
-    push_outline(&mut list, inner, 1.5 * px, INK);
-    push_outline(&mut list, outer, 1.5 * px, INK);
-    push_rect(&mut list, (outer.0, outer.1, outer.2, band), FRAME);
-    push_rect(
-        &mut list,
-        (outer.0, inner.1 + inner.3, outer.2, band),
-        FRAME,
-    );
-    push_rect(&mut list, (outer.0, inner.1, band, inner.3), FRAME);
-    push_rect(
-        &mut list,
-        (inner.0 + inner.2, inner.1, band, inner.3),
-        FRAME,
-    );
+    let inner_loop = rounded_loop(inner, INNER_RADIUS_MM);
+    let outer_loop = rounded_loop(outer, OUTER_RADIUS_MM);
+    let (depth, length) = TAB_MM;
+    let tab = (outer.0 - depth, c.y - length / 2.0, depth, length);
+    push_loop(&mut list, &inner_loop, 1.5 * px);
+    push_loop(&mut list, &outer_loop, 1.5 * px);
+    let tab_corners = corners(tab);
+    let [top_right, top_left, bottom_left, bottom_right] = [1, 0, 3, 2].map(|i| tab_corners[i]);
+    for (from, to) in [
+        (top_right, top_left),
+        (top_left, bottom_left),
+        (bottom_left, bottom_right),
+    ] {
+        list.extend(thick_line(from, to, 1.5 * px, INK));
+    }
+    // The band as a strip between the two loops, which pair point for point.
+    let count = outer_loop.len();
+    for i in 0..count {
+        let j = (i + 1) % count;
+        for position in [
+            outer_loop[i],
+            outer_loop[j],
+            inner_loop[j],
+            outer_loop[i],
+            inner_loop[j],
+            inner_loop[i],
+        ] {
+            list.triangles.push(Vertex {
+                position,
+                color: FRAME,
+            });
+        }
+    }
+    push_rect(&mut list, tab, FRAME);
     list
 }
 
@@ -307,6 +364,39 @@ impl Painter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_hoop_frame_has_rounded_corners_and_a_mounting_tab_on_the_left() {
+        let mut s = Session::new(98_401);
+        s.add_page_of_kind(curvyo_embroidery_core::PROCESS_ID, None)
+            .unwrap();
+        let page = s.active_page().clone();
+        let (w, h) = HoopSize::Field150x250.field_mm();
+        let (w, h) = (f64::from(w), f64::from(h));
+        let o = Point::new(
+            page.origin.x + page.size.width.as_mm() / 2.0 - w / 2.0,
+            page.origin.y + page.size.height.as_mm() / 2.0 - h / 2.0,
+        );
+        let list = hoop_list(HoopSize::Field150x250, &page, 0.1);
+        let at = |x: f64, y: f64| {
+            list.triangles.iter().any(|v| {
+                (v.position.x - o.x - x).abs() < 1e-6 && (v.position.y - o.y - y).abs() < 1e-6
+            })
+        };
+        // The outer edge lies 20 mm outside the field: x and y = -20 at the top-left.
+        assert!(!at(-20.0, -20.0), "no square outer corner");
+        assert!(
+            at(-20.0, -20.0 + 14.0),
+            "the 14 mm outer corner starts there"
+        );
+        assert!(at(-8.0, -8.0 + 10.0), "the 10 mm inner corner");
+        let mid = h / 2.0;
+        assert!(
+            at(-20.0 - 16.0, mid - 20.0),
+            "the 40 x 16 mm tab, centred on the left"
+        );
+        assert!(at(-20.0 - 16.0, mid + 20.0));
+    }
 
     #[test]
     fn the_casing_is_whichever_of_white_and_ink_contrasts_more() {

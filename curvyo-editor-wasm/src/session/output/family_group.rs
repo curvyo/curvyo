@@ -154,12 +154,8 @@ impl Session {
     }
 
     /// The play bar of the family page `family` while its Toolpath view is pressed: the stitch
-    /// axis on embroidery, the planner's time on CNC; `None` on a plotter page, which has no play
-    /// bar yet.
+    /// axis on embroidery, the planner's time on CNC, the time or path length on a plotter.
     pub(in crate::session) fn family_play_view(&self, family: &FamilyPage) -> Option<PlayView> {
-        if matches!(family, FamilyPage::Plotter(_)) {
-            return None;
-        }
         let view = self.family_view(family)?;
         let play = &view["play"];
         let position = play["position"].as_f64().unwrap_or(0.0);
@@ -184,7 +180,20 @@ impl Session {
             colour: embroidery
                 .then(|| play["colour"].as_str().map(str::to_owned))
                 .flatten(),
+            speed: embroidery.then_some(self.output.play.speed),
         })
+    }
+
+    /// The fraction of the axis an embroidery page sews per millisecond at 1×: the machine's
+    /// stitches per second over the stitch count; `None` on the other families.
+    pub(in crate::session) fn family_play_rate(&self, family: &FamilyPage) -> Option<f64> {
+        let FamilyPage::Embroidery(_) = family else {
+            return None;
+        };
+        let view = self.family_view(family)?;
+        let length = view["play"]["length"].as_f64().filter(|l| *l > 0.0)?;
+        let per_second = view["stitchesPerSecond"].as_f64()?;
+        Some(per_second / 1000.0 / length)
     }
 
     /// Moves the family page's play head to `fraction` of its axis.
@@ -203,7 +212,7 @@ impl Session {
             FamilyPage::Cnc(_) => {
                 self.set_cnc_play(fraction * length);
             }
-            FamilyPage::Plotter(_) => {}
+            FamilyPage::Plotter(_) => self.set_plotter_play(fraction * length),
         }
     }
 }

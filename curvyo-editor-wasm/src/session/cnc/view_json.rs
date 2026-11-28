@@ -19,7 +19,7 @@ fn items(n: usize) -> String {
 }
 
 /// "7 min 40 s", "12 s".
-fn duration(seconds: f64) -> String {
+pub(in crate::session) fn duration(seconds: f64) -> String {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     // invariant: a run time is finite and positive, far below u64::MAX seconds
     let s = seconds.max(0.0).ceil() as u64;
@@ -81,8 +81,13 @@ impl Session {
     /// size, the Generic GRBL router chosen.
     #[must_use]
     pub fn cnc_profiles_json(&self) -> String {
-        let rows: Vec<Value> = self
-            .cnc_profiles()
+        let profiles = self.cnc_profiles();
+        let chosen = self.preselected_machine(
+            curvyo_cnc_core::PROCESS_ID,
+            profiles.iter().map(|p| p.id.as_str()),
+            curvyo_cnc_core::DEFAULT_BUILTIN.id,
+        );
+        let rows: Vec<Value> = profiles
             .iter()
             .map(|p| {
                 let size = p.values.work_area;
@@ -91,7 +96,7 @@ impl Session {
                     "name": p.values.name,
                     "width": size.width.as_mm(),
                     "height": size.height.as_mm(),
-                    "chosen": p.id == curvyo_cnc_core::DEFAULT_BUILTIN.id,
+                    "chosen": p.id == chosen,
                 })
             })
             .collect();

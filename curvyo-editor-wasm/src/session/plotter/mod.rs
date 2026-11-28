@@ -18,11 +18,14 @@ use curvyo_document_core::{ManufacturingSnapshot, NodeId, OperationSnapshot, Pag
 
 use super::{Session, Workbench};
 
-/// The maker's cutter profiles (records of kind `cutter` in `machines/`, `adrs.md` PL2).
+/// The maker's cutter profiles (records of kind `cutter` in `machines/`, `adrs.md` PL2) and the
+/// play position.
 #[derive(Debug, Default)]
 pub(in crate::session) struct PlotterLibrary {
     /// The user profiles that read, in file order.
     pub(in crate::session) profiles: Vec<CutterProfile>,
+    /// The play position on the page's axis (seconds or mm); `None` shows the whole job.
+    pub(in crate::session) play: Option<f64>,
 }
 
 impl PlotterLibrary {
@@ -30,6 +33,7 @@ impl PlotterLibrary {
     /// family's record and a damaged one are skipped (the laser reader counts its own).
     pub(in crate::session) fn load(entries: &[(String, String)]) -> Self {
         Self {
+            play: None,
             profiles: entries
                 .iter()
                 .filter_map(|(name, text)| read_record(name, text).ok())
@@ -67,6 +71,8 @@ pub(in crate::session) struct PlotterPage {
     pub(in crate::session) mat: Option<(NodeId, MatRead)>,
     /// The operations in list order.
     pub(in crate::session) operations: Vec<OperationSnapshot>,
+    /// The Cuts last switch (UX C12): Draw runs before Cut while it is on.
+    pub(in crate::session) cuts_last: bool,
 }
 
 impl PlotterPage {
@@ -124,7 +130,18 @@ pub(in crate::session) fn plotter_page(
         mats,
         mat,
         operations: Vec::new(),
+        cuts_last: cuts_last(manufacturing),
     })
+}
+
+/// The plotter page's Cuts last switch, `x.curvyo.cutter.cuts_last` (the format-39 register of
+/// every process); on when absent, so a new page runs Draw before Cut (`0159` criterion 9, C12).
+pub(in crate::session) fn cuts_last(manufacturing: &ManufacturingSnapshot) -> bool {
+    manufacturing
+        .process_values
+        .get(&format!("x.{PROCESS_ID}.cuts_last"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true)
 }
 
 impl Session {

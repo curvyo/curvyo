@@ -109,8 +109,13 @@ impl Session {
     /// its page size, the W6 EU7 chosen, as `[{"id", "name", "width", "height", "chosen"}]`.
     #[must_use]
     pub fn embroidery_profiles_json(&self) -> String {
-        let rows: Vec<Value> = self
-            .embroidery_profiles()
+        let profiles = self.embroidery_profiles();
+        let chosen = self.preselected_machine(
+            curvyo_embroidery_core::PROCESS_ID,
+            profiles.iter().map(|p| p.id.as_str()),
+            curvyo_embroidery_core::DEFAULT_BUILTIN.id,
+        );
+        let rows: Vec<Value> = profiles
             .iter()
             .map(|p| {
                 let size = p.values.page_size();
@@ -119,7 +124,7 @@ impl Session {
                     "name": p.values.name,
                     "width": (size.width.as_mm() * 10.0).round() / 10.0,
                     "height": (size.height.as_mm() * 10.0).round() / 10.0,
-                    "chosen": p.id == curvyo_embroidery_core::DEFAULT_BUILTIN.id,
+                    "chosen": p.id == chosen,
                 })
             })
             .collect();

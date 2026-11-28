@@ -51,6 +51,9 @@ pub(in crate::session) struct MachineState {
     pub(in crate::session) profiles: MachineProfiles,
     /// The profile last picked on this computer.
     last_picked: Option<String>,
+    /// The machine last added with per other family's process, for this session (UX unify 3,
+    /// U20); the laser's lives in `last_picked`.
+    last_by_process: std::collections::BTreeMap<String, String>,
     /// The writes the host has not taken yet.
     outbox: Vec<HostWrite>,
 }
@@ -70,6 +73,12 @@ pub(in crate::session) struct ActiveCopy {
 }
 
 impl MachineState {
+    /// Notes `id` as the machine last added with on a page of `process`.
+    pub(in crate::session) fn remember(&mut self, process: &str, id: &str) {
+        self.last_by_process
+            .insert(process.to_owned(), id.to_owned());
+    }
+
     /// Queues a library write from outside this module (a library sync arrival).
     pub(in crate::session) fn queue(&mut self, write: LibraryWrite) {
         self.outbox.push(HostWrite::Library(write));
@@ -77,6 +86,23 @@ impl MachineState {
 }
 
 impl Session {
+    /// The machine Add page preselects for `process` (UX unify 3, U20): the last one a page of
+    /// that kind was added with while it is still `listed`, else `default`.
+    pub(in crate::session) fn preselected_machine<'a>(
+        &'a self,
+        process: &str,
+        mut listed: impl Iterator<Item = &'a str>,
+        default: &'a str,
+    ) -> &'a str {
+        self.manufacturing
+            .machine
+            .last_by_process
+            .get(process)
+            .map(String::as_str)
+            .filter(|last| listed.any(|id| id == *last))
+            .unwrap_or(default)
+    }
+
     /// Reads the records the host listed: `(file name, text)` pairs (criteria 4, 13). Every laser
     /// page whose profile record is now newer than its set mirror, and differs from it, takes the
     /// record's sets without an undo step (`0113` criteria 44, 47; ADR 0059 §10).

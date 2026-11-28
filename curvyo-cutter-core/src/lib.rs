@@ -16,6 +16,7 @@ mod mat;
 mod mat_print;
 mod numbers;
 mod operation;
+mod play;
 mod profile;
 mod profile_copy;
 mod profile_file;
@@ -42,6 +43,7 @@ pub use numbers::{Passes, PressurePct, SpeedMmS};
 pub use operation::{
     CutterSettings, Field, KEY_PASSES, KEY_PRESSURE, KEY_SPEED, OpKind, edit_setting,
 };
+pub use play::PlayAxis;
 pub use profile::{
     CutterProfile, CutterValues, ForceRange, MAX_NAME_CHARS, OriginCorner, OutputFormat, WorkArea,
 };

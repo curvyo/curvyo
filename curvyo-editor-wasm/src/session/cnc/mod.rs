@@ -12,6 +12,8 @@ mod operations;
 mod tests;
 mod view_json;
 
+pub(in crate::session) use view_json::duration;
+
 use curvyo_cnc_core::{
     CncCopy, CncProfile, PROCESS_ID, PROFILE_KIND, STOCK_KIND, Stock, TOOLS_FIELD, Tool, read_copy,
     read_record, read_tools,

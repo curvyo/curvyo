@@ -198,3 +198,31 @@ impl Session {
         Some(list)
     }
 }
+
+impl Session {
+    /// The stock's name label "Plywood · 10 mm" in its origin corner, the `0102` board label,
+    /// while the stock is at least 80 device px wide (UX unify 2.2, U15).
+    pub(in crate::session) fn cnc_stock_label(
+        &self,
+    ) -> Option<super::super::fixtures::FixtureLabel> {
+        let page = self.active_cnc()?;
+        let view = self.view();
+        let device = view.scale() * self.device_pixel_ratio.max(f64::MIN_POSITIVE);
+        let stock = &page.stock;
+        if stock.width.as_mm() * device < 80.0 {
+            return None;
+        }
+        let (x, y) = view.document_to_screen(page.page.origin);
+        Some(super::super::fixtures::FixtureLabel {
+            kind: "fixture",
+            text: format!(
+                "{} · {} mm",
+                stock.material,
+                curvyo_cnc_core::number(stock.thickness.as_mm())
+            ),
+            x,
+            y,
+            edge: None,
+        })
+    }
+}

@@ -55,7 +55,11 @@ impl Session {
     /// "Cuts last on" or "Cuts last off".
     pub fn set_cuts_last(&mut self, on: bool) -> bool {
         self.operations.notice = None;
-        let Some(active) = self.active_operations() else {
+        let applies = self.active_operations().is_some()
+            || self
+                .active_family()
+                .is_some_and(|family| self.family_cuts_last(&family).is_some());
+        let Some(active) = self.active_row_operations().filter(|_| applies) else {
             return false;
         };
         let order: Vec<NodeId> = run_sequence(&active.kinds(), on)

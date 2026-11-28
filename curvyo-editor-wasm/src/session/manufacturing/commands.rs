@@ -26,14 +26,17 @@ impl Session {
         }
         let manifest = curvyo_ui_core::manifest(process)?;
         let workbench = manifest.workbench()?;
-        if process == curvyo_cutter_core::PROCESS_ID {
-            return self.add_plotter_page(profile);
-        }
-        if process == curvyo_embroidery_core::PROCESS_ID {
-            return self.add_embroidery_page(profile);
-        }
-        if process == curvyo_cnc_core::PROCESS_ID {
-            return self.add_cnc_page(profile);
+        let family = match process {
+            curvyo_cutter_core::PROCESS_ID => Some(self.add_plotter_page(profile)),
+            curvyo_embroidery_core::PROCESS_ID => Some(self.add_embroidery_page(profile)),
+            curvyo_cnc_core::PROCESS_ID => Some(self.add_cnc_page(profile)),
+            _ => None,
+        };
+        if let Some(page) = family {
+            if let (Some(_), Some(id)) = (&page, profile) {
+                self.manufacturing.machine.remember(process, id);
+            }
+            return page;
         }
         let picked = profile.and_then(|id| self.manufacturing.machine.profiles.find(id).cloned());
         let chosen = picked.is_some();

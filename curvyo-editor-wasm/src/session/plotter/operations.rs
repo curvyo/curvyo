@@ -36,15 +36,16 @@ impl PlotterPage {
             .unwrap_or_default()
     }
 
-    /// Where a new operation of `kind` goes: Draw before every Cut, Cut at the end (criterion 9).
+    /// Where a new operation of `kind` goes: with Cuts last on Draw before every Cut, else and
+    /// for Cut at the end (criterion 9, UX C12).
     fn insert_index(&self, kind: OpKind) -> usize {
         match kind {
-            OpKind::Cut => self.operations.len(),
-            OpKind::Draw => self
+            OpKind::Draw if self.cuts_last => self
                 .operations
                 .iter()
                 .position(|op| Self::kind_of(op) == Some(OpKind::Cut))
                 .unwrap_or(self.operations.len()),
+            OpKind::Cut | OpKind::Draw => self.operations.len(),
         }
     }
 }

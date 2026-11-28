@@ -156,24 +156,7 @@ impl CutterJob {
     /// the speed of the operation it leads into (Proposal; HPGL `VS` sets one speed for both).
     #[must_use]
     pub fn seconds(&self) -> f64 {
-        let moves = self.moves();
-        let mut total = 0.0;
-        let mut next_op = 0;
-        for (index, m) in moves.iter().enumerate() {
-            let op = match m.kind {
-                MoveKind::Work { op } => op,
-                MoveKind::Travel => moves[index..]
-                    .iter()
-                    .find_map(|n| match n.kind {
-                        MoveKind::Work { op } => Some(op),
-                        MoveKind::Travel => None,
-                    })
-                    .unwrap_or(next_op),
-            };
-            next_op = op;
-            total += m.from.distance_mm(m.to) / f64::from(self.operations[op].settings.speed.get());
-        }
-        total
+        self.axis_total(crate::PlayAxis::Seconds)
     }
 
     /// Whether the job runs nothing.

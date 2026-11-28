@@ -56,9 +56,12 @@ pub(super) fn number_step(device_px_per_mm: f64) -> i64 {
 impl Session {
     /// The texts over the canvas: the tape numbers of the active laser page's shown grid at
     /// their 1-2-5 step, the names of boards and clamps 80 device px wide and of slots 40 device
-    /// px across (UX notes §5.1, §5.2).
+    /// px across (UX notes §5.1, §5.2), the stock's label on a CNC page.
     #[must_use]
     pub fn fixture_labels(&self) -> Vec<FixtureLabel> {
+        if let Some(label) = self.cnc_stock_label() {
+            return vec![label];
+        }
         let Some(fixtures) = self.active_fixtures() else {
             return Vec::new();
         };

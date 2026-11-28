@@ -273,6 +273,33 @@ fn criterion_12_13_the_toolpath_view_plays_the_written_stitches() {
     assert_eq!(view(&s)["toolpath"], true);
 }
 
+/// UX unify 7, `0160` E13: the play bar's Speed segments; 1× sews at the machine's speed, 16× by
+/// default.
+#[test]
+fn play_sews_at_the_machines_speed_times_the_speed_segment() {
+    let mut s = embroidery();
+    let a = rect(&mut s, 0.0, 0.0, 80.0, 60.0);
+    assign(&mut s, "tatami", &[a]);
+    let page = s.active_page().id;
+    assert!(s.toggle_toolpath_view(&page));
+    assert_eq!(s.play_view().unwrap().speed, Some(16));
+    let advance = |s: &mut Session, speed: u32| {
+        s.set_play_speed(speed);
+        s.set_play_position(0.0);
+        assert!(s.toggle_play(0.0));
+        s.play_tick(100.0);
+        let at = s.play_view().unwrap().fraction;
+        s.toggle_play(100.0);
+        at
+    };
+    let slow = advance(&mut s, 1);
+    let fast = advance(&mut s, 4);
+    assert!(slow > 0.0);
+    assert!((fast / slow - 4.0).abs() < 0.2, "{slow} {fast}");
+    s.set_play_speed(3);
+    assert_eq!(s.play_view().unwrap().speed, Some(4), "only 1, 4 and 16");
+}
+
 #[test]
 fn criterion_12_14_18_export_writes_the_dst_under_the_laser_name_rule() {
     let mut s = embroidery();

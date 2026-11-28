@@ -246,3 +246,20 @@ fn criterion_6_inner_holes_run_before_their_outline_in_the_file() {
     assert_eq!(job.job.reports.len(), 2);
     assert!(job.job.reports.iter().all(|r| r.loops == 1));
 }
+
+/// UX unify 2.2 (U15): the stock carries its label in its origin corner while it is 80 device px
+/// wide, as a holder board does.
+#[test]
+fn the_stock_shows_its_label_while_it_is_wide_enough() {
+    let mut s = cnc();
+    s.show_default_view();
+    let labels = s.fixture_labels();
+    assert_eq!(labels.len(), 1);
+    assert_eq!(labels[0].text, "Plywood · 10 mm");
+    let (x, y) = s
+        .view()
+        .document_to_screen(s.active_cnc().unwrap().page.origin);
+    assert_eq!((labels[0].x, labels[0].y), (x, y));
+    assert_eq!(s.edit_cnc_stock("width_mm", "10"), Ok(true));
+    assert!(s.fixture_labels().is_empty(), "too narrow");
+}

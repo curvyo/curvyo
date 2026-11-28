@@ -214,6 +214,29 @@ fn criterion_10_the_toolpath_view_draws_the_moves_of_the_written_job() {
     assert_eq!(view(&s)["toolpath"], true);
 }
 
+/// UX unify 7, `0159` C14: the plotter's play bar counts the path length on a Design Space
+/// profile, and the head stops at its place.
+#[test]
+fn the_play_bar_runs_the_path_length_and_draws_the_head() {
+    let mut s = plotter();
+    s.show_default_view();
+    let a = rect(&mut s, 10.0, 10.0, 20.0, 20.0);
+    assign(&mut s, "cut", &[a]);
+    assert!(s.play_view().is_none(), "only in the Toolpath view");
+    let page = s.active_page().id;
+    assert!(s.toggle_toolpath_view(&page));
+    let whole = s.play_view().unwrap();
+    assert!(whole.enabled);
+    assert_eq!(whole.fraction, 1.0, "the end by default");
+    assert!(whole.readout.ends_with(" m"), "{}", whole.readout);
+    let full = s.plotter_toolpath(s.view()).unwrap().triangles.len();
+    s.set_play_position(0.5);
+    let half = s.play_view().unwrap();
+    assert!((half.fraction - 0.5).abs() < 1e-9);
+    assert_ne!(half.readout, whole.readout);
+    assert_ne!(s.plotter_toolpath(s.view()).unwrap().triangles.len(), full);
+}
+
 #[test]
 fn criterion_11_16_export_is_the_design_space_svg_under_the_laser_name_rule() {
     let mut s = plotter();
@@ -303,4 +326,57 @@ fn criterion_18_cutter_profiles_go_out_on_first_sync_and_arrivals_take_the_cutte
     assert!(super::super::library_sync::is_cutter_record(&item.2));
     let laser = r#"{"format_version": 8, "kind": "laser"}"#;
     assert!(!super::super::library_sync::is_cutter_record(laser));
+}
+
+/// UX unify 6, `0159` C12: Cuts last is on for a new plotter page (Draw in Marking before Cut in
+/// Cutting); off, a new operation goes to the end; on again, the list takes the run order.
+#[test]
+fn cuts_last_is_on_by_default_and_switches_the_run_order() {
+    let mut s = plotter();
+    let a = rect(&mut s, 10.0, 10.0, 20.0, 20.0);
+    let b = rect(&mut s, 40.0, 10.0, 20.0, 20.0);
+    let cut = assign(&mut s, "cut", &[a]);
+    let draw = assign(&mut s, "draw", &[b]);
+    let order = |s: &Session| -> Vec<NodeId> {
+        s.operations_view()
+            .unwrap()
+            .rows
+            .iter()
+            .map(|r| r.id)
+            .collect()
+    };
+    let view = s.operations_view().unwrap();
+    assert_eq!(view.cuts_last, Some(true));
+    assert_eq!(order(&s), [draw, cut], "Draw before Cut");
+    assert!(view.rows[0].section.is_some());
+    assert!(s.set_cuts_last(false));
+    assert_eq!(undo_name(&mut s), "Cuts last off");
+    let second = rect(&mut s, 70.0, 10.0, 10.0, 10.0);
+    s.selection.set(&[second]);
+    let late = s.press_plotter_kind("draw", true).unwrap();
+    assert_eq!(order(&s), [draw, cut, late], "off: at the end");
+    assert!(s.set_cuts_last(true));
+    assert_eq!(order(&s), [draw, late, cut], "on: the run order");
+}
+
+/// UX unify 3 (U20, `0159` C3): Add page preselects the machine the last plotter page was added
+/// with, the Cricut Maker 3 before that.
+#[test]
+fn add_page_remembers_the_last_plotter_machine() {
+    let mut s = Session::new(98_501);
+    let chosen = |s: &Session| -> String {
+        let rows: Value = serde_json::from_str(&s.plotter_profiles_json()).unwrap();
+        rows.as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["chosen"] == true)
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(chosen(&s), curvyo_cutter_core::CRICUT_MAKER_3.id);
+    let hpgl = curvyo_cutter_core::GENERIC_HPGL_CUTTER.id;
+    s.add_page_of_kind(PLOTTER, Some(hpgl)).unwrap();
+    assert_eq!(chosen(&s), hpgl);
 }

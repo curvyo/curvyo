@@ -147,6 +147,11 @@ impl WasmSession {
         self.session.step_play_position(percent);
     }
 
+    /// The embroidery play bar's Speed segment: 1, 4 or 16.
+    pub fn set_play_speed(&mut self, speed: u32) {
+        self.session.set_play_speed(speed);
+    }
+
     /// Play or Pause at the clock `now_ms`. Whether it plays now.
     pub fn toggle_play(&mut self, now_ms: f64) -> bool {
         self.session.toggle_play(now_ms)

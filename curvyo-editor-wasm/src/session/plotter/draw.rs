@@ -8,8 +8,8 @@ use curvyo_cutter_core::{
 };
 use curvyo_document_core::{Page, Point, Vec2, ViewTransform};
 use curvyo_render_core::{
-    DrawList, RgbaColor, ToolpathArrow, ToolpathLook, ToolpathSegment, ToolpathStroke, Vertex,
-    build_toolpath, thick_line,
+    DrawList, RgbaColor, ToolpathArrow, ToolpathHead, ToolpathLook, ToolpathSegment,
+    ToolpathStroke, Vertex, build_toolpath, thick_line,
 };
 use serde::Serialize;
 
@@ -216,14 +216,25 @@ impl Session {
     }
 
     /// The Toolpath view of the active plotter page (criterion 10): Cut moves red, Draw moves
-    /// ink, travel dashed, an arrowhead at each path start; `None` while it is not pressed.
+    /// ink, travel dashed, an arrowhead at each path start, the head at the play position; `None`
+    /// while it is not pressed.
     pub(in crate::session) fn plotter_toolpath(&self, view: ViewTransform) -> Option<DrawList> {
         let page = self.active_plotter()?;
         if !self.toolpath_view_pressed(page.id) {
             return None;
         }
         let look = self.plotter_look(&page);
-        Some(build_toolpath(&look, None, view))
+        let origin = page.page.origin;
+        let head = self.manufacturing.plotter.play.and_then(|value| {
+            let built = self.plotter_job(&page, false);
+            let (index, p) = built.job.head_at(super::view_json::axis(&page), value)?;
+            let mm = p.to_mm();
+            Some(ToolpathHead {
+                index,
+                at: Point::new(origin.x + mm.x, origin.y + mm.y),
+            })
+        });
+        Some(build_toolpath(&look, head, view))
     }
 
     pub(in crate::session) fn plotter_look(&self, page: &PlotterPage) -> ToolpathLook {

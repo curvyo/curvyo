@@ -1,7 +1,7 @@
 //! The active plotter page as JSON for the front end (`specs/0159-cutting-plotter` criteria 1 to
 //! 10, `ux-notes.md` 4, 6, 7, 9): machine, mat, operations, checks, total and Export.
 
-use curvyo_cutter_core::{BUILTINS, Grip, OpKind, OutputFormat};
+use curvyo_cutter_core::{BUILTINS, Grip, OpKind, OutputFormat, PlayAxis};
 use serde_json::{Value, json};
 
 use super::super::Session;
@@ -34,6 +34,41 @@ fn metres(mm: f64) -> String {
     format!("{:.2} m", mm / 1000.0)
 }
 
+/// The play bar's axis of `page` (UX C14): time on HPGL, path length on Design Space.
+pub(in crate::session) fn axis(page: &PlotterPage) -> PlayAxis {
+    if page.copy.values.output_format.sets_numbers() {
+        PlayAxis::Millimetres
+    } else {
+        PlayAxis::Seconds
+    }
+}
+
+/// The play readout at `value` of `axis` (UX unify 7): "1 min 2 s of 3 min 40 s", "0.62 of
+/// 1.80 m"; the whole job for `None`.
+fn play_readout(built: &PlotterJob, axis: PlayAxis, value: Option<f64>) -> Value {
+    let total = built.job.axis_total(axis);
+    let at = value.unwrap_or(total).clamp(0.0, total);
+    let text = match axis {
+        PlayAxis::Seconds => {
+            let d = super::super::cnc::duration;
+            format!("{} of {}", d(at), d(total))
+        }
+        PlayAxis::Millimetres => format!("{:.2} of {}", at / 1000.0, metres(total)),
+    };
+    json!({ "position": at, "length": total, "text": text })
+}
+
+impl Session {
+    /// Moves the plotter page's play head to `value` of its axis (session state, no step).
+    pub(in crate::session) fn set_plotter_play(&mut self, value: f64) {
+        let Some(page) = self.active_plotter() else {
+            return;
+        };
+        let total = self.plotter_job(&page, false).job.axis_total(axis(&page));
+        self.manufacturing.plotter.play = Some(value.clamp(0.0, total));
+    }
+}
+
 /// "#RRGGBB" of a grip.
 fn hex(grip: Grip) -> String {
     format!("#{:06X}", grip.colour())
@@ -51,8 +86,13 @@ impl Session {
     /// page size, the Cricut Maker 3 chosen, as `[{"id", "name", "width", "height", "chosen"}]`.
     #[must_use]
     pub fn plotter_profiles_json(&self) -> String {
-        let rows: Vec<Value> = self
-            .plotter_profiles()
+        let profiles = self.plotter_profiles();
+        let chosen = self.preselected_machine(
+            curvyo_cutter_core::PROCESS_ID,
+            profiles.iter().map(|p| p.id.as_str()),
+            curvyo_cutter_core::DEFAULT_BUILTIN.id,
+        );
+        let rows: Vec<Value> = profiles
             .iter()
             .map(|p| {
                 let size = p.values.page_size();
@@ -61,7 +101,7 @@ impl Session {
                     "name": p.values.name,
                     "width": (size.width.as_mm() * 10.0).round() / 10.0,
                     "height": (size.height.as_mm() * 10.0).round() / 10.0,
-                    "chosen": p.id == curvyo_cutter_core::DEFAULT_BUILTIN.id,
+                    "chosen": p.id == chosen,
                 })
             })
             .collect();
@@ -144,6 +184,7 @@ impl Session {
             }).collect::<Vec<_>>(),
             "checks": checks,
             "total": total,
+            "play": play_readout(&built, axis(&page), self.manufacturing.plotter.play),
             "machineLine": format!("{} · {}", values.name, format.label()),
             "exportAllowed": !blocked && !built.job.is_empty(),
             "fileType": format.label(),

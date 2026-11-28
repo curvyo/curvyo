@@ -12,7 +12,7 @@ use super::super::output_page::{FamilyBodyView, FamilyPage};
 use super::ActiveOperations;
 use super::items::ItemLists;
 use super::kind_press::KindButtonView;
-use super::view_json::{KindView, OperationsView, RowView};
+use super::view_json::{KindView, OperationsView, RowView, SectionView};
 
 /// The Select-bar buttons of a family in bar order (ADR 0098 decision 3, UX unify 5).
 const fn bar_kinds(family: &FamilyPage) -> &'static [KindView] {
@@ -90,7 +90,9 @@ fn body(family: &FamilyPage, row: &Value, view: &Value) -> Option<FamilyBodyView
 impl Session {
     /// The operations of the active output page of any family, for the commands a row of the
     /// shared Operations tab sends (rename, delete, Show, Output, reorder, ticks, unfold):
-    /// Cuts last only on a laser page.
+    /// Cuts last on a laser and a plotter page. A plotter's `cut` is the laser Cut kind text and
+    /// its `draw` reads as no laser kind, which sits in the Marking section, so the laser's run
+    /// rule keeps Draw before Cut.
     pub(in crate::session) fn active_row_operations(&self) -> Option<ActiveOperations> {
         if let Some(active) = self.active_operations() {
             return Some(active);
@@ -100,8 +102,19 @@ impl Session {
         Some(ActiveOperations {
             manufacturing,
             operations: self.document.operations(manufacturing).ok()?,
-            cuts_last: false,
+            cuts_last: self.family_cuts_last(&family).unwrap_or(false),
         })
+    }
+
+    /// The Cuts last switch of a plotter page; `None` on an embroidery or CNC page, whose list
+    /// order is the run order (UX unify 6).
+    pub(in crate::session) fn family_cuts_last(&self, family: &FamilyPage) -> Option<bool> {
+        let FamilyPage::Plotter(_) = family else {
+            return None;
+        };
+        self.document
+            .manufacturing(family.manufacturing())
+            .map(|m| super::super::plotter::cuts_last(&m))
     }
 
     /// Whether `id` is an operation of the active output page of any family.
@@ -115,7 +128,8 @@ impl Session {
         let view = self.family_view(family).unwrap_or(Value::Null);
         let manufacturing = family.manufacturing();
         let operations = self.document.operations(manufacturing).unwrap_or_default();
-        let list = OperationList::new(&operations, false);
+        let cuts_last = self.family_cuts_last(family);
+        let list = OperationList::new(&operations, cuts_last.unwrap_or(false));
         let leaves = self.document.manufacturing(manufacturing).map_or_else(
             || std::sync::Arc::from(Vec::new()),
             |m| self.output_leaves(&m),
@@ -141,7 +155,12 @@ impl Session {
                     id: op.id,
                     name: op.name.clone(),
                     kind: row_kind(family, &row),
-                    section: None,
+                    section: cuts_last
+                        .filter(|on| *on)
+                        .map(|_| match row_kind(family, &row) {
+                            KindView::Cut => SectionView::Cutting,
+                            _ => SectionView::Marking,
+                        }),
                     show: op.show,
                     output: op.output,
                     margin_mm: op.margin.as_mm(),
@@ -179,9 +198,7 @@ impl Session {
                 .collect()
         });
         OperationsView {
-            // Plotter Cuts last is not built yet: the list order is the run order on every
-            // family page (UX unify 6, Proposal).
-            cuts_last: None,
+            cuts_last,
             rows,
             items: ItemLists::default(),
             view_pressed: self.operations_view_pressed(manufacturing)

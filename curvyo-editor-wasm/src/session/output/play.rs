@@ -10,6 +10,8 @@ use super::super::Session;
 
 /// Play runs the whole job in this many milliseconds, whatever its length (Proposal).
 pub const PLAY_WHOLE_MS: f64 = 10_000.0;
+/// The embroidery play bar's Speed segments: 1× is the machine's speed (`0160` E13).
+pub const PLAY_SPEEDS: [u32; 3] = [1, 4, 16];
 
 /// The slider and Play.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -18,6 +20,8 @@ pub(super) struct PlayState {
     pub(super) fraction: f64,
     /// While playing: the clock of the last tick and the job generation it plays.
     pub(super) playing: Option<(f64, u64)>,
+    /// The embroidery Speed, one of [`PLAY_SPEEDS`]; 16× by default (`0160` E13).
+    pub(super) speed: u32,
 }
 
 impl Default for PlayState {
@@ -25,6 +29,7 @@ impl Default for PlayState {
         Self {
             fraction: 1.0,
             playing: None,
+            speed: 16,
         }
     }
 }
@@ -47,6 +52,9 @@ pub struct PlayView {
     /// The thread of the colour block at the head, "#RRGGBB" (embroidery); absent elsewhere.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub colour: Option<String>,
+    /// The Speed segment pressed, 1, 4 or 16 (embroidery, UX unify 7); absent elsewhere.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed: Option<u32>,
 }
 
 impl Session {
@@ -69,7 +77,16 @@ impl Session {
             enabled: !job.built.job.moves.is_empty(),
             step: None,
             colour: None,
+            speed: None,
         })
+    }
+
+    /// The embroidery play bar's Speed segment (`0160` E13): 1, 4 or 16; another value changes
+    /// nothing. Session state, never a step.
+    pub fn set_play_speed(&mut self, speed: u32) {
+        if PLAY_SPEEDS.contains(&speed) {
+            self.output.play.speed = speed;
+        }
     }
 
     /// The position the view draws: Play stops by itself when the job changed (UX P12).
@@ -145,7 +162,15 @@ impl Session {
             return false;
         }
         let elapsed = (now_ms - last).max(0.0);
-        play.fraction = (play.fraction + elapsed / PLAY_WHOLE_MS).min(1.0);
+        // An embroidery page sews at the machine's speed times Speed (`0160` E13).
+        let per_ms = family
+            .as_ref()
+            .and_then(|f| self.family_play_rate(f))
+            .map_or(1.0 / PLAY_WHOLE_MS, |rate| {
+                rate * f64::from(self.output.play.speed)
+            });
+        let play = &mut self.output.play;
+        play.fraction = (play.fraction + elapsed * per_ms).min(1.0);
         let fraction = play.fraction;
         let done = fraction >= 1.0;
         play.playing = (!done).then_some((now_ms, generation));
