@@ -147,6 +147,9 @@ pub(crate) fn refresh_window_title(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
         let _ = window.set_title(&title);
     }
+    if let Some(pen) = app.get_webview_window(crate::pen_window::PEN_LABEL) {
+        let _ = pen.set_title(&crate::pen_window::pen_title(app));
+    }
 }
 
 /// Returns and clears any open payload buffered before the frontend had

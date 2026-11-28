@@ -54,6 +54,7 @@ mod pen_input;
 #[cfg(not(target_os = "linux"))]
 #[path = "pen_input_none.rs"]
 mod pen_input;
+mod pen_window;
 #[cfg(target_os = "linux")]
 mod preview_fonts;
 #[cfg(target_os = "linux")]
@@ -68,6 +69,7 @@ mod svg_export;
 #[cfg(target_os = "linux")]
 mod svg_preview;
 mod synced_fonts;
+mod window_commands;
 mod workspace;
 mod workspace_around;
 mod workspace_share;
@@ -90,6 +92,11 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         pen_input::pen_watch,
         pen_input::pen_unwatch,
         pen_input::pen_compression,
+        pen_window::pen_window_open,
+        pen_window::pen_window_close,
+        pen_window::bridge_watch,
+        pen_window::bridge_send,
+        pen_window::pen_window_flags,
         project::take_pending_open,
         project::pick_project,
         project::pick_import_files,
@@ -252,14 +259,23 @@ fn main() {
         .manage(fonts::FontFiles::default())
         .manage(recovery::RecoveryLocks::default())
         .manage(fonts::GrantedFontPaths::default())
-        .invoke_handler(commands())
-        // The window's close button and Alt+F4: a project with unsaved changes holds the close and
-        // the page asks; a clean one closes at once, with no round trip to the page.
+        .manage(pen_window::Hub::default())
+        // The pen window's page may call its allow-list only (`specs/0158` 2a criterion 21).
+        .invoke_handler(window_commands::guarded(commands()))
+        // The main window's close button and Alt+F4: a project with unsaved changes holds the
+        // close and the page asks; a clean one closes the pen window and then itself. The pen
+        // window's close is never held (ADR 0096 A2).
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event
-                && project::hold_close_for_check(window.app_handle())
-            {
-                api.prevent_close();
+            if window.label() == pen_window::PEN_LABEL {
+                pen_window::on_pen_event(window, event);
+                return;
+            }
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if project::hold_close_for_check(window.app_handle()) {
+                    api.prevent_close();
+                } else {
+                    pen_window::close(window.app_handle());
+                }
             }
         })
         .setup(|app| {
@@ -269,8 +285,10 @@ fn main() {
             #[cfg(target_os = "linux")]
             native_file_lists::watch_drags(&handle);
             // The pen's pressure, which WebKitGTK drops, read from GDK (ADR 0094).
-            #[cfg(target_os = "linux")]
-            pen_input::watch_pen(&handle);
+            pen_input::manage_sink(&handle);
+            if let Some(main) = handle.get_webview_window("main") {
+                pen_input::watch_pen(&handle, &main);
+            }
             // A font folder an interrupted archive add left is removed at start (`0083`
             // criterion 12).
             if let Ok(dir) = fonts::fonts_dir(&handle) {
