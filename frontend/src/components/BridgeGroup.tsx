@@ -10,14 +10,17 @@ import {
   clampField,
 } from "@/lib/bridgeText";
 import { Button } from "@/components/ui/button";
-import { Link2, Spline } from "lucide-react";
+import { Link2, SlidersHorizontal, Spline } from "lucide-react";
 import { ToggleButton } from "@/components/ui/toggle-button";
 import { NumberField } from "@/components/ui/number-field";
+import { bridgeParts } from "@/lib/selectBarGroups";
 
 /** How long a limit notice stays (UX notes §4.4). */
 const NOTICE_MS = 3000;
 
-
+/** Whether "Bridge options" is on: off at start, kept for the session across bar remounts
+ * (Frage 461 A). */
+let optionsOnInSession = false;
 
 /** Up to two decimals, no trailing zeros. */
 function formatValue(value: number): string {
@@ -175,8 +178,9 @@ export interface BridgeGroupProps {
 
 /**
  * The Bridge group of the Select bar (`specs/0156-fused-lettering/`; customer answer of
- * 2026-11-26 to Frage 395: no chip, no preview, the fields in the Select bar): Mode, Width, Reach
- * and Join all in Lettering, Bridges per island in Stencil, and the Bridge button. The values are
+ * 2026-11-26 to Frage 395: no chip, no preview, the fields in the Select bar): the Bridge button,
+ * the "Bridge options" toggle and, only while it is on (`specs/0164-ui-consistency/`, Frage 461 A),
+ * Mode, Width, Reach and Join all in Lettering, Bridges per island in Stencil. The values are
  * app preferences shared with the Boolean card's Bridge button. Only labels that name a control
  * or a state; no hint text.
  */
@@ -190,22 +194,45 @@ export function BridgeGroup({ ready, onBridge, onReturnFocus }: BridgeGroupProps
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setNotice(null), NOTICE_MS);
   };
-  const stencil = settings.mode === "stencil";
+  const [optionsOn, setOptionsOn] = useState(optionsOnInSession);
+  const parts = new Set(bridgeParts(optionsOn, settings.mode));
   return (
     <div role="group" aria-label="Bridge" className="relative flex flex-wrap content-start items-center gap-x-2 py-1">
-      <ModePill mode={settings.mode} onChange={(mode) => setBridgeSettings({ mode })} />
-      <BridgeField
-        label="Width"
-        name="Width, millimetres"
-        unit="mm"
-        range={WIDTH_RANGE}
-        step={0.1}
-        value={settings.widthMm}
-        onCommit={(widthMm) => setBridgeSettings({ widthMm })}
-        onNotice={showNotice}
+      <Button size="bar" icon={Spline} className="my-1"
+        aria-disabled={!ready}
+        onClick={() => {
+          if (ready) {
+            onBridge();
+          }
+        }}
+      >
+        Bridge
+      </Button>
+      <ToggleButton icon={SlidersHorizontal} look="icon"
+        label="Bridge options"
+        tooltip="Bridge options"
+        pressed={optionsOn}
+        onPressedChange={(next) => {
+          optionsOnInSession = next;
+          setOptionsOn(next);
+        }}
         onReturnFocus={onReturnFocus}
       />
-      {stencil ? (
+      {parts.has("mode") ? <ModePill mode={settings.mode} onChange={(mode) => setBridgeSettings({ mode })} /> : null}
+      {parts.has("width") ? (
+        <BridgeField
+          label="Width"
+          name="Width, millimetres"
+          unit="mm"
+          range={WIDTH_RANGE}
+          step={0.1}
+          value={settings.widthMm}
+          onCommit={(widthMm) => setBridgeSettings({ widthMm })}
+          onNotice={showNotice}
+          onReturnFocus={onReturnFocus}
+        />
+      ) : null}
+      {parts.has("bridges") ? (
         <BridgeField
           label="Bridges"
           name="Bridges per island"
@@ -217,37 +244,28 @@ export function BridgeGroup({ ready, onBridge, onReturnFocus }: BridgeGroupProps
           onNotice={showNotice}
           onReturnFocus={onReturnFocus}
         />
-      ) : (
-        <>
-          <BridgeField
-            label="Reach"
-            name="Reach, millimetres"
-            unit="mm"
-            range={REACH_RANGE}
-            step={0.1}
-            value={settings.reachMm}
-            onCommit={(reachMm) => setBridgeSettings({ reachMm })}
-            onNotice={showNotice}
-            onReturnFocus={onReturnFocus}
-          />
-          <ToggleButton icon={Link2} look="bar"
-            label="Join all"
-            tooltip="Join all"
-            pressed={settings.joinAll}
-            onPressedChange={(joinAll) => setBridgeSettings({ joinAll })}
-          />
-        </>
-      )}
-      <Button size="bar" icon={Spline} className="my-1"
-        aria-disabled={!ready}
-        onClick={() => {
-          if (ready) {
-            onBridge();
-          }
-        }}
-      >
-        Bridge
-      </Button>
+      ) : null}
+      {parts.has("reach") ? (
+        <BridgeField
+          label="Reach"
+          name="Reach, millimetres"
+          unit="mm"
+          range={REACH_RANGE}
+          step={0.1}
+          value={settings.reachMm}
+          onCommit={(reachMm) => setBridgeSettings({ reachMm })}
+          onNotice={showNotice}
+          onReturnFocus={onReturnFocus}
+        />
+      ) : null}
+      {parts.has("joinAll") ? (
+        <ToggleButton icon={Link2} look="bar"
+          label="Join all"
+          tooltip="Join all"
+          pressed={settings.joinAll}
+          onPressedChange={(joinAll) => setBridgeSettings({ joinAll })}
+        />
+      ) : null}
       <div
         role="status"
         className="absolute top-full left-0 mt-1 w-max max-w-[320px] rounded-[8px] px-2 py-1 text-xs"

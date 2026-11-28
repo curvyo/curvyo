@@ -70,6 +70,10 @@ The "Boolean tooltip" surface, three lines, opening past the rail's right edge, 
 - **Slice 2:** a "Mode" two-segment control "Lettering | Stencil" (S7); in Stencil the fields "Width" and
   "Bridges" (integer, accessible name "Bridges per island", 1 to 4). Reach and Join all are hidden, not
   disabled.
+- **Bridge options (`0164` Frage 461 A, 2026-11-28):** the group starts with the **Bridge** button, then
+  an icon-only toggle "Bridge options" (shared `ToggleButton`, Lucide `SlidersHorizontal`, tooltip
+  "Bridge options"). Mode, Width and the mode's fields follow only while it is on; off by default, kept
+  for the session (not across restarts). The button and the toggle never move when the fields appear.
 - **Values:** an app preference; first use Width 1.0, Reach 5.0, Join all off, Mode Lettering, Bridges 2.
   A typed value outside the range is clamped on commit and the field shows the limit; the notice "Width
   set to 10 mm, the maximum." shows under the group for 3 s in the status look, never `aria-invalid`. A
