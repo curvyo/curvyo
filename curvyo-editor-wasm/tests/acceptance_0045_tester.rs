@@ -28,7 +28,7 @@
 
 use curvyo_document_core::{
     CURRENT_FORMAT_VERSION, DisplayUnit, Document, ObjectSnapshot, Orientation, Point, Shape,
-    unpack,
+    Timestamp, unpack,
 };
 use curvyo_editor_wasm::{DocumentSide, FormTexts, FormatEdit, Session, SizeOutcome, Tool};
 use curvyo_ui_core::{FormField, FormatListView};
@@ -59,6 +59,22 @@ fn changes(s: &Session) -> usize {
 
 fn with_rect() -> Session {
     let mut s = Session::new(1);
+    s.set_tool(Tool::Rectangle);
+    s.pointer_down(pt(10.0, 10.0), false);
+    s.pointer_up(pt(60.0, 60.0), false, false);
+    s.set_tool(Tool::Select);
+    s.escape();
+    s
+}
+
+/// [`with_rect`] with every step stamped at the same second, so that two such sessions write the
+/// same bytes for the same edits.
+fn with_rect_at_fixed_time() -> Session {
+    fn fixed() -> Timestamp {
+        Timestamp::from_secs(1_800_000_000)
+    }
+    let mut s = Session::new(1);
+    s.set_clock(fixed);
     s.set_tool(Tool::Rectangle);
     s.pointer_down(pt(10.0, 10.0), false);
     s.pointer_up(pt(60.0, 60.0), false, false);
@@ -991,9 +1007,11 @@ fn c28_the_project_stores_only_its_size_and_the_format_version_is_unchanged() {
     assert!(close(size(&reopened), (30.0, 50.0)));
     assert_eq!(reopened.document_presets_view().subject, "Custom");
     // A project saved with a library of other content has the same layout: the
-    // bytes of two sessions with the same drawing and size are equally long.
-    let mut a = with_rect();
-    let mut b = with_rect();
+    // bytes of two sessions with the same drawing and size are equally long. Each
+    // step's header carries the wall-clock second it was made in (ADR 0014 §2), so
+    // both sessions stamp their steps from the same fixed clock.
+    let mut a = with_rect_at_fixed_time();
+    let mut b = with_rect_at_fixed_time();
     b.add_format(&form("Ring", "30", "50", "mm", "paper"));
     b.set_format_group_enabled("slides", true);
     a.set_document_side(DocumentSide::Width, "100");
