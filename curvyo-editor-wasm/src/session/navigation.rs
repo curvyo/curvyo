@@ -33,7 +33,35 @@ fn zoom_factor_from_wheel_delta(delta_y: f64) -> f64 {
     (-delta_y / ZOOM_WHEEL_SENSITIVITY_PX).exp2()
 }
 
+/// The pen rail's zoom step: two wheel notches (`specs/0158-pen-display` UX 9.3).
+const PEN_ZOOM_STEP: f64 = 1.414;
+
 impl Session {
+    /// Shows the active page whole and as large as it fits in the canvas right of `free_left`
+    /// and below `free_top` (CSS px), with a 24 px margin on the other sides: the pen window's Fit
+    /// page and its first view (`specs/0158-pen-display` criterion 22).
+    pub fn view_fit_page(&mut self, free_left: f64, free_top: f64) {
+        self.pen_fit_insets = (free_left, free_top);
+        let page = self.active_page();
+        let max = Point::new(
+            page.origin.x + page.size.width.as_mm(),
+            page.origin.y + page.size.height.as_mm(),
+        );
+        self.viewport
+            .fit_area(page.origin, max, free_left, free_top);
+    }
+
+    /// One tap of the pen rail's Zoom in or Zoom out: a factor of 1.414 about the point
+    /// `screen_x`, `screen_y` (the free canvas's centre), within the zoom range of the wheel.
+    pub fn zoom_step(&mut self, zoom_in: bool, screen_x: f64, screen_y: f64) {
+        let factor = if zoom_in {
+            PEN_ZOOM_STEP
+        } else {
+            1.0 / PEN_ZOOM_STEP
+        };
+        self.viewport.zoom_about(screen_x, screen_y, factor);
+    }
+
     /// Puts the document's top-left corner 128 px in from the canvas's
     /// top-left corner at 100 % zoom (criterion 11a) until the canvas size is
     /// known; every size report then centres the document in the canvas

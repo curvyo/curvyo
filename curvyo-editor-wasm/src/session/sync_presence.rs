@@ -84,6 +84,12 @@ impl Session {
                 .workspace_channel()
                 .map(|c| c.list_peer.to_string())
                 .unwrap_or_default(),
+            pen_peer: self
+                .link
+                .as_ref()
+                .and_then(|l| l.other_peer)
+                .map(|p| p.to_string())
+                .unwrap_or_default(),
         }
     }
 
@@ -117,11 +123,21 @@ impl Session {
 
     /// The live label of the participant whose session has Loro peer id `peer`, for the History
     /// tab (adrs.md decision 4).
+    /// The pen windows of this device are "Pen window", a collaborator's pen window "<label>
+    /// (pen window)" (`specs/0158-pen-display` criterion 17, ADR 0096 A7).
     pub(super) fn live_peer_label(&self, peer: u64) -> Option<String> {
+        if self.pen_peers.contains(&peer) {
+            return Some(super::window_link::PEN_WINDOW_LABEL.to_owned());
+        }
         let link = self.sync.as_ref()?;
         link.peers.values().find_map(|p| {
             let presence = p.presence.as_ref()?;
-            (presence.peer_id() == Some(peer)).then(|| presence.label.clone())
+            if presence.peer_id() == Some(peer) {
+                Some(presence.label.clone())
+            } else {
+                (presence.pen_peer_id() == Some(peer))
+                    .then(|| format!("{} (pen window)", presence.label))
+            }
         })
     }
 

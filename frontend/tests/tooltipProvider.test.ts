@@ -39,11 +39,13 @@ test("the app root renders the one TooltipProvider, around everything", () => {
   assert.match(main, /<App \/>/, "main.tsx mounts App, which owns the provider");
 });
 
+// The pen window (`?window=pen`, ADR 0096 A10) is a second root next to App, mounted by main.tsx
+// in its place, so it owns the provider of its own tree.
 test("no other component declares a TooltipProvider of its own", () => {
   const owners = files
     .filter((path) => /<TooltipProvider[ >]/.test(text(path)))
     .map(rel);
-  assert.deepEqual(owners, ["App.tsx"]);
+  assert.deepEqual(owners, ["App.tsx", "pen/PenApp.tsx"]);
 });
 
 test("every file that renders a Tooltip or a SliderTip is a component under App", () => {

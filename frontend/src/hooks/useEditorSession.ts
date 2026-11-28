@@ -908,6 +908,9 @@ export interface EditorSession {
    * from the view repaints there instead of one frame late. Returns the
    * function that removes it. */
   addViewResizedListener: (listener: () => void) => () => void;
+  /** Registers a function that runs at the start of every frame, before the frame's state is
+   * read (the pen window's link, `specs/0158-pen-display` slice 2a). Returns its removal. */
+  addFrameHook: (hook: (session: WasmSession) => void) => () => void;
   /** A side pane now lies over the canvas's right `px` (0 for none): the canvas keeps its size,
    * the session's fit, centring and visibility rules use the visible part. */
   coverCanvasRight: (px: number) => void;
@@ -1475,6 +1478,14 @@ export function useEditorSession(
     };
   }, []);
 
+  const frameHooksRef = useRef(new Set<(session: WasmSession) => void>());
+  const addFrameHook = useCallback((hook: (session: WasmSession) => void) => {
+    frameHooksRef.current.add(hook);
+    return () => {
+      frameHooksRef.current.delete(hook);
+    };
+  }, []);
+
   /** The canvas's right px a side pane lies over (`specs/0077-font-preview` criterion 2). */
   const coveredRightRef = useRef(0);
   const coverCanvasRight = useCallback((px: number) => {
@@ -1548,8 +1559,10 @@ export function useEditorSession(
   const attachSession = useCallback(
     (session: WasmSession) =>
       enqueueSessionTask(async () => {
-        // A shared workspace's link goes on with the next document (`specs/0095-workspace`).
+        // A shared workspace's link goes on with the next document (`specs/0095-workspace`), and
+        // so does the pen window's link (`specs/0158-pen-display` slice 2a criterion 12).
         moveWorkspaceLink(sessionRef.current, session);
+        if (sessionRef.current) session.link_continue(sessionRef.current);
         sessionRef.current?.free();
         sessionRef.current = null;
         // A new or opened project keeps the pane over the canvas (`coverCanvasRight`).
@@ -1717,6 +1730,7 @@ export function useEditorSession(
         // One `pen_samples` call per frame, before the frame is drawn (ADR 0095 decision 2).
         const flushed = pencilRef.current.flush(session);
         if (flushed) afterPencilFlushRef.current(session, flushed.ended);
+        for (const hook of frameHooksRef.current) hook(session);
         const stateStart = perfStart();
         state = session.frame_state();
         perfSpan("loop: frame_state", stateStart);
@@ -3438,6 +3452,7 @@ export function useEditorSession(
     sync: syncFromSession,
     getSession,
     addViewResizedListener,
+    addFrameHook,
     coverCanvasRight,
     refreshCursor,
     setSelectedRadius,

@@ -115,6 +115,8 @@
     --rail-right: 116px;
     --toolbar-bg: #DCDCE0;
     --toolbar-icon: #3A3A3F;
+    /* `0158` slice 2b: the Pen window frame in the main window, an alias of the ink. */
+    --pen-view-frame: var(--toolbar-icon);
     --toolbar-icon-active-bg: #2F6FEE;
     --toolbar-icon-active-fg: #FFFFFF;
     --editor-accent: #2F6FEE;

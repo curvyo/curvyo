@@ -24,7 +24,7 @@ no new dependency, no `unsafe`, no document format change.
 - [ADR 0053](../../docs/adr/0053-editable-curves-and-width-profiles.md): slice 1 writes pressure
   into its centre line and width profile; no new format.
 - [ADR 0095](../../docs/adr/0095-pencil-stroke-pipeline-pen-samples-to-a-fitted-centre-line-with-a-width-profile.md)
-  (Proposed; accepted with the slice-1 PR):
+  (Accepted 2026-11-27, merged with PR #525):
   - `WasmSession::pen_samples(flat)` once per frame, 9-value records, beside `pointer_*`;
     `frontend/src/platform/penSamples.ts` feeds it for the Pencil, no touch (decisions 1, 2;
     criteria 10, 11);
@@ -54,6 +54,22 @@ no new dependency, no `unsafe`, no document format change.
     (decisions 5, 6; criterion 1);
   - lifecycle and remembered size, position, Follow flag (decision 7; criterion 3);
   - the pen reader attaches to each webview; only main holds the relay link (decisions 8, 10).
+  - amendment 2026-11-27 for 2a (criteria 1 to 20) and the hooks of 2b:
+    - A2 close order: a pen close is never held; main asks first, Cancel keeps both, then pen
+      closes, then main (2a criteria 10, 11);
+    - A3 no reopen at start, "offered" = the command (2a criterion 16);
+    - A4 `pen_window.json` format 1 in `app_config_dir()` (`ui-core::pen_window_place`, golden
+      `pen_window_v1.json`); 2b format 2 adds `follow_view`, `canvas_only` (2a 16, 2b 4, 5);
+    - A5 wire: `pen_window_open/close`, `bridge_watch(channel)`, `bridge_send(raw)`, hub's
+      `PEER_GONE`; one bundle per frame (assets, updates with `needs`, selection, controls);
+      export, import, mark; main `sync_export` after a pen import (2a 2 to 5, 8, 19);
+    - A6 refusal or seq gap → reload from main's `Session::pack`, fresh pen peer id; `Hold` and
+      `Release` around main's fate dialogs; `Save` (2a 9, 12, 13, 18);
+    - A7 relay: pen-peer ops pass the checks (read in code, local-relay test), `pen_peer` in
+      presence; pressure strokes are not shared at all yet (extended path history) (2a 17);
+    - A8 main-bound commands refused for the pen page by `curvyo-app::window_commands`, built in
+      2a (2b criterion 7);
+    - A9 pen reader per window label (2a 7); A10 module layout; A11 build order.
 
 ## Notes for the product owner and UX
 
@@ -67,4 +83,18 @@ no new dependency, no `unsafe`, no document format change.
   criterion 10 reads "within the Smoothing value plus 5 % of Max − Min of the last preview".
   Alternatively the preview shows the fitted curve live, which is slice 3.
 - ADR 0096 decision 4: a stroke or drag in progress shows in the other window only once committed;
-  criterion 1's 200 ms counts from the release.
+  the 200 ms of 2a criterion 2 counts from the release.
+- 2a criterion 17 (2026-11-27, ADR 0096 A12): the link carries width profiles (unshared
+  projects: pressure strokes appear in the other window with their profile). In a shared project
+  ADR 0053 refuses creating a width profile; today a Pencil stroke with pressure in a shared
+  project, from either window, is committed as a uniform stroke at Max width, unselected, with no
+  notice, and it reaches collaborators that way. Suggested wording: "a stroke drawn in the pen
+  window reaches a collaborator through the main window's next sync export, as the same stroke
+  drawn in the main window would (in a shared project without its width profile, ADR 0053)".
+  The silent drop without a notice is a slice-1 defect to decide.
+- 2b criterion 7's allow-list is built in 2a (ADR 0096 A8): the pen page exists there, and the
+  main page's start (`reset_project`, `set_dirty`) would otherwise change the main window's
+  project state. Suggested: 2a gets a criterion "the pen page's host calls outside the allow-list
+  are refused"; 2b criterion 7 checks the Pen layout against it.
+- 2a criterion 10, crash: detected on Linux through WebKitGTK's `web-process-terminated`; on
+  Windows and macOS only the window's destruction is seen (out of scope for tuning in 2a).

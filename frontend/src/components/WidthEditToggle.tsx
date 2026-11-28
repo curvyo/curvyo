@@ -12,7 +12,7 @@ import { WIDTH_PRESET_GLYPHS } from "@/lib/widthPresets";
  * refused start shows the session's reason below the button. A 14 px text button with the border of
  * its neighbours (Close path's Sharp and Smooth), filled while pressed (UX review 2026-11-12).
  */
-export function WidthEditToggle({ editor, inBar = false }: { editor: EditorSession; inBar?: boolean }) {
+export function WidthEditToggle({ editor, inBar = false, tall = false }: { editor: EditorSession; inBar?: boolean; tall?: boolean }) {
   const session = editor.getSession();
   const active = session?.width_edit_active() ?? false;
   const [notice, setNotice] = useState("");
@@ -29,7 +29,7 @@ export function WidthEditToggle({ editor, inBar = false }: { editor: EditorSessi
         <button
           type="button"
           aria-pressed={active}
-          className={`my-1 flex h-7 min-w-[96px] items-center justify-center gap-1.5 rounded-[5px] border px-3 text-sm whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
+          className={`my-1 flex ${tall ? "h-12" : "h-7"} min-w-[96px] items-center justify-center gap-1.5 rounded-[5px] border px-3 text-sm whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
             active ? "" : "hover:bg-[var(--editor-accent-hover)]"
           }`}
           style={

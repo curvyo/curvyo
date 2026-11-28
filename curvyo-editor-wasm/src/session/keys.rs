@@ -733,7 +733,13 @@ impl Session {
         self.recording_unguarded(|this| {
             this.flush_select_bar_preview();
             this.flush_style_preview();
-            match this.tool {
+            // The pen rail's Delete deletes the Pencil's selection as Select does (UX 9.2).
+            let tool = if this.tool == Tool::Pencil && this.link_is_pen() {
+                Tool::Select
+            } else {
+                this.tool
+            };
+            match tool {
                 Tool::Select => {
                     if this.refuse_marks_delete() {
                         return;

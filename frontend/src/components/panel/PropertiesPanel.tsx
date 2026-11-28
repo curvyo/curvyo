@@ -36,7 +36,7 @@ import { RegistrationMarksBlock } from "@/components/panel/RegistrationMarksBloc
 import type { PrintAndCutApi } from "@/hooks/usePrintAndCut";
 import { DocumentSection } from "@/components/panel/DocumentSection";
 import { CreditsBlock } from "@/components/panel/CreditsBlock";
-import { PenProbeButton } from "@/components/PenProbe";
+import { PenDisplaySection } from "@/components/PenProbe";
 import { ExportSvgSection } from "@/components/panel/ExportSvgSection";
 import { FileTab } from "@/components/panel/FileTab";
 import { WorkspaceSection } from "@/components/panel/WorkspaceSection";
@@ -564,7 +564,7 @@ export function PropertiesPanel({
                 exportSvg={<ExportSvgSection project={project} onReturnFocus={returnFocus} />}
                 credits={<CreditsBlock getSession={getSession} revision={editor.syncRevision} />}
                 extensions={<ExtensionsGroup workbenches={workbenches} />}
-                diagnostics={<PenProbeButton />}
+                diagnostics={<PenDisplaySection />}
                 workspace={
                   // The browser holds synced workspaces only (`specs/0096-own-devices-sync`
                   // criterion 35): the section is shown once it holds one.

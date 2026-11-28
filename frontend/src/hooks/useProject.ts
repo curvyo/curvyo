@@ -12,7 +12,7 @@ import {
 import { isMac } from "@/lib/historyText";
 import { createBusyGate } from "@/lib/busyGate";
 import { templateOutcome } from "@/lib/guideText";
-import { downloadSvg, invoke, isTauri, listen, PLATFORM } from "@/platform/host";
+import { closePenWindow, downloadSvg, invoke, isTauri, listen, PLATFORM } from "@/platform/host";
 import { withGradientNotice } from "@/hooks/useGradient";
 import { parseSvgExportAnswer, parseTimedNotice, type SvgExportOptions } from "@/lib/svgExport";
 import {
@@ -97,6 +97,10 @@ export interface ProjectInfo {
 
 export interface ProjectApi {
   info: ProjectInfo;
+  /** A dialog that decides the project's fate is open: the unsaved check, or the host's Open or
+   * Save as dialog; the pen window waits meanwhile (`specs/0158-pen-display` slice 2a
+   * criterion 13). */
+  fateOpen: boolean;
   /** The project has changes that no saved file holds. */
   dirty: boolean;
   /** The check on screen, or `null`. */
@@ -255,6 +259,8 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     setCheckState(next);
   }, []);
   const checkCounter = useRef(0);
+  /** The host's Open or Save as dialog is up (criterion 13 of `0158` slice 2a). */
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   /** An Open or Save dialog is up, or a write is running: its answer belongs to the project that
    * was open when it started, so nothing that ends that project starts meanwhile. */
@@ -434,7 +440,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       return;
     }
     try {
-      const picked = await invoke<OpenPayload | null>("pick_project", { kind: "open" });
+      setDialogOpen(true);
+      const picked = await invoke<OpenPayload | null>("pick_project", { kind: "open" }).finally(
+        () => setDialogOpen(false),
+      );
       if (!picked) {
         return;
       }
@@ -655,8 +664,12 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     async (action: Action) => {
       switch (action.kind) {
         case "new":
+          await resetProject();
+          break;
         case "close":
           await resetProject();
+          // Close of the project to the start state closes the pen window (`0158` 2a crit. 12).
+          await closePenWindow().catch(() => undefined);
           break;
         case "open":
           await openFlow();
@@ -696,11 +709,16 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         // The thumbnail and the page pictures of the library are joined in one pass by the wasm
         // (`specs/0095` criterion 6, `specs/0137` criterion 2); the host writes the bytes.
         bytes = await editor.withPagePictures(bytes, thumbnail);
+        // Without a path the host's Save as dialog asks where: the pen window waits meanwhile.
+        const dialog = saveAs || !infoRef.current.path;
+        if (dialog) setDialogOpen(true);
         const outcome = await invoke<SaveOutcome>("save_project_bytes", {
           bytes: Array.from(bytes),
           saveAs,
           fileName: infoRef.current.fileName ?? suggestedName ?? DEFAULT_FILE_NAME,
           suggestedName,
+        }).finally(() => {
+          if (dialog) setDialogOpen(false);
         });
         if (outcome.kind === "cancelled") {
           return "cancelled";
@@ -961,6 +979,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
 
   return {
     info,
+    fateOpen: check !== null || dialogOpen,
     dirty,
     check,
     press,

@@ -57,6 +57,8 @@ import { useDocumentPanel } from "@/hooks/useDocumentPanel";
 import { usePanelOpen } from "@/hooks/usePanelOpen";
 import { type RecoveryApi, useRecovery } from "@/hooks/useRecovery";
 import { useProject } from "@/hooks/useProject";
+import { useMainWindowLink } from "@/hooks/useWindowLink";
+import { PenViewFrame } from "@/components/PenViewFrame";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useWorkspaceSync } from "@/hooks/useWorkspaceSync";
 import { useMembership } from "@/hooks/useMembership";
@@ -205,6 +207,8 @@ function Editor() {
   // The recovery copy of the open project and the offer of the copies a crash left
   // (`specs/0136-autosave-and-restore`).
   const recovery = useRecovery({ editor, project, panelOpen, panel: documentPanel });
+  // The pen window's link: its button, the hold around fate dialogs, its Save (`0158` 2a).
+  useMainWindowLink(editor, { fateOpen: project.fateOpen, save: project.save });
   useEffect(() => {
     recoveryRef.current = recovery;
   });
@@ -622,6 +626,7 @@ function Editor() {
           overlay={
             <>
               <PresenceOverlay getSession={editor.getSession} />
+              <PenViewFrame getSession={editor.getSession} />
               <CropOverlay api={cropBar} />
             </>
           }

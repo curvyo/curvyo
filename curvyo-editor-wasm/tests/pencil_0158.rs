@@ -640,3 +640,56 @@ fn key_p_picks_the_pencil() {
     });
     assert_eq!(session.tool(), Tool::Pencil);
 }
+
+/// The same line crossed by the tip, for the Eraser button.
+fn tip_across(session: &Session, x: f64, y0: f64, y1: f64) -> Vec<f64> {
+    let mut flat = eraser_across(session, x, y0, y1);
+    for record in flat.chunks_mut(PEN_SAMPLE_STRIDE) {
+        record[5] = TIP;
+    }
+    flat
+}
+
+/// Slice 2b criterion 2: the same samples through the Eraser button and as eraser-end samples
+/// give the same document and one "Erase" step; nothing is written when nothing was touched.
+#[test]
+fn slice_2b_criterion_2_the_eraser_button_erases_as_the_eraser_end_does() {
+    let (mut by_end, _, b) = with_lines();
+    by_end.pen_samples(&eraser_across(&by_end, 50.0, 40.0, 60.0));
+    let (mut by_button, _, _) = with_lines();
+    by_button.set_pencil_eraser(true);
+    assert!(by_button.pencil_eraser());
+    by_button.pen_samples(&tip_across(&by_button, 50.0, 40.0, 60.0));
+    let ids = |s: &Session| paths(s).iter().map(|p| p.id).collect::<Vec<_>>();
+    assert_eq!(ids(&by_button), ids(&by_end));
+    assert_eq!(ids(&by_button), vec![b]);
+    assert_eq!(undo_name(&mut by_button).as_deref(), Some("Erase"));
+    assert_eq!(by_button.undo_len(), by_end.undo_len());
+    assert_eq!(by_button.cursor_hint(), by_end.cursor_hint());
+    // Nothing touched: nothing written.
+    let (mut idle, _, _) = with_lines();
+    idle.set_pencil_eraser(true);
+    idle.pen_samples(&tip_across(&idle, 50.0, 60.0, 80.0));
+    assert_eq!(paths(&idle).len(), 2);
+    assert_eq!(undo_name(&mut idle), None);
+}
+
+/// Slice 2b criterion 2: with the button off the tip draws with the Pencil again, and the real
+/// eraser end still erases with the button on or off.
+#[test]
+fn slice_2b_criterion_2_off_the_tip_draws_and_the_eraser_end_keeps_working() {
+    let (mut session, _, _) = with_lines();
+    session.set_pencil_eraser(true);
+    session.set_pencil_eraser(false);
+    let flat = stroke(&session, Point::new(10.0, 120.0), 40.0, 30, 8.0, |_| 0.5);
+    session.pen_samples(&flat);
+    assert_eq!(paths(&session).len(), 3, "a stroke is drawn");
+    assert_eq!(undo_name(&mut session).as_deref(), Some("Pencil stroke"));
+    let (mut session, _, b) = with_lines();
+    session.set_pencil_eraser(true);
+    session.pen_samples(&eraser_across(&session, 50.0, 40.0, 60.0));
+    assert_eq!(
+        paths(&session).iter().map(|p| p.id).collect::<Vec<_>>(),
+        vec![b]
+    );
+}
