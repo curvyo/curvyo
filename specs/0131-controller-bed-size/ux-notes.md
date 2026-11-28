@@ -1,5 +1,7 @@
 # 0131 Bed size from the controller: UX notes
 
+Revised 2026-11-28 by `docs/design-drafts/2026-11-machine-families/ux-unify.md` section 4.3: the offer row moves with the work area into the machine's body in the Machines tab; a press is one undo step on the library record; the pages using the machine follow through the inline ask of ux-unify 4.5.
+
 ux-engineer, 2026-11-21. Covers criteria 1 to 5 of `specification.md` (Fragen 255 B, 256 A). Checked against the built `frontend/src/components/workbench/MachineBlock.tsx` (state row, Work area line), `ConnectorGroup.tsx` (Controller block), `frontend/src/components/panel/MachineControls.tsx`, `MachineProfileList.tsx`, `specs/0029` P31 (nothing in the Machine block moves under the pointer) and `docs/design-system.md` rows "Machine block (profile picker)", "Laser page Document tab (`0098`)", "Controller block (`0127`)", "Armed action", "No notice after a success". No hint or tip text. (Proposal) marks are vetoable at the demo (V1 to V5).
 
 ## 1. What changes where

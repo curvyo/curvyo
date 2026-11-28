@@ -13,6 +13,9 @@ day: a thin end-to-end slice through all three families first, then the rest. Sp
 decision 10 (the merge's home) by notes. **`needs-customer`** (answered): decision 4 (MF-REC-KIND,
 default A), decision 5 (Frage 433 A), decision 6 (Frage 431 A), decision 7 (Fragen 421 C, 430 A;
 mechanics **(Proposal)**), decision 9 (Frage 432 A). Everything else is architect scope.
+Note 2026-11-28: decision 3 ("no shared operation type") is amended for views only by
+[ADR 0098](0098-one-output-page-for-every-machine-family.md) (proposed): the laser's view types serve every
+family, dispatched by an enum; domain operation, job and timeline types stay per family, and there is still no trait.
 
 ## Context
 

@@ -156,3 +156,13 @@ profile's work area" for mat profiles).
   - the cut area (0.25 in inside the field, UX C6) is a fixture outline inside the page;
   - a Maker 3 profile has no Origin corner (the mat fixes it);
   - PL3 stores no extra register, because the page size is the page's own register.
+
+## Note 2026-11-28: ADR 0098 (UX revision `ux-unify.md`)
+
+- **PL11 is superseded** by ADR 0098 decision 1. The page is the active mat's cut area, not the
+  printed field. The mat origin is 6.35 mm left of and above the page origin, in the one constant
+  `PAGE_ORIGIN_ON_MAT`. The export maps page to mat coordinates before any writer runs, so PL6's
+  "page positions, with no translation" no longer holds. `write_svg` takes the mat field as its
+  size. Set mat resizes about the top-left corner.
+- The panel tabs, the shared views and the Machines tab are ADR 0098 decisions 2 to 4. The MVP's
+  `PlotterPanel` is deleted.

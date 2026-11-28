@@ -129,3 +129,13 @@ and one port golden (tatami rows) are also compared in the wasm build.
   DST from the hoop centre.
 - **Hoop check.** The check of EM7 uses the same centred field, so screen and file agree. Nothing
   on screen shows DST coordinates.
+
+## Note 2026-11-28: ADR 0098 (UX revision `ux-unify.md`)
+
+- **EM10's page and Set hoop sentences are superseded** by ADR 0098 decision 1. The page is the
+  active hoop's sewing field, with no 20 mm margin (`PAGE_MARGIN_MM` and `page_mm` go). Set hoop,
+  Pick and Reset resize about the page centre (`PageAnchor::Centre`). The DST translation from
+  the page centre is unchanged.
+- The panel tabs, the shared views (`KindView` stitch kinds, the row's `thread`, `PlayView` `step`
+  and `speed`) and the Machines tab are ADR 0098 decisions 2 to 4. The MVP's `EmbroideryPanel`
+  is deleted.

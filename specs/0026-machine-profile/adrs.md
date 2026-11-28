@@ -90,3 +90,12 @@ write (the machine profile record) and one project `format_version` bump. Both A
      `ParamKind::Display`, `ParamValue::Text`, the `host.*` values of the view JSON, and
      `host_param` in `curvyo-editor-wasm/src/session/manufacturing/commands.rs`. The 0093
      acceptance tests that read `values["host.*"]` move to the Machine block's view keys.
+
+## Note 2026-11-28: ADR 0098 decisions 4 and 5 (Frage 434 C)
+
+- Machine fields are edited only in the new Machines tab, as journal undo steps on the record.
+  The page copy setters and Update profile are removed.
+- The page keeps its copy (R1). "Not in your machines" offers Save as machine (R2). "Differs from
+  profile" offers Reset, one step, with no question (R3).
+- An inline offer to update the open project's pages comes only after a local Machines-tab edit
+  (R4, one step). There is no follow at open, reload or sync (R5).

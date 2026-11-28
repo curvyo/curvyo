@@ -1,5 +1,7 @@
 # 0026 Machine profile: UX notes
 
+Revised 2026-11-28 by `docs/design-drafts/2026-11-machine-families/ux-unify.md` section 4: on the page only the profile button, a "…" (Edit machine) and the state row remain; the fields of §2, the Connection group and the row actions of §3 (Duplicate, Rename, Delete) move to the new Machines tab, where every edit is one undo step (as Materials). Update profile leaves the page. After a machine edit the tab asks inline whether the pages using it follow (Frage 434 C, ux-unify 4.5); kept pages show "Differs from profile" with Reset. Motorised Z axis and Air assist become machine capabilities; their per-job use is on the operation (Frage 435).
+
 ux-engineer, 2026-11-03. Checked against `specification.md` (criteria 1 to 14), `adrs.md`, ADR 0038 and 0039, the built Laser tab of `specs/0093-laser-workbench-shell/ux-notes.md` (sections 3 to 6) with `frontend/src/components/workbench/ManifestTab.tsx`, and `docs/design-system.md` (rows "Schema-rendered workbench tab", "Action notice", "Bar number field", "Reference control"; Interaction conventions "Inline delete confirm" (`0081`), "No notice after a success", "Segmented icon control", "Hidden, not disabled"). Customer rules applied: no popups, inline groups, symbol buttons with tooltips, no hint labels or operating tips, a reversible action never asks, permit over refuse, notices at most 70 characters. Choices marked (Proposal) are vetoable at the demo.
 
 ## 1. Where it lives

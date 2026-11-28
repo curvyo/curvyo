@@ -158,3 +158,13 @@ so the outer boundary moves outward and holes shrink: the part and its holes kee
 Inside shrinks it, so the outer boundary moves inward and holes grow. A region piece that vanishes
 is the `TooNarrow` case of CN3. Holes still run before their outer boundary (CN3). The product
 owner can state this in criterion 6.
+
+## Note 2026-11-28: ADR 0098 (UX revision `ux-unify.md`)
+
+- The page size and its anchor are unchanged (the origin corner). The stock is drawn as a fixture
+  with its label.
+- CNC pages get Operations, Fixtures, a new **Tools** tab (`PanelTab::Tools`) and Machines (ADR
+  0098 decision 2).
+- The views are shared: Profile outside and inside are two `KindView`s of one stored Profile kind
+  with its Side. The play bar uses the shared `PlayView`, and `set_cnc_play` goes (decision 3).
+- The MVP's `CncPanel` is deleted.

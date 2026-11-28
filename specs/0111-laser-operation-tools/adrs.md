@@ -45,3 +45,12 @@ Status: Proposed (architect, 2026-11-12). Builds first of the three redesign sto
 ## Questions for the customer
 
 None new. Frage 212 and 213 keep their defaults (A, A). The ADR is `needs-customer` and is accepted with the story PR.
+
+## Note 2026-11-28: ADR 0098 decision 6 (Frage 435)
+
+- Motorised Z is a machine capability, edited in the Machines tab. It is no longer a page switch
+  (amends criterion 22).
+- An operation's Z offset (and its new Air option) is shown only while the page's machine has the
+  capability.
+- On a machine without it, the stored offset is kept, inactive and unwarned (Proposal), and it
+  works again on a capable machine.

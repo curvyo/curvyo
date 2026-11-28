@@ -41,3 +41,17 @@ Status: Proposed (architect, 2026-11-16), amended 2026-11-17 after the customer'
 - **`0101` summary** (M11, P28): its count lines are the gate's `NotAssigned`, `HiddenRuns`, `OutputOff` checks from `GateFacts` (same operations index); the operations view JSON drops its `summary` counts; "Runs N operations, M items." is the total's second line, from the same `summarize`. A change of accepted `0101` behaviour that the customer asked for (one compact tab); no new question.
 - **Play readout** (M13): time only; the session's play view drops the lengths, the timeline keeps them for the total and the tests.
 - **No format or dependency change** beyond ADR 0065's: no crate, no dependency, format 48 and profile record format 6 unchanged.
+
+## Note 2026-11-28: ADR 0098 decision 6 (Frage 435)
+
+- The profile's `air_assist` now means "the machine has air assist" (same key, no record format
+  change).
+- Every operation has a new `air` option, on by default and on when absent. The job writes `M8`
+  and `M9` per operation instead of for the whole job, so old projects keep their bytes.
+- `M8` before an operation with Air on, `M9` before one with Air off, and `M9` at the end only
+  while the air is on. Without the capability neither is written. Goldens and the format bump
+  (71 to 72) are in ADR 0098 decision 6.
+- Without the capability the setting is hidden, and a stored value is kept but inactive.
+- This amends criterion 25. The "Z offset with no motorised Z axis" warning of criteria 5 and 19
+  goes, because the setting is hidden (Proposal).
+- The project format takes one bump for `air`, the next free number at merge.

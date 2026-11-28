@@ -1,5 +1,7 @@
 # 0098 Page kinds: UX notes
 
+Revised 2026-11-28 by `docs/design-drafts/2026-11-machine-families/ux-unify.md`: the Kind switch of §2 is one row of 32 x 32px symbol buttons (24px glyph, word only as tooltip and accessible name; section 3 there); the laser page's Machine block of §9 keeps only the profile button, "…" and the state row, the Work area line, Origin corner and the `Ruler` action move to the Machines tab (section 4 there).
+
 ux-engineer, 2026-11-05. Checked against `specification.md` (criteria 1 to 21), `specs/0063-manufacturing-workbenches/concept-output-pages.md` §2.1, §2.2, §5.1, §7 and sketches a, b, f of `concept-sketches.html`, `docs/design-system.md` (rows "Properties panel: tabs", "Header row", "Machine block", "Inline delete confirm", "Bar overflow", "Hidden, not disabled", Interaction conventions), `PagesBlock.tsx`, `PageFrames.tsx`, `StatusBar.tsx`, `PropertiesPanel.tsx`, `WorkbenchSwitcher.tsx`, `MachineProfileList.tsx` and the UX notes of `0059`, `0066`, `0093`. Customer rules applied: no popups, no operating tips or hint labels (customer rule 2026-10-16: labels name a control or a state, nothing explains), no notice after a success, permit over refuse, symbols with tooltips only where there is no visible word. No new colour token: everything uses `--toolbar-icon`, `--panel-muted-fg`, `--editor-accent`, `--toolbar-bg`. Choices marked (Proposal) are vetoable at the demo.
 
 ## 1. The kind chip (one component, four places)
