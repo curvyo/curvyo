@@ -216,7 +216,14 @@ fn q17_q18_the_enter_key_starts_a_waiting_job_and_the_log_gets_a_line() {
             break;
         }
     }
-    let log = std::fs::read_to_string(dir.path().join("jobs.log")).unwrap();
+    // The status goes out before the log line is written, so the file can lag behind it.
+    let log = loop {
+        match std::fs::read_to_string(dir.path().join("jobs.log")) {
+            Ok(log) if log.ends_with('\n') => break log,
+            _ if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
+            other => panic!("no log line before the deadline: {other:?}"),
+        }
+    };
     let fields: Vec<&str> = log.trim_end_matches('\n').split('\t').collect();
     assert_eq!(
         &fields[1..],
