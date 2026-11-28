@@ -222,7 +222,7 @@ Facts checked in the code on 2026-11-28:
        for every offered page in one batch.
      - A page whose resize `check_layout` refuses (`OutOfRange`) is left out and keeps "Differs".
        The step goes on.
-   - **Fixture sets: Frage 436, open, default A.** The laser's fixture-set alignment
+   - **Fixture sets: Frage 436 answered A (customer, 2026-11-28).** The laser's fixture-set alignment
      (`align_fixture_pages` at open, reload and page activation; ADR 0059 §10, ADR 0060 §5a,
      accepted) silently makes the page's sets follow the record's. R1 covers the machine values
      and the page size, not the sets. Under default A the sets keep following silently. If the

@@ -72,6 +72,48 @@ export function OperationGlyph({ kind, size = 16 }: { kind: OperationKind; size?
           ))}
         </svg>
       );
+    // The families' kinds (ADR 0098 decision 3, `0159` 7.1, `0160` 2, `0161` 2): shape only.
+    case "draw":
+      return (
+        <svg {...common}>
+          <path d="M3 13 L11 5 L13 7 L5 15 Z" strokeLinejoin="round" />
+          <line x1="2" y1="14" x2="3" y2="13" />
+        </svg>
+      );
+    case "running_stitch":
+      return (
+        <svg {...common}>
+          <line x1="2" y1="8" x2="14" y2="8" strokeDasharray="2.5 1.5" />
+        </svg>
+      );
+    case "tatami_fill":
+      return (
+        <svg {...common}>
+          <line x1="2" y1="4" x2="14" y2="4" strokeDasharray="3 1" />
+          <line x1="2" y1="8" x2="14" y2="8" strokeDasharray="1 1 3 1" />
+          <line x1="2" y1="12" x2="14" y2="12" strokeDasharray="3 1" />
+        </svg>
+      );
+    case "satin":
+      return (
+        <svg {...common}>
+          <path d="M3 3 L13 5 L3 7 L13 9 L3 11 L13 13" strokeLinejoin="round" />
+        </svg>
+      );
+    case "profile_outside":
+      return (
+        <svg {...common}>
+          <rect x="4.25" y="4.25" width="7.5" height="7.5" strokeWidth={1} />
+          <rect x="1.25" y="1.25" width="13.5" height="13.5" strokeDasharray="3 1.5" />
+        </svg>
+      );
+    case "profile_inside":
+      return (
+        <svg {...common}>
+          <rect x="1.25" y="1.25" width="13.5" height="13.5" strokeWidth={1} />
+          <rect x="4.25" y="4.25" width="7.5" height="7.5" strokeDasharray="3 1.5" />
+        </svg>
+      );
     case "unknown":
       return <CircleHelp size={size} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />;
   }

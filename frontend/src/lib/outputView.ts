@@ -97,7 +97,8 @@ export interface RunsLine {
 
 /** The total (criterion 10). */
 export interface Total {
-  time: string;
+  /** "About 9 min 51 s"; `null` where the format has no time (Design Space). */
+  time: string | null;
   /** "Runs 3 operations, 16 items.", `null` when no work operation runs. */
   runs: RunsLine | null;
   /** "1 fixture job runs.", `null` when no fixture job runs. */
@@ -154,15 +155,16 @@ export interface SendButton {
 export interface OutputGroup {
   /** "Diode 10 W · GRBL[ · air assist]". */
   machine: string;
-  start: StartView;
+  /** The Start pick; `null` on a family page, which has none (ADR 0098 decision 3). */
+  start: StartView | null;
   checks: Check[];
   total: Total | null;
   export: ExportButton;
   /** `null` without a connector address on the profile. */
   send: SendButton | null;
   toolpathView: boolean;
-  /** The Frame button (`specs/0118` 2b). */
-  frame: FrameButton;
+  /** The Frame button (`specs/0118` 2b); `null` on a family page. */
+  frame: FrameButton | null;
 }
 
 /** What the page says of the Frame button: whether it frames, and the cause if not. */
@@ -185,6 +187,10 @@ export interface PlayView {
   playing: boolean;
   readout: string;
   enabled: boolean;
+  /** The fraction one arrow press moves (one stitch on an embroidery page); `null` elsewhere. */
+  step: number | null;
+  /** The thread at the head, "#RRGGBB" (embroidery); `null` elsewhere. */
+  colour: string | null;
 }
 
 type Json = Record<string, unknown>;
@@ -330,10 +336,10 @@ function asTotal(value: unknown): Total | null | undefined {
   if (!isObject(value)) return undefined;
   const fixtures = asFixtureLine(value.fixtures);
   const runs = asRunsLine(value.runs);
-  if (typeof value.time !== "string" || runs === undefined || fixtures === undefined || typeof value.lengths !== "string") {
+  if ((typeof value.time !== "string" && value.time !== null) || runs === undefined || fixtures === undefined || typeof value.lengths !== "string") {
     return undefined;
   }
-  return { time: value.time, runs, fixtures, lengths: value.lengths };
+  return { time: value.time as string | null, runs, fixtures, lengths: value.lengths };
 }
 
 function asExport(value: unknown): ExportButton | null {
@@ -380,12 +386,13 @@ function asFrame(value: unknown): FrameButton | null {
 /** The output group from its JSON value; `null` for `null` (another page) or a broken value. */
 export function decodeOutputGroup(value: unknown): OutputGroup | null {
   if (!isObject(value)) return null;
-  const start = asStart(value.start);
+  // A family page has no Start pick and no Frame button: the keys are absent (ADR 0098).
+  const start = value.start === undefined ? undefined : asStart(value.start);
   const checks = asList(value.checks, asCheck);
   const total = asTotal(value.total);
   const exportButton = asExport(value.export);
   const send = asSend(value.send);
-  const frame = asFrame(value.frame);
+  const frame = value.frame === undefined ? undefined : asFrame(value.frame);
   if (
     typeof value.machine !== "string" ||
     typeof value.toolpath_view !== "boolean" ||
@@ -398,7 +405,16 @@ export function decodeOutputGroup(value: unknown): OutputGroup | null {
   ) {
     return null;
   }
-  return { machine: value.machine, start, checks, total, export: exportButton, send, toolpathView: value.toolpath_view, frame };
+  return {
+    machine: value.machine,
+    start: start ?? null,
+    checks,
+    total,
+    export: exportButton,
+    send,
+    toolpathView: value.toolpath_view,
+    frame: frame ?? null,
+  };
 }
 
 /** The ring labels of the Toolpath view; `null` for a broken value. */
@@ -424,7 +440,9 @@ export function decodePlayView(value: unknown): PlayView | null {
   ) {
     return null;
   }
-  return { fraction, playing: value.playing, readout: value.readout, enabled: value.enabled };
+  const step = typeof value.step === "number" && value.step > 0 ? value.step : null;
+  const colour = typeof value.colour === "string" ? value.colour : null;
+  return { fraction, playing: value.playing, readout: value.readout, enabled: value.enabled, step, colour };
 }
 
 /** [`decodeOutputGroup`] of a JSON text. */

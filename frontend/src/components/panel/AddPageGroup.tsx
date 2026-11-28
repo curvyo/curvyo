@@ -1,5 +1,6 @@
 import { createElement, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
+import { Tooltip } from "@/components/ui/tooltip";
 import type { MachineProfileRow } from "@/hooks/useWorkbenches";
 import type { PageKindEntry } from "@/workbenches/registry";
 import { glyphOf } from "@/workbenches/iconNames";
@@ -23,8 +24,9 @@ function storeKind(kind: string) {
   }
 }
 
+/** A Kind symbol button (UX unify 3): 32 x 32 px (36 coarse), the 24 px glyph, no word. */
 const SEGMENT =
-  "flex h-7 min-w-0 flex-1 basis-0 items-center justify-center gap-1 rounded-md px-1 text-[13px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] aria-checked:bg-[var(--toolbar-icon-active-bg)] aria-checked:text-[var(--toolbar-icon-active-fg)] [@media(pointer:coarse)]:h-9";
+  "flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] aria-checked:bg-[var(--toolbar-icon-active-bg)] aria-checked:text-[var(--toolbar-icon-active-fg)] [@media(pointer:coarse)]:size-9";
 const TEXT_BUTTON =
   "h-7 rounded-md px-3 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] [@media(pointer:coarse)]:h-9";
 
@@ -134,25 +136,26 @@ export function AddPageGroup({
         className="flex flex-wrap gap-1"
       >
         {kinds.map((k, index) => (
-          <button
-            key={k.id}
-            type="button"
-            role="radio"
-            data-kind={k.id}
-            aria-checked={k.id === kind}
-            tabIndex={k.id === kind ? 0 : -1}
-            className={SEGMENT}
-            onClick={() => setKind(k.id)}
-            onKeyDown={(event) => onKindKey(event, index)}
-          >
-            {createElement(glyphOf(k.icon), {
-              size: 14,
-              strokeWidth: 1.5,
-              absoluteStrokeWidth: true,
-              "aria-hidden": true,
-            })}
-            <span className="truncate">{k.label}</span>
-          </button>
+          <Tooltip key={k.id} content={k.label} side="bottom">
+            <button
+              type="button"
+              role="radio"
+              data-kind={k.id}
+              aria-label={k.label}
+              aria-checked={k.id === kind}
+              tabIndex={k.id === kind ? 0 : -1}
+              className={SEGMENT}
+              onClick={() => setKind(k.id)}
+              onKeyDown={(event) => onKindKey(event, index)}
+            >
+              {createElement(glyphOf(k.icon), {
+                size: 24,
+                strokeWidth: 1.5,
+                absoluteStrokeWidth: true,
+                "aria-hidden": true,
+              })}
+            </button>
+          </Tooltip>
         ))}
       </div>
       {output && (

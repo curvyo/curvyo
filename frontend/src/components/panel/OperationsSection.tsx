@@ -1,3 +1,4 @@
+import { FamilyBodyView } from "@/components/panel/FamilyBody";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { DropBadgePill } from "@/components/DropBadgePill";
@@ -398,12 +399,14 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
 
   return (
     <section ref={addRef} aria-label="Operations" className="flex flex-col gap-2">
-      <PanelSwitch
-        label="Cuts last"
-        checked={view.cutsLast}
-        onCheckedChange={(on) => api.setCutsLast(on)}
-        onReturnFocus={onReturnFocus}
-      />
+      {view.cutsLast === null ? null : (
+        <PanelSwitch
+          label="Cuts last"
+          checked={view.cutsLast}
+          onCheckedChange={(on) => api.setCutsLast(on)}
+          onReturnFocus={onReturnFocus}
+        />
+      )}
       {view.rows.length === 0 ? (
         <p className="py-2 text-sm text-[var(--panel-muted-fg)]">No operations on this page.</p>
       ) : (
@@ -417,7 +420,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
           className="flex flex-col overflow-y-auto overflow-x-hidden"
         >
           <div aria-hidden style={{ height: range.before }} />
-          {sectionRuns(entries.slice(range.first, range.last), view.cutsLast).map((run, runIndex) => {
+          {sectionRuns(entries.slice(range.first, range.last), view.cutsLast === true).map((run, runIndex) => {
             const rows = run.entries.flatMap((entry) => (entry.kind === "row" ? [entry] : []));
             const header = run.entries.find((entry) => entry.kind === "header");
             const list = (
@@ -437,7 +440,14 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
                     open={selectedKeys.includes(operationIdKey(entry.row.id))}
                     unfolded={openBodyKey === operationIdKey(entry.row.id)}
                     body={
-                      openBodyKey === operationIdKey(entry.row.id) ? (
+                      openBodyKey === operationIdKey(entry.row.id) && entry.row.body !== null ? (
+                        <FamilyBodyView
+                          row={entry.row}
+                          body={entry.row.body}
+                          onEdit={(field, text) => api.editField(entry.row.id, field, text)}
+                          onReturnToRow={() => focusRow(listRef.current, entry.index, true)}
+                        />
+                      ) : openBodyKey === operationIdKey(entry.row.id) ? (
                         <OperationBody
                           row={entry.row}
                           pick={view.pick}

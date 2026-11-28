@@ -95,6 +95,9 @@ export interface OperationOptions {
   hatch: HatchOptions | null;
   /** The stored Z offset in mm (kept even while hidden). */
   zOffsetMm: number;
+  /** The Air assist toggle (ADR 0098 decision 6, Frage 435); `null` while the machine has no air
+   * assist (the stored value is kept). */
+  air: boolean | null;
   /** The Image settings group of an Image operation, always (`specs/0123` criterion 11);
    * `null` for every other kind. */
   image: ImageSettings | null;
@@ -432,7 +435,8 @@ function asOptions(value: unknown): OperationOptions | null | undefined {
   if (hatch === undefined || image === undefined || tabs === undefined || path === undefined || !finite(value.z_offset_mm)) {
     return undefined;
   }
-  return { hatch, zOffsetMm: value.z_offset_mm, image, tabs, path };
+  const air = typeof value.air === "boolean" ? value.air : null;
+  return { hatch, zOffsetMm: value.z_offset_mm, air, image, tabs, path };
 }
 
 function asPickChoices(value: unknown): PickChoice[] | null {

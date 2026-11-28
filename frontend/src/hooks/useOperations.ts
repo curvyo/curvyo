@@ -42,6 +42,8 @@ export interface OperationsApi {
   move: (id: OperationId, to: number) => boolean;
   /** Ticks (`on`) or unticks the selection in the operation. */
   tick: (id: OperationId, on: boolean) => boolean;
+  /** Types `text` into a family row's field (ADR 0098 decision 3): the message, empty when it took. */
+  editField: (id: OperationId, field: string, text: string) => string;
 }
 
 interface Snapshot {
@@ -107,6 +109,11 @@ export function useOperations(editor: OperationsEditor): OperationsApi {
   );
   const tick = useCallback(
     (id: OperationId, on: boolean) => run(false, (s) => s.set_selection_in_operation(operationIdText(id), on)),
+    [run],
+  );
+  const editField = useCallback(
+    (id: OperationId, field: string, text: string) =>
+      run("", (s) => s.edit_operation_field(operationIdText(id), field, text)),
     [run],
   );
 
@@ -190,5 +197,6 @@ export function useOperations(editor: OperationsEditor): OperationsApi {
     setCutsLast,
     move,
     tick,
+    editField,
   };
 }

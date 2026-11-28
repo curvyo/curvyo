@@ -45,7 +45,9 @@ test("the five kinds and the unknown kind decode with their section", () => {
   assert.equal(view.cutsLast, true);
   const kinds = view.rows.map((row) => row.kind);
   // The fixture has the five older kinds; Image has its own fixture (`options_image`).
-  assert.deepEqual(new Set(kinds), new Set(OPERATION_KINDS.filter((kind) => kind !== "image")));
+  // The family kinds of ADR 0098 have their own fixtures.
+  const laser = ["cut", "score", "engrave", "engrave_outline", "cut_out"];
+  assert.deepEqual(new Set(kinds), new Set(OPERATION_KINDS.filter((kind) => laser.includes(kind))));
   for (const row of view.rows) {
     if (row.kind === "cut" || row.kind === "cut_out") assert.equal(row.section, "cutting", row.name);
     else assert.equal(row.section, "marking", row.name);
@@ -175,6 +177,8 @@ test("Interval, the hatch options and the Z offset capability decode (AC 19 to 2
   assert.deepEqual(engrave.options, {
     hatch: { crosshatch: true, bidirectional: false, scanAngleDeg: 15, overscanPct: 5 },
     zOffsetMm: 1.5,
+    // ADR 0098 decision 6: no Air assist toggle without the machine's air assist.
+    air: null,
     image: null,
     tabs: null,
     path: null,

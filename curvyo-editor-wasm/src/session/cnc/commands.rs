@@ -1,15 +1,15 @@
 //! The commands of a CNC page (`specs/0161-cnc-output` criteria 1 to 4, UX 3 to 5): Add page,
-//! Pick and Save as profile, the connector address, the machine fields, the stock and the tool
-//! list, each one history step (the connector address is a record edit, not a document step).
+//! Pick and Save as profile, the connector address, the stock and the tool list, each one history
+//! step (the connector address is a record edit, not a document step).
 
 use curvyo_cnc_core::{
-    ADD_PAGE_COMMIT_LABEL, BUILTINS, CncCopy, CncProfile, DEFAULT_BUILTIN, PROCESS_ID, Rpm,
-    STOCK_KIND, Stock, TOOLS_FIELD, Tool, WORD, builtin, write_copy, write_record, write_tools,
+    ADD_PAGE_COMMIT_LABEL, BUILTINS, CncCopy, CncProfile, DEFAULT_BUILTIN, PROCESS_ID, STOCK_KIND,
+    Stock, TOOLS_FIELD, Tool, WORD, builtin, write_copy, write_record, write_tools,
 };
 use curvyo_document_core::{
     FixtureAdd, Length, NewFixture, NewOutputPage, NodeId, PageCorner, ProfileChange,
 };
-use curvyo_laser_core::{LibraryWrite, MAX_CONNECTION_CHARS, new_record_id};
+use curvyo_laser_core::{LibraryWrite, new_record_id};
 
 use super::super::Session;
 use super::CncPage;
@@ -22,12 +22,6 @@ pub(in crate::session) const ADD_TOOL_LABEL: &str = "add_tool";
 pub(in crate::session) const EDIT_TOOL_LABEL: &str = "edit_tool";
 /// The step of a tool's delete.
 pub(in crate::session) const REMOVE_TOOL_LABEL: &str = "remove_tool";
-/// The steps of the machine fields (UX 3).
-pub(in crate::session) const EDIT_Z_TRAVEL_LABEL: &str = "edit_z_travel";
-/// The step of Spindle max.
-pub(in crate::session) const EDIT_SPINDLE_MAX_LABEL: &str = "edit_spindle_max";
-/// The step of Safe height.
-pub(in crate::session) const EDIT_SAFE_HEIGHT_LABEL: &str = "edit_safe_height";
 /// The step of Pick profile.
 const PICK_PROFILE_LABEL: &str = "pick_profile";
 
@@ -177,83 +171,6 @@ impl Session {
     pub(in crate::session) fn cnc_record(&self) -> Option<CncProfile> {
         let id = self.active_cnc()?.copy.id?;
         self.manufacturing.cnc.find(&id).cloned()
-    }
-
-    /// The connector address of the active page's user profile (criterion 19, `0064`): written
-    /// to the record at `now_ms` and synced; no document step.
-    ///
-    /// # Errors
-    /// "Save as profile first." on a built-in; the length message beyond 200 characters.
-    pub fn set_cnc_connector(&mut self, address: &str, now_ms: i64) -> Result<bool, String> {
-        let mut record = self.cnc_record().ok_or("Save as profile first.")?;
-        let address = address.trim();
-        if address.chars().count() > MAX_CONNECTION_CHARS {
-            return Err(format!(
-                "The address is at most {MAX_CONNECTION_CHARS} characters."
-            ));
-        }
-        if record.values.connection.connector_address == address {
-            return Ok(false);
-        }
-        address.clone_into(&mut record.values.connection.connector_address);
-        record.modified = now_ms;
-        let (id, text) = (record.id.clone(), write_record(&record));
-        self.manufacturing.cnc.put(record);
-        self.manufacturing
-            .machine
-            .queue(LibraryWrite::Write { id, text });
-        Ok(true)
-    }
-
-    /// A machine field of the copy (UX 3): `z_travel_mm`, `spindle_max_rpm` or `safe_height_mm`
-    /// from the typed `text`, one step "Edit Z travel", "Edit spindle max" or "Edit safe height".
-    ///
-    /// # Errors
-    /// The field message for a value out of its range; empty for an unknown field.
-    pub fn set_cnc_machine_value(&mut self, field: &str, text: &str) -> Result<bool, String> {
-        let active = self.active_cnc().ok_or_else(String::new)?;
-        let mut copy = active.copy.clone();
-        let v = &mut copy.values;
-        let number = text.trim().replace(',', "").parse::<f64>().ok();
-        let label = match field {
-            "z_travel_mm" => {
-                let z = number
-                    .filter(|z| (active.stock.thickness.as_mm().max(1.0)..=1_000.0).contains(z))
-                    .ok_or_else(|| {
-                        format!(
-                            "Z travel is {} to 1,000 mm.",
-                            active.stock.thickness.as_mm().max(1.0)
-                        )
-                    })?;
-                v.z_travel = Length::from_mm(z);
-                if v.safe_height.as_mm() > z {
-                    v.safe_height = Length::from_mm(z);
-                }
-                EDIT_Z_TRAVEL_LABEL
-            }
-            "spindle_max_rpm" => {
-                v.spindle_max = number
-                    .filter(|n| n.fract() == 0.0 && *n >= 0.0)
-                    .and_then(|n| {
-                        // invariant: a whole, non-negative number checked above
-                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                        let n = n as u64;
-                        Rpm::new(n)
-                    })
-                    .ok_or("Spindle max is 0 to 100,000 rpm.")?;
-                EDIT_SPINDLE_MAX_LABEL
-            }
-            "safe_height_mm" => {
-                let max = v.z_travel.as_mm();
-                v.safe_height = number
-                    .filter(|h| (0.5..=max).contains(h))
-                    .map(Length::from_mm)
-                    .ok_or_else(|| format!("Safe height is 0.5 to {max} mm."))?;
-                EDIT_SAFE_HEIGHT_LABEL
-            }
-            _ => return Err(String::new()),
-        };
-        Ok(self.write_cnc_copy(&active, &copy, label, ProfileChange::EditName))
     }
 
     /// A stock field (criterion 3, UX 4): `width_mm`, `height_mm`, `thickness_mm` or `material`

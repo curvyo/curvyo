@@ -132,3 +132,46 @@ fn the_machine_group_names_the_copys_state_against_the_library() {
     assert!(s.save_output_profile([4; 16], 3).is_some());
     assert_eq!(state(&s), serde_json::Value::Null);
 }
+
+/// `0161` criterion 19 in the Machines tab: the connector address is a record field, and Send
+/// shows on a page using the record; no Update offer, the copy does not hold it.
+#[test]
+fn the_connector_address_is_set_in_the_machines_tab() {
+    let mut s = cnc();
+    let id = s
+        .duplicate_machine("generic-grbl-router", [5; 16], 1)
+        .unwrap();
+    assert!(s.pick_output_profile(&id));
+    assert!(s.output_group_view().unwrap().send.is_none());
+    assert_eq!(
+        s.set_machine_value(&id, "connector", "lab:4242", 2),
+        Ok(None)
+    );
+    assert!(s.machines_view().unwrap().follow.is_none());
+    let send = s.output_group_view().unwrap().send.unwrap();
+    assert_eq!(send.address, "lab:4242");
+}
+
+/// ADR 0098 decision 5: Update pages keeps the numbers an operation without its own settings
+/// reads, as a page edit of the defaults does (`0150` fills).
+#[test]
+fn update_pages_keeps_the_numbers_of_operations_without_settings() {
+    let mut s = Session::new(98_102);
+    s.add_page_of_kind("curvyo.laser", None).unwrap();
+    let id = s.duplicate_machine("generic-laser", [6; 16], 1).unwrap();
+    assert!(s.pick_output_profile(&id));
+    let page = s.active_page();
+    let a = s
+        .document
+        .create_rect(curvyo_document_core::RectBounds::from_corners(
+            curvyo_document_core::Point::new(page.origin.x + 10.0, page.origin.y + 10.0),
+            curvyo_document_core::Point::new(page.origin.x + 30.0, page.origin.y + 30.0),
+        ));
+    s.selection.set(&[a]);
+    s.press_operation_kind("cut", false).unwrap();
+    let line = |s: &Session| s.operations_view().unwrap().rows[0].numbers.clone();
+    let before = line(&s);
+    assert!(s.set_machine_value(&id, "default_power", "77", 2).is_ok());
+    assert!(s.follow_machine());
+    assert_eq!(line(&s), before, "the operation keeps its numbers");
+}

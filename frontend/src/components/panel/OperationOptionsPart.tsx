@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Hash } from "lucide-react";
+import { ArrowRightLeft, Hash, Wind } from "lucide-react";
 import { Toggle } from "radix-ui";
 
 import { EntryField } from "@/components/panel/EntryField";
@@ -8,7 +8,7 @@ import { lowerPart, optionStep, toggleNames, type OptionField, type OptionToggle
 import type { OperationRow } from "@/lib/operationsView";
 import { CHIP_IS_MESSAGE, outcomeOf, typedNumber } from "@/lib/settingsFieldText";
 
-const GLYPHS = { crosshatch: Hash, bidirectional: ArrowRightLeft } as const;
+const GLYPHS = { crosshatch: Hash, bidirectional: ArrowRightLeft, air: Wind } as const;
 
 interface OptionFieldViewProps {
   field: OptionField & { shown: string };

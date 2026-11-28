@@ -1,10 +1,10 @@
 //! The commands of an embroidery page (`specs/0160-embroidery` criteria 1 to 3, UX 3, 4): Add
-//! page, Pick and Save as profile, Edit speed and Set hoop, each one history step.
+//! page, Pick and Save as profile and Set hoop, each one history step.
 
 use curvyo_document_core::{FixtureAdd, NewFixture, NewOutputPage, NodeId, ProfileChange};
 use curvyo_embroidery_core::{
     ADD_PAGE_COMMIT_LABEL, BUILTINS, DEFAULT_BUILTIN, EmbroideryCopy, EmbroideryProfile, HoopSize,
-    PROCESS_ID, StitchesPerMin, WORD, builtin, resize_anchor, write_copy, write_record,
+    PROCESS_ID, WORD, builtin, resize_anchor, write_copy, write_record,
 };
 use curvyo_laser_core::{LibraryWrite, new_record_id};
 
@@ -12,8 +12,6 @@ use super::super::Session;
 
 /// The step of Set hoop.
 pub(in crate::session) const SET_HOOP_LABEL: &str = "set_hoop";
-/// The step of the Speed field.
-pub(in crate::session) const EDIT_SPEED_LABEL: &str = "edit_embroidery_speed";
 /// The step of Pick profile on an embroidery page.
 const PICK_PROFILE_LABEL: &str = "pick_profile";
 /// The message of a speed out of range (UX 10).
@@ -136,39 +134,6 @@ impl Session {
             text,
         });
         Some(id)
-    }
-
-    /// The Speed field (UX 3): the copy's stitches per minute from the typed `text`, one step
-    /// "Edit speed".
-    ///
-    /// # Errors
-    /// The field message for a value that is no whole number from 100 to 1 500.
-    pub fn set_embroidery_speed(&mut self, text: &str) -> Result<bool, String> {
-        let active = self.active_embroidery().ok_or_else(String::new)?;
-        let speed = text
-            .trim()
-            .replace(',', "")
-            .parse::<u64>()
-            .ok()
-            .and_then(StitchesPerMin::new)
-            .ok_or_else(|| SPEED_MESSAGE.to_owned())?;
-        let mut copy = active.copy.clone();
-        copy.values.speed = speed;
-        let map = write_copy(&copy);
-        let contents = self.page_contents().unwrap_or_default();
-        Ok(self.recording_unguarded(|this| {
-            this.document.batch(EDIT_SPEED_LABEL, |d| {
-                d.set_manufacturing_profile(
-                    active.id,
-                    &map,
-                    active.page.size,
-                    resize_anchor(&active.copy),
-                    ProfileChange::EditName,
-                    &contents,
-                )
-                .unwrap_or(false)
-            })
-        }))
     }
 
     /// Set hoop (criterion 3, ADR 0098 decision 1): the hoop `key` (`150x250`, `100x100`) of the

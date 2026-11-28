@@ -20,7 +20,7 @@
   literals renumbered. Goldens `embroidery_page_v70.curvyo`, `embroidery_page_damaged_v70.curvyo`
   in `curvyo-editor-wasm/tests/fixtures/`.
 - `curvyo-ui-core`: history names Set hoop, Edit speed; step scopes.
-- `frontend`: `EmbroideryPanel` (drawn by `ManifestTab` when the view has `embroidery`),
+- `frontend`: the shared output page of ADR 0098 (the panel is deleted),
   `lib/embroideryView.ts`, the embroidery machine list of Add page, the embroidery commands in
   `useWorkbenches`.
 
@@ -49,6 +49,13 @@
 - [x] E11. Frontend panel with play bar, Add page machine list (1 to 6, 12 to 14 visible).
 - [ ] Criterion 19 is the customer's sewn test on the EU7 (fact 3).
 
+### Revision 2026-11-28 (ADR 0098, `docs/design-drafts/2026-11-machine-families/ux-unify.md`)
+
+- [x] U1. The page is the machine work area (the active hoop's sewing field, Set hoop resizes about the hoop centre); writer goldens unchanged.
+- [x] U2. The family panel is withdrawn and deleted: the page uses the laser's Operations tab
+  (rows, unfolded body, output group with Export), Select-bar kinds, the Fixtures tab (Hoop), the
+  Machines tab, the page-label Toolpath toggle and the canvas play bar (one stitch per arrow, the thread swatch; the Speed segments are not built yet).
+
 ### Deviations (Proposal, for the UX and architect review)
 
 - The thread colour is stored as `thread_colour` in `op_settings`: an operation node has no
@@ -62,9 +69,6 @@
   short stitches".
 - DST `ST:` counts the records after the header (a trim is three), `+X`/`-X`/`+Y`/`-Y` are the
   needle points' extents with the hoop centre included; a colour change writes no trim before it.
-- The embroidery Machine, Hoop, Operations and Output sections are one panel in the Document tab
-  (as the plotter's), not split over the Fixtures and Operations tabs; the kind buttons are the
-  panel's buttons, the play bar sits in the Output section.
 - The hoop frame has square corners and no mounting tab; trims are an ink cross on a white
   disc, a colour change a disc of the new thread at its point (not the filled run ring).
 - The licence view of EM8 does not exist in the front end yet; Ink/Stitch and pyembroidery are

@@ -95,37 +95,6 @@ impl Session {
         })
     }
 
-    /// Takes the selection out of operation `id` of the active CNC page, one step.
-    pub fn remove_selection_from_cnc_operation(&mut self, id: NodeId) -> bool {
-        let Some(active) = self.active_cnc() else {
-            return false;
-        };
-        let Some(op) = active.operations.iter().find(|op| op.id == id) else {
-            return false;
-        };
-        let keys: Vec<Vec<NodeId>> = self
-            .selection_targets()
-            .targets
-            .iter()
-            .map(|&t| vec![t])
-            .collect();
-        let name = op.name.clone();
-        self.recording_named_counting(format!("Remove from {name}"), None, |this| {
-            this.document
-                .set_operation_members(id, &keys, false)
-                .unwrap_or(false)
-        })
-    }
-
-    /// Deletes operation `id` of the active CNC page with its memberships, one step.
-    pub fn delete_cnc_operation(&mut self, id: NodeId) -> bool {
-        let Some(active) = self.active_cnc() else {
-            return false;
-        };
-        active.operations.iter().any(|op| op.id == id)
-            && self.recording_unguarded(|this| this.document.delete_operation(id).is_ok())
-    }
-
     /// Sets the field `field` (`side`, `direction`, `depth_mm`, `tool`, `feed_mm_min`,
     /// `plunge_mm_min`) of Profile `id` to the typed `text` (criterion 5, UX 6.3), one step
     /// "Edit settings"; an empty feed follows the tool again.

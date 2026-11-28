@@ -143,8 +143,12 @@ export function PlayBar({ getSession, frame }: { getSession: () => WasmSession |
       </div>
       <span
         data-play-readout
-        className="shrink-0 whitespace-nowrap text-xs tabular-nums text-[var(--toolbar-icon)]"
+        className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs tabular-nums text-[var(--toolbar-icon)]"
       >
+        {view?.colour ? (
+          // The thread of the colour block at the head (embroidery, `0160` E11).
+          <span aria-hidden className="size-2.5 shrink-0 rounded-sm" style={{ background: view.colour }} />
+        ) : null}
         {readoutParts(readout).map((part, index) => (
           <span key={index} className={part.muted ? "text-[var(--panel-muted-fg)]" : undefined}>
             {part.text}

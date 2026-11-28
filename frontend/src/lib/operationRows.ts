@@ -25,6 +25,12 @@ export const KIND_WORDS: Record<OperationKind, string> = {
   engrave_outline: "Engrave + Outline",
   cut_out: "Cut-out",
   image: "Image",
+  draw: "Draw",
+  running_stitch: "Running stitch",
+  tatami_fill: "Tatami fill",
+  satin: "Satin",
+  profile_outside: "Profile outside",
+  profile_inside: "Profile inside",
   unknown: "Unknown operation",
 };
 

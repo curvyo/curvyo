@@ -58,11 +58,14 @@ export function usePlayBar(getSession: () => WasmSession | null): PlayBarApi {
       const action = playKeyAction(name);
       const session = getSession();
       if (!action || !session) return false;
-      if (action.kind === "step") session.step_play_position(action.percent);
+      // An embroidery page steps one stitch per arrow (ADR 0098 decision 3, `0160` E10).
+      if (action.kind === "step" && view?.step) {
+        session.set_play_position(Math.min(1, Math.max(0, view.fraction + Math.sign(action.percent) * view.step)));
+      } else if (action.kind === "step") session.step_play_position(action.percent);
       else session.set_play_position(action.fraction);
       return true;
     },
-    [getSession],
+    [getSession, view],
   );
   return { view, toggle, seek, key };
 }

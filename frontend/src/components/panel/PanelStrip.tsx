@@ -16,8 +16,7 @@ import {
   Check,
   PanelRightClose,
   PanelRightOpen,
-  Users,
-} from "lucide-react";
+  Users, Drill, Factory } from "lucide-react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
 
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -47,6 +46,8 @@ const GLYPHS: Record<string, Glyph> = {
   operations: ListTree,
   materials: SwatchBook,
   fixtures: HolderGlyph,
+  tools: Drill,
+  machines: Factory,
   history: History,
   fonts: CaseSensitive,
   library: LibraryBig,

@@ -15,6 +15,8 @@ export type PanelContent =
   | "operations"
   | "materials"
   | "fixtures"
+  | "tools"
+  | "machines"
   | "file" | "document" | "style" | "layers" | "history" | "fonts" | "library" | "empty";
 
 /** One tab of the panel's strip (`curvyo-ui-core::panel_tabs`). */

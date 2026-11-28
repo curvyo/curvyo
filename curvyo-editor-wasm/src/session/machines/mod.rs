@@ -74,6 +74,8 @@ pub enum FieldKind {
     Corner,
     /// A plain read-only line.
     Text,
+    /// A free text field (the connector address).
+    Entry,
 }
 
 /// One field of a machine's body, in the order of UX unify 4.3.

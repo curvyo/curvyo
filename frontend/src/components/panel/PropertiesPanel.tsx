@@ -2,6 +2,8 @@ import { useFramePage } from "@/hooks/useFramePage";
 import { Frame, TriangleAlert } from "lucide-react";
 import { selectedRow } from "@/lib/fixturesView";
 import { FixturesTab } from "@/components/workbench/FixturesTab";
+import { CncToolsTab, FamilyFixtures } from "@/components/workbench/FamilyFixtures";
+import { MachinesTab } from "@/components/workbench/MachinesTab";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
 import { MachineControls } from "@/components/panel/MachineControls";
 import { OperationsSection } from "@/components/panel/OperationsSection";
@@ -344,7 +346,7 @@ export function PropertiesPanel({
     output.session.sync,
     page.id ?? "",
     output.view?.frame ?? { enabled: false, cause: "Nothing to frame" },
-    output.view?.start.value === "head_position",
+    output.view?.start?.value === "head_position",
   );
   // The kind chip sits in the header of the page-scoped tabs only (`specs/0098` criterion 6).
   const pageScoped = ["document", "style", "layers", "snapping", "grid", "sketches", "parameters", "materials", "fixtures"].includes(
@@ -637,7 +639,7 @@ export function PropertiesPanel({
                       workbenches={workbenches}
                       unit={doc.view.unit}
                       library={devicesForTabs.library}
-                      output={output}
+                      onOpenMachines={() => activate("machines")}
                       onReturnFocus={returnFocus}
                     />
                   ) : page.off ? (
@@ -763,8 +765,14 @@ export function PropertiesPanel({
                   />
                 }
               />
+            ) : doc.view.content === "fixtures" && manufacturing && !manufacturing.machine ? (
+              <FamilyFixtures view={manufacturing} workbenches={workbenches} onReturnFocus={returnFocus} />
             ) : doc.view.content === "fixtures" ? (
               <FixturesTab api={fixtures} />
+            ) : doc.view.content === "tools" && manufacturing ? (
+              <CncToolsTab view={manufacturing} workbenches={workbenches} onReturnFocus={returnFocus} />
+            ) : doc.view.content === "machines" ? (
+              <MachinesTab workbenches={workbenches} onReturnFocus={returnFocus} />
             ) : doc.view.content === "materials" ? (
               <MaterialsTab api={materials} library={devicesForTabs.library} onReturnFocus={returnFocus} />
             ) : doc.view.content === "layers" ? (

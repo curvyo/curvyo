@@ -1,7 +1,7 @@
-// `specs/0159-cutting-plotter` slice 1 in the front end: the plotter panel drawn from the session's
-// view (Machine, Mat, Operations, Output; laser rows absent), the Add page group listing the plotter
+// `specs/0159-cutting-plotter` slice 1 in the front end: the Add page group listing the plotter
 // profiles for Plotter, the mat labels reader, and the browser session's plotter page (needs
-// `npm run build:wasm`). Rendered on the server through the vite harness of `panelStrip.test.ts`.
+// `npm run build:wasm`). The page's panel is the shared output page of ADR 0098
+// (`machine_families_0098.test.ts`).
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -49,26 +49,11 @@ async function render(module: string, name: string, props: Record<string, unknow
 
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
-const API = {
-  pick: () => true,
-  saveAs: () => "",
-  setDefault: () => "",
-  setMat: () => true,
-  setGrip: () => true,
-  setGrid: () => true,
-  press: () => "",
-  removeSelection: () => true,
-  remove: () => true,
-  setNumber: () => "",
-};
-
 type Session = {
   add_page_of_kind: (kind: string, profile: string) => string;
-  plotter_view_json: () => string;
   plotter_profiles_json: () => string;
   set_plotter_mat: (size: string) => boolean;
   set_plotter_mat_grid: (on: boolean) => boolean;
-  pick_plotter_profile: (id: string) => boolean;
   manufacturing_view_json: () => string;
 };
 
@@ -84,47 +69,17 @@ async function open(): Promise<Session> {
 test("criteria 1 to 3: a new plotter page is the 12 x 12 in mat, set mat resizes it", skipWasm, async () => {
   const s = await open();
   assert.notEqual(s.add_page_of_kind("curvyo.cutter", "cricut-maker-3"), "");
-  const view = JSON.parse(s.plotter_view_json());
+  const view = JSON.parse(s.manufacturing_view_json()).plotter;
   assert.equal(view.profile.name, "Cricut Maker 3");
   assert.equal(view.mat.size, "12x12");
   assert.equal(view.profile.area, "292.1 × 292.1 mm");
   assert.ok(s.set_plotter_mat("12x24"));
-  assert.match(JSON.parse(s.manufacturing_view_json()).status, /304\.8 × 609\.6 mm/);
+  assert.match(JSON.parse(s.manufacturing_view_json()).status, /292\.1 × 596\.9 mm/);
   const profiles = JSON.parse(s.plotter_profiles_json()) as { name: string }[];
   assert.deepEqual(
     profiles.map((p) => p.name),
     ["Cricut Maker 3", "Generic HPGL cutter"],
   );
-});
-
-test("criterion 8: the panel of a Design Space page hides the numbers, an HPGL page shows them", skipWasm, async () => {
-  const s = await open();
-  s.add_page_of_kind("curvyo.cutter", "");
-  const ds = await render("/src/components/workbench/PlotterPanel.tsx", "PlotterPanel", {
-    view: JSON.parse(s.plotter_view_json()),
-    api: API,
-    onExport: noop,
-    onToggleToolpath: noop,
-    onSelectItems: noop,
-    onReturnFocus: noop,
-  });
-  for (const word of ["Machine", "Cut area", "Output", "Design Space SVG", "Mat", "Mat grid", "Cut", "Draw", "Export job file"]) {
-    assert.match(text(ds), new RegExp(word), word);
-  }
-  assert.doesNotMatch(ds, /Default pressure|Max speed|Laser mode|Air assist|Max power/, "laser rows and DS numbers absent");
-  assert.match(ds, /role="radiogroup" aria-label="Mat size"/);
-  assert.ok(s.pick_plotter_profile("generic-hpgl-cutter"));
-  const hpgl = await render("/src/components/workbench/PlotterPanel.tsx", "PlotterPanel", {
-    view: JSON.parse(s.plotter_view_json()),
-    api: API,
-    onExport: noop,
-    onToggleToolpath: noop,
-    onSelectItems: noop,
-    onReturnFocus: noop,
-  });
-  assert.match(text(hpgl), /Work area/);
-  assert.match(hpgl, /Default pressure \(percent\)/);
-  assert.doesNotMatch(hpgl, /aria-label="Mat size"/, "no mat on a matless profile");
 });
 
 test("criterion 2: the Add page group lists the plotter profiles for Plotter", async () => {
@@ -144,7 +99,7 @@ test("criterion 2: the Add page group lists the plotter profiles for Plotter", a
   });
   // Drawing is the first kind on the server, so no machine list yet.
   assert.doesNotMatch(html, /role="listbox"/);
-  assert.match(text(html), /Plotter/);
+  assert.match(html, /aria-label="Plotter"/);
 });
 
 test("criterion 5: the mat labels reader keeps only well-formed labels", async () => {

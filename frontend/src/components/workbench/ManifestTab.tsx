@@ -2,10 +2,7 @@ import { TriangleAlert } from "lucide-react";
 
 import { InlinePickList } from "@/components/InlinePickList";
 import { MachineBlock } from "@/components/workbench/MachineBlock";
-import { CncPanel } from "@/components/workbench/CncPanel";
-import { EmbroideryPanel } from "@/components/workbench/EmbroideryPanel";
-import { PlotterPanel } from "@/components/workbench/PlotterPanel";
-import type { OutputApi } from "@/hooks/useOutput";
+import { MachineGroup } from "@/components/workbench/MachinesTab";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { ManufacturingView, WorkbenchesApi } from "@/hooks/useWorkbenches";
 import type { LibrarySyncApi } from "@/lib/devicesApi";
@@ -22,8 +19,8 @@ interface ManifestTabProps {
   unit: UnitSymbol;
   /** The library sync's toggles (`specs/0116-library-sync`). */
   library?: LibrarySyncApi;
-  /** Export, the Toolpath view and the check counts of an output page (`specs/0159`). */
-  output?: Pick<OutputApi, "exportJob" | "toggleRoute" | "selectItems">;
+  /** The "…" of the Machine group: the Machines tab (ADR 0098 decision 4). */
+  onOpenMachines?: () => void;
   onReturnFocus: () => void;
 }
 
@@ -33,42 +30,20 @@ interface ManifestTabProps {
  * (`specs/0026-machine-profile`) in the manifest's order; a `FixtureList` block draws nothing here (the Fixtures tab, `specs/0113`). Nothing here names a
  * process.
  */
-export function ManifestTab({ contribution, pages, view, workbenches, unit, library, output, onReturnFocus }: ManifestTabProps) {
-  // A family with its own view draws its own panel (`specs/0159`): the laser blocks are absent.
-  if (view.plotter) {
+export function ManifestTab({ contribution, pages, view, workbenches, unit, library, onOpenMachines, onReturnFocus }: ManifestTabProps) {
+  // A plotter, embroidery or CNC page: the Machine group and Place page; everything else lives
+  // in its Operations, Fixtures, Tools and Machines tabs (ADR 0098, UX unify 4.1).
+  if (!view.machine && view.picker) {
     return (
-      <PlotterPanel
-        view={view.plotter}
-        api={workbenches.plotter}
-        onExport={() => void output?.exportJob()}
-        onToggleToolpath={(page) => output?.toggleRoute(page)}
-        onSelectItems={(ids) => output?.selectItems(ids)}
-        onReturnFocus={onReturnFocus}
-      />
-    );
-  }
-  if (view.embroidery) {
-    return (
-      <EmbroideryPanel
-        view={view.embroidery}
-        api={workbenches.embroidery}
-        onExport={() => void output?.exportJob()}
-        onToggleToolpath={(page) => output?.toggleRoute(page)}
-        onSelectItems={(ids) => output?.selectItems(ids)}
-        onReturnFocus={onReturnFocus}
-      />
-    );
-  }
-  if (view.cnc) {
-    return (
-      <CncPanel
-        view={view.cnc}
-        api={workbenches.cnc}
-        onExport={() => void output?.exportJob()}
-        onToggleToolpath={(page) => output?.toggleRoute(page)}
-        onSelectItems={(ids) => output?.selectItems(ids)}
-        onReturnFocus={onReturnFocus}
-      />
+      <div className="flex flex-col gap-4">
+        <MachineGroup
+          picker={view.picker}
+          workbenches={workbenches}
+          onOpenMachines={() => onOpenMachines?.()}
+          onReturnFocus={onReturnFocus}
+        />
+        <PlacePage pages={pages} workbenches={workbenches} onReturnFocus={onReturnFocus} />
+      </div>
     );
   }
   const blocks = contribution.tabs[0]?.blocks ?? [];

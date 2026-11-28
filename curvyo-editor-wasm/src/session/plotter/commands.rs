@@ -1,17 +1,15 @@
 //! The commands of a plotter page (`specs/0159-cutting-plotter` criteria 1 to 5, 8, `adrs.md`
-//! PL11): Add page, Pick and Save as profile, the default numbers, Set mat, Set grip and Mat
-//! grid, each one history step.
+//! PL11, ADR 0098): Add page, Pick and Save as profile, Set mat, Set grip and Mat grid, each one
+//! history step; the machine's numbers are the Machines tab's.
 
 use curvyo_cutter_core::{
-    ADD_PAGE_COMMIT_LABEL, BUILTINS, CutterCopy, CutterProfile, DEFAULT_BUILTIN, Field, Grip,
-    MatRead, MatSize, OpKind, PROCESS_ID, PressurePct, SpeedMmS, WORD, builtin, edit_setting,
-    mat_params, resize_anchor, write_copy, write_record,
+    ADD_PAGE_COMMIT_LABEL, BUILTINS, CutterCopy, CutterProfile, DEFAULT_BUILTIN, Grip, MatRead,
+    MatSize, PROCESS_ID, WORD, builtin, mat_params, resize_anchor, write_copy, write_record,
 };
 use curvyo_document_core::{FixtureAdd, NewFixture, NewOutputPage, NodeId, ProfileChange};
 use curvyo_laser_core::{LibraryWrite, new_record_id};
 
 use super::super::Session;
-use super::PlotterPage;
 
 /// The step of Set mat.
 pub(in crate::session) const SET_MAT_LABEL: &str = "set_mat";
@@ -21,12 +19,6 @@ pub(in crate::session) const SET_GRIP_LABEL: &str = "set_grip";
 pub(in crate::session) const MAT_GRID_LABEL: &str = "set_mat_grid";
 /// The step of Pick profile on a plotter page.
 pub(in crate::session) const PICK_PROFILE_LABEL: &str = "pick_profile";
-/// The step of a default number of the copy.
-pub(in crate::session) const EDIT_DEFAULT_PRESSURE_LABEL: &str = "edit_default_pressure";
-/// The step of the Default speed field.
-pub(in crate::session) const EDIT_DEFAULT_SPEED_LABEL: &str = "edit_default_speed";
-/// The step of the Max speed field.
-pub(in crate::session) const EDIT_MAX_SPEED_LABEL: &str = "edit_max_speed";
 
 impl Session {
     /// Every plotter profile the pick lists: the built-ins, then the maker's (criterion 2).
@@ -148,73 +140,6 @@ impl Session {
             text,
         });
         Some(id)
-    }
-
-    /// Sets a number of the copy: `default_pressure`, `default_speed` or `max_speed` from the
-    /// typed `text` (criterion 8, UX 4). `Err` with the field message when it does not read.
-    ///
-    /// # Errors
-    /// The message to show.
-    pub fn set_plotter_default(&mut self, field: &str, text: &str) -> Result<bool, String> {
-        let active = self.active_plotter().ok_or_else(String::new)?;
-        let mut values = active.copy.values.clone();
-        let n: u64 = text
-            .trim()
-            .parse()
-            .map_err(|_| "Enter a whole number.".to_owned())?;
-        let label = match field {
-            "default_pressure" => {
-                values.default_pressure =
-                    PressurePct::new(n).ok_or_else(|| "Pressure is 1 to 100 %.".to_owned())?;
-                EDIT_DEFAULT_PRESSURE_LABEL
-            }
-            "default_speed" => {
-                let speed = edit_setting(
-                    OpKind::Draw,
-                    curvyo_cutter_core::CutterSettings::defaults(&values),
-                    Field::Speed,
-                    text,
-                    values.max_speed,
-                )?
-                .speed;
-                values.default_speed = speed;
-                EDIT_DEFAULT_SPEED_LABEL
-            }
-            "max_speed" => {
-                values.max_speed = SpeedMmS::new(n)
-                    .ok_or_else(|| format!("Speed is 1 to {} mm/s.", SpeedMmS::LIMIT))?;
-                values.default_speed = values.default_speed.min(values.max_speed);
-                EDIT_MAX_SPEED_LABEL
-            }
-            _ => return Err(String::new()),
-        };
-        let copy = write_copy(&CutterCopy {
-            id: active.copy.id.clone(),
-            values,
-        });
-        Ok(self.write_plotter_copy(&active, &copy, label))
-    }
-
-    fn write_plotter_copy(
-        &mut self,
-        active: &PlotterPage,
-        copy: &serde_json::Map<String, serde_json::Value>,
-        label: &str,
-    ) -> bool {
-        let contents = self.page_contents().unwrap_or_default();
-        self.recording_unguarded(|this| {
-            this.document.batch(label, |d| {
-                d.set_manufacturing_profile(
-                    active.id,
-                    copy,
-                    active.page.size,
-                    resize_anchor(&active.copy),
-                    ProfileChange::EditName,
-                    &contents,
-                )
-                .unwrap_or(false)
-            })
-        })
     }
 
     /// Set mat (criteria 1, 3; ADR 0098 decision 1): the mat `size` (`12x12`, `12x24`) becomes the

@@ -146,6 +146,8 @@ test("every missing or mistyped field is refused", () => {
   for (const name of NAMES) {
     const { output, play, ring_labels: rings } = fixture(name);
     for (const broken of breakEveryField(output)) {
+      // ADR 0098: a family page has no Start pick and no Frame button, so their keys may be absent.
+      if (broken.how === "missing" && (broken.path === "start" || broken.path === "frame")) continue;
       assert.equal(decodeOutputGroup(broken.value), null, `${name}: ${broken.how} ${broken.path} must be refused`);
     }
     for (const broken of breakEveryField(rings)) {

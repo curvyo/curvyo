@@ -60,7 +60,7 @@ export const PATH_FIELDS = {
 
 /** A toggle of the lower part. */
 export interface OptionToggle {
-  option: "crosshatch" | "bidirectional";
+  option: "crosshatch" | "bidirectional" | "air";
   pressed: boolean;
 }
 
@@ -82,7 +82,7 @@ export function optionText(value: number | null): string {
 
 /** The name and tooltip of a toggle (no caption, UX 6.3). */
 export function toggleNames(option: OptionToggle["option"]): string {
-  return option === "crosshatch" ? "Crosshatch" : "Bidirectional fill";
+  return option === "crosshatch" ? "Crosshatch" : option === "air" ? "Air assist" : "Bidirectional fill";
 }
 
 /**
@@ -105,6 +105,8 @@ export function lowerPart(kind: OperationKind, settings: OperationSettings): Low
       { ...OPTION_FIELDS[1], shown: optionText(hatch.overscanPct) },
     );
   }
+  // Air assist on every kind while the machine has it (ADR 0098 decision 6, Frage 435).
+  if (options.air !== null) toggles.push({ option: "air", pressed: options.air });
   if (settings.zOffsetShown) fields.push({ ...OPTION_FIELDS[2], shown: optionText(options.zOffsetMm) });
   return toggles.length === 0 && fields.length === 0 ? null : { toggles, fields };
 }

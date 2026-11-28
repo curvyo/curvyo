@@ -91,13 +91,14 @@ fn criterion_1_2_add_page_is_the_150_x_250_field_with_the_w6_eu7() {
 #[test]
 fn criterion_2_save_as_profile_writes_an_embroidery_record_that_syncs() {
     let mut s = embroidery();
+    // ADR 0098 decision 4: Speed is edited in the Machines tab on the record, not on the page.
+    let id = s.save_embroidery_profile([3; 16], 1_000).unwrap();
+    let _ = s.take_machine_writes_json();
     assert_eq!(
-        s.set_embroidery_speed("2000"),
+        s.set_machine_value(&id, "speed", "2000", 1_001),
         Err("Speed is 100 to 1,500 stitches/min.".to_owned())
     );
-    assert_eq!(s.set_embroidery_speed("800"), Ok(true));
-    assert_eq!(undo_name(&mut s), "Edit speed");
-    let id = s.save_embroidery_profile([3; 16], 1_000).unwrap();
+    assert_eq!(s.set_machine_value(&id, "speed", "800", 1_002), Ok(None));
     let writes: Value = serde_json::from_str(&s.take_machine_writes_json()).unwrap();
     let text = writes[0]["text"].as_str().unwrap();
     assert!(text.contains("\"kind\": \"embroidery\"") && text.contains("\"speed_spm\": 800"));

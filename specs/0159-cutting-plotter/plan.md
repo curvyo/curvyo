@@ -58,7 +58,7 @@ slice 1, not groundwork, and comes with M1.
   `curvyo-editor-wasm/tests/fixtures/`.
 - `curvyo-ui-core`: history names Set mat, Set grip, Mat grid, Edit default pressure, Edit max
   speed; step scopes.
-- `frontend`: `PlotterPanel` (drawn by `ManifestTab` when the view has `plotter`), `MatLabels`,
+- `frontend`: the shared output page of ADR 0098 (the panel is deleted), `MatLabels`,
   `AddPageGroup` machine list per family, icons Slice, Spool, Drill, `--mat-*` tokens.
 
 ### Tasks
@@ -79,11 +79,15 @@ slice 1, not groundwork, and comes with M1.
 - [x] M1k. format 69 with the two goldens (17).
 - [x] M1l. frontend panel, mat labels, Add page machine list (1 to 11 visible).
 
+### Revision 2026-11-28 (ADR 0098, `docs/design-drafts/2026-11-machine-families/ux-unify.md`)
+
+- [x] U1. The page is the machine work area (the active mat's cut area, the mat drawn around it, `PAGE_ORIGIN_ON_MAT` maps to the mat for the SVG); writer goldens unchanged.
+- [x] U2. The family panel is withdrawn and deleted: the page uses the laser's Operations tab
+  (rows, unfolded body, output group with Export), Select-bar kinds, the Fixtures tab (Mat), the
+  Machines tab, the page-label Toolpath toggle and the canvas play bar; the plotter has no play bar yet.
+
 ### Deviations (Proposal, for the UX review)
 
-- The plotter's Machine, Mat, Operations and Output sections are one panel in the Document tab
-  (`ManifestTab`), not split over the Fixtures and Operations tabs; the Select-bar kind buttons
-  are the panel's Cut and Draw buttons.
 - Draw moves in the Toolpath view use the laser's Score stroke (1.5 px ink, dotted) instead of a
   solid ink stroke; no run-ring digits and no play axis in metres yet (UX C14).
 - The remembered profile per kind (UX C3) is not kept; Add page preselects Cricut Maker 3.

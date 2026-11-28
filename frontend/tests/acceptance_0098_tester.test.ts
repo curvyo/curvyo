@@ -85,7 +85,11 @@ test("AC1: the Add page group is an inline group with a Kind radiogroup Drawing 
   const radios = byRole(html, "radio");
   assert.equal(radios.length, 3);
   const text = html.replace(/<[^>]+>/g, " ");
-  for (const word of ["Drawing", "Sketch", "Laser", "Add", "Cancel"]) {
+  // ADR 0098 (UX unify 3): the kinds are symbol buttons, the word is the name and the tooltip.
+  for (const word of ["Drawing", "Sketch", "Laser"]) {
+    assert.match(html, new RegExp(`aria-label="${word}"`), word);
+  }
+  for (const word of ["Add", "Cancel"]) {
     assert.match(text, new RegExp(`\\b${word}\\b`), word);
   }
   // Drawing the first time (no stored kind on the server).

@@ -22,7 +22,7 @@
   the machine library load and the library sync; `curvyo-connector-core` becomes a normal
   dependency (the planner). Goldens `cnc_page_v71.curvyo`, `cnc_page_damaged_v71.curvyo`.
 - `curvyo-ui-core`: history names and step scopes of the stock, tools and machine fields.
-- `frontend`: `CncPanel` (drawn by `ManifestTab` when the view has `cnc`), `lib/cncView.ts`, the
+- `frontend`: the shared output page of ADR 0098 (the panel is deleted), `lib/cncView.ts`, the
   CNC machine list of Add page and the CNC commands with Send in `useWorkbenches`.
 
 ### Tasks
@@ -47,6 +47,13 @@
 - [x] C10. Library load and sync of CNC records (2); format 71 with the two goldens (20).
 - [x] C11. Frontend panel and Add page machine list (1 to 12, 19 visible).
 
+### Revision 2026-11-28 (ADR 0098, `docs/design-drafts/2026-11-machine-families/ux-unify.md`)
+
+- [x] U1. The page is the machine work area (the work area, unchanged); writer goldens unchanged.
+- [x] U2. The family panel is withdrawn and deleted: the page uses the laser's Operations tab
+  (rows, unfolded body, output group with Export and Send), Select-bar kinds, the Fixtures tab (Stock), the Tools tab, the
+  Machines tab, the page-label Toolpath toggle and the canvas play bar on the planner's time with the Z readout.
+
 ### Deviations (Proposal, for the UX and architect review)
 
 - **Connector spindle mode.** The grbl-serial controller refuses every job while GRBL reports
@@ -60,13 +67,10 @@
   (CN11 says its fill rule). Same result for every ordinary drawing.
 - The plunge goes from the safe height to the pass depth at the plunge feed (criterion 12 read
   literally); no rapid down to a clearance plane first.
-- The CNC Machine, Stock, Tools, Operations and Output sections are one panel in the Document tab
-  (as the plotter's and embroidery's), not split over a Fixtures, a Tools and the Operations tab;
-  the Profile buttons are the panel's. The Tool pick is a segment row, not the material pick look.
-  Tools cannot be renamed yet (the name follows the diameter, UX N2).
-- Send in the panel: a Send button and the connector's state line with the job's line; the 0118
-  machine controls footer (Pause, Stop, Home, Jog) is not shown on CNC pages yet. The connector
-  address is a field on a saved profile (a built-in has none), not the 0064 Connection group.
+- The Tool pick is a Choice strip of the page's tools, not the material pick look. Tools cannot be
+  renamed yet (the name follows the diameter, UX N2).
+- The 0118 machine controls footer (Pause, Stop, Home, Jog) is not shown on CNC pages yet. The
+  connector address is set on a saved profile (a built-in has none), not the 0064 Connection group.
 - The Toolpath view draws the tool band on the first pass only (passes share the drawn path, UX
   N7) and has no arrowheads; the stock label "Plywood · 10 mm" is not drawn.
 - The virtual GRBL treats `G2`/`G3` as straight moves to their end (the writer writes none), runs

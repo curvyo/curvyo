@@ -69,13 +69,14 @@ export function OutputGroup({
   };
   const exportOn = view.export.enabled;
   const describedBy = "output-export-reason";
-  const options = view.start.options.map((option) => ({
+  const start = view.start;
+  const options = (start?.options ?? []).map((option) => ({
     id: option.value,
     name: option.label,
     pickable: true,
     note: null,
   }));
-  const current = view.start.options.find((option) => option.value === view.start.value);
+  const current = start?.options.find((option) => option.value === start.value);
   const fixtureLine = view.total?.fixtures ?? null;
   return (
     <section aria-label="Output" data-output-group className="flex flex-col gap-2">
@@ -85,20 +86,23 @@ export function OutputGroup({
         <span className="font-semibold">{machine.name}</span>
         <span className="text-[var(--panel-muted-fg)]">{machine.rest}</span>
       </p>
-      <OutputPick
-        label="Start"
-        Icon={Crosshair}
-        value={view.start.value ?? ""}
-        valueText={view.start.damaged ? START_DAMAGED : (current?.label ?? "Machine origin")}
-        options={options}
-        buttonRef={startButton}
-        openRequest={startRequest}
-        onPick={(id) => api.setStart(id as StartValue)}
-        onReturnFocus={onReturnFocus}
-        dataName="data-start-pick"
-      />
-      {view.start.userOrigin === null ? null : (
-        <UserOriginRow point={view.start.userOrigin} api={api} onReturnFocus={onReturnFocus} />
+      {start === null ? null : (
+        // No Start pick on a family page (UX unify 6).
+        <OutputPick
+          label="Start"
+          Icon={Crosshair}
+          value={start.value ?? ""}
+          valueText={start.damaged ? START_DAMAGED : (current?.label ?? "Machine origin")}
+          options={options}
+          buttonRef={startButton}
+          openRequest={startRequest}
+          onPick={(id) => api.setStart(id as StartValue)}
+          onReturnFocus={onReturnFocus}
+          dataName="data-start-pick"
+        />
+      )}
+      {start === null || start.userOrigin === null ? null : (
+        <UserOriginRow point={start.userOrigin} api={api} onReturnFocus={onReturnFocus} />
       )}
       {view.checks.length > 0 ? (
         <>
@@ -109,7 +113,9 @@ export function OutputGroup({
       {view.total ? <Divider /> : null}
       {view.total ? (
         <section aria-label="Total" role="status" aria-atomic="true" className="flex flex-col gap-0.5">
-          <p className="text-[13px] leading-4 font-semibold text-[var(--toolbar-icon)]">{view.total.time}</p>
+          {view.total.time === null ? null : (
+            <p className="text-[13px] leading-4 font-semibold text-[var(--toolbar-icon)]">{view.total.time}</p>
+          )}
           {view.total.runs === null ? null : (
             <p className="text-xs tabular-nums text-[var(--panel-muted-fg)]" data-total-runs>
               {view.total.runs.before}

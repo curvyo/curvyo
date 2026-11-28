@@ -22,8 +22,28 @@ export interface OperationId {
   counter: number;
 }
 
-/** The six kinds a row can have. */
-export const OPERATION_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out", "image"] as const;
+/** The kinds a row can have: the laser's six and the families' (ADR 0098 decision 3). */
+export const OPERATION_KINDS = [
+  "cut",
+  "score",
+  "engrave",
+  "engrave_outline",
+  "cut_out",
+  "image",
+  "draw",
+  "running_stitch",
+  "tatami_fill",
+  "satin",
+  "profile_outside",
+  "profile_inside",
+] as const;
+
+/** The unfolded body of a plotter, embroidery or CNC row: the family's fields as the session
+ * computes them (ADR 0098 decision 3); the laser has `settings` instead. */
+export type FamilyBody =
+  | { family: "plotter"; kind: string; fields: Record<string, unknown> }
+  | { family: "embroidery"; kind: string; fields: Record<string, unknown> }
+  | { family: "cnc"; fields: Record<string, unknown>; tools: { id: string; name: string; line2: string }[] };
 
 /** A row's kind; `unknown` for a kind this build does not know (criterion 26). */
 export type OperationKind = (typeof OPERATION_KINDS)[number] | "unknown";
@@ -73,6 +93,10 @@ export interface OperationRow {
   /** The Path options, Start and Direction rows of the item part (`specs/0139` criteria 19 to
    * 21); `null` when `itemTabs` is. */
   itemPath: ItemPath | null;
+  /** The thread of an embroidery row as "#RRGGBB"; `null` elsewhere. */
+  thread: string | null;
+  /** The unfolded body of a family row; `null` on a laser row. */
+  body: FamilyBody | null;
 }
 
 /** The path rows of the item part (`specs/0139` `ux-notes.md` 3.2 rows 2 to 4). */
@@ -168,7 +192,8 @@ export interface EnteredGroup {
 
 /** The whole Operations tab of the active laser page. */
 export interface OperationsView {
-  cutsLast: boolean;
+  /** The Cuts last switch; `null` where the family has none (embroidery, CNC). */
+  cutsLast: boolean | null;
   rows: OperationRow[];
   /** Whether the page's Operations view toggle is pressed (`specs/0111` criterion 15). */
   operationsView: boolean;
@@ -291,9 +316,11 @@ function asRow(value: unknown): OperationRow | null {
   ) {
     return null;
   }
-  // An unknown operation has no section (criterion 26); a known one has one.
+  const thread = typeof value.thread === "string" ? value.thread : null;
+  const body = asBody(value.body);
+  // An unknown operation has no section (criterion 26); a known laser one has one.
   const known = kind !== "unknown";
-  if (known && section === null) return null;
+  if (known && section === null && body === null && !FAMILY_KINDS.includes(kind)) return null;
   return {
     id,
     name: value.name,
@@ -313,10 +340,31 @@ function asRow(value: unknown): OperationRow | null {
     accessibleName: value.accessible_name,
     itemTabs,
     itemPath,
+    thread,
+    body,
   };
 }
 
-const BUTTON_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out", "image"] as const;
+/** The kinds only the other families have; their rows carry no section. */
+const FAMILY_KINDS: readonly OperationKind[] = ["draw", "running_stitch", "tatami_fill", "satin", "profile_outside", "profile_inside", "cut"];
+
+function asBody(value: unknown): FamilyBody | null {
+  if (!isObject(value) || !isObject(value.fields)) return null;
+  if (value.family === "plotter" || value.family === "embroidery") {
+    return { family: value.family, kind: typeof value.kind === "string" ? value.kind : "", fields: value.fields };
+  }
+  if (value.family === "cnc" && Array.isArray(value.tools)) {
+    const tools = value.tools.filter(isObject).map((t) => ({
+      id: String(t.id ?? ""),
+      name: String(t.name ?? ""),
+      line2: String(t.line2 ?? ""),
+    }));
+    return { family: "cnc", fields: value.fields, tools };
+  }
+  return null;
+}
+
+const BUTTON_KINDS = OPERATION_KINDS;
 
 function asKindButtons(value: unknown): KindButton[] | null | undefined {
   if (value === null) return null;
@@ -343,7 +391,7 @@ function asEnteredGroup(value: unknown): EnteredGroup | null | undefined {
  * active laser page with its extension on), or any value that is not the view.
  */
 export function decodeOperationsView(value: unknown): OperationsView | null {
-  if (!isObject(value) || typeof value.cuts_last !== "boolean" || !Array.isArray(value.rows)) {
+  if (!isObject(value) || (typeof value.cuts_last !== "boolean" && value.cuts_last !== null) || !Array.isArray(value.rows)) {
     return null;
   }
   const rows: OperationRow[] = [];
@@ -368,7 +416,7 @@ export function decodeOperationsView(value: unknown): OperationsView | null {
     return null;
   }
   return {
-    cutsLast: value.cuts_last,
+    cutsLast: value.cuts_last as boolean | null,
     rows,
     operationsView: value.operations_view,
     selectBarKinds,

@@ -11,6 +11,15 @@ use curvyo_laser_core::{
 use super::super::Session;
 use super::{Family, FieldKind, FollowView, MachineFieldView};
 
+/// One page's Update: its copy, size, anchor and the `0150` fills (laser only).
+type FollowWrite = (
+    NodeId,
+    serde_json::Map<String, serde_json::Value>,
+    DocumentSize,
+    curvyo_document_core::PageAnchor,
+    Vec<curvyo_document_core::SettingsWrite>,
+);
+
 /// The offer after an edit: the record and the pages that used it as it was.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::session) struct FollowOffer {
@@ -274,6 +283,15 @@ pub(super) fn cnc_fields(v: &curvyo_cnc_core::CncValues, builtin: bool) -> Vec<M
             n,
             builtin,
         ),
+        // Send's connector (`0161` criterion 19): a record value, no page follows it.
+        field(
+            "connector",
+            "Connector",
+            v.connection.connector_address.clone(),
+            "",
+            FieldKind::Entry,
+            builtin,
+        ),
         field(
             "output",
             "Output",
@@ -399,7 +417,11 @@ fn edit_cnc(
     key: &str,
     text: &str,
 ) -> Result<curvyo_cnc_core::CncValues, String> {
-    let n = typed(text)?;
+    let n = if key == "connector" {
+        0.0
+    } else {
+        typed(text)?
+    };
     match key {
         "width" | "height" => {
             if !(10.0..=10_000.0).contains(&n) {
@@ -422,6 +444,14 @@ fn edit_cnc(
         "spindle_max_rpm" => {
             v.spindle_max = curvyo_cnc_core::Rpm::new(whole(text)?)
                 .ok_or("Spindle max is 0 to 100,000 rpm.")?;
+        }
+        "connector" => {
+            let address = text.trim();
+            let limit = curvyo_laser_core::MAX_CONNECTION_CHARS;
+            if address.chars().count() > limit {
+                return Err(format!("The address is at most {limit} characters."));
+            }
+            address.clone_into(&mut v.connection.connector_address);
         }
         "safe_height_mm" => {
             let max = v.z_travel.as_mm();
@@ -680,7 +710,7 @@ impl Session {
     }
 
     /// Update pages (Frage 434 C, ADR 0098 R4): every offered page that still differs takes the
-    /// record's copy through its family's writer, in one step "Update <n> pages". A page whose
+    /// record's copy through its family's writer, in one step "Update `n` pages". A page whose
     /// new size cannot be laid out keeps its copy. Whether a page changed.
     pub fn follow_machine(&mut self) -> bool {
         let Some(offer) = self.machines_follow.take() else {
@@ -699,12 +729,7 @@ impl Session {
             return false;
         }
         let contents = self.page_contents().unwrap_or_default();
-        let writes: Vec<(
-            NodeId,
-            serde_json::Map<String, serde_json::Value>,
-            DocumentSize,
-            curvyo_document_core::PageAnchor,
-        )> = pages
+        let writes: Vec<FollowWrite> = pages
             .iter()
             .filter_map(|page| self.follow_write(family, *page, &offer.id))
             .collect();
@@ -716,14 +741,16 @@ impl Session {
         self.recording_named_counting(label, None, |this| {
             this.document.batch("update_pages", |d| {
                 let mut any = false;
-                for (page, map, size, anchor) in &writes {
+                for (page, map, size, anchor, fills) in &writes {
                     any |= d
-                        .set_manufacturing_profile(
+                        .set_manufacturing_profile_filled(
                             *page,
                             map,
                             *size,
                             *anchor,
                             ProfileChange::Reset,
+                            None,
+                            fills,
                             &contents,
                         )
                         .unwrap_or(false);
@@ -734,17 +761,7 @@ impl Session {
     }
 
     /// The copy, page size and anchor the page `page` takes from the record `id`.
-    fn follow_write(
-        &self,
-        family: Family,
-        page: NodeId,
-        id: &str,
-    ) -> Option<(
-        NodeId,
-        serde_json::Map<String, serde_json::Value>,
-        DocumentSize,
-        curvyo_document_core::PageAnchor,
-    )> {
+    fn follow_write(&self, family: Family, page: NodeId, id: &str) -> Option<FollowWrite> {
         let m = self.document.manufacturing(page)?;
         let size = m.page.as_ref()?.size;
         Some(match family {
@@ -756,11 +773,23 @@ impl Session {
                     right: origin.is_right(),
                     bottom: origin.is_bottom(),
                 };
+                // The `0150` fills: operations without their own numbers keep what they read
+                // (as `write_active_copy`).
+                let before = curvyo_laser_core::read_copy(
+                    m.profile.as_ref(),
+                    m.legacy_machine_name.as_deref(),
+                );
+                let fills = if before.copy.values.defaults == copy.values.defaults {
+                    Vec::new()
+                } else {
+                    self.derived_fills(Some(page))
+                };
                 (
                     page,
                     curvyo_laser_core::write_copy(&copy),
                     record.work_area,
                     anchor.into(),
+                    fills,
                 )
             }
             Family::Plotter => {
@@ -772,7 +801,13 @@ impl Session {
                     size
                 };
                 let anchor = curvyo_cutter_core::resize_anchor(&copy);
-                (page, curvyo_cutter_core::write_copy(&copy), size, anchor)
+                (
+                    page,
+                    curvyo_cutter_core::write_copy(&copy),
+                    size,
+                    anchor,
+                    Vec::new(),
+                )
             }
             Family::Embroidery => {
                 let record = self.embroidery_profile(id)?;
@@ -783,6 +818,7 @@ impl Session {
                     curvyo_embroidery_core::write_copy(&copy),
                     size,
                     anchor,
+                    Vec::new(),
                 )
             }
             Family::Cnc => {
@@ -790,13 +826,19 @@ impl Session {
                 let copy = curvyo_cnc_core::CncCopy::of(&record);
                 let anchor = curvyo_cnc_core::resize_anchor(&copy);
                 let size = copy.values.work_area;
-                (page, curvyo_cnc_core::write_copy(&copy), size, anchor)
+                (
+                    page,
+                    curvyo_cnc_core::write_copy(&copy),
+                    size,
+                    anchor,
+                    Vec::new(),
+                )
             }
         })
     }
 
     /// Duplicate (UX unify 4.2, "+ Machine" too): a copy of the machine `id` of any family,
-    /// "<name> copy", added to its library. The new id.
+    /// "`name` copy", added to its library. The new id.
     pub fn duplicate_machine(&mut self, id: &str, random: [u8; 16], now_ms: i64) -> Option<String> {
         let new_id = new_record_id(random);
         match self.family_of_record(id)? {

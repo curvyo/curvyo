@@ -4,10 +4,10 @@ import type { EditorSession } from "@/hooks/useEditorSession";
 import { storeExtensions } from "@/lib/extensionsFile";
 import { flushMachineWrites } from "@/lib/machineProfilesFile";
 import { flushMaterialWrites } from "@/lib/materialsFile";
-import { linkStore } from "@/hooks/useLinkEntry";
 import type { CncView } from "@/lib/cncView";
 import type { EmbroideryView } from "@/lib/embroideryView";
 import type { PlotterView } from "@/lib/plotterView";
+import { decodeMachinesView, type MachinePicker, type MachinesView } from "@/lib/machinesView";
 import { NO_WORKBENCHES, type WorkbenchList } from "@/workbenches/registry";
 
 /** The active laser page's values (`manufacturing_view_json`), `null` on another page. */
@@ -29,6 +29,8 @@ export interface ManufacturingView {
     visible: boolean;
     values: Record<string, number | string>;
   }[];
+  /** The Machine group of every output page (ADR 0098 decision 4). */
+  picker?: MachinePicker | null;
   /** The plotter page's own view (`specs/0159`), present on a plotter page only. */
   plotter?: PlotterView | null;
   /** The embroidery page's own view (`specs/0160`), present on an embroidery page only. */
@@ -138,6 +140,11 @@ export function useWorkbenches(editor: EditorSession) {
     const session = getSession();
     return session ? (JSON.parse(session.cnc_profiles_json()) as MachineProfileRow[]) : [];
   }, [getSession, syncRevision]);
+  const machinesView = useMemo<MachinesView | null>(() => {
+    void syncRevision;
+    const session = getSession();
+    return session ? decodeMachinesView(session.machines_view_json()) : null;
+  }, [getSession, syncRevision]);
   const plotterProfiles = useMemo<MachineProfileRow[]>(() => {
     void syncRevision;
     const session = getSession();
@@ -154,68 +161,44 @@ export function useWorkbenches(editor: EditorSession) {
       "curvyo.embroidery": embroideryProfiles,
       "curvyo.cnc": cncProfiles,
     } as Record<string, MachineProfileRow[]>,
-    /** The commands of a plotter page (`specs/0159`); each returns what the session says. */
+    /** The mat of a plotter page (`specs/0159`, Fixtures tab); each returns what the session says. */
     plotter: {
-      pick: (id: string) => run((session) => session.pick_plotter_profile(id)) ?? false,
-      saveAs: () => run((session) => session.save_plotter_profile(randomBytes(), Date.now())) ?? "",
-      /** `default_pressure`, `default_speed` or `max_speed`; the field message or "". */
-      setDefault: (field: string, text: string) => run((session) => session.set_plotter_default(field, text)) ?? "",
       setMat: (size: string) => run((session) => session.set_plotter_mat(size)) ?? false,
       setGrip: (grip: string) => run((session) => session.set_plotter_grip(grip)) ?? false,
       setGrid: (on: boolean) => run((session) => session.set_plotter_mat_grid(on)) ?? false,
-      press: (kind: string, shift: boolean) => run((session) => session.press_plotter_kind(kind, shift)) ?? "",
-      removeSelection: (id: string) => run((session) => session.remove_selection_from_plotter_operation(id)) ?? false,
-      remove: (id: string) => run((session) => session.delete_plotter_operation(id)) ?? false,
-      /** `pressure`, `speed` or `passes`; the field message or "". */
-      setNumber: (id: string, field: string, text: string) =>
-        run((session) => session.edit_plotter_setting(id, field, text)) ?? "",
     },
-    /** The commands of an embroidery page (`specs/0160`); each returns what the session says. */
+    /** The hoop of an embroidery page (`specs/0160`, Fixtures tab). */
     embroidery: {
-      pick: (id: string) => run((session) => session.pick_embroidery_profile(id)) ?? false,
-      saveAs: () => run((session) => session.save_embroidery_profile(randomBytes(), Date.now())) ?? "",
-      setSpeed: (text: string) => run((session) => session.set_embroidery_speed(text)) ?? "",
       setHoop: (key: string) => run((session) => session.set_embroidery_hoop(key)) ?? false,
-      press: (kind: string, shift: boolean) => run((session) => session.press_embroidery_kind(kind, shift)) ?? "",
-      removeSelection: (id: string) => run((session) => session.remove_selection_from_embroidery_operation(id)) ?? false,
-      remove: (id: string) => run((session) => session.delete_embroidery_operation(id)) ?? false,
-      setNumber: (id: string, field: string, text: string) =>
-        run((session) => session.edit_embroidery_setting(id, field, text)) ?? "",
-      setThread: (id: string, hex: string) => run((session) => session.set_embroidery_thread(id, hex)) ?? false,
-      /** The simulation's position (session state, no step). */
-      play: (position: number) => {
-        run((session) => session.set_embroidery_play(position));
-      },
-      hsvOf: (rgb: number) => {
-        const [hue, saturation, value] = getSession()?.colour_hsv(rgb) ?? [-1, 0, 0];
-        return [hue, saturation, value] as const;
-      },
-      rgbOf: (hue: number, saturation: number, value: number) => getSession()?.hsv_colour(hue, saturation, value) ?? 0,
     },
-    /** The commands of a CNC page (`specs/0161`); each returns what the session says. */
+    /** The stock and tools of a CNC page (`specs/0161`, Fixtures and Tools tabs). */
     cnc: {
-      pick: (id: string) => run((session) => session.pick_cnc_profile(id)) ?? false,
-      saveAs: () => run((session) => session.save_cnc_profile(randomBytes(), Date.now())) ?? "",
-      setConnector: (address: string) => run((session) => session.set_cnc_connector(address, Date.now())) ?? "",
-      setMachine: (field: string, text: string) => run((session) => session.set_cnc_machine_value(field, text)) ?? "",
       setStock: (field: string, text: string) => run((session) => session.edit_cnc_stock(field, text)) ?? "",
       addTool: () => run((session) => session.add_cnc_tool(randomBytes())) ?? "",
       setTool: (id: string, field: string, text: string) => run((session) => session.edit_cnc_tool(id, field, text)) ?? "",
       removeTool: (id: string) => run((session) => session.remove_cnc_tool(id)) ?? false,
-      press: (side: string, shift: boolean) => run((session) => session.press_cnc_profile(side, shift)) ?? "",
-      removeSelection: (id: string) => run((session) => session.remove_selection_from_cnc_operation(id)) ?? false,
-      remove: (id: string) => run((session) => session.delete_cnc_operation(id)) ?? false,
-      setNumber: (id: string, field: string, text: string) => run((session) => session.edit_cnc_setting(id, field, text)) ?? "",
-      play: (seconds: number) => {
-        run((session) => session.set_cnc_play(seconds));
-      },
-      /** Send to machine: the bytes Export writes go to the page's connector (`0125`, `0161` 19). */
-      send: () => {
-        const job = getSession()?.cnc_send_job();
-        if (!job) return;
-        const { bytes, name, profile_id: profile, address } = job;
-        job.free();
-        void linkStore.sendPage(profile, address, { token: Date.now(), name, bytes, start: false }, () => sync());
+    },
+    /** The Machine group of any output page (ADR 0098 decision 4): pick, reset and save. */
+    output: {
+      pick: (id: string) => run((session) => session.pick_output_profile(id)) ?? false,
+      reset: () => run((session) => session.reset_output_profile()) ?? false,
+      saveAs: () => run((session) => session.save_output_profile(randomBytes(), Date.now())) ?? "",
+    },
+    /** The Machines tab (ADR 0098 decisions 4 and 5): its view and its edits. */
+    machines: {
+      view: machinesView,
+      /** A field from typed text: `{ notice }`, `{ error }` or `{}`. */
+      set: (id: string, field: string, text: string) =>
+        JSON.parse(run((session) => session.set_machine_value(id, field, text, Date.now())) ?? "{}") as {
+          notice?: string;
+          error?: string;
+        },
+      duplicate: (id: string) => run((session) => session.duplicate_machine(id, randomBytes(), Date.now())) ?? "",
+      rename: (id: string, name: string) => run((session) => session.rename_machine(id, name, Date.now())) ?? false,
+      remove: (id: string) => run((session) => session.delete_machine(id)) ?? false,
+      follow: () => run((session) => session.follow_machine()) ?? false,
+      keep: () => {
+        run((session) => session.keep_machine_pages());
       },
     },
     /** Add page with the Kind switch (`specs/0098` criteria 1 to 4); the new page's id. */

@@ -81,9 +81,10 @@ fn criterion_1_2_add_page_is_the_work_area_with_the_generic_grbl_router() {
 fn criterion_2_save_as_profile_writes_a_cnc_record_with_the_connector() {
     let mut s = cnc();
     let id = s.save_cnc_profile([7; 16], 1_700_000_000_000).unwrap();
+    // ADR 0098: the connector address is a Machines-tab field of the record.
     assert_eq!(
-        s.set_cnc_connector("127.0.0.1:7447", 1_700_000_000_001),
-        Ok(true)
+        s.set_machine_value(&id, "connector", "127.0.0.1:7447", 1_700_000_000_001),
+        Ok(None)
     );
     let record = s.manufacturing.cnc.find(&id).unwrap().clone();
     let text = write_record(&record);
@@ -225,8 +226,9 @@ fn criteria_11_12_14_18_19_the_view_the_file_and_the_send_agree() {
     assert!(readout["text"].as_str().unwrap().contains(" · Z "));
     // Send needs a saved profile with a connector address; it sends Export's bytes.
     assert!(s.cnc_send_job().is_none());
-    s.save_cnc_profile([9; 16], 1).unwrap();
-    s.set_cnc_connector("127.0.0.1:7447", 2).unwrap();
+    let id = s.save_cnc_profile([9; 16], 1).unwrap();
+    s.set_machine_value(&id, "connector", "127.0.0.1:7447", 2)
+        .unwrap();
     let sent = s.cnc_send_job().unwrap();
     assert_eq!(sent.bytes, job.bytes);
     assert_eq!(sent.address, "127.0.0.1:7447");
