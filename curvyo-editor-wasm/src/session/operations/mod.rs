@@ -80,6 +80,20 @@ impl ActiveOperations {
             .map(|op| KindRead::of(op.kind.as_deref()))
             .collect()
     }
+
+    /// Whether any operation outside a test grid cuts paths through (Cut, Cut-out): only their
+    /// blocks get tabs, leads, overcuts, start points and cut keys, so only then can the job carry
+    /// marks (`specs/0139`).
+    pub(in crate::session) fn any_cuts_through(&self) -> bool {
+        self.operations.iter().any(|op| {
+            !op.grid
+                && op.grid_part.is_none()
+                && matches!(
+                    KindRead::of(op.kind.as_deref()),
+                    KindRead::Known(k) if curvyo_laser_core::settings::cuts_through(k)
+                )
+        })
+    }
 }
 
 impl super::Session {

@@ -343,7 +343,9 @@ impl Session {
             }
         }
         out.extend(dots);
-        if operations_view {
+        // Without a Cut or Cut-out the job has no marks: the draw builds no job for them (`0101`
+        // criterion 29 f).
+        if operations_view && active.any_cuts_through() {
             overlay.extend(self.tab_marks_overlay(view));
         }
         self.chips_overlay(&mut overlay, rows, view);
