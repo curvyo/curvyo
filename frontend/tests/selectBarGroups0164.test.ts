@@ -7,6 +7,7 @@ import { test } from "node:test";
 
 import {
   arrangeGroupsShown,
+  bridgeParts,
   isNarrowSelectBar,
   kindGroupShown,
   NARROW_SELECT_BAR_PX,
@@ -75,4 +76,14 @@ test("the session's kind codes are read as a list", () => {
   assert.deepEqual(readSelectionKinds(""), []);
   assert.deepEqual(readSelectionKinds("rectangle"), ["rectangle"]);
   assert.deepEqual(readSelectionKinds("path,rectangle,polygon"), ["path", "rectangle", "polygon"]);
+});
+
+test("the Bridge value fields are absent while Bridge options is off (Frage 461 A)", () => {
+  assert.deepEqual(bridgeParts(false, "lettering"), ["button", "options"]);
+  assert.deepEqual(bridgeParts(false, "stencil"), ["button", "options"]);
+});
+
+test("the Bridge value fields are present while Bridge options is on (Frage 461 A)", () => {
+  assert.deepEqual(bridgeParts(true, "lettering"), ["button", "options", "mode", "width", "reach", "joinAll"]);
+  assert.deepEqual(bridgeParts(true, "stencil"), ["button", "options", "mode", "width", "bridges"]);
 });

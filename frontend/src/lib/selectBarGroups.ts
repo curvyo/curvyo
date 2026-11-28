@@ -1,6 +1,9 @@
 // Which groups the Select bar shows for a selection (`specs/0164-ui-consistency`, Frage 460 B):
 // a kind group only while every selected object is of its kind, and in the narrow window class
-// the Align and Distribute groups only from two selected objects.
+// the Align and Distribute groups only from two selected objects; the Bridge value fields only
+// while "Bridge options" is on (Frage 461 A).
+
+import type { BridgeMode } from "@/lib/bridgeText";
 
 /** The groups that act on one kind of object, each with the object kinds it accepts. */
 const GROUP_KINDS = {
@@ -60,4 +63,18 @@ export function arrangeGroupsShown(
   const many = selectedCount >= 2;
   const arrange = many || !narrow;
   return { align: arrange, distribute: arrange, grid: many };
+}
+
+/** A part of the Select bar's Bridge group. */
+export type BridgePart = "button" | "options" | "mode" | "width" | "reach" | "joinAll" | "bridges";
+
+/** The parts of the Bridge group in bar order (Frage 461 A): the Bridge button and the "Bridge
+ * options" toggle always; Mode, Width and the mode's own fields (Reach and Join all in Lettering,
+ * Bridges per island in Stencil) only while the toggle is on. */
+export function bridgeParts(optionsOn: boolean, mode: BridgeMode): BridgePart[] {
+  if (!optionsOn) {
+    return ["button", "options"];
+  }
+  const own: BridgePart[] = mode === "stencil" ? ["bridges"] : ["reach", "joinAll"];
+  return ["button", "options", "mode", "width", ...own];
 }
