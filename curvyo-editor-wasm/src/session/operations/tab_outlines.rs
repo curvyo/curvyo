@@ -91,7 +91,12 @@ impl Session {
     /// first Cut or Cut-out of the run order (C2), at most [`MAX_OUTLINES`].
     pub(in crate::session) fn tab_outlines(&self, only: Option<NodeId>) -> Vec<TabOutline> {
         let selected = self.selection.ids();
-        if selected.is_empty() {
+        // Only Cut and Cut-out blocks have cut keys: no job is built for a page without them.
+        if selected.is_empty()
+            || !self
+                .active_operations()
+                .is_some_and(|active| active.any_cuts_through())
+        {
             return Vec::new();
         }
         // The job the views read (stale while a big raster edit is worked, `0029` 37 d).
