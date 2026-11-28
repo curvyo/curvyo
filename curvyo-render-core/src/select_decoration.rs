@@ -33,6 +33,25 @@ pub enum TransformGlyphKind {
     Parameter,
 }
 
+impl TransformGlyphKind {
+    /// The drawn footprint of the glyph, `(width, height)` in screen pixels, as an axis-aligned
+    /// box around its position: a skew glyph turns with its side, so it takes its long side both
+    /// ways.
+    #[must_use]
+    pub fn footprint_px(self) -> (f64, f64) {
+        let square = |side: f64| (side, side);
+        match self {
+            Self::Resize => square(theme::TRANSFORM_RESIZE_HANDLE_SIZE_PX),
+            Self::Rotate => square(theme::TRANSFORM_ROTATE_HANDLE_SIZE_PX),
+            Self::Skew { .. } => square(
+                theme::TRANSFORM_SKEW_HANDLE_LENGTH_PX.max(theme::TRANSFORM_SKEW_HANDLE_WIDTH_PX),
+            ),
+            Self::Move => square(theme::TRANSFORM_MOVE_HANDLE_SIZE_PX),
+            Self::Parameter => square(theme::PARAM_KNOB_DIAMETER_PX),
+        }
+    }
+}
+
 /// One of the Select tool's transform handles — this crate's own minimal
 /// shape (ADR 0011 §3: it cannot read `curvyo-ui-core`'s
 /// `EditHandle` directly), carrying only what drawing needs: where

@@ -352,7 +352,7 @@ impl Session {
             .collect();
         let at = layers.iter().position(|&id| id == layer);
         match self.document.delete_layer(layer) {
-            Ok(objects) => {
+            Ok(_) => {
                 let next = at.and_then(|at| {
                     at.checked_sub(1)
                         .and_then(|back| layers.get(back))
@@ -361,7 +361,7 @@ impl Session {
                 });
                 self.layers.active = ActiveLayer::Chosen(next);
                 self.panel.target_layer = next.is_some();
-                PanelReply::Notice(deleted_layer_notice(&name, objects))
+                PanelReply::Notice(deleted_layer_notice(&name))
             }
             Err(ObjectEditError::Locked) => PanelReply::Refusal(delete_locked_layer_notice(&name)),
             Err(_) => PanelReply::Quiet,

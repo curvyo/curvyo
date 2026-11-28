@@ -88,7 +88,8 @@ impl Session {
     }
 
     /// Puts text `id` on `carriers` as one step "Put text on paths" (criterion 37): the text on
-    /// the first, a text clone on each further one; selects the text and posts the notice.
+    /// the first, a text clone on each further one; selects the text. No notice: the canvas shows
+    /// the text on the paths (`specs/0159-ui-consistency` S7, the UI is not verbose).
     pub(super) fn put_on_set(&mut self, id: NodeId, carriers: &[CarrierRef]) {
         let pairs = self.set_values(id, carriers);
         if pairs.is_empty() {
@@ -98,7 +99,6 @@ impl Session {
             Ok(_) => {
                 self.selection.select_single(id);
                 self.text_path.announcement = Some("Put on paths");
-                self.text_path.notice = Some(format!("Put text on {} paths.", pairs.len()));
             }
             Err(curvyo_document_core::TextEditError::NeedsCurveConversion) => {
                 self.text_path.notice = Some("Convert the editable curve to Bézier before putting text on it. Nothing changed.".to_owned());
@@ -107,8 +107,8 @@ impl Session {
         }
     }
 
-    /// Takes the canvas notice of the last put on several carriers ("Put text on 3 paths."), or
-    /// the empty string.
+    /// Takes the canvas notice of the last put on several carriers (a refusal such as "Convert the
+    /// editable curve to Bézier ..."), or the empty string.
     pub fn take_text_path_notice(&mut self) -> String {
         self.text_path.notice.take().unwrap_or_default()
     }

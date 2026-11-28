@@ -117,6 +117,7 @@ impl GridLooks {
                     bounds: union,
                     glyphs: grid.glyphs.clone(),
                     muted: Vec::new(),
+                    handles: false,
                 })
             })
             .collect()

@@ -1759,10 +1759,7 @@ fn ac36_delete_layer_removes_the_layer_with_its_content_in_one_step_and_undo_res
     let reply = s.delete_active_layer();
     assert_eq!(commits(&s), n0 + 1, "one commit");
     assert_eq!(labels(&s).last().unwrap(), "delete_layer");
-    assert_eq!(
-        reply,
-        PanelReply::Notice("Deleted layer Cut and 3 objects.".to_owned())
-    );
+    assert_eq!(reply, PanelReply::Notice("Deleted layer Cut.".to_owned()));
     let dd = doc_of(&s);
     assert!(dd.object_ids().iter().all(|i| !ids.contains(i)));
     assert!(!has_row(&mut s, l));

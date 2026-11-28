@@ -208,6 +208,7 @@ mod select_bar;
 mod select_bar_arc;
 mod select_tool;
 mod selection;
+mod selection_kind;
 mod send_button;
 mod shape_arc_edit;
 mod shape_arc_text;
@@ -597,6 +598,7 @@ pub use select_tool::{
     double_click, double_click_in, entry_anchor,
 };
 pub use selection::NodeSelection;
+pub use selection_kind::{object_kind_code, selection_kind_codes};
 pub use shape_arc_edit::{
     ARC_SEAM, ArcEnd, arc_angle_from_pointer, arc_capable, curve_capable, curve_from_pointer,
 };

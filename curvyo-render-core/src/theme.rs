@@ -266,10 +266,12 @@ pub const OP_MUTED_INK: RgbaColor = RgbaColor::opaque(0x5A, 0x5A, 0x5F);
 /// ink symbol.
 pub const OP_INK: RgbaColor = RgbaColor::opaque(0x3A, 0x3A, 0x3F);
 
-/// `--toolbar-bg`: the ground of a symbol chip (ux-notes section 13.3).
+/// `--toolbar-bg`: the ground of the canvas symbol pill (`docs/ui-elements.md` §13; `specs/0101`
+/// ux-notes section 13.3). A copy of the DOM token: a theme changes both.
 pub const OP_CHIP_GROUND: RgbaColor = RgbaColor::opaque(0xDC, 0xDC, 0xE0);
 
-/// `--lane-line` (ux-notes section 13.1): the Not assigned outline and the chip border.
+/// `--lane-line` (ux-notes section 13.1): the Not assigned outline and the 1 px edge of the symbol
+/// pill. A copy of the DOM token: a theme changes both.
 pub const OP_LANE_LINE: RgbaColor = RgbaColor::opaque(0x7B, 0x7B, 0x7F);
 
 /// The width of a guide path's line, screen-space pixels.

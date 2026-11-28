@@ -57,7 +57,7 @@ pub struct ItemOptionsView {
 /// The Start row of the item part (UX 3.2 row 3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ItemStartView {
-    /// "Automatic", "Set", "Set on 2 of 3 outlines".
+    /// "Automatic", "Set", "Set on some outlines".
     pub readout: String,
     /// Whether any is set (the Automatic button shows).
     pub set: bool,
@@ -135,7 +135,7 @@ impl Session {
             let readout = match (set, closed.len()) {
                 (0, _) => "Automatic".to_owned(),
                 (_, 1) => "Set".to_owned(),
-                (n, total) => format!("Set on {n} of {total} outlines"),
+                _ => "Set on some outlines".to_owned(),
             };
             ItemStartView {
                 readout,

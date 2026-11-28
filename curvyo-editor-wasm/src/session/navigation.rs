@@ -278,13 +278,13 @@ mod tests {
         );
         assert!((top - (1300.0 - bottom)).abs() < 1e-9, "{top} {bottom}");
 
-        session.resize_viewport(1100.0, 1250.0);
+        session.resize_viewport(1100.0, 1290.0);
         let ((left, right), (top, bottom)) = document_edges(&session);
         assert!(
             ((left - 128.0) - (1100.0 - right)).abs() < 1e-9,
             "{left} {right}"
         );
-        assert!((top - (1250.0 - bottom)).abs() < 1e-9, "{top} {bottom}");
+        assert!((top - (1290.0 - bottom)).abs() < 1e-9, "{top} {bottom}");
     }
 
     /// After the first pan the view is the maker's own: a resize keeps the

@@ -99,10 +99,15 @@ impl Default for Zoom {
 /// `specs/0035-combine-and-break-apart` criterion 1a).
 pub const DOCUMENT_INSET_PX: f64 = 128.0;
 
-/// The least distance between the canvas's top edge and the document's top edge
-/// in a centred new view, CSS pixels: a document taller than the canvas starts
-/// here instead of being cut off at the top as well as at the bottom.
-const DOCUMENT_TOP_MARGIN_PX: f64 = 24.0;
+/// The margin, CSS pixels, a shown area keeps from the canvas's right and bottom edges
+/// (`Viewport::show_area`, `Viewport::fit_area`).
+const AREA_MARGIN_PX: f64 = 24.0;
+
+/// The least distance between the canvas's top edge and the document's top edge in a centred
+/// new view, CSS pixels: the bar's 12 px inset and 36 px row, 4 px, and the page's 20 px name
+/// label above its frame, so the label is never under a one-row bar (`specs/0159-ui-consistency`
+/// F50). A document taller than the room starts here instead of being cut off at the top too.
+const DOCUMENT_TOP_CLEAR_PX: f64 = 72.0;
 
 /// How far the real width change of a panel toggle may differ from the
 /// announced one, CSS pixels: the host rounds to whole device pixels.
@@ -233,7 +238,8 @@ impl Viewport {
     /// the view is still the untouched [`Viewport::with_document_inset`] one:
     /// on x in the space right of the tool rail (from [`DOCUMENT_INSET_PX`]),
     /// on y in the whole height. An axis the document does not fit keeps its
-    /// start margin ([`DOCUMENT_INSET_PX`] on x, 24 px on y) so the corner and the 0 ticks stay visible. A no-op once the maker
+    /// start margin ([`DOCUMENT_INSET_PX`] on x, `DOCUMENT_TOP_CLEAR_PX` on
+    /// y) so the corner and the 0 ticks stay visible. A no-op once the maker
     /// panned, zoomed or opened or closed the panel, and before the host's first
     /// size report. Call it after every [`Viewport::resize`], with the
     /// document's current size; it sets the origin from scratch, so repeated
@@ -247,7 +253,7 @@ impl Viewport {
         let left = (DOCUMENT_INSET_PX
             + (canvas_width - DOCUMENT_INSET_PX - width_mm * scale) / 2.0)
             .max(DOCUMENT_INSET_PX);
-        let top = ((canvas_height - height_mm * scale) / 2.0).max(DOCUMENT_TOP_MARGIN_PX);
+        let top = ((canvas_height - height_mm * scale) / 2.0).max(DOCUMENT_TOP_CLEAR_PX);
         self.origin = Point::new(-left / scale, -top / scale);
     }
 
@@ -264,8 +270,8 @@ impl Viewport {
             .iter()
             .all(|v| v.is_finite());
         let (free_left, free_top) = (free_left.max(0.0), free_top.max(0.0));
-        let free_right = canvas_width - DOCUMENT_TOP_MARGIN_PX;
-        let free_bottom = canvas_height - DOCUMENT_TOP_MARGIN_PX;
+        let free_right = canvas_width - AREA_MARGIN_PX;
+        let free_bottom = canvas_height - AREA_MARGIN_PX;
         let (room_width, room_height) = (free_right - free_left, free_bottom - free_top);
         if !finite || room_width <= 0.0 || room_height <= 0.0 {
             return;
@@ -306,8 +312,8 @@ impl Viewport {
     /// UX notes §3). An unknown canvas size, no room or an empty box leaves the view as it is.
     pub fn fit_area(&mut self, min: Point, max: Point, free_left: f64, free_top: f64) {
         let (canvas_width, canvas_height) = self.canvas_size;
-        let room_width = canvas_width - DOCUMENT_TOP_MARGIN_PX - free_left.max(0.0);
-        let room_height = canvas_height - DOCUMENT_TOP_MARGIN_PX - free_top.max(0.0);
+        let room_width = canvas_width - AREA_MARGIN_PX - free_left.max(0.0);
+        let room_height = canvas_height - AREA_MARGIN_PX - free_top.max(0.0);
         let (width_mm, height_mm) = (max.x - min.x, max.y - min.y);
         let usable = |value: f64| value.is_finite() && value > 0.0;
         if ![room_width, room_height, width_mm, height_mm]

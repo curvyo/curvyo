@@ -196,15 +196,11 @@ pub fn objects_count_text(count: usize) -> String {
     }
 }
 
-/// "Deleted layer Cut and 12 objects." (criterion 36).
+/// "Deleted layer Cut." (criterion 36): the objects that went with it are not counted
+/// (`specs/0159-ui-consistency` S7, the UI is not verbose).
 #[must_use]
-pub fn deleted_layer_notice(layer: &str, objects: usize) -> String {
-    let layer = layer_words(layer, "layer");
-    match objects {
-        0 => format!("Deleted {layer}."),
-        1 => format!("Deleted {layer} and 1 object."),
-        n => format!("Deleted {layer} and {n} objects."),
-    }
+pub fn deleted_layer_notice(layer: &str) -> String {
+    format!("Deleted {}.", layer_words(layer, "layer"))
 }
 
 /// "Layer Cut is locked. Unlock it first." (criterion 36).
@@ -380,11 +376,7 @@ mod tests {
     fn the_notices_and_captions() {
         assert_eq!(objects_count_text(1), "1 object");
         assert_eq!(objects_count_text(40), "40 objects");
-        assert_eq!(
-            deleted_layer_notice("Cut", 12),
-            "Deleted layer Cut and 12 objects."
-        );
-        assert_eq!(deleted_layer_notice("Cut", 0), "Deleted layer Cut.");
+        assert_eq!(deleted_layer_notice("Cut"), "Deleted layer Cut.");
         assert_eq!(
             delete_locked_layer_notice("Cut"),
             "Layer Cut is locked. Unlock it first."
@@ -404,7 +396,7 @@ mod tests {
     #[test]
     fn a_default_layer_name_is_not_preceded_by_the_word_layer_again() {
         // UX review of the customer feedback 2026-10-14, should-fix 5.
-        assert_eq!(deleted_layer_notice("Layer 1", 0), "Deleted Layer 1.");
+        assert_eq!(deleted_layer_notice("Layer 1"), "Deleted Layer 1.");
         assert_eq!(
             delete_locked_layer_notice("Initial Layer"),
             "Initial Layer is locked. Unlock it first."
