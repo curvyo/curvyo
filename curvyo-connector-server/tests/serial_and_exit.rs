@@ -205,9 +205,17 @@ fn g16_sigterm_stops_a_running_job_and_logs_it_before_exiting() {
         }
     }
     running.signal(Signal::SIGTERM);
-    running.until(|l| l == "Stopping long.gcode");
-    running.until(|l| l == "Job long.gcode: Stopped");
+    // The stop notice and the job's end line come from two threads, so their order varies;
+    // both must come before "Exiting".
+    let start = running.seen.len();
     running.until(|l| l == "Exiting");
+    let after_signal = &running.seen[start..];
+    for line in ["Stopping long.gcode", "Job long.gcode: Stopped"] {
+        assert!(
+            after_signal.iter().any(|l| l == line),
+            "{line:?} missing before Exiting; seen: {after_signal:?}"
+        );
+    }
     assert_eq!(running.exit_code(), 0);
     let log = std::fs::read_to_string(dir.path().join("jobs.log")).unwrap();
     assert!(log.contains("\tlong.gcode\tStopped\t"), "{log}");
