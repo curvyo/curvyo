@@ -130,7 +130,9 @@ test("criteria 3, 14: a worker that fails to start or fails a tile is dropped an
 });
 
 test("worker 0 failing fails the Run and ends the extras", async () => {
-  const workers = [new FakeWorker(() => 1, 3), new FakeWorker(() => 5)];
+  // Tile 0 always goes to worker 0 (it is ready first); a later index could be taken by worker 1
+  // on a loaded machine, and then nothing fails.
+  const workers = [new FakeWorker(() => 1, 0), new FakeWorker(() => 5)];
   await assert.rejects(
     runPool({
       modelKind: "denoise",
