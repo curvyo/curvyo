@@ -1,4 +1,4 @@
-# 0159 UI consistency: visual walkthrough
+# 0164 UI consistency: visual walkthrough
 
 Status: Draft (UX, 2026-11-27). Browser companion to [`inventory.md`](inventory.md) (code scan);
 targets refer to [`docs/ui-elements.md`](../../docs/ui-elements.md) (`§n` = its section).
@@ -58,14 +58,14 @@ confirming one §1 Primary.
 File tab New, Open..., Save, Close, Template, Export SVG..., Pen probe...; Document "Fit to
 content", "Add registration marks"; generator "Convert to paths"; File confirm Cancel, Discard,
 Save; Snapping targets and Grid Mode/Scale choices; Pen probe Clear, Copy report, Close. Target:
-§0 Icon rule, symbol before every label (Frage 417).
+§0 Icon rule, symbol before every label (Frage 453).
 
 **W4 (high) Sliding switches everywhere, in three sizes.** `01`, `11`, `14`, `17`, `18`, `24`,
 `25`, `27`, `28`, `34`. 32 x 18 (Select bar Scale stroke and Scale corners, Extensions, Cuts last,
 Laser mode, Focus pulse, Motorised Z axis, Air assist, Snapping, Grid, Simulate pressure, Keep
 source, Join all), about 24 x 14 (SVG export options, All formats "Show"), and the unlabelled
 switch in every Pages row ("Move frame only", visible name none). "All formats" pairs the switch
-with a redundant "Off" text. Target: §6 Toggle button, pressed = accent ground (Frage 416).
+with a redundant "Off" text. Target: §6 Toggle button, pressed = accent ground (Frage 452).
 
 **W5 (medium) Switch position varies in one tab.** `27`. Laser mode: label indented 4 px, switch
 at the right edge; Focus pulse: switch directly after the label; Motorised Z axis and Air assist:
@@ -103,7 +103,7 @@ group label.
 **W46 (medium) Tooltips carry operating instructions.** Select tool: "Drag a box. Shift: add.
 Ctrl: remove. Alt: invert, lasso, cycle / Arrows nudge 1 mm ...", Opacity: "Click to set,
 double-click to type, drag to change. Shift: coarse. Ctrl: fine. Ctrl+Backspace: reset." This
-conflicts with the no-hint rule (Frage 431). Target: §15 name + shortcut only.
+conflicts with the no-hint rule (Frage 458). Target: §15 name + shortcut only.
 
 ## Canvas chrome
 
@@ -113,7 +113,7 @@ specify 4 px). Pixel read: the Score dots start 1 px from the left edge and end 
 right, and sit 1 px above the chip's centre line. The chip row floats 10 px right of the bounding
 box's top-right corner, so on a rectangle it reads as a stray glyph, not as a label of the object.
 Target: §13 Canvas symbol pill: one pill per object (radius 11, symbols centred on both axes),
-anchor per Frage 419 and Frage 432.
+anchor per Frage 455 and Frage 459.
 
 **W12 (medium) Page label hidden under the Select bar.** `01`. On the default view the label
 "Page 1 Drawing" sits at y 35, the bar covers y 36 to 108; only the top half of the letters shows.
@@ -126,12 +126,12 @@ group at y 72). Target: empty groups are not rendered; one 36 px row.
 
 **W14 (high) Select bar covers the selection.** `06`, `40`. A mixed selection makes four rows at
 1440 (bar bottom y 180) and five at 800; the top resize and rotate handles are under the bar.
-Target: Frage 430.
+Target: Frage 457.
 
 **W15 (high) Bars overflow the canvas at 800 px.** `40`, `42`. The ellipse field row sticks out
 past the bar's right edge ("Rounded 0.00" over the panel edge); the Generators bar runs under the
 panel and "QR code" / "Rounded box" print over "Cuts last". Target: §13 a bar never extends past
-the canvas; wrap whole groups or overflow into a menu (Frage 430).
+the canvas; wrap whole groups or overflow into a menu (Frage 457).
 
 **W16 (medium) Dangling dividers.** `03`, `44`, `06`. A divider after the last group ("Box from
 path |"), and at 800 every wrapped Pencil row starts with a divider. Target: dividers only
@@ -273,21 +273,21 @@ state as a third line.
 
 ## Questions for the customer
 
-Frage 430 (BAR-NARROW): What a context bar does when its groups do not fit in one row
+Frage 457 (BAR-NARROW): What a context bar does when its groups do not fit in one row
 - A: wrap whole groups into more rows (as now), but never past the canvas; the bar may cover
   handles.
 - B: one row; groups that do not fit go into a "More" menu at the bar's end.
 - C: A up to two rows, then B.
 Recommendation: C (keeps the common case visible, never covers more than 72 px). Default: C.
 
-Frage 431 (TIP-TOOLTIPS): Tool and slider tooltips with operating instructions (W46)
+Frage 458 (TIP-TOOLTIPS): Tool and slider tooltips with operating instructions (W46)
 - A: keep them (accepted behaviour).
 - B: tooltips show name and shortcut only; the instructions go.
 - C: B, and the instructions move into the documentation.
 Recommendation: C (fits the no-hint rule, nothing is lost). Default: A until answered. Same
-family as Frage 418.
+family as Frage 454.
 
-Frage 432 (PILL-ANCHOR): Where the operation pill sits on the laser canvas (W11)
+Frage 459 (PILL-ANCHOR): Where the operation pill sits on the laser canvas (W11)
 - A: centred above the object, 6 px over its top edge.
 - B: at the top-right corner as now, only the look changes.
 - C: centred inside the object when it fits, else A.

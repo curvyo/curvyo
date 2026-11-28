@@ -91,7 +91,7 @@ test("UX notes §12.3: the notice slot shows only while a notice is active", asy
   assert.match(await barHtml("simplified"), /role="status"[^>]*aria-label="Over 10,000 instances\. The preview is simplified\."/);
   assert.match(await barHtml("fine", "grid", true), /aria-label="Images become copies\."/);
   const refused = await barHtml("refused");
-  // The shared refusal notice (0159 F57): its CircleAlert, then the text.
+  // The shared refusal notice (0164 F57): its CircleAlert, then the text.
   assert.match(refused, /role="alert"[^>]*>(?:<svg[\s\S]*?<\/svg>)?<span[^>]*>Too many instances\. 100,000 at most\.</, "the refusal stays readable");
 });
 

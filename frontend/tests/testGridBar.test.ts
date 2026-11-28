@@ -170,7 +170,7 @@ test("specs/0135 criterion 51: an Image grid reads its Picture segments; other k
   assert.equal(decodeTestGridText(JSON.stringify(selected)), null, "an unknown source is refused");
 });
 
-// `specs/0159-ui-consistency` F47: Passes is a count, its fields show no "×" after the number.
+// `specs/0164-ui-consistency` F47: Passes is a count, its fields show no "×" after the number.
 test("Passes fields show no unit and are named without one; the others keep theirs", () => {
   assert.equal(sharedFieldName("passes"), "Passes");
   assert.equal(sharedFieldName("power"), "Power, %");

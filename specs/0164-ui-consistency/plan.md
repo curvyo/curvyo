@@ -1,4 +1,4 @@
-# Plan for UI consistency (0159)
+# Plan for UI consistency (0164)
 
 Implementer, 2026-11-27. All seven slices of [`fix-plan.md`](fix-plan.md) land in one PR on
 `story/ui-consistency` (customer answer 2026-11-27); each slice is one or two commits (shared
@@ -6,10 +6,10 @@ component, then the swaps), scope = the area. This plan covers the build order; 
 findings (`F<n>`) of `fix-plan.md` and the criterion (1 to 7) of `specification.md` they close.
 No `format_version` change, no document-model change, no new crate, no new dependency.
 
-Answers built: Frage 416 A (full-width toggle button), 417 A (every labelled button has a
-symbol), 419 A (one pill per object), 420 A (option checks become toggle buttons), 430 A (bars
-wrap, never past the canvas), 431 A (tooltips keep their text), 432 A (pill centred 6 px above
-the object; at the corner while the object shows handles, Proposal), 418 A (hint chips and the
+Answers built: Frage 452 A (full-width toggle button), 453 A (every labelled button has a
+symbol), 455 A (one pill per object), 456 A (option checks become toggle buttons), 457 A (bars
+wrap, never past the canvas), 458 A (tooltips keep their text), 459 A (pill centred 6 px above
+the object; at the corner while the object shows handles, Proposal), 454 A (hint chips and the
 slider help line stay; S7 lists verbose result notices instead).
 
 ## Affected crates/modules
@@ -47,12 +47,12 @@ slider help line stay; S7 lists verbose result notices instead).
 
 ### S2 Toggle buttons (criterion 2)
 - [x] 2.1 `ui/toggle-button.tsx` on Radix `Toggle` (`aria-pressed`, Enter and Space, return focus,
-  armed), panel full-width (Frage 416 A) and bar looks; `ui/checkbox.tsx` tri-state (F14, F18)
+  armed), panel full-width (Frage 452 A) and bar looks; `ui/checkbox.tsx` tri-state (F14, F18)
 - [x] 2.2 Every switch call site (`PanelSwitch`, `ToolbarSwitch`, `CentreSwitch`, the export
   options, Move frame only) becomes a toggle button; the switch components go (F14)
 - [x] 2.3 One pressed colour: Into slot caption, Fixture shape, the pale-blue selected toggles
   (F15); Snapping block as four toggle buttons with symbols (F16)
-- [x] 2.4 Option checks of the entry chips and the Sketch panel become toggle buttons (Frage 420
+- [x] 2.4 Option checks of the entry chips and the Sketch panel become toggle buttons (Frage 456
   A) (F17); list ticks use `Checkbox` (F18)
 - [x] 2.5 Tests that queried `role="switch"` move to `aria-pressed`; docs rows (§6, §8, "Switch")
 
@@ -72,7 +72,7 @@ slider help line stay; S7 lists verbose result notices instead).
   touch, 4 px clear (`chips_list_clear_of`, footprints from `theme.rs`); render-core tests for a
   selected object and a group selection
 
-### S4 Bars, rail and canvas overlap (criterion 4, Frage 430 A)
+### S4 Bars, rail and canvas overlap (criterion 4, Frage 457 A)
 - [x] 4.1 Empty groups take no room: no empty row, no divider after the last group (F38, F41)
 - [x] 4.2 Compact Select bar: commands and scale toggles icon-only with tooltips; Place on…
   symbol; groups shrink and wrap inside the bar (F39, F40)
@@ -102,7 +102,7 @@ slider help line stay; S7 lists verbose result notices instead).
   token pass (F31, F32, F33), section headings and label column (F35), Layers row (F37): not built
   in this pass
 
-### S7 Tooltips and notices (criterion 7, Fragen 418 A, 431 A)
+### S7 Tooltips and notices (criterion 7, Fragen 454 A, 458 A)
 - [x] 7.1 One tooltip look `TOOLTIP_CLASS` (shared tooltip, rail, command buttons, Import card, the
   bars' own Radix tooltips) (F54)
 - [x] 7.2 One notice radius (8 px) on the canvas slot, action notices, Boolean notice, slot replace
@@ -117,13 +117,13 @@ slider help line stay; S7 lists verbose result notices instead).
     "Centre lines: some shapes were skipped." and "Linked clones became ordinary paths." remain,
     when they apply.
   - Kept (refusals and warnings, not chatter): every refusal, the skip reasons, the hint chips and
-    the slider help line (418 A), operating text in tooltips (431 A).
+    the slider help line (454 A), operating text in tooltips (458 A).
   - **Found, not changed (Rust texts, for the customer's call):** "Put text on 3 paths."
     (`text_on_path_set.rs`), "Deleted Layer 1 and 5 objects." (`layer_text.rs`), "Set on 2 of 5
     outlines" (`path_options.rs`), "Own tabs on 2 of 5 items" (`tabs.rs`); the Centre lines Apply
     tooltip's preview counts ("70 paths, 1,200 nodes").
 - [ ] 7.4 Native `title` attributes to `Tooltip`, `ActionNotice` and `AlertLine` components, Pen
-  probe sheet (F55 n/a under 431 A, F56 n/a under 418 A, F58): not built in this pass
+  probe sheet (F55 n/a under 458 A, F56 n/a under 454 A, F58): not built in this pass
 
 ### Last pass (lead dispatch 2026-11-28)
 - [x] L1 Browser check: the page label is never under a bar: a new view keeps the page top 72 px
@@ -161,7 +161,7 @@ slider help line stay; S7 lists verbose result notices instead).
 - [x] L13 Native `title` attributes on controls to the shared `Tooltip` (F54, criterion 7)
 - [x] L14 `ActionNotice` and `AlertLine` in `ui/notice.tsx` and their call sites (F57); the Pen
   probe on the dialog look (F58) (criterion 7)
-- [x] L10 Frage 433 B (customer 2026-11-28; criterion 4): kind groups only while every selected
+- [x] L10 Frage 460 B (customer 2026-11-28; criterion 4): kind groups only while every selected
   object is of their kind (`lib/selectBarGroups.ts`, `curvyo-ui-core` `selection_kind_codes`,
   wasm `selection_kinds`); one shared Gap field between Distribute and Grid, Rows and Columns
   with labels inside; Align as two groups of three (Proposal); the narrow class (usable bar

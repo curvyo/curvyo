@@ -300,7 +300,7 @@ interface FaceRowProps {
 export function FaceRow({ rowKey, zone, face, current, focused, style, onFocus, onPick }: FaceRowProps) {
   const cssFamily = cssFamilyOf(face.id);
   const lines = face.singleLine ? linePreviewOf(face.id)?.style : undefined;
-  // The full name in the tooltip: a long one ends with "…" in the row (0159).
+  // The full name in the tooltip: a long one ends with "…" in the row (0164).
   return (
     <Tooltip side="left" content={face.style}>
     <div

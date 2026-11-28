@@ -118,7 +118,7 @@ test("Star mode of the polygon/star bar renders with the provider and throws wit
 
 test("the Select bar's Ratio slider renders with the provider", async () => {
   const SelectToolbar = await component("/src/components/SelectToolbar.tsx", "SelectToolbar");
-  // A kind group shows only while every selected object is of its kind (0159 Frage 433 B): the
+  // A kind group shows only while every selected object is of its kind (0164 Frage 460 B): the
   // stars' Ratio and the ellipses' Arc kind are rendered from two selections.
   const barOf = (kinds: string[]) => ({
     radiusShown: false,

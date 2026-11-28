@@ -281,7 +281,7 @@ export function TestGridBar({ tool, view, onNewMaterial, onReturnFocus }: TestGr
           <div className="group/row relative flex items-center gap-2">
             <Divider />
             {/* The code says what it is: the muted caption "Test" before it, like the row captions
-                (0159 F47). */}
+                (0164 F47). */}
             {view.id !== null ? (
               <span className="flex h-9 shrink-0 items-center gap-1.5 text-[var(--toolbar-icon)]">
                 <span className="text-xs text-[var(--panel-muted-fg)]">Test</span>

@@ -1,5 +1,5 @@
 //! The kind codes of the selected objects, by which the Select bar shows a kind group only while
-//! every selected object is of its kind (`specs/0159-ui-consistency`, Frage 433 B).
+//! every selected object is of its kind (`specs/0164-ui-consistency`, Frage 460 B).
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, PrimitiveSnapshot, Shape};
 

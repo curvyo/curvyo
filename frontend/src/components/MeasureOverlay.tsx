@@ -31,7 +31,7 @@ export function MeasureOverlay({ getSession, measuring }: { getSession: () => Wa
   }, [getSession]);
   return <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" data-measure-overlay="">
     {view.dimensions.map((label, index) => <DimensionText key={`${label.id}:${index}`} label={label} />)}
-    {/* One chip (`docs/ui-elements.md` §13, 0159 F53): the mode ("Aligned") is the readout's last
+    {/* One chip (`docs/ui-elements.md` §13, 0164 F53): the mode ("Aligned") is the readout's last
         line while both show; alone it keeps its own place below the pointer. */}
     {measuring && view.readout && <Chip chip={view.readout} kind="readout" mode={view.mode ?? undefined} />}
     {measuring && !view.readout && view.mode && <Chip chip={view.mode} kind="mode" />}

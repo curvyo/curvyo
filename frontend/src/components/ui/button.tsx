@@ -9,14 +9,14 @@ import { useControlTooltipSide } from "@/components/ui/tooltip-side";
 type ButtonProps = Omit<ComponentProps<"button">, "children"> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
-  /** The symbol left of the label (`docs/ui-elements.md` §0 "Icon rule", Frage 417 A): every
+  /** The symbol left of the label (`docs/ui-elements.md` §0 "Icon rule", Frage 453 A): every
    * labelled button has one. */
   icon: LucideIcon;
   /** The label: the act in one or two words. */
   children: ReactNode;
   /** The act is running: the symbol spins, label and width stay. */
   busy?: boolean;
-  /** A compact bar (`docs/ui-elements.md` §0 Icon rule, 0159 S4): the symbol alone in a 28 px
+  /** A compact bar (`docs/ui-elements.md` §0 Icon rule, 0164 S4): the symbol alone in a 28 px
    * square; the label stays the accessible name (a string label) and the tooltip's first line. */
   iconOnly?: boolean;
   /** The tooltip (below the button, left of it in the panel): the name, and for a compact button

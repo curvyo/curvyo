@@ -330,7 +330,7 @@ export function MoveEntryChip({
               );
             })}
           </div>
-          {/* Two named states are a choice, not on/off (`docs/ui-elements.md` §7, 0159 F20):
+          {/* Two named states are a choice, not on/off (`docs/ui-elements.md` §7, 0164 F20):
               one radio group, the chosen item the Tab stop, the arrows move and choose. */}
           <Tooltip side="bottom" content={ABSOLUTE_HINT}>
             <div

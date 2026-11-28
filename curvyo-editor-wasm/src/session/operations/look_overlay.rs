@@ -128,7 +128,7 @@ pub(super) fn own_overlay(
     {
         let selected_here = selected.contains(&id);
         // The one selected object shows its own handles: its pill takes the corner anchor
-        // (`specs/0159` Frage 432 A); the members of a multi-selection keep theirs centred.
+        // (`specs/0164` Frage 459 A); the members of a multi-selection keep theirs centred.
         let chip = ChipItem {
             handles: selected_here && selected.len() == 1,
             ..chip
@@ -172,7 +172,7 @@ impl Session {
             let mut items: Vec<ChipItem> = grids.chips(&bounds);
             items.extend(chips.into_iter().map(|(_, chip)| chip));
             // No pill lies over a transform handle of the selection or the group box
-            // (`specs/0159` S3).
+            // (`specs/0164` S3).
             let handles = if self.selection.ids().is_empty() {
                 Vec::new()
             } else {

@@ -709,7 +709,7 @@ export function SelectToolbar({
   useRowStarts(barRef);
   const pillRef = useRef<HTMLDivElement>(null);
   const narrow = useNarrowBar(pillRef);
-  // A kind group only while every selected object is of its kind (Frage 433 B).
+  // A kind group only while every selected object is of its kind (Frage 460 B).
   const only = (group: Parameters<typeof kindGroupShown>[0]) => kindGroupShown(group, bar.kinds);
   const objectToPathRef = useRef<HTMLDivElement>(null);
   const objectToPathShift = useNoticeShift(objectToPathRef, objectToPathNotice);
@@ -720,7 +720,7 @@ export function SelectToolbar({
   // The arrange groups directly after Guide, before the kind groups, so they do not move with
   // the selection; Grid from two selected objects (`specs/0061-align-and-distribute/` UX notes,
   // "Placement" and "Grid group"); in the narrow window class Align and Distribute from two too
-  // (`specs/0159-ui-consistency`, Frage 433 B). Align is two groups of three, so the bar wraps
+  // (`specs/0164-ui-consistency`, Frage 460 B). Align is two groups of three, so the bar wraps
   // between the axes.
   const arrange = arrangeGroupsShown(align?.selectedCount ?? 0, narrow);
   if (align?.shown) {

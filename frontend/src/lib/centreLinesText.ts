@@ -50,7 +50,7 @@ export function centreLinesNotice(result: CentreLinesResult, paths?: number): { 
   if (refusal) {
     return { text: refusal, alert: true };
   }
-  // No counts of what came out (customer 2026-11-27, `specs/0159` S7): the lines on the canvas
+  // No counts of what came out (customer 2026-11-27, `specs/0164` S7): the lines on the canvas
   // are the feedback; a notice only names what was skipped or changed besides.
   if (result.kind !== "applied" || (result.skipped === 0 && result.unlinked === 0)) {
     return null;

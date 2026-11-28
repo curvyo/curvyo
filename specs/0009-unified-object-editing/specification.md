@@ -375,7 +375,7 @@ instead of the committed ones and the ghost instead of the blue outline, the sam
     the bar shows Radius, Remove rounding, Points and Ratio. The tooltip of
     each control says what it acts on ("Remove rounding of the selected
     rectangles").
-    **Amendment 2026-11-28 (customer, `specs/0159-ui-consistency` Frage 433 B):** a kind
+    **Amendment 2026-11-28 (customer, `specs/0164-ui-consistency` Frage 433 B):** a kind
     control is shown only while **every** selected object is of the kind it acts on (Points
     for polygons and stars, Ratio for stars only, Radius and Remove rounding for rectangles);
     a mixed selection shows only the groups all its kinds share, so a rectangle and a star
@@ -406,7 +406,7 @@ instead of the committed ones and the ghost instead of the blue outline, the sam
     else except a skew or a stretch a primitive cannot represent, which
     `specs/0047-transform-polish/` converts silently). It is the last control of the bar and has no keyboard shortcut. The
     shape tools' bars no longer show it.
-    **Amendment 2026-11-28 (customer, `specs/0159-ui-consistency` Frage 433 B):** shown only
+    **Amendment 2026-11-28 (customer, `specs/0164-ui-consistency` Frage 433 B):** shown only
     while every selected object can be converted (rectangles, ellipses, polygons, stars,
     texts, generated objects); not beside a path in the same selection.
 23. Given the Select tool is active, then two switches are the first group of

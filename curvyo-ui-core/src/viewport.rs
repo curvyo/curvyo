@@ -105,7 +105,7 @@ const AREA_MARGIN_PX: f64 = 24.0;
 
 /// The least distance between the canvas's top edge and the document's top edge in a centred
 /// new view, CSS pixels: the bar's 12 px inset and 36 px row, 4 px, and the page's 20 px name
-/// label above its frame, so the label is never under a one-row bar (`specs/0159-ui-consistency`
+/// label above its frame, so the label is never under a one-row bar (`specs/0164-ui-consistency`
 /// F50). A document taller than the room starts here instead of being cut off at the top too.
 const DOCUMENT_TOP_CLEAR_PX: f64 = 72.0;
 

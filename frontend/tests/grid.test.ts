@@ -119,7 +119,7 @@ async function pane(view = VIEW): Promise<string> {
 test("the Grid pane names the page and holds every control, all enabled with the grid hidden", async () => {
   const html = await pane();
   assert.match(html, /Coasters/);
-  // 0159 S2: the Grid switch is a toggle button (`aria-pressed`) named by its label.
+  // 0164 S2: the Grid switch is a toggle button (`aria-pressed`) named by its label.
   assert.match(html, /aria-pressed="false"[^>]*>(?:<svg[\s\S]*?<\/svg>)?<span class="truncate">Grid</);
   for (const group of ["Mode", "Scale"]) {
     assert.match(html, new RegExp(`role="radiogroup" aria-label="${group}"`));
@@ -150,7 +150,7 @@ test("the origin corner is a radio group of four corners under the page name", a
   assert.ok(group > html.indexOf("Coasters"), "under the page name");
   assert.ok(group < html.indexOf("aria-pressed="), "before the Grid toggle");
   // The control of the laser Machine block (`0045` criterion 41): four 28 px radios in a 2 x 2 grid,
-  // no page pictogram; one segmented strip since 0159 F21.
+  // no page pictogram; one segmented strip since 0164 F21.
   assert.match(html, /role="radiogroup" aria-label="Origin corner" class="grid grid-cols-2 gap-px[^"]*border/);
   for (const corner of ["Top left", "Top right", "Bottom left", "Bottom right"]) {
     assert.match(html, new RegExp(`role="radio" aria-checked="(true|false)" aria-label="${corner}"`));

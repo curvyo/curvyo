@@ -75,7 +75,7 @@ export function axisKeys(side: "columns" | "rows"): { min: string; max: string; 
 }
 
 /** The unit inside a bar field: Passes is a count and shows none, so no "×" reads as a clear
- * button after its number (0159 F47). */
+ * button after its number (0164 F47). */
 export function fieldUnit(param: Param): string {
   return param === "passes" ? "" : PARAM_UNIT[param];
 }

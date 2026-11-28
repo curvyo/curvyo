@@ -126,7 +126,7 @@ function TilingField({ label, name, value, unit, rule, width, onValue, inputRef,
 }
 
 /** A radiogroup of text segments in the one segmented look (UX notes §2.1: one Tab stop, arrows
- * move; `docs/ui-elements.md` §7, 0159 F45). */
+ * move; `docs/ui-elements.md` §7, 0164 F45). */
 function Segments<T extends string>({ name, options, value, onChange }: { name: string; options: { value: T; label: string }[]; value: T; onChange: (value: T) => void }) {
   return (
     <div role="radiogroup" aria-label={name} className={`flex ${SEGMENT_STRIP}`}>
@@ -184,7 +184,7 @@ const LAYOUTS = [
 ];
 
 /** The Layout radiogroup (UX notes §12.2): two 28 px icon segments in the one segmented look
- * (0159 F45), the name in the tooltip and the accessible name; one Tab stop, arrows choose. */
+ * (0164 F45), the name in the tooltip and the accessible name; one Tab stop, arrows choose. */
 function LayoutSegments({ value, onChange }: { value: "grid" | "circle"; onChange: (value: "grid" | "circle") => void }) {
   return (
     <div role="radiogroup" aria-label="Layout" className={`flex ${SEGMENT_STRIP}`}>
@@ -228,7 +228,7 @@ function LineGlyph({ columns, offset }: { columns: boolean; offset: boolean }) {
 }
 
 /** An icon toggle with a drawn glyph: the shared toggle look and tooltip (`docs/ui-elements.md`
- * §6, 0159 F45). */
+ * §6, 0164 F45). */
 function Toggle({ name, pressed, onPress, children }: { name: string; pressed: boolean; onPress: () => void; children: React.ReactNode }) {
   return (
     <SharedTooltip side="bottom" content={name}>

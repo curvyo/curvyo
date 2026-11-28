@@ -17,7 +17,7 @@ interface ToggleButtonProps {
   icon: LucideIcon;
   pressed: boolean;
   onPressedChange: (pressed: boolean) => void;
-  /** Full-width panel row (Frage 416 A), labelled bar button, or icon-only. */
+  /** Full-width panel row (Frage 452 A), labelled bar button, or icon-only. */
   look?: ToggleLook;
   /** The tooltip; it opens left of a toggle in the panel, below one elsewhere. */
   tooltip?: string;

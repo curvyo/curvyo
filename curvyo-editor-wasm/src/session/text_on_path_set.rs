@@ -89,7 +89,7 @@ impl Session {
 
     /// Puts text `id` on `carriers` as one step "Put text on paths" (criterion 37): the text on
     /// the first, a text clone on each further one; selects the text. No notice: the canvas shows
-    /// the text on the paths (`specs/0159-ui-consistency` S7, the UI is not verbose).
+    /// the text on the paths (`specs/0164-ui-consistency` S7, the UI is not verbose).
     pub(super) fn put_on_set(&mut self, id: NodeId, carriers: &[CarrierRef]) {
         let pairs = self.set_values(id, carriers);
         if pairs.is_empty() {

@@ -253,7 +253,7 @@ fn c2_c37_pick_set_badge_enter_one_step_and_notice() {
     key(&mut s, "Enter", false);
     assert!(!s.text_path_picking(), "Enter ends pick mode");
     assert_eq!(s.history_len(), steps + 1, "one step");
-    // 0159 S7 (lead decision, Proposal): no count notice, the canvas shows the text on the paths.
+    // 0164 S7 (lead decision, Proposal): no count notice, the canvas shows the text on the paths.
     let notice = all_notices(&mut s);
     assert!(!notice.contains("Put text on"), "notice: {notice:?}");
     let src = source_text(&s);
@@ -288,7 +288,7 @@ fn c3_c37_select_route_puts_the_text_on_the_lowest_carrier() {
     let src = source_text(&s);
     assert_eq!(carrier_of(&src), Some(circles[0]), "lowest first");
     assert_eq!(texts(&s).len(), 3);
-    // 0159 S7 (lead decision, Proposal): no count notice, the canvas shows the text on the paths.
+    // 0164 S7 (lead decision, Proposal): no count notice, the canvas shows the text on the paths.
     let notice = all_notices(&mut s);
     assert!(!notice.contains("Put text on"), "notice: {notice:?}");
 }

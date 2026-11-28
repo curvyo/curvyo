@@ -288,7 +288,7 @@ Live regions: the summary (`role="status"`, `aria-atomic`), the tab's sr-only st
 
 ### 13.3 Symbol placement (View: Operations only)
 
-> **Superseded in part by `specs/0159-ui-consistency` (2026-11-27, Fragen 419 A and 432 A):** one
+> **Superseded in part by `specs/0164-ui-consistency` (2026-11-27, Fragen 419 A and 432 A):** one
 > rounded pill per object holds all its symbols, centred above the object; the corner anchor below
 > applies while the object shows its handles. The look is `docs/ui-elements.md` §13 "Canvas symbol
 > pill".

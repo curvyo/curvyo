@@ -138,7 +138,7 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
           />
           <StyleRow label="Profile">
             {/* One radio group like Join and Cap: arrows move and choose, the preset the path has
-                is checked (UX review U9, 0159 F19). */}
+                is checked (UX review U9, 0164 F19). */}
             <ToggleGroup
               label="Width profile"
               options={WIDTH_PROFILE_OPTIONS}

@@ -1,4 +1,4 @@
-// Which groups the Select bar shows for a selection (`specs/0159-ui-consistency`, Frage 433 B):
+// Which groups the Select bar shows for a selection (`specs/0164-ui-consistency`, Frage 460 B):
 // a kind group only while every selected object is of its kind, and in the narrow window class
 // the Align and Distribute groups only from two selected objects.
 

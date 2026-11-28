@@ -150,7 +150,7 @@ async function history(page){
     await rows.fill('2');await columns.fill('');
     const before=(await saved(page)).boxes;
     await selectTool(page);
-    // The one Gap field of the bar is the grid's gap too (0159 Frage 433 B); Enter in Rows arranges.
+    // The one Gap field of the bar is the grid's gap too (0164 Frage 460 B); Enter in Rows arranges.
     await page.getByRole('textbox',{name:'Gap, millimetres',exact:true}).fill('5');
     await rows.press('Enter');await pump(page);
     doc=await saved(page);

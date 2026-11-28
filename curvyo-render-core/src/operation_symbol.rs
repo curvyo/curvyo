@@ -1,8 +1,8 @@
 //! The symbol pills of the output page (`docs/ui-elements.md` §13, `specs/0101-laser-operations`
-//! ux-notes 13.3, `specs/0159-ui-consistency` slice S3): one rounded pill per object, View:
+//! ux-notes 13.3, `specs/0164-ui-consistency` slice S3): one rounded pill per object, View:
 //! Operations only, holding one 16 px symbol per kind the object is in.
 //!
-//! The pill sits centred 6 px above the object (Frage 432 A); while the object shows its transform
+//! The pill sits centred 6 px above the object (Frage 459 A); while the object shows its transform
 //! handles it takes the corner anchor right of the top-right corner, mirrored to the top-left at
 //! the viewport edge. A pill never lies over a transform handle: it moves past the handles it
 //! would touch, `HANDLE_GAP_PX` clear of their glyphs, and is not drawn when no place is left. A

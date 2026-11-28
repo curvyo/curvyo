@@ -83,7 +83,7 @@ export function PageFrames({
           )}
           {/* The label is never wider than its frame: the name truncates first, the word goes
               below 96 px, the whole label below 24 px (`specs/0098` UX notes §5). It is never under a
-              bar: below the bars where they cover its place (0159 F50). */}
+              bar: below the bars where they cover its place (0164 F50). */}
           {page.screenWidth >= 24 && (
             <span
               data-page-label=""

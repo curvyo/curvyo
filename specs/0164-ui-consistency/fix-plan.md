@@ -1,4 +1,4 @@
-# 0159 UI consistency: fix plan
+# 0164 UI consistency: fix plan
 
 Status: Draft (UX, 2026-11-27). Merges [`inventory.md`](inventory.md) (code scan, `I1` to `I39`)
 and [`walkthrough.md`](walkthrough.md) (browser pass, `W1` to `W52`, screens in `screens/`) into
@@ -34,7 +34,7 @@ lead's grouping a to g; the slices S1 to S7 follow the build order of section 2.
 | F14 | Sliding switch in five implementations and three sizes (33+ on screen); switch column moves within the laser Document tab; "All formats" pairs a switch with "Off" | I12, W4, W5 | 01, 11, 14, 17, 18, 24, 25, 27, 28, 34 | high | §6 | S2 |
 | F15 | Two "selected" colours: pale blue with dark text equals hover (Test grid, Pencil profile, Template after a press); Into slot caption label at 2.5:1; Fixture shape pressed in ink | I14, W6, W45 | 11, 18, 33 | high | §0 States Pressed, §6 | S2 |
 | F16 | Snapping block mixes a switch with pressed text toggles without symbols | I15 | 24 | medium | §6 | S2 |
-| F17 | Option checks (Copy in the move, transform and placement chips; Reference, Fix origin, Expose in the Sketch panel) are native checkboxes | I23 (options) | 36 | medium | §6 (Frage 420) | S2 |
+| F17 | Option checks (Copy in the move, transform and placement chips; Reference, Fix origin, Expose in the Sketch panel) are native checkboxes | I23 (options) | 36 | medium | §6 (Frage 456) | S2 |
 | F18 | List-tick checkboxes in five custom versions; Operations row: checkbox, chevron at x 284 versus 256, 24 px actions | I23 (ticks), W34 | 28 | medium | §8, §18 | S2 |
 | F19 | Five constructions of segmented control in 11 implementations; Stroke Profile shows no active segment; Fonts filter two-row grid; library Items/Sets | I16, W7, W38 (Items/Sets), W43 | 09, 14, 15, 16, 20, 23, 24, 25, 34, 37 | medium | §7 | S5 |
 | F20 | Relative / Absolute is a `role="switch"` drawn as segments | I13 | - (move chip) | medium | §7 | S5 |
@@ -56,7 +56,7 @@ lead's grouping a to g; the slices S1 to S7 follow the build order of section 2.
 | F36 | Generator card runs into Stroke without heading or hairline; Sketches tab blank without an empty line; Parameters heading twice | W44, W42 | 13, 35, 36 | low | §17 | S6 |
 | F37 | Layers: selected ground stops 22 px short, row tooltip over the tab strip (default names with ids: not this story) | W40 | 21 | low | §18 | S6 |
 | F38 | Select bar with nothing selected is 72 px: an empty group wraps to row 2 | W13 | 01, 03 | high | §13 Bar | S4 |
-| F39 | A mixed selection makes the Select bar four rows (five at 800) and covers the top handles | W14 | 06, 40 | high | §13 Bar (Frage 430) | S4 |
+| F39 | A mixed selection makes the Select bar four rows (five at 800) and covers the top handles | W14 | 06, 40 | high | §13 Bar (Frage 457) | S4 |
 | F40 | At 800 px the ellipse fields and the Generators bar run past the canvas under the panel | W15 | 40, 42 | high | §13 Bar | S4 |
 | F41 | Dangling dividers after the last group and at the start of wrapped rows | W16 | 03, 06, 44 | medium | §13 Bar | S4 |
 | F42 | The "Original" clone tag is drawn over the Select bar | W17 | 43 | high | §13 (z-order) | S4 |
@@ -72,8 +72,8 @@ lead's grouping a to g; the slices S1 to S7 follow the build order of section 2.
 | F52 | Canvas chips in four radii | I28 | 30, 43 | low | §13 Canvas chip | S3 |
 | F53 | Measure readout and its "Aligned" state are two chips | W50 | - | low | §13 Canvas chip | S3 |
 | F54 | 19 tooltip implementations, two grounds, three max widths; 139 native `title` attributes | I30 | all | medium | §15 | S7 |
-| F55 | Tool and slider tooltips carry operating instructions | W46 | 20, rail | medium | §15 (Frage 431) | S7 |
-| F56 | Four canvas hint chips and the slider help line predate the no-hint rule | I29 | - | medium | §0 Copy (Frage 418) | S7 |
+| F55 | Tool and slider tooltips carry operating instructions | W46 | 20, rail | medium | §15 (Frage 458) | S7 |
+| F56 | Four canvas hint chips and the slider help line predate the no-hint rule | I29 | - | medium | §0 Copy (Frage 454) | S7 |
 | F57 | Nine notice implementations; paste/export notice radius matches nothing | I31, W49 | - | medium | §16 | S7 |
 | F58 | Pen probe is a raw full-window sheet with text-only buttons | W47 | - | low | §19 | S7 |
 
@@ -134,12 +134,12 @@ control, `:focus-visible` ring present (the walkthrough's focus script).
   (`CentreSwitch`), `panel/ExportSvgSection.tsx`, `panel/PagesBlock.tsx` (Move frame only) and
   their 28 call sites; the 15 pressed-toggle class sets of I14 (`index.css:488`,
   `workbench/FixtureBody.tsx:189` fixed first); `panel/SnappingSection.tsx`; entry-chip and Sketch
-  option checks (if Frage 420 A); `OperationRow.tsx`, `FixtureJobParts.tsx`, `FixtureSetRow.tsx`,
+  option checks (if Frage 456 A); `OperationRow.tsx`, `FixtureJobParts.tsx`, `FixtureSetRow.tsx`,
   `FixtureRowItem.tsx` checkboxes.
 - **Risk:** tests that query `role="switch"` break and move to `aria-pressed` (acceptance tests of
   earlier stories: the tester updates the selectors, the behaviour criteria stay). Space-only
   toggling becomes Enter and Space: Enter inside a bar must not also commit a field. A row-wide
-  panel toggle (Frage 416 A) changes panel heights; check the laser Document tab at 640 px.
+  panel toggle (Frage 452 A) changes panel heights; check the laser Document tab at 640 px.
 - **Screens:** 01, 11, 14, 17, 18, 24, 25, 27, 28, 33, 34, 36.
 - **Design-system row changes:** yes ("Switch (`ScaleStrokeSwitch`)" is replaced).
 
@@ -158,7 +158,7 @@ control, `:focus-visible` ring present (the walkthrough's focus script).
   each symbol's visual centre on its cell centre within 0.1 px, mirror at the viewport edge,
   collision skip and cap per pill; the existing laser-look CPU-time test under
   `curvyo-editor-wasm/tests/cpu_time/` stays green.
-- **Risk:** the anchor of Frage 432 A (centred, 6 px above the top edge) sits where the top edge
+- **Risk:** the anchor of Frage 459 A (centred, 6 px above the top edge) sits where the top edge
   resize handle, the skew handle (16 px) and the Shift rotate handle (32 px, hit radius 16) of a
   selected object are; under the existing "a chip never covers a handle" rule the pill of the
   selected object would vanish. **(Proposal)** While the object shows transform handles, its
@@ -181,15 +181,15 @@ control, `:focus-visible` ring present (the walkthrough's focus script).
   overlay row, now `z-30`); `ToolRail.tsx` (column A scrolls, `overflow-y-auto` as the panel
   already does); the default view's top inset for F50 (where the fit lives; Rust if it is in
   `curvyo-editor-wasm`).
-- **Order inside the slice:** first everything that holds under every answer to Frage 430 (F38,
+- **Order inside the slice:** first everything that holds under every answer to Frage 457 (F38,
   F40 to F44, F46 to F50); the two-row limit and the "More" part (F39, F45) last, in their own
   commit, so a late answer changes one commit.
-- **Risk:** Frage 430 B and C reverse the customer rule "Bar overflow: expandable second row,
+- **Risk:** Frage 457 B and C reverse the customer rule "Bar overflow: expandable second row,
   never a dropdown icon" (2026-10-24, `0084`); the Text bar's row-2 chevron must keep working.
   Changing the Select bar's anchor (F43) moves every Select-bar control; check the move and
   transform chips that sit below it.
 - **Screens:** 01, 03, 05, 06, 07, 09, 10, 12, 14, 33, 35, 40 to 45.
-- **Design-system row changes:** yes ("Select bar layout", "Bar overflow" if 430 B or C,
+- **Design-system row changes:** yes ("Select bar layout", "Bar overflow" if 457 B or C,
   "Toolbox card").
 
 ### S5 Segmented controls, sliders, pick lists (lead's c) - 5 findings: F19 to F23
@@ -235,7 +235,7 @@ control, `:focus-visible` ring present (the walkthrough's focus script).
 ### S7 Tooltips, notices, hints (lead's g) - 5 findings: F54 to F58
 
 - **Customer sees:** one tooltip look that also opens on keyboard focus; tooltips name the control
-  and its shortcut only (Frage 431); the hint chips and the slider help line gone (Frage 418 B);
+  and its shortcut only (Frage 458); the hint chips and the slider help line gone (Frage 454 B);
   one notice look.
 - **Components:** `ui/tooltip.tsx` (look moves to the canvas chip surface); `ActionNotice`,
   `AlertLine` (new, `components/ui/`).
@@ -267,49 +267,49 @@ control, `:focus-visible` ring present (the walkthrough's focus script).
 The Fragen as asked in `inventory.md` and `walkthrough.md`, with the lead's defaults. Each blocks
 nothing: the default is built and the answer can change it at the demo.
 
-Frage 416 (SWITCH-LOOK): How an on/off setting in the panel looks once the switch is gone
+Frage 452 (SWITCH-LOOK): How an on/off setting in the panel looks once the switch is gone
 - A: a full-width 244 x 28 button with symbol and label; on = blue ground, white symbol and label.
 - B: the label at the left, a 28 x 28 symbol toggle at the right.
 - C: keep the switch in the panel, toggle buttons only in the bars.
 Recommendation: A. Default: A. Slice S2.
 
-Frage 417 (BTN-SYMBOL): "All buttons with symbols": which buttons
+Frage 453 (BTN-SYMBOL): "All buttons with symbols": which buttons
 - A: every button with a label gets a symbol, Cancel (`X`), OK (`Check`), Add (`Plus`) included.
 - B: action buttons get one; Cancel, OK and Done stay text only (outlined).
 - C: bars icon-only with tooltips, panel symbol + label.
 Recommendation: A. Default: A. Slice S1.
 
-Frage 418 (HINT-KEEP): The four canvas hint chips and the slider help line predate the no-hint rule
+Frage 454 (HINT-KEEP): The four canvas hint chips and the slider help line predate the no-hint rule
 - A: keep them as they are.
 - B: remove them all.
 - C: remove the slider help line, keep the canvas chips.
 Recommendation (lead): B, per the no-hint rule. Default: B. Slice S7, last commit.
 
-Frage 419 (OP-PILL): The operation symbols on the laser canvas
+Frage 455 (OP-PILL): The operation symbols on the laser canvas
 - A: one rounded pill per object holding all its symbols, centred.
 - B: one chip per kind as now, but rounded (4 px) and centred.
 - C: A plus a count when more than three kinds.
 Recommendation: A. Default: A. Slice S3.
 
-Frage 420 (CHECK-TOGGLE): The option checks in the entry chips and the Sketch panel
+Frage 456 (CHECK-TOGGLE): The option checks in the entry chips and the Sketch panel
 - A: become toggle buttons like the former switches.
 - B: stay checkboxes, in the one checkbox look.
 Recommendation: A. Default: A. Slice S2.
 
-Frage 430 (BAR-NARROW): What a context bar does when its groups do not fit in one row
+Frage 457 (BAR-NARROW): What a context bar does when its groups do not fit in one row
 - A: wrap whole groups into more rows, never past the canvas; the bar may cover handles.
 - B: one row; groups that do not fit go into a "More" menu at the bar's end.
 - C: A up to two rows, then B.
 Recommendation (lead): C. Default: C. Slice S4, last commit. B and C replace your rule of
 2026-10-24 "expandable second row, never a dropdown icon".
 
-Frage 431 (TIP-TOOLTIPS): Tool and slider tooltips with operating instructions
+Frage 458 (TIP-TOOLTIPS): Tool and slider tooltips with operating instructions
 - A: keep them.
 - B: tooltips show name and shortcut only; the instructions go.
 - C: B, and the instructions move into the documentation.
 Recommendation (lead): C. Default: C. Slice S7.
 
-Frage 432 (PILL-ANCHOR): Where the operation pill sits on the laser canvas
+Frage 459 (PILL-ANCHOR): Where the operation pill sits on the laser canvas
 - A: centred above the object, 6 px over its top edge.
 - B: at the top-right corner as now, only the look changes.
 - C: centred inside the object when it fits, else A.
@@ -317,20 +317,20 @@ Recommendation: A. Default: A, with the corner anchor while the object shows its
 (Proposal, slice S3 risk). Slice S3.
 
 **Dependencies:**
-- 419 and 432: 432 places what 419 decides; with 419 B "centred" means the chip row is centred.
+- 419 and 432: 432 places what 419 decides; with 455 B "centred" means the chip row is centred.
   C of 432 puts the pill over the artwork, against 13.3 "chips never lie over the object's hatch".
-- 416 and 420: 420 A uses the look 416 picks; with 416 C, 420 A means toggle buttons in the
-  chips but switches in the panel (two "on" looks again), so 416 C pairs with 420 B.
-- 417 and 416: 417 C (bars icon-only) also makes the bar toggles icon-only.
+- 416 and 420: 456 A uses the look 416 picks; with 452 C, 456 A means toggle buttons in the
+  chips but switches in the panel (two "on" looks again), so 452 C pairs with 456 B.
+- 417 and 416: 453 C (bars icon-only) also makes the bar toggles icon-only.
 - 418 and 431: one family; the slider help line is both a hint (418) and a tooltip text (431,
-  Opacity). 418 B with 431 A would keep the text in the tooltip: the lead's pair B + C is
+  Opacity). 454 B with 458 A would keep the text in the tooltip: the lead's pair B + C is
   consistent. Both remove accepted behaviour, so both are the customer's call; the removals are
   the last commits of S7.
 - 430 and S1: symbols widen the bars, so the bars wrap more until S4 lands; 430 decides how far.
 
 ## 4. Changes to `docs/ui-elements.md` and `docs/design-system.md`
 
-`docs/ui-elements.md` is the rule from 0159 on; each slice marks its entries as built (a line
+`docs/ui-elements.md` is the rule from 0164 on; each slice marks its entries as built (a line
 "Built: PR #n" under the entry), turns its **(Proposal)** into the rule once the customer accepts
 the PR, and records the Frage answers. `docs/design-system.md` sections that a slice supersedes
 get a one-line pointer to the `ui-elements.md` entry instead of their own spec (no copy kept).
@@ -340,7 +340,7 @@ get a one-line pointer to the `ui-elements.md` entry instead of their own spec (
 | S1 | §0 Icon rule (417 answer, symbol table final), Copy (OK not Done); §1 to §5 component paths final and "Built"; §17 Inline form box and confirm layout; §19 Dialog; header paragraph: questions 416 to 420 and 430 to 432, link to this plan | "Fit to content", File tab "Buttons", "Close path group", "Stroke to path", "Flip buttons", "Guide", "Link corners toggle" and the Add page group row: pointer to §1, §2, §5; "Properties panel" disabled rule unchanged |
 | S2 | §6 Toggle button (416 answer, list of former switches checked off); §8 Checkbox (420 answer); §0 States "Pressed" | "Switch (`ScaleStrokeSwitch`)" replaced by a pointer to §6; the Select bar and laser tab rows naming a switch; Library facets "Customizable" row (`ui/switch`) |
 | S3 | §13 Canvas symbol pill (419 and 432 answers, anchor while selected); §13 Canvas chip radius; §20 token names | "Spacing and sizing": new "Canvas symbol pill" row; "Transform entry chip" and chip radii to 8 px; `specs/0101-laser-operations/ux-notes.md` 13.3 pointer |
-| S4 | §13 Bar (`ui/bar.tsx`, one anchor, empty groups, never past the canvas, 430 answer) | "Select bar layout", "Bar overflow" (only if 430 B or C), "Toolbox card" (column scrolls), Text bar row "measured" values re-measured |
+| S4 | §13 Bar (`ui/bar.tsx`, one anchor, empty groups, never past the canvas, 430 answer) | "Select bar layout", "Bar overflow" (only if 457 B or C), "Toolbox card" (column scrolls), Text bar row "measured" values re-measured |
 | S5 | §7 Segmented control (radio grid), §9 Slider (`ui/slider.tsx`), §12 Pick list and Menu (I25 decided) | "Segmented icon control (`ToggleGroup`)", "Choice strip" last sentence, the Slider row, "No popups in the panel" unchanged |
 | S6 | §0 Radius and Type (Proposal to rule), §0 States Focus, §10, §11, §17 Panel row grid, §18 List row | Colour table: add `--row-hover`; "List row" hover to `--row-hover`; "Bar number field"; "Properties panel: Document section" label column 60 px |
 | S7 | §15 Tooltip (431 answer), §16 Notice components, §0 Copy (418 answer) | "No operating tips by default" gains the 418 and 431 outcome; the hint-chip rows and the instruction texts in tool rows go; "Canvas notice slot" pointer to §16 |

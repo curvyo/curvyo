@@ -1,4 +1,4 @@
-// The shared field components of `specs/0159-ui-consistency` (F24, F28; `docs/ui-elements.md`
+// The shared field components of `specs/0164-ui-consistency` (F24, F28; `docs/ui-elements.md`
 // §10, §11): one look for number, text, search and rename fields, the label and the unit inside.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -116,7 +116,7 @@ test("No field look outside the shared ones: no native number input, search and 
   }
 });
 
-test("No native title on a control: buttons, links and fields use the shared Tooltip (0159 F54)", () => {
+test("No native title on a control: buttons, links and fields use the shared Tooltip (0164 F54)", () => {
   for (const file of files(new URL("../src/components/", import.meta.url))) {
     assert.doesNotMatch(readFileSync(file, "utf8"), /<(button|input|a|label)\s[^<]*?\stitle=/, file);
   }

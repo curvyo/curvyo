@@ -182,7 +182,7 @@ export interface SelectBarState {
   /** Stroke to path is in the bar: not for a selection of dimensions only (`0070` UI review). */
   strokeToPathShown: boolean;
   /** The distinct kinds of the selected objects (`selection_kinds`): a kind group is shown only
-   * while every selected object is of its kind (`specs/0159-ui-consistency`, Frage 433 B). */
+   * while every selected object is of its kind (`specs/0164-ui-consistency`, Frage 460 B). */
   kinds: string[];
 }
 

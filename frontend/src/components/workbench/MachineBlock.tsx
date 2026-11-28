@@ -157,7 +157,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
       ) : null}
       {/* The state row keeps its 28 px place on every laser page, so nothing below it moves under
           the pointer after a press (`specs/0029` P31); it holds the "Fixture sets in profile"
-          line, and the state above that line when the copy differs (0159: no blank row). */}
+          line, and the state above that line when the copy differs (0164: no blank row). */}
       {machine.state === null || machine.state === undefined ? (
         <div data-machine-state-row="" className="flex h-7 shrink-0 items-center">
           <span className="text-xs text-[var(--panel-muted-fg)]">Fixture sets in profile: {machine.fixture_sets_in_profile}</span>
@@ -235,7 +235,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
         {/* The work area is the machine's: read-only text on the page (`specs/0098` criterion
             13); it is typed only in a user profile of the list. */}
         {/* Read-only, but on the fields' grid: the label and the value where a field holds them,
-            the full row width like Max feed and Max power (0159 S6). */}
+            the full row width like Max feed and Max power (0164 S6). */}
         <div className="flex h-7 items-center justify-between rounded-[5px] border border-transparent px-2 text-sm">
           <span className="text-[var(--toolbar-icon)]">Work area</span>
           <span className="tabular-nums text-[var(--toolbar-icon)]">

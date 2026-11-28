@@ -143,7 +143,7 @@ export function useAlign(
   }, []);
 
   const count = state.selectedCount;
-  // The grid's gap is the bar's one Gap field (`specs/0159-ui-consistency`, Frage 433 B).
+  // The grid's gap is the bar's one Gap field (`specs/0164-ui-consistency`, Frage 460 B).
   const gridFields: GridFields = { rows: fields.rows, columns: fields.columns, gap };
   const arrange = useCallback(() => {
     const session = getSession();

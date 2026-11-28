@@ -69,7 +69,7 @@ export function NumberField({
   children,
   ...input
 }: NumberFieldProps) {
-  // The label, 8 px of air and the value never touch (0159 W19): the padding follows the label's
+  // The label, 8 px of air and the value never touch (0164 W19): the padding follows the label's
   // measured width.
   const measured = typeof label === "string" ? Math.ceil(6 + fieldLabelWidth(label) + 8) : 0;
   const padLeft = label === undefined ? 6 : Math.max(labelPx ?? 0, measured);

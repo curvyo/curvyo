@@ -197,7 +197,7 @@ pub fn objects_count_text(count: usize) -> String {
 }
 
 /// "Deleted layer Cut." (criterion 36): the objects that went with it are not counted
-/// (`specs/0159-ui-consistency` S7, the UI is not verbose).
+/// (`specs/0164-ui-consistency` S7, the UI is not verbose).
 #[must_use]
 pub fn deleted_layer_notice(layer: &str) -> String {
     format!("Deleted {}.", layer_words(layer, "layer"))

@@ -164,7 +164,7 @@ function PenProbePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   return (
-    // One sheet on the app's dialog look (`docs/ui-elements.md` §19, 0159 F58): an 8 px surface
+    // One sheet on the app's dialog look (`docs/ui-elements.md` §19, 0164 F58): an 8 px surface
     // with the panel elevation over a dimmed window, 16 px from every edge, the title 14 px
     // semibold, the actions as shared buttons.
     <div className="fixed inset-0 z-50 flex bg-black/10 p-4">
