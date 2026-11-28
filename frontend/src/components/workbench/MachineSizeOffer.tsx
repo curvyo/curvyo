@@ -14,8 +14,8 @@ interface Props {
   profileId: string | null;
   address: string;
   unit: UnitSymbol;
-  api: WorkbenchesApi["machine"];
-  /** The work area the block shows, so a change of it re-reads the offer. */
+  api: ReturnType<WorkbenchesApi["machines"]["sizeApi"]>;
+  /** The work area the row shows, so a change of it re-reads the offer. */
   width: number;
   height: number;
   /** Where focus goes after the press and when the offer leaves under the focus. */
@@ -25,7 +25,7 @@ interface Props {
 }
 
 /**
- * The offer row of the Machine block (`specs/0131` UX notes §2): "Machine reports W × H" and the
+ * The offer row of a laser machine in the Machines tab (`specs/0131` UX notes §2): "Machine reports W × H" and the
  * symbol button Use machine size, while the connected GRBL controller's travel differs from the
  * copy's work area. The row keeps its 28 px place while the controller reports a usable travel;
  * without a connector, controller or usable travel (and in the browser build) there is no row.

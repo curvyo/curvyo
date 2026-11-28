@@ -1,8 +1,7 @@
-// `specs/0130-fix-machine-profile-rename` criteria 2a and 3 in the front end: the order, names and
-// glyphs of the two buttons of the "Differs from profile" row (Reset from profile first with
-// `BookmarkCheck`, Update profile last with `RotateCcw`; Update hidden for the built-in), and the
-// armed colour (Update profile in `--armed-accent`, every other armed press of the block in
-// `--destructive`). Rendered on the server through the vite harness of `acceptance_0098_tester`.
+// `specs/0130-fix-machine-profile-rename` criteria 2a and 3 in the front end, as ADR 0098 revised
+// them: the "Differs from profile" row of the Machine group keeps Reset from profile with
+// `BookmarkCheck` (Update profile left the page, UX unify U6), and the armed presses stay
+// `--destructive`. Rendered on the server through the vite harness of `acceptance_0098_tester`.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -32,96 +31,46 @@ after(async () => {
 const SRC = path.resolve(import.meta.dirname, "..", "src");
 const source = (rel: string) => readFileSync(path.join(SRC, rel), "utf8");
 
-function machine(canUpdate: boolean) {
-  return {
-    copy: {
-      id: "u1",
-      name: "Generic laser copy",
-      origin: "bottom_left",
-      max_feed: 6000,
-      max_power: 1000,
-      laser_mode: true,
-      width: 400,
-      height: 300,
-    },
-    builtin: !canUpdate,
-    state: "differs",
-    can_update: canUpdate,
-    name_notice: null,
-    connection: null,
-    library_notices: [],
-    profiles: [
-      { id: "generic-laser", name: "Generic laser", width: 400, height: 300, builtin: true, chosen: !canUpdate },
-      { id: "u1", name: "Kitchen laser", width: 400, height: 300, builtin: false, chosen: canUpdate },
-    ],
-  };
-}
-
-/** The state row's buttons in DOM (and so Tab) order: accessible name and Lucide glyph id. */
-async function stateRowButtons(canUpdate: boolean): Promise<{ name: string; glyph: string }[]> {
-  // The block's module chain reads the host at load; a bare window stands in on the server.
+/** The Machine group's state-row buttons in DOM order (ADR 0098 decision 4, UX unify 4.1). */
+async function stateRowButtons(): Promise<{ name: string; glyph: string }[]> {
   const g = globalThis as Record<string, unknown>;
   const hadWindow = "window" in g;
   g.window ??= {};
   const react = await import("react");
   const dom = await import("react-dom/server");
   const tooltip = await server.ssrLoadModule("/src/components/ui/tooltip.tsx");
-  const loaded = await server.ssrLoadModule("/src/components/workbench/MachineBlock.tsx");
+  const loaded = await server.ssrLoadModule("/src/components/workbench/MachinesTab.tsx");
   const html = dom.renderToString(
     react.createElement(
       tooltip.TooltipProvider as never,
       null,
-      react.createElement(loaded.MachineBlock as never, {
-        label: "Machine",
-        machine: machine(canUpdate),
-        workbenches: { machine: {}, setProfileWorkArea: () => "" },
+      react.createElement(loaded.MachineGroup as never, {
+        picker: { family: "laser", id: "u1", name: "Kitchen laser", state: "differs", profiles: [] },
+        workbenches: { output: {} },
+        onOpenMachines: () => {},
+        onReturnFocus: () => {},
       }),
     ) as never,
   );
   if (!hadWindow) delete g.window;
-  const row = html.match(/<div data-machine-state-row=""[\s\S]*?<span role="status" class="sr-only">/);
-  assert.ok(row, "the state row is rendered");
-  return [...row[0].matchAll(/<button[^>]*aria-label="([^"]+)"[^>]*>\s*<svg[^>]*class="lucide lucide-([a-z0-9-]+)/g)].map(
+  const row = html.slice(html.indexOf("Differs from profile"));
+  return [...row.matchAll(/<button[^>]*aria-label="([^"]+)"[^>]*>\s*<svg[^>]*class="lucide lucide-([a-z0-9-]+)/g)].map(
     (m) => ({ name: m[1], glyph: m[2] }),
   );
 }
 
-test("2a: Differs from profile shows Reset from profile (BookmarkCheck) first, Update profile (RotateCcw) last", async () => {
-  assert.deepEqual(await stateRowButtons(true), [
-    { name: "Reset from profile", glyph: "bookmark-check" },
-    { name: "Update profile", glyph: "rotate-ccw" },
-  ]);
+test("2a: Differs from profile shows Reset from profile (BookmarkCheck); Update profile left the page (U6)", async () => {
+  assert.deepEqual(await stateRowButtons(), [{ name: "Reset from profile", glyph: "bookmark-check" }]);
+  assert.match(source("components/workbench/MachinesTab.tsx"), /content="Reset from profile"/);
+  assert.doesNotMatch(source("components/workbench/MachinesTab.tsx"), /Update profile/);
 });
 
-test("2a: for the built-in Update profile is hidden and Reset from profile is the only button", async () => {
-  assert.deepEqual(await stateRowButtons(false), [{ name: "Reset from profile", glyph: "bookmark-check" }]);
-});
-
-test("2a: the tooltips and the armed text stay as built", () => {
-  const block = source("components/workbench/MachineBlock.tsx");
-  assert.match(block, /const ARMED_UPDATE = "Update profile\. Overwrites the saved profile\.";/);
-  assert.match(block, /content="Reset from profile"/);
-  assert.match(block, /content=\{update\.armed \? ARMED_UPDATE : "Update profile"\}/);
-});
-
-test("3: Update profile arms in --armed-accent, an alias of --editor-accent, with a white glyph", async () => {
-  const styles = await server.ssrLoadModule("/src/components/workbench/machineStyles.ts");
-  const accent = styles.ARMED_ACCENT_BUTTON as string;
-  assert.match(accent, /bg-\[var\(--armed-accent\)\] text-white/);
-  assert.doesNotMatch(accent, /--destructive|hover:bg/);
-  assert.match(source("components/workbench/MachineBlock.tsx"), /update\.armed \? ARMED_ACCENT_BUTTON : ICON_BUTTON/);
-  assert.match(source("index.css"), /--armed-accent: var\(--editor-accent\);/);
-});
-
-test("3: every other armed press of the Machine block stays --destructive", async () => {
+test("3: the armed presses of the machine controls stay --destructive", async () => {
   const styles = await server.ssrLoadModule("/src/components/workbench/machineStyles.ts");
   assert.match(styles.ARMED_DESTRUCTIVE_BUTTON as string, /bg-\[var\(--destructive\)\] text-white/);
-  // Forget pairing (Connector group) and Delete in the profile list.
+  // Forget pairing (Connector group).
   assert.match(source("components/workbench/ConnectorGroup.tsx"), /arm\.armed \? ARMED_DESTRUCTIVE_BUTTON : ICON_BUTTON/);
-  assert.match(source("components/workbench/MachineProfileList.tsx"), /bg-\[var\(--destructive\)\] text-white/);
-  for (const file of ["components/workbench/ConnectorGroup.tsx", "components/workbench/MachineProfileList.tsx"]) {
-    assert.doesNotMatch(source(file), /--armed-accent|ARMED_ACCENT_BUTTON/, file);
-  }
+  assert.doesNotMatch(source("components/workbench/ConnectorGroup.tsx"), /--armed-accent|ARMED_ACCENT_BUTTON/);
 });
 
 test("3: white on the accent passes 4.5:1", () => {

@@ -58,7 +58,8 @@ const src = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8
 const TOOLBAR = src("../src/components/panel/MachineControls.tsx");
 const MACHINE_BLOCK = [
   src("../src/components/workbench/ConnectorGroup.tsx"),
-  src("../src/components/workbench/MachineBlock.tsx"),
+  // ADR 0098: the laser's Connection group lives in the Machines tab.
+  src("../src/components/workbench/MachinesTab.tsx"),
 ].join("\n");
 const OUTPUT_GROUP = src("../src/components/panel/OutputGroup.tsx");
 const PANEL = src("../src/components/panel/PropertiesPanel.tsx");

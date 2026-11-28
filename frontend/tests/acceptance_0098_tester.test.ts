@@ -199,57 +199,60 @@ test("AC7: there is no workbench switcher anywhere in the front end", () => {
 });
 
 // ---- criterion 13: the Machine block's work area ---------------------------------------------
+// ADR 0098 (UX unify 4.1): the page's Machine group is the pick, the "…" and the state row; the
+// work area is typed only in a maker's machine in the Machines tab.
 
-test("AC13: the Machine block shows 'Work area 400 × 300 mm' as text, with no width or height field", async () => {
-  const machine = {
-    copy: {
-      id: "generic-laser",
-      name: "Generic laser",
-      origin: "bottom_left",
-      max_feed: 6000,
-      max_power: 1000,
-      laser_mode: true,
-      width: 400,
-      height: 300,
-    },
-    builtin: true,
-    state: null,
-    can_update: false,
-    name_notice: null,
-    connection: null,
-    library_notices: [],
-    profiles: PROFILES,
-  };
-  // The block's module chain reads the host at load; a bare window stands in on the server.
+test("AC13: the Machine group has no width or height field and no format presets", async () => {
   const g = globalThis as Record<string, unknown>;
   const hadWindow = "window" in g;
   g.window ??= {};
-  const html = await render("/src/components/workbench/MachineBlock.tsx", "MachineBlock", {
-    label: "Machine",
-    machine,
-    workbenches: { machine: {}, setProfileWorkArea: () => "" },
+  const html = await render("/src/components/workbench/MachinesTab.tsx", "MachineGroup", {
+    picker: { family: "laser", id: "generic-laser", name: "Generic laser", state: null, profiles: [] },
+    workbenches: { output: {} },
+    onOpenMachines: noop,
+    onReturnFocus: noop,
   });
   if (!hadWindow) delete g.window;
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-  assert.match(text, /Work area 400 × 300 mm/);
+  assert.match(html, /aria-label="Edit machine Generic laser"/);
   assert.doesNotMatch(html, /aria-label="(Width|Height)[^"]*"/, "no width or height fields");
   assert.doesNotMatch(text, /\bA4\b|\bLetter\b/, "no format presets");
 });
 
 // ---- criterion 15: Edit work area only on user profiles -------------------------------------
 
-test("AC15: a user profile row has 'Edit work area of <name>', Generic laser has none", async () => {
-  const html = await render("/src/components/workbench/MachineProfileList.tsx", "MachineProfileList", {
-    rows: PROFILES,
-    onPick: noop,
-    onDuplicate: () => "",
-    onRename: noop,
-    onDelete: noop,
-    onWorkArea: () => "",
-    onClose: noop,
+test("AC15: a maker's laser is edited in the Machines tab (rename, delete), Generic laser only duplicated", async () => {
+  const fields = (builtin: boolean) => [
+    { key: "width", label: "Width", value: builtin ? "400" : "600", unit: "mm", kind: builtin ? "text" : "number" },
+    { key: "height", label: "Height", value: builtin ? "300" : "400", unit: "mm", kind: builtin ? "text" : "number" },
+  ];
+  const row = (id: string, name: string, builtin: boolean) => ({
+    id,
+    name,
+    line2: "",
+    builtin,
+    fields: fields(builtin),
+    connection: null,
   });
-  assert.match(html, /Edit work area of Garage/);
-  assert.doesNotMatch(html, /Edit work area of Generic laser/, "hidden, not disabled");
+  const g = globalThis as Record<string, unknown>;
+  const hadWindow = "window" in g;
+  g.window ??= {};
+  const machines = () => {
+    const view = {
+      sections: [{ family: "laser", word: "Laser", active: true, notices: [], rows: [row("generic-laser", "Generic laser", true), row("u1", "Garage", false)] }],
+      follow: null,
+    };
+    return render("/src/components/workbench/MachinesTab.tsx", "MachinesTab", {
+      workbenches: { machines: { view, sizeApi: () => ({}) } },
+      onReturnFocus: noop,
+    });
+  };
+  const html = await machines();
+  if (!hadWindow) delete g.window;
+  assert.match(html, /aria-label="Garage, "/);
+  assert.match(html, /aria-label="Duplicate Generic laser"/);
+  assert.match(html, /aria-label="Delete Garage"/);
+  assert.doesNotMatch(html, /aria-label="Delete Generic laser"/, "hidden, not disabled");
 });
 
 // ---- criterion 18 a: the registry keyed by kind ------------------------------------------------
@@ -293,8 +296,7 @@ test("AC22: the new page-kind components open no network connection", () => {
   for (const file of [
     "components/panel/AddPageGroup.tsx",
     "components/KindChip.tsx",
-    "components/workbench/MachineProfileList.tsx",
-    "components/workbench/MachineBlock.tsx",
+    "components/workbench/MachinesTab.tsx",
   ]) {
     assert.doesNotMatch(source(file), /fetch\(|WebSocket|XMLHttpRequest|sendBeacon/, file);
   }

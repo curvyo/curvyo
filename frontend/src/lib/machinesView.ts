@@ -11,6 +11,15 @@ export interface MachineField {
   value: string;
   unit: string;
   kind: "number" | "switch" | "corner" | "text" | "entry";
+  /** Greyed in place with this cause, its value kept (the pulse while Laser mode is off). */
+  greyed?: string;
+}
+
+/** A laser machine's Connection group: a plain library write without a step. */
+export interface MachineConnection {
+  connector_address: string;
+  controller_port: string;
+  baud_rate: number;
 }
 
 /** One machine row. */
@@ -20,6 +29,8 @@ export interface MachineRow {
   line2: string;
   builtin: boolean;
   fields: MachineField[];
+  /** A maker's laser's connection; `null` elsewhere. */
+  connection: MachineConnection | null;
 }
 
 /** One family's section. */
@@ -67,7 +78,18 @@ function asField(value: unknown): MachineField | null {
   const { key, label, unit, kind } = value;
   if (typeof key !== "string" || typeof label !== "string" || typeof unit !== "string") return null;
   if (typeof value.value !== "string" || !(KINDS as readonly unknown[]).includes(kind)) return null;
-  return { key, label, value: value.value, unit, kind: kind as MachineField["kind"] };
+  const field: MachineField = { key, label, value: value.value, unit, kind: kind as MachineField["kind"] };
+  if (typeof value.greyed === "string") field.greyed = value.greyed;
+  return field;
+}
+
+function asConnection(value: unknown): MachineConnection | null {
+  if (!isObject(value)) return null;
+  const { connector_address, controller_port, baud_rate } = value;
+  if (typeof connector_address !== "string" || typeof controller_port !== "string" || typeof baud_rate !== "number") {
+    return null;
+  }
+  return { connector_address, controller_port, baud_rate };
 }
 
 function asRow(value: unknown): MachineRow | null {
@@ -78,7 +100,7 @@ function asRow(value: unknown): MachineRow | null {
   }
   const fields = value.fields.map(asField);
   if (fields.some((f) => f === null)) return null;
-  return { id, name, line2, builtin, fields: fields as MachineField[] };
+  return { id, name, line2, builtin, fields: fields as MachineField[], connection: asConnection(value.connection) };
 }
 
 /** The Machines tab from its JSON text; `null` off an output page or for a broken value. */

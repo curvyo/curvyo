@@ -9,6 +9,10 @@ import type { WasmSession } from "@/lib/editorSession";
 import { barPlace, readoutParts, sliderMinWidth } from "@/lib/outputText";
 
 const THUMB = 14;
+/** The embroidery Speed segments (`0160` E13: 1× is the machine's speed). */
+const SPEEDS = [1, 4, 16];
+/** The embroidery bar's minimum width, which holds the Speed segments (`0160` E14). */
+const SPEED_BAR_MIN = 440;
 const INSET = THUMB / 2 + 1;
 const TARGET_HEIGHT = 24;
 
@@ -92,7 +96,11 @@ export function PlayBar({ getSession, frame }: { getSession: () => WasmSession |
       aria-label="Toolpath playback"
       data-play-bar
       className="pointer-events-auto absolute z-10 flex h-10 items-center gap-x-2.5 rounded-lg bg-[var(--toolbar-bg)] py-1 pr-3 pl-1.5"
-      style={{ ...place, boxShadow: "var(--panel-elevation-shadow)" }}
+      style={{
+        ...place,
+        ...(view?.speed ? { width: Math.max(place.width, SPEED_BAR_MIN) } : {}),
+        boxShadow: "var(--panel-elevation-shadow)",
+      }}
     >
       <Tooltip side="top" content={name}>
         <button
@@ -155,6 +163,31 @@ export function PlayBar({ getSession, frame }: { getSession: () => WasmSession |
           </span>
         ))}
       </span>
+      {view?.speed ? (
+        // The bar's own segments (the Choice-strip rule for bars, UX unify 7), session state.
+        <div role="radiogroup" aria-label="Speed" className="flex shrink-0 gap-px">
+          {SPEEDS.map((speed) => (
+            <button
+              key={speed}
+              type="button"
+              role="radio"
+              aria-checked={view.speed === speed}
+              tabIndex={view.speed === speed ? 0 : -1}
+              onClick={() => play.setSpeed(speed)}
+              onKeyDown={(event) => {
+                const at = SPEEDS.indexOf(view.speed ?? 16);
+                const next = event.key === "ArrowRight" ? at + 1 : event.key === "ArrowLeft" ? at - 1 : null;
+                if (next === null) return;
+                event.preventDefault();
+                play.setSpeed(SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, next))]);
+              }}
+              className="h-7 w-8 rounded text-xs tabular-nums text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-checked:bg-[var(--value-fill)]"
+            >
+              {speed}×
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -53,6 +53,8 @@
 - [x] U2. The family panel is withdrawn and deleted: the page uses the laser's Operations tab
   (rows, unfolded body, output group with Export and Send), Select-bar kinds, the Fixtures tab (Stock), the Tools tab, the
   Machines tab, the page-label Toolpath toggle and the canvas play bar on the planner's time with the Z readout.
+- [x] U3. The stock label "Plywood · 10 mm" at the stock's origin corner while it is at least
+  80 device px wide (UX unify 2.2, U15), the `0102` board label.
 
 ### Deviations (Proposal, for the UX and architect review)
 
@@ -72,7 +74,7 @@
 - The 0118 machine controls footer (Pause, Stop, Home, Jog) is not shown on CNC pages yet. The
   connector address is set on a saved profile (a built-in has none), not the 0064 Connection group.
 - The Toolpath view draws the tool band on the first pass only (passes share the drawn path, UX
-  N7) and has no arrowheads; the stock label "Plywood · 10 mm" is not drawn.
+  N7) and has no arrowheads.
 - The virtual GRBL treats `G2`/`G3` as straight moves to their end (the writer writes none), runs
   a hold as an immediate stop with GRBL's deceleration time, and ignores `$C` check mode.
 - Planner time: the whole program is planned between spindle changes (infinite look-ahead); the

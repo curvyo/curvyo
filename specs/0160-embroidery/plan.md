@@ -54,7 +54,10 @@
 - [x] U1. The page is the machine work area (the active hoop's sewing field, Set hoop resizes about the hoop centre); writer goldens unchanged.
 - [x] U2. The family panel is withdrawn and deleted: the page uses the laser's Operations tab
   (rows, unfolded body, output group with Export), Select-bar kinds, the Fixtures tab (Hoop), the
-  Machines tab, the page-label Toolpath toggle and the canvas play bar (one stitch per arrow, the thread swatch; the Speed segments are not built yet).
+  Machines tab, the page-label Toolpath toggle and the canvas play bar (one stitch per arrow, the thread swatch).
+- [x] U3. The play bar's Speed segments 1×, 4×, 16× (E13, default 16×, 1× the machine's stitches
+  per second, bar at least 440 px, E14); the rounded hoop frame (14 and 10 mm corners) with the
+  40 x 16 mm mounting tab on the left (E2); the 12 px thread swatch after a row's glyph (E5).
 
 ### Deviations (Proposal, for the UX and architect review)
 
@@ -69,8 +72,8 @@
   short stitches".
 - DST `ST:` counts the records after the header (a trim is three), `+X`/`-X`/`+Y`/`-Y` are the
   needle points' extents with the hoop centre included; a colour change writes no trim before it.
-- The hoop frame has square corners and no mounting tab; trims are an ink cross on a white
-  disc, a colour change a disc of the new thread at its point (not the filled run ring).
+- Trims are an ink cross on a white disc, a colour change a disc of the new thread at its point
+  (not the filled run ring); the frame's edges carry no casing.
 - The licence view of EM8 does not exist in the front end yet; Ink/Stitch and pyembroidery are
   credited in the two crates' `NOTICE.md` files.
 - The stitch plan is rebuilt for every view and frame (no cache): fine for the MVP designs, a

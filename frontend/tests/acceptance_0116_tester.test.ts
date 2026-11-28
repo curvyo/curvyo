@@ -87,15 +87,21 @@ const PROFILES = [
   { id: "u2", name: "Shed", width: 300, height: 200, builtin: false, chosen: false },
 ];
 
-const LIST_PROPS = {
-  rows: PROFILES,
-  onPick: noop,
-  onDuplicate: () => "",
-  onRename: noop,
-  onDelete: noop,
-  onWorkArea: () => "",
-  onClose: noop,
-};
+/** ADR 0098 (UX unify 4.2): the machine rows and their sync toggles live in the Machines tab. */
+function machinesTabProps(profiles: typeof PROFILES, library: unknown) {
+  // The tab's module chain (the connector and size offer) reads the host at load.
+  (globalThis as Record<string, unknown>).window ??= {};
+  const rows = profiles.map((p) => ({
+    id: p.id,
+    name: p.name,
+    line2: `${p.width} × ${p.height} mm · GRBL`,
+    builtin: p.builtin,
+    fields: [],
+    connection: null,
+  }));
+  const view = { sections: [{ family: "laser", word: "Laser", active: true, notices: [], rows }], follow: null };
+  return { workbenches: { machines: { view, sizeApi: () => ({}) } }, onReturnFocus: noop, library };
+}
 
 const GREYED = { view: null, switch: noop, firstSync: noop };
 
@@ -148,10 +154,7 @@ function materialsApi() {
 // ---- criterion 1: the per-row toggles ----------------------------------------------------------------
 
 test("c1: every user machine row carries the symbol toggle, the builtin none, not a Tab stop", async () => {
-  const html = await render("/src/components/workbench/MachineProfileList.tsx", "MachineProfileList", {
-    ...LIST_PROPS,
-    library: { view: view(), switch: noop, firstSync: noop },
-  });
+  const html = await render("/src/components/workbench/MachinesTab.tsx", "MachinesTab", machinesTabProps(PROFILES, { view: view(), switch: noop, firstSync: noop }));
   const buttons = syncButtons(html);
   assert.equal(buttons.length, 2, "one toggle per user profile, none for the builtin");
   assert.match(buttons[0], /aria-label="Sync Garage to my devices"/);
@@ -189,10 +192,7 @@ test("c1: a readable material row carries the toggle, damaged and newer rows non
 // ---- criterion 2: no paired device yet ----------------------------------------------------------------
 
 test("c2: without a paired device the toggles grey with their reason and the state lines show", async () => {
-  const machines = await render("/src/components/workbench/MachineProfileList.tsx", "MachineProfileList", {
-    ...LIST_PROPS,
-    library: GREYED,
-  });
+  const machines = await render("/src/components/workbench/MachinesTab.tsx", "MachinesTab", machinesTabProps(PROFILES, GREYED));
   const [button] = syncButtons(machines);
   assert.match(button, /aria-pressed="true"/, "the stored state still shows, on by default");
   assert.match(button, /aria-disabled="true"/, "a press does nothing");
@@ -206,10 +206,7 @@ test("c2: without a paired device the toggles grey with their reason and the sta
   });
   assert.match(materials, /role="status"[^>]*>Pair a device to sync materials\./);
   // With a group the state lines leave in the frame the first device joins.
-  const paired = await render("/src/components/workbench/MachineProfileList.tsx", "MachineProfileList", {
-    ...LIST_PROPS,
-    library: { view: view(), switch: noop, firstSync: noop },
-  });
+  const paired = await render("/src/components/workbench/MachinesTab.tsx", "MachinesTab", machinesTabProps(PROFILES, { view: view(), switch: noop, firstSync: noop }));
   assert.doesNotMatch(paired, /Pair a device to sync machine profiles\./);
 });
 

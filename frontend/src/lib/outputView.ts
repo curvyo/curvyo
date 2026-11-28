@@ -191,6 +191,8 @@ export interface PlayView {
   step: number | null;
   /** The thread at the head, "#RRGGBB" (embroidery); `null` elsewhere. */
   colour: string | null;
+  /** The Speed segment pressed, 1, 4 or 16 (embroidery, `0160` E13); `null` elsewhere. */
+  speed: number | null;
 }
 
 type Json = Record<string, unknown>;
@@ -442,7 +444,8 @@ export function decodePlayView(value: unknown): PlayView | null {
   }
   const step = typeof value.step === "number" && value.step > 0 ? value.step : null;
   const colour = typeof value.colour === "string" ? value.colour : null;
-  return { fraction, playing: value.playing, readout: value.readout, enabled: value.enabled, step, colour };
+  const speed = typeof value.speed === "number" ? value.speed : null;
+  return { fraction, playing: value.playing, readout: value.readout, enabled: value.enabled, step, colour, speed };
 }
 
 /** [`decodeOutputGroup`] of a JSON text. */

@@ -169,3 +169,15 @@ export function LeadGlyph({ kind, mirrored = false, size = 16 }: { kind: "none" 
     </svg>
   );
 }
+
+/** The 12 px thread swatch after an embroidery row's glyph (`0160` E5); `thread` is "#RRGGBB". */
+export function ThreadChip({ thread }: { thread: string }) {
+  return (
+    <span
+      aria-hidden
+      data-thread-swatch
+      className="size-3 shrink-0 rounded-sm border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)]"
+      style={{ background: thread }}
+    />
+  );
+}

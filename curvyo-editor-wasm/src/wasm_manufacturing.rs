@@ -2,7 +2,6 @@
 //! laser page as JSON, and the commands of its Machine block (the Fixtures block's are in
 //! `wasm_fixtures.rs`).
 
-use curvyo_document_core::Length;
 use wasm_bindgen::prelude::*;
 
 use crate::wasm_api::WasmSession;

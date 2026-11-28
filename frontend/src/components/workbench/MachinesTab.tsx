@@ -2,11 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { BookmarkCheck, BookmarkPlus, ChevronDown, ChevronRight, Copy, Ellipsis, Plus, Trash2 } from "lucide-react";
 
 import { InlinePickList } from "@/components/InlinePickList";
+import { LibrarySyncToggle } from "@/components/LibrarySyncToggle";
 import { EntryField } from "@/components/panel/EntryField";
 import { PanelSwitch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ConnectorGroup } from "@/components/workbench/ConnectorGroup";
+import { MachineSizeOffer } from "@/components/workbench/MachineSizeOffer";
 import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
-import type { MachineField, MachinePicker, MachineRow } from "@/lib/machinesView";
+import type { LibrarySyncApi } from "@/lib/devicesApi";
+import { profileRowKey } from "@/lib/machineBlockKeys";
+import { librarySyncOn } from "@/lib/librarySyncView";
+import { setMachineWriteFailureHandler } from "@/lib/machineProfilesFile";
+import type { MachineConnection, MachineField, MachinePicker, MachineRow } from "@/lib/machinesView";
 
 const HEADING = "text-[11px] font-semibold text-[var(--panel-muted-fg)]";
 const ICON =
@@ -23,13 +30,10 @@ const CORNERS = [
 /** The family whose row the "…" of the Document tab asked to open, across the tab switch. */
 let requestedRow: string | null = null;
 
-/** The built-in a family's "+ Machine" duplicates. */
-const BUILTIN: Record<string, string> = {
-  laser: "generic-laser",
-  plotter: "cricut-maker-3",
-  embroidery: "w6-eu7",
-  cnc: "generic-grbl-router",
-};
+/** The write-failure alert (UX unify 4.4): the library is read back from storage. */
+const WRITE_FAILED = "Could not save the machine. Nothing was changed.";
+/** How long the alert stays. */
+const NOTICE_MS = 3000;
 
 /**
  * The Machine group of an output page's Document tab (ADR 0098 decision 4, UX unify 4.1): the
@@ -119,6 +123,20 @@ function FieldView({
     setNotice(result.notice ?? null);
     return result.error;
   };
+  if (field.greyed !== undefined) {
+    // Greyed in place at 40 % with its cause, its value kept (`specs/0118` W62).
+    return (
+      <Tooltip side="left" content={<><div>{field.label}</div><div className="text-muted-foreground">{field.greyed}</div></>}>
+        <div aria-disabled="true" aria-description={field.greyed} className="flex items-baseline justify-between gap-2 opacity-40">
+          <span className="text-xs text-[var(--panel-muted-fg)]">{field.label}</span>
+          <span className="text-[13px] tabular-nums text-[var(--toolbar-icon)]">
+            {field.kind === "switch" ? (field.value === "on" ? "On" : "Off") : field.value}
+            {field.unit && field.kind !== "switch" ? ` ${field.unit}` : ""}
+          </span>
+        </div>
+      </Tooltip>
+    );
+  }
   if (field.kind === "text") {
     return (
       <div className="flex items-baseline justify-between gap-2">
@@ -171,6 +189,96 @@ function FieldView({
   );
 }
 
+/** A body field, and under a laser's Height the Machine size offer row (`specs/0131`). */
+function FieldRow(props: { row: MachineRow; field: MachineField; workbenches: WorkbenchesApi; onReturnFocus: () => void }) {
+  const { row, field, workbenches } = props;
+  const number = (key: string) => Number(row.fields.find((f) => f.key === key)?.value ?? "0");
+  return (
+    <>
+      <FieldView {...props} />
+      {field.key === "height" && row.connection ? (
+        <MachineSizeOffer
+          profileId={row.id}
+          address={row.connection.connector_address.trim()}
+          unit="mm"
+          api={workbenches.machines.sizeApi(row.id)}
+          width={number("width")}
+          height={number("height")}
+          onFocusProfile={() => {}}
+          onUsed={() => {}}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** The Connection group of a maker's laser (`0064`, UX unify 4.2): a library write on commit,
+ * no undo step; the connector's state under it. */
+function ConnectionGroup({
+  row,
+  connection,
+  onCommit,
+}: {
+  row: MachineRow;
+  connection: MachineConnection;
+  onCommit: (address: string, port: string, baud: number) => string;
+}) {
+  const [notice, setNotice] = useState("");
+  const { connector_address: address, controller_port: port, baud_rate: baud } = connection;
+  const commit = (a: string, p: string, b: number) => {
+    setNotice(onCommit(a, p, b));
+    return "committed" as const;
+  };
+  return (
+    <section aria-label="Connection" className="mt-1 flex flex-col gap-2">
+      <h3 className={HEADING}>Connection</h3>
+      <EntryField
+        label="Connector address"
+        prefix="Connector"
+        shown={address}
+        mixed={false}
+        width={228}
+        align="left"
+        inputMode="text"
+        onSubmit={(text) => commit(text, port, baud)}
+        messages={{}}
+        onReturnFocus={() => {}}
+        commitOnBlur
+      />
+      <EntryField
+        label="Controller port"
+        prefix="Port"
+        shown={port}
+        mixed={false}
+        width={228}
+        align="left"
+        inputMode="text"
+        onSubmit={(text) => commit(address, text, baud)}
+        messages={{}}
+        onReturnFocus={() => {}}
+        commitOnBlur
+      />
+      <EntryField
+        label="Baud rate"
+        prefix="Baud rate"
+        shown={String(baud)}
+        mixed={false}
+        width={228}
+        inputMode="decimal"
+        onSubmit={(text) => {
+          const value = Number(text.replace(/,/g, ""));
+          return Number.isFinite(value) ? commit(address, port, value) : "invalid:field";
+        }}
+        messages={{ field: "Enter a number." }}
+        onReturnFocus={() => {}}
+        commitOnBlur
+      />
+      {notice ? <p className="text-[11px] text-[var(--panel-muted-fg)]">{notice}</p> : null}
+      <ConnectorGroup profileId={row.id} address={address.trim()} />
+    </section>
+  );
+}
+
 /** One machine row with its actions and, unfolded, its body. */
 function MachineRowView({
   row,
@@ -179,6 +287,7 @@ function MachineRowView({
   workbenches,
   onReturnFocus,
   follow,
+  library,
 }: {
   row: MachineRow;
   open: boolean;
@@ -186,7 +295,12 @@ function MachineRowView({
   workbenches: WorkbenchesApi;
   onReturnFocus: () => void;
   follow: { sentence: string } | null;
+  library?: LibrarySyncApi;
 }) {
+  const syncOn = library ? librarySyncOn(library.view, "machines", row.id) : false;
+  const toggleSync = () => {
+    if (library && !row.builtin) library.switch("machine", row.id, !syncOn);
+  };
   const [armed, setArmed] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const nameRef = useRef<HTMLButtonElement>(null);
@@ -229,10 +343,16 @@ function MachineRowView({
             onClick={onToggle}
             onDoubleClick={() => !row.builtin && setRenaming(true)}
             onKeyDown={(event) => {
-              if (event.key === "F2" && !row.builtin) setRenaming(true);
-              if (event.key === "d" && (event.ctrlKey || event.metaKey)) {
+              // The `0026` §3 row keys: F2 renames, Ctrl+D duplicates, S syncs, Delete arms.
+              const action = profileRowKey(event.key, event.ctrlKey || event.metaKey, 0, 1);
+              if (action?.kind === "rename" && !row.builtin) setRenaming(true);
+              else if (action?.kind === "duplicate") {
                 event.preventDefault();
                 workbenches.machines.duplicate(row.id);
+              } else if (action?.kind === "sync") toggleSync();
+              else if (action?.kind === "delete" && !row.builtin) {
+                if (armed) workbenches.machines.remove(row.id);
+                setArmed(!armed);
               }
             }}
             className="flex min-w-0 flex-1 flex-col items-start text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
@@ -246,6 +366,9 @@ function MachineRowView({
             <Copy size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
           </button>
         </Tooltip>
+        {library && !row.builtin ? (
+          <LibrarySyncToggle name={row.name} on={syncOn} view={library.view} onToggle={toggleSync} slot="flex size-7" />
+        ) : null}
         {row.builtin ? null : (
           <button
             type="button"
@@ -266,7 +389,7 @@ function MachineRowView({
       {open ? (
         <div className="flex flex-col gap-2 border-l-2 border-[var(--editor-accent)] py-2 pl-4" data-machine-body>
           {row.fields.map((field) => (
-            <FieldView key={field.key} row={row} field={field} workbenches={workbenches} onReturnFocus={onReturnFocus} />
+            <FieldRow key={field.key} row={row} field={field} workbenches={workbenches} onReturnFocus={onReturnFocus} />
           ))}
           {follow ? (
             // Frage 434 C (UX unify 4.5): the inline offer after the fields, no focus taken.
@@ -296,6 +419,13 @@ function MachineRowView({
               </div>
             </div>
           ) : null}
+          {row.connection ? (
+            <ConnectionGroup
+              row={row}
+              connection={row.connection}
+              onCommit={(address, port, baud) => workbenches.machines.setConnection(row.id, address, port, baud)}
+            />
+          ) : null}
         </div>
       ) : null}
     </li>
@@ -307,14 +437,43 @@ function MachineRowView({
  * the active page's family first and unfolded, "+ Machine", rows with Duplicate, rename and the
  * armed trash, one body open at a time, and the inline offer to update the pages.
  */
-export function MachinesTab({ workbenches, onReturnFocus }: { workbenches: WorkbenchesApi; onReturnFocus: () => void }) {
+export function MachinesTab({
+  workbenches,
+  onReturnFocus,
+  library,
+}: {
+  workbenches: WorkbenchesApi;
+  onReturnFocus: () => void;
+  /** The library sync's toggles (`specs/0116-library-sync`). */
+  library?: LibrarySyncApi;
+}) {
   const view = workbenches.machines.view;
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState<string | null>(requestedRow);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setMachineWriteFailureHandler(() => setFailed(true));
+    return () => setMachineWriteFailureHandler(null);
+  }, []);
+  useEffect(() => {
+    if (!failed) return;
+    const timer = window.setTimeout(() => setFailed(false), NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [failed]);
   if (!view) return null;
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-sm font-semibold text-[var(--toolbar-icon)]">Machines</h2>
+      {failed ? (
+        <p role="alert" className="text-xs text-[var(--field-invalid)]">
+          {WRITE_FAILED}
+        </p>
+      ) : null}
+      {library !== undefined && library.view === null ? (
+        <p role="status" className="text-xs text-[var(--panel-muted-fg)]">
+          Pair a device to sync machine profiles.
+        </p>
+      ) : null}
       {view.sections.map((section) => {
         const isFolded = folded[section.family] ?? !section.active;
         return (
@@ -339,7 +498,7 @@ export function MachinesTab({ workbenches, onReturnFocus }: { workbenches: Workb
                   type="button"
                   className={TEXT_BUTTON}
                   onClick={() => {
-                    const id = workbenches.machines.duplicate(BUILTIN[section.family] ?? "");
+                    const id = workbenches.machines.add(section.family);
                     if (id) setOpen(id);
                   }}
                 >
@@ -368,6 +527,7 @@ export function MachinesTab({ workbenches, onReturnFocus }: { workbenches: Workb
                       workbenches={workbenches}
                       onReturnFocus={onReturnFocus}
                       follow={view.follow && view.follow.id === row.id ? view.follow : null}
+                      library={library}
                     />
                   ))}
                 </ul>

@@ -42,6 +42,20 @@ Implementer, 2026-11-05. Branch `story/0098-page-kinds`. ADR 0042 (Proposed), `a
 - [x] 11. Earlier tests updated per the spec's "Changes to accepted specs" table; full gate;
   browser check (AC 22: no network, no I/O added).
 
+### Revision 2026-11-28 (ADR 0098, `docs/design-drafts/2026-11-machine-families/ux-unify.md`)
+
+- [x] R1. The laser page's Machine block is the Machine group of every family (pick, "…" to the
+  Machines tab, state row; "Fixture sets in profile" stays under it); `MachineBlock` and
+  `MachineProfileList` are deleted, the sync toggle and the row keys move to the Machines tab.
+- [x] R2. The laser body in the Machines tab adds Focus pulse, Pulse power and Pulse length
+  (greyed while Laser mode is off), the Machine size offer row under Height and the Connection
+  group (a plain write); the edits are steps, the connection is not.
+- Deviation (for the architect): the page's copy-field setters (`set_machine_name` to
+  `set_machine_air_assist`, `update_machine_profile`, `set_profile_work_area`, the page's
+  `use_machine_size`) lost their wasm bindings but stay in the session, because the tester suites
+  of `0026`, `0029`, `0111`, `0113`, `0116`, `0118`, `0123`, `0131`, `0135` and `0150` call them;
+  moving those tests to the Machines-tab path is the tester's.
+
 ## Notes for the lead
 
 - The first page of a new document and SVG import pages get no `kind` register (absent reads as

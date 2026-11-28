@@ -77,7 +77,8 @@ test("the removed binding is called nowhere", () => {
 test("the fixed jobs of a pin or screw have no trash and no rename, and the Machine block counts sets", () => {
   const row = source("components/panel/FixtureJobRow.tsx");
   assert.match(row, /renaming \|\| fixed \? null : <TrashButton/);
-  assert.match(source("components/workbench/MachineBlock.tsx"), /Fixture sets in profile: \{machine\.fixture_sets_in_profile\}/);
+  // ADR 0098: the count stays under the laser's Machine group in the Document tab.
+  assert.match(source("components/workbench/ManifestTab.tsx"), /Fixture sets in profile: \{view\.machine\.fixture_sets_in_profile\}/);
 });
 
 // Superseded by `0113` rework: a set fixture gets the Lock bar too (criterion 32), hidden on a read only page.

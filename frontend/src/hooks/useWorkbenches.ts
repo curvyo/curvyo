@@ -194,7 +194,21 @@ export function useWorkbenches(editor: EditorSession) {
           error?: string;
         },
       duplicate: (id: string) => run((session) => session.duplicate_machine(id, randomBytes(), Date.now())) ?? "",
+      /** "+ Machine" of a family section: a copy of its built-in, one step; the new id. */
+      add: (family: string) => run((session) => session.add_machine(family, randomBytes(), Date.now())) ?? "",
       rename: (id: string, name: string) => run((session) => session.rename_machine(id, name, Date.now())) ?? false,
+      /** The Connection group of laser machine `id`: a library write without a step; the notice. */
+      setConnection: (id: string, address: string, port: string, baud: number) =>
+        run((session) => session.set_machine_connection_of(id, address, port, baud, Date.now())) ?? "",
+      /** The size offer of laser machine `id` (`specs/0131`), read on every render. */
+      sizeApi: (id: string) => ({
+        sizeOffer: (x: number, y: number): [number, number] | null => {
+          const offer = getSession()?.machine_size_offer_of(id, x, y);
+          return offer !== undefined && offer.length === 2 ? [offer[0], offer[1]] : null;
+        },
+        sizeReported: (x: number, y: number): boolean => getSession()?.machine_size_reported_of(id, x, y) ?? false,
+        useSize: (x: number, y: number) => run((session) => session.use_machine_size_of(id, x, y, Date.now())) ?? false,
+      }),
       remove: (id: string) => run((session) => session.delete_machine(id)) ?? false,
       follow: () => run((session) => session.follow_machine()) ?? false,
       keep: () => {
@@ -210,48 +224,6 @@ export function useWorkbenches(editor: EditorSession) {
     /** Place page (`specs/0100` criterion 15): drawing page `id` at the active laser page's
      * centre. Whether it was placed. */
     placePage: (id: string) => run((session) => session.place_page_on_active(id)) ?? false,
-    /** Edit work area of a user profile (criterion 15): a library write; the notice. */
-    setProfileWorkArea: (id: string, width: number, height: number) =>
-      run((session) => session.set_profile_work_area(id, width, height, Date.now())) ?? "",
-    machine: {
-      pick: (id: string) => run((session) => session.pick_machine_profile(id)),
-      setOrigin: (corner: OriginCorner) => run((session) => session.set_machine_origin(corner)),
-      setMaxFeed: (value: number) => run((session) => session.set_machine_max_feed(value)) ?? "",
-      setMaxPower: (value: number) => run((session) => session.set_machine_max_power(value)) ?? "",
-      /** The Default power field (`specs/0150` criterion 1): one undo step; the notice. */
-      setDefaultPower: (value: number) => run((session) => session.set_machine_default_power(value)) ?? "",
-      /** The Default speed field: one undo step; the notice. */
-      setDefaultSpeed: (value: number) => run((session) => session.set_machine_default_speed(value)) ?? "",
-      setLaserMode: (on: boolean) => run((session) => session.set_machine_laser_mode(on)),
-      /** The Motorised Z axis switch of the page's profile copy: one undo step. */
-      setMotorisedZ: (on: boolean) => run((session) => session.set_motorised_z(on)),
-      /** The Air assist switch of the page's profile copy: one undo step. */
-      setAirAssist: (on: boolean) => run((session) => session.set_air_assist(on)),
-      /** The focus pulse fields (`specs/0118` 35 a): one undo step each; the notice or "". */
-      setFocusPulse: (on: boolean) => run((session) => session.set_focus_pulse(on)),
-      setPulsePower: (percent: number) => run((session) => session.set_pulse_power(percent)) ?? "",
-      setPulseLength: (ms: number) => run((session) => session.set_pulse_length(ms)) ?? "",
-      /** The size the connected machine reports as an offer for this page, `[width, height]` in
-       * mm, or null (`specs/0131`); read on every render, no command. */
-      sizeOffer: (x: number, y: number): [number, number] | null => {
-        const offer = getSession()?.machine_size_offer(x, y);
-        return offer !== undefined && offer.length === 2 ? [offer[0], offer[1]] : null;
-      },
-      /** Whether the reported size is usable, so the offer row keeps its place. */
-      sizeReported: (x: number, y: number): boolean => getSession()?.machine_size_reported(x, y) ?? false,
-      /** Use machine size: one undo step, the library write of a saved profile. */
-      useSize: (x: number, y: number) => run((session) => session.use_machine_size(x, y, Date.now())) ?? false,
-      reset: () => run((session) => session.reset_machine_profile()),
-      saveAs: () => run((session) => session.save_machine_profile(randomBytes(), Date.now())) ?? "",
-      update: () => run((session) => session.update_machine_profile(Date.now())) ?? "",
-      duplicate: (id: string) =>
-        run((session) => session.duplicate_machine_profile(id, randomBytes(), Date.now())) ?? "",
-      rename: (id: string, name: string) =>
-        run((session) => session.rename_machine_profile(id, name, Date.now())) ?? "",
-      remove: (id: string) => run((session) => session.delete_machine_profile(id)),
-      setConnection: (address: string, port: string, baud: number) =>
-        run((session) => session.set_machine_connection(address, port, baud, Date.now())) ?? "",
-    },
     setExtensionEnabled: (id: string, enabled: boolean) => {
       const text = run((session) => session.set_extension_enabled(id, enabled));
       if (text !== undefined) {

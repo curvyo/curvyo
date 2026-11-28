@@ -84,13 +84,20 @@ slice 1, not groundwork, and comes with M1.
 - [x] U1. The page is the machine work area (the active mat's cut area, the mat drawn around it, `PAGE_ORIGIN_ON_MAT` maps to the mat for the SVG); writer goldens unchanged.
 - [x] U2. The family panel is withdrawn and deleted: the page uses the laser's Operations tab
   (rows, unfolded body, output group with Export), Select-bar kinds, the Fixtures tab (Mat), the
-  Machines tab, the page-label Toolpath toggle and the canvas play bar; the plotter has no play bar yet.
+  Machines tab, the page-label Toolpath toggle and the canvas play bar.
+- [x] U3. The canvas play bar on the job's time (HPGL) or path length (Design Space, UX C14) with
+  the head drawn (`curvyo-cutter-core` `PlayAxis`); Cuts last on by default (C12, the format-39
+  `x.<process>.cuts_last` register, Draw in Marking before Cut in Cutting); Add page preselects the
+  machine the last plotter page was added with (C3, U20).
+- [x] U4. Every Machines-tab edit, add, duplicate, rename and delete is one undo step with the
+  library journal (ADR 0098 decision 4; all four families).
 
 ### Deviations (Proposal, for the UX review)
 
 - Draw moves in the Toolpath view use the laser's Score stroke (1.5 px ink, dotted) instead of a
-  solid ink stroke; no run-ring digits and no play axis in metres yet (UX C14).
-- The remembered profile per kind (UX C3) is not kept; Add page preselects Cricut Maker 3.
+  solid ink stroke; no run-ring digits yet.
+- The remembered machine per kind (UX C3, U20) is kept for the session only; machine-choice.json
+  holds the laser's pick alone (a per-kind shape would change that per-user file's format).
 
 ### Validation
 

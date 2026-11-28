@@ -18,6 +18,8 @@ export interface PlayBarApi {
   seek: (fraction: number) => void;
   /** A key on the slider; whether it was one the slider handles. */
   key: (key: string) => boolean;
+  /** The embroidery Speed segment (1, 4 or 16). */
+  setSpeed: (speed: number) => void;
 }
 
 /** The play bar's API for the session `getSession` gives. */
@@ -67,5 +69,11 @@ export function usePlayBar(getSession: () => WasmSession | null): PlayBarApi {
     },
     [getSession, view],
   );
-  return { view, toggle, seek, key };
+  const setSpeed = useCallback(
+    (speed: number) => {
+      getSession()?.set_play_speed(speed);
+    },
+    [getSession],
+  );
+  return { view, toggle, seek, key, setSpeed };
 }

@@ -1,11 +1,8 @@
 import { TriangleAlert } from "lucide-react";
 
 import { InlinePickList } from "@/components/InlinePickList";
-import { MachineBlock } from "@/components/workbench/MachineBlock";
 import { MachineGroup } from "@/components/workbench/MachinesTab";
-import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { ManufacturingView, WorkbenchesApi } from "@/hooks/useWorkbenches";
-import type { LibrarySyncApi } from "@/lib/devicesApi";
 import type { PageRow } from "@/lib/pages";
 import type { ManifestBlock, ManifestWorkbenchContribution } from "@/workbenches/registry";
 
@@ -15,10 +12,6 @@ interface ManifestTabProps {
   pages: PageRow[];
   view: ManufacturingView;
   workbenches: WorkbenchesApi;
-  /** The document's display unit (the Machine block's work area line). */
-  unit: UnitSymbol;
-  /** The library sync's toggles (`specs/0116-library-sync`). */
-  library?: LibrarySyncApi;
   /** The "…" of the Machine group: the Machines tab (ADR 0098 decision 4). */
   onOpenMachines?: () => void;
   onReturnFocus: () => void;
@@ -27,12 +20,13 @@ interface ManifestTabProps {
 /**
  * A manufacturing workbench's tab, drawn from its extension's manifest (ADR 0034 §4,
  * `specs/0093-laser-workbench-shell` UX notes §4): the block kinds `Notice`, `MachineProfile`
- * (`specs/0026-machine-profile`) in the manifest's order; a `FixtureList` block draws nothing here (the Fixtures tab, `specs/0113`). Nothing here names a
+ * (the Machine group of ADR 0098) in the manifest's order; a `FixtureList` block draws nothing here (the Fixtures tab, `specs/0113`). Nothing here names a
  * process.
  */
-export function ManifestTab({ contribution, pages, view, workbenches, unit, library, onOpenMachines, onReturnFocus }: ManifestTabProps) {
+export function ManifestTab({ contribution, pages, view, workbenches, onOpenMachines, onReturnFocus }: ManifestTabProps) {
   // A plotter, embroidery or CNC page: the Machine group and Place page; everything else lives
-  // in its Operations, Fixtures, Tools and Machines tabs (ADR 0098, UX unify 4.1).
+  // in its Operations, Fixtures, Tools and Machines tabs (ADR 0098, UX unify 4.1). A laser page
+  // draws the same group from its manifest's Machine profile block.
   if (!view.machine && view.picker) {
     return (
       <div className="flex flex-col gap-4">
@@ -57,8 +51,7 @@ export function ManifestTab({ contribution, pages, view, workbenches, unit, libr
           pages={pages}
           view={view}
           workbenches={workbenches}
-          unit={unit}
-          library={library}
+          onOpenMachines={onOpenMachines}
           onReturnFocus={onReturnFocus}
         />
       ))}
@@ -71,17 +64,26 @@ function Block({
   pages,
   view,
   workbenches,
-  unit,
-  library,
+  onOpenMachines,
   onReturnFocus,
 }: ManifestTabProps & { block: ManifestBlock }) {
   switch (block.kind) {
     case "notice":
       return <NoticeBlock text={view.notices[block.id]} />;
     case "machine_profile":
-      return view.machine ? (
+      // The Machine group (ADR 0098 decision 4, UX unify 4.1): the pick, the "…" to the Machines
+      // tab and the state row; the machine's fields live in the Machines tab.
+      return view.picker ? (
         <>
-          <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} unit={unit} library={library} onReturnFocus={onReturnFocus} />
+          <MachineGroup
+            picker={view.picker}
+            workbenches={workbenches}
+            onOpenMachines={() => onOpenMachines?.()}
+            onReturnFocus={onReturnFocus}
+          />
+          {view.machine ? (
+            <p className="text-xs text-[var(--panel-muted-fg)]">Fixture sets in profile: {view.machine.fixture_sets_in_profile}</p>
+          ) : null}
           <PlacePage pages={pages} workbenches={workbenches} onReturnFocus={onReturnFocus} />
         </>
       ) : null;

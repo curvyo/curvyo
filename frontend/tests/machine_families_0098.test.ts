@@ -96,6 +96,9 @@ test("ADR 0098 decision 4: the Machines tab lists every family, the page's first
 
 test("UX unify 4.1: the Machine group has the pick, the … and the state row", async () => {
   const workbenches = { output: { pick: () => true, reset: () => true, saveAs: () => "" } };
+  // The tab's module chain (the connector and size offer) reads the host at load.
+  const g = globalThis as Record<string, unknown>;
+  g.window ??= {};
   const html = await render("/src/components/workbench/MachinesTab.tsx", "MachineGroup", {
     picker: { family: "cnc", id: "x", name: "Router", state: "missing", profiles: [] },
     workbenches,

@@ -2,7 +2,7 @@ import { ChevronDown, ChevronUp, Eye, EyeOff, Power, PowerOff, Trash2 } from "lu
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
-import { OperationGlyph } from "@/components/panel/OperationGlyphs";
+import { OperationGlyph, ThreadChip } from "@/components/panel/OperationGlyphs";
 import { focusAfterRename, nameKeyAction, rowLine2, rowName, rowRunLine2, tickPressAdds } from "@/lib/operationRows";
 import { NumbersText } from "@/components/panel/NumbersText";
 import { canUnfold } from "@/lib/operationUnfold";
@@ -141,6 +141,7 @@ export function OperationRowView(props: RowProps) {
             <OperationGlyph kind={row.kind} />
           </span>
         )}
+        {row.thread ? <ThreadChip thread={row.thread} /> : null}
         {renaming ? (
           <RenameField row={row} actions={actions} />
         ) : (

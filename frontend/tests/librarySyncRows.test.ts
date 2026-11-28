@@ -128,15 +128,21 @@ const PROFILES = [
   { id: "u1", name: "Garage", width: 600, height: 400, builtin: false, chosen: true },
 ];
 
-const LIST_PROPS = {
-  rows: PROFILES,
-  onPick: noop,
-  onDuplicate: () => "",
-  onRename: noop,
-  onDelete: noop,
-  onWorkArea: () => "",
-  onClose: noop,
-};
+/** ADR 0098 (UX unify 4.2): the machine rows and their sync toggles live in the Machines tab. */
+function machinesTabProps(profiles: typeof PROFILES, library: unknown) {
+  // The tab's module chain (the connector and size offer) reads the host at load.
+  (globalThis as Record<string, unknown>).window ??= {};
+  const rows = profiles.map((p) => ({
+    id: p.id,
+    name: p.name,
+    line2: `${p.width} × ${p.height} mm · GRBL`,
+    builtin: p.builtin,
+    fields: [],
+    connection: null,
+  }));
+  const view = { sections: [{ family: "laser", word: "Laser", active: true, notices: [], rows }], follow: null };
+  return { workbenches: { machines: { view, sizeApi: () => ({}) } }, onReturnFocus: noop, library };
+}
 
 const GREYED = { view: null, switch: noop, firstSync: noop };
 
@@ -145,10 +151,7 @@ function syncButtons(html: string): string[] {
 }
 
 test("without a paired device every machine toggle greys with its reason, the builtin gets none", async () => {
-  const html = await render("/src/components/workbench/MachineProfileList.tsx", "MachineProfileList", {
-    ...LIST_PROPS,
-    library: GREYED,
-  });
+  const html = await render("/src/components/workbench/MachinesTab.tsx", "MachinesTab", machinesTabProps(PROFILES, GREYED));
   const buttons = syncButtons(html);
   assert.equal(buttons.length, 1, "one toggle, the user profile's");
   assert.match(buttons[0], /aria-label="Sync Garage to my devices"/);
@@ -167,10 +170,7 @@ test("with a group the machine toggles show the stored state and the stream's st
     switch: noop,
     firstSync: noop,
   };
-  const html = await render("/src/components/workbench/MachineProfileList.tsx", "MachineProfileList", {
-    ...LIST_PROPS,
-    library,
-  });
+  const html = await render("/src/components/workbench/MachinesTab.tsx", "MachinesTab", machinesTabProps(PROFILES, library));
   const [button] = syncButtons(html);
   assert.match(button, /aria-pressed="false"/, "the stored off state shows");
   assert.doesNotMatch(button, /aria-busy/, "an off toggle keeps the cloud through every state");
@@ -185,10 +185,7 @@ test("an on toggle is busy while this item transfers and presses on the active g
     switch: noop,
     firstSync: noop,
   };
-  const html = await render("/src/components/workbench/MachineProfileList.tsx", "MachineProfileList", {
-    ...LIST_PROPS,
-    library,
-  });
+  const html = await render("/src/components/workbench/MachinesTab.tsx", "MachinesTab", machinesTabProps(PROFILES, library));
   const [button] = syncButtons(html);
   assert.match(button, /aria-pressed="true"/);
   assert.match(button, /aria-busy="true"/, "RefreshCw while this item transfers");
@@ -203,10 +200,7 @@ test("an on, in-sync toggle carries the pressed look and no busy state", async (
     switch: noop,
     firstSync: noop,
   };
-  const html = await render("/src/components/workbench/MachineProfileList.tsx", "MachineProfileList", {
-    ...LIST_PROPS,
-    library: on,
-  });
+  const html = await render("/src/components/workbench/MachinesTab.tsx", "MachinesTab", machinesTabProps(PROFILES, on));
   const [button] = syncButtons(html);
   assert.match(button, /aria-pressed="true"/);
   assert.doesNotMatch(button, /aria-busy/);

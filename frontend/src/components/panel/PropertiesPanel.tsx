@@ -637,8 +637,6 @@ export function PropertiesPanel({
                       pages={doc.view.pages}
                       view={manufacturing}
                       workbenches={workbenches}
-                      unit={doc.view.unit}
-                      library={devicesForTabs.library}
                       onOpenMachines={() => activate("machines")}
                       onReturnFocus={returnFocus}
                     />
@@ -772,7 +770,7 @@ export function PropertiesPanel({
             ) : doc.view.content === "tools" && manufacturing ? (
               <CncToolsTab view={manufacturing} workbenches={workbenches} onReturnFocus={returnFocus} />
             ) : doc.view.content === "machines" ? (
-              <MachinesTab workbenches={workbenches} onReturnFocus={returnFocus} />
+              <MachinesTab workbenches={workbenches} onReturnFocus={returnFocus} library={devicesForTabs.library} />
             ) : doc.view.content === "materials" ? (
               <MaterialsTab api={materials} library={devicesForTabs.library} onReturnFocus={returnFocus} />
             ) : doc.view.content === "layers" ? (
