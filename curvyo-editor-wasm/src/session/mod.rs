@@ -226,6 +226,7 @@ mod fuse;
 mod fuse_tests;
 #[cfg(test)]
 mod membership_tests;
+mod pen_layers;
 #[cfg(test)]
 mod single_line_tests;
 mod snapping;
@@ -323,6 +324,13 @@ mod transform_entry;
 mod weld;
 #[cfg(test)]
 mod weld_tests;
+mod window_link;
+#[cfg(test)]
+mod window_link_share_tests;
+#[cfg(test)]
+mod window_link_tests;
+#[cfg(test)]
+mod window_link_view_tests;
 mod workspace_channel;
 mod workspace_files;
 mod workspace_notices;
@@ -411,6 +419,7 @@ pub use svg_export::SvgExportResult;
 pub use svg_import::SvgImportOutcome;
 pub use sync::{SyncSeeds, TransportAction};
 pub use sync::{hex, unhex};
+pub use window_link::{LinkRole, LinkState};
 pub use workspace_sync::{
     BackgroundItem, BackgroundKind, DocumentPlace, MarkerFiles, PreparedShare, WorkspaceLink,
     WorkspaceWrite,
@@ -759,6 +768,12 @@ pub struct Session {
     instances: sketch_instance::InstanceState,
     /// The knobs of a selected sketch clone (`sketch_instance_handles.rs`, `specs/0099`).
     sketch_knobs: sketch_instance_handles::SketchKnobs,
+    /// The link to the other window of this project (`specs/0158-pen-display` slice 2a).
+    link: Option<Box<window_link::WindowLink>>,
+    /// The Loro peer ids of this device's pen windows, named "Pen window" in History.
+    pen_peers: Vec<u64>,
+    /// The canvas the pen rail and bar leave free for Fit page (left, top CSS px).
+    pen_fit_insets: (f64, f64),
 }
 
 impl Session {
@@ -891,6 +906,9 @@ impl Session {
             generators: generators::GeneratorsState::default(),
             instances: sketch_instance::InstanceState::default(),
             sketch_knobs: sketch_instance_handles::SketchKnobs::default(),
+            link: None,
+            pen_peers: Vec::new(),
+            pen_fit_insets: (0.0, 0.0),
         }
     }
 
@@ -1018,6 +1036,9 @@ impl Session {
             generators: generators::GeneratorsState::default(),
             instances: sketch_instance::InstanceState::default(),
             sketch_knobs: sketch_instance_handles::SketchKnobs::default(),
+            link: None,
+            pen_peers: Vec::new(),
+            pen_fit_insets: (0.0, 0.0),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -1171,6 +1192,10 @@ impl Session {
             if this.history_preview_takes_press() {
                 return;
             }
+            // The pen window ignores presses while it waits, is held or reloads (`0158` 2a).
+            if this.link_blocks_input() {
+                return;
+            }
             this.pointer_position = Some(point);
             // The open tiling bar locks canvas selection; a press picks a circle handle only.
             if this.tiling_press(point) {
@@ -1180,6 +1205,9 @@ impl Session {
             // A press in the frame of a page of another kind only activates it: the tools follow
             // (`specs/0098` criterion 8), and nothing is drawn or started.
             if this.activate_page_of_other_kind_at(point) {
+                return;
+            }
+            if this.link_refuses_sketch_press() {
                 return;
             }
             if this.workbench() == Workbench::Sketch {

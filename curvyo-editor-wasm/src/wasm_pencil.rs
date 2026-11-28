@@ -1,6 +1,7 @@
 //! The Pencil on the `wasm-bindgen` surface (`specs/0158-pen-display` slice 1, ADR 0095
-//! decision 1): the frame's pen samples and the Pencil bar's session settings. A further
-//! `impl WasmSession` block, every method a pass-through to `Session`.
+//! decision 1; slice 2b criteria 2 and 3): the frame's pen samples and what the Pencil bar and the
+//! Pen strip set for the next stroke. A further `impl WasmSession` block, every method a
+//! pass-through to `Session`.
 
 use curvyo_document_core::Length;
 use curvyo_ui_core::{PEN_SAMPLE_STRIDE, PressureCurve};
@@ -30,6 +31,29 @@ impl WasmSession {
     /// (0 hover, 1 contact, 2 out), barrel bits, time (ms). Only the Pencil reads them.
     pub fn pen_samples(&mut self, flat: &[f64]) {
         self.session.pen_samples(flat);
+    }
+
+    /// The pen window's Eraser button: on, the tip erases as the eraser end does.
+    pub fn set_pencil_eraser(&mut self, on: bool) {
+        self.session.set_pencil_eraser(on);
+    }
+
+    /// Whether the Eraser button is on.
+    #[must_use]
+    pub fn pencil_eraser(&self) -> bool {
+        self.session.pencil_eraser()
+    }
+
+    /// The Pen strip's layer pick: the active page's layers, front-most first, as a JSON array of
+    /// `{id, name, hidden, locked, active}`; `[]` for a page without layers.
+    #[must_use]
+    pub fn pen_layers_json(&self) -> String {
+        serde_json::to_string(&self.session.pen_layers()).unwrap_or_else(|_| "[]".to_owned())
+    }
+
+    /// Makes the layer of the JSON id `id` the active layer (no step); false for another id.
+    pub fn set_pen_layer(&mut self, id: &str) -> bool {
+        self.session.set_pen_layer(id)
     }
 
     /// Smoothing as the fit accuracy in mm (the bar's percent / 100).

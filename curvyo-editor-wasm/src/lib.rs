@@ -198,6 +198,8 @@ mod wasm_trace_region;
 #[cfg(target_arch = "wasm32")]
 mod wasm_weld;
 #[cfg(target_arch = "wasm32")]
+mod wasm_window_link;
+#[cfg(target_arch = "wasm32")]
 mod wasm_workspace;
 #[cfg(target_arch = "wasm32")]
 mod wasm_workspace_sync;
@@ -235,8 +237,9 @@ pub use session::{
     SlotTargetRow, SlotTargetsView, TapesView, UnitBox,
 };
 pub use session::{
-    BackgroundItem, BackgroundKind, DiskAnswer, DiskScan, DiskStep, DocumentPlace, ListEdit,
-    MarkerFiles, PreparedShare, SyncSeeds, TransportAction, WorkspaceLink, WorkspaceWrite,
+    BackgroundItem, BackgroundKind, DiskAnswer, DiskScan, DiskStep, DocumentPlace, LinkRole,
+    LinkState, ListEdit, MarkerFiles, PreparedShare, SyncSeeds, TransportAction, WorkspaceLink,
+    WorkspaceWrite,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{DropBadge, RowDragAnswer, RowDragSource, SketchRowState, SketchUsage};

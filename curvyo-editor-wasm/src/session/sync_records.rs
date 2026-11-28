@@ -150,7 +150,7 @@ impl Session {
     }
 
     /// What a remote delete took from the selection leaves it (lazy resolve, ADR 0009 §2).
-    fn drop_gone_from_selection(&mut self) {
+    pub(super) fn drop_gone_from_selection(&mut self) {
         let ids = self.selection.ids();
         if ids.iter().all(|id| self.document.object(*id).is_some()) {
             return;

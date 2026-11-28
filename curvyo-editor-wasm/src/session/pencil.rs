@@ -14,6 +14,9 @@ use super::{Session, Tool, Workbench};
 pub(super) const PENCIL_STROKE_LABEL: &str = "pencil_stroke";
 /// The commit label of an eraser lift ("Erase" in the history).
 pub(super) const ERASE_LABEL: &str = "erase";
+/// The notice of the first pressure stroke in a shared project (criterion 23).
+pub(super) const SHARED_PRESSURE_NOTICE: &str =
+    "Pressure width is not available in a shared project yet.";
 /// Handles whose cross product is within this share of their lengths' product are collinear.
 const COLLINEAR_SHARE: f64 = 1e-3;
 
@@ -26,20 +29,54 @@ pub(super) struct PencilState {
     pub(super) erase_hits: Vec<NodeId>,
     /// Whether the last sample came from the eraser end (the eraser cursor).
     pub(super) eraser_end: bool,
+    /// The pen window's Eraser button: every sample erases as the eraser end does
+    /// (`specs/0158-pen-display` slice 2b criterion 2).
+    pub(super) eraser_mode: bool,
     /// Whether the last finished stroke had pen pressure, `None` before the first.
     pub(super) last_had_pressure: Option<bool>,
+    /// The shared-project notice was shown in this session (criterion 23).
+    pub(super) shared_notice_shown: bool,
 }
 
 impl Session {
     /// Takes one frame's pen samples as flat records (ADR 0095 decision 1); outside the Pencil, or
     /// on a sketch page, they are ignored. Each finished stroke and each erase is its own step.
     pub fn pen_samples(&mut self, flat: &[f64]) {
-        if self.tool != Tool::Pencil || self.workbench() == Workbench::Sketch {
+        // The pen window ignores the pen while it waits, is held or reloads (criteria 13, 18).
+        if self.tool != Tool::Pencil || self.link_blocks_input() {
             return;
         }
-        for sample in PenSample::decode_flat(flat) {
+        if self.workbench() == Workbench::Sketch {
+            let pressed = PenSample::decode_flat(flat)
+                .iter()
+                .any(|s| s.phase == curvyo_ui_core::PenPhase::Contact);
+            if pressed && !self.pencil.tool.in_contact() {
+                self.link_refuses_sketch_press();
+            }
+            return;
+        }
+        for mut sample in PenSample::decode_flat(flat) {
+            // The Eraser button takes slice 1's eraser-end path, nothing of its own.
+            if self.pencil.eraser_mode {
+                sample.end = PenEnd::Eraser;
+            }
             self.pencil_sample(&sample);
         }
+    }
+
+    /// The pen window's Eraser button on or off: on, the tip (and a mouse) erases as the eraser
+    /// end does; off, it draws again. Ends a stroke in progress as Escape does.
+    pub fn set_pencil_eraser(&mut self, on: bool) {
+        if self.pencil.eraser_mode != on {
+            self.pencil_reset();
+            self.pencil.eraser_mode = on;
+        }
+    }
+
+    /// Whether the Eraser button is on.
+    #[must_use]
+    pub const fn pencil_eraser(&self) -> bool {
+        self.pencil.eraser_mode
     }
 
     fn pencil_sample(&mut self, sample: &PenSample) {
@@ -128,8 +165,10 @@ impl Session {
 
     /// Fits a finished stroke and writes it as one path in one step "Pencil stroke": the new Pen
     /// path's style and layer, its stroke width Max with the profile on it, or the style's width
-    /// and no profile for a stroke without pressure (criteria 1, 5, 7, 13). The path is selected;
-    /// the tool stays the Pencil.
+    /// and no profile for a stroke without pressure (criteria 1, 5, 7, 13). In a shared project,
+    /// where width profiles are refused (ADR 0053), a pressure stroke is a uniform stroke at Max
+    /// and the first one says so once (slice 2a criterion 23). The path is selected; the tool
+    /// stays the Pencil.
     fn commit_pencil_stroke(&mut self, stroke: &PencilStroke) {
         let settings = *stroke.settings();
         let profiled = stroke.source() != WidthSource::Uniform;
@@ -156,12 +195,19 @@ impl Session {
             })
             .map(|(at, multiplier)| (self.minter.mint(), at, multiplier))
             .collect();
+        let uniform_at_max = !points.is_empty() && self.extended_edits_blocked();
+        if uniform_at_max && !self.pencil.shared_notice_shown {
+            self.pencil.shared_notice_shown = true;
+            *self.unsupported_width_notice.borrow_mut() = Some(SHARED_PRESSURE_NOTICE.to_owned());
+        }
         self.recording_unguarded(|this| {
             let created = this.document.batch(PENCIL_STROKE_LABEL, |doc| {
                 let id = doc.create_path(&anchors, false);
                 if !points.is_empty() {
                     doc.edit_style(&[id], &StyleEdit::StrokeWidth(max)).ok()?;
-                    doc.set_width_profiles(&[(id, points)]).ok()?;
+                    if !uniform_at_max {
+                        doc.set_width_profiles(&[(id, points)]).ok()?;
+                    }
                 }
                 Some(id)
             });
