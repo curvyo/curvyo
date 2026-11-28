@@ -1,6 +1,6 @@
 # Generator UI polish: nothing armed by itself, arm and disarm by hand, then a better look
 
-Status: **Slice 1 Done (PR #TBD, 2026-11-27)**; later slices Draft (customer reviews the UX preview first)
+Status: **Slice 1 Done (PR #527, 2026-11-27)**; later slices Draft (customer reviews the UX preview first)
 Priority: Should
 Origin: Customer (2026-11-25, after PR #481: "functional now, the UI needs another pass"; 2026-11-27, translated: "nothing in the Generators tool is armed automatically"). Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
