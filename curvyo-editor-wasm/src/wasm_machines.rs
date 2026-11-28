@@ -1,6 +1,7 @@
 //! Thin host bridge of the Machines tab and the shared output-page commands (ADR 0098 decisions 3
 //! to 5): the tab's view, a machine's field, duplicate, rename and delete, the offer to update
-//! the pages, the Machine group's pick, reset and save, and a family row's field.
+//! the pages, a laser machine's connection and size offer, the Machine group's pick, reset and
+//! save, and a family row's field.
 
 use wasm_bindgen::prelude::*;
 
@@ -47,6 +48,48 @@ impl WasmSession {
         self.session
             .duplicate_machine(id, sixteen(random), millis(now_ms))
             .unwrap_or_default()
+    }
+
+    /// "+ Machine" of the family section `family`: a copy of its built-in, one step; the new id,
+    /// empty when refused.
+    pub fn add_machine(&mut self, family: &str, random: &[u8], now_ms: f64) -> String {
+        self.session
+            .add_machine(family, sixteen(random), millis(now_ms))
+            .unwrap_or_default()
+    }
+
+    /// The Connection group of laser machine `id`: a library write without a step; the notice,
+    /// empty for none.
+    pub fn set_machine_connection_of(
+        &mut self,
+        id: &str,
+        address: &str,
+        port: &str,
+        baud: f64,
+        now_ms: f64,
+    ) -> String {
+        self.session
+            .set_machine_connection_of(id, address, port, baud, millis(now_ms))
+            .unwrap_or_default()
+    }
+
+    /// The size offer of laser machine `id` for the reported travel, `[w, h]` mm or empty.
+    pub fn machine_size_offer_of(&self, id: &str, x_mm: f64, y_mm: f64) -> Vec<f64> {
+        self.session
+            .machine_size_offer_of(id, x_mm, y_mm)
+            .map(Vec::from)
+            .unwrap_or_default()
+    }
+
+    /// Whether the reported travel is usable for laser machine `id`'s offer row.
+    pub fn machine_size_reported_of(&self, id: &str, x_mm: f64, y_mm: f64) -> bool {
+        self.session.machine_size_reported_of(id, x_mm, y_mm)
+    }
+
+    /// Use machine size on laser machine `id`: one step. Whether it changed.
+    pub fn use_machine_size_of(&mut self, id: &str, x_mm: f64, y_mm: f64, now_ms: f64) -> bool {
+        self.session
+            .use_machine_size_of(id, x_mm, y_mm, millis(now_ms))
     }
 
     /// Renames machine `id`. Whether it changed.

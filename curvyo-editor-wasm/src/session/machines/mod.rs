@@ -3,9 +3,15 @@
 //! offer to update the pages after an edit.
 
 mod block;
+mod connection;
 mod edit;
+mod fields;
 #[cfg(test)]
 mod tests;
+mod undo;
+#[cfg(test)]
+mod undo_tests;
+mod values;
 
 use serde::Serialize;
 
@@ -91,6 +97,9 @@ pub struct MachineFieldView {
     pub unit: &'static str,
     /// How it is drawn; every field of a built-in is [`FieldKind::Text`].
     pub kind: FieldKind,
+    /// Greyed in place with this cause, its value kept (the pulse while Laser mode is off).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub greyed: Option<&'static str>,
 }
 
 /// One machine row.
@@ -106,6 +115,19 @@ pub struct MachineRowView {
     pub builtin: bool,
     /// The body fields.
     pub fields: Vec<MachineFieldView>,
+    /// The Connection group of a maker's laser (`0064`, UX unify 4.2); `None` elsewhere.
+    pub connection: Option<ConnectionView>,
+}
+
+/// A laser machine's connection, a plain library write without a step.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ConnectionView {
+    /// The connector's address.
+    pub connector_address: String,
+    /// The controller's port.
+    pub controller_port: String,
+    /// The baud rate.
+    pub baud_rate: u32,
 }
 
 /// The inline question after an edit (Frage 434 C, UX unify 4.5).
@@ -203,7 +225,7 @@ impl Session {
     }
 
     /// The rows of `family`'s library, built-ins included.
-    fn machine_rows(&self, family: Family) -> Vec<MachineRowView> {
+    pub(super) fn machine_rows(&self, family: Family) -> Vec<MachineRowView> {
         match family {
             Family::Laser => self
                 .manufacturing
@@ -223,7 +245,12 @@ impl Session {
                             curvyo_laser_core::job::name(p.values.output_format)
                         ),
                         builtin,
-                        fields: edit::laser_fields(p, builtin),
+                        fields: fields::laser_fields(p, builtin),
+                        connection: (!builtin).then(|| ConnectionView {
+                            connector_address: p.connection.connector_address.clone(),
+                            controller_port: p.connection.controller_port.clone(),
+                            baud_rate: p.connection.baud_rate.get(),
+                        }),
                     }
                 })
                 .collect(),
@@ -237,7 +264,8 @@ impl Session {
                         name: p.values.name.clone(),
                         line2: format!("{} · {}", p.values.name, p.values.output_format.label()),
                         builtin,
-                        fields: edit::plotter_fields(&p.values, builtin),
+                        fields: fields::plotter_fields(&p.values, builtin),
+                        connection: None,
                     }
                 })
                 .collect(),
@@ -252,7 +280,8 @@ impl Session {
                         name: p.values.name.clone(),
                         line2: format!("{w} × {h} mm · {}", p.values.output_format.label()),
                         builtin,
-                        fields: edit::embroidery_fields(&p.values, builtin),
+                        fields: fields::embroidery_fields(&p.values, builtin),
+                        connection: None,
                     }
                 })
                 .collect(),
@@ -271,7 +300,8 @@ impl Session {
                             p.values.output_format.label()
                         ),
                         builtin,
-                        fields: edit::cnc_fields(&p.values, builtin),
+                        fields: fields::cnc_fields(&p.values, builtin),
+                        connection: None,
                     }
                 })
                 .collect(),

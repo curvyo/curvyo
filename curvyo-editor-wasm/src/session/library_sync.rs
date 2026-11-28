@@ -245,7 +245,8 @@ impl Session {
         self.library.notices.pop_front()
     }
 
-    fn machine_record_text(&self, id: &str) -> Option<String> {
+    /// The canonical text of the machine record `id` of any family, the built-ins included.
+    pub(in crate::session) fn machine_record_text(&self, id: &str) -> Option<String> {
         self.manufacturing
             .machine
             .profiles

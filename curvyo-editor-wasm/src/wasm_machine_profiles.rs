@@ -1,4 +1,4 @@
-//! Thin host bridge of the Machine block (`specs/0026-machine-profile`): the library texts in, the
+//! Thin host bridge of the machine library (`specs/0026-machine-profile`): the library texts in, the
 //! host writes out, and the commands; strings and scalars only (ADR 0001 §5). A command's text
 //! result is its notice, empty when there is none.
 
@@ -44,114 +44,10 @@ impl WasmSession {
         self.session.untracked_mut().take_machine_writes_json()
     }
 
-    /// Picks the library profile `id` for the active manufacturing.
-    pub fn pick_machine_profile(&mut self, id: &str) -> bool {
-        self.session.pick_machine_profile(id)
-    }
-
-    /// The origin corner by its stored name.
-    pub fn set_machine_origin(&mut self, name: &str) -> bool {
-        self.session.set_machine_origin(name)
-    }
-
-    /// The Max feed field.
-    pub fn set_machine_max_feed(&mut self, value: f64) -> String {
-        self.session.set_machine_max_feed(value).unwrap_or_default()
-    }
-
-    /// The Max power field.
-    pub fn set_machine_max_power(&mut self, value: f64) -> String {
-        self.session
-            .set_machine_max_power(value)
-            .unwrap_or_default()
-    }
-
-    /// The Default power field; returns the notice, empty without one.
-    pub fn set_machine_default_power(&mut self, value: f64) -> String {
-        self.session
-            .set_machine_default_power(value)
-            .unwrap_or_default()
-    }
-
-    /// The Default speed field; returns the notice, empty without one.
-    pub fn set_machine_default_speed(&mut self, value: f64) -> String {
-        self.session
-            .set_machine_default_speed(value)
-            .unwrap_or_default()
-    }
-
-    /// The Laser mode switch.
-    pub fn set_machine_laser_mode(&mut self, on: bool) {
-        self.session.set_machine_laser_mode(on);
-    }
-
-    /// Reset from profile.
-    pub fn reset_machine_profile(&mut self) -> bool {
-        self.session.reset_machine_profile()
-    }
-
     /// Save as profile.
     pub fn save_machine_profile(&mut self, random: &[u8], now_ms: f64) -> String {
         self.session
             .save_machine_profile(sixteen(random), millis(now_ms))
-            .unwrap_or_default()
-    }
-
-    /// Update profile (the armed second press).
-    pub fn update_machine_profile(&mut self, now_ms: f64) -> String {
-        self.session
-            .update_machine_profile(millis(now_ms))
-            .unwrap_or_default()
-    }
-
-    /// The size the connected machine reports as an offer for the active page: `[width, height]`
-    /// in mm, empty when there is none (`specs/0131`).
-    pub fn machine_size_offer(&self, x_mm: f64, y_mm: f64) -> Vec<f64> {
-        self.session
-            .machine_size_offer(x_mm, y_mm)
-            .map(Vec::from)
-            .unwrap_or_default()
-    }
-
-    /// Whether the reported size is within the profile range (the offer's place is kept).
-    pub fn machine_size_reported(&self, x_mm: f64, y_mm: f64) -> bool {
-        self.session.machine_size_reported(x_mm, y_mm)
-    }
-
-    /// Use machine size: one undo step; whether anything changed.
-    pub fn use_machine_size(&mut self, x_mm: f64, y_mm: f64, now_ms: f64) -> bool {
-        self.session.use_machine_size(x_mm, y_mm, millis(now_ms))
-    }
-
-    /// Duplicate: the new profile's id, empty when refused.
-    pub fn duplicate_machine_profile(&mut self, id: &str, random: &[u8], now_ms: f64) -> String {
-        self.session
-            .duplicate_machine_profile(id, sixteen(random), millis(now_ms))
-            .unwrap_or_default()
-    }
-
-    /// Rename in the list.
-    pub fn rename_machine_profile(&mut self, id: &str, name: &str, now_ms: f64) -> String {
-        self.session
-            .rename_machine_profile(id, name, millis(now_ms))
-            .unwrap_or_default()
-    }
-
-    /// Delete (the armed second press).
-    pub fn delete_machine_profile(&mut self, id: &str) -> bool {
-        self.session.delete_machine_profile(id)
-    }
-
-    /// The connection fields of the chosen user profile.
-    pub fn set_machine_connection(
-        &mut self,
-        address: &str,
-        port: &str,
-        baud: f64,
-        now_ms: f64,
-    ) -> String {
-        self.session
-            .set_machine_connection(address, port, baud, millis(now_ms))
             .unwrap_or_default()
     }
 }

@@ -226,6 +226,22 @@ fn a_material_edit_with_the_marker_of_the_last_one_is_still_its_own_step() {
     );
 }
 
+/// ADR 0098 decision 4: a Machines-tab edit is a step of its own with the generalised marker.
+#[test]
+fn a_machine_edit_is_its_own_step_with_the_marker() {
+    let d = Document::new(1);
+    let _ = laser(&d);
+    let steps = d.own_step_count();
+    d.commit_machine_edit(MachineStep::Edit, "a1b2", 42);
+    d.commit_machine_edit(MachineStep::Delete, "a1b2", 42);
+    assert_eq!(d.own_step_count(), steps + 2, "every edit a step");
+    assert!(last_message(&d).starts_with("delete_machine;"));
+    assert_eq!(
+        d.material_edit_marker(),
+        Some(json!({"id": "a1b2", "modified": 43}))
+    );
+}
+
 #[test]
 fn the_save_refresh_is_a_reserved_commit_without_a_step_and_only_when_something_differs() {
     let d = Document::new(1);

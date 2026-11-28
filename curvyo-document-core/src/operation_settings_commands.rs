@@ -50,6 +50,17 @@ pub const REMOVE_TEST_PHOTO_COMMIT_LABEL: &str = "remove_test_photo";
 /// The label of deleting a test (`specs/0112` criterion 25).
 pub const DELETE_TEST_COMMIT_LABEL: &str = "delete_test";
 
+/// The label of a field edit in the Machines tab (ADR 0098 decision 4).
+pub const EDIT_MACHINE_COMMIT_LABEL: &str = "edit_machine";
+/// The label of "+ Machine" in the Machines tab.
+pub const ADD_MACHINE_COMMIT_LABEL: &str = "add_machine";
+/// The label of Duplicate in the Machines tab.
+pub const DUPLICATE_MACHINE_COMMIT_LABEL: &str = "duplicate_machine";
+/// The label of a rename in the Machines tab.
+pub const RENAME_MACHINE_COMMIT_LABEL: &str = "rename_machine";
+/// The label of a delete in the Machines tab.
+pub const DELETE_MACHINE_COMMIT_LABEL: &str = "delete_machine";
+
 /// The root register a material edit writes so its step exists also when no operation points to
 /// the material (ADR 0054 §3): `{ id, modified }`. Nothing reads it; every build keeps it.
 pub(crate) const KEY_MATERIAL_EDIT: &str = "x.curvyo.laser.material_edit";
@@ -128,6 +139,33 @@ impl MaterialStep {
             Self::CropTestPhoto => CROP_TEST_PHOTO_COMMIT_LABEL,
             Self::RemoveTestPhoto => REMOVE_TEST_PHOTO_COMMIT_LABEL,
             Self::DeleteTest => DELETE_TEST_COMMIT_LABEL,
+        }
+    }
+}
+
+/// A machine record edit made in the Machines tab (ADR 0098 decision 4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MachineStep {
+    /// A field of the record.
+    Edit,
+    /// "+ Machine".
+    Add,
+    /// Duplicate.
+    Duplicate,
+    /// Rename.
+    Rename,
+    /// Delete.
+    Delete,
+}
+
+impl MachineStep {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Edit => EDIT_MACHINE_COMMIT_LABEL,
+            Self::Add => ADD_MACHINE_COMMIT_LABEL,
+            Self::Duplicate => DUPLICATE_MACHINE_COMMIT_LABEL,
+            Self::Rename => RENAME_MACHINE_COMMIT_LABEL,
+            Self::Delete => DELETE_MACHINE_COMMIT_LABEL,
         }
     }
 }
@@ -246,18 +284,31 @@ impl Document {
     ) -> Result<(), OperationError> {
         let metas = self.settings_targets(refreshed)?;
         Self::write_settings(&metas, refreshed);
-        // The marker only makes the step exist: it moves on past the stored one, so an edit in
-        // the same whole second as the last one (a delete right after an edit) is a step too.
+        self.write_edit_marker(material_id, modified);
+        self.commit_with_label(step.label());
+        Ok(())
+    }
+
+    /// The document part of a machine record edit in the Machines tab (ADR 0098 decision 4, the
+    /// marker generalised): the root marker `{ id, modified }` of [`Self::commit_material_edit`]
+    /// with the record's id, in one history step `step`.
+    pub fn commit_machine_edit(&self, step: MachineStep, record_id: &str, modified: u64) {
+        self.write_edit_marker(record_id, modified);
+        self.commit_with_label(step.label());
+    }
+
+    /// Writes the root marker, uncommitted. It only makes the step exist: it moves on past the
+    /// stored one, so an edit in the same whole second as the last one (a delete right after an
+    /// edit) is a step too.
+    fn write_edit_marker(&self, id: &str, modified: u64) {
         let last = self
             .material_edit_marker()
             .and_then(|m| m.get("modified").and_then(serde_json::Value::as_u64));
         let modified = last.map_or(modified, |last| modified.max(last.saturating_add(1)));
         let mut marker = serde_json::Map::new();
-        marker.insert("id".to_owned(), material_id.into());
+        marker.insert("id".to_owned(), id.into());
         marker.insert("modified".to_owned(), modified.into());
         write_plain_map(&self.loro().get_map(ROOT_MAP), KEY_MATERIAL_EDIT, &marker);
-        self.commit_with_label(step.label());
-        Ok(())
     }
 
     /// The save refresh (Frage 187 C, ADR 0054 §3): writes the refreshed settings as one commit

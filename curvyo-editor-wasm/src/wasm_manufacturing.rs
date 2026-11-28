@@ -31,29 +31,6 @@ impl WasmSession {
             .is_some_and(|id| self.session.delete_placement(id))
     }
 
-    /// Edit work area of the user profile `id` in mm (`specs/0098` criterion 15): a library
-    /// write, no history step. The notice of a side set into its range, empty when there is
-    /// none or the profile cannot be edited.
-    pub fn set_profile_work_area(
-        &mut self,
-        id: &str,
-        width_mm: f64,
-        height_mm: f64,
-        now_ms: f64,
-    ) -> String {
-        #[allow(clippy::cast_possible_truncation)] // a Unix time in milliseconds
-        let now = now_ms as i64;
-        self.session
-            .set_profile_work_area(
-                id,
-                Length::from_mm(width_mm),
-                Length::from_mm(height_mm),
-                now,
-            )
-            .flatten()
-            .unwrap_or_default()
-    }
-
     /// Switches an extension on or off; returns the text of `extensions.toml` to keep.
     pub fn set_extension_enabled(&mut self, id: &str, enabled: bool) -> String {
         self.session.set_extension_enabled(id, enabled)

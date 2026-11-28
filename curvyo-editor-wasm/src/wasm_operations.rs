@@ -138,12 +138,6 @@ impl WasmSession {
         node(id).is_some_and(|id| self.session.set_selection_direction(id, direction))
     }
 
-    /// The Motorised Z axis switch of the active laser page's profile copy (`specs/0111`
-    /// criterion 22). Whether it changed.
-    pub fn set_motorised_z(&mut self, on: bool) -> bool {
-        self.session.set_machine_motorised_z(on)
-    }
-
     /// Renames operation `id` (criterion 3). Whether it changed.
     pub fn rename_operation(&mut self, id: &str, name: &str) -> bool {
         node(id).is_some_and(|id| self.session.rename_operation(id, name))

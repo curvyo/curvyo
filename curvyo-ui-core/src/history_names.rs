@@ -154,6 +154,12 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0160-embroidery`: the embroidery page's hoop and speed.
     ("set_hoop", "Set hoop"),
     ("update_pages", "Update pages"),
+    // ADR 0098 decision 4: the Machines tab's record edits, each one step.
+    ("edit_machine", "Edit machine"),
+    ("add_machine", "Add machine"),
+    ("duplicate_machine", "Duplicate machine"),
+    ("rename_machine", "Rename machine"),
+    ("delete_machine", "Delete machine"),
     ("edit_embroidery_speed", "Edit speed"),
     // `specs/0161-cnc-output`: the CNC page's stock, tools and machine fields.
     ("edit_stock", "Edit stock"),
@@ -611,6 +617,11 @@ mod tests {
             (dc::EDIT_MATERIAL_COMMIT_LABEL, "Edit material"),
             (dc::RENAME_MATERIAL_COMMIT_LABEL, "Rename material"),
             (dc::DELETE_MATERIAL_COMMIT_LABEL, "Delete material"),
+            (dc::EDIT_MACHINE_COMMIT_LABEL, "Edit machine"),
+            (dc::ADD_MACHINE_COMMIT_LABEL, "Add machine"),
+            (dc::DUPLICATE_MACHINE_COMMIT_LABEL, "Duplicate machine"),
+            (dc::RENAME_MACHINE_COMMIT_LABEL, "Rename machine"),
+            (dc::DELETE_MACHINE_COMMIT_LABEL, "Delete machine"),
         ] {
             assert_eq!(operation_name(label), name, "{label}");
             assert!(

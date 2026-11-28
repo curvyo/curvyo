@@ -113,30 +113,6 @@ impl WasmSession {
         self.session.user_origin_marks_json()
     }
 
-    /// The Air assist switch of the page's profile copy. Whether it changed.
-    pub fn set_air_assist(&mut self, on: bool) -> bool {
-        self.session.set_machine_air_assist(on)
-    }
-
-    /// The Focus pulse switch of the page's profile copy (`specs/0118` 35 a). Whether it changed.
-    pub fn set_focus_pulse(&mut self, on: bool) -> bool {
-        self.session.set_machine_focus_pulse(on)
-    }
-
-    /// The Pulse power field in percent; the "limited to" or "rounded to" notice, else empty.
-    pub fn set_pulse_power(&mut self, percent: f64) -> String {
-        self.session
-            .set_machine_pulse_power(percent)
-            .unwrap_or_default()
-    }
-
-    /// The Pulse length field in ms; the notice, else empty.
-    pub fn set_pulse_length(&mut self, ms: f64) -> String {
-        self.session
-            .set_machine_pulse_length(ms)
-            .unwrap_or_default()
-    }
-
     /// The go to point target of a canvas press at document `(x_mm, y_mm)` (`specs/0118` 34,
     /// adrs P1): `{"x", "y"}` in job file coordinates or `{"cause"}`; `null` off a laser page.
     #[must_use]

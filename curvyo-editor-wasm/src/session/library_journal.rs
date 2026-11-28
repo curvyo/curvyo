@@ -28,6 +28,8 @@ pub(in crate::session) enum RecordKind {
     Material,
     /// A machine profile record whose sets a Fixtures tab edit changed (`0113` criterion 45).
     Machine,
+    /// A machine record of any family a Machines tab edit changed (ADR 0098 decision 4).
+    MachineEdit,
 }
 
 /// One record a step changed: its texts around the step (`None`: absent).
@@ -176,7 +178,9 @@ impl Session {
                 Direction::Redo => "redone",
             };
             return Some(match kind {
-                RecordKind::Material => format!("Only the project was {done}; {name} is too old."),
+                RecordKind::Material | RecordKind::MachineEdit => {
+                    format!("Only the project was {done}; {name} is too old.")
+                }
                 RecordKind::Machine => {
                     self.align_fixture_pages_after_history();
                     format!("{name} sets can no longer be undone.")
@@ -188,6 +192,9 @@ impl Session {
                 self.revert_material_records(direction, &name, &mut records, &photos)
             }
             RecordKind::Machine => self.revert_machine_records(direction, &name, &mut records),
+            RecordKind::MachineEdit => {
+                self.revert_machine_edit_records(direction, &name, &mut records)
+            }
         };
         if let Some(entry) = self
             .library_journal
