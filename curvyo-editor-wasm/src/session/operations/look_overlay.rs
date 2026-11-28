@@ -6,7 +6,8 @@ use std::collections::HashMap;
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, Point, ViewTransform};
 use curvyo_render_core::{
-    CONTEXT_DIM, ChipItem, DrawList, Glyph, chips_list, hatch_list, object_polygons,
+    CONTEXT_DIM, ChipItem, DrawList, Glyph, chips_list, chips_list_clear_of, hatch_list,
+    object_polygons,
 };
 
 use super::super::Session;
@@ -42,7 +43,7 @@ impl<'a> ChipRows<'a> {
         }
     }
 
-    /// Adds the chip of item `id`: drawing order is selected items first, then the rest top first
+    /// Adds the pill of item `id`: drawing order is selected items first, then the rest top first
     /// (ux-notes 13.4); an item outside an entered group goes to the dimmed ones.
     pub(super) fn add(&mut self, id: NodeId, chip: ChipItem, selected: bool, dimming: &Dimming) {
         if dimming.outside(id) {
@@ -103,6 +104,7 @@ pub(super) fn chip_of(object: &ObjectSnapshot, looks: &[KindLook]) -> Option<Chi
         bounds: curvyo_ui_core::object_bounds(object),
         glyphs,
         muted,
+        handles: false,
     })
 }
 
@@ -124,7 +126,14 @@ pub(super) fn own_overlay(
     if !rows.grids.parts.contains_key(&id)
         && let Some(chip) = chip_of(object, looks)
     {
-        rows.add(id, chip, selected.contains(&id), dimming);
+        let selected_here = selected.contains(&id);
+        // The one selected object shows its own handles: its pill takes the corner anchor
+        // (`specs/0159` Frage 432 A); the members of a multi-selection keep theirs centred.
+        let chip = ChipItem {
+            handles: selected_here && selected.len() == 1,
+            ..chip
+        };
+        rows.add(id, chip, selected_here, dimming);
     }
 }
 
@@ -162,7 +171,19 @@ impl Session {
             chips.sort_by_key(|(is_selected, _)| !is_selected);
             let mut items: Vec<ChipItem> = grids.chips(&bounds);
             items.extend(chips.into_iter().map(|(_, chip)| chip));
-            overlay.extend(chips_list(&items, self.viewport.canvas_size(), view));
+            // No pill lies over a transform handle of the selection or the group box
+            // (`specs/0159` S3).
+            let handles = if self.selection.ids().is_empty() {
+                Vec::new()
+            } else {
+                self.select_transform_decoration_input_in(objects).handles
+            };
+            overlay.extend(chips_list_clear_of(
+                &items,
+                self.viewport.canvas_size(),
+                view,
+                &handles,
+            ));
             if !outside_chips.is_empty() {
                 outside_chips.reverse();
                 let items: Vec<ChipItem> =

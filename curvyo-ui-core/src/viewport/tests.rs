@@ -282,7 +282,7 @@ fn an_axis_that_does_not_fit_keeps_the_start_margin_and_the_other_is_centred() {
     viewport.centre_document(210.0, 297.0);
 
     let ((left, top), (right, _)) = document_box_px(&viewport, 210.0, 297.0);
-    assert!((top - DOCUMENT_TOP_MARGIN_PX).abs() < 1e-9, "{top}");
+    assert!((top - DOCUMENT_TOP_CLEAR_PX).abs() < 1e-9, "{top}");
     assert!(((left - DOCUMENT_INSET_PX) - (1100.0 - right)).abs() < 1e-9);
 
     let mut wide = Viewport::with_document_inset();
@@ -291,6 +291,22 @@ fn an_axis_that_does_not_fit_keeps_the_start_margin_and_the_other_is_centred() {
     let ((left, top), (_, bottom)) = document_box_px(&wide, 210.0, 100.0);
     assert!((left - DOCUMENT_INSET_PX).abs() < 1e-9, "{left}");
     assert!((top - (800.0 - bottom)).abs() < 1e-9);
+}
+
+/// `specs/0159-ui-consistency` F50: the page's name label (20 px above the page) never lies under
+/// a one-row bar (12 px from the top, 36 px high) in a new view, also for a page that would fit
+/// centred but close to the top.
+#[test]
+fn the_page_label_of_a_new_view_clears_a_one_row_bar() {
+    const BAR_BOTTOM_PX: f64 = 12.0 + 36.0;
+    const LABEL_PX: f64 = 20.0;
+    for height_mm in [297.0, 180.0, 50.0] {
+        let mut viewport = Viewport::with_document_inset();
+        viewport.resize(1100.0, 760.0);
+        viewport.centre_document(210.0, height_mm);
+        let ((_, top), _) = document_box_px(&viewport, 210.0, height_mm);
+        assert!(top - LABEL_PX >= BAR_BOTTOM_PX, "{height_mm} mm: top {top}");
+    }
 }
 
 /// Before the host reported a size there is nothing to centre in: the

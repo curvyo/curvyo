@@ -134,7 +134,8 @@ fn ac12_size_text_follows_the_open_file() {
 /// Amended 2026-10-11 (`fix/center-document`): the untouched default view
 /// keeps the document centred through size reports and window resizes (x in
 /// the space right of the 128 px rail, y in the full height); an axis it does
-/// not fit starts at its margin (128 px left, 24 px top).
+/// not fit starts at its margin (128 px left, 24 px top; 72 px top since
+/// `specs/0159-ui-consistency` F50, so the page label clears a one-row bar).
 #[test]
 fn ac11a_default_view_stays_centred_through_resizes_until_first_pan_or_zoom() {
     let px_per_mm = 96.0 / 25.4;
@@ -154,7 +155,7 @@ fn ac11a_default_view_stays_centred_through_resizes_until_first_pan_or_zoom() {
         } else {
             (
                 (128.0 + (w - 128.0 - a4_w) / 2.0).max(128.0),
-                ((h - a4_h) / 2.0).max(24.0),
+                ((h - a4_h) / 2.0).max(72.0),
             )
         };
         assert!(

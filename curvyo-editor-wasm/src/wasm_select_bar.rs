@@ -133,6 +133,14 @@ impl WasmSession {
         view
     }
 
+    /// The distinct kind codes of the selected objects, comma-separated in selection order
+    /// (`"rectangle,path"`; empty while nothing is selected): the Select bar shows a kind group
+    /// only while every selected object is of its kind (`specs/0159-ui-consistency`, Frage 433 B).
+    #[must_use]
+    pub fn selection_kinds(&self) -> String {
+        self.session.selection_kinds().join(",")
+    }
+
     /// The Select tool's "Scale corner radius" switch (criterion 23). Off in
     /// every new session; not persisted.
     #[must_use]

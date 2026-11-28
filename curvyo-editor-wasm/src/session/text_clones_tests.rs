@@ -123,7 +123,11 @@ fn c37_shift_picks_a_set_and_enter_puts_the_text_on_it() {
         text(&session, clones[0]).on_path.unwrap().carrier.node,
         circles[1]
     );
-    assert_eq!(session.take_text_path_notice(), "Put text on 2 paths.");
+    assert_eq!(
+        session.take_text_path_notice(),
+        "",
+        "the canvas shows it: no notice"
+    );
     assert_eq!(session.selection.ids(), &[t]);
 }
 

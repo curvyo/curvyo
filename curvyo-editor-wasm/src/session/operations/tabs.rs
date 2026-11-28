@@ -72,7 +72,7 @@ pub struct TabChipView {
 pub struct ItemTabsView {
     /// Own pressed (`true`), Operation's (`false`), mixed (`None`).
     pub own: Option<bool>,
-    /// "4 tabs", "Own tabs (3)", "4 to 6 tabs", "Own tabs on 2 of 3 items".
+    /// "4 tabs", "Own tabs (3)", "4 to 6 tabs", "Own tabs on some items".
     pub readout: String,
 }
 
@@ -451,7 +451,7 @@ impl Session {
         let low = counts.iter().copied().min().unwrap_or(0);
         let high = counts.iter().copied().max().unwrap_or(0);
         let readout = match own {
-            None => format!("Own tabs on {owns} of {} items", items.len()),
+            None => "Own tabs on some items".to_owned(),
             Some(true) if items.len() == 1 => format!("Own tabs ({low})"),
             _ if low == high => format!("{low} {}", if low == 1 { "tab" } else { "tabs" }),
             _ => format!("{low} to {high} tabs"),

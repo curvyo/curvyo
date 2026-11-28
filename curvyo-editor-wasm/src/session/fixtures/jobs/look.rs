@@ -400,6 +400,7 @@ fn part_chip(geometry: &PartGeometry, looks: &[OperationLook]) -> Option<ChipIte
         bounds: (min, max),
         glyphs,
         muted: Vec::new(),
+        handles: false,
     })
 }
 

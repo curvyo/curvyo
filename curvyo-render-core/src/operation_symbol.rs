@@ -1,23 +1,50 @@
-//! The symbol chips of the output page (`specs/0101-laser-operations` ux-notes section 13.3): one
-//! 22 px chip per kind an object is in, top-right of the object, View: Operations only. A chip is
-//! drawn only when its item is on screen, it does not collide with a chip already drawn, and at
-//! most `CHIP_CAP` chips are drawn per frame (the summary counts the rest).
+//! The symbol pills of the output page (`docs/ui-elements.md` §13, `specs/0101-laser-operations`
+//! ux-notes 13.3, `specs/0159-ui-consistency` slice S3): one rounded pill per object, View:
+//! Operations only, holding one 16 px symbol per kind the object is in.
+//!
+//! The pill sits centred 6 px above the object (Frage 432 A); while the object shows its transform
+//! handles it takes the corner anchor right of the top-right corner, mirrored to the top-left at
+//! the viewport edge. A pill never lies over a transform handle: it moves past the handles it
+//! would touch, `HANDLE_GAP_PX` clear of their glyphs, and is not drawn when no place is left. A
+//! pill is drawn only when its item is on screen and it does not collide with a pill already drawn;
+//! at most `CHIP_CAP` pills are drawn per frame (the summary counts the rest).
 
-use curvyo_document_core::{Point, ViewTransform};
+use curvyo_document_core::{Angle, Point, ViewTransform};
 
-use crate::glyphs::{DrawList, filled_rect, thick_line};
+use crate::glyphs::{DrawList, filled_rect, rounded_rect, thick_line};
+use crate::select_decoration::TransformHandleGlyph;
 use crate::theme::{OP_CHIP_GROUND, OP_CUT, OP_INK, OP_LANE_LINE, OP_MUTED_INK};
 
-/// The chip's side, screen pixels.
+/// The pill's height, screen pixels.
 pub const CHIP_PX: f64 = 22.0;
-/// The gap between two chips of one item, screen pixels.
+/// The padding between the pill's edge and its symbol cells, screen pixels.
+pub const PILL_PADDING_PX: f64 = 3.0;
+/// The side of one symbol cell, screen pixels.
+pub const CELL_PX: f64 = 16.0;
+/// The gap between two symbol cells of one pill, screen pixels.
 pub const CHIP_GAP_PX: f64 = 4.0;
-/// The chip row starts this far right of the object's top-right corner, screen pixels.
+/// The corner anchor starts this far right of the object's top-right corner, screen pixels.
 pub const CHIP_OFFSET_X_PX: f64 = 10.0;
-/// The chip row's bottom edge sits this far above the object's top edge, screen pixels.
+/// The pill's bottom edge sits this far above the object's top edge, screen pixels.
 pub const CHIP_OFFSET_Y_PX: f64 = 6.0;
-/// The most chips of one frame.
+/// The most pills of one frame.
 pub const CHIP_CAP: usize = 500;
+/// The least distance between a pill and a transform handle glyph, screen pixels.
+pub const HANDLE_GAP_PX: f64 = 4.0;
+/// How many handles in a row a pill moves past before it gives up its place.
+const HANDLE_STEPS: usize = 16;
+/// The width of the symbol outlines (Cut, Cut-out, Engrave + Outline), screen pixels; the outline
+/// is drawn inside its cell, half its width in from the cell edge.
+const OUTLINE_PX: f64 = 1.5;
+
+/// The width of a pill of `count` symbols, screen pixels: `6 + 16n + 4(n - 1)`.
+#[must_use]
+pub fn pill_width(count: usize) -> f64 {
+    // At most five symbols per object: the count is small.
+    #[allow(clippy::cast_precision_loss)]
+    let n = count.max(1) as f64;
+    2.0 * PILL_PADDING_PX + CELL_PX * n + CHIP_GAP_PX * (n - 1.0)
+}
 
 /// The symbol of one kind (ux-notes section 3). Cut and Cut-out are red; the rest ink.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,12 +78,36 @@ pub struct ChipItem {
     /// not run it (Output off, `0101` UX notes 13.2; a vector shape in Image, `specs/0123`
     /// criterion 48).
     pub muted: Vec<Glyph>,
+    /// The object shows its own transform handles (it is the one selected object): the pill takes
+    /// the corner anchor instead of the centred one.
+    pub handles: bool,
 }
 
-/// The chips of `items`, in order, for a canvas of `canvas` screen pixels. Items that are off the
-/// canvas get none; a chip that would collide with one already placed is skipped.
+/// The pills of `items`, in order, for a canvas of `canvas` screen pixels, with no transform handle
+/// on screen. Items that are off the canvas get none; a pill that would collide with one already
+/// placed is skipped.
 #[must_use]
 pub fn chips_list(items: &[ChipItem], canvas: (f64, f64), view: ViewTransform) -> DrawList {
+    chips_list_clear_of(items, canvas, view, &[])
+}
+
+/// [`chips_list`] with the transform handles `handles` on screen: no pill lies over one.
+#[must_use]
+pub fn chips_list_clear_of(
+    items: &[ChipItem],
+    canvas: (f64, f64),
+    view: ViewTransform,
+    handles: &[TransformHandleGlyph],
+) -> DrawList {
+    let blocked: Vec<(f64, f64, f64, f64)> = handles
+        .iter()
+        .map(|handle| {
+            let (x, y) = view.document_to_screen(handle.position);
+            let (w, h) = handle.kind.footprint_px();
+            let (hw, hh) = (w / 2.0 + HANDLE_GAP_PX, h / 2.0 + HANDLE_GAP_PX);
+            (x - hw, y - hh, x + hw, y + hh)
+        })
+        .collect();
     let mut list = DrawList::default();
     let mut placed: Vec<(f64, f64, f64, f64)> = Vec::new();
     let origin = view.document_to_screen(Point::new(0.0, 0.0));
@@ -70,64 +121,111 @@ pub fn chips_list(items: &[ChipItem], canvas: (f64, f64), view: ViewTransform) -
             continue;
         }
         let (min, max) = item.bounds;
-        let top_right = view.document_to_screen(Point::new(max.x, min.y));
-        let top_left = view.document_to_screen(Point::new(min.x, min.y));
-        let count = item.glyphs.len();
-        // At most five symbols per object: the counts are small.
-        #[allow(clippy::cast_precision_loss)]
-        let width = count as f64 * CHIP_PX + (count - 1) as f64 * CHIP_GAP_PX;
-        let top = top_right.1 - CHIP_OFFSET_Y_PX - CHIP_PX;
-        // Right of the corner, or the top-left corner when the row would leave the canvas.
-        let mut left = top_right.0 + CHIP_OFFSET_X_PX;
-        if left + width > canvas.0 {
-            left = top_left.0 - CHIP_OFFSET_X_PX - width;
-        }
+        let (sx0, sy0) = view.document_to_screen(min);
+        let (sx1, sy1) = view.document_to_screen(max);
         // Off the canvas: the whole item is outside the viewport.
-        let (sx0, sx1) = (
-            view.document_to_screen(min).0,
-            view.document_to_screen(max).0,
-        );
-        let (sy0, sy1) = (
-            view.document_to_screen(min).1,
-            view.document_to_screen(max).1,
-        );
         if sx1 < 0.0 || sy1 < 0.0 || sx0 > canvas.0 || sy0 > canvas.1 {
             continue;
         }
-        for (index, glyph) in item.glyphs.iter().enumerate() {
-            #[allow(clippy::cast_precision_loss)]
-            let x = left + index as f64 * (CHIP_PX + CHIP_GAP_PX);
-            let rect = (x, top, x + CHIP_PX, top + CHIP_PX);
-            if placed.len() >= CHIP_CAP {
-                return list;
-            }
-            if placed.iter().any(|other| overlaps(*other, rect)) {
-                continue;
-            }
-            placed.push(rect);
-            let a = to_doc(rect.0, rect.1);
-            let b = to_doc(rect.2, rect.3);
-            list.extend(chip(a, b, *glyph, item.muted.contains(glyph), scale));
+        if placed.len() >= CHIP_CAP {
+            return list;
         }
+        let Some(rect) = pill_rect(item, (sx0, sy0, sx1), canvas.0, &blocked) else {
+            continue;
+        };
+        if placed.iter().any(|other| overlaps(*other, rect)) {
+            continue;
+        }
+        placed.push(rect);
+        list.extend(pill(item, rect, &to_doc, scale));
     }
     list
+}
+
+/// The screen rectangle of the pill of `item` whose box spans `x0..x1` with its top edge at `top`
+/// (`(x0, top, x1)`), on a canvas `width` wide, clear of the handle boxes `blocked`; `None` when
+/// no place is left.
+fn pill_rect(
+    item: &ChipItem,
+    (x0, top, x1): (f64, f64, f64),
+    width: f64,
+    blocked: &[(f64, f64, f64, f64)],
+) -> Option<(f64, f64, f64, f64)> {
+    let w = pill_width(item.glyphs.len());
+    let y = top - CHIP_OFFSET_Y_PX - CHIP_PX;
+    let at = |left: f64| (left, y, left + w, y + CHIP_PX);
+    let fits = |left: f64| left >= 0.0 && left + w <= width;
+    if item.handles {
+        // Right of the corner past the handles there; else left of the top-left corner.
+        let right = clear(at(x1 + CHIP_OFFSET_X_PX), blocked, 1.0);
+        if fits(right.0) {
+            return Some(right);
+        }
+        let left = clear(at(x0 - CHIP_OFFSET_X_PX - w), blocked, -1.0);
+        return fits(left.0).then_some(left);
+    }
+    // Centred over the object, moved inside the canvas when it would leave it (Proposal); past a
+    // handle it would touch, to the right, else to the left.
+    let centred = at((f64::midpoint(x0, x1) - w / 2.0).min(width - w).max(0.0));
+    [1.0, -1.0]
+        .into_iter()
+        .map(|direction| clear(centred, blocked, direction))
+        .find(|rect| fits(rect.0))
+}
+
+/// `rect` moved along x in `direction` (1 right, -1 left) past every box of `blocked` it touches.
+/// After `HANDLE_STEPS` moves it is returned off the canvas, so the caller drops it.
+fn clear(
+    mut rect: (f64, f64, f64, f64),
+    blocked: &[(f64, f64, f64, f64)],
+    direction: f64,
+) -> (f64, f64, f64, f64) {
+    for _ in 0..HANDLE_STEPS {
+        let Some(hit) = blocked.iter().find(|b| overlaps(**b, rect)) else {
+            return rect;
+        };
+        let w = rect.2 - rect.0;
+        let left = if direction > 0.0 { hit.2 } else { hit.0 - w };
+        rect = (left, rect.1, left + w, rect.3);
+    }
+    (f64::NEG_INFINITY, rect.1, f64::NEG_INFINITY, rect.3)
 }
 
 fn overlaps(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
     a.0 < b.2 && b.0 < a.2 && a.1 < b.3 && b.1 < a.3
 }
 
-/// One chip: ground, 1 px border, and the symbol at a 2 px inset, in muted ink when `muted`.
-fn chip(a: Point, b: Point, glyph: Glyph, muted: bool, scale: f64) -> DrawList {
-    let mut list = filled_rect(a, b, OP_CHIP_GROUND);
-    let edge = 1.0 / scale;
-    list.extend(filled_rect(a, Point::new(b.x, a.y + edge), OP_LANE_LINE));
-    list.extend(filled_rect(Point::new(a.x, b.y - edge), b, OP_LANE_LINE));
-    list.extend(filled_rect(a, Point::new(a.x + edge, b.y), OP_LANE_LINE));
-    list.extend(filled_rect(Point::new(b.x - edge, a.y), b, OP_LANE_LINE));
-    let inset = 2.0;
-    let at = |x: f64, y: f64| Point::new(a.x + (inset + x) / scale, a.y + (inset + y) / scale);
-    list.extend(symbol(glyph, &at, scale, muted));
+/// One pill over the screen rectangle `rect`: a 1 px `--lane-line` edge, the `--toolbar-bg`
+/// ground, both fully rounded, and the symbols in their cells, in muted ink when muted.
+fn pill(
+    item: &ChipItem,
+    rect: (f64, f64, f64, f64),
+    to_doc: &dyn Fn(f64, f64) -> Point,
+    scale: f64,
+) -> DrawList {
+    let (w, h) = (rect.2 - rect.0, rect.3 - rect.1);
+    let centre = to_doc(rect.0 + w / 2.0, rect.1 + h / 2.0);
+    let flat = Angle::from_radians(0.0);
+    let mut list = rounded_rect(
+        centre,
+        (w / scale, h / scale),
+        h / 2.0 / scale,
+        flat,
+        OP_LANE_LINE,
+    );
+    list.extend(rounded_rect(
+        centre,
+        ((w - 2.0) / scale, (h - 2.0) / scale),
+        (h - 2.0) / 2.0 / scale,
+        flat,
+        OP_CHIP_GROUND,
+    ));
+    for (index, glyph) in (0_u32..).zip(&item.glyphs) {
+        let cell_x = rect.0 + PILL_PADDING_PX + f64::from(index) * (CELL_PX + CHIP_GAP_PX);
+        let cell_y = rect.1 + PILL_PADDING_PX;
+        let at = |x: f64, y: f64| to_doc(cell_x + x, cell_y + y);
+        list.extend(symbol(*glyph, &at, scale, item.muted.contains(glyph)));
+    }
     list
 }
 
@@ -138,29 +236,21 @@ fn symbol(glyph: Glyph, at: &dyn Fn(f64, f64) -> Point, scale: f64, muted: bool)
     let red = matches!(glyph, Glyph::Cut | Glyph::CutOut);
     let ink = if muted { OP_MUTED_INK } else { OP_INK };
     let colour = if red && !muted { OP_CUT } else { ink };
-    let box_width = 1.5 / scale;
+    let box_width = OUTLINE_PX / scale;
     match glyph {
-        Glyph::Cut => list.extend(square_outline(at, 16.0, box_width, colour, None)),
-        Glyph::CutOut => list.extend(square_outline(
-            at,
-            16.0,
-            box_width,
-            colour,
-            Some((4.0, 2.0)),
-        )),
+        Glyph::Cut => list.extend(square_outline(at, box_width, colour, None)),
+        Glyph::CutOut => list.extend(square_outline(at, box_width, colour, Some((4.0, 2.0)))),
         Glyph::Score => {
-            let mut x = 0.0;
-            while x < 16.0 {
-                let p = at(x, 7.25);
-                let q = at(x + 1.5, 8.75);
-                list.extend(filled_rect(p, q, colour));
-                x += 3.0;
+            // Five 1.5 px dots every 3 px, centred in the cell: 1.25 to 14.75.
+            for dot in 0_u8..5 {
+                let x = 1.25 + f64::from(dot) * 3.0;
+                list.extend(filled_rect(at(x, 7.25), at(x + 1.5, 8.75), colour));
             }
         }
         Glyph::Engrave => list.extend(hatch_box(at, 1.0 / scale, ink)),
         Glyph::EngraveOutline => {
             list.extend(hatch_box(at, 1.0 / scale, ink));
-            list.extend(square_outline(at, 16.0, box_width, ink, None));
+            list.extend(square_outline(at, box_width, ink, None));
         }
         Glyph::Image => {
             for (column, rows) in (0_u8..).zip(IMAGE_RAMP) {
@@ -174,21 +264,23 @@ fn symbol(glyph: Glyph, at: &dyn Fn(f64, f64) -> Point, scale: f64, muted: bool)
     list
 }
 
-/// A square outline of `size` box pixels; `dash` = (on, off) pixels, or a solid outline.
+/// The outline of the 16 px cell, drawn inside it (its centre line half the outline width in from
+/// the cell edge, so the stroke ends on the edge and the symbol stays centred); `dash` = (on, off)
+/// pixels, or a solid outline.
 fn square_outline(
     at: &dyn Fn(f64, f64) -> Point,
-    size: f64,
     width_mm: f64,
     colour: crate::color::RgbaColor,
     dash: Option<(f64, f64)>,
 ) -> DrawList {
     let mut list = DrawList::default();
+    let (near, far) = (OUTLINE_PX / 2.0, CELL_PX - OUTLINE_PX / 2.0);
     let corners = [
-        (0.0, 0.0),
-        (size, 0.0),
-        (size, size),
-        (0.0, size),
-        (0.0, 0.0),
+        (near, near),
+        (far, near),
+        (far, far),
+        (near, far),
+        (near, near),
     ];
     for pair in corners.windows(2) {
         let (from, to) = (pair[0], pair[1]);
@@ -234,85 +326,5 @@ fn hatch_box(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn item(x: f64, glyphs: Vec<Glyph>) -> ChipItem {
-        ChipItem {
-            bounds: (Point::new(x, 10.0), Point::new(x + 20.0, 30.0)),
-            glyphs,
-            muted: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn an_item_gets_one_chip_per_kind_and_none_off_the_canvas() {
-        let view = ViewTransform::new(2.0, Point::new(0.0, 0.0));
-        let one = chips_list(
-            &[item(10.0, vec![Glyph::Cut, Glyph::Score])],
-            (800.0, 600.0),
-            view,
-        );
-        let none = chips_list(&[item(10_000.0, vec![Glyph::Cut])], (800.0, 600.0), view);
-        assert!(one.triangle_count() > 0);
-        assert_eq!(none.triangle_count(), 0);
-    }
-
-    #[test]
-    fn colliding_chips_are_skipped() {
-        let view = ViewTransform::new(2.0, Point::new(0.0, 0.0));
-        let twice = chips_list(
-            &[item(10.0, vec![Glyph::Cut]), item(10.0, vec![Glyph::Cut])],
-            (800.0, 600.0),
-            view,
-        );
-        let once = chips_list(&[item(10.0, vec![Glyph::Cut])], (800.0, 600.0), view);
-        assert_eq!(twice.triangle_count(), once.triangle_count());
-    }
-
-    #[test]
-    fn the_cap_holds_the_chips_of_one_frame() {
-        let view = ViewTransform::new(1.0, Point::new(0.0, 0.0));
-        let items: Vec<ChipItem> = (0..700)
-            .map(|i| ChipItem {
-                bounds: (
-                    Point::new(f64::from(i) * 40.0, 10.0),
-                    Point::new(f64::from(i) * 40.0 + 20.0, 30.0),
-                ),
-                glyphs: vec![Glyph::Cut],
-                muted: Vec::new(),
-            })
-            .collect();
-        let capped = chips_list(&items, (100_000.0, 100_000.0), view);
-        let expected = chips_list(&items[..CHIP_CAP], (100_000.0, 100_000.0), view);
-        assert_eq!(capped.triangle_count(), expected.triangle_count());
-    }
-
-    #[test]
-    fn the_image_glyph_is_ten_ink_dots() {
-        let at = |x: f64, y: f64| Point::new(x, y);
-        let list = symbol(Glyph::Image, &at, 1.0, false);
-        assert_eq!(list.triangle_count(), 10 * 2, "4 + 3 + 2 + 1 squares");
-    }
-
-    #[test]
-    fn a_muted_symbol_is_all_muted_ink_even_a_red_one() {
-        let at = |x: f64, y: f64| Point::new(x, y);
-        for glyph in [Glyph::Image, Glyph::Cut, Glyph::Engrave] {
-            let list = symbol(glyph, &at, 1.0, true);
-            assert!(
-                list.triangles.iter().all(|v| v.color == OP_MUTED_INK),
-                "{glyph:?}"
-            );
-        }
-        let mut muted = item(10.0, vec![Glyph::Cut, Glyph::Image]);
-        muted.muted = vec![Glyph::Image];
-        let view = ViewTransform::new(2.0, Point::new(0.0, 0.0));
-        let list = chips_list(&[muted], (800.0, 600.0), view);
-        assert!(list.triangles.iter().any(|v| v.color == OP_MUTED_INK));
-        assert!(
-            list.triangles.iter().any(|v| v.color == OP_CUT),
-            "the Cut chip stays red"
-        );
-    }
-}
+#[path = "operation_symbol_tests.rs"]
+mod tests;

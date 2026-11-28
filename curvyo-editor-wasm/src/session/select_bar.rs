@@ -45,6 +45,16 @@ impl Session {
         state
     }
 
+    /// The distinct kind codes of the selected objects (`curvyo_ui_core::selection_kind_codes`),
+    /// a generated object as `"generated"`: the Select bar shows a kind group only while every
+    /// selected object is of its kind (`specs/0159-ui-consistency`, Frage 433 B).
+    #[must_use]
+    pub fn selection_kinds(&self) -> Vec<&'static str> {
+        curvyo_ui_core::selection_kind_codes(&self.objects(), &self.selection, |id| {
+            self.document.is_generated(id)
+        })
+    }
+
     /// Whether the selection holds only dimensions: no style, clone or scale control applies
     /// (`specs/0070-measure-and-dimension` UI review item 3).
     pub(super) fn selection_only_dimensions(&self) -> bool {

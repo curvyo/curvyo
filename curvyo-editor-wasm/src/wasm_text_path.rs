@@ -76,7 +76,7 @@ impl WasmSession {
         self.session.confirm_text_path_pick()
     }
 
-    /// The canvas notice of the last put on several paths ("Put text on 3 paths."), once.
+    /// The canvas notice of the last put on several paths (a refusal), once.
     pub fn take_text_path_notice(&mut self) -> String {
         self.session.take_text_path_notice()
     }

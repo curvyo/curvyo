@@ -224,7 +224,7 @@ fn delete_layer_takes_everything_says_so_and_activates_the_next_layer_back() {
     session.document.set_node_locked(&[layer], false).unwrap();
     assert_eq!(
         session.delete_layer_row(&key(layer)),
-        PanelReply::Notice("Deleted layer Cut and 3 objects.".into())
+        PanelReply::Notice("Deleted layer Cut.".into())
     );
     assert!(!session.document.contains_node(a));
     assert_eq!(session.active_layer(), None);

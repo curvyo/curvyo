@@ -86,11 +86,9 @@ fn layers_is_sticky_like_history_whatever_the_selection_does() {
 fn the_words_of_the_spec() {
     assert_eq!(objects_count_text(40), "40 objects");
     assert_eq!(objects_count_text(1), "1 object");
-    assert_eq!(
-        deleted_layer_notice("Cut", 12),
-        "Deleted layer Cut and 12 objects."
-    );
-    assert!(!deleted_layer_notice("Cut", 12).contains("No undo yet."));
+    // 0159 S7 (lead decision, Proposal): the notice no longer counts the objects.
+    assert_eq!(deleted_layer_notice("Cut"), "Deleted layer Cut.");
+    assert!(!deleted_layer_notice("Cut").contains("No undo yet."));
     assert_eq!(
         moved_announcement("Rectangle 3f9a1c", 2, 5),
         "Moved Rectangle 3f9a1c to position 2 of 5"
