@@ -83,10 +83,12 @@ fn build_with(
             (true, Some(numbers)) => {
                 let plan = cache.plan(block, &numbers, entry);
                 entry = plan.exit;
-                built
-                    .job
-                    .blocks
-                    .push(job_block_of(block, &numbers, values.motorised_z));
+                built.job.blocks.push(job_block_of(
+                    block,
+                    &numbers,
+                    values.motorised_z,
+                    values.air_assist,
+                ));
                 (Some(built.job.blocks.len() - 1), Some(plan))
             }
             _ => (None, None),
@@ -190,8 +192,14 @@ fn empty_built(input: &JobInput, frame: Frame) -> Built {
     }
 }
 
-/// The job block of the input `block` that runs with `numbers`.
-fn job_block_of(block: &BlockInput, numbers: &BlockNumbers, motorised_z: bool) -> Block {
+/// The job block of the input `block` that runs with `numbers` on a machine with the capabilities
+/// `motorised_z` and `air_assist`.
+fn job_block_of(
+    block: &BlockInput,
+    numbers: &BlockNumbers,
+    motorised_z: bool,
+    air_assist: bool,
+) -> Block {
     Block {
         id: block.id,
         ring: block.ring,
@@ -199,6 +207,7 @@ fn job_block_of(block: &BlockInput, numbers: &BlockNumbers, motorised_z: bool) -
         kind: numbers.kind,
         numbers: *numbers,
         z: running_z_um(numbers, motorised_z),
+        air: numbers.options.running_air(air_assist),
     }
 }
 

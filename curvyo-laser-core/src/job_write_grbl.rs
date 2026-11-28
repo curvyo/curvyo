@@ -1,5 +1,6 @@
-//! The GRBL G-code bytes of a job (ADR 0064 §7, §12, ADR 0069 §3; criteria 24 to 26, 38): a pure
-//! function of the job, so the same job always gives the same bytes.
+//! The GRBL G-code bytes of a job (ADR 0064 §7, §12, ADR 0069 §3; criteria 24 to 26, 38; air
+//! assist per operation, ADR 0098 decision 6): a pure function of the job, so the same job always
+//! gives the same bytes.
 
 use std::fmt::Write as _;
 
@@ -25,7 +26,7 @@ pub fn write_grbl(job: &Job) -> Vec<u8> {
     }
     out.line("M5");
     out.laser_on = false;
-    if job.machine.air_assist {
+    if out.air_on {
         out.line("M9");
     }
     if let Some(last) = last {
@@ -35,7 +36,7 @@ pub fn write_grbl(job: &Job) -> Vec<u8> {
 }
 
 #[allow(clippy::struct_excessive_bools)]
-// four independent modal states of the controller
+// five independent modal states of the controller
 struct Writer<'a> {
     job: &'a Job,
     text: String,
@@ -48,6 +49,8 @@ struct Writer<'a> {
     m3: bool,
     laser_on: bool,
     air_on: bool,
+    /// Whether the block of the current move has air assist.
+    air_wanted: bool,
 }
 
 impl<'a> Writer<'a> {
@@ -63,6 +66,7 @@ impl<'a> Writer<'a> {
             m3: !job.machine.laser_mode,
             laser_on: false,
             air_on: false,
+            air_wanted: false,
         }
     }
 
@@ -165,9 +169,10 @@ impl<'a> Writer<'a> {
         self.text.push('\n');
     }
 
-    /// A laser-on `G1` to `to` at `feed` and `s` (M3 turns the laser on first).
+    /// A laser-on `G1` to `to` at `feed` and `s` (M3 turns the laser on first; M8 the air while
+    /// the block has it and it is off).
     fn burn(&mut self, to: PointUm, feed: u32, s: u32) {
-        if self.job.machine.air_assist && !self.air_on {
+        if self.air_wanted && !self.air_on {
             self.line("M8");
             self.air_on = true;
         }
@@ -226,6 +231,12 @@ impl<'a> Writer<'a> {
             }
             return;
         };
+        // M9 before the first move of a block without air while the air is on.
+        self.air_wanted = block.air;
+        if !block.air && self.air_on {
+            self.line("M9");
+            self.air_on = false;
+        }
         match m.kind {
             MoveKind::Travel => self.travel(m.to),
             MoveKind::Burn { role, .. } => {

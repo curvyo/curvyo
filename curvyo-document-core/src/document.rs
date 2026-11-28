@@ -804,7 +804,12 @@ impl DocumentVersion {
 /// diameter of 0 or a depth beyond the stock reads as the default, with a notice; nothing is
 /// rewritten on read. Goldens (in `curvyo-editor-wasm`): `cnc_page_v71.curvyo`,
 /// `cnc_page_damaged_v71.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 71;
+/// Version 72 (ADR 0098 decision 6, Frage 435): a laser operation's `op_options` may hold
+/// `air: false` (air assist off while it burns; opaque here, read by the laser extension). An
+/// absent key reads as on, so there is no migration and a file of 71 or lower exports the same
+/// bytes. A build that stops at 71 would ignore the key and switch the air on for the whole job,
+/// so this build's files are refused there by version.
+pub const CURRENT_FORMAT_VERSION: u32 = 72;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

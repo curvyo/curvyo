@@ -184,3 +184,24 @@ fn each_key_is_valid_on_its_kinds_only() {
     assert!(defaults.with(image, grey).is_some());
     assert_eq!(defaults.with(OperationKind::Engrave, grey), None);
 }
+
+/// ADR 0098 decision 6: air is on by default, an absent key reads as on, only off is stored, and
+/// it runs only on a machine with air assist.
+#[test]
+fn air_is_on_unless_stored_off_and_runs_only_with_the_capability() {
+    let on = read(&json!({ "z_offset_mm": 0.0 }), OperationKind::Cut).unwrap();
+    assert!(on.air);
+    assert_eq!(
+        on.to_value(OperationKind::Cut),
+        json!({ "z_offset_mm": 0.0 })
+    );
+    let off = on.with(OperationKind::Cut, OptionEdit::Air(false)).unwrap();
+    let stored = off.to_value(OperationKind::Cut);
+    assert_eq!(stored, json!({ "z_offset_mm": 0.0, "air": false }));
+    assert_eq!(read(&stored, OperationKind::Cut), Ok(off));
+    assert!(on.running_air(true) && !on.running_air(false) && !off.running_air(true));
+    assert_eq!(
+        read(&json!({ "air": 1 }), OperationKind::Cut),
+        Err(OptionsDamage::WrongType)
+    );
+}

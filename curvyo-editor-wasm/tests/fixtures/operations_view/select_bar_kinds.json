@@ -52,6 +52,7 @@
         "material": null,
         "needs": "engrave",
         "options": {
+          "air": null,
           "hatch": {
             "bidirectional": true,
             "crosshatch": false,

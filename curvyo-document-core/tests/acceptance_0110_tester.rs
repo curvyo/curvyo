@@ -44,10 +44,10 @@ fn c8_format_version_is_42_and_written_on_save() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 71);
+    assert_eq!(CURRENT_FORMAT_VERSION, 72);
     let doc = Document::new(1);
     let bytes = pack(&doc, "test").unwrap();
-    assert_eq!(manifest_version(&bytes), 71);
+    assert_eq!(manifest_version(&bytes), 72);
 }
 
 /// Criterion 8: the v42 golden opens here; the same bytes are refused by a reader one version
@@ -112,7 +112,7 @@ fn c8_a_newer_file_is_refused() {
         file.read_to_end(&mut content).unwrap();
         if name == "manifest.json" {
             let mut json: serde_json::Value = serde_json::from_slice(&content).unwrap();
-            json["format_version"] = serde_json::json!(72);
+            json["format_version"] = serde_json::json!(73);
             content = serde_json::to_vec(&json).unwrap();
         }
         writer
@@ -123,7 +123,7 @@ fn c8_a_newer_file_is_refused() {
     let newer = writer.finish().unwrap().into_inner();
     assert!(matches!(
         unpack(6, &newer),
-        Err(OpenError::FormatTooNew { found: 72, .. })
+        Err(OpenError::FormatTooNew { found: 73, .. })
     ));
 }
 

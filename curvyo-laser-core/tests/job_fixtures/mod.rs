@@ -296,6 +296,7 @@ pub fn options(
         scan_angle: ScanAngle::from_degrees(angle).unwrap(),
         overscan: Overscan::new(overscan).unwrap(),
         z_offset: ZOffset::from_mm(z).unwrap(),
+        air: true,
         image: curvyo_laser_core::settings::ImageSettings::DEFAULT,
         cut: curvyo_laser_core::settings::CutSettings::DEFAULT,
         path: curvyo_laser_core::settings::PathOptions::DEFAULT,

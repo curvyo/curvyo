@@ -199,6 +199,9 @@ pub struct OperationOptions {
     pub overscan: Overscan,
     /// The focus height offset; runs only with a motorised Z axis.
     pub z_offset: ZOffset,
+    /// Air assist on while this operation burns; runs only on a machine with air assist (ADR
+    /// 0098 decision 6). On by default, and an absent key reads as on.
+    pub air: bool,
     /// The Image settings of a raster item (Image only, `specs/0123`; ADR 0069 §13).
     pub image: ImageSettings,
     /// The cut path settings (Cut and Cut-out only, `specs/0139` adrs L2).
@@ -215,6 +218,7 @@ impl Default for OperationOptions {
             scan_angle: ScanAngle::default(),
             overscan: Overscan::DEFAULT,
             z_offset: ZOffset::default(),
+            air: true,
             image: ImageSettings::DEFAULT,
             cut: CutSettings::DEFAULT,
             path: PathOptions::DEFAULT,
@@ -252,6 +256,8 @@ pub enum OptionEdit {
     Overscan(Overscan),
     /// A Z offset.
     ZOffset(ZOffset),
+    /// Air assist on or off (ADR 0098 decision 6).
+    Air(bool),
     /// One of the Image settings (Image only, `specs/0123` criteria 11, 12).
     Image(ImageEdit),
     /// One of the cut path settings (Cut and Cut-out only, `specs/0139` criterion 1).
@@ -265,6 +271,7 @@ const KEY_BIDIRECTIONAL: &str = "bidirectional";
 const KEY_SCAN_ANGLE: &str = "scan_angle_deg";
 const KEY_OVERSCAN: &str = "overscan_pct";
 const KEY_Z_OFFSET: &str = "z_offset_mm";
+const KEY_AIR: &str = "air";
 const SCAN_KEYS: [&str; 3] = [KEY_BIDIRECTIONAL, KEY_SCAN_ANGLE, KEY_OVERSCAN];
 
 /// Whether operations of `kind` hatch areas, so Crosshatch applies: the Engrave kinds.
@@ -344,6 +351,7 @@ pub fn read_options(
                 options.z_offset =
                     ZOffset::from_mm(number(value)?).ok_or(OptionsDamage::BadValue)?;
             }
+            KEY_AIR => options.air = flag(value)?,
             _ => return Err(OptionsDamage::UnknownKey),
         }
     }
@@ -376,6 +384,11 @@ impl OperationOptions {
             write_path_keys(self.path, &mut map);
         }
         map.insert(KEY_Z_OFFSET.to_owned(), json!(self.z_offset.mm()));
+        // Air off only, so a project that never turns it off stores the same map as before
+        // ADR 0098 (absent reads as on).
+        if !self.air {
+            map.insert(KEY_AIR.to_owned(), json!(false));
+        }
         Value::Object(map)
     }
 
@@ -386,6 +399,7 @@ impl OperationOptions {
         let mut next = *self;
         match edit {
             OptionEdit::ZOffset(z) => next.z_offset = z,
+            OptionEdit::Air(on) => next.air = on,
             OptionEdit::Crosshatch(on) if hatches(kind) => next.crosshatch = on,
             OptionEdit::Bidirectional(on) if scans(kind) => next.bidirectional = on,
             OptionEdit::ScanAngle(angle) if scans(kind) => next.scan_angle = angle,
@@ -398,6 +412,13 @@ impl OperationOptions {
             _ => return None,
         }
         (next != *self).then_some(next)
+    }
+
+    /// Whether air assist runs for this operation: its own setting on a machine with air assist,
+    /// else never (ADR 0098 decision 6; the stored value is kept).
+    #[must_use]
+    pub const fn running_air(&self, air_assist: bool) -> bool {
+        air_assist && self.air
     }
 
     /// The Z offset that runs: the stored one with a motorised Z axis, else none (criterion 21;

@@ -164,6 +164,9 @@ pub struct OptionsView {
     pub hatch: Option<HatchOptionsView>,
     /// The stored Z offset in mm (shown only with `z_offset_shown`, kept either way).
     pub z_offset_mm: f64,
+    /// The Air assist toggle (ADR 0098 decision 6, Frage 435); `None` while the machine has no
+    /// air assist (the stored value is kept).
+    pub air: Option<bool>,
     /// The Image settings group, only while the Engrave operation holds a raster item
     /// (`specs/0123` criterion 11); the settings stay stored while it is `None`.
     pub image: Option<ImageSettingsView>,
@@ -204,8 +207,10 @@ fn options_view(
     kind: OperationKind,
     facts: RasterFacts,
     placed: Option<String>,
+    air_assist: bool,
 ) -> OptionsView {
     OptionsView {
+        air: air_assist.then_some(options.air),
         path: cuts_through(kind).then(|| super::path_options::PathOptionsView::of(options.path)),
         tabs: cuts_through(kind).then(|| TabsView {
             count: options.cut.tab_count.get(),
@@ -368,6 +373,8 @@ pub(super) struct PageFacts {
     pub(super) defaults: curvyo_laser_core::DefaultNumbers,
     /// Whether the machine has a motorised Z axis.
     pub(super) motorised_z: bool,
+    /// Whether the machine has air assist.
+    pub(super) air_assist: bool,
     /// What each Image operation's items need of its group, by operation.
     pub(super) raster: HashMap<NodeId, RasterFacts>,
     /// The placed line of each Cut or Cut-out whose paths get fewer tabs than Count
@@ -383,6 +390,7 @@ impl PageFacts {
             max_feed: session.active_max_feed(),
             defaults: session.active_defaults(),
             motorised_z: session.active_motorised_z(),
+            air_assist: session.active_air_assist(),
             raster: session.raster_facts(),
             placed: session.placed_lines(),
         }
@@ -480,7 +488,13 @@ pub(super) fn settings_view(
         interval_mm: interval_view(&state),
         options: options.map(|options| {
             let facts = page.raster.get(&op.id).copied().unwrap_or_default();
-            options_view(options, kind, facts, page.placed.get(&op.id).cloned())
+            options_view(
+                options,
+                kind,
+                facts,
+                page.placed.get(&op.id).cloned(),
+                page.air_assist,
+            )
         }),
         z_offset_shown: page.motorised_z,
     })

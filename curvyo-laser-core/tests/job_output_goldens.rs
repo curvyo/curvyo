@@ -460,6 +460,43 @@ fn air_assist() {
     assert_eq!(&lines[lines.len() - 3..lines.len() - 1], ["M5", "M9"]);
 }
 
+/// Three cuts with air on, off, on (ADR 0098 decision 6).
+fn air_per_operation_page(air_assist: bool) -> Page {
+    let mut page = Page::new();
+    for (n, air) in [(1, true), (2, false), (3, true)] {
+        let y = 280.0 - 20.0 * f64::from(n);
+        let mut options = plain();
+        options.air = air;
+        page.operation(
+            Cut,
+            &format!("Cut {n}"),
+            own(Cut, 50.0, 600, 1),
+            options,
+            vec![leaf(vec![line(Point::new(20.0, y), Point::new(120.0, y))])],
+        );
+    }
+    page.values().air_assist = air_assist;
+    page
+}
+
+/// ADR 0098 decision 6: M8 before the first burn of an operation with air, M9 before the first
+/// move of one without while the air is on, and M9 at the end only while it is on.
+#[test]
+fn air_per_operation() {
+    let page = air_per_operation_page(true);
+    let text = golden("air_per_operation.gcode", &page.input, &[]);
+    let codes: Vec<&str> = text.lines().filter(|l| *l == "M8" || *l == "M9").collect();
+    assert_eq!(codes, ["M8", "M9", "M8", "M9"]);
+}
+
+/// ADR 0098 decision 6: stored air values on a machine without air assist write no M8 and no M9.
+#[test]
+fn air_stored_without_capability() {
+    let page = air_per_operation_page(false);
+    let text = golden("air_stored_without_capability.gcode", &page.input, &[]);
+    assert!(!text.lines().any(|l| l == "M8" || l == "M9"), "{text}");
+}
+
 #[test]
 fn every_golden_of_criterion_31_exists() {
     for name in [

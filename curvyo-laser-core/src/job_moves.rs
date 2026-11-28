@@ -77,6 +77,9 @@ pub struct Block {
     pub numbers: BlockNumbers,
     /// The Z offset in µm that runs (only with a motorised Z axis and a non-zero offset).
     pub z: Option<i64>,
+    /// Whether air assist is on while it burns (only on a machine with air assist, ADR 0098
+    /// decision 6).
+    pub air: bool,
 }
 
 impl Block {

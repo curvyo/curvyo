@@ -81,7 +81,8 @@ fn c31_every_named_golden_exists_in_its_format_folder_and_reads() {
     // `specs/0121` criterion 17 adds `print_and_cut_cut_line`, checked in `job_output_goldens.rs`.
     // `specs/0118` criterion 31 adds `start_user_origin_*`, checked in `user_origin_0118.rs`.
     // `specs/0139` slice 1 adds `tabs_*`, checked in `tabs_goldens.rs`; slice 2 the path goldens,
-    // checked in `path_options_goldens.rs`.
+    // checked in `path_options_goldens.rs`. ADR 0098 decision 6 adds `air_per_operation` and
+    // `air_stored_without_capability`, checked in `job_output_goldens.rs`.
     let count = std::fs::read_dir(&dir)
         .unwrap()
         .filter(|e| {
@@ -91,6 +92,8 @@ fn c31_every_named_golden_exists_in_its_format_folder_and_reads() {
                 && !name.starts_with("print_and_cut_")
                 && !name.starts_with("start_user_origin_")
                 && !name.starts_with("tabs_")
+                && name != "air_per_operation.gcode"
+                && name != "air_stored_without_capability.gcode"
                 && ![
                     "lead_",
                     "overcut_",
@@ -779,7 +782,7 @@ fn c32_project_format_48_and_the_page_registers_read() {
     // Format 49 since `specs/0124-gradient-fill` (ADR 0066 §8).
     // Format 50 since `specs/0123-raster-engraving` (ADR 0069 §10).
     // Format 51 since `specs/0135-image-optimisation` slice 1 (ADR 0072 §8); Superseded by 0135 slice 1 (2026-11-19).
-    assert_eq!(CURRENT_FORMAT_VERSION, 71);
+    assert_eq!(CURRENT_FORMAT_VERSION, 72);
     let dir =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../curvyo-document-core/tests/fixtures");
     let bytes = std::fs::read(dir.join("laser_output_v48.curvyo")).unwrap();

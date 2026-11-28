@@ -162,6 +162,7 @@ fn engrave_page(crosshatch: bool) -> JobInput {
         scan_angle: ScanAngle::default(),
         overscan: Overscan::DEFAULT,
         z_offset: ZOffset::default(),
+        air: true,
         image: curvyo_laser_core::settings::ImageSettings::DEFAULT,
         cut: curvyo_laser_core::settings::CutSettings::DEFAULT,
         path: curvyo_laser_core::settings::PathOptions::DEFAULT,

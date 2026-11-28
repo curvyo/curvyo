@@ -51,6 +51,7 @@
         "material": null,
         "needs": "image",
         "options": {
+          "air": null,
           "hatch": {
             "bidirectional": true,
             "crosshatch": null,

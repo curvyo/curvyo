@@ -51,6 +51,7 @@
         "material": null,
         "needs": "cut",
         "options": {
+          "air": null,
           "hatch": null,
           "image": null,
           "path": {
@@ -125,6 +126,7 @@
         "material": null,
         "needs": "score",
         "options": {
+          "air": null,
           "hatch": null,
           "image": null,
           "path": null,

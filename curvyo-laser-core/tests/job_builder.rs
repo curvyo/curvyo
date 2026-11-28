@@ -197,6 +197,7 @@ fn the_estimate_is_burn_over_feed_plus_travel_over_the_maximum_feed() {
                 options: plain(),
             },
             z: None,
+            air: false,
         }],
         moves: vec![
             burn(100_000),

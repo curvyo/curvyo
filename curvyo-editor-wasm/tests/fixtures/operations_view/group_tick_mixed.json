@@ -51,6 +51,7 @@
         "material": null,
         "needs": "engrave",
         "options": {
+          "air": null,
           "hatch": {
             "bidirectional": true,
             "crosshatch": false,
@@ -119,6 +120,7 @@
         "material": null,
         "needs": "cut",
         "options": {
+          "air": null,
           "hatch": null,
           "image": null,
           "path": {

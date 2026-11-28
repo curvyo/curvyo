@@ -101,7 +101,7 @@ fn opened(bytes: &[u8]) -> (Session, Value) {
 
 #[test]
 fn the_golden_reads_back_its_page_stock_tools_and_operations() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 71);
+    assert_eq!(CURRENT_FORMAT_VERSION, 72);
     let bytes = read_or_write("cnc_page_v71.curvyo", build);
     let (s, view) = opened(&bytes);
     assert_eq!(view["profile"]["name"], "Generic GRBL router");

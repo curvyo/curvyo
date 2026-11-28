@@ -92,6 +92,25 @@ fn criterion_21_and_22_z_offset_needs_the_motorised_z_axis_and_is_kept_without_i
     );
 }
 
+/// ADR 0098 decision 6 (Frage 435): the Air assist toggle shows only while the machine has air
+/// assist, is one step "Edit settings", and a stored value is kept without the capability.
+#[test]
+fn air_assist_per_operation_needs_the_capability_and_is_kept_without_it() {
+    let air = |s: &crate::session::Session| row(s, "Cut 1").settings.unwrap().options.unwrap().air;
+    let mut f = fixture(false);
+    let cut = empty_op(&mut f.s, "cut", "Cut 1");
+    assert_eq!(air(&f.s), None, "hidden without air assist");
+    assert_eq!(f.s.edit_operation_option(cut, "air", 0.0), Ok(false));
+    assert!(f.s.set_machine_air_assist(true));
+    assert_eq!(air(&f.s), Some(true), "on by default");
+    assert_eq!(f.s.edit_operation_option(cut, "air", 0.0), Ok(true));
+    assert_eq!(undo_label(&mut f.s), "Edit settings");
+    assert_eq!(air(&f.s), Some(false));
+    assert!(f.s.set_machine_air_assist(false));
+    assert!(f.s.set_machine_air_assist(true));
+    assert_eq!(air(&f.s), Some(false), "kept");
+}
+
 #[test]
 fn criterion_19_an_interval_typed_without_settings_stores_it_with_the_derived_numbers() {
     // `specs/0150` criterion 5: no draft any more; the derived numbers are written with it.

@@ -21,6 +21,8 @@ enum OptionField {
     ScanAngle,
     Overscan,
     ZOffset,
+    /// The Air assist toggle (ADR 0098 decision 6).
+    Air,
     /// A number of the Image settings group (`specs/0123` criterion 11).
     Image(ImageField),
     /// The Invert toggle of the Image settings group.
@@ -43,6 +45,7 @@ impl OptionField {
             "scan_angle" => Self::ScanAngle,
             "overscan" => Self::Overscan,
             "z_offset" => Self::ZOffset,
+            "air" => Self::Air,
             "threshold" => Self::Image(ImageField::Threshold),
             "brightness" => Self::Image(ImageField::Brightness),
             "contrast" => Self::Image(ImageField::Contrast),
@@ -69,6 +72,7 @@ impl OptionField {
             Self::ScanAngle => ScanAngle::typed(value).map(OptionEdit::ScanAngle),
             Self::Overscan => Overscan::typed(value).map(OptionEdit::Overscan),
             Self::ZOffset => ZOffset::typed(value).map(OptionEdit::ZOffset),
+            Self::Air => Ok(OptionEdit::Air(value != 0.0)),
             Self::Image(field) => field.typed(value).map(OptionEdit::Image),
             Self::Invert => Ok(OptionEdit::Image(ImageEdit::Invert(value != 0.0))),
             Self::TabCount => TabCount::typed(value).map(|c| OptionEdit::Cut(CutEdit::TabCount(c))),
@@ -89,6 +93,13 @@ impl Session {
             .is_some_and(|copy| copy.read.copy.values.motorised_z)
     }
 
+    /// Whether the active laser page's machine has air assist (its profile copy, ADR 0098
+    /// decision 6).
+    pub(in crate::session) fn active_air_assist(&self) -> bool {
+        self.active_copy()
+            .is_some_and(|copy| copy.read.copy.values.air_assist)
+    }
+
     /// The Motorised Z axis switch of the page's profile copy (`specs/0111` criterion 22): one
     /// step "Motorised Z axis on" or "off". Whether it changed.
     pub fn set_machine_motorised_z(&mut self, on: bool) -> bool {
@@ -106,14 +117,14 @@ impl Session {
     /// Types `value` into the field `option` of operation `id`'s unfolded row (`interval`,
     /// `scan_angle`, `overscan`, `z_offset`; the Image settings `threshold`, `brightness`,
     /// `contrast`, `gamma`, `lowest_power`), or presses the toggle `option` (`crosshatch`,
-    /// `bidirectional`, `invert`) on (`value` non-zero) or off (criteria 19, 20, 24; `specs/0123`
+    /// `bidirectional`, `invert`, `air`) on (`value` non-zero) or off (criteria 19, 20, 24; `specs/0123`
     /// criteria 11, 12); on a Cut or Cut-out `tab_count`, `tab_width` and the switch
     /// `tab_skip_inner` (`specs/0139` criterion 1), the Path options `lead_in` and `lead_out`
     /// (the pill's segment index, 0 None, 1 Line, 2 Arc), `lead_in_mm`, `lead_out_mm` and
     /// `overcut` (criterion 13). One step "Edit
     /// settings"; the whole `op_options` map is written. `Ok(false)` when nothing is written: the
     /// same value, a field the row does not show (a hatch option on a Cut, Z offset without a
-    /// motorised Z axis, Interval with No settings, which waits in the draft), damaged settings or another page.
+    /// motorised Z axis, Air without air assist, Interval with No settings, which waits in the draft), damaged settings or another page.
     ///
     /// # Errors
     /// The chip text of a value out of range (UX notes §10); nothing is written.
@@ -130,7 +141,9 @@ impl Session {
             return Ok(self.edit_interval(id, interval));
         };
         let edit = edit.map_err(str::to_owned)?;
-        if field == OptionField::ZOffset && !self.active_motorised_z() {
+        if (field == OptionField::ZOffset && !self.active_motorised_z())
+            || (field == OptionField::Air && !self.active_air_assist())
+        {
             return Ok(false);
         }
         Ok(self.write_option_edit(id, edit))
