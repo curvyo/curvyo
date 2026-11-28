@@ -19,8 +19,9 @@ use super::job_cache::PageJob;
 pub struct OutputGroupView {
     /// "Diode 10 W · GRBL", " · air assist" when on; "Machine profile damaged" (P30).
     pub machine: String,
-    /// The Start pick.
-    pub start: StartView,
+    /// The Start pick; absent on a family page, which has none (ADR 0098 decision 3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start: Option<StartView>,
     /// The checks: blocks first, then warns; empty when there is none.
     pub checks: Vec<CheckView>,
     /// The total, `None` when nothing runs.
@@ -32,8 +33,9 @@ pub struct OutputGroupView {
     pub send: Option<super::send::SendView>,
     /// Whether the page's Toolpath view is pressed.
     pub toolpath_view: bool,
-    /// The Frame button (`specs/0118` 2b).
-    pub frame: super::frame::FrameView,
+    /// The Frame button (`specs/0118` 2b); absent on a family page.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub frame: Option<super::frame::FrameView>,
 }
 
 /// The Start pick (criterion 38; UX P29; `specs/0118` W42, W43): one value of three, User origin
@@ -118,8 +120,8 @@ pub struct CheckView {
 /// The total (criterion 10; UX notes §6.5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TotalView {
-    /// "About 9 min 51 s".
-    pub time: String,
+    /// "About 9 min 51 s"; `None` where the format has no time (Design Space).
+    pub time: Option<String>,
     /// "Runs 3 operations, 16 items." (the `0101` summary's words), `None` when no work
     /// operation runs (`0103` criterion 17, lead decision J7).
     pub runs: Option<RunsLineView>,
@@ -197,7 +199,7 @@ pub(in crate::session) const STALE_TIME: &str = "…";
 /// The total of a stale job: its time and lengths in the words of [`STALE_TIME`].
 fn stale_total(total: TotalView) -> TotalView {
     TotalView {
-        time: format!("About {STALE_TIME}"),
+        time: Some(format!("About {STALE_TIME}")),
         lengths: format!("Burn {STALE_TIME} · travel {STALE_TIME}"),
         ..total
     }
@@ -261,10 +263,13 @@ fn check_view(issue: &Issue, names: &Names) -> CheckView {
 }
 
 impl Session {
-    /// The output group of the active laser page, `None` on another page or with its extension
-    /// off.
+    /// The output group of the active output page of any family (ADR 0098 decision 3), `None` on
+    /// another page or with its extension off.
     #[must_use]
     pub fn output_group_view(&self) -> Option<OutputGroupView> {
+        if let Some(family) = self.active_family() {
+            return Some(self.family_output_group(&family));
+        }
         let (job, stale) = self.job_with_facts(None)?;
         let facts = job.tab.get()?;
         let manufacturing = self.document.manufacturing(job.manufacturing)?;
@@ -276,7 +281,7 @@ impl Session {
         let send = self.send_view(&job, first_block.clone());
         Some(OutputGroupView {
             machine: machine_line(&gate.machine),
-            start: StartView {
+            start: Some(StartView {
                 value: (!settings.start_damaged).then(|| settings.start.as_str()),
                 damaged: settings.start_damaged,
                 options: Start::ALL
@@ -292,7 +297,7 @@ impl Session {
                     })
                     .collect(),
                 user_origin: self.user_origin_view(),
-            },
+            }),
             checks: gate.issues.iter().map(|i| check_view(i, names)).collect(),
             total: self
                 .total_view(&job, facts.summary.as_ref())
@@ -305,7 +310,7 @@ impl Session {
             },
             send,
             toolpath_view: self.toolpath_view_pressed(job.manufacturing),
-            frame: self.frame_view(&job),
+            frame: Some(self.frame_view(&job)),
         })
     }
 
@@ -317,7 +322,7 @@ impl Session {
         let summary = summary?;
         let fixtures = self.running_fixture_jobs();
         Some(TotalView {
-            time: estimate_text(job.timeline.total_s()),
+            time: Some(estimate_text(job.timeline.total_s())),
             runs: (summary.operations > 0).then(|| runs_line(summary.operations, summary.running)),
             fixtures: (fixtures > 0).then(|| fixture_line(fixtures, self.running_fixture_ids())),
             lengths: lengths_text(job.timeline.burn_mm(), job.timeline.travel_mm()),

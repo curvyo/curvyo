@@ -5,7 +5,8 @@
 //! `curvyo_ui_core::panel_tabs`'s and `panel_content`'s.
 
 use curvyo_ui_core::{
-    PanelContent, PanelTab, PanelTabEntry, PanelTabs, StyleBlocker, panel_body, tab_entries_for,
+    PanelContent, PanelTab, PanelTabEntry, PanelTabs, StyleBlocker, output_tabs, panel_body,
+    tab_entries_for,
 };
 
 use curvyo_document_core::PageKind;
@@ -23,14 +24,33 @@ fn tab_of_kind(name: &str, sketch: bool) -> bool {
     }
 }
 
-/// Whether `tab` may show on the active page: the Operations tab only on a laser page with its
-/// extension on (`specs/0101-laser-operations` criterion 1, 28), the drawing tabs as `tab_of_kind`.
-fn tab_allowed(tab: PanelTab, sketch: bool, laser: bool) -> bool {
-    (!matches!(
+/// Whether `tab` is an output-page tab ([`output_tabs`]).
+const fn is_output_tab(tab: PanelTab) -> bool {
+    matches!(
         tab,
-        PanelTab::Operations | PanelTab::Materials | PanelTab::Fixtures
-    ) || laser)
-        && tab_of_kind(tab.name(), sketch)
+        PanelTab::Operations
+            | PanelTab::Materials
+            | PanelTab::Fixtures
+            | PanelTab::Tools
+            | PanelTab::Machines
+    )
+}
+
+/// Whether `tab` may show on the active page: an output-page tab only while `output` (the active
+/// output page's list, ADR 0098 decision 2) holds it, the drawing tabs as `tab_of_kind`.
+fn tab_allowed(tab: PanelTab, sketch: bool, output: &[PanelTab]) -> bool {
+    (!is_output_tab(tab) || output.contains(&tab)) && tab_of_kind(tab.name(), sketch)
+}
+
+/// The strip label of an output-page tab.
+const fn output_label(tab: PanelTab) -> &'static str {
+    match tab {
+        PanelTab::Materials => "Materials",
+        PanelTab::Fixtures => "Fixtures",
+        PanelTab::Tools => "Tools",
+        PanelTab::Machines => "Machines",
+        _ => "Operations",
+    }
 }
 
 /// The key a page kind's last tab is kept under (criterion 9): an output page by its process,
@@ -54,6 +74,14 @@ pub struct PanelView {
 }
 
 impl Session {
+    /// The output-page tabs of the active page (ADR 0098 decision 2): its process's list while it
+    /// is an output page with its extension on, else none.
+    pub(in crate::session) fn output_tabs(&self) -> &'static [PanelTab] {
+        self.active_output_page()
+            .filter(|m| self.process_enabled(&m.process))
+            .map_or(&[], |m| output_tabs(&m.process))
+    }
+
     /// Whether the active tool's style scope holds objects: the "selection
     /// state" of the tab rules (`adrs.md` decision 2).
     fn panel_scope_non_empty(&self) -> bool {
@@ -115,25 +143,16 @@ impl Session {
                 PanelTab::Library.entry_labelled("Library", active == PanelTab::Library),
             );
         }
-        if self.operations_available() {
-            // The Operations tab comes right after Document (`specs/0101` criterion 1).
-            let at = tabs
-                .iter()
-                .position(|tab| tab.name == PanelTab::Document.name())
-                .map_or(tabs.len(), |index| index + 1);
+        // The output-page tabs come right after Document, in their process's order
+        // (`specs/0101` criterion 1, ADR 0098 decision 2).
+        let at = tabs
+            .iter()
+            .position(|tab| tab.name == PanelTab::Document.name())
+            .map_or(tabs.len(), |index| index + 1);
+        for (offset, tab) in self.output_tabs().iter().enumerate() {
             tabs.insert(
-                at,
-                PanelTab::Operations.entry_labelled("Operations", active == PanelTab::Operations),
-            );
-            // The Materials tab comes right after Operations (`specs/0112` criterion 16).
-            tabs.insert(
-                at + 1,
-                PanelTab::Materials.entry_labelled("Materials", active == PanelTab::Materials),
-            );
-            // The Fixtures tab comes after Operations and Materials (`specs/0113` criterion 1).
-            tabs.insert(
-                at + 2,
-                PanelTab::Fixtures.entry_labelled("Fixtures", active == PanelTab::Fixtures),
+                at + offset,
+                tab.entry_labelled(output_label(*tab), active == *tab),
             );
         }
         PanelView {
@@ -170,15 +189,15 @@ impl Session {
         let current = self.panel_tabs.get().active();
         self.kind_tabs.insert(from, current);
         let sketch = to == super::Workbench::Sketch;
-        let laser = self.operations_available();
-        if tab_allowed(current, sketch, laser) {
+        let output = self.output_tabs();
+        if tab_allowed(current, sketch, output) {
             return;
         }
         let tab = self
             .kind_tabs
             .get(&kind)
             .copied()
-            .filter(|tab| tab_allowed(*tab, sketch, laser))
+            .filter(|tab| tab_allowed(*tab, sketch, output))
             .unwrap_or(PanelTab::Document);
         if !self.press_panel_tab(tab.name()) {
             self.press_panel_tab(PanelTab::Document.name());
@@ -196,11 +215,7 @@ impl Session {
         let Some(tab) = PanelTab::from_name(name) else {
             return false;
         };
-        if matches!(
-            tab,
-            PanelTab::Operations | PanelTab::Materials | PanelTab::Fixtures
-        ) && !self.operations_available()
-        {
+        if is_output_tab(tab) && !self.output_tabs().contains(&tab) {
             return false;
         }
         let non_empty = self.panel_scope_non_empty();
@@ -303,6 +318,8 @@ impl PanelTabsRecord {
             PanelContent::Operations => "operations",
             PanelContent::Materials => "materials",
             PanelContent::Fixtures => "fixtures",
+            PanelContent::Tools => "tools",
+            PanelContent::Machines => "machines",
             PanelContent::Empty => "empty",
         };
         Self {

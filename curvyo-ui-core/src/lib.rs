@@ -525,7 +525,7 @@ pub use offset_plan::{
 pub use oriented_box::{OrientedBox, oriented_bounds, oriented_bounds_with_artwork};
 pub use panel_content::{PanelContent, panel_body};
 pub use panel_tabs::{
-    PanelTab, PanelTabEntry, PanelTabs, StyleBlocker, tab_entries, tab_entries_for,
+    PanelTab, PanelTabEntry, PanelTabs, StyleBlocker, output_tabs, tab_entries, tab_entries_for,
 };
 pub use param_edit::{
     MAX_INNER_RATIO, MIN_INNER_RATIO, ParamValue, apply_param, clamped_ratio, commit_param_batch,

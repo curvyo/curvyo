@@ -26,8 +26,9 @@ use super::settings_view::{
 /// The whole Operations tab of the active laser page.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct OperationsView {
-    /// The Cuts last switch.
-    pub cuts_last: bool,
+    /// The Cuts last switch; `None` where the family has none (embroidery, CNC: the list order
+    /// is the run order, ADR 0098 decision 3).
+    pub cuts_last: Option<bool>,
     /// The rows in run order (the list order, sections as the switch shows them).
     pub rows: Vec<RowView>,
     /// The items behind each count of the `0101` summary (criterion 17). The counts themselves
@@ -101,6 +102,14 @@ pub struct RowView {
     /// The name button's accessible name: "Cut 1, run 3, 3 min 21 s" while it runs, else the
     /// name (UX notes §6.1, §11).
     pub accessible_name: String,
+    /// The thread swatch of an embroidery row, "#RRGGBB" (ADR 0098 decision 3); absent on
+    /// every other family.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thread: Option<String>,
+    /// The unfolded body of a plotter, embroidery or CNC row (ADR 0098 decision 3); absent on a
+    /// laser row, which has `settings`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<super::super::output_page::FamilyBodyView>,
 }
 
 /// The kinds of the rows; the five known ones and the unknown one.
@@ -119,6 +128,18 @@ pub enum KindView {
     CutOut,
     /// Image (`specs/0123` criterion 47).
     Image,
+    /// The plotter's Draw (ADR 0098 decision 3; the plotter's Cut is [`KindView::Cut`]).
+    Draw,
+    /// The embroidery Running stitch.
+    RunningStitch,
+    /// The embroidery Tatami fill.
+    TatamiFill,
+    /// The embroidery Satin.
+    Satin,
+    /// A CNC Profile with Side Outside.
+    ProfileOutside,
+    /// A CNC Profile with Side Inside.
+    ProfileInside,
     /// A kind this build does not know, or an unreadable record.
     Unknown,
 }
@@ -157,7 +178,7 @@ pub struct EnteredGroupView {
 /// How many items an operation's `members` hold (`specs/0111` criteria 10, 14): one per node
 /// key, where a node inside a group that holds a key of the same operation is part of that group's
 /// item and is not counted again; a legacy clone-member path key is not counted.
-fn item_count(members: &[Vec<NodeId>], leaves: &[IndexedLeaf]) -> usize {
+pub(super) fn item_count(members: &[Vec<NodeId>], leaves: &[IndexedLeaf]) -> usize {
     let nodes: HashSet<NodeId> = members
         .iter()
         .filter_map(|key| match key.as_slice() {
@@ -238,9 +259,13 @@ impl Session {
         ))
     }
 
-    /// The Operations tab of the active laser page, `None` on another page.
+    /// The Operations tab of the active output page of any family (ADR 0098 decision 3), `None`
+    /// on another page.
     #[must_use]
     pub fn operations_view(&self) -> Option<OperationsView> {
+        if let Some(family) = self.active_family() {
+            return Some(self.family_operations_view(&family));
+        }
         let active = self.active_operations()?;
         let manufacturing = self.active_manufacturing()?;
         let list = OperationList::new(&active.operations, active.cuts_last);
@@ -304,11 +329,13 @@ impl Session {
                         )
                     },
                     accessible_name,
+                    thread: None,
+                    body: None,
                 }
             })
             .collect();
         Some(OperationsView {
-            cuts_last: active.cuts_last,
+            cuts_last: Some(active.cuts_last),
             rows,
             items: item_lists(&list, &leaves),
             view_pressed: self.operations_view_pressed(manufacturing.id)
@@ -330,7 +357,7 @@ impl Session {
 }
 
 /// The tick of row `at` over the selection, and the line-2 words of the groups in part.
-fn row_tick(
+pub(super) fn row_tick(
     session: &Session,
     selection: &Selection,
     list: &OperationList,

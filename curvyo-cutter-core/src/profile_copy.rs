@@ -3,6 +3,7 @@
 //! built-in's value on damage.
 
 use curvyo_document_core::{PageAnchor, PageCorner};
+use curvyo_library_core::Connection;
 use serde_json::{Map, Value};
 
 use crate::builtins::{DEFAULT_BUILTIN, builtin};
@@ -59,7 +60,12 @@ pub fn resize_anchor(copy: &CutterCopy) -> PageAnchor {
 /// the values, not the page size, which follows the active mat.
 #[must_use]
 pub fn differs(copy: &CutterCopy, record: &CutterProfile) -> bool {
-    copy.values != record.values
+    // The connection lives in the record only (the Machines tab writes it, no step).
+    let plain = |v: &CutterValues| CutterValues {
+        connection: Connection::default(),
+        ..v.clone()
+    };
+    plain(&copy.values) != plain(&record.values)
 }
 
 /// A copy as read and how many of its values were damaged.

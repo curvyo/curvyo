@@ -43,9 +43,39 @@ pub enum PanelTab {
     /// The materials of a laser page (`specs/0112-test-grid-and-materials` criterion 16): after
     /// Operations, on a laser page only; never active by itself.
     Materials,
-    /// The fixtures of a laser page (`specs/0113-fixture-sets-and-pins` criterion 1): after
-    /// Operations and Materials, on a laser page only; never active by itself.
+    /// The fixtures of an output page (`specs/0113-fixture-sets-and-pins` criterion 1, ADR 0098
+    /// decision 2): mats, hoops, stock or the laser's sets; never active by itself.
     Fixtures,
+    /// The CNC tools of a CNC page (`specs/0161-cnc-output`, ADR 0098 decision 2): after
+    /// Fixtures; never active by itself.
+    Tools,
+    /// The machines of every enabled family (ADR 0098 decision 4): the last output-page tab;
+    /// never active by itself.
+    Machines,
+}
+
+/// The output-page tabs of a page of `process`, in strip order after Document (ADR 0098
+/// decision 2): none for a process that is no machine family.
+#[must_use]
+pub fn output_tabs(process: &str) -> &'static [PanelTab] {
+    match process {
+        "curvyo.laser" => &[
+            PanelTab::Operations,
+            PanelTab::Materials,
+            PanelTab::Fixtures,
+            PanelTab::Machines,
+        ],
+        "curvyo.cutter" | "curvyo.embroidery" => {
+            &[PanelTab::Operations, PanelTab::Fixtures, PanelTab::Machines]
+        }
+        "curvyo.cnc" => &[
+            PanelTab::Operations,
+            PanelTab::Fixtures,
+            PanelTab::Tools,
+            PanelTab::Machines,
+        ],
+        _ => &[],
+    }
 }
 
 impl PanelTab {
@@ -69,6 +99,8 @@ impl PanelTab {
             Self::Operations => "operations",
             Self::Materials => "materials",
             Self::Fixtures => "fixtures",
+            Self::Tools => "tools",
+            Self::Machines => "machines",
         }
     }
 
@@ -83,6 +115,8 @@ impl PanelTab {
                 Self::Operations,
                 Self::Materials,
                 Self::Fixtures,
+                Self::Tools,
+                Self::Machines,
             ])
             .find(|tab| tab.name() == name)
     }
@@ -120,6 +154,8 @@ impl PanelTab {
             Self::Operations => "Operations",
             Self::Materials => "Materials",
             Self::Fixtures => "Fixtures",
+            Self::Tools => "Tools",
+            Self::Machines => "Machines",
         }
     }
 
@@ -144,6 +180,8 @@ impl PanelTab {
             (Self::Operations, _) => "Operations",
             (Self::Materials, _) => "Materials",
             (Self::Fixtures, _) => "Fixtures",
+            (Self::Tools, _) => "Tools",
+            (Self::Machines, _) => "Machines",
         }
     }
 }
@@ -316,6 +354,31 @@ pub fn tab_entries_for(active: PanelTab, blocker: Option<StyleBlocker>) -> Vec<P
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ADR 0098 decision 2: the output-page tabs per process, in strip order.
+    #[test]
+    fn every_family_has_operations_fixtures_and_machines_in_strip_order() {
+        use PanelTab::{Fixtures, Machines, Materials, Operations, Tools};
+        assert_eq!(
+            output_tabs("curvyo.laser"),
+            [Operations, Materials, Fixtures, Machines]
+        );
+        assert_eq!(
+            output_tabs("curvyo.cutter"),
+            [Operations, Fixtures, Machines]
+        );
+        assert_eq!(
+            output_tabs("curvyo.embroidery"),
+            [Operations, Fixtures, Machines]
+        );
+        assert_eq!(
+            output_tabs("curvyo.cnc"),
+            [Operations, Fixtures, Tools, Machines]
+        );
+        assert_eq!(output_tabs("curvyo.unknown"), []);
+        assert_eq!(PanelTab::from_name("machines"), Some(Machines));
+        assert_eq!(PanelTab::from_name("tools"), Some(Tools));
+    }
     use PanelTab::{Document, Style};
 
     /// One step of the table: what happens to the scope or what the maker does.

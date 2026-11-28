@@ -154,7 +154,7 @@ impl Session {
     /// Unfolds operation row `id` and keeps it unfolded when it already is (a check's button of
     /// the output group). `false` for an operation of another page.
     pub fn reveal_operation_row(&mut self, id: NodeId) -> bool {
-        if !self.is_active_operation(id) {
+        if !self.is_active_row_operation(id) {
             return false;
         }
         self.operations.tools.reveal(id);
@@ -165,7 +165,7 @@ impl Session {
     /// itself and any unfolded row folds; a press on the unfolded row folds it. Session state, no
     /// step. `false` for an operation of another page.
     pub fn unfold_operation_row(&mut self, id: NodeId) -> bool {
-        if !self.is_active_operation(id) {
+        if !self.is_active_row_operation(id) {
             return false;
         }
         self.operations.tools.unfold(id);

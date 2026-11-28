@@ -126,6 +126,8 @@ mod wasm_library_browser;
 #[cfg(target_arch = "wasm32")]
 mod wasm_library_fonts;
 #[cfg(target_arch = "wasm32")]
+mod wasm_machines;
+#[cfg(target_arch = "wasm32")]
 mod wasm_membership;
 #[cfg(target_arch = "wasm32")]
 mod wasm_membership_text;

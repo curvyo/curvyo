@@ -39,7 +39,7 @@ impl Session {
         out
     }
 
-    fn plotter_profile(&self, id: &str) -> Option<CutterProfile> {
+    pub(in crate::session) fn plotter_profile(&self, id: &str) -> Option<CutterProfile> {
         builtin(id).or_else(|| self.manufacturing.plotter.find(id).cloned())
     }
 

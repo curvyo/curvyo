@@ -78,7 +78,7 @@ impl Session {
         out
     }
 
-    fn cnc_profile(&self, id: &str) -> Option<CncProfile> {
+    pub(in crate::session) fn cnc_profile(&self, id: &str) -> Option<CncProfile> {
         builtin(id).or_else(|| self.manufacturing.cnc.find(id).cloned())
     }
 

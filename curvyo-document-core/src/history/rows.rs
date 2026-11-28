@@ -201,6 +201,7 @@ const DOCUMENT_LEVEL_LABELS: &[&str] = &[
     "set_mat_grid",
     // `specs/0160-embroidery`: the embroidery page's hoop and speed.
     "set_hoop",
+    "update_pages",
     "edit_embroidery_speed",
     // `specs/0161-cnc-output`: the CNC page's stock, tools and machine fields.
     "edit_stock",

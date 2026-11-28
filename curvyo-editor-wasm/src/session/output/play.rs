@@ -17,7 +17,7 @@ pub(super) struct PlayState {
     /// The position, 0 to 1 of the job's time; the end by default (UX P10).
     pub(super) fraction: f64,
     /// While playing: the clock of the last tick and the job generation it plays.
-    playing: Option<(f64, u64)>,
+    pub(super) playing: Option<(f64, u64)>,
 }
 
 impl Default for PlayState {
@@ -40,6 +40,13 @@ pub struct PlayView {
     pub readout: String,
     /// Whether the controls work: something runs (UX P20).
     pub enabled: bool,
+    /// The fraction one arrow press moves: one stitch on an embroidery page (ADR 0098 decision
+    /// 3); absent elsewhere, where the arrows step by percent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub step: Option<f64>,
+    /// The thread of the colour block at the head, "#RRGGBB" (embroidery); absent elsewhere.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub colour: Option<String>,
 }
 
 impl Session {
@@ -49,6 +56,9 @@ impl Session {
         if !self.toolpath_view_on() {
             return None;
         }
+        if let Some(family) = self.active_family() {
+            return self.family_play_view(&family);
+        }
         let job = self.laser_job()?;
         let fraction = self.play_fraction();
         let head = job.timeline.head_at(&job.built.job, fraction);
@@ -57,6 +67,8 @@ impl Session {
             playing: self.output.play.playing.is_some(),
             readout: readout_text(&head, &job.timeline),
             enabled: !job.built.job.moves.is_empty(),
+            step: None,
+            colour: None,
         })
     }
 
@@ -73,6 +85,9 @@ impl Session {
             1.0
         };
         self.output.play.fraction = fraction;
+        if let Some(family) = self.active_family() {
+            self.set_family_play(&family, fraction);
+        }
     }
 
     /// The arrow and page keys: steps the slider by `percent` of the run (UX notes §5).
@@ -87,17 +102,27 @@ impl Session {
             // One ring means one head: Play pauses while the frame's ring shows (W34).
             return false;
         }
-        let Some(job) = self.laser_job() else {
-            return false;
+        let (generation, empty) = match self.active_family() {
+            Some(family) => {
+                let view = self.family_play_view(&family);
+                if let Some(view) = &view {
+                    self.output.play.fraction = view.fraction;
+                }
+                (0, view.is_none_or(|v| !v.enabled))
+            }
+            None => match self.laser_job() {
+                Some(job) => (job.generation, job.built.job.moves.is_empty()),
+                None => return false,
+            },
         };
-        if job.built.job.moves.is_empty() {
+        if empty {
             return false;
         }
         let play = &mut self.output.play;
         if play.fraction >= 1.0 {
             play.fraction = 0.0;
         }
-        play.playing = Some((now_ms, job.generation));
+        play.playing = Some((now_ms, generation));
         true
     }
 
@@ -108,7 +133,11 @@ impl Session {
         let Some((last, generation)) = self.output.play.playing else {
             return false;
         };
-        let current = self.laser_job().map(|job| job.generation);
+        let family = self.active_family();
+        let current = match &family {
+            Some(_) => Some(0),
+            None => self.laser_job().map(|job| job.generation),
+        };
         let shown = self.toolpath_view_on();
         let play = &mut self.output.play;
         if current != Some(generation) || !shown {
@@ -117,11 +146,12 @@ impl Session {
         }
         let elapsed = (now_ms - last).max(0.0);
         play.fraction = (play.fraction + elapsed / PLAY_WHOLE_MS).min(1.0);
-        if play.fraction >= 1.0 {
-            play.playing = None;
-            return false;
+        let fraction = play.fraction;
+        let done = fraction >= 1.0;
+        play.playing = (!done).then_some((now_ms, generation));
+        if let Some(family) = family {
+            self.set_family_play(&family, fraction);
         }
-        play.playing = Some((now_ms, generation));
-        true
+        !done
     }
 }

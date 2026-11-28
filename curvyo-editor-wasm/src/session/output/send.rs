@@ -146,6 +146,10 @@ impl Session {
     /// The job of the active laser page for the connector (S6): the gate is checked again at
     /// this moment, and `None` unless Send is enabled. Nothing is written to the project.
     pub fn send_job(&mut self) -> Option<SentJobFile> {
+        // A CNC page sends its G-code (`specs/0161`, ADR 0098 decision 3).
+        if self.active_cnc().is_some() {
+            return self.cnc_send_job();
+        }
         let (profile_id, address) = self.connector_of_page()?;
         let HandOut { job, effects } = self.hand_out()?;
         let format = job.input.machine.values.output_format;

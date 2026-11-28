@@ -30,7 +30,7 @@ impl Session {
         out
     }
 
-    fn embroidery_profile(&self, id: &str) -> Option<EmbroideryProfile> {
+    pub(in crate::session) fn embroidery_profile(&self, id: &str) -> Option<EmbroideryProfile> {
         builtin(id).or_else(|| self.manufacturing.embroidery.find(id).cloned())
     }
 

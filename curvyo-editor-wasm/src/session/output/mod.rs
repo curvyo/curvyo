@@ -5,6 +5,7 @@
 mod commands;
 mod cut_keys;
 mod export;
+mod family_group;
 mod fixture_pick;
 mod focus;
 mod frame;

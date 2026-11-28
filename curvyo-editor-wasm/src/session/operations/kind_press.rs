@@ -39,6 +39,10 @@ impl Session {
     pub fn press_operation_kind(&mut self, kind: &str, shift: bool) -> Option<NodeId> {
         self.operations.notice = None;
         self.operations.status = None;
+        // A family page presses its own kinds (ADR 0098 decision 3).
+        if let Some(pressed) = self.press_family_kind(kind, shift) {
+            return pressed;
+        }
         let kind = OperationKind::parse(kind)?;
         let active = self.active_operations()?;
         let selection = self.selection_targets();

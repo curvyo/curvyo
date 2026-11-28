@@ -205,7 +205,7 @@ fn ac8_the_tabs_follow_the_page_kind() {
     assert_eq!(
         laser
             .iter()
-            .filter(|n| !["operations", "materials", "fixtures", "output"].contains(n))
+            .filter(|n| !["operations", "materials", "fixtures", "machines", "output"].contains(n))
             .copied()
             .collect::<Vec<_>>(),
         drawing,

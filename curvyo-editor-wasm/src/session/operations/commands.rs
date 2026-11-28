@@ -12,7 +12,7 @@ impl Session {
     /// Renames operation `id`; an empty name reverts (criterion 3). `false` when nothing changes.
     pub fn rename_operation(&mut self, id: NodeId, name: &str) -> bool {
         self.operations.notice = None;
-        self.is_active_operation(id)
+        self.is_active_row_operation(id)
             && self.recording_unguarded(|this| {
                 this.document.rename_operation(id, name).unwrap_or(false)
             })
@@ -22,7 +22,7 @@ impl Session {
     /// (criterion 4). One step, undone with its memberships.
     pub fn delete_operation(&mut self, id: NodeId) -> bool {
         self.operations.notice = None;
-        self.is_active_operation(id)
+        self.is_active_row_operation(id)
             && self.recording_unguarded(|this| this.document.delete_operation(id).is_ok())
     }
 
@@ -42,7 +42,7 @@ impl Session {
     /// what runs. `false` when it already reads so.
     pub fn set_operation_switch(&mut self, id: NodeId, which: OperationSwitch, on: bool) -> bool {
         self.operations.notice = None;
-        self.is_active_operation(id)
+        self.is_active_row_operation(id)
             && self.recording_unguarded(|this| {
                 this.document
                     .set_operation_switch(id, which, on)
@@ -74,7 +74,7 @@ impl Session {
     /// when it already sits there.
     pub fn move_operation(&mut self, id: NodeId, to: usize) -> bool {
         self.operations.notice = None;
-        let Some(active) = self.active_operations() else {
+        let Some(active) = self.active_row_operations() else {
             return false;
         };
         let kinds = active.kinds();

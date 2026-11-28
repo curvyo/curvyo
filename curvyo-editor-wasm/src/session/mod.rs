@@ -110,6 +110,7 @@ mod library_preview;
 pub use library_preview::PreviewView;
 mod library_journal;
 mod library_sync;
+mod machines;
 mod manufacturing;
 mod materials;
 mod measure;
@@ -128,6 +129,7 @@ mod offset_view;
 mod open_error;
 mod operations;
 mod output;
+mod output_page;
 mod plotter;
 mod print_and_cut;
 mod print_and_cut_overlay;
@@ -752,6 +754,8 @@ pub struct Session {
     /// The record part of this session's material and machine-set steps (ADR 0055 §9, ADR 0060
     /// §5a), one budget for both.
     library_journal: library_journal::Journal,
+    /// The Machines tab's offer to update the pages after an edit (Frage 434 C).
+    machines_follow: Option<machines::FollowOffer>,
     /// The device group's library sync (`library_sync.rs`, `specs/0116-library-sync`).
     library: library_sync::LibrarySyncState,
     /// The Test grid tool (`test_grid/`, `specs/0112`).
@@ -889,6 +893,7 @@ impl Session {
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
             library_journal: library_journal::Journal::default(),
+            machines_follow: None,
             library: library_sync::LibrarySyncState::default(),
             test_grid: test_grid::TestGridTool::default(),
             generators: generators::GeneratorsState::default(),
@@ -1016,6 +1021,7 @@ impl Session {
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
             library_journal: library_journal::Journal::default(),
+            machines_follow: None,
             library: library_sync::LibrarySyncState::default(),
             test_grid: test_grid::TestGridTool::default(),
             generators: generators::GeneratorsState::default(),

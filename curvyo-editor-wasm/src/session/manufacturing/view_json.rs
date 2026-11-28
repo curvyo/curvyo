@@ -206,6 +206,7 @@ impl Session {
                 area.height.as_mm()
             ),
             "machine": machine,
+            "picker": self.machine_picker_view(),
             "notices": notices,
             // The fixture rows in listing order (`0113` criterion 16), the one type of
             // `fixtures/view_json.rs`.
@@ -237,6 +238,7 @@ impl Session {
                 area.height.as_mm()
             ),
             "machine": Value::Null,
+            "picker": self.machine_picker_view(),
             "notices": {},
             "fixtures": [],
             key: family,

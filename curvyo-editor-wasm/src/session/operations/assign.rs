@@ -181,7 +181,7 @@ impl Session {
     /// a mixed tick adding the rest). One step, `Assign to <name>` or `Remove from <name>`.
     pub fn set_selection_in_operation(&mut self, id: NodeId, member: bool) -> bool {
         self.operations.notice = None;
-        let Some(active) = self.active_operations() else {
+        let Some(active) = self.active_row_operations() else {
             return false;
         };
         let Some(at) = active.operations.iter().position(|op| op.id == id) else {
@@ -197,7 +197,7 @@ impl Session {
     /// notes §5).
     pub fn toggle_selection_by_number(&mut self, number: usize) -> bool {
         self.operations.notice = None;
-        let Some(active) = self.active_operations() else {
+        let Some(active) = self.active_row_operations() else {
             return false;
         };
         let list = OperationList::new(&active.operations, active.cuts_last);
@@ -219,9 +219,9 @@ impl Session {
         self.write_targets(&active, at, &selection, !all_in)
     }
 
-    /// The leaves of the active laser page's output page, empty on another page.
+    /// The leaves of the active output page of any family, empty on another page.
     pub(super) fn active_leaves(&self) -> std::sync::Arc<[IndexedLeaf]> {
-        self.active_manufacturing().map_or_else(
+        self.active_output_page().map_or_else(
             || std::sync::Arc::from(Vec::new()),
             |manufacturing| self.output_leaves(&manufacturing),
         )

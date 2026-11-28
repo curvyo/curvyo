@@ -6,6 +6,7 @@
 
 mod assign;
 mod commands;
+mod family_view;
 mod grid_look;
 pub(in crate::session) mod image_view;
 pub(in crate::session) mod index;

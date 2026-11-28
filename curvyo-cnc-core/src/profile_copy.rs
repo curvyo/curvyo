@@ -3,6 +3,7 @@
 //! built-in's value on damage. The connection stays on the record.
 
 use curvyo_document_core::{DocumentSize, Length, PageAnchor, PageCorner};
+use curvyo_library_core::Connection;
 use serde_json::{Map, Value};
 
 use crate::builtins::{DEFAULT_BUILTIN, builtin};
@@ -55,7 +56,12 @@ pub fn resize_anchor(copy: &CncCopy) -> PageAnchor {
 /// the values, the work area among them.
 #[must_use]
 pub fn differs(copy: &CncCopy, record: &CncProfile) -> bool {
-    copy.values != record.values
+    // The connection lives in the record only (the Machines tab writes it, no step).
+    let plain = |v: &CncValues| CncValues {
+        connection: Connection::default(),
+        ..v.clone()
+    };
+    plain(&copy.values) != plain(&record.values)
 }
 
 /// A copy as read and how many of its values were damaged.

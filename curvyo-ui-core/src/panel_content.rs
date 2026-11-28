@@ -12,8 +12,12 @@ pub enum PanelContent {
     Operations,
     /// The Materials tab of a laser page (`specs/0112-test-grid-and-materials`).
     Materials,
-    /// The Fixtures tab of a laser page (`specs/0113-fixture-sets-and-pins`).
+    /// The Fixtures tab of an output page (`specs/0113-fixture-sets-and-pins`, ADR 0098).
     Fixtures,
+    /// The Tools tab of a CNC page (ADR 0098 decision 2).
+    Tools,
+    /// The Machines tab of an output page (ADR 0098 decision 4).
+    Machines,
     /// The File tab: the project and the file commands (`specs/0051-sidebar-and-no-menu`).
     File,
     /// The Document section.
@@ -75,6 +79,8 @@ pub fn panel_body(
         PanelTab::Operations => PanelContent::Operations,
         PanelTab::Materials => PanelContent::Materials,
         PanelTab::Fixtures => PanelContent::Fixtures,
+        PanelTab::Tools => PanelContent::Tools,
+        PanelTab::Machines => PanelContent::Machines,
     }
 }
 

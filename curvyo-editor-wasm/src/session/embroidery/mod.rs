@@ -3,7 +3,7 @@
 //! embroidery profiles and the simulation's position. Reading only; the commands live in the
 //! submodules.
 
-mod commands;
+pub(in crate::session) mod commands;
 mod draw;
 mod export;
 mod job;
