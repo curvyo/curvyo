@@ -3,6 +3,7 @@
 // focus (arrows move focus, Enter or Space presses), and the Italic toggle 12 px after it.
 // Greyed buttons keep their Tab stop and tooltip; the session decides every state.
 import { Italic } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { Tooltip } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 
@@ -18,6 +19,7 @@ import {
   weightFocusMove,
   weightTabStop,
 } from "@/lib/styleText";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
 /** How long a notice stays under the pressed button (Action notice, status). */
 const NOTICE_MS = 3000;
@@ -31,7 +33,7 @@ const TOOLTIP_STYLE = {
 } as const;
 
 const BUTTON_CLASS =
-  "flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+  "flex size-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /** The look of a button's state (UX notes §3); no transition. */
 function stateClass(state: StyleButtonState): string {
@@ -55,7 +57,7 @@ function StyleTooltip({ name, line, children }: { name: string; line: string | n
         <Tooltip.Content
           side="bottom"
           sideOffset={6}
-          className="z-50 max-w-[300px] rounded-md px-2 py-1 text-xs"
+          className={TOOLTIP_CLASS}
           style={TOOLTIP_STYLE}
         >
           <div className="font-semibold">{name}</div>
@@ -120,7 +122,7 @@ export function StyleGroup({ style, editing, onPressWeight, onPressItalic, onRet
         ref={noticeRef}
         role="status"
         style={shiftStyle(shift)}
-        className="absolute top-full left-0 z-30 mt-1 w-max max-w-[480px] rounded-lg bg-[var(--toolbar-bg)] p-2 text-xs text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)]"
+        className="absolute top-full left-0 z-30 mt-1 w-max max-w-[480px] rounded-[8px] bg-[var(--toolbar-bg)] p-2 text-xs text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)]"
       >
         {notice.text}
       </div>
@@ -200,7 +202,7 @@ export function StyleGroup({ style, editing, onPressWeight, onPressItalic, onRet
             }}
             className={`${BUTTON_CLASS} ${stateClass(style.italic)}`}
           >
-            <Italic size={16} strokeWidth={1.5} aria-hidden />
+            <Italic {...GLYPH} aria-hidden />
           </button>
         </StyleTooltip>
         {noticeUnder("italic")}

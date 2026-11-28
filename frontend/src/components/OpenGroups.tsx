@@ -1,4 +1,5 @@
 import { ChevronRight, Lock } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { Fragment } from "react";
 
 import { collapsedName, crumbName, crumbRow } from "@/lib/groupText";
@@ -15,7 +16,7 @@ interface OpenGroupsProps {
 }
 
 const CRUMB_CLASS =
-  "flex h-7 items-center rounded-md px-3 outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "flex h-7 items-center rounded-[5px] px-3 outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 /**
  * The indicator "Open groups" (`docs/design-system.md`, row "Entered group"): the persistent line
@@ -53,7 +54,7 @@ export function OpenGroups({ depth, onLeaveToLevel, laserGroup = null }: OpenGro
                   >
                     ...
                   </span>
-                  <ChevronRight size={12} aria-hidden="true" />
+                  <ChevronRight {...SMALL_GLYPH} aria-hidden="true" />
                 </li>
               ) : null}
               <li className="flex items-center">
@@ -75,7 +76,7 @@ export function OpenGroups({ depth, onLeaveToLevel, laserGroup = null }: OpenGro
                     {crumb.label}
                   </button>
                 )}
-                {index < crumbs.length - 1 ? <ChevronRight size={12} aria-hidden="true" /> : null}
+                {index < crumbs.length - 1 ? <ChevronRight {...SMALL_GLYPH} aria-hidden="true" /> : null}
               </li>
             </Fragment>
           ))}
@@ -87,7 +88,7 @@ export function OpenGroups({ depth, onLeaveToLevel, laserGroup = null }: OpenGro
             ·
           </span>
           <span className="flex items-center gap-1" style={{ color: "var(--panel-muted-fg)" }}>
-            <Lock size={12} aria-hidden />
+            <Lock {...SMALL_GLYPH} aria-hidden />
             Read-only
           </span>
           <span aria-hidden style={{ color: "var(--panel-muted-fg)" }}>

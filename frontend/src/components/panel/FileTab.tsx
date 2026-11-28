@@ -8,15 +8,14 @@ import { TEMPLATE_NAME } from "@/lib/guideText";
 
 /** The name of the Import SVG… button and its tooltip (UX notes: the control's name only). */
 import { checkSentence, projectName, projectStatus } from "@/lib/projectText";
+import { Button } from "@/components/ui/button";
+import { Eraser, FilePlus, FolderOpen, LayoutTemplate, type LucideIcon, Power, Save, SaveAll, X } from "lucide-react";
+import { AlertLine } from "@/components/ui/notice";
 
 /** Discard ignores presses for this long after the check appears (a double-click on the button
  * that raised it cannot confirm). */
 const DISCARD_ARM_MS = 400;
 
-const BUTTON =
-  "h-7 shrink-0 rounded-[5px] border text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9";
-const OUTLINE =
-  "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
 
 interface FileTabProps {
   project: ProjectApi;
@@ -99,7 +98,7 @@ export function FileTab({
             className="my-4 h-px"
             style={{ background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
           />
-          <CommandButton command="quit" label="Quit" {...buttonProps} />
+          <CommandButton command="quit" label="Quit" icon={Power} {...buttonProps} />
         </>
       ) : null}
       {extensions}
@@ -143,9 +142,9 @@ function ProjectBlock({
       <p className="text-xs text-[var(--panel-muted-fg)]">{projectStatus(fileName, dirty, missing, deleted)}</p>
       {failure ? (
         // The failed write of the recovery copy (`specs/0136` criterion 13), until the next success.
-        <p role="alert" className="text-xs text-[var(--field-invalid)]">
+        <AlertLine>
           {failure}
-        </p>
+        </AlertLine>
       ) : null}
     </div>
   );
@@ -155,21 +154,21 @@ function ProjectBlock({
  * as. */
 function Buttons(props: ButtonProps) {
   const { desktop } = props;
-  const button = (command: FileCommandName, label: string) => (
-    <CommandButton command={command} label={label} {...props} />
+  const button = (command: FileCommandName, label: string, icon: LucideIcon) => (
+    <CommandButton command={command} label={label} icon={icon} {...props} />
   );
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
-        {button("new", "New")}
-        {button("open", "Open…")}
+        {button("new", "New", FilePlus)}
+        {button("open", "Open…", FolderOpen)}
       </div>
       <div className="flex gap-2">
-        {button("save", "Save")}
-        {desktop ? button("save-as", "Save as…") : null}
+        {button("save", "Save", Save)}
+        {desktop ? button("save-as", "Save as…", SaveAll) : null}
       </div>
       <div className="flex gap-2">
-        {button("close", "Close")}
+        {button("close", "Close", X)}
         <TemplateButton {...props} />
       </div>
     </div>
@@ -181,19 +180,17 @@ function Buttons(props: ButtonProps) {
 function TemplateButton({ project, onReturnFocus }: ButtonProps) {
   return (
     <Tooltip side="left" content={TEMPLATE_NAME}>
-      <button
-        type="button"
+      <Button icon={LayoutTemplate}
         data-file-command="template"
         onClick={(event) => {
           project.loadTemplate();
           if (event.detail > 0) {
             onReturnFocus();
           }
-        }}
-        className={`${BUTTON} ${OUTLINE} w-[118px]`}
+        }} className="min-w-[118px]"
       >
         {TEMPLATE_NAME}
-      </button>
+      </Button>
     </Tooltip>
   );
 }
@@ -201,14 +198,15 @@ function TemplateButton({ project, onReturnFocus }: ButtonProps) {
 function CommandButton({
   command,
   label,
+  icon,
   project,
   tooltipFor,
   onReturnFocus,
-}: ButtonProps & { command: FileCommandName; label: string }) {
+}: ButtonProps & { command: FileCommandName; label: string; icon: LucideIcon }) {
   return (
     <Tooltip side="left" content={tooltipFor(command)}>
-      <button
-        type="button"
+      <Button
+        icon={icon}
         data-file-command={command}
         onClick={(event) => {
           project.press(command);
@@ -218,10 +216,10 @@ function CommandButton({
             onReturnFocus();
           }
         }}
-        className={`${BUTTON} ${OUTLINE} w-[118px]`}
+        className="min-w-[118px]"
       >
         {label}
-      </button>
+      </Button>
     </Tooltip>
   );
 }
@@ -263,34 +261,28 @@ function UnsavedCheck({
         {sentence}
       </p>
       <div className="mt-2 flex gap-2">
-        <button
+        <Button icon={X} size="bar"
           ref={cancel}
-          type="button"
           aria-describedby={sentenceId}
           onClick={project.cancel}
-          className={`${BUTTON} ${OUTLINE} w-[76px]`}
         >
           Cancel
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button variant="destructive" icon={Eraser} size="bar"
           aria-disabled={!armed}
           onClick={() => {
             if (armed) {
               project.discard();
             }
           }}
-          className={`${BUTTON} w-[76px] border-[var(--destructive)] bg-[var(--background)] text-[var(--destructive)] hover:bg-[var(--destructive)] hover:text-white focus-visible:bg-[var(--destructive)] focus-visible:text-white aria-disabled:hover:bg-[var(--background)] aria-disabled:hover:text-[var(--destructive)] aria-disabled:focus-visible:bg-[var(--background)] aria-disabled:focus-visible:text-[var(--destructive)]`}
         >
           Discard
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button variant="primary" icon={Save} size="bar"
           onClick={project.saveFromCheck}
-          className={`${BUTTON} w-[76px] border-[var(--toolbar-icon-active-bg)] bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:brightness-110`}
         >
           Save
-        </button>
+        </Button>
       </div>
     </div>
   );

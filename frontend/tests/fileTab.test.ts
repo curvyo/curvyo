@@ -66,7 +66,7 @@ async function render(overrides: Overrides = {}): Promise<string> {
 
 /** The visible text of every button, in order. */
 function buttons(html: string): string[] {
-  return [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
+  return [...html.matchAll(/<button[^>]*>(?:<svg[\s\S]*?<\/svg>)?([^<]*)<\/button>/g)].map((m) => m[1]);
 }
 
 test("an untitled clean project: name, status, six buttons, Quit, version", async () => {
@@ -120,7 +120,7 @@ test("the check replaces the six buttons in place with a sentence and three butt
     /role="group" aria-label="Poster\.curvyo has unsaved changes\. Save them before you open another project\? Discarded changes cannot be brought back\."/,
   );
   // Discard starts out not armed: it ignores presses for the first 400 ms.
-  assert.match(html, /aria-disabled="true"[^>]*>Discard</);
+  assert.match(html, /aria-disabled="true"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Discard</);
 });
 
 test("an untitled project says This project has", async () => {

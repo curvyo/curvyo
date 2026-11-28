@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { FixtureGlyph } from "@/components/workbench/FixtureGlyphs";
@@ -23,6 +24,7 @@ import {
 import { insertionEdge, nextFocusIndex } from "@/lib/operationRows";
 import { visibleRange } from "@/lib/operationWindow";
 import { entriesOf, HEADING_PX, WINDOW_ABOVE, OVERSCAN, type Entry } from "@/lib/fixtureJobRows";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** The nearest ancestor that scrolls, or `null`: the panel's column (the tab scrolls as one). */
 function scrollParent(element: HTMLElement | null): HTMLElement | null {
@@ -336,19 +338,19 @@ export function FixtureJobsSection({ api, selectFixture, onPickMaterial, onRetur
       >
         {view.addTo
           ? ADD_KINDS.map(([kind], at) => (
-              <button
-                key={kind}
-                type="button"
-                data-add-kind={kind}
-                aria-label={addLabel(kind, view.addTo?.name ?? "")}
-                title={addLabel(kind, view.addTo?.name ?? "")}
-                tabIndex={at === addStop ? 0 : -1}
-                onFocus={() => setAddStop(at)}
-                onClick={() => press(kind)}
-                className="flex h-7 w-7 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-              >
-                <OperationGlyph kind={kind} />
-              </button>
+              <Tooltip key={kind} side="left" content={addLabel(kind, view.addTo?.name ?? "")}>
+                <button
+                  type="button"
+                  data-add-kind={kind}
+                  aria-label={addLabel(kind, view.addTo?.name ?? "")}
+                  tabIndex={at === addStop ? 0 : -1}
+                  onFocus={() => setAddStop(at)}
+                  onClick={() => press(kind)}
+                  className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                >
+                  <OperationGlyph kind={kind} />
+                </button>
+              </Tooltip>
             ))
           : null}
       </div>
@@ -400,9 +402,9 @@ export function FixtureJobsSection({ api, selectFixture, onPickMaterial, onRetur
           rememberedExpanded = !expanded;
           setExpanded(rememberedExpanded);
         }}
-        className="flex h-7 w-full items-center gap-1 rounded text-left text-sm text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="flex h-7 w-full items-center gap-1 rounded-[5px] text-left text-sm text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
-        {expanded ? <ChevronDown size={12} aria-hidden /> : <ChevronRight size={12} aria-hidden />}
+        {expanded ? <ChevronDown {...SMALL_GLYPH} aria-hidden /> : <ChevronRight {...SMALL_GLYPH} aria-hidden />}
         <span className="flex-1">{sectionTitle(view.count)}</span>
         {view.output ? (
           <span data-fixture-time className="pr-1 text-[11px] tabular-nums text-[var(--panel-muted-fg)]">
@@ -420,7 +422,7 @@ export function FixtureJobsSection({ api, selectFixture, onPickMaterial, onRetur
         <div
           aria-hidden
           data-job-ghost=""
-          className="pointer-events-none fixed z-50 flex h-10 items-center rounded bg-[var(--value-fill)] px-2 text-[13px] text-[var(--toolbar-icon)] shadow"
+          className="pointer-events-none fixed z-50 flex h-10 items-center rounded-[8px] bg-[var(--value-fill)] px-2 text-sm text-[var(--toolbar-icon)] shadow"
           style={{
             left: ghost.left,
             top: Math.min(Math.max(ghost.y - ghost.offset, ghost.top), ghost.bottom - 40),
@@ -546,15 +548,16 @@ function JobGroupView({
       className={`flex flex-col ${first ? "" : "mt-1 border-t border-[var(--divider,transparent)] pt-1"}`}
     >
       {headingAt >= 0 && drawn(headingAt) ? (
-        <div
-          id={headingId}
-          title={group.name}
-          onClick={() => selectFixture(group.fixture)}
-          className="flex h-7 items-center gap-1.5 text-[13px] font-semibold text-[var(--toolbar-icon)]"
-        >
-          <FixtureGlyph kind={group.kind} className="shrink-0" />
-          <span className="min-w-0 truncate">{group.name}</span>
-        </div>
+        <Tooltip side="left" content={group.name}>
+          <div
+            id={headingId}
+            onClick={() => selectFixture(group.fixture)}
+            className="flex h-7 items-center gap-1.5 text-sm font-semibold text-[var(--toolbar-icon)]"
+          >
+            <FixtureGlyph kind={group.kind} className="shrink-0" />
+            <span className="min-w-0 truncate">{group.name}</span>
+          </div>
+        </Tooltip>
       ) : (
         <div id={headingId} aria-hidden style={{ height: HEADING_PX }} />
       )}

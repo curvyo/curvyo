@@ -1,9 +1,21 @@
 import { Tooltip as TooltipPrimitive } from "radix-ui";
 import type { ReactElement, ReactNode } from "react";
 
+import { InPanelTooltips } from "@/components/ui/tooltip-side";
+
+/** The one tooltip look (`docs/ui-elements.md` §15, 0159 S7): the canvas chip surface, 12 px,
+ * 8 px radius, at most 260 px wide; also for the bars' own Radix tooltips. */
+export const TOOLTIP_CLASS =
+  "pointer-events-none z-[60] max-w-[260px] whitespace-pre-line rounded-[8px] bg-[var(--toolbar-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)]";
+
 /** One provider for a group of tooltips (`docs/design-system.md`, "Frontend
  * components to add"). */
 export const TooltipProvider = TooltipPrimitive.Provider;
+
+/** Marks its subtree as the panel, so `Button` and `ToggleButton` tooltips open left. */
+export function PanelTooltipScope({ children }: { children: ReactNode }) {
+  return <InPanelTooltips.Provider value>{children}</InPanelTooltips.Provider>;
+}
 
 interface TooltipProps {
   /** The text after a 400 ms rest; empty for no tooltip. */
@@ -18,7 +30,8 @@ interface TooltipProps {
 }
 
 /**
- * A tooltip in the house style: 400 ms, `bg-popover`, rendered in a portal so
+ * A tooltip in the house style (`docs/ui-elements.md` §15): 400 ms, the canvas chip surface,
+ * rendered in a portal so
  * it may cover the canvas but never the panel row it belongs to.
  */
 export function Tooltip({ content, side, offset = 8, children }: TooltipProps) {
@@ -47,7 +60,7 @@ export function Tooltip({ content, side, offset = 8, children }: TooltipProps) {
         <TooltipPrimitive.Content
           side={side}
           sideOffset={offset}
-          className="pointer-events-none z-[60] max-w-64 rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground ring-1 ring-foreground/10"
+          className={TOOLTIP_CLASS}
         >
           {content}
         </TooltipPrimitive.Content>

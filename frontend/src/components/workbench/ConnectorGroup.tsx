@@ -16,6 +16,7 @@ import {
   typedCode,
 } from "@/lib/connectorText";
 import { isTauri } from "@/platform/host";
+import { FIELD_FRAME, FIELD_FRAME_LABEL } from "@/components/ui/looks";
 
 interface Props {
   /** The chosen saved profile's id; `null` for the built-in profile or a profile not in the library. */
@@ -220,8 +221,8 @@ function PairRow({ model, focusOnMount, onPaired }: { model: ConnectorLinkModel;
   };
   return (
     <div className="flex items-center gap-1">
-      <label className="flex h-7 w-[212px] items-center gap-1 rounded-[5px] border border-[var(--field-border)] bg-white px-2 focus-within:ring-2 focus-within:ring-[var(--editor-accent)]">
-        <span className="shrink-0 text-xs text-[var(--panel-muted-fg)]">Code</span>
+      <label className={`${FIELD_FRAME} w-[212px]`}>
+        <span className={FIELD_FRAME_LABEL}>Code</span>
         <input
           ref={field}
           aria-label="Code"

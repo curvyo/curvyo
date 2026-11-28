@@ -1,5 +1,5 @@
 import { PagesBlock } from "@/components/panel/PagesBlock";
-import { CircleAlert } from "lucide-react";
+import { Scan } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { BackgroundBlock } from "@/components/panel/BackgroundBlock";
@@ -14,6 +14,8 @@ import type { BackgroundPanelApi } from "@/hooks/useBackgroundPanel";
 import type { DocumentPanelApi, UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { FormatsApi } from "@/hooks/useFormats";
 import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
+import { Button } from "@/components/ui/button";
+import { ActionNotice } from "@/components/ui/notice";
 
 const UNIT_TOOLTIP =
   "How lengths are shown on the rulers, here and in the status bar. Other fields stay in mm. Stored sizes are always mm.";
@@ -185,37 +187,35 @@ export function DocumentSection({
       {view.hasObjects && !fixedSize && (
         <div className="relative">
           <Tooltip side="left" content={FIT_TOOLTIP}>
-            <button
-              type="button"
+            <Button icon={Scan}
               onClick={(event) => {
                 fit();
                 // `detail` is 0 for keyboard activation, 1 or more for a click.
                 if (event.detail > 0) {
                   onReturnFocus();
                 }
-              }}
-              className="h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+              }} className="w-full"
             >
               Fit to content
-            </button>
+            </Button>
           </Tooltip>
           {notice && (
             <p
               aria-hidden
-              className="pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[244px] rounded-md bg-[var(--toolbar-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)]"
+              className="pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[244px] rounded-[8px] bg-[var(--toolbar-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)]"
               style={{ boxShadow: "var(--panel-elevation-shadow)" }}
             >
               {notice}
             </p>
           )}
           {refusal && (
-            <div
-              role="alert"
-              className="pointer-events-none absolute top-full right-0 z-30 mt-1 flex max-w-[244px] items-start gap-1 rounded-md bg-popover px-2 py-1 text-xs text-[var(--field-invalid)] ring-1 ring-[var(--field-invalid)]"
+            <ActionNotice
+              refusal
+              maxWidth={244}
+              className="absolute top-full right-0 z-30 mt-1"
             >
-              <CircleAlert size={12} aria-hidden className="mt-0.5 shrink-0" />
               {refusal}
-            </div>
+            </ActionNotice>
           )}
         </div>
       )}

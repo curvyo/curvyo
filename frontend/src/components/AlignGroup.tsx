@@ -14,9 +14,11 @@ import {
   type AlignReference,
   type DistributeCode,
 } from "@/lib/alignText";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
+import { NumberField } from "@/components/ui/number-field";
 
 export const BUTTON_CLASS =
-  "flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] hover:bg-[var(--editor-accent-hover)]";
+  "flex size-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] hover:bg-[var(--editor-accent-hover)]";
 
 /** One align glyph: two bars of different widths with their left edges on a
  * dashed reference line (`specs/0061-align-and-distribute/` UX notes). The
@@ -122,7 +124,7 @@ export function ArrangeTooltip({
         <Tooltip.Content
           side="bottom"
           sideOffset={6}
-          className="z-50 max-w-[260px] rounded-md px-2 py-1 text-xs"
+          className={TOOLTIP_CLASS}
           style={{
             background: "var(--toolbar-bg)",
             color: "var(--toolbar-icon)",
@@ -212,10 +214,11 @@ interface BarFieldProps {
   onFocusField?: () => void;
 }
 
-/** A number field of the arrange groups, the "Bar number field" look: the
- * label outside on the left, the value right-aligned, an optional fixed
- * suffix inside the right edge, the refusal ring and chip. Enter applies;
- * Escape restores the value the field had on focus and blurs. */
+/** A number field of the arrange groups, the one number field look: the
+ * label inside the left edge (`specs/0159-ui-consistency`, Frage 433 B), the
+ * value right-aligned, an optional fixed suffix inside the right edge, the
+ * refusal ring and chip. Enter applies; Escape restores the value the field
+ * had on focus and blurs. */
 export function BarField({
   label,
   accessibleName,
@@ -234,19 +237,15 @@ export function BarField({
   const previous = useRef("");
   const invalid = error !== null && error !== undefined;
   return (
-    <div className="relative flex items-center gap-1.5 text-[var(--toolbar-icon)]">
-      <label htmlFor={`${id}-field`} className="whitespace-nowrap">
-        {label}
-      </label>
+    <div className="relative flex items-center text-[var(--toolbar-icon)]">
       <div className={`relative ${widthClass}`}>
-        <input
+        <NumberField
+          label={label}
+          unit={suffix || undefined}
+          invalid={invalid}
+          derivedPlaceholder={derivedPlaceholder}
           id={`${id}-field`}
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          spellCheck={false}
           aria-label={accessibleName}
-          aria-invalid={invalid}
           value={value}
           placeholder={placeholder}
           onFocus={(event) => {
@@ -269,32 +268,11 @@ export function BarField({
               event.currentTarget.blur();
             }
           }}
-          className={`h-7 w-full rounded-[5px] border bg-white text-right text-sm tabular-nums outline-none ${
-            derivedPlaceholder
-              ? "placeholder:text-[var(--field-derived-fg)]"
-              : "placeholder:text-[var(--panel-muted-fg)]"
-          } ${
-            suffix ? "pr-8" : "pr-1.5"
-          } ${
-            invalid
-              ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_2px_var(--field-invalid)]"
-              : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
-          }`}
-          style={{ color: "var(--toolbar-icon)" }}
         />
-        {suffix ? (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
-            style={{ opacity: 0.7 }}
-          >
-            {suffix}
-          </span>
-        ) : null}
         {error ? (
           <div
             role="status"
-            className="absolute top-full left-0 z-50 mt-1 w-max rounded-md px-2 py-1 text-xs"
+            className="absolute top-full left-0 z-50 mt-1 w-max rounded-[8px] px-2 py-1 text-xs"
             style={{
               background: "var(--toolbar-bg)",
               color: "var(--toolbar-icon)",
@@ -316,17 +294,32 @@ function usePageCueCleanup(align: AlignApi) {
   useEffect(() => () => setPageCue(false), [setPageCue]);
 }
 
+/** The align commands of one axis: left, centre and right, or top, centre and bottom. */
+const AXIS_COMMANDS: Record<"horizontal" | "vertical", AlignCommand[]> = {
+  horizontal: ALIGN_ORDER.slice(0, 3),
+  vertical: ALIGN_ORDER.slice(3),
+};
+
 /**
- * The Align group of the Select bar (`specs/0061-align-and-distribute/`
- * criteria 1, 2, 14, 15): six symbol-only buttons, in the bar in every
- * selection state of the Select tool.
+ * One Align group of the Select bar (`specs/0061-align-and-distribute/`
+ * criteria 1, 2, 14, 15): the three symbol-only buttons of one axis, so a
+ * narrow bar wraps between the axes (`specs/0159-ui-consistency`, Frage 433 B,
+ * Proposal).
  */
-export function AlignBarGroup({ align, onReturnFocus }: { align: AlignApi; onReturnFocus: () => void }) {
+export function AlignBarGroup({
+  axis,
+  align,
+  onReturnFocus,
+}: {
+  axis: "horizontal" | "vertical";
+  align: AlignApi;
+  onReturnFocus: () => void;
+}) {
   usePageCueCleanup(align);
   return (
     <Tooltip.Provider delayDuration={400}>
-      <div role="group" aria-label="Align" className="flex items-center gap-1 py-1">
-        {ALIGN_ORDER.map((command) => (
+      <div role="group" aria-label={axis === "horizontal" ? "Align horizontally" : "Align vertically"} className="flex items-center gap-1 py-1">
+        {AXIS_COMMANDS[axis].map((command) => (
           <CommandButton
             key={command}
             name={ALIGN_TEXT[command].name}
@@ -346,8 +339,7 @@ export function AlignBarGroup({ align, onReturnFocus }: { align: AlignApi; onRet
 
 /**
  * The Distribute group of the Select bar (criteria 6 to 8, 15, 16): four
- * symbol-only buttons and the Gap field, in the bar in every selection
- * state of the Select tool.
+ * symbol-only buttons; their gap is the bar's one Gap field (`GapBarGroup`).
  */
 export function DistributeBarGroup({
   align,
@@ -372,17 +364,30 @@ export function DistributeBarGroup({
             <DistributeGlyph code={code} />
           </CommandButton>
         ))}
-        <BarField
-          label="Gap"
-          accessibleName="Gap, millimetres"
-          widthClass="w-[84px]"
-          suffix="mm"
-          value={align.gap}
-          error={align.gapError}
-          onChange={align.setGap}
-          onEnter={() => align.distribute("h-gaps")}
-        />
       </div>
     </Tooltip.Provider>
+  );
+}
+
+/**
+ * The one Gap field of the Select bar, between Distribute and Arrange in a grid
+ * (`specs/0159-ui-consistency`, Frage 433 B): both use it; empty keeps the
+ * distribute ends and arranges the grid without a gap. Enter distributes the
+ * horizontal gaps, as before.
+ */
+export function GapBarGroup({ align }: { align: AlignApi }) {
+  return (
+    <div role="group" aria-label="Gap" className="flex items-center py-1">
+      <BarField
+        label="Gap"
+        accessibleName="Gap, millimetres"
+        widthClass="w-[88px]"
+        suffix="mm"
+        value={align.gap}
+        error={align.gapError}
+        onChange={align.setGap}
+        onEnter={() => align.distribute("h-gaps")}
+      />
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import { CircleHelp } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import type { FixtureKind } from "@/lib/fixturesView";
 
 /** The kind symbols of the fixtures (`specs/0102-laser-fixtures` UX notes section 4.0): a 16 px
@@ -8,7 +9,7 @@ import type { FixtureKind } from "@/lib/fixturesView";
  * (`specs/0113-fixture-sets-and-pins` UX notes section 2). */
 export function FixtureGlyph({ kind, className }: { kind: FixtureKind; className?: string }) {
   if (kind === "unknown") {
-    return <CircleHelp size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className={className} />;
+    return <CircleHelp {...GLYPH} aria-hidden className={className} />;
   }
   return (
     <svg

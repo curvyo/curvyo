@@ -2,11 +2,11 @@ import type { CSSProperties } from "react";
 
 /**
  * The surface of a toolbox card of the tool rail (`docs/design-system.md`, row "Toolbox card"):
- * 48px wide, `--toolbar-bg`, `rounded-lg`, the panel elevation shadow, 4px padding above and
+ * 48px wide, `--toolbar-bg`, 8 px radius, the panel elevation shadow, 4px padding above and
  * below, buttons in one column 4px apart. The tools card and the Boolean card both use it.
  */
 export const RAIL_CARD_CLASS =
-  "pointer-events-auto flex w-12 shrink-0 flex-col items-center gap-1 rounded-lg py-1";
+  "pointer-events-auto flex w-12 shrink-0 flex-col items-center gap-1 rounded-[8px] py-1";
 
 export const RAIL_CARD_STYLE: CSSProperties = {
   background: "var(--toolbar-bg)",

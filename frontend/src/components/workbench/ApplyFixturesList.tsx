@@ -1,10 +1,12 @@
-import { CopyPlus } from "lucide-react";
+import { Check, CopyPlus, X } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useRef, useState } from "react";
 
 import { TEXT_BUTTON } from "@/components/workbench/FixtureSetsSection";
 import type { FixturesApi } from "@/hooks/useFixtures";
 import { applyKeyTarget, applyLabel, applyReplacesText, candidateCountText } from "@/lib/fixtureSets";
 import type { FixturesView } from "@/lib/fixturesView";
+import { Button } from "@/components/ui/button";
 
 /**
  * "Apply fixtures from page…" (`specs/0113-fixture-sets-and-pins` `ux-notes.md` 5.3): an inline
@@ -50,7 +52,7 @@ export function ApplyFixturesList({ view, api }: { view: FixturesView; api: Fixt
         className={`${TEXT_BUTTON} ${open ? "!bg-[var(--toolbar-icon-active-bg)] !text-[var(--toolbar-icon-active-fg)]" : ""}`}
         onClick={() => (open ? fold() : setOpen(true))}
       >
-        <CopyPlus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+        <CopyPlus {...GLYPH} aria-hidden />
         Apply fixtures from page…
       </button>
       {open ? (
@@ -76,10 +78,10 @@ export function ApplyFixturesList({ view, api }: { view: FixturesView; api: Fixt
                 aria-label={`${candidate.name}, ${candidateCountText(candidate.count)}`}
                 aria-checked={candidate.id === picked?.id}
                 tabIndex={candidate.id === stop ? 0 : -1}
-                className={`flex h-7 items-center justify-between rounded-md px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${candidate.id === picked?.id ? "bg-[var(--value-fill)] shadow-[inset_3px_0_0_var(--editor-accent)]" : "hover:bg-[var(--editor-accent-hover)]"}`}
+                className={`flex h-7 items-center justify-between rounded-[5px] px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${candidate.id === picked?.id ? "bg-[var(--value-fill)] shadow-[inset_3px_0_0_var(--editor-accent)]" : "hover:bg-[var(--editor-accent-hover)]"}`}
                 onClick={() => api.setApplyPreview(candidate.id)}
               >
-                <span className="truncate text-[13px] text-[var(--toolbar-icon)]">{candidate.name}</span>
+                <span className="truncate text-sm text-[var(--toolbar-icon)]">{candidate.name}</span>
                 <span className="shrink-0 pl-2 text-xs tabular-nums text-[var(--panel-muted-fg)]">{candidateCountText(candidate.count)}</span>
               </button>
             ))}
@@ -91,21 +93,17 @@ export function ApplyFixturesList({ view, api }: { view: FixturesView; api: Fixt
           ) : null}
           <div className="flex gap-2">
             {picked ? (
-              <button
-                type="button"
-                className="h-7 w-[140px] rounded-md bg-[var(--editor-accent)] text-[13px] text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 pointer-coarse:h-9"
+              <Button variant="primary" icon={Check} className="min-w-[140px]"
                 onClick={apply}
               >
                 {applyLabel(picked.count)}
-              </button>
+              </Button>
             ) : null}
-            <button
-              type="button"
-              className="h-7 w-24 rounded-md border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] text-[13px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9"
+            <Button icon={X} className="w-24"
               onClick={fold}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </>
       ) : null}

@@ -1,5 +1,5 @@
 import { InlinePickList, type PickRow } from "@/components/InlinePickList";
-import { CircleAlert, Link, Unlink } from "lucide-react";
+import { CircleAlert, Link, Link2, MapPin, Scaling, Spline, Square, SquareRoundCorner, Unlink } from "lucide-react";
 import { AlignmentGroup } from "@/components/AlignmentGroup";
 import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
 import { StyleGroup } from "@/components/StyleGroup";
@@ -34,7 +34,7 @@ import {
   EllipseKindGroup,
   RandomizedGroup,
 } from "@/components/ArcCurveGroups";
-import { AlignBarGroup, DistributeBarGroup } from "@/components/AlignGroup";
+import { AlignBarGroup, DistributeBarGroup, GapBarGroup } from "@/components/AlignGroup";
 import { GridBarGroup } from "@/components/GridGroup";
 import { FlipGroup } from "@/components/FlipGroup";
 import { GuideButton } from "@/components/GuideButton";
@@ -42,7 +42,6 @@ import { TileGroup } from "@/components/TileGroup";
 import type { TileSlot } from "@/lib/tilingText";
 import { RatioSlider } from "@/components/RatioSlider";
 import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
-import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import { OperationKindGroup } from "@/components/OperationKindGroup";
 import { enteredBarShown } from "@/lib/kindButtons";
 import type { KindButton } from "@/lib/operationsView";
@@ -53,6 +52,13 @@ import type { FlipApi } from "@/hooks/useFlip";
 import type { GuideState } from "@/lib/guideText";
 import type { AlignApi } from "@/hooks/useAlign";
 import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
+import { Button } from "@/components/ui/button";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
+import { NumberField } from "@/components/ui/number-field";
+import { Tooltip as UiTooltip } from "@/components/ui/tooltip";
+import { arrangeGroupsShown, isNarrowSelectBar, kindGroupShown } from "@/lib/selectBarGroups";
 
 export interface SelectToolbarProps {
   /** The selection holds an object out of context: move commands only (`specs/0106`). */
@@ -176,7 +182,7 @@ const MAX_POINT_COUNT = 1024;
 
 /** A kind group: its controls wrap inside it in a bar too narrow for all of them (the first row
  * keeps its y; every row is 36px: 28px controls and 4px above and below). */
-const GROUP_CLASS = "flex flex-wrap content-start items-center gap-x-3 py-1";
+const GROUP_CLASS = "flex min-w-0 flex-wrap content-start items-center gap-x-3 py-1";
 
 const DIVIDER_STYLE = {
   background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)",
@@ -213,6 +219,11 @@ export function useRowStarts(container: React.RefObject<HTMLDivElement | null>) 
     const mark = () => {
       let rowTop = -1;
       for (const child of Array.from(element.children) as HTMLElement[]) {
+        // A hidden (empty) group starts no row.
+        if (child.getClientRects().length === 0) {
+          delete child.dataset.rowStart;
+          continue;
+        }
         const top = child.offsetTop;
         const startsRow: boolean = rowTop >= 0 && top > rowTop;
         if (startsRow) {
@@ -232,8 +243,29 @@ export function useRowStarts(container: React.RefObject<HTMLDivElement | null>) 
   });
 }
 
-const BUTTON_CLASS =
-  "h-7 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+const BUTTON_CLASS = buttonClass("secondary", "bar");
+
+/** The bar's side padding, px (`px-2` on each side). */
+const BAR_PADDING_PX = 16;
+
+/** Whether the bar whose pill is `pill` is in the narrow window class: measured on the bar area
+ * (the pill's parent), the room the bar may take, after every resize. */
+function useNarrowBar(pill: React.RefObject<HTMLDivElement | null>): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    const area = pill.current?.parentElement;
+    if (!area) {
+      return undefined;
+    }
+    const measure = () => setNarrow(isNarrowSelectBar(area.clientWidth - BAR_PADDING_PX));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(area);
+    return () => observer.disconnect();
+    // After every render: the pill mounts late when the bar starts inside an entered laser group.
+  });
+  return narrow;
+}
 
 interface RadiusFieldProps {
   bar: SelectBarState;
@@ -299,16 +331,14 @@ function RadiusField({ bar, onSetRadius, onReturnFocus }: RadiusFieldProps) {
       <label htmlFor={`${messageId}-field`}>Radius</label>
       <Tooltip.Provider>
       <Tooltip.Root delayDuration={400}>
+      <Tooltip.Trigger asChild>
       <div className="relative w-24">
-        <Tooltip.Trigger asChild>
-        <input
+        <NumberField
+          unit="mm"
+          limited={bar.radiusLimited}
+          invalid={invalid !== null}
           id={`${messageId}-field`}
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          spellCheck={false}
           aria-label="Corner radius"
-          aria-invalid={invalid ? true : undefined}
           aria-describedby={invalid ? messageId : undefined}
           placeholder={bar.radiusMixed ? "Mixed" : undefined}
           value={text}
@@ -338,37 +368,14 @@ function RadiusField({ bar, onSetRadius, onReturnFocus }: RadiusFieldProps) {
               onReturnFocus();
             }
           }}
-          className={`h-7 w-full rounded-[5px] border bg-white pl-1.5 text-right text-sm tabular-nums outline-none ${
-            bar.radiusLimited ? "pr-[74px]" : "pr-8"
-          } ${
-            invalid
-              ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_2px_var(--field-invalid)]"
-              : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
-          }`}
-          style={{ color: "var(--toolbar-icon)" }}
         />
-        </Tooltip.Trigger>
-        {bar.radiusLimited && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 right-[30px] -translate-y-1/2 text-[12px] opacity-60"
-          >
-            limited
-          </span>
-        )}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
-          style={{ opacity: 0.7 }}
-        >
-          mm
-        </span>
       </div>
+      </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Content
           side="bottom"
           sideOffset={6}
-          className="z-50 max-w-[300px] rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground ring-1 ring-foreground/10"
+          className={TOOLTIP_CLASS}
         >
           {tooltip.split("\n").map((line) => (
             <div key={line}>{line}</div>
@@ -443,13 +450,14 @@ function PointsField({ bar, onSetPointCount }: PointsFieldProps) {
   };
 
   return (
-    <label
+    <UiTooltip side="bottom" content="Points of the selected polygons and stars">
+      <label
       className="flex items-center gap-1.5 text-[var(--toolbar-icon)]"
-      title="Points of the selected polygons and stars"
     >
       Points
-      <input
-        type="number"
+      <NumberField
+        numeric
+        width={80}
         min={MIN_POINT_COUNT}
         max={MAX_POINT_COUNT}
         step={1}
@@ -483,10 +491,9 @@ function PointsField({ bar, onSetPointCount }: PointsFieldProps) {
             onSetPointCount(next);
           }
         }}
-        className="h-7 w-20 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white px-1.5 text-right text-sm tabular-nums outline-none focus:ring-2 focus:ring-[var(--editor-accent)]"
-        style={{ color: "var(--toolbar-icon)" }}
       />
     </label>
+    </UiTooltip>
   );
 }
 
@@ -514,12 +521,12 @@ function LinkCornersToggle({ linked, onLinkedChange }: LinkCornersToggleProps) {
             pressed={linked}
             onPressedChange={onLinkedChange}
             aria-label="Link corners"
-            className="flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
+            className="flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
           >
             {linked ? (
-              <Link aria-hidden size={16} strokeWidth={1.5} absoluteStrokeWidth />
+              <Link {...GLYPH} aria-hidden />
             ) : (
-              <Unlink aria-hidden size={16} strokeWidth={1.5} absoluteStrokeWidth />
+              <Unlink {...GLYPH} aria-hidden />
             )}
           </Toggle.Root>
         </Tooltip.Trigger>
@@ -527,7 +534,7 @@ function LinkCornersToggle({ linked, onLinkedChange }: LinkCornersToggleProps) {
           <Tooltip.Content
             side="bottom"
             sideOffset={6}
-            className="z-50 max-w-[280px] rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground ring-1 ring-foreground/10"
+            className={TOOLTIP_CLASS}
           >
             <div>
               {linked
@@ -585,24 +592,22 @@ function LinkedCloneButton({
     <Tooltip.Provider delayDuration={400}>
       <Tooltip.Root>
         <Tooltip.Trigger asChild>
-          <button
-            type="button"
+          <Button size="bar" icon={Link2} iconOnly
             onClick={(event) => {
               onLinkedClone();
               if (event.detail > 0) {
                 onReturnFocus();
               }
-            }}
-            className={`${BUTTON_CLASS} my-1`}
+            }} className="my-1"
           >
             Linked clone
-          </button>
+          </Button>
         </Tooltip.Trigger>
         <Tooltip.Portal>
           <Tooltip.Content
             side="bottom"
             sideOffset={6}
-            className="z-50 rounded-md px-2 py-1 text-xs"
+            className={TOOLTIP_CLASS}
             style={{ background: "var(--toolbar-bg)", color: "var(--toolbar-icon)", boxShadow: "var(--panel-elevation-shadow)" }}
           >
             {LINKED_CLONE_TOOLTIP.map((line) => (
@@ -617,7 +622,7 @@ function LinkedCloneButton({
       ref={noticeRef}
       role={notice?.alert ? "alert" : "status"}
       // At most 320 px wide, wrapping, right-aligned to the button (UX review must-fix 8).
-      className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-md px-2 py-1 text-xs"
+      className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-[8px] px-2 py-1 text-xs"
       style={
         notice
           ? {
@@ -702,19 +707,33 @@ export function SelectToolbar({
 }: SelectToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   useRowStarts(barRef);
+  const pillRef = useRef<HTMLDivElement>(null);
+  const narrow = useNarrowBar(pillRef);
+  // A kind group only while every selected object is of its kind (Frage 433 B).
+  const only = (group: Parameters<typeof kindGroupShown>[0]) => kindGroupShown(group, bar.kinds);
   const objectToPathRef = useRef<HTMLDivElement>(null);
   const objectToPathShift = useNoticeShift(objectToPathRef, objectToPathNotice);
   const groups: React.ReactNode[] = [];
   // A move-only selection (`specs/0106` criterion 11, UX notes §3): the move groups stay in their
   // places, every edit control is hidden, not dimmed.
   const edits = !moveOnly;
-  // The arrange groups directly after Guide, before the kind groups, in every selection state of
-  // the Select tool, so they do not move with the selection; Grid from two selected objects
-  // (`specs/0061-align-and-distribute/` UX notes, "Placement" and "Grid group").
+  // The arrange groups directly after Guide, before the kind groups, so they do not move with
+  // the selection; Grid from two selected objects (`specs/0061-align-and-distribute/` UX notes,
+  // "Placement" and "Grid group"); in the narrow window class Align and Distribute from two too
+  // (`specs/0159-ui-consistency`, Frage 433 B). Align is two groups of three, so the bar wraps
+  // between the axes.
+  const arrange = arrangeGroupsShown(align?.selectedCount ?? 0, narrow);
   if (align?.shown) {
-    groups.push(<AlignBarGroup key="align" align={align} onReturnFocus={onReturnFocus} />);
-    groups.push(<DistributeBarGroup key="distribute" align={align} onReturnFocus={onReturnFocus} />);
-    if (align.grid.shown) {
+    if (arrange.align) {
+      groups.push(<AlignBarGroup key="align-h" axis="horizontal" align={align} onReturnFocus={onReturnFocus} />);
+      groups.push(<AlignBarGroup key="align-v" axis="vertical" align={align} onReturnFocus={onReturnFocus} />);
+    }
+    if (arrange.distribute) {
+      groups.push(<DistributeBarGroup key="distribute" align={align} onReturnFocus={onReturnFocus} />);
+      // The one Gap field, between Distribute and Grid, which both use.
+      groups.push(<GapBarGroup key="gap" align={align} />);
+    }
+    if (align.grid.shown && arrange.grid) {
       groups.push(<GridBarGroup key="grid" align={align} onReturnFocus={onReturnFocus} />);
     }
   }
@@ -723,32 +742,32 @@ export function SelectToolbar({
   if (tile && edits) {
     groups.push(<TileGroup key="tile" slot={tile.slot} onEnter={tile.onEnter} onRelease={tile.onRelease} onReturnFocus={onReturnFocus} />);
   }
-  if (bar.radiusShown && edits) {
+  if (bar.radiusShown && edits && only("rectangle")) {
     groups.push(
       <div key="rectangle" className={GROUP_CLASS}>
         <RadiusField bar={bar} onSetRadius={onSetRadius} onReturnFocus={onReturnFocus} />
         <LinkCornersToggle linked={linkCorners} onLinkedChange={onSetLinkCorners} />
-        <button
-          type="button"
+        <Button size="bar" icon={Square} iconOnly
           aria-disabled={!bar.removeRoundingEnabled}
-          title="Remove rounding of the selected rectangles (all corners)"
+          tooltip="Remove rounding: the selected rectangles get sharp corners"
           onClick={() => {
             if (bar.removeRoundingEnabled) {
               onRemoveRounding();
             }
           }}
-          className={`${BUTTON_CLASS} ${bar.removeRoundingEnabled ? "" : "opacity-40"}`}
         >
           Remove rounding
-        </button>
+        </Button>
       </div>,
     );
   }
-  if ((bar.pointsShown || bar.ratioShown) && edits) {
+  const pointsShown = bar.pointsShown && only("points");
+  const ratioShown = bar.ratioShown && only("ratio");
+  if ((pointsShown || ratioShown) && edits) {
     groups.push(
       <div key={"star"} className={GROUP_CLASS}>
-        {bar.pointsShown && <PointsField bar={bar} onSetPointCount={onSetPointCount} />}
-        {bar.ratioShown && (
+        {pointsShown && <PointsField bar={bar} onSetPointCount={onSetPointCount} />}
+        {ratioShown && (
           <div className="flex items-center gap-1.5 text-[var(--toolbar-icon)]">
             Ratio
             <RatioSlider
@@ -767,21 +786,22 @@ export function SelectToolbar({
     );
   }
   // After the kind groups: the ellipse group, then the curve group (UX notes, "Select bar").
-  if (arcBar.state.ellipseShown && edits) {
+  const ellipseShown = arcBar.state.ellipseShown && only("ellipse");
+  if (ellipseShown && edits) {
     groups.push(<EllipseKindGroup key="ellipse" arc={arcBar} onReturnFocus={onReturnFocus} />);
     groups.push(<ArcFieldGroup key="arc-fields" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
-  if ((arcBar.state.curveShown || arcBar.state.roundedShown) && !arcBar.state.ellipseShown && edits) {
+  if ((arcBar.state.curveShown || arcBar.state.roundedShown) && !ellipseShown && only("curve") && edits) {
     groups.push(<CurveGroup key="curve" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
   // Directly after the Curve group: Randomized and "Re-roll seed", on polygons and stars only.
-  if (arcBar.state.randomizedShown && edits) {
+  if (arcBar.state.randomizedShown && only("randomized") && edits) {
     groups.push(<RandomizedGroup key="randomized" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
   // The Text controls' row 1 in place, in the Text bar's order (`specs/0084-text-bar-second-row`
   // criteria 6 and 8): Font and Size, Alignment, Style, the expand button. Row 2 is the bottom
   // line of the pill, under every other row.
-  const textShown = Boolean(edits && textBar?.shown && onShowFonts && onSetTextSize && onPreviewTextSize);
+  const textShown = Boolean(edits && textBar?.shown && only("text") && onShowFonts && onSetTextSize && onPreviewTextSize);
   const row2Id = useId();
   if (textBar && textShown && onShowFonts && onSetTextSize && onPreviewTextSize) {
     groups.push(
@@ -840,6 +860,7 @@ export function SelectToolbar({
         // The list opens under the button, over the canvas, and closes on a choice or Escape.
         <div className="relative my-1 w-fit has-[[role=listbox]]:w-60">
           <InlinePickList
+            icon={MapPin}
             label="Place on…"
             className={`${BUTTON_CLASS} flex items-center gap-1`}
             rows={placeOn.rows}
@@ -849,24 +870,23 @@ export function SelectToolbar({
       )}
     </div>
   ) : null;
-  if ((edits && bar.objectToPathShown) || strokeToPathShown) {
+  const objectToPathShown = edits && bar.objectToPathShown && only("objectToPath");
+  if (objectToPathShown || strokeToPathShown) {
     const convert = (
       <div role="group" aria-label="Convert" className="flex items-start gap-1">
-      {edits && bar.objectToPathShown && (
+      {objectToPathShown && (
       <div className="relative">
-        <button
-          type="button"
-          title="Convert the selected shapes and texts to paths"
-          onClick={onConvertToPaths}
-          className={`${BUTTON_CLASS} my-1`}
+        <Button size="bar" icon={Spline} iconOnly
+          tooltip="Object to path: the selected shapes and texts become paths"
+          onClick={onConvertToPaths} className="my-1"
         >
           Object to path
-        </button>
+        </Button>
         {/* Takes no focus; the refusal look of the design system ("Action notice"). */}
         <div
           ref={objectToPathRef}
           role="alert"
-          className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-md px-2 py-1 text-xs ring-1 ring-[var(--field-invalid)]"
+          className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-[8px] px-2 py-1 text-xs ring-1 ring-[var(--field-invalid)]"
           style={
             objectToPathNotice
               ? { background: "var(--popover)", color: "var(--field-invalid)", ...shiftStyle(objectToPathShift) }
@@ -901,7 +921,7 @@ export function SelectToolbar({
     // Select bar"); no link glyph, which the Link corners toggle already uses.
     groups.push(linkedClone);
   }
-  if (edits && boxFromPath && (boxFromPath.shown || boxFromPath.notice)) {
+  if (edits && boxFromPath && ((boxFromPath.shown && only("path")) || boxFromPath.notice)) {
     // Last in the bar but for the tool commands, in a group of its own, so no earlier control
     // moves (`0149` UX notes §1.1).
     groups.push(
@@ -917,7 +937,7 @@ export function SelectToolbar({
     // Last, in a group of its own, so no earlier control moves (`0025` UX notes section 1).
     groups.push(<TraceButton key="trace" onTrace={onTrace} onReturnFocus={onReturnFocus} />);
   }
-  if (recognise && (recognise.shown || recognise.notice) && edits) {
+  if (recognise && ((recognise.shown && only("path")) || recognise.notice) && edits) {
     // Last, in a group of its own, so no earlier control moves (`0088` UX notes §1).
     groups.push(
       <RecogniseTextButton
@@ -944,7 +964,7 @@ export function SelectToolbar({
     return (
       <div
         data-context-bar=""
-        className="pointer-events-auto flex min-w-0 flex-col rounded-lg px-2 text-sm"
+        className="pointer-events-auto flex min-w-0 flex-col rounded-[8px] px-2 text-sm"
         style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
       >
         <div className={BAR_ROW_CLASS}>
@@ -963,8 +983,9 @@ export function SelectToolbar({
   }
   return (
     <div
+      ref={pillRef}
       data-context-bar=""
-      className="pointer-events-auto flex min-w-0 flex-col rounded-lg px-2 text-sm"
+      className="pointer-events-auto flex min-w-0 flex-col rounded-[8px] px-2 text-sm"
       style={{
         background: "var(--toolbar-bg)",
         boxShadow: "var(--panel-elevation-shadow)",
@@ -979,19 +1000,17 @@ export function SelectToolbar({
        * (`specs/0049-linked-clone` criterion 18). */}
       {bar.scaleSwitchesShown && (
       <div className="flex min-h-9 flex-wrap content-start items-center gap-x-1 gap-y-0 py-1">
-        <ToolbarSwitch
+        <ToggleButton icon={Scaling} look="icon"
           label="Scale stroke width"
-          shortLabel="Scale stroke"
           tooltip="Scale stroke width with the object. Off: a resize keeps the stroke thickness."
-          checked={scaleStrokeWidth}
-          onCheckedChange={onSetScaleStrokeWidth}
+          pressed={scaleStrokeWidth}
+          onPressedChange={onSetScaleStrokeWidth}
         />
-        <ToolbarSwitch
+        <ToggleButton icon={SquareRoundCorner} look="icon"
           label="Scale corner radius"
-          shortLabel="Scale corners"
           tooltip="Scale corner radius with the object. Off: a resize keeps the corner radius."
-          checked={scaleCornerRadius}
-          onCheckedChange={onSetScaleCornerRadius}
+          pressed={scaleCornerRadius}
+          onPressedChange={onSetScaleCornerRadius}
         />
       </div>
       )}
@@ -1024,7 +1043,7 @@ export function SelectToolbar({
         )}
       </div>
       {groups.map((group, index) => (
-        <BarGroup key={index} className="flex min-h-9 items-start">
+        <BarGroup key={index} className="flex min-h-9 max-w-full min-w-0 items-start">
           {group}
         </BarGroup>
       ))}

@@ -68,14 +68,11 @@ test("only a close chip is immediate, and nothing else has a chip", () => {
 });
 
 test("the Close path notice (criterion 20)", () => {
-  assert.equal(closeNoticeText({ closed: 3, skipped: 0 }), "Closed 3 paths.");
-  assert.equal(closeNoticeText({ closed: 1, skipped: 0 }), "Closed 1 path.");
+  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  assert.equal(closeNoticeText({ closed: 3, skipped: 0 }), null);
+  assert.equal(closeNoticeText({ closed: 1, skipped: 0 }), null);
   const skipped = closeNoticeText({ closed: 2, skipped: 1 });
-  assert.equal(
-    skipped,
-    "Closed 2 paths. 1 path has fewer than 3 nodes and was not closed.",
-  );
-  assert.equal(skipped?.length, 65, "the sentence without the 'No undo yet.' of before 0020");
+  assert.equal(skipped, "1 path has fewer than 3 nodes and was not closed.");
   assert.equal(closeNoticeMs(skipped ?? ""), 3000);
   assert.equal(closeNoticeMs("x".repeat(71)), 5000);
   assert.equal(closeNoticeMs("Closed 3 paths."), 3000);
@@ -97,11 +94,11 @@ test("the Close path tooltip note by state", () => {
 test("a path whose three nodes start and end on one point has its own words", () => {
   assert.equal(
     closeNoticeText({ closed: 1, skipped: 1, sameEnds: 1 }),
-    "Closed 1 path. 1 path starts and ends on the same point and was not closed.",
+    "1 path starts and ends on the same point and was not closed.",
   );
   assert.equal(
     closeNoticeText({ closed: 1, skipped: 3, sameEnds: 2 }),
-    "Closed 1 path. 1 path has fewer than 3 nodes and was not closed. 2 paths start and end on the same point and were not closed.",
+    "1 path has fewer than 3 nodes and was not closed. 2 paths start and end on the same point and were not closed.",
   );
   assert.equal(
     closeTooltipNote({ closable: 1, skipped: 1, sameEnds: 1 }),

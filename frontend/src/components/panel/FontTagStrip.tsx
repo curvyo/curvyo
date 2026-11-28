@@ -3,7 +3,8 @@
 // strip's look, single choice, at most four rows, the Cuttable cell's progress bar; an own tag's
 // cell carries Rename, edited in place, and Delete, an inline delete confirm
 // (`specs/0081-inline-delete-confirm` Part B).
-import { CircleAlert, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { RadioGroup } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 
@@ -13,6 +14,8 @@ import { ARM_TRASH, ARM_ZONE, type DeleteArm } from "@/hooks/useDeleteArm";
 import type { FontTagView } from "@/hooks/useFontLibrary";
 import { armedTagLabel, checkingDescription, tagDeletedText, tagNameError } from "@/lib/fontLibraryText";
 import { stripCells, stripKeyAction } from "@/lib/tagStrip";
+import { RenameField as RenameInput } from "@/components/ui/rename-field";
+import { ActionNotice } from "@/components/ui/notice";
 
 const BORDER = "color-mix(in srgb, var(--toolbar-icon) 60%, transparent)";
 /** Four rows of 28 px with 1 px between them (UX notes §2). */
@@ -55,12 +58,11 @@ function RenameField({ initial, onSave, onCancel }: RenameFieldProps) {
   };
   return (
     <div className="relative flex h-7 min-w-24 flex-[1_1_auto] items-center bg-[var(--panel-bg)] px-0.5">
-      <input
-        ref={ref}
-        type="text"
+      <RenameInput
+        inputRef={ref}
         value={value}
         aria-label={`Rename tag ${initial}`}
-        aria-invalid={error !== null}
+        invalid={error !== null}
         onChange={(event) => {
           setValue(event.target.value);
           setError(null);
@@ -77,16 +79,16 @@ function RenameField({ initial, onSave, onCancel }: RenameFieldProps) {
             onCancel();
           }
         }}
-        className="h-6 w-full rounded-[5px] bg-white px-1.5 text-sm outline-none ring-1 ring-border focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="w-full"
       />
       {error ? (
-        <p
-          role="alert"
-          className="absolute top-full left-0 z-30 mt-1 flex w-max max-w-[244px] items-center gap-1 rounded-md bg-popover px-2 py-1 text-xs text-[var(--field-invalid)] ring-1 ring-[var(--field-invalid)]"
+        <ActionNotice
+          refusal
+          maxWidth={244}
+          className="absolute top-full left-0 z-30 mt-1"
         >
-          <CircleAlert size={12} aria-hidden />
           {error}
-        </p>
+        </ActionNotice>
       ) : null}
     </div>
   );
@@ -230,7 +232,7 @@ export function FontTagStrip({
               )}
               {cell.own ? (
                 <span className="flex items-center pr-1">
-                  <Tooltip side="bottom" content="Rename">
+                  <Tooltip side="left" content="Rename">
                     <button
                       type="button"
                       tabIndex={-1}
@@ -238,10 +240,10 @@ export function FontTagStrip({
                       onClick={() => setEditing(cell.id)}
                       className={CELL_ICON}
                     >
-                      <Pencil size={12} aria-hidden />
+                      <Pencil {...SMALL_GLYPH} aria-hidden />
                     </button>
                   </Tooltip>
-                  <Tooltip side="bottom" content={armedLabel ?? "Delete"}>
+                  <Tooltip side="left" content={armedLabel ?? "Delete"}>
                     <button
                       type="button"
                       tabIndex={-1}
@@ -251,7 +253,7 @@ export function FontTagStrip({
                       onClick={() => pressDelete(cell, false)}
                       className={`${CELL_ICON} ${ARM_TRANSITION} ${armed ? `${ARMED_TRASH} !bg-[var(--destructive)]` : ""}`}
                     >
-                      <Trash2 size={12} aria-hidden />
+                      <Trash2 {...SMALL_GLYPH} aria-hidden />
                     </button>
                   </Tooltip>
                 </span>

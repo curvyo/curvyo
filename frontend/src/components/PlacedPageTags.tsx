@@ -1,4 +1,5 @@
 import { Frame } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 
@@ -122,7 +123,7 @@ export function PlacedPageTags({ getSession }: { getSession: () => WasmSession |
               color: "var(--toolbar-icon)",
             }}
           >
-            <Frame size={12} className="shrink-0" />
+            <Frame {...SMALL_GLYPH} className="shrink-0" />
             <span className={`min-w-0 truncate ${tag.selected ? "font-semibold" : ""}`}>{tag.name}</span>
           </span>
         );

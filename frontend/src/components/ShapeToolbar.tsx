@@ -1,6 +1,12 @@
 import { RatioSlider } from "@/components/RatioSlider";
 import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import type { PolyStarMode, Tool } from "@/hooks/useEditorSession";
+import { SEGMENT_STRIP } from "@/components/ui/looks";
+
+/** A segment that is a pressed toggle (`aria-pressed`) rather than a radio: `SEGMENT_ITEM` with the pressed variant. */
+const SEGMENT_TOGGLE =
+  "flex h-7 min-w-0 items-center justify-center gap-1 bg-[var(--panel-bg)] px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[color-mix(in_srgb,var(--editor-accent)_20%,var(--panel-bg))] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] pointer-coarse:h-9";
+import { NumberField } from "@/components/ui/number-field";
 
 export interface ShapeToolbarProps {
   tool: Tool;
@@ -42,7 +48,7 @@ export function ShapeToolbar({
     <div
       // A press here does not cancel a click-to-create placement (`0052` criterion 25).
       data-placement-keeps
-      className="flex pointer-events-auto h-9 min-w-0 items-center gap-3 rounded-lg px-2 text-sm"
+      className="flex pointer-events-auto h-9 min-w-0 items-center gap-3 rounded-[8px] px-2 text-sm"
       style={{
         background: "var(--toolbar-bg)",
         boxShadow: "var(--panel-elevation-shadow)",
@@ -51,19 +57,13 @@ export function ShapeToolbar({
       <div
         role="group"
         aria-label="Polygon or star mode"
-        className="flex overflow-hidden rounded-md ring-1 ring-border"
+        className={`flex ${SEGMENT_STRIP}`}
       >
         <button
           type="button"
           aria-pressed={polyStarMode === "polygon"}
           onClick={() => onSetPolyStarMode("polygon")}
-          className="px-2 py-1"
-          style={{
-            background:
-              polyStarMode === "polygon" ? "var(--toolbar-icon-active-bg)" : "transparent",
-            color:
-              polyStarMode === "polygon" ? "var(--toolbar-icon-active-fg)" : "var(--toolbar-icon)",
-          }}
+          className={SEGMENT_TOGGLE}
         >
           Polygon
         </button>
@@ -71,11 +71,7 @@ export function ShapeToolbar({
           type="button"
           aria-pressed={polyStarMode === "star"}
           onClick={() => onSetPolyStarMode("star")}
-          className="px-2 py-1"
-          style={{
-            background: polyStarMode === "star" ? "var(--toolbar-icon-active-bg)" : "transparent",
-            color: polyStarMode === "star" ? "var(--toolbar-icon-active-fg)" : "var(--toolbar-icon)",
-          }}
+          className={SEGMENT_TOGGLE}
         >
           Star
         </button>
@@ -83,8 +79,10 @@ export function ShapeToolbar({
 
       <label className="flex items-center gap-1 text-[var(--toolbar-icon)]">
         <span className="opacity-60">New:</span> Points
-        <input
-          type="number"
+        <NumberField
+          numeric
+          width={64}
+          aria-label="New: Points"
           min={MIN_POINT_COUNT}
           max={MAX_POINT_COUNT}
           step={1}
@@ -95,7 +93,6 @@ export function ShapeToolbar({
               onSetPolyStarPointCount(next);
             }
           }}
-          className="w-16 rounded-md border border-border bg-transparent px-1 py-0.5"
         />
       </label>
 

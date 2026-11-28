@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { PANEL_CONTROL_PX, PANEL_LABEL, PANEL_ROW } from "@/components/ui/looks";
 
 /**
  * One 28 px row of the Style section (`docs/design-system.md`, "Rows"): the
@@ -11,9 +12,11 @@ export function StyleRow({
   ...props
 }: { label: string } & ComponentProps<"div">) {
   return (
-    <div className="flex h-7 items-center gap-2" {...props}>
-      <span className="w-[60px] shrink-0 text-sm text-[var(--toolbar-icon)]">{label}</span>
-      <div className="flex w-[176px] items-center gap-1">{children}</div>
+    <div className={PANEL_ROW} {...props}>
+      <span className={PANEL_LABEL}>{label}</span>
+      <div className="flex items-center gap-1" style={{ width: PANEL_CONTROL_PX }}>
+        {children}
+      </div>
     </div>
   );
 }

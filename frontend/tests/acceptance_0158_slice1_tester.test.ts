@@ -96,7 +96,7 @@ test("rail: Pencil is the eighth Tools slot after Text, key P, column A scrolls"
 test("bar: names, Pen probe button and the status label", () => {
   const bar = read("../src/components/PencilBar.tsx");
   for (const s of ["Pencil options", "Pencil smoothing", "Simulate pressure", "Minimum width", "Maximum width",
-    "Pressure curve", "No pen pressure", "Pen probe...", 'role="status"', "openPenProbe"]) {
+    "Pressure curve", "No pen pressure", "Pen probe…", 'role="status"', "openPenProbe"]) {
     assert.ok(bar.includes(s), s);
   }
 });

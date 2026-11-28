@@ -1,15 +1,4 @@
-import {
-  ArrowDown,
-  ArrowUp,
-  CircleCheck,
-  CircleDashed,
-  CircleX,
-  GripVertical,
-  Move,
-  Plus,
-  Trash2,
-  TriangleAlert,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, CircleCheck, CircleDashed, CircleX, Frame, GripVertical, Move, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
@@ -28,11 +17,13 @@ import {
   usedByTail,
 } from "@/lib/sketchPages";
 import { DropBadgePill } from "@/components/DropBadgePill";
+import { iconButtonClass, toggleClass, GLYPH } from "@/components/ui/looks";
+import { RenameField } from "@/components/ui/rename-field";
 
 const STATE_GLYPHS = { CircleDashed, CircleCheck, Move, TriangleAlert, CircleX };
 
-const buttonClass =
-  "flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-[var(--editor-accent-hover)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)] focus-visible:outline-offset-1 aria-disabled:opacity-40";
+const buttonClass = iconButtonClass("plain", 28);
+const headerButtonClass = iconButtonClass("outlined", 28);
 export function PagesBlock({
   document: doc,
   workbenches,
@@ -91,12 +82,12 @@ export function PagesBlock({
           <button
             ref={addButton}
             type="button"
-            className={buttonClass}
+            className={headerButtonClass}
             aria-label="Add page"
             aria-expanded={adding}
             onClick={() => setAdding(!adding)}
           >
-            <Plus size={16} />
+            <Plus {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
         {([-1, 1] as const).map((delta) => (
@@ -116,7 +107,7 @@ export function PagesBlock({
                 if (pages[active]) reorder(pages[active], active + delta);
               }}
             >
-              {delta < 0 ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+              {delta < 0 ? <ArrowUp {...GLYPH} aria-hidden /> : <ArrowDown {...GLYPH} aria-hidden />}
             </button>
           </Tooltip>
         ))}
@@ -282,14 +273,14 @@ export function PagesBlock({
                 }}
                 onPointerCancel={cancelDrag}
               >
-                <GripVertical size={16} />
+                <GripVertical {...GLYPH} />
               </button>
             </div>
             <div role="gridcell" className="min-w-0 flex-1">
               {editing === page.id ? (
-                <input
+                <RenameField
                   aria-label={`Name of ${page.name}`}
-                  className="w-full text-xs"
+                  className="w-full"
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -310,31 +301,32 @@ export function PagesBlock({
                   }}
                 />
               ) : (
-                <button
-                  type="button"
-                  data-page-name={index}
-                  title={page.cameFrom ? `${page.name}\n${page.cameFrom}` : page.name}
-                  aria-label={
-                    page.sketch
-                      ? sketchPageReading(page.name, page.sketch.state)
-                      : pageReading(page.name, page.kindWord)
-                  }
-                  className={`flex w-full min-w-0 items-center gap-1.5 text-left text-xs focus-visible:outline-2 ${page.active ? "font-semibold" : ""}`}
-                  tabIndex={page.active ? 0 : -1}
-                  onClick={() => doc.pageAction("activate", page.id)}
-                  onDoubleClick={() => {
-                    cancelledName.current = false;
-                    setEditing(page.id);
-                    setName(page.name);
-                  }}
-                >
-                  <span className="min-w-0 truncate">{page.name}</span>
-                  <KindChip
-                    hidden
-                    className="font-normal"
-                    kind={{ icon: page.kindIcon, word: page.kindWord, off: page.kindOff }}
-                  />
-                </button>
+                <Tooltip side="left" content={page.cameFrom ? `${page.name}\n${page.cameFrom}` : page.name}>
+                  <button
+                    type="button"
+                    data-page-name={index}
+                    aria-label={
+                      page.sketch
+                        ? sketchPageReading(page.name, page.sketch.state)
+                        : pageReading(page.name, page.kindWord)
+                    }
+                    className={`flex w-full min-w-0 items-center gap-1.5 rounded-[5px] text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${page.active ? "font-semibold" : ""}`}
+                    tabIndex={page.active ? 0 : -1}
+                    onClick={() => doc.pageAction("activate", page.id)}
+                    onDoubleClick={() => {
+                      cancelledName.current = false;
+                      setEditing(page.id);
+                      setName(page.name);
+                    }}
+                  >
+                    <span className="min-w-0 truncate">{page.name}</span>
+                    <KindChip
+                      hidden
+                      className="font-normal"
+                      kind={{ icon: page.kindIcon, word: page.kindWord, off: page.kindOff }}
+                    />
+                  </button>
+                </Tooltip>
               )}
               <RowLine page={page} />
             </div>
@@ -344,33 +336,15 @@ export function PagesBlock({
               <Tooltip side="left" content={`Move frame only: ${page.name}`}>
                 <button
                   type="button"
-                  role="switch"
                   tabIndex={-1}
-                  aria-checked={page.frameOnly}
+                  aria-pressed={page.frameOnly}
                   aria-label={`Move frame only: ${page.name}`}
-                  className={buttonClass}
+                  className={toggleClass("icon")}
                   onClick={() =>
                     doc.pageAction("frameOnly", page.id, !page.frameOnly)
                   }
                 >
-                  <span
-                    aria-hidden
-                    className="relative h-3 w-5 rounded-full border"
-                    style={{
-                      borderColor: "var(--toolbar-icon)",
-                      background: page.frameOnly
-                        ? "var(--editor-accent)"
-                        : "transparent",
-                    }}
-                  >
-                    <span
-                      className="absolute top-px h-2 w-2 rounded-full"
-                      style={{
-                        background: "var(--toolbar-icon)",
-                        left: page.frameOnly ? 9 : 1,
-                      }}
-                    />
-                  </span>
+                  <Frame {...GLYPH} aria-hidden />
                 </button>
               </Tooltip>
               )}
@@ -390,7 +364,7 @@ export function PagesBlock({
                       );
                     }}
                   >
-                    <Trash2 size={16} />
+                    <Trash2 {...GLYPH} />
                   </button>
                 </Tooltip>
               </div>
@@ -438,17 +412,18 @@ function RowLine({ page }: { page: PageRow }) {
   const word = stateWord(sketch.state);
   const strong = stateEmphasised(sketch.state);
   return (
-    <div
-      className="flex min-w-0 items-center gap-1 text-[11px] tabular-nums"
-      title={`${word} · ${page.size}${usedByTail(sketch.clones)}`}
-    >
-      <span aria-hidden className={`flex shrink-0 items-center gap-1 ${strong ? "" : "opacity-65"}`}>
-        <Glyph size={12} strokeWidth={1.5} />
-        <span className="whitespace-nowrap">{word}</span>
-      </span>
-      <span aria-hidden className="min-w-0 truncate opacity-65">
-        {` · ${page.size}`}
-      </span>
-    </div>
+    <Tooltip side="left" content={`${word} · ${page.size}${usedByTail(sketch.clones)}`}>
+      <div
+        className="flex min-w-0 items-center gap-1 text-[11px] tabular-nums"
+      >
+        <span aria-hidden className={`flex shrink-0 items-center gap-1 ${strong ? "" : "opacity-65"}`}>
+          <Glyph size={12} strokeWidth={1.5} />
+          <span className="whitespace-nowrap">{word}</span>
+        </span>
+        <span aria-hidden className="min-w-0 truncate opacity-65">
+          {` · ${page.size}`}
+        </span>
+      </div>
+    </Tooltip>
   );
 }

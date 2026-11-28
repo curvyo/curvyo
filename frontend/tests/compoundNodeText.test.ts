@@ -9,8 +9,9 @@ import { joinNoticeText, splitNoticeText } from "../src/lib/nodeText.ts";
 import { closeDimmed, closeNoticeText, closeTooltipNote } from "../src/lib/penText.ts";
 
 test("criterion 5 c: the Join notice counts the moved outlines", () => {
-  assert.equal(joinNoticeText(2), "Join: 2 more outlines moved into this compound path.");
-  assert.equal(joinNoticeText(1), "Join: 1 more outline moved into this compound path.");
+  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  assert.equal(joinNoticeText(2), "Join: the other outlines moved into this compound path.");
+  assert.equal(joinNoticeText(1), "Join: the other outlines moved into this compound path.");
   assert.equal(joinNoticeText(0), null);
 });
 
@@ -25,14 +26,12 @@ test("criterion 6: the Split notice of a compound path", () => {
 });
 
 test("criterion 7: the Close path notice counts paths and outlines apart", () => {
-  assert.equal(
-    closeNoticeText({ closed: 1, skipped: 0, closedOutlines: 3 }),
-    "Closed 1 path and 3 outlines.",
-  );
-  assert.equal(closeNoticeText({ closed: 0, skipped: 0, closedOutlines: 3 }), "Closed 3 outlines.");
+  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  assert.equal(closeNoticeText({ closed: 1, skipped: 0, closedOutlines: 3 }), null);
+  assert.equal(closeNoticeText({ closed: 0, skipped: 0, closedOutlines: 3 }), null);
   assert.equal(
     closeNoticeText({ closed: 0, skipped: 0, closedOutlines: 3, skippedOutlines: 1 }),
-    "Closed 3 outlines. 1 outline has fewer than 3 nodes and was not closed.",
+    "1 outline has fewer than 3 nodes and was not closed.",
   );
   assert.equal(closeNoticeText({ closed: 0, skipped: 0, skippedOutlines: 1 }), null);
 });

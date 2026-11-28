@@ -1,4 +1,5 @@
 import { Check, ChevronDown, ChevronRight, ChevronUp, Trash2 } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react";
 
 import { FixtureLockButton } from "@/components/workbench/FixtureLockButton";
@@ -11,6 +12,7 @@ import type { FixturesApi } from "@/hooks/useFixtures";
 import { setAddKinds } from "@/lib/fixtureRows";
 import { onPageName, removedStatus, renamedText, setArmStatus, setKeyAction } from "@/lib/fixtureSets";
 import type { FixtureRow, FixturesView, SetRow } from "@/lib/fixturesView";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const LINE1_CONTROLS =
   "[data-line1] > button[role=checkbox], [data-line1] > button[data-arm-trash], [data-line1] > button[data-order], [data-line1] > button[aria-pressed]";
@@ -94,7 +96,7 @@ export function FixtureSetRow(props: SetRowProps) {
       }}
       onKeyDown={onKey}
       onPointerDown={readOnly ? undefined : (event) => onDragPress(event, index)}
-      className={`relative flex flex-col rounded-md px-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : ""} ${dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""}`}
+      className={`relative flex flex-col rounded-[5px] px-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : ""} ${dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""}`}
     >
       {insertion ? (
         <div
@@ -111,10 +113,10 @@ export function FixtureSetRow(props: SetRowProps) {
             aria-expanded={set.unfolded}
             aria-label={`${set.unfolded ? "Fold" : "Unfold"} ${set.name}`}
             tabIndex={-1}
-            className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
             onClick={toggle}
           >
-            {set.unfolded ? <ChevronDown size={12} aria-hidden /> : <ChevronRight size={12} aria-hidden />}
+            {set.unfolded ? <ChevronDown {...SMALL_GLYPH} aria-hidden /> : <ChevronRight {...SMALL_GLYPH} aria-hidden />}
           </button>
         )}
         {renaming ? (
@@ -133,47 +135,50 @@ export function FixtureSetRow(props: SetRowProps) {
             }}
           />
         ) : (
-          <button
-            type="button"
-            title={set.name}
-            tabIndex={-1}
-            className={`min-w-0 flex-1 truncate text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${set.onPage ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
-            onClick={toggle}
-            onDoubleClick={readOnly ? undefined : () => setRenaming(true)}
-          >
-            {set.name}
-          </button>
+          <Tooltip side="left" content={set.name}>
+            <button
+              type="button"
+              tabIndex={-1}
+              className={`min-w-0 flex-1 truncate text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${set.onPage ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
+              onClick={toggle}
+              onDoubleClick={readOnly ? undefined : () => setRenaming(true)}
+            >
+              {set.name}
+            </button>
+          </Tooltip>
         )}
         {renaming || readOnly ? null : (
           <FixtureLockButton name={set.name} locked={set.locked} onPress={() => api.setSetLocked(set.id, !set.locked)} />
         )}
         {renaming ? null : (
           <>
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={set.onPage}
-              aria-label={onPageName(set.name)}
-              title="On this page"
-              tabIndex={-1}
-              className={checkBoxClass(set.onPage)}
-              onClick={() => api.setOnPage(set.id, !set.onPage)}
-            >
-              {set.onPage ? <Check size={12} strokeWidth={3} absoluteStrokeWidth aria-hidden /> : null}
-            </button>
+            <Tooltip side="left" content="On this page">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={set.onPage}
+                aria-label={onPageName(set.name)}
+                tabIndex={-1}
+                className={checkBoxClass(set.onPage)}
+                onClick={() => api.setOnPage(set.id, !set.onPage)}
+              >
+                {set.onPage ? <Check {...SMALL_GLYPH} aria-hidden /> : null}
+              </button>
+            </Tooltip>
             {readOnly ? null : (
               <>
-                <button
-                  type="button"
-                  {...{ [ARM_TRASH]: set.id }}
-                  aria-label={trashLabel}
-                  title={trashLabel}
-                  tabIndex={-1}
-                  className={armed ? ARMED_TRASH : `${ICON_BUTTON} text-[var(--panel-muted-fg)]`}
-                  onClick={removeSet}
-                >
-                  <Trash2 size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-                </button>
+                <Tooltip side="left" content={trashLabel}>
+                  <button
+                    type="button"
+                    {...{ [ARM_TRASH]: set.id }}
+                    aria-label={trashLabel}
+                    tabIndex={-1}
+                    className={armed ? ARMED_TRASH : `${ICON_BUTTON} text-[var(--panel-muted-fg)]`}
+                    onClick={removeSet}
+                  >
+                    <Trash2 {...GLYPH} aria-hidden />
+                  </button>
+                </Tooltip>
                 <span className="w-2 shrink-0" aria-hidden />
                 <OrderButton set={set} up available={index > 0} onPress={() => api.moveSet(set.id, index - 1)} />
                 <OrderButton set={set} up={false} available={index < count - 1} onPress={() => api.moveSet(set.id, index + 1)} />
@@ -182,13 +187,14 @@ export function FixtureSetRow(props: SetRowProps) {
           </>
         )}
       </div>
-      <p
-        title={set.line2}
-        className="h-4 truncate pl-5 text-[11px] leading-4 text-[var(--panel-muted-fg)] pointer-coarse:h-5 pointer-coarse:leading-5"
-        onClick={toggle}
-      >
-        {set.line2}
-      </p>
+      <Tooltip side="left" content={set.line2}>
+        <p
+          className="h-4 truncate pl-5 text-[11px] leading-4 text-[var(--panel-muted-fg)] pointer-coarse:h-5 pointer-coarse:leading-5"
+          onClick={toggle}
+        >
+          {set.line2}
+        </p>
+      </Tooltip>
       {set.unfolded ? (
         <div data-set-body className="ml-4 mt-1 flex flex-col gap-1 border-l border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] pl-1">
           {set.canAdd ? (
@@ -216,16 +222,17 @@ function OrderButton({ set, up, available, onPress }: { set: SetRow; up: boolean
   if (!available) return <span className="h-6 w-6 shrink-0" aria-hidden />;
   const Icon = up ? ChevronUp : ChevronDown;
   return (
-    <button
-      type="button"
-      data-order=""
-      aria-label={`Move ${set.name} ${up ? "up" : "down"}`}
-      title={up ? "Move up" : "Move down"}
-      tabIndex={-1}
-      className={ICON_BUTTON}
-      onClick={onPress}
-    >
-      <Icon size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-    </button>
+    <Tooltip side="left" content={up ? "Move up" : "Move down"}>
+      <button
+        type="button"
+        data-order=""
+        aria-label={`Move ${set.name} ${up ? "up" : "down"}`}
+        tabIndex={-1}
+        className={ICON_BUTTON}
+        onClick={onPress}
+      >
+        <Icon size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+      </button>
+    </Tooltip>
   );
 }

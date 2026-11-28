@@ -16,6 +16,8 @@ import {
   tileWidth,
 } from "@/lib/libraryBrowserLayout";
 import { type TileWords, tileWords } from "@/lib/libraryBrowserQuery";
+import { Button } from "@/components/ui/button";
+import { Layers, X } from "lucide-react";
 
 export interface GridHandle {
   /** Focuses the first tile (Down or Enter in the search field, UX U18). */
@@ -262,14 +264,14 @@ export const BrowserGrid = forwardRef<GridHandle, GridProps>(function BrowserGri
           <div className="absolute right-0 left-0 flex flex-col items-center gap-3 px-4 text-center" style={{ top: GRID_PAD_PX + 12 }}>
             <p className="text-sm text-[var(--panel-muted-fg)]">{props.empty}</p>
             {props.onShowSets ? (
-              <button type="button" onClick={props.onShowSets} className={EMPTY_BUTTON}>
+              <Button icon={Layers} onClick={props.onShowSets}>
                 Show sets
-              </button>
+              </Button>
             ) : null}
             {props.onClearAll ? (
-              <button type="button" onClick={props.onClearAll} className={EMPTY_BUTTON}>
+              <Button icon={X} onClick={props.onClearAll}>
                 Clear all
-              </button>
+              </Button>
             ) : null}
           </div>
         ) : null}
@@ -278,5 +280,3 @@ export const BrowserGrid = forwardRef<GridHandle, GridProps>(function BrowserGri
   );
 });
 
-const EMPTY_BUTTON =
-  "h-7 rounded-[5px] px-3 text-sm text-[var(--toolbar-icon)] ring-1 ring-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] hover:bg-[var(--editor-accent-hover)]";

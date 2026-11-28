@@ -2,6 +2,7 @@ import { DropBadgePill } from "@/components/DropBadgePill";
 import { badgeWord, type DropBadgeKind } from "@/lib/dragAnswer";
 import { type FitCue, fitWord } from "@/lib/fixtureRows";
 import { Minus, MoveDiagonal, MoveHorizontal, MoveVertical, Plus } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { MoveBadgeState } from "@/hooks/useEditorSession";
@@ -140,12 +141,12 @@ export function MoveBadges({ badges, containerRef, fit = null }: MoveBadgesProps
             ) : kind === "remove" ? (
               <Minus size={8} strokeWidth={1.5} absoluteStrokeWidth />
             ) : kind === "lock-x" ? (
-              <MoveHorizontal size={12} strokeWidth={1.5} absoluteStrokeWidth />
+              <MoveHorizontal {...SMALL_GLYPH} />
             ) : kind === "lock-angle" ? (
               // A Sketch drawing direction locked by Ctrl (`0066` UX notes revision 2, section 5).
-              <MoveDiagonal size={10} strokeWidth={1.5} absoluteStrokeWidth />
+              <MoveDiagonal {...SMALL_GLYPH} />
             ) : (
-              <MoveVertical size={12} strokeWidth={1.5} absoluteStrokeWidth />
+              <MoveVertical {...SMALL_GLYPH} />
             )}
           </div>
         );

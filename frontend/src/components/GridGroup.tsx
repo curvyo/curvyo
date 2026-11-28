@@ -24,12 +24,14 @@ function GridGlyph() {
 
 /**
  * The Grid group of the Select bar (`specs/0061-align-and-distribute/`
- * criteria 18 to 22): the Arrange in a grid button, then Rows, Columns and
- * Gap. In the bar from two selected objects; Enter in a field arranges.
+ * criteria 18 to 22): the Arrange in a grid button, then Rows and Columns with
+ * their labels inside; the gap is the Distribute group's one Gap field
+ * (`specs/0159-ui-consistency`, Frage 433 B). In the bar from two selected
+ * objects; Enter in a field arranges.
  */
 export function GridBarGroup({ align, onReturnFocus }: { align: AlignApi; onReturnFocus: () => void }) {
   const { grid } = align;
-  // Escape restores all three fields as they were when the field got focus:
+  // Escape restores both counts as they were when the field got focus:
   // typing a count clears the other, so one field's own value is not enough.
   const snapshot = useRef(grid.fields);
   const remember = () => {
@@ -57,7 +59,7 @@ export function GridBarGroup({ align, onReturnFocus }: { align: AlignApi; onRetu
         <BarField
           label="Rows"
           accessibleName="Rows"
-          widthClass="w-[44px]"
+          widthClass="w-[64px]"
           value={grid.fields.rows}
           placeholder={String(grid.derived.rows)}
           derivedPlaceholder
@@ -70,25 +72,12 @@ export function GridBarGroup({ align, onReturnFocus }: { align: AlignApi; onRetu
         <BarField
           label="Columns"
           accessibleName="Columns"
-          widthClass="w-[44px]"
+          widthClass="w-[84px]"
           value={grid.fields.columns}
           placeholder={String(grid.derived.columns)}
           derivedPlaceholder
           error={grid.errors.columns}
           onChange={(text) => grid.setField("columns", text)}
-          onEnter={grid.arrange}
-          onFocusField={remember}
-          onEscape={restore}
-        />
-        <BarField
-          label="Gap"
-          accessibleName="Grid gap, millimetres"
-          widthClass="w-[72px]"
-          suffix="mm"
-          value={grid.fields.gap}
-          placeholder="0"
-          error={grid.errors.gap}
-          onChange={(text) => grid.setField("gap", text)}
           onEnter={grid.arrange}
           onFocusField={remember}
           onEscape={restore}

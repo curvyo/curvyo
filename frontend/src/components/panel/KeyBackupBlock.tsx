@@ -4,11 +4,14 @@
 // passkey beside Add device. One status or alert line under them.
 
 import { KeyRound } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 
-import { ALERT, ARMED, ArmLines, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { ARMED, ArmLines, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
 import { useArm } from "@/hooks/useArm";
 import type { KeyBackupApi } from "@/hooks/useKeyBackup";
 import { key_backup_text } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The busy line or the last run's sentence. */
 function BackupLines({ backup }: { backup: KeyBackupApi }) {
@@ -23,9 +26,9 @@ function BackupLines({ backup }: { backup: KeyBackupApi }) {
     return null;
   }
   return backup.message.alert ? (
-    <p role="alert" className={ALERT}>
+    <AlertLine>
       {backup.message.text}
-    </p>
+    </AlertLine>
   ) : (
     <p role="status" aria-live="polite" className={MUTED}>
       {backup.message.text}
@@ -65,7 +68,7 @@ export function KeyBackupRow({ backup }: { backup: KeyBackupApi }) {
               }
             }}
           >
-            <KeyRound size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+            <KeyRound {...GLYPH} aria-hidden />
             {key_backup_text(backup.backedUp ? "remove" : "back-up")}
           </button>
       </span>
@@ -92,20 +95,18 @@ export function RestoreButton({
   }
   const blocked = reason !== "" || backup.busy !== "";
   return (
-    <button
-      type="button"
+    <Button icon={KeyRound}
       aria-disabled={blocked}
       aria-describedby={reason ? reasonId : undefined}
-      className={`${BUTTON} ${OUTLINE} w-[176px]`}
+       className="min-w-[176px]"
       onClick={() => {
         if (!blocked) {
           backup.restore(server);
         }
       }}
     >
-      <KeyRound size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-      {key_backup_text("restore")}
-    </button>
+{key_backup_text("restore")}
+</Button>
   );
 }
 

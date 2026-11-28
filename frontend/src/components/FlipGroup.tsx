@@ -4,9 +4,10 @@ import { useEffect, useRef } from "react";
 import type { FlipApi } from "@/hooks/useFlip";
 import { useNoticeShift } from "@/hooks/useNoticeShift";
 import { FLIP_DISABLED_LINE, FLIP_TEXT, type FlipAxis } from "@/lib/flipText";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
 const BUTTON_CLASS =
-  "flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+  "flex size-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /**
  * The flip glyph (`specs/0056-mirror-and-negative-scale/` UX notes, "Glyphs"; `review-ux.md`
@@ -89,7 +90,7 @@ function FlipButton({ axis, enabled, flip, onReturnFocus }: FlipButtonProps) {
           <Tooltip.Content
             side="bottom"
             sideOffset={6}
-            className="z-50 max-w-[260px] rounded-md px-2 py-1 text-xs"
+            className={TOOLTIP_CLASS}
             style={{
               background: "var(--toolbar-bg)",
               color: "var(--toolbar-icon)",
@@ -108,7 +109,7 @@ function FlipButton({ axis, enabled, flip, onReturnFocus }: FlipButtonProps) {
       <div
         ref={noticeRef}
         role="status"
-        className="absolute top-full left-0 z-50 mt-1 w-max max-w-[320px] rounded-md px-2 py-1 text-xs"
+        className="absolute top-full left-0 z-50 mt-1 w-max max-w-[320px] rounded-[8px] px-2 py-1 text-xs"
         style={
           notice
             ? {

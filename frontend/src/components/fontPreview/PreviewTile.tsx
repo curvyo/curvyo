@@ -4,6 +4,7 @@
 // and the star, the family's tag line in a row of its own (all its tags with x, "+N" and Add tag,
 // the list's own component), the missing-glyph marker and the current mark.
 import { Star, TriangleAlert } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import { AREA_SLACK_EM, BASELINE_EM, emPx, sampleAreaHeight } from "@/lib/fontPreviewLayout";
@@ -87,7 +88,7 @@ export function PreviewTile(props: PreviewTileProps) {
       onClick={(event) => props.onPick(event.detail === 0)}
       onPointerLeave={props.allTags ? props.onLeaveTags : undefined}
       style={style}
-      className={`group absolute flex cursor-default flex-col overflow-hidden rounded-lg border border-[var(--tile-edge)] px-4 pt-3 pb-2 text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+      className={`group absolute flex cursor-default flex-col overflow-hidden rounded-[8px] border border-[var(--tile-edge)] px-4 pt-3 pb-2 text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
         current ? "bg-[var(--value-fill)]" : "bg-[var(--tile-bg)] hover:bg-[var(--editor-accent-hover)]"
       }`}
     >
@@ -127,7 +128,7 @@ export function PreviewTile(props: PreviewTileProps) {
             aria-hidden
             className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-[5px] bg-inherit"
           >
-            <TriangleAlert size={14} strokeWidth={1.5} className="text-[var(--panel-muted-fg)]" />
+            <TriangleAlert {...GLYPH} className="text-[var(--panel-muted-fg)]" />
           </span>
         </Tooltip>
       ) : null}
@@ -148,9 +149,7 @@ export function PreviewTile(props: PreviewTileProps) {
             }}
             className="-mr-1 flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] hover:bg-[var(--editor-accent-hover)]"
           >
-            <Star
-              size={16}
-              strokeWidth={1.5}
+            <Star {...GLYPH}
               aria-hidden
               className={favourite ? "fill-[var(--toolbar-icon)] text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}
             />

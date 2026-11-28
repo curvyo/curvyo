@@ -1,4 +1,4 @@
-import { Link2 } from "lucide-react";
+import { Link2, MousePointerClick, Palette, type LucideIcon, Unlink } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
@@ -13,9 +13,10 @@ import {
   STYLE_SEGMENTS,
   unlinkTitle,
 } from "@/lib/cloneText";
+import { Button } from "@/components/ui/button";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
 
-const OUTLINE_BUTTON =
-  "h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+const OUTLINE_BUTTON = buttonClass("secondary", "panel", "w-full");
 
 interface CloneBlockProps {
   clones: ClonesApi;
@@ -34,6 +35,7 @@ interface CloneBlockProps {
  * (and the block moves it where the UX notes say). Its tooltip is the panel's, at the left. */
 function BlockButton({
   label,
+  icon: Icon,
   title,
   onPress,
   onReturnFocus,
@@ -41,6 +43,7 @@ function BlockButton({
   onPressedAt,
 }: {
   label: string;
+  icon: LucideIcon;
   title: string;
   onPressedAt: (button: DOMRect) => void;
   /** `keyboard` is true for Enter or Space. */
@@ -75,6 +78,7 @@ function BlockButton({
           }
         }}
       >
+        <Icon size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
         {label}
       </button>
     </Tooltip>
@@ -146,7 +150,7 @@ export function OverrideRow({
                 aria-checked={on}
                 aria-label={segment.name}
                 tabIndex={focusable(index) ? 0 : -1}
-                className="flex-1 rounded-[4px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                className="flex-1 rounded-[5px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
                 style={
                   on
                     ? { background: "var(--editor-accent)", color: "#ffffff" }
@@ -198,13 +202,13 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt, moveOnly = fals
   return (
     <div role="group" aria-label="Linked clone" className="flex flex-col gap-2">
       <div className="flex items-start gap-1 text-sm text-[var(--toolbar-icon)]">
-        <Link2 aria-hidden size={16} className="mt-0.5 shrink-0" />
+        <Link2 {...GLYPH} aria-hidden className="mt-0.5 shrink-0" />
         <span className="min-w-0 break-words">{title}</span>
       </div>
       {chain !== "" && <p className="text-xs text-[var(--panel-muted-fg)]">{chain}</p>}
       <div className="mt-2 flex flex-col gap-2">
         <BlockButton
-          label={many ? "Select originals" : "Select original"}
+          label={many ? "Select originals" : "Select original"} icon={MousePointerClick}
           title="Selects the object this clone follows."
           onPress={(keyboard) => {
             clones.apply("select-original", "panel", keyboard);
@@ -221,7 +225,7 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt, moveOnly = fals
         />
         {panel.deepest >= 2 && (
           <BlockButton
-            label={many ? "Select root originals" : "Select root original"}
+            label={many ? "Select root originals" : "Select root original"} icon={MousePointerClick}
             title="Selects the path at the end of the chain."
             onPress={(keyboard) => clones.apply("select-root", "panel", keyboard)}
             onReturnFocus={onReturnFocus}
@@ -231,7 +235,7 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt, moveOnly = fals
         )}
         {moveOnly ? null : (
           <BlockButton
-            label={many ? "Unlink clones" : "Unlink clone"}
+            label={many ? "Unlink clones" : "Unlink clone"} icon={Unlink}
             title={unlinkTitle(panel)}
             onPress={(keyboard) => clones.apply("unlink", "panel", keyboard)}
             onReturnFocus={onReturnFocus}
@@ -267,10 +271,8 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt, moveOnly = fals
           onPressedAt={onPressedAt}
         />
         <Tooltip side="left" content={panel.spreadReady ? SPREAD_COLOURS_TITLE : SPREAD_COLOURS_DISABLED_TITLE}>
-          <button
-            type="button"
+          <Button icon={Palette} className="w-full"
             aria-disabled={!panel.spreadReady}
-            className={`${OUTLINE_BUTTON} ${panel.spreadReady ? "" : "cursor-default opacity-50 hover:bg-transparent"}`}
             onClick={(event) => {
               if (!panel.spreadReady) {
                 return;
@@ -284,7 +286,7 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt, moveOnly = fals
             }}
           >
             Spread colours
-          </button>
+          </Button>
         </Tooltip>
           </>
         )}
@@ -303,7 +305,7 @@ export function GreyedStyleHeaders({ clones }: { clones: ClonesApi }) {
     hex === "" ? null : (
       <span
         aria-hidden
-        className="inline-block h-3 w-3 rounded-[2px] border border-[var(--panel-muted-fg)]"
+        className="inline-block h-3 w-3 rounded-[5px] border border-[var(--panel-muted-fg)]"
         style={{ background: hex }}
       />
     );
@@ -340,7 +342,7 @@ export function OriginLine({ clones, onReturnFocus, onPressedAt }: CloneBlockPro
   return (
     <div className="flex flex-col gap-2">
       <BlockButton
-        label={clones.panel.followers === 1 ? "Select clone" : "Select clones"}
+        label={clones.panel.followers === 1 ? "Select clone" : "Select clones"} icon={MousePointerClick}
         title="Selects every clone of this object."
         onPress={(keyboard) => clones.apply("select-clones", "panel", keyboard)}
         onReturnFocus={onReturnFocus}

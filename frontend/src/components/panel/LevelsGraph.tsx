@@ -95,7 +95,7 @@ export function LevelsGraph({ row, onSet }: { row: StepRow; onSet: (key: string,
       width={WIDTH}
       height={BARS_HEIGHT + MARKS_HEIGHT}
       viewBox={`0 0 ${WIDTH} ${BARS_HEIGHT + MARKS_HEIGHT}`}
-      className="block rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+      className="block rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       style={{ touchAction: "none" }}
       onPointerDown={down}
       onPointerMove={move}

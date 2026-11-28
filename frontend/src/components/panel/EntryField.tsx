@@ -1,5 +1,7 @@
-import { CircleAlert } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+
+import { NumberField } from "@/components/ui/number-field";
+import { ActionNotice } from "@/components/ui/notice";
 
 export interface EntryFieldProps {
   /** The accessible name ("Stroke width, millimetres"). */
@@ -159,9 +161,18 @@ export function EntryField({
   const message = invalid ? (messages[invalid] ?? "Not a valid value") : null;
 
   return (
-    <div className="relative" style={{ width }}>
-      <input
-        ref={(node) => {
+    <NumberField
+        width={width}
+        label={prefix}
+        unit={mixed ? undefined : suffix}
+        unitPx={gutter}
+        unitRight={suffixRight}
+        largeUnit={!smallSuffix}
+        align={align}
+        compact={compact}
+        invalid={invalid !== null}
+        inputClassName="style-field"
+        inputRef={(node) => {
           input.current = node;
           if (typeof inputRef === "function") {
             inputRef(node);
@@ -169,16 +180,12 @@ export function EntryField({
             inputRef.current = node;
           }
         }}
-        type="text"
         inputMode={inputMode}
-        autoComplete="off"
-        spellCheck={false}
         aria-label={label}
         role={range ? "spinbutton" : undefined}
         aria-valuenow={range?.now}
         aria-valuemin={range?.min}
         aria-valuemax={range?.max}
-        aria-invalid={invalid ? true : undefined}
         aria-describedby={invalid ? messageId : undefined}
         placeholder={mixed ? "Mixed" : placeholder}
         value={text}
@@ -250,45 +257,17 @@ export function EntryField({
             onReturnFocus();
           }
         }}
-        className={`style-field h-7 w-full rounded-[5px] border bg-white pl-1.5 ${compact ? "text-[13px]" : "text-sm"} tabular-nums outline-none ${
-          align === "right" ? "text-right" : "text-left"
-        } ${
-          invalid
-            ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_2px_var(--field-invalid)]"
-            : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
-        }`}
-        style={{
-          paddingRight: suffix && !mixed ? (gutter ?? (suffix.length > 1 ? 32 : 24)) : 6,
-          ...(prefix ? { paddingLeft: 8 + prefix.length * 6.5 } : {}),
-        }}
-      />
-      {prefix && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-xs text-[var(--panel-muted-fg)]"
-        >
-          {prefix}
-        </span>
-      )}
-      {suffix && !mixed && (
-        <span
-          aria-hidden
-          className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--panel-muted-fg)] ${smallSuffix ? "text-xs" : "text-sm"}`}
-          style={{ right: suffixRight }}
-        >
-          {suffix}
-        </span>
-      )}
+      >
       {message && (
-        <div
+        <ActionNotice
+          refusal
+          maxWidth={244}
           id={messageId}
-          role="alert"
-          className={`pointer-events-none absolute top-full ${messageFromLeft ? "left-0" : "right-0"} z-30 mt-1 flex w-max max-w-[244px] items-start gap-1 rounded-md bg-popover px-2 py-1 text-xs text-[var(--field-invalid)] ring-1 ring-[var(--field-invalid)]`}
+          className={`absolute top-full ${messageFromLeft ? "left-0" : "right-0"} z-30 mt-1`}
         >
-          <CircleAlert size={12} aria-hidden className="mt-0.5 shrink-0" />
           {message}
-        </div>
+        </ActionNotice>
       )}
-    </div>
+    </NumberField>
   );
 }

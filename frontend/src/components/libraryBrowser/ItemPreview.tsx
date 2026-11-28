@@ -3,12 +3,14 @@
 // template's thumbnail or a page's stored picture, each asked once the tile has been in the page
 // for 100 ms; until then a quiet bar, never another icon.
 import { FileText, Files, TriangleAlert } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useState } from "react";
 
 import { heldIconTile, iconTile } from "@/lib/iconTiles";
 import { pagePicture } from "@/lib/libraryApi";
 import { noteBody, type TileWords } from "@/lib/libraryBrowserQuery";
 import { onlineThumbnail } from "@/lib/onlineApi";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const LOAD_AFTER_MS = 100;
 /** The stored picture's size: never drawn larger (UX U22). */
@@ -79,8 +81,8 @@ export function ItemPreview({
   const url = usePicture(words);
   if (words.refusal) {
     return (
-      <div className="flex items-center justify-center rounded-[4px] bg-white" style={{ width: size, height: size }}>
-        <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="text-[var(--panel-muted-fg)]" />
+      <div className="flex items-center justify-center rounded-[5px] bg-white" style={{ width: size, height: size }}>
+        <TriangleAlert {...GLYPH} aria-hidden className="text-[var(--panel-muted-fg)]" />
       </div>
     );
   }
@@ -110,25 +112,26 @@ export function ItemPreview({
       )}
       {words.pages > 1 ? (
         // A press on the chip shows the pages, as Show pages (H4); a 24 px target around it.
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={`Show ${words.pages} pages`}
-          title="Show pages"
-          disabled={!onShowPages}
-          onClick={(event) => {
-            event.stopPropagation();
-            onShowPages?.(words.index);
-          }}
-          onDoubleClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => event.stopPropagation()}
-          className="absolute right-0 bottom-0 flex h-6 items-center p-1"
-        >
-          <span className="flex h-4 items-center gap-0.5 rounded-[4px] border border-[var(--tile-edge)] bg-[var(--panel-bg)] px-1 text-[11px] tabular-nums text-[var(--toolbar-icon)]">
-            <Files size={12} strokeWidth={1.5} aria-hidden />
-            {words.pages}
-          </span>
-        </button>
+        <Tooltip side="bottom" content="Show pages">
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={`Show ${words.pages} pages`}
+            disabled={!onShowPages}
+            onClick={(event) => {
+              event.stopPropagation();
+              onShowPages?.(words.index);
+            }}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="absolute right-0 bottom-0 flex h-6 items-center p-1"
+          >
+            <span className="flex h-4 items-center gap-0.5 rounded-[5px] border border-[var(--tile-edge)] bg-[var(--panel-bg)] px-1 text-[11px] tabular-nums text-[var(--toolbar-icon)]">
+              <Files {...SMALL_GLYPH} aria-hidden />
+              {words.pages}
+            </span>
+          </button>
+        </Tooltip>
       ) : null}
     </div>
   );

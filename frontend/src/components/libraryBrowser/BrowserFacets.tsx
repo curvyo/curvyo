@@ -2,14 +2,17 @@
 // notes section 5): strips, a switch and check lists, never dropdowns or popovers; the same
 // sections in the facet column and in the Filters band. Each strip and list is one Tab stop. The
 // Items view ends with the search keywords' credit line (`specs/0153-library-keywords` UX K8).
-import { Check } from "lucide-react";
+import { Check, Palette, X } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { PanelSwitch } from "@/components/ui/switch";
 import type { BrowserSort, ColourFilter } from "@/lib/libraryBrowserState";
 import { type FacetRow, facetSelect } from "@/lib/libraryBrowserQuery";
 import { openLicence } from "@/lib/onlineApi";
 import { isTauri } from "@/platform/host";
+import { Button } from "@/components/ui/button";
+import { TEXT_LINK_CLASS, GLYPH } from "@/components/ui/looks";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const CUSTOMIZABLE_TIP = "Icons that take the colour you give the object, and templates tagged customizable";
 const COLOUR_TIP = "Templates and your own pages have no colour data";
@@ -76,7 +79,7 @@ function KeywordCredit({ onLicences }: { onLicences: () => void }) {
         </span>
       ))}
       {" · "}
-      <button type="button" className="text-[var(--editor-accent)] hover:underline" onClick={onLicences}>
+      <button type="button" className={TEXT_LINK_CLASS} onClick={onLicences}>
         Licences
       </button>
     </p>
@@ -115,48 +118,49 @@ function Strip<T extends string>({
   const ref = useRef<HTMLDivElement>(null);
   const usable = cells.filter((c) => !c.disabled);
   return (
-    <div
-      ref={ref}
-      role="radiogroup"
-      aria-label={label}
-      title={title}
-      className="grid gap-px overflow-hidden rounded-[5px] ring-1 ring-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)]"
-      style={{ gridTemplateColumns: typeof columns === "number" ? `repeat(${columns}, minmax(0, 1fr))` : columns }}
-      onKeyDown={(event) => {
-        const at = usable.findIndex((c) => c.value === value);
-        const by = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
-        if (by !== 0 && usable.length > 0) {
-          event.preventDefault();
-          const next = usable[(at + by + usable.length) % usable.length];
-          if (next) {
-            onChange(next.value);
-            ref.current?.querySelector<HTMLElement>(`[data-value="${next.value}"]`)?.focus();
+    <Tooltip side="bottom" content={title}>
+      <div
+        ref={ref}
+        role="radiogroup"
+        aria-label={label}
+        className="grid gap-px overflow-hidden rounded-[5px] ring-1 ring-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)]"
+        style={{ gridTemplateColumns: typeof columns === "number" ? `repeat(${columns}, minmax(0, 1fr))` : columns }}
+        onKeyDown={(event) => {
+          const at = usable.findIndex((c) => c.value === value);
+          const by = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+          if (by !== 0 && usable.length > 0) {
+            event.preventDefault();
+            const next = usable[(at + by + usable.length) % usable.length];
+            if (next) {
+              onChange(next.value);
+              ref.current?.querySelector<HTMLElement>(`[data-value="${next.value}"]`)?.focus();
+            }
           }
-        }
-      }}
-    >
-      {cells.map((cell) => (
-        <button
-          key={cell.value}
-          type="button"
-          role="radio"
-          data-value={cell.value}
-          aria-checked={cell.value === value}
-          aria-disabled={cell.disabled || undefined}
-          aria-description={cell.description}
-          title={cell.description ?? cell.title}
-          tabIndex={cell.value === value ? 0 : -1}
-          onClick={() => !cell.disabled && onChange(cell.value)}
-          className={`h-7 truncate px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-inset ${
-            cell.value === value
-              ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]"
-              : "bg-[var(--panel-bg)] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-          } ${cell.disabled ? "opacity-40" : ""}`}
-        >
-          {cell.label}
-        </button>
-      ))}
-    </div>
+        }}
+      >
+        {cells.map((cell) => (
+          <Tooltip key={cell.value} side="bottom" content={cell.description ?? cell.title}>
+            <button
+            type="button"
+            role="radio"
+            data-value={cell.value}
+            aria-checked={cell.value === value}
+            aria-disabled={cell.disabled || undefined}
+            aria-description={cell.description}
+            tabIndex={cell.value === value ? 0 : -1}
+            onClick={() => !cell.disabled && onChange(cell.value)}
+            className={`h-7 truncate px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-inset ${
+              cell.value === value
+                ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]"
+                : "bg-[var(--panel-bg)] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+            } ${cell.disabled ? "opacity-40" : ""}`}
+          >
+            {cell.label}
+          </button>
+          </Tooltip>
+        ))}
+      </div>
+    </Tooltip>
   );
 }
 
@@ -214,27 +218,27 @@ function SelectList({
       {rows.map((row, index) => {
         const on = selected.includes(row.key);
         return (
-          <div
-            key={row.key}
-            role="option"
-            aria-selected={on}
-            tabIndex={index === focus ? 0 : -1}
-            title={row.label}
-            onClick={(event) => {
-              setFocus(index);
-              press(row.key, event.shiftKey);
-            }}
-            className={`flex h-7 cursor-default items-center gap-1 rounded-[4px] pr-1 outline-none select-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-inset ${
-              on ? "bg-[var(--value-fill)]" : "hover:bg-[var(--editor-accent-hover)]"
-            }`}
-            style={{ paddingLeft: row.indent ? 20 : 4 }}
-          >
-            <span className="flex w-4 shrink-0 justify-center">{on ? <Check size={14} aria-hidden /> : null}</span>
-            <span className={`min-w-0 flex-1 truncate text-sm ${row.count === 0 ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}`}>
-              {row.label}
-            </span>
-            <span className="shrink-0 text-xs tabular-nums text-[var(--panel-muted-fg)]">{row.count.toLocaleString("en-US")}</span>
-          </div>
+          <Tooltip key={row.key} side="bottom" content={row.label}>
+            <div
+              role="option"
+              aria-selected={on}
+              tabIndex={index === focus ? 0 : -1}
+              onClick={(event) => {
+                setFocus(index);
+                press(row.key, event.shiftKey);
+              }}
+              className={`flex h-7 cursor-default items-center gap-1 rounded-[5px] pr-1 outline-none select-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-inset ${
+                on ? "bg-[var(--value-fill)]" : "hover:bg-[var(--editor-accent-hover)]"
+              }`}
+              style={{ paddingLeft: row.indent ? 20 : 4 }}
+            >
+              <span className="flex w-4 shrink-0 justify-center">{on ? <Check {...GLYPH} aria-hidden /> : null}</span>
+              <span className={`min-w-0 flex-1 truncate text-sm ${row.count === 0 ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}`}>
+                {row.label}
+              </span>
+              <span className="shrink-0 text-xs tabular-nums text-[var(--panel-muted-fg)]">{row.count.toLocaleString("en-US")}</span>
+            </div>
+          </Tooltip>
         );
       })}
     </div>
@@ -248,15 +252,14 @@ export function BrowserFacets(props: FacetsProps) {
     <div className="flex flex-col">
       <div className="flex h-6 items-center justify-between">
         <span className="text-sm text-[var(--toolbar-icon)]">Filters</span>
-        <button
-          type="button"
+        <Button size="bar" icon={X}
           onClick={props.onClearAll}
-          className={`h-6 text-xs text-[var(--editor-accent)] ${props.canClear ? "" : "invisible"}`}
+          className={props.canClear ? "h-6" : "invisible h-6"}
           tabIndex={props.canClear ? 0 : -1}
           aria-hidden={!props.canClear}
         >
           Clear all
-        </button>
+        </Button>
       </div>
       {/* The Sets view has no Sort and no Customizable (UX U37). */}
       {props.sets ? null : <Heading>Sort</Heading>}
@@ -316,13 +319,14 @@ export function BrowserFacets(props: FacetsProps) {
           },
         ]}
       />
-      {props.sets ? null : <div className="mt-4 flex h-7 items-center" title={CUSTOMIZABLE_TIP}>
-        <PanelSwitch
+      {props.sets ? null : <div className="mt-4 flex h-7 items-center">
+        <ToggleButton icon={Palette}
           label="Customizable"
-          checked={props.customizable}
-          onCheckedChange={(on) => answer.has_customizable && props.onCustomizable(on)}
+          pressed={props.customizable}
+          onPressedChange={(on) => answer.has_customizable && props.onCustomizable(on)}
           onReturnFocus={() => {}}
-          extra={answer.has_customizable ? { title: CUSTOMIZABLE_TIP } : { "aria-disabled": "true", title: "Nothing fetched is customizable" }}
+          tooltip={answer.has_customizable ? CUSTOMIZABLE_TIP : "Nothing fetched is customizable"}
+          extra={answer.has_customizable ? undefined : { "aria-disabled": "true" }}
         />
       </div>}
       <Heading>Category</Heading>

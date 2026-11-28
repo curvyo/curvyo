@@ -1,4 +1,5 @@
 import { Contrast } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { Toggle } from "radix-ui";
 import { useId } from "react";
 
@@ -42,14 +43,14 @@ export function ImageSettingsGroup({ row, image, tools, onReturnFocus }: GroupPr
       </div>
       <div className="flex items-center gap-1">
         {field(gamma)}
-        <Tooltip side="bottom" content="Invert">
+        <Tooltip side="left" content="Invert">
           <Toggle.Root
             pressed={image.invert}
             onPressedChange={(on) => tools.edit(row.id, "invert", on ? 1 : 0)}
             aria-label="Invert"
-            className="flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
+            className="flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
           >
-            <Contrast aria-hidden size={16} strokeWidth={1.5} absoluteStrokeWidth />
+            <Contrast {...GLYPH} aria-hidden />
           </Toggle.Root>
         </Tooltip>
       </div>

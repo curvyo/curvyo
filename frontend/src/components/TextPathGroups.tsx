@@ -7,7 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { type TextPathBar, onPathEnabled, onPathTooltipLine } from "@/lib/textPathText";
 
 const ICON_BUTTON_CLASS =
-  "flex size-7 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+  "flex size-7 shrink-0 items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /** A 16px glyph on a 16 grid (UX notes §1, row "Command glyphs"). */
 export function Glyph16({ children }: { children: ReactNode }) {

@@ -3,12 +3,14 @@
 // (the search field in Glyphs mode) with Clear, the Size slider and its readout, the subject
 // line, Full view and Close; one row from 560px of pane width, two rows below. Info mode has no
 // field and no Size slider (`specs/0083-font-info-and-zip` UX notes §1).
-import { Maximize2, Minimize2, Search, X } from "lucide-react";
+import { Maximize2, Minimize2, X } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 
 import { ModeSwitch } from "@/components/fontPreview/ModeSwitch";
 import { SizeSlider } from "@/components/fontPreview/SizeSlider";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MAX_GLYPH_SEARCH_CHARS, MAX_SAMPLE_CHARS, type PreviewMode } from "@/lib/fontPreviewState";
+import { SearchField } from "@/components/ui/search-field";
 
 interface PreviewHeaderProps {
   rows: 1 | 2;
@@ -39,45 +41,22 @@ export function PreviewHeader(props: PreviewHeaderProps) {
     props;
   const search = mode === "glyphs";
   const field = (
-    <div className={`relative h-7 min-w-0 flex-1 ${rows === 1 ? "max-w-[480px] min-w-[200px]" : ""}`}>
-      {search ? (
-        <Search
-          size={16}
-          strokeWidth={1.5}
-          aria-hidden
-          className="pointer-events-none absolute top-1.5 left-2 text-[var(--panel-muted-fg)]"
-        />
-      ) : null}
-      <input
-        ref={sampleRef}
-        type="text"
-        value={sample}
-        maxLength={search ? MAX_GLYPH_SEARCH_CHARS : MAX_SAMPLE_CHARS}
-        aria-label={search ? "Search characters" : "Sample text"}
-        spellCheck={false}
-        onChange={(event) => onSample(event.target.value)}
-        onKeyDown={(event) => {
-          if (search && (event.key === "ArrowDown" || event.key === "Enter")) {
-            event.preventDefault();
-            props.onFieldDown();
-          }
-        }}
-        className={`h-7 w-full rounded-[5px] bg-white pr-7 ${search ? "pl-7" : "pl-2"} text-sm text-[var(--toolbar-icon)] outline-none ring-1 ring-border focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]`}
-      />
-      {sample ? (
-        <button
-          type="button"
-          aria-label={search ? "Clear search" : "Clear sample"}
-          onClick={() => {
-            onSample("");
-            sampleRef.current?.focus();
-          }}
-          className="absolute top-0.5 right-0.5 flex size-6 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-        >
-          <X size={16} strokeWidth={1.5} aria-hidden />
-        </button>
-      ) : null}
-    </div>
+    <SearchField
+      className={`flex-1 ${rows === 1 ? "max-w-[480px] min-w-[200px]" : ""}`}
+      glyph={search}
+      clearLabel={search ? "Clear search" : "Clear sample"}
+      inputRef={sampleRef}
+      value={sample}
+      onValue={onSample}
+      maxLength={search ? MAX_GLYPH_SEARCH_CHARS : MAX_SAMPLE_CHARS}
+      aria-label={search ? "Search characters" : "Sample text"}
+      onKeyDown={(event) => {
+        if (search && (event.key === "ArrowDown" || event.key === "Enter")) {
+          event.preventDefault();
+          props.onFieldDown();
+        }
+      }}
+    />
   );
   const sizeGroup = (
     <div className="flex shrink-0 items-center gap-1">
@@ -95,13 +74,13 @@ export function PreviewHeader(props: PreviewHeaderProps) {
       {canSplit ? (
         <Tooltip side="bottom" content={full ? "Split view" : "Full view"}>
           <button type="button" aria-label={full ? "Split view" : "Full view"} onClick={onFull} className={ICON_BUTTON}>
-            {full ? <Minimize2 size={16} strokeWidth={1.5} aria-hidden /> : <Maximize2 size={16} strokeWidth={1.5} aria-hidden />}
+            {full ? <Minimize2 {...GLYPH} aria-hidden /> : <Maximize2 {...GLYPH} aria-hidden />}
           </button>
         </Tooltip>
       ) : null}
       <Tooltip side="bottom" content="Close preview">
         <button type="button" aria-label="Close preview" onClick={onClose} className={ICON_BUTTON}>
-          <X size={16} strokeWidth={1.5} aria-hidden />
+          <X {...GLYPH} aria-hidden />
         </button>
       </Tooltip>
     </div>

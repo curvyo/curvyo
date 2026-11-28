@@ -376,7 +376,7 @@ async function renderFile(opts: {
 
 const text = (html: string) => html.replace(/<[^>]+>/g, "|").replace(/\|+/g, "|");
 const buttonLabels = (html: string) =>
-  [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
+  [...html.matchAll(/<button[^>]*>(?:<svg[\s\S]*?<\/svg>)?([^<]*)<\/button>/g)].map((m) => m[1]);
 
 test("c15 desktop File tab: six buttons, then Quit, then the version", async () => {
   const html = await renderFile({ desktop: true, project: {} });
@@ -402,7 +402,7 @@ test("c15 the buttons are never dimmed or hidden by the state of the project", a
     const html = await renderFile({ desktop: true, project });
     assert.deepEqual(buttonLabels(html), ["New", "Open…", "Save", "Save as…", "Close", "Template", "Quit"]);
     assert.doesNotMatch(html, /\sdisabled=/);
-    assert.doesNotMatch(html, /aria-disabled/);
+    assert.doesNotMatch(html, /aria-disabled="/);
   }
 });
 
@@ -448,9 +448,9 @@ test("c24 c25 the inline check: a group named by its sentence, three buttons, no
 test("c25 Discard starts disarmed (ignores presses for the first 400 ms)", async () => {
   const check = { id: 1, kind: "new", origin: "outside", previous: null };
   const html = await renderFile({ desktop: true, project: { dirty: true, check } });
-  const discard = /<button[^>]*>Discard<\/button>/.exec(html)![0];
+  const discard = /<button[^>]*>(?:<svg[\s\S]*?<\/svg>)?Discard<\/button>/.exec(html)![0];
   assert.equal(attr(discard, "aria-disabled"), "true");
-  const cancel = /<button[^>]*>Cancel<\/button>/.exec(html)![0];
+  const cancel = /<button[^>]*>(?:<svg[\s\S]*?<\/svg>)?Cancel<\/button>/.exec(html)![0];
   assert.doesNotMatch(cancel, /aria-disabled="true"/);
 });
 

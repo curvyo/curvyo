@@ -31,10 +31,11 @@ test("c1: the dimmed Test grid tool says Laser pages only.", () => {
 
 test("c3: row 1 shows the test id read-only with the tooltip Test id; Crosshatch is # for Engrave", () => {
   const bar = source("components/TestGridBar.tsx");
-  assert.match(bar, /title="Test id"/);
-  assert.match(bar, /title="Crosshatch"/);
-  assert.match(bar, /aria-label="Crosshatch"/);
-  assert.match(bar, /<Hash\b/, "the toggle shows the # glyph");
+  // 0159: the shared tooltip instead of the native `title`; Crosshatch is the shared toggle.
+  assert.match(bar, /content="Test id"/);
+  assert.match(bar, /tooltip="Crosshatch"/);
+  assert.match(bar, /label="Crosshatch"/);
+  assert.match(bar, /icon=\{Hash\}/, "the toggle shows the # glyph");
   const engrave = decodeTestGridText(fixture("test_grid_view/engrave_crosshatch.json"));
   assert.ok(engrave);
   assert.equal(typeof engrave.crosshatch, "boolean");

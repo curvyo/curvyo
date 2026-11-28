@@ -7,9 +7,10 @@ import { usePublishPlayBarClearance } from "@/hooks/usePlayBarClearance";
 import { useSliderPointer } from "@/hooks/useSliderPointer";
 import type { WasmSession } from "@/lib/editorSession";
 import { barPlace, readoutParts, sliderMinWidth } from "@/lib/outputText";
+import { SLIDER_INSET_PX, SLIDER_THUMB_PX, SliderMarks } from "@/components/ui/slider";
 
-const THUMB = 14;
-const INSET = THUMB / 2 + 1;
+const THUMB = SLIDER_THUMB_PX;
+const INSET = SLIDER_INSET_PX;
 const TARGET_HEIGHT = 24;
 
 /** Where the page frame is in the canvas, px. */
@@ -91,7 +92,7 @@ export function PlayBar({ getSession, frame }: { getSession: () => WasmSession |
       role="group"
       aria-label="Toolpath playback"
       data-play-bar
-      className="pointer-events-auto absolute z-10 flex h-10 items-center gap-x-2.5 rounded-lg bg-[var(--toolbar-bg)] py-1 pr-3 pl-1.5"
+      className="pointer-events-auto absolute z-10 flex h-9 items-center gap-x-2.5 rounded-[8px] bg-[var(--toolbar-bg)] px-2"
       style={{ ...place, boxShadow: "var(--panel-elevation-shadow)" }}
     >
       <Tooltip side="top" content={name}>
@@ -100,7 +101,7 @@ export function PlayBar({ getSession, frame }: { getSession: () => WasmSession |
           aria-label={name}
           disabled={!enabled}
           onClick={play.toggle}
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] disabled:opacity-40 disabled:hover:bg-transparent"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] disabled:opacity-40 disabled:hover:bg-transparent"
         >
           <Glyph size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
         </button>
@@ -125,21 +126,7 @@ export function PlayBar({ getSession, frame }: { getSession: () => WasmSession |
           if (enabled && play.key(event.key)) event.preventDefault();
         }}
       >
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full"
-          style={{ left: INSET, right: INSET, background: "color-mix(in srgb, var(--toolbar-icon) 35%, transparent)" }}
-        />
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--editor-accent)]"
-          style={{ left: INSET, width: thumbLeft - INSET }}
-        />
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 rounded-full border-2 border-[var(--editor-accent)] bg-white group-focus-visible:shadow-[0_0_0_2px_var(--toolbar-bg),0_0_0_4px_var(--editor-accent)]"
-          style={{ width: THUMB, height: THUMB, left: thumbLeft - THUMB / 2, marginTop: -THUMB / 2 }}
-        />
+        <SliderMarks thumbLeft={thumbLeft} />
       </div>
       <span
         data-play-readout

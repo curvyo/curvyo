@@ -16,7 +16,8 @@ test("the bar is a toolbar of two rows with plain fields: no slider, no caption 
   assert.doesNotMatch(bar, /type="range"|<Slider|ui\/slider/);
   assert.match(bar, /label="Kind"/);
   assert.match(bar, /\$\{caption\} parameter/);
-  assert.match(bar, /aria-label="Crosshatch"/);
+  // The shared toggle button names itself from `label` (0159 F47).
+  assert.match(bar, /label="Crosshatch"/);
 });
 
 test("the material dropdown lists New material first and filters above 8", () => {

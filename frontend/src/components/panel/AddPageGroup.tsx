@@ -1,8 +1,12 @@
+import { Plus, X } from "lucide-react";
 import { createElement, type KeyboardEvent, useEffect, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
 
 import type { MachineProfileRow } from "@/hooks/useWorkbenches";
 import type { PageKindEntry } from "@/workbenches/registry";
 import { glyphOf } from "@/workbenches/iconNames";
+import { SEGMENT_ITEM, SEGMENT_STRIP } from "@/components/ui/looks";
 
 /** Where the kind last added on this computer is kept (UX notes §2, per OS user, not the file). */
 const KIND_KEY = "curvyo.addPage.kind";
@@ -23,10 +27,10 @@ function storeKind(kind: string) {
   }
 }
 
-const SEGMENT =
-  "flex h-7 min-w-0 flex-1 basis-0 items-center justify-center gap-1 rounded-md px-1 text-[13px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] aria-checked:bg-[var(--toolbar-icon-active-bg)] aria-checked:text-[var(--toolbar-icon-active-fg)] [@media(pointer:coarse)]:h-9";
-const TEXT_BUTTON =
-  "h-7 rounded-md px-3 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] [@media(pointer:coarse)]:h-9";
+const SEGMENT = `${SEGMENT_ITEM} flex-1 basis-0 px-1 text-xs`;
+/** The inline form box (`docs/ui-elements.md` §0 "Surfaces", §17). */
+export const FORM_BOX =
+  "flex flex-col gap-1 rounded-[8px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] bg-[var(--panel-bg)] p-2";
 
 /**
  * The Add page group (`specs/0098-page-kinds` criterion 1, UX notes §2): inline under the page
@@ -101,7 +105,7 @@ export function AddPageGroup({
     <div
       role="group"
       aria-label="Add page"
-      className="flex flex-col gap-1 rounded-md bg-[var(--toolbar-bg)] p-2"
+      className={FORM_BOX}
       onKeyDown={(event) => {
         event.stopPropagation();
         if (event.key === "Escape") {
@@ -120,7 +124,7 @@ export function AddPageGroup({
         ref={kindRow}
         role="radiogroup"
         aria-labelledby="add-page-kind"
-        className="flex flex-wrap gap-1"
+        className={`flex ${SEGMENT_STRIP}`}
       >
         {kinds.map((k, index) => (
           <button
@@ -154,7 +158,7 @@ export function AddPageGroup({
             role="listbox"
             aria-labelledby="add-page-machine"
             tabIndex={0}
-            className="max-h-[176px] overflow-y-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+            className="max-h-[176px] overflow-y-auto rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
             aria-activedescendant={profile ? `add-page-profile-${profile}` : undefined}
             onKeyDown={onMachineKey}
           >
@@ -164,7 +168,7 @@ export function AddPageGroup({
                 id={`add-page-profile-${p.id}`}
                 role="option"
                 aria-selected={p.id === profile}
-                className="flex h-11 cursor-default flex-col justify-center rounded-md px-2 text-[13px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] aria-selected:bg-[var(--toolbar-icon-active-bg)] aria-selected:text-[var(--toolbar-icon-active-fg)]"
+                className="flex h-11 cursor-default flex-col justify-center rounded-[5px] px-2 text-sm text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] aria-selected:bg-[var(--toolbar-icon-active-bg)] aria-selected:text-[var(--toolbar-icon-active-fg)]"
                 onClick={() => setProfile(p.id)}
               >
                 <span className="truncate">{p.name}</span>
@@ -176,13 +180,13 @@ export function AddPageGroup({
           </div>
         </>
       )}
-      <div className="mt-1 flex justify-end gap-1">
-        <button type="button" data-cancel="true" className={TEXT_BUTTON} onClick={onCancel}>
+      <div className="mt-1 grid grid-cols-2 gap-2">
+        <Button icon={X} data-cancel="true" onClick={onCancel}>
           Cancel
-        </button>
-        <button type="button" className={TEXT_BUTTON} onClick={add}>
+        </Button>
+        <Button variant="primary" icon={Plus} onClick={add}>
           Add
-        </button>
+        </Button>
       </div>
     </div>
   );

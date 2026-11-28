@@ -27,7 +27,7 @@ export function SketchAnnotations({ sketch }: { sketch: SketchApi }) {
       ? <PendingBadge key={label.id} label={label} />
       : label.dimension && !label.preview
       ? <DimensionText key={label.id} label={label} onSelect={() => sketch.run(s => s.sketch_inspect_constraint(label.id, false))} onEdit={() => edit(label.id)} />
-      : <span key={label.id} className="absolute rounded bg-[var(--toolbar-bg)] px-1 text-[11px] text-[var(--toolbar-icon)] shadow-sm"
+      : <span key={label.id} className="absolute rounded-[8px] bg-[var(--toolbar-bg)] px-1 text-[11px] text-[var(--toolbar-icon)] shadow-sm"
         style={{ ...AT(label.x, label.y), border: label.conflicting || label.redundant ? "1px solid var(--destructive)" : undefined }}>{label.text}</span>)}
   </div>;
 }
@@ -37,14 +37,14 @@ function DimensionText({ label, onSelect, onEdit }: { label: SketchAnnotation; o
   const border = label.conflicting || label.redundant ? "1px solid var(--destructive)" : label.selected ? "1px solid var(--editor-accent)" : "1px solid transparent";
   const name = `${label.name || label.text}${label.exposed ? ", exposed" : ""}${label.group ? `, linked in group ${label.group}` : ""}`;
   return <button type="button" aria-label={name} aria-pressed={label.selected} data-sketch-dimension-text={label.id}
-    className="absolute rounded-full px-1 text-[12px] leading-4 whitespace-nowrap tabular-nums focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)]"
+    className="absolute rounded-full px-1 text-xs leading-4 whitespace-nowrap tabular-nums focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)]"
     style={{ ...AT(label.x, label.y), color, border, textShadow: HALO, visibility: label.editing ? "hidden" : undefined,
       background: label.hovered ? "var(--editor-accent-hover)" : undefined }}
     onClick={e => { if (e.detail === 0) onSelect(); }}
     onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onEdit(); } }}>
     {label.exposed && <span aria-hidden data-exposed-mark className="mr-0.5 inline-block size-1.5 rounded-full align-middle" style={{ border: "1px solid currentColor" }} />}
-    {label.group && <span aria-hidden data-link-group className="mr-0.5 text-[10px]">{label.group}</span>}
-    {label.fx && <span className="mr-0.5 text-[10px] text-[var(--panel-muted-fg)]">fx</span>}{label.text}
+    {label.group && <span aria-hidden data-link-group className="mr-0.5 text-[11px]">{label.group}</span>}
+    {label.fx && <span className="mr-0.5 text-[11px] text-[var(--panel-muted-fg)]">fx</span>}{label.text}
   </button>;
 }
 

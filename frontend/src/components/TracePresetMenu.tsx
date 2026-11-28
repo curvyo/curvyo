@@ -153,7 +153,7 @@ export function TracePresetMenu<T extends MenuChoice>({
         aria-expanded={open}
         onClick={() => (open ? setOpen(false) : openMenu())}
         onKeyDown={buttonKey}
-        className={`my-1 flex h-7 ${widthClass} items-center justify-between gap-1 rounded-md border border-[var(--toolbar-icon)]/40 px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]`}
+        className={`my-1 flex h-7 ${widthClass} items-center justify-between gap-1 rounded-[5px] border border-[var(--toolbar-icon)]/40 px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]`}
       >
         <span className="truncate">{label}</span>
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" className="shrink-0">
@@ -166,7 +166,7 @@ export function TracePresetMenu<T extends MenuChoice>({
           role="menu"
           aria-label={name}
           onKeyDown={menuKey}
-          className={`absolute ${align === "end" ? "right-0" : "left-0"} z-50 flex flex-col rounded-lg py-1`}
+          className={`absolute ${align === "end" ? "right-0" : "left-0"} z-50 flex flex-col rounded-[8px] py-1`}
           style={{
             minWidth: MENU_WIDTH,
             width: "max-content",
@@ -195,7 +195,7 @@ export function TracePresetMenu<T extends MenuChoice>({
                   close();
                 }}
                 onPointerMove={() => setFocused(index)}
-                className="aria-disabled:opacity-40 mx-1 flex cursor-default flex-col rounded-md px-2 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                className="aria-disabled:opacity-40 mx-1 flex cursor-default flex-col rounded-[5px] px-2 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
                 style={{
                   background: index === focused || marked ? "var(--editor-accent-hover)" : undefined,
                 }}

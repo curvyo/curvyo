@@ -5,12 +5,15 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { decodeTestGridText, decodeTestGridView } from "../src/lib/testGridView.ts";
 import {
+  axisFieldName,
+  axisUnit,
   barName,
   causeOf,
   fieldText,
   filterMaterials,
   materialButtonText,
   plainNumber,
+  sharedFieldName,
   sharedValue,
   steppedText,
   thicknessLabel,
@@ -165,4 +168,16 @@ test("specs/0135 criterion 51: an Image grid reads its Picture segments; other k
   assert.equal(decodeTestGridText(JSON.stringify(strength))?.columns.param, "strength");
   selected.picture = { value: "photo", selected_offered: true, strength_offered: true };
   assert.equal(decodeTestGridText(JSON.stringify(selected)), null, "an unknown source is refused");
+});
+
+// `specs/0159-ui-consistency` F47: Passes is a count, its fields show no "×" after the number.
+test("Passes fields show no unit and are named without one; the others keep theirs", () => {
+  assert.equal(sharedFieldName("passes"), "Passes");
+  assert.equal(sharedFieldName("power"), "Power, %");
+  const passes = { param: "passes" } as Parameters<typeof axisUnit>[1];
+  const speed = { param: "speed" } as Parameters<typeof axisUnit>[1];
+  assert.equal(axisUnit("Min", passes), "");
+  assert.equal(axisFieldName("rows", "Max", passes), "Rows Max");
+  assert.equal(axisUnit("Min", speed), "mm/min");
+  assert.equal(axisFieldName("columns", "Min", speed), "Columns Min, mm/min");
 });

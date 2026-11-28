@@ -426,7 +426,7 @@ function StepPick({ step, onStep, homed }: { step: JogStep; onStep: (step: JogSt
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs text-[var(--panel-muted-fg)]">Step (mm)</span>
-      <div role="radiogroup" aria-label="Step" className="flex overflow-hidden rounded-md border border-[var(--field-border)]">
+      <div role="radiogroup" aria-label="Step" className="flex overflow-hidden rounded-[5px] border border-[var(--field-border)]">
         {STEPS.map((value, at) => (
           <button
             key={value}

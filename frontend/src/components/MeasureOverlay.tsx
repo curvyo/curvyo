@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Unlink } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import type { WasmSession } from "@/lib/editorSession";
 import { chipPlace, EMPTY_MEASURE_VIEW, readMeasureView, type MeasureChip, type MeasureLabel } from "@/lib/measureView";
 
@@ -30,8 +31,10 @@ export function MeasureOverlay({ getSession, measuring }: { getSession: () => Wa
   }, [getSession]);
   return <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" data-measure-overlay="">
     {view.dimensions.map((label, index) => <DimensionText key={`${label.id}:${index}`} label={label} />)}
-    {measuring && view.readout && <Chip chip={view.readout} kind="readout" />}
-    {measuring && view.mode && <Chip chip={view.mode} kind="mode" />}
+    {/* One chip (`docs/ui-elements.md` §13, 0159 F53): the mode ("Aligned") is the readout's last
+        line while both show; alone it keeps its own place below the pointer. */}
+    {measuring && view.readout && <Chip chip={view.readout} kind="readout" mode={view.mode ?? undefined} />}
+    {measuring && !view.readout && view.mode && <Chip chip={view.mode} kind="mode" />}
     {/* Polite live regions: the mode label on each change, the value on a pin or a placement. */}
     <div aria-live="polite" role="status" className="sr-only">{measuring ? view.mode?.lines[0] ?? "" : ""}</div>
     <div aria-live="polite" role="status" className="sr-only" data-measure-speech="">{measuring ? view.speech : ""}</div>
@@ -41,18 +44,18 @@ export function MeasureOverlay({ getSession, measuring }: { getSession: () => Wa
 function DimensionText({ label }: { label: MeasureLabel }) {
   const color = label.selected ? "var(--editor-accent)" : "var(--dim-guide)";
   return <span aria-hidden data-measure-dimension={label.linked ? "linked" : "unlinked"}
-    className="absolute flex items-center gap-0.5 rounded-full px-1 text-[12px] leading-4 whitespace-nowrap tabular-nums"
+    className="absolute flex items-center gap-0.5 rounded-full px-1 text-xs leading-4 whitespace-nowrap tabular-nums"
     style={{ ...AT(label.x, label.y), color, textShadow: HALO,
       border: label.selected ? "1px solid var(--editor-accent)" : "1px solid transparent" }}>
-    {!label.linked && <Unlink size={10} strokeWidth={1.5} aria-hidden />}
+    {!label.linked && <Unlink {...SMALL_GLYPH} aria-hidden />}
     {label.text}
   </span>;
 }
 
-function Chip({ chip, kind }: { chip: MeasureChip; kind: "readout" | "mode" }) {
+function Chip({ chip, kind, mode }: { chip: MeasureChip; kind: "readout" | "mode"; mode?: MeasureChip }) {
   const ref = useRef<HTMLDivElement>(null);
   const [place, setPlace] = useState<{ left: number; top: number } | null>(null);
-  const key = `${chip.x}|${chip.y}|${chip.lines.join("|")}`;
+  const key = `${chip.x}|${chip.y}|${chip.lines.join("|")}|${mode?.lines.join("|") ?? ""}`;
   useEffect(() => {
     const box = ref.current;
     const parent = box?.parentElement;
@@ -64,9 +67,10 @@ function Chip({ chip, kind }: { chip: MeasureChip; kind: "readout" | "mode" }) {
     setPlace(chipPlace(at, size, canvas));
   }, [key, kind, chip]);
   return <div ref={ref} aria-hidden data-measure-chip={kind}
-    className="absolute rounded px-1.5 py-0.5 text-xs whitespace-nowrap tabular-nums"
+    className="absolute rounded-[8px] px-1.5 py-0.5 text-xs whitespace-nowrap tabular-nums"
     style={{ left: place?.left ?? -9999, top: place?.top ?? -9999,
       background: "var(--toolbar-bg)", color: "var(--toolbar-icon)" }}>
     {chip.lines.map((line, index) => <div key={index}>{line}</div>)}
+    {mode && <div data-measure-chip="mode">{mode.lines.map((line, index) => <div key={index}>{line}</div>)}</div>}
   </div>;
 }

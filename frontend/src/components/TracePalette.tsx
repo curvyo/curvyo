@@ -91,7 +91,7 @@ export function TracePalette({ palette, stale, onReturnFocus }: TracePaletteProp
             tooltip={
               <>
                 <span className="block tabular-nums">{paletteTooltip(swatch.hex)}</span>
-                <span className="block text-[10px] opacity-70">{PALETTE_HINT}</span>
+                <span className="block text-xs opacity-70">{PALETTE_HINT}</span>
               </>
             }
             excluded={excluded}

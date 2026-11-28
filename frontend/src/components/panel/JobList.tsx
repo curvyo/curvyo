@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, CircleAlert, GripVertical, ListRestart, LoaderCircle, SkipForward, Trash2, TriangleAlert } from "lucide-react";
+import { GLYPH as ICON_GLYPH } from "@/components/ui/looks";
 import { type KeyboardEvent, type PointerEvent as ReactPointer, useEffect, useId, useRef, useState } from "react";
 
 import { ARMED_DESTRUCTIVE_BUTTON, GLYPH, ICON_BUTTON, SMALL } from "@/components/workbench/machineStyles";
@@ -34,6 +35,7 @@ import {
 } from "@/lib/jobList";
 import { restartCause } from "@/lib/machineControls";
 import { ignoredKey } from "@/lib/sendArm";
+import { AlertLine } from "@/components/ui/notice";
 
 // The pressed toggle keeps its ground under the pointer: the hover ground would hide it.
 const ON_BUTTON = ICON_BUTTON.replace(
@@ -284,10 +286,9 @@ export function JobList({ model }: { model: MachineControlsModel }) {
         </p>
       ) : null}
       {listChanged ? (
-        <p role="alert" className="flex items-start gap-1 text-xs text-[var(--destructive)]">
-          <CircleAlert {...SMALL} className="mt-0.5 shrink-0" />
+        <AlertLine>
           <span>The list changed</span>
-        </p>
+        </AlertLine>
       ) : null}
       {confirmRow !== undefined ? (
         <RestartConfirm key={confirmRow.job_id} row={confirmRow} onCancel={cancelRestart} onConfirm={() => confirmRestart(confirmRow)} />
@@ -340,7 +341,7 @@ export function JobList({ model }: { model: MachineControlsModel }) {
                   className="flex h-7 w-4 shrink-0 cursor-grab touch-none items-center text-[var(--panel-muted-fg)]"
                   onPointerDown={(event) => startDrag(event, row)}
                 >
-                  <GripVertical size={16} strokeWidth={1.5} absoluteStrokeWidth />
+                  <GripVertical {...ICON_GLYPH} />
                 </span>
               ) : owner ? (
                 <span className="w-4 shrink-0" />
@@ -477,9 +478,11 @@ function RowName({ name }: { name: string }) {
   const dot = name.lastIndexOf(".");
   const [stem, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
   return (
-    <span className="flex min-w-0 text-[var(--toolbar-icon)]" title={name}>
-      <span className="truncate">{stem}</span>
-      <span className="shrink-0">{extension}</span>
-    </span>
+    <Tooltip side="left" content={name}>
+      <span className="flex min-w-0 text-[var(--toolbar-icon)]">
+        <span className="truncate">{stem}</span>
+        <span className="shrink-0">{extension}</span>
+      </span>
+    </Tooltip>
   );
 }

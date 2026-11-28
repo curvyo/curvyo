@@ -1,4 +1,5 @@
 import { MousePointer2, PenTool, Square, Type } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { type ComponentType, useEffect, useState } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
@@ -28,7 +29,7 @@ function Chip({ mark, text }: { mark: PeerMark; text: string }) {
   const Glyph = mark.tool !== "select" ? TOOL_GLYPHS[mark.tool] : undefined;
   return (
     <span
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-[4px] px-1.5 py-0.5 text-xs font-bold text-white"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-[5px] px-1.5 py-0.5 text-xs font-bold text-white"
       style={{ background: `var(--peer-${mark.colour})` }}
     >
       {text}
@@ -83,9 +84,7 @@ export function PresenceOverlay({ getSession }: { getSession: () => WasmSession 
           ) : null}
           {mark.pointer ? (
             <div className="absolute" style={{ left: mark.pointer[0], top: mark.pointer[1] }}>
-              <MousePointer2
-                size={16}
-                strokeWidth={1}
+              <MousePointer2 {...GLYPH}
                 aria-hidden
                 style={{ fill: `var(--peer-${mark.colour})`, color: "var(--selection-casing)" }}
               />

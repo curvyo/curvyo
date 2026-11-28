@@ -121,7 +121,7 @@ function asItemPath(value: unknown): ItemPath | null | undefined {
 /** The Tabs row of the item part: Own pressed, Operation's, or mixed (`null`). */
 export interface ItemTabs {
   own: boolean | null;
-  /** "4 tabs", "Own tabs (3)", "Own tabs on 2 of 3 items". */
+  /** "4 tabs", "Own tabs (3)", "Own tabs on some items". */
   readout: string;
 }
 

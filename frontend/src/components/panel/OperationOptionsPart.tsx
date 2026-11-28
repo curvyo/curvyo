@@ -43,12 +43,12 @@ function OptionToggleView({ toggle, row, tools }: { toggle: OptionToggle; row: O
   const Glyph = GLYPHS[toggle.option];
   const name = toggleNames(toggle.option);
   return (
-    <Tooltip side="bottom" content={name}>
+    <Tooltip side="left" content={name}>
       <Toggle.Root
         pressed={toggle.pressed}
         onPressedChange={(on) => tools.edit(row.id, toggle.option, on ? 1 : 0)}
         aria-label={name}
-        className="flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
+        className="flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
       >
         <Glyph aria-hidden size={16} strokeWidth={1.5} absoluteStrokeWidth />
       </Toggle.Root>

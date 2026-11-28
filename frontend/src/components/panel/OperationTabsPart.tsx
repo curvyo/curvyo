@@ -1,4 +1,5 @@
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, SquareDashed } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 
 import { OverrideRow } from "@/components/panel/CloneBlock";
 import { EntryField } from "@/components/panel/EntryField";
@@ -6,11 +7,11 @@ import { OptionFieldView } from "@/components/panel/OperationOptionsPart";
 import { OperationItemPathRows } from "@/components/panel/OperationPathPart";
 import { TabsGlyph } from "@/components/panel/OperationGlyphs";
 import { Tooltip } from "@/components/ui/tooltip";
-import { PanelSwitch } from "@/components/ui/switch";
 import type { OperationToolsApi } from "@/hooks/useOperationTools";
 import { TAB_FIELDS, optionText } from "@/lib/operationOptionRows";
 import type { OperationRow, TabChip } from "@/lib/operationsView";
 import { CHIP_IS_MESSAGE, outcomeOf, typedNumber } from "@/lib/settingsFieldText";
+import { ToggleButton } from "@/components/ui/toggle-button";
 
 const HAIRLINE = { background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" };
 
@@ -35,10 +36,10 @@ export function OperationTabsGroup({ row, tools, onReturnFocus }: { row: Operati
         <OptionFieldView field={{ ...width, shown: optionText(tabs.widthMm) }} row={row} tools={tools} onReturnFocus={onReturnFocus} />
       </div>
       {tabs.placed !== null ? <p className="text-xs text-[var(--panel-muted-fg)]">{tabs.placed}</p> : null}
-      <PanelSwitch
+      <ToggleButton icon={SquareDashed}
         label="Skip inner shapes"
-        checked={tabs.skipInner}
-        onCheckedChange={(on) => tools.edit(row.id, "tab_skip_inner", on ? 1 : 0)}
+        pressed={tabs.skipInner}
+        onPressedChange={(on) => tools.edit(row.id, "tab_skip_inner", on ? 1 : 0)}
         onReturnFocus={onReturnFocus}
       />
     </div>
@@ -106,7 +107,7 @@ export function OperationItemPart({
             onReturnFocus={onReturnFocus}
           />
           {chip.ownWidth ? (
-            <Tooltip side="bottom" content="Operation's width">
+            <Tooltip side="left" content="Operation's width">
               <button
                 type="button"
                 tabIndex={-1}
@@ -115,9 +116,9 @@ export function OperationItemPart({
                   tools.setTabWidth(null);
                   onReturnFocus();
                 }}
-                className="flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+                className="flex size-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
               >
-                <RotateCcw aria-hidden size={16} strokeWidth={1.5} absoluteStrokeWidth />
+                <RotateCcw {...GLYPH} aria-hidden />
               </button>
             </Tooltip>
           ) : null}

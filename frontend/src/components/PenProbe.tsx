@@ -4,12 +4,13 @@
 // or sent (criterion 4); the host reader runs only while this page is open.
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import { type PenProbeApi, usePenProbe } from "@/hooks/usePenProbe";
 import { closePenProbe, openPenProbe, usePenProbeOpen } from "@/lib/penProbeStore";
+import { Button } from "@/components/ui/button";
+import { Activity, Copy, Eraser, X } from "lucide-react";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { SECTION_HEADING } from "@/components/ui/looks";
 
-const BUTTON =
-  "h-7 shrink-0 rounded-[5px] border px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9 border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
 
 const ms = (value: number | null): string => (value === null ? "-" : `${value.toFixed(1)} ms`);
 const px = (value: number | null): string => (value === null ? "-" : `${value.toFixed(1)} px`);
@@ -17,7 +18,7 @@ const px = (value: number | null): string => (value === null ? "-" : `${value.to
 function Rows({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="min-w-0 flex-1" aria-label={title}>
-      <h3 className="mb-1 text-sm text-[var(--toolbar-icon)]">{title}</h3>
+      <h3 className={`mb-1 ${SECTION_HEADING}`}>{title}</h3>
       <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-sm tabular-nums">{children}</dl>
     </section>
   );
@@ -106,25 +107,23 @@ function Actions({ probe }: { probe: PenProbeApi }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       {probe.route === "native" ? (
-        <ToolbarSwitch
+        <ToggleButton icon={Activity} look="bar"
           label="Motion compression"
           tooltip="GDK merges queued motion events to one per frame; off keeps every pen sample and gives the webview all of them"
-          checked={probe.compression}
-          onCheckedChange={probe.setCompression}
+          pressed={probe.compression}
+          onPressedChange={probe.setCompression}
         />
       ) : null}
-      <button type="button" className={BUTTON} onClick={probe.clear}>
+      <Button icon={Eraser} onClick={probe.clear}>
         Clear
-      </button>
-      <button
-        type="button"
-        className={BUTTON}
+      </Button>
+      <Button icon={Copy}
         onClick={() => {
           void copyText(probe.report()).then((done) => setCopied(done ? "copied" : "failed"));
         }}
       >
         Copy report
-      </button>
+      </Button>
       <span role="status" className="text-xs text-[var(--panel-muted-fg)]">
         {copied === "copied" ? "Copied. Nothing was stored or sent." : copied === "failed" ? "Could not copy." : ""}
       </span>
@@ -135,9 +134,9 @@ function Actions({ probe }: { probe: PenProbeApi }) {
 /** The File tab's entry to the page (**Proposal**, `specs/0158-pen-display/plan.md`). */
 export function PenProbeButton() {
   return (
-    <button type="button" onClick={openPenProbe} className={`${BUTTON} mt-4 w-[118px]`}>
+    <Button icon={Activity} onClick={openPenProbe} className="mt-4 min-w-[118px]">
       Pen probe…
-    </button>
+    </Button>
   );
 }
 
@@ -165,34 +164,39 @@ function PenProbePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Pen probe"
-      className="fixed inset-0 z-50 flex flex-col gap-3 overflow-auto bg-[var(--panel-bg)] p-4 text-[var(--toolbar-icon)]"
-    >
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-base">Pen probe</h2>
-          <p className="text-xs text-[var(--panel-muted-fg)]">
-            Draw on the area below with the pen. Blue dots are the webview, dark dots the native pen; the dot size is the pressure. Nothing is stored or sent.
-          </p>
+    // One sheet on the app's dialog look (`docs/ui-elements.md` §19, 0159 F58): an 8 px surface
+    // with the panel elevation over a dimmed window, 16 px from every edge, the title 14 px
+    // semibold, the actions as shared buttons.
+    <div className="fixed inset-0 z-50 flex bg-black/10 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Pen probe"
+        className="m-auto flex h-full max-h-[900px] w-full max-w-[1200px] flex-col gap-3 overflow-auto rounded-[8px] bg-[var(--panel-bg)] p-4 text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)]"
+      >
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Pen probe</h2>
+            <p className="text-xs text-[var(--panel-muted-fg)]">
+              Draw on the area below with the pen. Blue dots are the webview, dark dots the native pen; the dot size is the pressure. Nothing is stored or sent.
+            </p>
+          </div>
+          <Button icon={X} autoFocus onClick={closePenProbe}>
+            Close
+          </Button>
+        </header>
+        <div className="flex flex-wrap gap-6">
+          <WebColumn probe={probe} />
+          <NativeColumn probe={probe} />
+          <Measurements probe={probe} />
         </div>
-        <button type="button" autoFocus className={BUTTON} onClick={closePenProbe}>
-          Close
-        </button>
-      </header>
-      <div className="flex flex-wrap gap-6">
-        <WebColumn probe={probe} />
-        <NativeColumn probe={probe} />
-        <Measurements probe={probe} />
+        <Actions probe={probe} />
+        <canvas
+          ref={canvas}
+          aria-label="Scratch area"
+          className="min-h-[200px] w-full flex-1 touch-none rounded-[5px] border border-[var(--field-border)] bg-white"
+        />
       </div>
-      <Actions probe={probe} />
-      <canvas
-        ref={canvas}
-        aria-label="Scratch area"
-        className="min-h-[200px] w-full flex-1 touch-none rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] bg-white"
-      />
     </div>
   );
 }

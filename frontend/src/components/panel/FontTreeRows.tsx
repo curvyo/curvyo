@@ -3,7 +3,8 @@
 // two lines (its name in its own face with chevron, current mark, Curvyo trash, star and face
 // count; under it the tag line), a face row.
 import { ChevronDown, ChevronRight, FilePlus, Star, Trash2, TriangleAlert } from "lucide-react";
-import type { ReactNode } from "react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import { LibrarySyncToggle } from "@/components/LibrarySyncToggle";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -32,6 +33,36 @@ export function LineName({ preview, em }: { preview: LinePreview; em: number }) 
         vectorEffect="non-scaling-stroke"
       />
     </svg>
+  );
+}
+/** The room the "…" of a clipped single-line name takes, px. */
+const ELLIPSIS_PX = 14;
+
+/** A single-line name in the row's free room: a name too long for it is cut and ends with "…",
+ * as a text name does (the full name is in the row's tooltip). */
+function FittedLineName({ preview, em, name }: { preview: LinePreview; em: number; name: string }) {
+  const slot = useRef<HTMLSpanElement>(null);
+  const [room, setRoom] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const element = slot.current;
+    if (!element) {
+      return undefined;
+    }
+    const measure = () => setRoom(element.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const clipped = room !== null && preview.box[2] * em > room;
+  return (
+    <span ref={slot} className="flex min-w-0 flex-1 items-center overflow-hidden">
+      <span className="sr-only">{name}</span>
+      <span className="min-w-0 overflow-hidden" style={clipped ? { width: Math.max(0, room - ELLIPSIS_PX) } : undefined}>
+        <LineName preview={preview} em={em} />
+      </span>
+      {clipped ? <span aria-hidden>…</span> : null}
+    </span>
   );
 }
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
@@ -103,7 +134,7 @@ export function RowTrash({ target, armed, label, tip, onPress }: TrashProps) {
             armed ? ARMED_TRASH : "text-[var(--panel-muted-fg)]"
           }`}
         >
-          <Trash2 size={16} strokeWidth={1.5} aria-hidden />
+          <Trash2 {...GLYPH} aria-hidden />
         </span>
       </button>
     </Tooltip>
@@ -145,116 +176,112 @@ export function FamilyRow({
     .filter(Boolean)
     .join("\n");
   return (
-    <div
-      role="treeitem"
-      aria-level={1}
-      aria-expanded={open}
-      aria-label={name}
-      data-row-key={rowKey}
-      {...(zone ? { [ARM_ZONE]: zone } : {})}
-      tabIndex={focused ? 0 : -1}
-      onFocus={onFocus}
-      onClick={(event) => onPick(event.detail === 0)}
-      title={tip}
-      style={style}
-      className={`flex cursor-default flex-col rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${ARM_TRANSITION} ${
-        trash?.armed ? "bg-[var(--destructive-soft)]" : "hover:bg-[var(--editor-accent-hover)]"
-      }`}
-    >
-      <div className="flex h-7 shrink-0 items-center gap-1">
-        <span
-          aria-hidden
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggle();
-          }}
-          className="flex h-7 w-6 shrink-0 items-center justify-center"
-        >
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </span>
-        {lines ? (
-          <span className="min-w-0 flex-1 overflow-hidden">
-            <span className="sr-only">{family.family}</span>
-            <LineName preview={lines} em={16} />
-          </span>
-        ) : (
+    <Tooltip side="left" content={tip}>
+      <div
+        role="treeitem"
+        aria-level={1}
+        aria-expanded={open}
+        aria-label={name}
+        data-row-key={rowKey}
+        {...(zone ? { [ARM_ZONE]: zone } : {})}
+        tabIndex={focused ? 0 : -1}
+        onFocus={onFocus}
+        onClick={(event) => onPick(event.detail === 0)}
+        style={style}
+        className={`flex cursor-default flex-col rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${ARM_TRANSITION} ${
+          trash?.armed ? "bg-[var(--destructive-soft)]" : "hover:bg-[var(--editor-accent-hover)]"
+        }`}
+      >
+        <div className="flex h-7 shrink-0 items-center gap-1">
           <span
-            className="min-w-0 flex-1 truncate"
-            style={cssFamily ? { fontFamily: cssFamily, fontSize: 16 } : { fontSize: 14 }}
-          >
-            {family.family}
-          </span>
-        )}
-        {holdsCurrent && !open ? <span aria-hidden className="size-1.5 rotate-45 bg-[var(--editor-accent)]" /> : null}
-        {sync ? (
-          <LibrarySyncToggle
-            name={family.family}
-            on={sync.on}
-            view={sync.view}
-            onToggle={sync.onToggle}
-            slot="flex h-7 w-6"
-            keyHint={false}
-          />
-        ) : null}
-        {trash ? (
-          <span className="relative flex shrink-0">
-            <RowTrash {...trash} />
-            {notice}
-          </span>
-        ) : null}
-        {install ? (
-          <span className="relative flex shrink-0">
-            <Tooltip side="left" content="Install font">
-              <button
-                type="button"
-                tabIndex={-1}
-                aria-label={`Install ${family.family}`}
-                disabled={install.busy}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  install.onPress();
-                }}
-                className="flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--panel-muted-fg)] hover:bg-[var(--editor-accent-hover)]"
-              >
-                <FilePlus size={16} strokeWidth={1.5} aria-hidden />
-              </button>
-            </Tooltip>
-            {notice}
-          </span>
-        ) : null}
-        <Tooltip side="left" content="Favourite">
-          <button
-            type="button"
-            tabIndex={-1}
-            disabled={greyed}
-            aria-pressed={favourite}
-            aria-label={`Favourite: ${family.family}`}
-            onMouseDown={(event) => event.preventDefault()}
+            aria-hidden
             onClick={(event) => {
               event.stopPropagation();
-              onStar();
+              onToggle();
             }}
-            className="flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] hover:bg-[var(--editor-accent-hover)] disabled:opacity-40 disabled:hover:bg-transparent"
+            className="flex h-7 w-6 shrink-0 items-center justify-center"
           >
-            <Star
-              size={16}
-              strokeWidth={1.5}
-              aria-hidden
-              className={favourite ? "fill-[var(--toolbar-icon)] text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}
+            {open ? <ChevronDown {...SMALL_GLYPH} /> : <ChevronRight {...SMALL_GLYPH} />}
+          </span>
+          {lines ? (
+            <FittedLineName preview={lines} em={16} name={family.family} />
+          ) : (
+            <span
+              className="min-w-0 flex-1 truncate"
+              style={cssFamily ? { fontFamily: cssFamily, fontSize: 16 } : { fontSize: 14 }}
+            >
+              {family.family}
+            </span>
+          )}
+          {holdsCurrent && !open ? <span aria-hidden className="size-1.5 rotate-45 bg-[var(--editor-accent)]" /> : null}
+          {sync ? (
+            <LibrarySyncToggle
+              name={family.family}
+              on={sync.on}
+              view={sync.view}
+              onToggle={sync.onToggle}
+              slot="flex h-7 w-6"
+              keyHint={false}
             />
-          </button>
-        </Tooltip>
-        <span className="pr-2 text-xs tabular-nums text-[var(--panel-muted-fg)]">{faces}</span>
-      </div>
-      {greyed ? (
-        <div inert aria-hidden className="opacity-40">
-          {tagLine}
+          ) : null}
+          {trash ? (
+            <span className="relative flex shrink-0">
+              <RowTrash {...trash} />
+              {notice}
+            </span>
+          ) : null}
+          {install ? (
+            <span className="relative flex shrink-0">
+              <Tooltip side="left" content="Install font">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label={`Install ${family.family}`}
+                  disabled={install.busy}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    install.onPress();
+                  }}
+                  className="flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--panel-muted-fg)] hover:bg-[var(--editor-accent-hover)]"
+                >
+                  <FilePlus {...GLYPH} aria-hidden />
+                </button>
+              </Tooltip>
+              {notice}
+            </span>
+          ) : null}
+          <Tooltip side="left" content="Favourite">
+            <button
+              type="button"
+              tabIndex={-1}
+              disabled={greyed}
+              aria-pressed={favourite}
+              aria-label={`Favourite: ${family.family}`}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onStar();
+              }}
+              className="flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] hover:bg-[var(--editor-accent-hover)] disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <Star {...GLYPH}
+                aria-hidden
+                className={favourite ? "fill-[var(--toolbar-icon)] text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}
+              />
+            </button>
+          </Tooltip>
+          <span className="pr-2 text-xs tabular-nums text-[var(--panel-muted-fg)]">{faces}</span>
         </div>
-      ) : (
-        tagLine
-      )}
-    </div>
+        {greyed ? (
+          <div inert aria-hidden className="opacity-40">
+            {tagLine}
+          </div>
+        ) : (
+          tagLine
+        )}
+      </div>
+    </Tooltip>
   );
 }
 
@@ -273,7 +300,9 @@ interface FaceRowProps {
 export function FaceRow({ rowKey, zone, face, current, focused, style, onFocus, onPick }: FaceRowProps) {
   const cssFamily = cssFamilyOf(face.id);
   const lines = face.singleLine ? linePreviewOf(face.id)?.style : undefined;
+  // The full name in the tooltip: a long one ends with "…" in the row (0159).
   return (
+    <Tooltip side="left" content={face.style}>
     <div
       role="treeitem"
       aria-level={2}
@@ -289,16 +318,14 @@ export function FaceRow({ rowKey, zone, face, current, focused, style, onFocus, 
       }`}
     >
       {lines ? (
-        <span className="min-w-0 overflow-hidden">
-          <span className="sr-only">{face.style}</span>
-          <LineName preview={lines} em={14} />
-        </span>
+        <FittedLineName preview={lines} em={14} name={face.style} />
       ) : (
         <span className="min-w-0 truncate" style={cssFamily ? { fontFamily: cssFamily, fontSize: 14 } : { fontSize: 14 }}>
           {face.style}
         </span>
       )}
     </div>
+    </Tooltip>
   );
 }
 
@@ -312,14 +339,15 @@ interface BlockHeaderProps {
 
 export function BlockHeader({ title, count, tip, style }: BlockHeaderProps) {
   return (
-    <div
-      style={style}
-      title={tip}
-      className="flex items-center justify-between bg-[var(--panel-bg)] text-xs font-semibold text-[var(--panel-muted-fg)]"
-    >
-      <span>{title}</span>
-      <span className="font-normal tabular-nums">{count}</span>
-    </div>
+    <Tooltip side="left" content={tip}>
+      <div
+        style={style}
+        className="flex items-center justify-between bg-[var(--panel-bg)] text-xs font-semibold text-[var(--panel-muted-fg)]"
+      >
+        <span>{title}</span>
+        <span className="font-normal tabular-nums">{count}</span>
+      </div>
+    </Tooltip>
   );
 }
 
@@ -343,7 +371,7 @@ export function MissingRow({ rowKey, name, focused, style, onFocus }: MissingRow
       style={style}
       className="flex items-center gap-1 border-l-[3px] border-[var(--editor-accent)] bg-[var(--value-fill)] pl-[17px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
     >
-      <TriangleAlert size={16} aria-hidden className="shrink-0 text-[var(--field-invalid)]" />
+      <TriangleAlert {...GLYPH} aria-hidden className="shrink-0 text-[var(--field-invalid)]" />
       <span className="min-w-0 flex-1 truncate">{name}</span>
       <span className="pr-2 text-xs text-[var(--field-invalid)]">missing</span>
     </div>

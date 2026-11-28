@@ -1,4 +1,5 @@
 import { Link, TriangleAlert, Unlink } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useId, useRef, useState } from "react";
 
 import { OverrideRow } from "@/components/panel/CloneBlock";
@@ -23,6 +24,7 @@ import {
   resetName,
   type SketchInstanceRow,
 } from "@/lib/sketchInstanceView";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const MESSAGES = { number: "Enter a number" } as const;
 
@@ -35,16 +37,17 @@ function LinkMark({ row }: { row: SketchInstanceRow }) {
   const unlinked = row.link === "unlinked";
   const Glyph = unlinked ? Unlink : Link;
   return (
-    <span
-      aria-hidden
-      data-link-mark={row.link}
-      title={linkMarkTitle(row)}
-      className="pointer-events-auto inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium tabular-nums"
-      style={{ color: unlinked ? "var(--toolbar-icon)" : "var(--panel-muted-fg)" }}
-    >
-      <Glyph size={12} strokeWidth={1.5} />
-      {row.group}
-    </span>
+    <Tooltip side="left" content={linkMarkTitle(row)}>
+      <span
+        aria-hidden
+        data-link-mark={row.link}
+        className="pointer-events-auto inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium tabular-nums"
+        style={{ color: unlinked ? "var(--toolbar-icon)" : "var(--panel-muted-fg)" }}
+      >
+        <Glyph size={12} strokeWidth={1.5} />
+        {row.group}
+      </span>
+    </Tooltip>
   );
 }
 
@@ -160,7 +163,7 @@ function ValueRow({
       {api.notice?.key === row.key ? (
         <p
           role="status"
-          className="pointer-events-none absolute top-full right-0 z-10 mt-1 w-max max-w-[244px] break-words rounded-md p-2 text-right text-xs"
+          className="pointer-events-none absolute top-full right-0 z-10 mt-1 w-max max-w-[244px] break-words rounded-[8px] p-2 text-right text-xs"
           style={{
             background: "var(--toolbar-bg)",
             color: "var(--toolbar-icon)",
@@ -217,7 +220,7 @@ export function SketchParametersRow({
           className="flex items-center gap-1 text-xs"
           style={{ color: "var(--toolbar-icon)" }}
         >
-          <TriangleAlert aria-hidden size={12} />
+          <TriangleAlert {...SMALL_GLYPH} aria-hidden />
           {NO_SOLUTION_LINE}
         </p>
       ) : null}

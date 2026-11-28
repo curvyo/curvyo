@@ -1,15 +1,14 @@
-import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Sparkles, Trash2, TriangleAlert, X } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { FocusEvent } from "react";
 
 import type { AiSteps } from "@/lib/aiSteps";
 import { ARM_GUARD_MS } from "@/lib/deleteArm";
 import type { AiBody } from "@/lib/adjustmentsView";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
-const TEXT_BUTTON =
-  "h-7 rounded-md px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
-const APPLY = `${TEXT_BUTTON} w-[72px] bg-[var(--editor-accent)] text-white hover:opacity-90`;
-const OUTLINE = `${TEXT_BUTTON} border border-[var(--field-border)] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`;
 const MUTED = "w-full text-xs text-[var(--panel-muted-fg)]";
 const ALERT = "w-full text-xs text-[var(--field-invalid)]";
 
@@ -31,7 +30,7 @@ export function AiStepBody({ index, body, steps }: { index: number; body: AiBody
       ) : null}
       {body.consent !== null ? (
         <div
-          className="flex w-full flex-col gap-2 rounded-md border border-[var(--field-border)] p-2"
+          className="flex w-full flex-col gap-2 rounded-[5px] border border-[var(--field-border)] p-2"
           onKeyDown={(event) => {
             if (event.key !== "Escape") return;
             // The consent's Escape only cancels the consent; the canvas's Escape (focus to the
@@ -43,49 +42,45 @@ export function AiStepBody({ index, body, steps }: { index: number; body: AiBody
         >
           <p className="text-xs text-[var(--toolbar-icon)]">{body.consent}</p>
           <div className="flex gap-2">
-            <button ref={primaryRef} type="button" className={`${OUTLINE} flex-1`} onClick={() => steps?.dismiss(body.model)}>
+            <Button icon={X} ref={primaryRef} className="flex-1" onClick={() => steps?.dismiss(body.model)}>
               Cancel
-            </button>
-            <button
-              type="button"
-              className={`${APPLY} flex-1`}
+            </Button>
+            <Button variant="primary" icon={Download} className="flex-1"
               onClick={() => {
                 if (downloadReady()) void steps?.consent(index, body.model);
               }}
             >
               Download
-            </button>
+            </Button>
           </div>
         </div>
       ) : body.progress !== null ? (
         <div className="flex w-full flex-col gap-1">
-          <div className="h-1 w-full rounded bg-[color-mix(in_srgb,var(--toolbar-icon)_20%,transparent)]">
-            <div className="h-1 rounded bg-[var(--editor-accent)]" style={{ width: `${Math.round(body.progress.fraction * 100)}%` }} />
+          <div className="h-1 w-full rounded-full bg-[color-mix(in_srgb,var(--toolbar-icon)_20%,transparent)]">
+            <div className="h-1 rounded-full bg-[var(--editor-accent)]" style={{ width: `${Math.round(body.progress.fraction * 100)}%` }} />
           </div>
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs tabular-nums text-[var(--panel-muted-fg)]">{body.progress.line}</p>
-            <button ref={primaryRef} type="button" className={OUTLINE} onClick={() => steps?.cancel(body.model)}>
+            <Button icon={X} ref={primaryRef} onClick={() => steps?.cancel(body.model)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
         <div className="flex flex-wrap gap-1">
-          <button
+          <Button variant="primary" icon={Sparkles}
             ref={primaryRef}
-            type="button"
-            className={APPLY}
             aria-disabled={body.sizeRefused}
             onClick={() => {
               if (!body.sizeRefused) void steps?.run(index, body.model);
             }}
           >
             {body.run}
-          </button>
+          </Button>
           {body.stored !== null ? (
-            <button type="button" className={OUTLINE} onClick={() => steps?.removeResult(index)}>
+            <Button icon={Trash2} onClick={() => steps?.removeResult(index)}>
               Remove stored result
-            </button>
+            </Button>
           ) : null}
         </div>
       )}
@@ -100,14 +95,14 @@ function AiStateLines({ body, steps, idle }: { body: AiBody; steps: AiSteps | nu
   return (
     <>
       {body.refusal !== null ? (
-        <p role="alert" className={ALERT}>
+        <AlertLine>
           {body.refusal}
-        </p>
+        </AlertLine>
       ) : null}
       {body.stored !== null ? <p className={MUTED}>{body.stored}</p> : null}
       {body.outOfDate !== null ? (
         <p className="flex items-center gap-1 text-xs text-[var(--toolbar-icon)]">
-          <TriangleAlert aria-hidden size={16} strokeWidth={1.5} className="shrink-0" />
+          <TriangleAlert {...GLYPH} aria-hidden className="shrink-0" />
           {body.outOfDate}
         </p>
       ) : null}
@@ -118,9 +113,9 @@ function AiStateLines({ body, steps, idle }: { body: AiBody; steps: AiSteps | nu
             {body.state}
           </p>
           {body.modelReady ? (
-            <button type="button" className={OUTLINE} onClick={() => void steps?.removeModel(body.model)}>
+            <Button icon={Trash2} onClick={() => void steps?.removeModel(body.model)}>
               Remove model
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
@@ -189,9 +184,9 @@ function ModelLicence({ steps, kind }: { steps: AiSteps | null; kind: string }) 
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         onClick={() => setOpen(!open)}
-        className="flex h-5 items-center gap-1 rounded text-xs text-[var(--panel-muted-fg)] outline-none hover:text-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="flex h-5 items-center gap-1 rounded-[5px] text-xs text-[var(--panel-muted-fg)] outline-none hover:text-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
-        {open ? <ChevronDown size={12} aria-hidden /> : <ChevronRight size={12} aria-hidden />}
+        {open ? <ChevronDown {...SMALL_GLYPH} aria-hidden /> : <ChevronRight {...SMALL_GLYPH} aria-hidden />}
         Model licence
       </button>
       {open ? (

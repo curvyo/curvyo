@@ -1,9 +1,11 @@
-import { CircleAlert, Link2 } from "lucide-react";
+import { CircleAlert, Crosshair, Link2, RotateCw } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { EntryField } from "@/components/EntryField";
 import type { PlacementApi, PlacementChipState } from "@/hooks/usePlacement";
 import { type Rect, placePlacementChip } from "@/lib/readoutPlacement";
+import { toggleClass, GLYPH } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** Field widths and label paddings (`docs/design-system.md`, "Placement chip"): each field keeps
  * 72px for the text, room for 9 digits at 14px (criterion 33), as the Pen entry chip does. */
@@ -164,21 +166,22 @@ export function PlacementChip({ placement, chip, containerRef }: PlacementChipPr
         {chip.fields.map((field, index) => {
           const angle = field.label === "Angle";
           const label = field.size ? (
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-label="Diameter"
-              aria-pressed={field.label !== "r"}
-              title="Radius or diameter (Space)"
-              // Keeps the focus in the field it came from.
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => placement.toggleDiameter()}
-              className="absolute top-0 left-0 z-10 flex h-7 w-6 cursor-pointer items-center justify-center text-xs"
-              // Reachable before the first edit too, so the tooltip names Space.
-              style={{ pointerEvents: "auto" }}
-            >
-              {field.label}
-            </button>
+            <Tooltip side="bottom" content="Radius or diameter (Space)">
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label="Diameter"
+                aria-pressed={field.label !== "r"}
+                // Keeps the focus in the field it came from.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => placement.toggleDiameter()}
+                className="absolute top-0 left-0 z-10 flex h-7 w-6 cursor-pointer items-center justify-center text-xs"
+                // Reachable before the first edit too, so the tooltip names Space.
+                style={{ pointerEvents: "auto" }}
+              >
+                {field.label}
+              </button>
+            </Tooltip>
           ) : (
             field.label
           );
@@ -213,20 +216,24 @@ export function PlacementChip({ placement, chip, containerRef }: PlacementChipPr
       {chip.checks.length > 0 && (
         // The checks take the pointer although the chip does not before the first edit; a press on
         // one keeps the focus in the field.
-        <div className="mt-1 flex items-center gap-3" style={{ pointerEvents: "auto" }}>
+        <div className="mt-1 flex items-center gap-1" style={{ pointerEvents: "auto" }}>
           {chip.checks.map((check) => (
-            <label key={check.label} className="flex h-6 cursor-pointer items-center gap-1.5 px-1 text-xs">
-              <input
-                type="checkbox"
-                tabIndex={-1}
-                checked={check.on}
-                aria-label={check.label}
-                onMouseDown={(event) => event.preventDefault()}
-                onChange={() => placement.toggleModifier(check.shift)}
-                className="size-3.5 cursor-pointer accent-[var(--editor-accent)]"
-              />
-              <span aria-hidden>{check.label}</span>
-            </label>
+            <button
+              key={check.label}
+              type="button"
+              tabIndex={-1}
+              aria-pressed={check.on}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => placement.toggleModifier(check.shift)}
+              className={toggleClass("bar", false, "h-6 text-xs")}
+            >
+              {check.shift ? (
+                <Crosshair {...GLYPH} aria-hidden />
+              ) : (
+                <RotateCw {...GLYPH} aria-hidden />
+              )}
+              {check.label}
+            </button>
           ))}
         </div>
       )}

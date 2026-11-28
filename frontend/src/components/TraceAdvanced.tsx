@@ -1,4 +1,5 @@
-import { Contrast, ImageMinus, Pipette, ScanText, Shapes, type LucideIcon } from "lucide-react";
+import { Contrast, ImageMinus, Pipette, ScanSearch, ScanText, Shapes, type LucideIcon } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useLayoutEffect, useRef } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
@@ -22,6 +23,7 @@ import {
   coloursText,
 } from "@/lib/traceText";
 import { PICK_PALETTE_COLOUR } from "@/lib/tracePaletteText";
+import { Button } from "@/components/ui/button";
 
 /** The Output pill as a choice of the schema's shape (`specs/0089` criterion 25). */
 const OUTPUT_PARAM: TraceParam = {
@@ -51,10 +53,6 @@ const TOGGLES: Partial<Record<TraceParam["name"], { key: "invert" | "ignoreBackg
 
 const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
 
-/** The blue text button of the Trace button's look (`ux-notes.md` §22.3): the Analyse button
- * (the Trace button has the same colours). */
-const ACCENT_BUTTON_CLASS =
-  "my-1 h-7 shrink-0 rounded-md bg-[var(--editor-accent)] text-sm text-white outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 const CELL_CLASS = "flex h-9 min-w-[150px] items-center";
 
 interface ChoicePillProps {
@@ -89,7 +87,7 @@ function ChoicePill({ param, bare = false, value, onValue, onReturnFocus }: Choi
   return (
     <div className={bare ? "flex h-9 items-center" : CELL_CLASS}>
       {bare ? null : <span className={`${LABEL_CLASS} w-16 shrink-0`}>{param.label}</span>}
-      <div role="radiogroup" aria-label={param.label} className="flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
+      <div role="radiogroup" aria-label={param.label} className="flex h-7 overflow-hidden rounded-[5px] outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
         {param.choices.map((choice, index) => {
           const on = index === value;
           return (
@@ -173,7 +171,7 @@ function PalettePipette({ armed, onPipette, onReturnFocus }: { armed: boolean; o
             armed ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
           }`}
         >
-          <Pipette size={16} strokeWidth={1.5} aria-hidden />
+          <Pipette {...GLYPH} aria-hidden />
         </button>
       </Tooltip>
     </span>
@@ -364,10 +362,8 @@ export function TraceAdvanced({
       {/* 4. The Parts and Mask unit, then Analyse at the far right; each wraps as a whole. */}
       {parts}
       <div className="ml-auto flex h-9 items-center">
-        <button
-          type="button"
-          data-trace-analyse=""
-          className={`${ACCENT_BUTTON_CLASS} w-[75px]`}
+        <Button variant="primary" size="bar" icon={ScanSearch}
+          data-trace-analyse="" className="min-w-[75px]"
           onClick={(event) => {
             onAnalyse();
             if (event.detail > 0) {
@@ -383,7 +379,7 @@ export function TraceAdvanced({
           }}
         >
           {ANALYSE}
-        </button>
+        </Button>
       </div>
     </div>
   );

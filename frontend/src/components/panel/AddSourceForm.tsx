@@ -2,7 +2,8 @@
 // the line that says what is sent, for a Git catalogue the optional Access token (`specs/0157`),
 // Cancel and Add. Add checks the address with one request, which the line under the field says;
 // nothing else is sent. The refusals are Rust's words, each under the field it is about.
-import { GitBranch, Globe, LoaderCircle } from "lucide-react";
+import { GitBranch, Globe, Plus, X } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useId, useRef, useState } from "react";
 
 import { TokenField, type TokenFieldHandle } from "@/components/panel/TokenField";
@@ -10,6 +11,8 @@ import { addOnlineSource, cancelOnlineAdd, removeOnlineSource, type RefusalField
 import { library_online_add_sent_text } from "@/wasm-bindings/curvyo_editor_wasm.js";
 import { openGuide } from "@/lib/libraryBrowserStore";
 import { tokenWords } from "@/lib/tokenWords";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
 type Kind = "git" | "iconify";
 
@@ -129,7 +132,7 @@ export function AddSourceForm({ onAdded, onCancel }: AddSourceFormProps) {
               setKind(k);
             }}
           >
-            {k === "git" ? <GitBranch size={14} aria-hidden="true" /> : <Globe size={14} aria-hidden="true" />}
+            {k === "git" ? <GitBranch {...GLYPH} aria-hidden="true" /> : <Globe {...GLYPH} aria-hidden="true" />}
             {k === "git" ? "Git catalogue" : "Iconify"}
           </button>
         ))}
@@ -156,9 +159,9 @@ export function AddSourceForm({ onAdded, onCancel }: AddSourceFormProps) {
         }}
       />
       {addressRefusal ? (
-        <p id={ids.refusal} role="alert" className="library-refusal">
+        <AlertLine id={ids.refusal}>
           {addressRefusal}
-        </p>
+        </AlertLine>
       ) : null}
       <p id={ids.sent} className="library-line" style={{ margin: 0 }}>
         {library_online_add_sent_text(kind === "iconify")}
@@ -178,13 +181,13 @@ export function AddSourceForm({ onAdded, onCancel }: AddSourceFormProps) {
           </button>
         </>
       ) : null}
-      <div className="library-source-buttons">
-        <button type="button" onClick={cancel}>
+      <div className="grid grid-cols-2 gap-2">
+        <Button icon={X} onClick={cancel}>
           Cancel
-        </button>
-        <button type="button" aria-busy={busy || undefined} aria-describedby={ids.sent} onClick={add}>
-          {busy ? <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" /> : "Add"}
-        </button>
+        </Button>
+        <Button variant="primary" icon={Plus} busy={busy} aria-describedby={ids.sent} onClick={add}>
+          Add
+        </Button>
       </div>
     </div>
   );

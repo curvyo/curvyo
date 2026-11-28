@@ -118,7 +118,9 @@ test("Star mode of the polygon/star bar renders with the provider and throws wit
 
 test("the Select bar's Ratio slider renders with the provider", async () => {
   const SelectToolbar = await component("/src/components/SelectToolbar.tsx", "SelectToolbar");
-  const bar = {
+  // A kind group shows only while every selected object is of its kind (0159 Frage 433 B): the
+  // stars' Ratio and the ellipses' Arc kind are rendered from two selections.
+  const barOf = (kinds: string[]) => ({
     radiusShown: false,
     radiusMixed: false,
     radius: 0,
@@ -134,8 +136,9 @@ test("the Select bar's Ratio slider renders with the provider", async () => {
     ratioMixed: false,
     ratio: 0.5,
     objectToPathShown: false,
-  };
-  const element = ({ react }: { react: typeof import("react") }) =>
+    kinds,
+  });
+  const elementOf = (bar: ReturnType<typeof barOf>) => ({ react }: { react: typeof import("react") }) =>
     react.createElement(SelectToolbar, {
       scaleStrokeWidth: true,
       onSetScaleStrokeWidth: noop,
@@ -189,11 +192,15 @@ test("the Select bar's Ratio slider renders with the provider", async () => {
       },
       onReturnFocus: noop,
     });
-  const html = await render(element as never, true);
-  assert.match(html, /aria-label="Star inner ratio"/);
-  assert.match(html, /aria-label="Arc kind"/);
-  assert.match(html, /aria-label="Curve"/);
-  await assert.rejects(render(element as never, false), /TooltipProvider/);
+  const stars = elementOf(barOf(["star"]));
+  const starsHtml = await render(stars as never, true);
+  assert.match(starsHtml, /aria-label="Star inner ratio"/);
+  assert.match(starsHtml, /aria-label="Curve"/);
+  assert.doesNotMatch(starsHtml, /aria-label="Arc kind"/);
+  const ellipsesHtml = await render(elementOf(barOf(["ellipse"])) as never, true);
+  assert.match(ellipsesHtml, /aria-label="Arc kind"/);
+  assert.doesNotMatch(ellipsesHtml, /aria-label="Star inner ratio"/);
+  await assert.rejects(render(stars as never, false), /TooltipProvider/);
 });
 
 test("a value field renders with the provider and throws without it", async () => {

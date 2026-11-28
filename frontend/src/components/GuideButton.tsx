@@ -1,10 +1,12 @@
 import { SquareDashed } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { Tooltip } from "radix-ui";
 
 import { GUIDE_NAME, type GuideState } from "@/lib/guideText";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
 const BUTTON_CLASS =
-  "flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)]";
+  "flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)]";
 
 /**
  * The Guide button of the Select bar (`specs/0046-document-shapes` criteria 9, 10, 14 and 37):
@@ -51,14 +53,14 @@ export function GuideButton({
               enabled ? "hover:bg-[var(--editor-accent-hover)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]" : "opacity-40"
             }`}
           >
-            <SquareDashed aria-hidden size={16} strokeWidth={1.5} absoluteStrokeWidth />
+            <SquareDashed {...GLYPH} aria-hidden />
           </button>
         </Tooltip.Trigger>
         <Tooltip.Portal>
           <Tooltip.Content
             side="bottom"
             sideOffset={6}
-            className="z-50 rounded-md px-2 py-1 text-xs"
+            className={TOOLTIP_CLASS}
             style={{
               background: "var(--toolbar-bg)",
               color: "var(--toolbar-icon)",

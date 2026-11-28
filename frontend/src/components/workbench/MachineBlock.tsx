@@ -1,16 +1,7 @@
-import {
-  BookmarkCheck,
-  BookmarkPlus,
-  ChevronDown,
-  ChevronUp,
-  RotateCcw,
-  TriangleAlert,
-} from "lucide-react";
+import { BookmarkCheck, BookmarkPlus, ChevronDown, ChevronUp, Crosshair, MoveVertical, RotateCcw, TriangleAlert, Wind, Zap } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { CornerControl } from "@/components/CornerControl";
-import { ToolbarSwitch } from "@/components/ToolbarSwitch";
-import { PanelSwitch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ConnectorGroup } from "@/components/workbench/ConnectorGroup";
 import { ARMED_ACCENT_BUTTON, FIELD, ICON_BUTTON } from "@/components/workbench/machineStyles";
@@ -23,6 +14,8 @@ import type { LibrarySyncApi } from "@/lib/devicesApi";
 import { typedNumber } from "@/lib/machineBlockKeys";
 import { setMachineWriteFailureHandler } from "@/lib/machineProfilesFile";
 import { formatWorkArea } from "@/lib/workAreaText";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { FIELD_FRAME_LABEL, GLYPH, SECTION_HEADING } from "@/components/ui/looks";
 
 /** The write-failure alert (UX notes §7). */
 const WRITE_FAILED = "Could not save the profile. Nothing was changed.";
@@ -109,17 +102,17 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
 
   return (
     <section aria-label={label} className="flex flex-col gap-2">
-      <h3 className="text-sm text-[var(--toolbar-icon)]">{label}</h3>
+      <h3 className={SECTION_HEADING}>{label}</h3>
       {machine.library_notices.length > 0 ? (
         <div
           role="status"
-          className="flex items-start gap-2 rounded-md p-2 text-xs text-[var(--toolbar-icon)]"
+          className="flex items-start gap-2 rounded-[5px] p-2 text-xs text-[var(--toolbar-icon)]"
           style={{
             background: "var(--toolbar-bg)",
             border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)",
           }}
         >
-          <TriangleAlert size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />
+          <TriangleAlert {...GLYPH} aria-hidden className="shrink-0" />
           <span className="flex flex-col">
             {machine.library_notices.map((text) => (
               <span key={text}>{text}</span>
@@ -134,14 +127,14 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
             type="button"
             aria-expanded={open}
             aria-label={`Machine profile, ${copy.name}`}
-            className="flex h-7 min-w-0 flex-1 items-center justify-between gap-1 rounded-md border border-[var(--field-border)] bg-white px-2 text-sm outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+            className="flex h-7 min-w-0 flex-1 items-center justify-between gap-1 rounded-[5px] border border-[var(--field-border)] bg-white px-2 text-sm outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
             onClick={() => setOpen((was) => !was)}
           >
             <span className="truncate">{copy.name}</span>
             {open ? (
-              <ChevronUp size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />
+              <ChevronUp {...GLYPH} aria-hidden className="shrink-0" />
             ) : (
-              <ChevronDown size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />
+              <ChevronDown {...GLYPH} aria-hidden className="shrink-0" />
             )}
           </button>
         </Tooltip>
@@ -152,25 +145,30 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
             className={ICON_BUTTON}
             onClick={() => show(api.saveAs(), "save")}
           >
-            <BookmarkPlus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+            <BookmarkPlus {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
         {noticeAt("save")}
       </div>
-      <p className="text-xs text-[var(--panel-muted-fg)]">Fixture sets in profile: {machine.fixture_sets_in_profile}</p>
       {machine.name_notice ? (
         <p role="status" className="text-xs text-[var(--toolbar-icon)]">
           {machine.name_notice}
         </p>
       ) : null}
-      {/* The state row keeps its 28 px place on every laser page, empty while the copy equals its
-          profile, so nothing below it moves under the pointer after a press (`specs/0029` P31). */}
+      {/* The state row keeps its 28 px place on every laser page, so nothing below it moves under
+          the pointer after a press (`specs/0029` P31); it holds the "Fixture sets in profile"
+          line, and the state above that line when the copy differs (0159: no blank row). */}
       {machine.state === null || machine.state === undefined ? (
-        <div aria-hidden data-machine-state-row="" className="h-7 shrink-0" />
+        <div data-machine-state-row="" className="flex h-7 shrink-0 items-center">
+          <span className="text-xs text-[var(--panel-muted-fg)]">Fixture sets in profile: {machine.fixture_sets_in_profile}</span>
+        </div>
       ) : (
         <div data-machine-state-row="" className="flex h-7 items-center justify-between gap-1" {...{ [ARM_ZONE]: "update" }}>
-          <span role="status" className="text-xs text-[var(--toolbar-icon)]">
-            {machine.state === "differs" ? "Differs from profile" : "Not in your profiles"}
+          <span className="flex min-w-0 flex-col text-xs leading-[14px]">
+            <span role="status" className="truncate text-[var(--toolbar-icon)]">
+              {machine.state === "differs" ? "Differs from profile" : "Not in your profiles"}
+            </span>
+            <span className="truncate text-[var(--panel-muted-fg)]">Fixture sets in profile: {machine.fixture_sets_in_profile}</span>
           </span>
           {/* Reset from profile first with the save mark, Update profile last with the
               counter-clockwise arrow (`specs/0130` criterion 2a, Frage 260 B); Update is hidden
@@ -187,7 +185,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
                     profileButton.current?.focus();
                   }}
                 >
-                  <BookmarkCheck size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+                  <BookmarkCheck {...GLYPH} aria-hidden />
                 </button>
               </Tooltip>
               {machine.can_update ? (
@@ -205,7 +203,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
                       })
                     }
                   >
-                    <RotateCcw size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+                    <RotateCcw {...GLYPH} aria-hidden />
                   </button>
                 </Tooltip>
               ) : null}
@@ -236,9 +234,11 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
       <div className="flex flex-col gap-2">
         {/* The work area is the machine's: read-only text on the page (`specs/0098` criterion
             13); it is typed only in a user profile of the list. */}
-        <div className="flex h-7 items-center justify-between">
-          <span className="text-xs text-[var(--panel-muted-fg)]">Work area</span>
-          <span className="text-[13px] tabular-nums text-[var(--toolbar-icon)]">
+        {/* Read-only, but on the fields' grid: the label and the value where a field holds them,
+            the full row width like Max feed and Max power (0159 S6). */}
+        <div className="flex h-7 items-center justify-between rounded-[5px] border border-transparent px-2 text-sm">
+          <span className="text-[var(--toolbar-icon)]">Work area</span>
+          <span className="tabular-nums text-[var(--toolbar-icon)]">
             {formatWorkArea(copy.width, copy.height, unit)}
           </span>
         </div>
@@ -288,11 +288,12 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
           onCommit={(value) => show(api.setDefaultSpeed(value), "default_speed")}
         />
         <div className={SWITCH_ROW}>
-          <ToolbarSwitch
+          <ToggleButton icon={Zap}
             label="Laser mode"
             tooltip="Laser mode"
-            checked={copy.laser_mode}
-            onCheckedChange={(on) => api.setLaserMode(on)}
+            pressed={copy.laser_mode}
+            onPressedChange={(on) => api.setLaserMode(on)}
+            onReturnFocus={onReturnFocus}
           />
         </div>
         {/* The Focus point mode's pulse (`specs/0118` 35 a, W60 to W62): after Laser mode, which
@@ -311,26 +312,26 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", library
         {/* The capability Z offset reads (`specs/0111` criterion 22): one undo step on the page's
             profile copy; default off. */}
         <div className={SWITCH_ROW}>
-          <PanelSwitch
+          <ToggleButton icon={MoveVertical}
             label="Motorised Z axis"
-            checked={copy.motorised_z === true}
-            onCheckedChange={(on) => api.setMotorisedZ(on)}
+            pressed={copy.motorised_z === true}
+            onPressedChange={(on) => api.setMotorisedZ(on)}
             onReturnFocus={onReturnFocus}
           />
         </div>
         {/* Air assist (`specs/0029` criterion 25): one undo step on the page's profile copy. */}
         <div className={SWITCH_ROW}>
-          <PanelSwitch
+          <ToggleButton icon={Wind}
             label="Air assist"
-            checked={copy.air_assist === true}
-            onCheckedChange={(on) => api.setAirAssist(on)}
+            pressed={copy.air_assist === true}
+            onPressedChange={(on) => api.setAirAssist(on)}
             onReturnFocus={onReturnFocus}
           />
         </div>
         {/* The output format, plain text while there is one (`specs/0029` P23, criterion 39). */}
         <div className="flex h-7 items-center justify-between">
           <span className="text-sm text-[var(--toolbar-icon)]">Output</span>
-          <span className="text-[13px] text-[var(--panel-muted-fg)]">{copy.output}</span>
+          <span className="text-sm text-[var(--panel-muted-fg)]">{copy.output}</span>
         </div>
       </div>
       <ConnectionGroup
@@ -372,10 +373,10 @@ function FocusPulseFields({
       <div className={`${SWITCH_ROW} ${greyed ? "opacity-40" : ""}`}>
         <Tooltip side="left" content={greyed ? <Cause name="Focus pulse" cause={off} /> : "Focus pulse"}>
           <span className="w-full">
-            <PanelSwitch
+            <ToggleButton icon={Crosshair}
               label="Focus pulse"
-              checked={copy.focus_pulse === true}
-              onCheckedChange={(on) => {
+              pressed={copy.focus_pulse === true}
+              onPressedChange={(on) => {
                 if (!greyed) onFocusPulse(on);
               }}
               onReturnFocus={onReturnFocus}
@@ -430,7 +431,7 @@ function FieldNotice({ notice }: { notice: Notice }) {
   return (
     <div
       role={notice.alert ? "alert" : "status"}
-      className="pointer-events-none absolute right-0 top-full z-20 mt-1 w-max max-w-[244px] rounded-lg p-2 text-xs"
+      className="pointer-events-none absolute right-0 top-full z-20 mt-1 w-max max-w-[244px] rounded-[8px] p-2 text-xs"
       style={{
         background: "var(--toolbar-bg)",
         color: notice.alert ? "var(--field-invalid)" : "var(--toolbar-icon)",
@@ -481,7 +482,7 @@ function TextField({
   return (
     <div className="relative">
       <label className={`${FIELD} ${readOnly ? "opacity-70" : ""}`}>
-        <span className="shrink-0 text-[var(--toolbar-icon)]">{label}</span>
+        <span className={FIELD_FRAME_LABEL}>{label}</span>
         <input
           aria-label={label}
           aria-describedby={describedBy}
@@ -540,7 +541,7 @@ function NumberField({
       <div className="relative">
         <Tooltip side="left" content={<Cause name={label} cause={greyed} />}>
           <label className={`${FIELD} opacity-40`}>
-            <span className="shrink-0 text-[var(--toolbar-icon)]">{label}</span>
+            <span className={FIELD_FRAME_LABEL}>{label}</span>
             <input
               aria-label={accessibleName}
               aria-describedby={describedBy}
@@ -573,7 +574,7 @@ function NumberField({
     <div className="relative">
       <Tooltip side="left" content={label}>
         <label className={`${FIELD} ${readOnly ? "opacity-70" : ""}`}>
-          <span className="shrink-0 text-[var(--toolbar-icon)]">{label}</span>
+          <span className={FIELD_FRAME_LABEL}>{label}</span>
           <input
             aria-label={accessibleName}
             aria-describedby={describedBy}
@@ -626,7 +627,7 @@ function ConnectionGroup({
   const describedBy = readOnly ? reason : undefined;
   return (
     <section aria-label="Connection" className="mt-1 flex flex-col gap-2">
-      <h3 className="text-sm text-[var(--toolbar-icon)]">Connection</h3>
+      <h3 className={SECTION_HEADING}>Connection</h3>
       {readOnly ? (
         <p id={reason} className="text-xs text-[var(--panel-muted-fg)]">
           {NO_CONNECTION}

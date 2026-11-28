@@ -27,7 +27,7 @@ export function CollaborationPill({ view, onOpen }: { view: ShareView; onOpen: (
           type="button"
           aria-label={view.pillName}
           onClick={onOpen}
-          className="flex h-8 items-center gap-1.5 rounded-md bg-[var(--toolbar-bg)] px-1.5 py-1 text-xs text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          className="flex h-8 items-center gap-1.5 rounded-[8px] bg-[var(--toolbar-bg)] px-1.5 py-1 text-xs text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         >
           <Glyph
             size={16}

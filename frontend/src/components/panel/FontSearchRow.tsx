@@ -1,12 +1,14 @@
 // The Fonts tab's search row (`specs/0074-text-objects` UX notes §4, `specs/0075-font-library`
 // UX notes §4): the search field and the Add font… button with its busy state and notice.
-import { FilePlus, LayoutGrid, LoaderCircle, Search, X } from "lucide-react";
+import { FilePlus, LayoutGrid, LoaderCircle } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 
 import { TabNotice } from "@/components/panel/FontTabNotice";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { FontNotice } from "@/hooks/useFontLibrary";
 import { addingText } from "@/lib/fontLibraryText";
 import { PREVIEW_BUTTON_ID } from "@/lib/fontPreviewStore";
+import { SearchField } from "@/components/ui/search-field";
 
 interface FontSearchRowProps {
   searchRef: React.RefObject<HTMLInputElement | null>;
@@ -39,32 +41,15 @@ export function FontSearchRow({
 }: FontSearchRowProps) {
   return (
     <div className="relative mb-2 flex h-7 shrink-0 gap-1">
-      <div className="relative h-7 min-w-0 flex-1">
-        <Search size={16} aria-hidden className="pointer-events-none absolute top-1.5 left-2 text-[var(--panel-muted-fg)]" />
-        <input
-          ref={searchRef}
-          type="text"
-          value={search}
-          aria-label="Search fonts"
-          placeholder="Search fonts"
-          onChange={(event) => onSearch(event.target.value)}
-          onKeyDown={onKeyDown}
-          className="h-7 w-full rounded-[5px] bg-white pr-7 pl-8 text-sm outline-none ring-1 ring-border placeholder:text-[var(--field-placeholder)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-        />
-        {search ? (
-          <button
-            type="button"
-            aria-label="Clear search"
-            onClick={() => {
-              onSearch("");
-              searchRef.current?.focus();
-            }}
-            className="absolute top-0.5 right-0.5 flex size-6 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-          >
-            <X size={14} aria-hidden />
-          </button>
-        ) : null}
-      </div>
+      <SearchField
+        className="flex-1"
+        inputRef={searchRef}
+        value={search}
+        onValue={onSearch}
+        aria-label="Search fonts"
+        placeholder="Search fonts"
+        onKeyDown={onKeyDown}
+      />
       <Tooltip side="left" content="Font preview">
         <button
           id={PREVIEW_BUTTON_ID}
@@ -78,7 +63,7 @@ export function FontSearchRow({
               : "text-[var(--toolbar-icon)]"
           }`}
         >
-          <LayoutGrid size={16} strokeWidth={1.5} aria-hidden />
+          <LayoutGrid {...GLYPH} aria-hidden />
         </button>
       </Tooltip>
       <div className="relative">
@@ -96,7 +81,7 @@ export function FontSearchRow({
               dropOver ? "!bg-[var(--toolbar-icon-active-bg)] !text-[var(--toolbar-icon-active-fg)]" : ""
             }`}
           >
-            {busy !== null ? <LoaderCircle size={16} aria-hidden className="motion-safe:animate-spin" /> : <FilePlus size={16} aria-hidden />}
+            {busy !== null ? <LoaderCircle {...GLYPH} aria-hidden className="motion-safe:animate-spin" /> : <FilePlus {...GLYPH} aria-hidden />}
           </button>
         </Tooltip>
         {busy !== null ? (

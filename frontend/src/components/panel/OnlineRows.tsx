@@ -20,10 +20,13 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { type KeyboardEvent, useEffect, useState } from "react";
 
 import type { IconCell, LibraryRow } from "@/lib/libraryApi";
 import { onlineIconSvg, onlineThumbnail } from "@/lib/onlineApi";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** An icon, drawn from its SVG as an image: nothing in it can run. */
 function IconPicture({ source, cell }: { source: string; cell: IconCell }) {
@@ -77,12 +80,12 @@ function Thumbnail({ row }: { row: LibraryRow }) {
     };
   }, [row.picture, row.source, row.path]);
   if (row.unreadable) {
-    return <TriangleAlert size={16} aria-hidden="true" className="library-document-placeholder" />;
+    return <TriangleAlert {...GLYPH} aria-hidden="true" className="library-document-placeholder" />;
   }
   return url ? (
     <img className="library-document-picture" src={url} alt="" draggable={false} />
   ) : (
-    <FileText size={16} aria-hidden="true" className="library-document-placeholder" />
+    <FileText {...GLYPH} aria-hidden="true" className="library-document-placeholder" />
   );
 }
 
@@ -118,7 +121,7 @@ export interface OnlineHandlers {
 function Chevron({ row }: { row: LibraryRow }) {
   return (
     <span className="library-chevron" aria-hidden="true">
-      {row.expandable ? row.expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} /> : null}
+      {row.expandable ? row.expanded ? <ChevronDown {...GLYPH} /> : <ChevronRight {...GLYPH} /> : null}
     </span>
   );
 }
@@ -181,17 +184,17 @@ export function OnlineRowContent({ row, handlers: h }: { row: LibraryRow; handle
     return (
       <>
         <span className="library-chevron" aria-hidden="true" />
-        <Globe size={16} aria-hidden="true" style={{ opacity: 0.55 }} />
+        <Globe {...GLYPH} aria-hidden="true" style={{ opacity: 0.55 }} />
         <span className="library-names">
           <span className="library-name" style={{ color: "var(--panel-muted-fg)" }}>
             <span className="library-name-text">{row.name}</span>
           </span>
         </span>
-        <button
-          type="button"
-          className="library-online-add"
+        <Button icon={Plus}
+          size="bar"
+          className="library-online-add mr-1 h-6 text-xs"
           aria-label={`Add ${row.name}`}
-          title={`Add ${row.name}\n${extra.host}`}
+          tooltip={`Add ${row.name}\n${extra.host}`}
           tabIndex={-1}
           onClick={(event) => {
             event.stopPropagation();
@@ -199,7 +202,7 @@ export function OnlineRowContent({ row, handlers: h }: { row: LibraryRow; handle
           }}
         >
           Add
-        </button>
+        </Button>
       </>
     );
   }
@@ -223,25 +226,25 @@ export function OnlineRowContent({ row, handlers: h }: { row: LibraryRow; handle
     return (
       <span className="library-icon-cells" role="group" aria-label={row.label}>
         {extra.cells.map((cell) => (
-          <button
-            key={`${cell.prefix}:${cell.name}`}
-            type="button"
-            data-icon-cell
-            className="library-icon-cell"
-            aria-label={cell.label}
-            title={cell.tooltip}
-            tabIndex={-1}
-            onFocus={() => h.onCellFocus(row.key)}
-            onKeyDown={(event) => cellKeys(event, row, cell, h)}
-            onDoubleClick={(event) => {
-              event.stopPropagation();
-              h.importIcon(row, cell, null);
-            }}
-            onPointerDown={(event) => h.dragIcon(event, row, cell)}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <IconPicture source={row.source} cell={cell} />
-          </button>
+          <Tooltip key={`${cell.prefix}:${cell.name}`} side="left" content={cell.tooltip}>
+            <button
+              type="button"
+              data-icon-cell
+              className="library-icon-cell"
+              aria-label={cell.label}
+              tabIndex={-1}
+              onFocus={() => h.onCellFocus(row.key)}
+              onKeyDown={(event) => cellKeys(event, row, cell, h)}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                h.importIcon(row, cell, null);
+              }}
+              onPointerDown={(event) => h.dragIcon(event, row, cell)}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <IconPicture source={row.source} cell={cell} />
+            </button>
+          </Tooltip>
         ))}
       </span>
     );
@@ -289,19 +292,20 @@ export function OnlineRowContent({ row, handlers: h }: { row: LibraryRow; handle
           {extra.font_note ? <span className="library-line">{extra.font_note}</span> : null}
         </span>
         {extra.loadable ? (
-          <button
-            type="button"
-            className="library-action"
-            aria-label={`Load ${row.name}`}
-            title="Load template"
-            tabIndex={-1}
-            onClick={(event) => {
-              event.stopPropagation();
-              h.load(row);
-            }}
-          >
-            <Import size={16} />
-          </button>
+          <Tooltip side="left" content="Load template">
+            <button
+              type="button"
+              className="library-action"
+              aria-label={`Load ${row.name}`}
+              tabIndex={-1}
+              onClick={(event) => {
+                event.stopPropagation();
+                h.load(row);
+              }}
+            >
+              <Import {...GLYPH} />
+            </button>
+          </Tooltip>
         ) : null}
       </>
     );
@@ -321,18 +325,19 @@ function LicenceLink({ extra, h }: { extra: NonNullable<LibraryRow["online"]>; h
     h.licence(extra.licence_url);
   };
   return (
-    <a
-      className="library-licence-link"
-      href={extra.licence_url}
-      title={extra.licence_url}
-      tabIndex={-1}
-      draggable={false}
-      onClick={open}
-      onAuxClick={(event) => event.preventDefault()}
-      onPointerDown={(event) => event.stopPropagation()}
-    >
-      {extra.licence}
-    </a>
+    <Tooltip side="left" content={extra.licence_url}>
+      <a
+        className="library-licence-link"
+        href={extra.licence_url}
+        tabIndex={-1}
+        draggable={false}
+        onClick={open}
+        onAuxClick={(event) => event.preventDefault()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        {extra.licence}
+      </a>
+    </Tooltip>
   );
 }
 
@@ -346,47 +351,50 @@ export function OnlineSourceCells({ row, handlers: h }: { row: LibraryRow; handl
   return (
     <>
       <span className="library-count">{extra.state}</span>
-      <button
-        type="button"
-        className={`library-action${running || row.expanded ? " library-action-shown" : ""}`}
-        aria-label={`Refresh ${row.name}`}
-        title="Refresh"
-        tabIndex={-1}
-        onClick={(event) => {
-          event.stopPropagation();
-          h.refresh(row);
-        }}
-      >
-        <RefreshCw size={16} className={running ? "motion-safe:animate-spin" : undefined} />
-      </button>
-      {extra.token.action ? (
+      <Tooltip side="left" content="Refresh">
         <button
           type="button"
-          className={`library-action${extra.token.attention ? " library-action-shown" : ""}`}
-          aria-label={`${extra.token.action} ${row.name}`}
-          title={extra.token.action}
+          className={`library-action${running || row.expanded ? " library-action-shown" : ""}`}
+          aria-label={`Refresh ${row.name}`}
           tabIndex={-1}
           onClick={(event) => {
             event.stopPropagation();
-            h.token(row);
+            h.refresh(row);
           }}
         >
-          <KeyRound size={16} />
+          <RefreshCw {...GLYPH} className={running ? "motion-safe:animate-spin" : undefined} />
         </button>
+      </Tooltip>
+      {extra.token.action ? (
+        <Tooltip side="left" content={extra.token.action}>
+          <button
+            type="button"
+            className={`library-action${extra.token.attention ? " library-action-shown" : ""}`}
+            aria-label={`${extra.token.action} ${row.name}`}
+            tabIndex={-1}
+            onClick={(event) => {
+              event.stopPropagation();
+              h.token(row);
+            }}
+          >
+            <KeyRound {...GLYPH} />
+          </button>
+        </Tooltip>
       ) : null}
-      <button
-        type="button"
-        className={h.armed === row.key ? "library-action library-armed" : "library-action"}
-        tabIndex={-1}
-        aria-label={h.armed === row.key ? h.armedText(row) : `Remove ${row.name} from the library`}
-        title={h.armed === row.key ? h.armedText(row) : `Remove ${row.name} from the library`}
-        onClick={(event) => {
-          event.stopPropagation();
-          h.remove(row);
-        }}
-      >
-        <X size={16} />
-      </button>
+      <Tooltip side="left" content={h.armed === row.key ? h.armedText(row) : `Remove ${row.name} from the library`}>
+        <button
+          type="button"
+          className={h.armed === row.key ? "library-action library-armed" : "library-action"}
+          tabIndex={-1}
+          aria-label={h.armed === row.key ? h.armedText(row) : `Remove ${row.name} from the library`}
+          onClick={(event) => {
+            event.stopPropagation();
+            h.remove(row);
+          }}
+        >
+          <X {...GLYPH} />
+        </button>
+      </Tooltip>
     </>
   );
 }
@@ -394,9 +402,9 @@ export function OnlineSourceCells({ row, handlers: h }: { row: LibraryRow; handl
 /** The glyph of a source row. */
 export function OnlineSourceGlyph({ row }: { row: LibraryRow }) {
   return row.online?.glyph === "git" ? (
-    <GitBranch size={16} aria-hidden="true" />
+    <GitBranch {...GLYPH} aria-hidden="true" />
   ) : (
-    <Globe size={16} aria-hidden="true" />
+    <Globe {...GLYPH} aria-hidden="true" />
   );
 }
 

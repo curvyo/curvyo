@@ -29,6 +29,8 @@ import {
 } from "@/lib/machineControls";
 import { isTauri } from "@/platform/host";
 import { controller_warnings } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { SECTION_HEADING } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface Props {
   profileId: string;
@@ -69,7 +71,7 @@ function MachineControlsFor({ profileId, address, profile, frame }: Props) {
         className="my-0.5 h-px w-full shrink-0"
         style={{ background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
       />
-      <h3 id={heading} className="text-[11px] leading-4 font-semibold text-[var(--panel-muted-fg)]">
+      <h3 id={heading} className={`${SECTION_HEADING} leading-4`}>
         Machine controls
       </h3>
       {notice !== null ? (
@@ -394,10 +396,12 @@ function JobName({ name, sender = null }: { name: string; sender?: string | null
   const dot = name.lastIndexOf(".");
   const [stem, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
   return (
-    <span className="flex min-w-0 text-[var(--panel-muted-fg)]" title={name || undefined}>
-      <span className="truncate">{stem}</span>
-      <span className="shrink-0">{extension}</span>
-      {sender !== null ? <span className="shrink-0">, {sender}</span> : null}
-    </span>
+    <Tooltip side="left" content={name || undefined}>
+      <span className="flex min-w-0 text-[var(--panel-muted-fg)]">
+        <span className="truncate">{stem}</span>
+        <span className="shrink-0">{extension}</span>
+        {sender !== null ? <span className="shrink-0">, {sender}</span> : null}
+      </span>
+    </Tooltip>
   );
 }

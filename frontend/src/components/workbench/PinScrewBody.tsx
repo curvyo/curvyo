@@ -71,7 +71,7 @@ function JobToggleButton({ job, fixtureName, onPress }: { job: JobToggle; fixtur
         aria-pressed={job.toggle.on}
         aria-description={fixtureName}
         onClick={onPress}
-        className={`inline-flex h-7 items-center gap-1 rounded-md border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${job.toggle.on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"}`}
+        className={`inline-flex h-7 items-center gap-1 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${job.toggle.on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"}`}
       >
         <Icon size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
         {job.label}

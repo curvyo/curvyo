@@ -1,8 +1,10 @@
+import { Grid3x3 } from "lucide-react";
 import { CornerControl } from "@/components/CornerControl";
 import { EntryField } from "@/components/panel/EntryField";
 import { PanelRadioGroup } from "@/components/panel/PanelRadioGroup";
-import { PanelSwitch } from "@/components/ui/switch";
 import { GRID_MESSAGES, type GridApi, type GridField } from "@/hooks/useGrid";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { PANEL_CONTROL_PX, PANEL_LABEL, PANEL_ROW } from "@/components/ui/looks";
 
 const MODES = [["adaptive", "Adaptive"], ["fixed", "Fixed"]] as const;
 const SCALES = [["linear", "Linear"], ["log", "Logarithmic"]] as const;
@@ -39,21 +41,21 @@ export function GridSection({ grid, disabled, onReturnFocus }: {
         <span aria-hidden className="min-w-0 truncate text-[var(--panel-muted-fg)]">{view.pageName}</span>
       </div>
       <CornerControl label="Origin" corner={view.origin} onChange={(corner) => grid.setOrigin(corner)} onReturnFocus={onReturnFocus} />
-      <PanelSwitch label="Grid" checked={view.shown} onCheckedChange={(checked) => grid.setShown(checked)} onReturnFocus={onReturnFocus} />
+      <ToggleButton icon={Grid3x3} label="Grid" pressed={view.shown} onPressedChange={(checked) => grid.setShown(checked)} onReturnFocus={onReturnFocus} />
       <PanelRadioGroup legend="Mode" options={MODES} value={view.mode} onChange={(mode) => grid.setMode(mode)} onReturnFocus={onReturnFocus} />
       <PanelRadioGroup legend="Scale" options={SCALES} value={view.scale} onChange={(scale) => grid.setScale(scale)} onReturnFocus={onReturnFocus} />
       <div className="flex flex-col gap-2">
-        <label className="flex items-center justify-between text-sm">
-          <span>Spacing</span>
-          {field("spacing", "Spacing", view.spacing, view.unit, 112)}
+        <label className={PANEL_ROW}>
+          <span className={PANEL_LABEL}>Spacing</span>
+          {field("spacing", "Spacing", view.spacing, view.unit, PANEL_CONTROL_PX)}
         </label>
-        <label className="flex items-center justify-between text-sm">
-          <span>Subdivision</span>
-          {field("subdivision", "Subdivision", view.subdivision, undefined, 112)}
+        <label className={PANEL_ROW}>
+          <span className={PANEL_LABEL}>Divisions</span>
+          {field("subdivision", "Subdivision", view.subdivision, undefined, PANEL_CONTROL_PX)}
         </label>
-        <label className="flex items-center justify-between text-sm">
-          <span>Angle</span>
-          {field("angle", "Angle", view.angle, "°", 112)}
+        <label className={PANEL_ROW}>
+          <span className={PANEL_LABEL}>Angle</span>
+          {field("angle", "Angle", view.angle, "°", PANEL_CONTROL_PX)}
         </label>
       </div>
     </fieldset>

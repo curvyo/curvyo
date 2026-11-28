@@ -156,18 +156,18 @@ function pathsAndOutlines(pathCount: number, outlineCount: number): string {
 }
 
 /** The notice after a press (criterion 20, `0055` criterion 7), or `null` if nothing was
- * closed. */
+ * closed. No count of what was closed: the closed outlines are the feedback, the notice names
+ * only what was skipped and why (customer 2026-11-27, `specs/0159` S7). */
 export function closeNoticeText(result: ClosePathResult): string | null {
   const closedOutlines = result.closedOutlines ?? 0;
   if (result.closed === 0 && closedOutlines === 0) {
     return null;
   }
-  const closed = `Closed ${pathsAndOutlines(result.closed, closedOutlines)}.`;
   const reasons = [
     skippedSentences(result.skipped, result.sameEnds ?? 0, paths),
     skippedSentences(result.skippedOutlines ?? 0, result.sameEndsOutlines ?? 0, outlines),
   ].filter((part) => part !== "");
-  return [closed, ...reasons].join(" ");
+  return reasons.length > 0 ? reasons.join(" ") : null;
 }
 
 /** How long that notice stays: 3 s, or 5 s when the sentence is longer than 70 characters. */

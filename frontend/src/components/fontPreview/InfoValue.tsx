@@ -4,6 +4,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { NOT_STATED } from "@/lib/fontInfoText";
+import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
 
 export function InfoValue({ text, clamp = true, part = false }: { text: string | null; clamp?: boolean; part?: boolean }) {
   // A part of a value (the Licence row's name, text and URL) is a `div` inside the row's `dd`.
@@ -38,14 +40,12 @@ export function InfoValue({ text, clamp = true, part = false }: { text: string |
         {text}
       </p>
       {clamp && (cut || open) ? (
-        <button
-          type="button"
+        <Button size="bar" icon={ChevronDown}
           aria-expanded={open}
           onClick={() => setOpen(!open)}
-          className="h-7 rounded-[5px] text-sm text-[var(--editor-accent)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         >
           {open ? "Show less" : "Show all"}
-        </button>
+        </Button>
       ) : null}
     </Tag>
   );

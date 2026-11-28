@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { RenameField } from "@/components/ui/rename-field";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The longest name, characters (`ux-notes.md` section 3.2; Rust's `MAX_ENTRY_NAME_CHARS`). */
 const MAX_NAME_CHARS = 120;
@@ -51,13 +53,12 @@ export function WorkspaceNameField({ label, initial, error, onCommit, onCancel }
   };
   return (
     <div className="min-w-0 flex-1">
-      <input
-        ref={input}
+      <RenameField
+        inputRef={input}
         type="text"
         value={text}
         maxLength={MAX_NAME_CHARS}
         aria-label={label}
-        aria-invalid={shownError !== ""}
         aria-describedby={shownError !== "" ? messageId : undefined}
         onChange={(event) => {
           setText(event.target.value);
@@ -75,14 +76,13 @@ export function WorkspaceNameField({ label, initial, error, onCommit, onCancel }
             onCancel();
           }
         }}
-        className={`h-6 w-full rounded-[4px] border bg-[var(--background)] px-1.5 text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
-          shownError !== "" ? "border-[var(--field-invalid)]" : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]"
-        }`}
+        invalid={shownError !== ""}
+        className="w-full"
       />
       {shownError !== "" ? (
-        <p id={messageId} role="alert" className="mt-0.5 text-xs text-[var(--field-invalid)]">
+        <AlertLine id={messageId} className="mt-0.5">
           {shownError}
-        </p>
+        </AlertLine>
       ) : null}
     </div>
   );

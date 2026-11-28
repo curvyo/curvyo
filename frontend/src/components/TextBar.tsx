@@ -4,6 +4,7 @@
 // orientation, Glyphs), shown below row 1 while the maker has opened it. In the Select tool the
 // same controls are the Select bar's Text groups.
 import { ChevronsDown, ChevronsUp, Omega, TriangleAlert, Type } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { AlignmentGroup } from "@/components/AlignmentGroup";
@@ -25,10 +26,12 @@ import type { WeightCode } from "@/lib/styleText";
 import type { AlignCode } from "@/lib/textLayoutText";
 import { changedRow2Controls, changedText, expandLabel, fontButtonName, fontTooltipLines } from "@/lib/textBarRows";
 import { parseSize, sizeStep, sizeText } from "@/lib/textText";
+import { NumberField } from "@/components/ui/number-field";
+import { ActionNotice } from "@/components/ui/notice";
 
 /** A 28 x 28 icon button of the bar (the Glyphs button's look, `0082` UX notes §1). */
 export const ICON_BUTTON_CLASS =
-  "flex size-7 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+  "flex size-7 shrink-0 items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /** How long the clamp notice stays under the field (Action notice, status). */
 const NOTICE_MS = 3000;
@@ -91,20 +94,19 @@ export function TextControls({ bar, onShowFonts, onSetSize, onPreviewSize, onRet
           className={`${ICON_BUTTON_CLASS} text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}
         >
           {bar.missing ? (
-            <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="text-[var(--field-invalid)]" />
+            <TriangleAlert {...GLYPH} aria-hidden className="text-[var(--field-invalid)]" />
           ) : (
-            <Type size={16} strokeWidth={1.5} aria-hidden />
+            <Type {...GLYPH} aria-hidden />
           )}
         </button>
       </Tooltip>
       <div className="relative">
-        <label className="flex h-7 w-[120px] items-center rounded-[5px] bg-white px-2 text-sm ring-1 ring-border focus-within:ring-2 focus-within:ring-[var(--editor-accent)]">
-          <span className="text-[var(--toolbar-icon)]">Size</span>
-          <input
-            type="text"
-            inputMode="decimal"
+        <NumberField
+            width={120}
+            label="Size"
+            unit="mm"
+            invalid={invalid}
             aria-label="Size"
-            aria-invalid={invalid}
             value={draft ?? shown}
             placeholder={bar.sizeMm === null ? "Mixed" : undefined}
             onChange={(event) => {
@@ -155,19 +157,11 @@ export function TextControls({ bar, onShowFonts, onSetSize, onPreviewSize, onRet
               }
               setDraft(null);
             }}
-            className="min-w-0 flex-1 bg-transparent text-right tabular-nums outline-none placeholder:text-[var(--field-placeholder)]"
           />
-          <span className="pl-1 text-[var(--toolbar-icon)]">mm</span>
-        </label>
         {notice ? (
-          <div
-            ref={noticeRef}
-            role="status"
-            style={shiftStyle(shift)}
-            className="absolute top-full right-0 z-10 mt-1 rounded-lg bg-[var(--toolbar-bg)] p-2 text-xs whitespace-nowrap text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)]"
-          >
+          <ActionNotice noticeRef={noticeRef} style={shiftStyle(shift)} className="absolute top-full right-0 z-10 mt-1 whitespace-nowrap">
             {notice}
-          </div>
+          </ActionNotice>
         ) : null}
       </div>
     </div>
@@ -199,7 +193,7 @@ export function GlyphsButton({ glyphs }: { glyphs: GlyphsButtonState }) {
             : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
         }`}
       >
-        <Omega size={16} strokeWidth={1.5} aria-hidden />
+        <Omega {...GLYPH} aria-hidden />
       </button>
     </Tooltip>
   );
@@ -265,9 +259,9 @@ export function ExpandButton({
           className={`${ICON_BUTTON_CLASS} relative text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}
         >
           {open ? (
-            <ChevronsUp size={16} strokeWidth={1.5} aria-hidden />
+            <ChevronsUp {...GLYPH} aria-hidden />
           ) : (
-            <ChevronsDown size={16} strokeWidth={1.5} aria-hidden />
+            <ChevronsDown {...GLYPH} aria-hidden />
           )}
           {changed ? (
             <span
@@ -313,7 +307,9 @@ export function BarGroup({ divider = true, className = "flex h-9 items-center", 
   children: ReactNode;
 }) {
   return (
-    <div className={`group/row relative ${className}`}>
+    // A group whose component drew nothing (only its divider, or empty wrappers) takes no room, so
+    // it never wraps to an empty row or leaves a divider after the last group (0159 F38, F41).
+    <div className={`group/row relative ${className} [&:not(:has(>:not([aria-hidden]):not(:empty)))]:hidden`}>
       {divider ? <Divider /> : null}
       {children}
     </div>
@@ -380,7 +376,7 @@ export function TextBar({
   const row2Id = useId();
   return (
     <div
-      className="pointer-events-auto flex min-w-0 flex-col rounded-lg px-2"
+      className="pointer-events-auto flex min-w-0 flex-col rounded-[8px] px-2"
       style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
     >
       <div ref={rowRef} role="toolbar" aria-label="Text" className={BAR_ROW_CLASS}>

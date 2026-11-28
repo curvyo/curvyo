@@ -1,10 +1,12 @@
-import { Trash2 } from "lucide-react";
+import { Eye, Plus, Trash2, X } from "lucide-react";
 import { useRef, useState } from "react";
 import type { SketchApi, SketchParameter } from "@/hooks/useSketch";
-import { SketchField, sketchButton, sketchInput } from "./SketchField";
+import { SketchField, sketchButton } from "./SketchField";
+import { FIELD_WIDE as sketchInput, GLYPH } from "@/components/ui/looks";
 import { ToggleGroup } from "@/components/ui/toggle-group";
 import { quantityText } from "@/lib/sketchView";
 import { ExposeControls } from "./ExposeControls";
+import { Button } from "@/components/ui/button";
 
 const units = [
   {value:"Length",label:"Millimetres",tooltip:"Length in millimetres",icon:"mm"},
@@ -30,9 +32,9 @@ function ParameterRow({ parameter: p, sketch }: { parameter: SketchParameter; sk
         const section = e.currentTarget.closest("section");
         const next = e.currentTarget.closest("[data-parameter]")?.nextElementSibling?.querySelector<HTMLInputElement>("input");
         if (sketch.run(s => s.sketch_remove_parameter(p.id))) requestAnimationFrame(() => (next ?? section?.querySelector<HTMLButtonElement>("[data-add-parameter]"))?.focus());
-      }}>{holders > 0 ? <Trash2 size={14} aria-hidden /> : "×"}</button>
+      }}><Trash2 {...GLYPH} aria-hidden /></button>
     <div className="col-span-3"><SketchField label={`${p.name} expression`} value={p.expression ?? ""} commit={text => save(p.name, text, p.dimension)} focusCanvas={sketch.focusCanvas} /></div>
-    <div className="col-span-3 flex items-center justify-between"><output className="text-xs text-[var(--toolbar-icon)]">{quantityText(p.value)}</output><button className={sketchButton} onClick={() => sketch.run(s => s.sketch_inspect_parameter(p.id))}>Inspect</button></div>
+    <div className="col-span-3 flex items-center justify-between"><output className="text-xs text-[var(--toolbar-icon)]">{quantityText(p.value)}</output><Button icon={Eye} onClick={() => sketch.run(s => s.sketch_inspect_parameter(p.id))}>Inspect</Button></div>
     {p.expose && <ExposeControls expose={p.expose} subject={p.name} sketch={sketch} />}
   </div>;
 }
@@ -42,14 +44,14 @@ export function SketchParameters({ sketch }: { sketch: SketchApi }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState(""); const [expression, setExpression] = useState(""); const [unit, setUnit] = useState("Length");
   const add = () => { if (sketch.run(s => s.sketch_add_parameter(name, expression, unit))) { setAdding(false); setName(""); setExpression(""); sketch.focusCanvas(); } };
-  return <section aria-label="Parameters" className="space-y-1"><h3 className="text-xs font-medium">Parameters</h3>
+  return <section aria-label="Parameters" className="space-y-1">
     {sketch.error && <p id="sketch-error" role="alert" className="text-xs text-red-600">{sketch.error}</p>}
     {sketch.view.parameters.map(p => <ParameterRow key={p.id} parameter={p} sketch={sketch} />)}
     {adding ? <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-1" onSubmit={e => { e.preventDefault(); add(); }} onKeyDown={e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancel(); } }}>
       <input autoFocus className={sketchInput} aria-label="New parameter name" aria-describedby={sketch.error ? "sketch-error" : undefined} aria-invalid={!!sketch.error} value={name} onChange={e => setName(e.target.value)} />
       <ToggleGroup label="New parameter unit" options={units} value={unit} onChange={setUnit} itemWidth={32} onReturnFocus={() => {}} />
       <input className={`${sketchInput} col-span-2`} aria-label="New parameter expression" aria-describedby={sketch.error ? "sketch-error" : undefined} aria-invalid={!!sketch.error} value={expression} onChange={e => setExpression(e.target.value)} />
-      <button className={sketchButton} type="submit">Add</button><button className={sketchButton} type="button" onClick={cancel}>Cancel</button>
-    </form> : <button data-add-parameter ref={addButton} className={sketchButton} onClick={() => setAdding(true)}>Add parameter</button>}
+      <Button icon={X} onClick={cancel}>Cancel</Button><Button variant="primary" icon={Plus} type="submit">Add</Button>
+    </form> : <Button icon={Plus} data-add-parameter ref={addButton} onClick={() => setAdding(true)}>Add parameter</Button>}
   </section>;
 }

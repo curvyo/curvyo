@@ -1,4 +1,4 @@
-import { Camera, Crop, Trash2, TriangleAlert, Upload } from "lucide-react";
+import { Camera, Crop, Trash2, TriangleAlert, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PhotoCrop } from "@/components/panel/PhotoCrop";
@@ -8,9 +8,11 @@ import type { MaterialsApi } from "@/hooks/useMaterials";
 import type { TestDetail } from "@/lib/materialsView";
 import { photoArmText } from "@/lib/materialRows";
 import { PHOTO_MAX_PX, encodeType, isPhotoFile, scaledSize, type Frame } from "@/lib/photoSize";
+import { Button } from "@/components/ui/button";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
 
-const OUTLINE_BUTTON =
-  "flex h-7 items-center gap-1 rounded border border-[var(--lane-line)] px-2 text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+const OUTLINE_BUTTON = buttonClass("secondary", "panel", "px-2");
 
 /** What the photo section shows: the stored image, the live camera or Crop. */
 type Mode = { kind: "view" } | { kind: "camera" } | { kind: "crop"; url: string; width: number; height: number; mime: string };
@@ -196,18 +198,16 @@ export function TestPhoto({ material, test, api, arm }: TestPhotoProps) {
         >
           <video ref={attachVideo} muted playsInline aria-label="Camera" className="w-[228px] bg-[var(--canvas-bg)]" />
           <div className="flex gap-1">
-            <button type="button" onClick={cancelCamera} className={`${OUTLINE_BUTTON} w-[112px] justify-center`}>
+            <Button icon={X} onClick={cancelCamera} className="min-w-[112px]">
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button variant="primary" icon={Camera}
               autoFocus
               onClick={() => void takePhoto()}
-              className="flex h-7 w-[112px] items-center justify-center gap-1 rounded bg-[var(--toolbar-icon-active-bg)] text-xs text-white focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+               className="min-w-[112px]"
             >
-              <Camera size={16} aria-hidden />
-              Take photo
-            </button>
+Take photo
+</Button>
           </div>
         </div>
       ) : (
@@ -218,29 +218,30 @@ export function TestPhoto({ material, test, api, arm }: TestPhotoProps) {
                 <div className="h-7" aria-hidden />
               ) : stored.url === null ? (
                 <p className="flex items-center gap-1 text-xs text-[var(--panel-muted-fg)]">
-                  <TriangleAlert size={16} aria-hidden className="shrink-0" />
+                  <TriangleAlert {...GLYPH} aria-hidden className="shrink-0" />
                   Photo not found
                 </p>
               ) : (
                 <img src={stored.url} alt={`Photo of test ${test.id}`} className="max-h-[228px] w-[228px] bg-[var(--canvas-bg)] object-contain" />
               )}
-              <button
-                type="button"
-                {...{ [ARM_TRASH]: key }}
-                aria-label={armed ? photoArmText() : "Remove photo"}
-                title={armed ? "Press again to remove" : "Remove photo"}
-                onClick={() =>
-                  arm.press(key, photoArmText(), () => {
-                    api.removePhoto(material, test.id);
-                    return "Photo removed.";
-                  })
-                }
-                className={`absolute right-1 top-1 flex size-[22px] items-center justify-center rounded-[5px] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
-                  armed ? "bg-[var(--destructive)] text-white" : "bg-[var(--toolbar-bg)] text-[var(--toolbar-icon)]"
-                }`}
-              >
-                <Trash2 size={16} aria-hidden />
-              </button>
+              <Tooltip side="left" content={armed ? "Press again to remove" : "Remove photo"}>
+                <button
+                  type="button"
+                  {...{ [ARM_TRASH]: key }}
+                  aria-label={armed ? photoArmText() : "Remove photo"}
+                  onClick={() =>
+                    arm.press(key, photoArmText(), () => {
+                      api.removePhoto(material, test.id);
+                      return "Photo removed.";
+                    })
+                  }
+                  className={`absolute right-1 top-1 flex size-[22px] items-center justify-center rounded-[5px] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
+                    armed ? "bg-[var(--destructive)] text-white" : "bg-[var(--toolbar-bg)] text-[var(--toolbar-icon)]"
+                  }`}
+                >
+                  <Trash2 {...GLYPH} aria-hidden />
+                </button>
+              </Tooltip>
             </div>
           ) : null}
           <div className="flex flex-wrap gap-1">
@@ -255,18 +256,18 @@ export function TestPhoto({ material, test, api, arm }: TestPhotoProps) {
               }}
             />
             <button ref={fileButton} type="button" onClick={() => fileInput.current?.click()} className={OUTLINE_BUTTON}>
-              <Upload size={16} aria-hidden />
+              <Upload {...GLYPH} aria-hidden />
               File
             </button>
             {cameraOffered ? (
               <button type="button" onClick={() => void startCamera()} className={OUTLINE_BUTTON}>
-                <Camera size={16} aria-hidden />
+                <Camera {...GLYPH} aria-hidden />
                 Camera
               </button>
             ) : null}
             {stored?.url ? (
               <button type="button" onClick={() => openCropOfStored(stored.url as string)} className={OUTLINE_BUTTON}>
-                <Crop size={16} aria-hidden />
+                <Crop {...GLYPH} aria-hidden />
                 Crop
               </button>
             ) : null}

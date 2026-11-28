@@ -1,10 +1,10 @@
-import { RefreshCw, UserPlus } from "lucide-react";
+import { Plus, RefreshCw, UserPlus, X } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { ALERT, APPLY, ArmLines, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { ArmLines, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
 import { InviteBlock } from "@/components/panel/ShareInviteJoin";
 import { Tooltip } from "@/components/ui/tooltip";
-import { PanelSwitch } from "@/components/ui/switch";
 import { useArm } from "@/hooks/useArm";
 import type { CollaborationApi, ShareView } from "@/hooks/useCollaboration";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
@@ -18,6 +18,9 @@ import {
   workspace_not_added_text,
   workspace_uploading_text,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The switch "Sync to my devices" (`specs/0096-own-devices-sync` ux-notes 6): present while this
  * device is in a device group. */
@@ -47,7 +50,7 @@ export function TryAgain({ onPress }: { onPress: () => void }) {
   return (
     <Tooltip side="left" content={label}>
       <button type="button" aria-label={label} className={`${BUTTON} ${OUTLINE} w-7 border-transparent pointer-coarse:w-9`} onClick={onPress}>
-        <RefreshCw size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+        <RefreshCw {...GLYPH} aria-hidden />
       </button>
     </Tooltip>
   );
@@ -79,20 +82,18 @@ export function inviteBlocker(context: InviteContext, workspaceOpen: boolean, li
 /** Invite person, greyed with its reason as tooltip and description when it cannot work. */
 export function InvitePersonButton({ blocker, onPress }: { blocker: string; onPress: () => void }) {
   const button = (
-    <button
-      type="button"
+    <Button icon={UserPlus}
       aria-disabled={blocker !== ""}
       aria-description={blocker || undefined}
-      className={`${BUTTON} ${OUTLINE} px-3 ${blocker ? "opacity-40" : ""}`}
+      
       onClick={() => {
         if (blocker === "") {
           onPress();
         }
       }}
     >
-      <UserPlus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-      {sharing_word("invite-person")}
-    </button>
+{sharing_word("invite-person")}
+</Button>
   );
   return blocker ? (
     <Tooltip side="left" content={blocker}>
@@ -197,9 +198,9 @@ export function WorkspaceShareBlock({
       {!synced && ended ? ended : null}
       {devices ? (
         <div {...arm.zone} className="flex flex-col gap-1" aria-busy={switching}>
-          <PanelSwitch
+          <ToggleButton icon={RefreshCw}
             label={sharing_word("sync-to-my-devices")}
-            checked={(devices.on && devices.switching !== "leave") || sharing}
+            pressed={(devices.on && devices.switching !== "leave") || sharing}
             armed={arm.armed}
             extra={arm.control}
             onReturnFocus={() => {
@@ -207,7 +208,7 @@ export function WorkspaceShareBlock({
                 onReturnFocus();
               }
             }}
-            onCheckedChange={(next) => {
+            onPressedChange={(next) => {
               if (devices.switching === "leave") {
                 return;
               }
@@ -240,10 +241,8 @@ export function WorkspaceShareBlock({
         <div role="group" aria-label={sharing_word("sync-confirm")} className="flex flex-col gap-2">
           <p className="text-sm text-[var(--toolbar-icon)]">{sharing_word("sync-confirm")}</p>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
+            <Button variant="primary" icon={Plus}
               autoFocus
-              className={`${BUTTON} ${APPLY} px-3`}
               onClick={() => {
                 invited.current = false;
                 setInviteAfterSync(true);
@@ -252,18 +251,18 @@ export function WorkspaceShareBlock({
               }}
             >
               {sharing_word("invite-person")}
-            </button>
-            <button type="button" className={`${BUTTON} ${OUTLINE} px-3`} onClick={() => setConfirm(false)}>
+            </Button>
+            <Button icon={X} onClick={() => setConfirm(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
       {failure && !switching && !synced ? (
         <div className="flex items-start gap-2">
-          <p role="alert" className={`${ALERT} min-w-0 flex-1`}>
+          <AlertLine className="min-w-0 flex-1">
             {failure}
-          </p>
+          </AlertLine>
           <TryAgain
             onPress={() => {
               devices?.reconnect();

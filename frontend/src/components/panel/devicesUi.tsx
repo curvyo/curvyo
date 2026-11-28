@@ -1,20 +1,17 @@
 // The small parts the Share tab's My devices blocks share (`specs/0096-own-devices-sync`
-// ux-notes 2 to 9): the button, field and text looks, and the armed destructive action.
+// ux-notes 2 to 9): the field and text looks, the armed destructive action, and the button looks
+// of `components/ui/button.tsx` under their old names.
 
 import type { Arm } from "@/hooks/useArm";
+import { BUTTON_BASE, BUTTON_LOOK } from "@/components/ui/looks";
+import { AlertLine } from "@/components/ui/notice";
 
-export const BUTTON =
-  "inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-[5px] border text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9 aria-disabled:opacity-40";
-export const OUTLINE =
-  "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
-export const APPLY =
-  "border-[var(--toolbar-icon-active-bg)] bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:brightness-110";
-export const DESTRUCTIVE =
-  "border-[var(--destructive)] bg-[var(--background)] text-[var(--destructive)] hover:bg-[var(--destructive)] hover:text-white focus-visible:bg-[var(--destructive)] focus-visible:text-white";
-export const FIELD =
-  "h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-[var(--background)] px-2 text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-invalid:border-[var(--field-invalid)]";
+export const BUTTON = BUTTON_BASE;
+export const OUTLINE = BUTTON_LOOK.secondary;
+export const APPLY = BUTTON_LOOK.primary;
+export const DESTRUCTIVE = BUTTON_LOOK.destructive;
+export { FIELD_WIDE as FIELD } from "@/components/ui/looks";
 export const MUTED = "text-xs text-[var(--panel-muted-fg)]";
-export const ALERT = "text-xs text-[var(--field-invalid)]";
 export const SURFACE = "rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)]";
 /** How long a membership row shows its busy line at most when no change arrives (ms). */
 export const BUSY_MS = 5000;
@@ -25,8 +22,8 @@ export const ARMED = "border-[var(--destructive)] bg-[var(--destructive)] text-w
  * (customer 2026-11-09). */
 export function ArmLines({ arm, className = "" }: { arm: Arm; className?: string }) {
   return arm.refusal ? (
-    <p role="alert" className={`${ALERT} ${className}`}>
+    <AlertLine className={className}>
       {arm.refusal}
-    </p>
+    </AlertLine>
   ) : null;
 }

@@ -7,10 +7,10 @@ import type { DeleteArm } from "@/hooks/useDeleteArm";
 import type { FixturesApi } from "@/hooks/useFixtures";
 import { tabStopRow } from "@/lib/fixtureRows";
 import type { FixtureRow, FixturesView } from "@/lib/fixturesView";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
 
 /** The outline text button of the tab (`+ Set`, Apply fixtures from page): 244 x 28px. */
-export const TEXT_BUTTON =
-  "flex h-7 w-[244px] items-center justify-center gap-1 rounded-md border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] text-[13px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9";
+export const TEXT_BUTTON = buttonClass("secondary", "panel", "w-[244px]");
 
 /**
  * The Machine sets section (`specs/0113-fixture-sets-and-pins` `ux-notes.md` 4): the set rows with
@@ -71,14 +71,14 @@ export function FixtureSetsSection({
       ) : null}
       {view.canAddSet ? (
         <button type="button" className={TEXT_BUTTON} onClick={addSet}>
-          <Plus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+          <Plus {...GLYPH} aria-hidden />
           Set
         </button>
       ) : null}
       {drag ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed z-50 w-[244px] rounded-md bg-[var(--toolbar-bg)] px-2 text-[13px] leading-6 text-[var(--toolbar-icon)] opacity-60"
+          className="pointer-events-none fixed z-50 w-[244px] rounded-[8px] bg-[var(--toolbar-bg)] px-2 text-sm leading-6 text-[var(--toolbar-icon)] opacity-60"
           style={{ top: drag.y - 12, left: drag.left }}
         >
           {view.sets[drag.source]?.name}

@@ -13,10 +13,10 @@ import {
   LayoutGrid,
   Lock,
   Plus,
-  Search,
   TriangleAlert,
   X,
 } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddSourceForm } from "@/components/panel/AddSourceForm";
@@ -72,12 +72,16 @@ import {
 import { openPreview, pageRowKey, usePreview } from "@/lib/libraryStore";
 import { useLibraryTreeKeys } from "@/hooks/useLibraryTreeKeys";
 import { Tooltip } from "@/components/ui/tooltip";
+import { SearchField } from "@/components/ui/search-field";
+import { IconButton } from "@/components/ui/icon-button";
 import { isTauri } from "@/platform/host";
 import {
   library_no_match_text,
   library_online_searching_text,
   library_remove_armed_text,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
 const HEIGHTS: Record<LibraryRow["kind"], number> = {
   heading: 32,
@@ -176,7 +180,7 @@ function PagePicture({ row }: { row: LibraryRow }) {
     return <img className={className} src={url} alt="" />;
   }
   return row.kind === "document" ? (
-    <FileText size={16} aria-hidden="true" className="library-document-placeholder" />
+    <FileText {...GLYPH} aria-hidden="true" className="library-document-placeholder" />
   ) : (
     <span className={className} />
   );
@@ -659,48 +663,42 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
         {announce || status}
       </span>
       <div className="library-search-row">
-      <label className="library-search">
-        <Search size={16} aria-hidden="true" />
-        <input
-          ref={searchRef}
-          type="search"
-          placeholder="Search library"
-          aria-label="Search library"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && query) {
-              event.stopPropagation();
-              setQuery("");
-            } else if (event.key === "Enter") {
-              searchOnlineNow();
-            } else if (event.key === "ArrowDown" && active) {
-              event.preventDefault();
-              focusRow(active.index);
-            }
-          }}
-        />
-        {query && isTauri && hasIconify ? (
-          <button
-            type="button"
-            className="library-search-online"
-            aria-label="Search Iconify sources (Enter)"
-            title="Search Iconify sources (Enter)"
-            tabIndex={-1}
-            onClick={() => {
-              searchOnlineNow();
-              searchRef.current?.focus();
-            }}
-          >
-            <Globe size={16} />
-          </button>
-        ) : null}
-        {query ? (
-          <button type="button" aria-label="Clear search" onClick={() => setQuery("")}>
-            <X size={16} />
-          </button>
-        ) : null}
-      </label>
+      <SearchField
+        className="flex-1"
+        inputRef={searchRef}
+        placeholder="Search library"
+        aria-label="Search library"
+        value={query}
+        onValue={setQuery}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && query) {
+            event.stopPropagation();
+            setQuery("");
+          } else if (event.key === "Enter") {
+            searchOnlineNow();
+          } else if (event.key === "ArrowDown" && active) {
+            event.preventDefault();
+            focusRow(active.index);
+          }
+        }}
+        action={
+          isTauri && hasIconify ? (
+            <Tooltip side="left" content="Search Iconify sources (Enter)">
+              <IconButton
+                icon={Globe}
+                size={24}
+                tabIndex={-1}
+                aria-label="Search Iconify sources (Enter)"
+                className="pointer-coarse:size-6"
+                onClick={() => {
+                  searchOnlineNow();
+                  searchRef.current?.focus();
+                }}
+              />
+            </Tooltip>
+          ) : undefined
+        }
+      />
       {/* The library browser (`specs/0152` criterion 1): the big grid of what this list holds. */}
       <Tooltip side="left" content="Library browser">
         <button
@@ -715,15 +713,15 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
               : "text-[var(--toolbar-icon)]"
           }`}
         >
-          <LayoutGrid size={16} strokeWidth={1.5} aria-hidden />
+          <LayoutGrid {...GLYPH} aria-hidden />
         </button>
       </Tooltip>
       </div>
       {isTauri && keyStoreLine ? (
-        <p className="library-refusal library-keystore-line" role="alert">
-          <CircleAlert size={14} aria-hidden="true" style={{ color: "var(--destructive)" }} />
+        <AlertLine className="library-keystore-line">
+          <CircleAlert {...GLYPH} aria-hidden="true" style={{ color: "var(--destructive)" }} />
           {keyStoreLine}
-        </p>
+        </AlertLine>
       ) : null}
       <div
         className="library-tree"
@@ -761,142 +759,144 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
               );
             })()}
             {shown.map(({ row, index }) => (
-              <div
-                key={row.key}
-                data-row-key={row.key}
-                data-page-row={row.kind === "page" ? pageRowKey(row.source, row.path, row.page_id ?? "") : undefined}
-                className={`library-row library-row-${row.kind}${isCurrent(row) ? " library-row-current" : ""}`}
-                role={row.kind === "heading" ? "presentation" : "row"}
-                aria-level={row.kind === "heading" ? undefined : row.level + 1}
-                aria-posinset={row.kind === "heading" ? undefined : tops.result[index]?.posinset}
-                aria-setsize={row.kind === "heading" ? undefined : tops.result[index]?.setsize}
-                aria-rowindex={index + 1}
-                aria-expanded={row.expandable ? row.expanded : undefined}
-                aria-busy={row.kind === "source" && busySources.has(row.source) ? true : undefined}
-                data-status={row.kind === "status" ? row.online?.status : undefined}
-                aria-label={row.kind === "heading" ? undefined : row.label}
-                aria-selected={row.kind === "page" ? isCurrent(row) : undefined}
-                style={{ top: tops.result[index]?.top, height: tops.result[index]?.height, paddingLeft: 4 + 12 * Math.min(row.level, 6) }}
-                onClick={() => {
-                  if (row.kind === "heading" || row.kind === "status" || row.kind === "icons" || row.kind === "ready") {
-                    return;
-                  }
-                  setFocusKey(row.key);
-                  if (row.kind === "page") {
-                    openRow(row);
-                  } else {
-                    toggle(row);
-                  }
-                }}
-                onKeyDown={(event) => rowKey(event, row, index)}
-                onPointerDown={(event) => {
-                  if (
-                    (row.kind !== "page" && !(row.kind === "template" && row.online?.loadable)) ||
-                    event.button !== 0 ||
-                    (event.target as HTMLElement).closest("button")
-                  ) {
-                    return;
-                  }
-                  if (row.kind === "template") {
-                    // A template row dragged onto the drawing loads it, as Load does (UX Q12).
-                    const picture = event.currentTarget.querySelector<HTMLImageElement>("img.library-document-picture")?.src ?? null;
-                    watchCanvasDrag(event, () => canvasRef.current, row.name, () => "import", () => {
-                      void loadTemplate(row);
-                    }, picture, slotDragOf(loadContext, () => templateSlotSource(row.source, row.path, sourceNameOf(row)), { eager: false }));
-                    return;
-                  }
-                  const picture = event.currentTarget.querySelector<HTMLImageElement>("img.library-page-picture")?.src ?? null;
-                  watchCanvasDrag(event, () => canvasRef.current, row.name, () => "import", (at) => {
-                    void importPage(row, at);
-                  }, picture, pageSlotDrag(loadContext, pageOf(row)));
-                }}
-                tabIndex={row.kind === "heading" ? undefined : active?.index === index ? 0 : -1}
-                title={row.kind === "heading" ? undefined : tooltipOf(row, index)}
-              >
-                {row.kind === "heading" ? (
-                  <span className="library-heading">{row.name}</span>
-                ) : isOnlineKind(row.kind) ? (
-                  <OnlineRowContent row={row} handlers={handlers} />
-                ) : (
-                  <>
-                    {row.kind !== "page" ? (
-                      <span className="library-chevron" aria-hidden="true">
-                        {row.expandable ? row.expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} /> : null}
-                      </span>
-                    ) : null}
-                    {row.unreadable ? (
-                      <TriangleAlert size={16} aria-hidden="true" />
-                    ) : row.kind === "source" && row.online ? (
-                      <OnlineSourceGlyph row={row} />
-                    ) : row.kind === "source" || row.kind === "folder" ? (
-                      <Folder size={16} aria-hidden="true" />
-                    ) : (
-                      <PagePicture row={row} />
-                    )}
-                    <span className="library-names">
-                      <span className={row.open ? "library-name library-open" : "library-name"}>
-                        <Highlighted name={row.name} matched={row.matched} />
-                        {row.chip ? <span className="library-chip">{row.chip}</span> : null}
-                        {row.kind === "source" && row.online?.token.private ? (
-                          <Lock size={12} strokeWidth={1.5} aria-hidden="true" className="library-lock" />
+              <Tooltip key={row.key} side="left" content={row.kind === "heading" ? undefined : tooltipOf(row, index)}>
+                <div
+                  data-row-key={row.key}
+                  data-page-row={row.kind === "page" ? pageRowKey(row.source, row.path, row.page_id ?? "") : undefined}
+                  className={`library-row library-row-${row.kind}${isCurrent(row) ? " library-row-current" : ""}`}
+                  role={row.kind === "heading" ? "presentation" : "row"}
+                  aria-level={row.kind === "heading" ? undefined : row.level + 1}
+                  aria-posinset={row.kind === "heading" ? undefined : tops.result[index]?.posinset}
+                  aria-setsize={row.kind === "heading" ? undefined : tops.result[index]?.setsize}
+                  aria-rowindex={index + 1}
+                  aria-expanded={row.expandable ? row.expanded : undefined}
+                  aria-busy={row.kind === "source" && busySources.has(row.source) ? true : undefined}
+                  data-status={row.kind === "status" ? row.online?.status : undefined}
+                  aria-label={row.kind === "heading" ? undefined : row.label}
+                  aria-selected={row.kind === "page" ? isCurrent(row) : undefined}
+                  style={{ top: tops.result[index]?.top, height: tops.result[index]?.height, paddingLeft: 4 + 12 * Math.min(row.level, 6) }}
+                  onClick={() => {
+                    if (row.kind === "heading" || row.kind === "status" || row.kind === "icons" || row.kind === "ready") {
+                      return;
+                    }
+                    setFocusKey(row.key);
+                    if (row.kind === "page") {
+                      openRow(row);
+                    } else {
+                      toggle(row);
+                    }
+                  }}
+                  onKeyDown={(event) => rowKey(event, row, index)}
+                  onPointerDown={(event) => {
+                    if (
+                      (row.kind !== "page" && !(row.kind === "template" && row.online?.loadable)) ||
+                      event.button !== 0 ||
+                      (event.target as HTMLElement).closest("button")
+                    ) {
+                      return;
+                    }
+                    if (row.kind === "template") {
+                      // A template row dragged onto the drawing loads it, as Load does (UX Q12).
+                      const picture = event.currentTarget.querySelector<HTMLImageElement>("img.library-document-picture")?.src ?? null;
+                      watchCanvasDrag(event, () => canvasRef.current, row.name, () => "import", () => {
+                        void loadTemplate(row);
+                      }, picture, slotDragOf(loadContext, () => templateSlotSource(row.source, row.path, sourceNameOf(row)), { eager: false }));
+                      return;
+                    }
+                    const picture = event.currentTarget.querySelector<HTMLImageElement>("img.library-page-picture")?.src ?? null;
+                    watchCanvasDrag(event, () => canvasRef.current, row.name, () => "import", (at) => {
+                      void importPage(row, at);
+                    }, picture, pageSlotDrag(loadContext, pageOf(row)));
+                  }}
+                  tabIndex={row.kind === "heading" ? undefined : active?.index === index ? 0 : -1}
+                >
+                  {row.kind === "heading" ? (
+                    <span className="library-heading">{row.name}</span>
+                  ) : isOnlineKind(row.kind) ? (
+                    <OnlineRowContent row={row} handlers={handlers} />
+                  ) : (
+                    <>
+                      {row.kind !== "page" ? (
+                        <span className="library-chevron" aria-hidden="true">
+                          {row.expandable ? row.expanded ? <ChevronDown {...GLYPH} /> : <ChevronRight {...GLYPH} /> : null}
+                        </span>
+                      ) : null}
+                      {row.unreadable ? (
+                        <TriangleAlert {...GLYPH} aria-hidden="true" />
+                      ) : row.kind === "source" && row.online ? (
+                        <OnlineSourceGlyph row={row} />
+                      ) : row.kind === "source" || row.kind === "folder" ? (
+                        <Folder {...GLYPH} aria-hidden="true" />
+                      ) : (
+                        <PagePicture row={row} />
+                      )}
+                      <span className="library-names">
+                        <span className={row.open ? "library-name library-open" : "library-name"}>
+                          <Highlighted name={row.name} matched={row.matched} />
+                          {row.chip ? <span className="library-chip">{row.chip}</span> : null}
+                          {row.kind === "source" && row.online?.token.private ? (
+                            <Lock {...SMALL_GLYPH} aria-hidden="true" className="library-lock" />
+                          ) : null}
+                        </span>
+                        {row.kind === "document" || row.kind === "page" || row.unreadable ? (
+                          <span className="library-line">{row.line}</span>
                         ) : null}
                       </span>
-                      {row.kind === "document" || row.kind === "page" || row.unreadable ? (
-                        <span className="library-line">{row.line}</span>
+                      {row.kind === "source" && row.online ? (
+                        <OnlineSourceCells row={row} handlers={handlers} />
+                      ) : row.kind === "source" || row.kind === "folder" ? (
+                        row.unreadable ? null : <span className="library-count">{row.line}</span>
                       ) : null}
-                    </span>
-                    {row.kind === "source" && row.online ? (
-                      <OnlineSourceCells row={row} handlers={handlers} />
-                    ) : row.kind === "source" || row.kind === "folder" ? (
-                      row.unreadable ? null : <span className="library-count">{row.line}</span>
-                    ) : null}
-                    {row.kind === "page" ? (
-                      <IntoSlotButton
-                        ctx={loadContext}
-                        look="icon"
-                        open={slotList?.key === row.key}
-                        onToggle={() =>
-                          setSlotList((open) => (open?.key === row.key ? null : { key: row.key, height: intoSlotListHeight(loadContext) }))
-                        }
-                      />
-                    ) : null}
-                    {row.kind === "page" ? (
-                      <button
-                        type="button"
-                        className="library-action"
-                        aria-label={`Import page ${row.name}`}
-                        title="Import page"
-                        tabIndex={-1}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void importPage(row, null);
-                          // A press on an import action returns focus to the canvas (UX notes 11).
-                          if (event.detail > 0) {
-                            onReturnFocus();
+                      {row.kind === "page" ? (
+                        <IntoSlotButton
+                          ctx={loadContext}
+                          look="icon"
+                          open={slotList?.key === row.key}
+                          onToggle={() =>
+                            setSlotList((open) => (open?.key === row.key ? null : { key: row.key, height: intoSlotListHeight(loadContext) }))
                           }
-                        }}
-                      >
-                        <Import size={16} />
-                      </button>
-                    ) : null}
-                    {row.removable && !row.online ? (
-                      <button
-                        type="button"
-                        className={armed === row.key ? "library-action library-armed" : "library-action"}
-                        tabIndex={-1}
-                        aria-label={armed === row.key ? library_remove_armed_text(row.name) : `Remove ${row.name} from the library`}
-                        title={armed === row.key ? library_remove_armed_text(row.name) : `Remove ${row.name} from the library`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void remove(row);
-                        }}
-                      >
-                        <X size={16} />
-                      </button>
-                    ) : null}
-                  </>
-                )}
-              </div>
+                        />
+                      ) : null}
+                      {row.kind === "page" ? (
+                        <Tooltip side="left" content="Import page">
+                          <button
+                          type="button"
+                          className="library-action"
+                          aria-label={`Import page ${row.name}`}
+                          tabIndex={-1}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void importPage(row, null);
+                            // A press on an import action returns focus to the canvas (UX notes 11).
+                            if (event.detail > 0) {
+                              onReturnFocus();
+                            }
+                          }}
+                        >
+                          <Import {...GLYPH} />
+                        </button>
+                        </Tooltip>
+                      ) : null}
+                      {row.removable && !row.online ? (
+                        <Tooltip side="left" content={armed === row.key ? library_remove_armed_text(row.name) : `Remove ${row.name} from the library`}>
+                          <button
+                          type="button"
+                          className={armed === row.key ? "library-action library-armed" : "library-action"}
+                          tabIndex={-1}
+                          aria-label={armed === row.key ? library_remove_armed_text(row.name) : `Remove ${row.name} from the library`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void remove(row);
+                          }}
+                        >
+                          <X {...GLYPH} />
+                        </button>
+                        </Tooltip>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              </Tooltip>
             ))}
           </div>
         )}
@@ -939,29 +939,27 @@ export function LibraryTab({ getSession, sync, canvasRef, showNotice, onSubject,
       {isTauri ? (
         <div className="library-footer">
           <div className="library-footer-buttons">
-            <button type="button" className="library-add" onClick={() => void addFolder()}>
-              <FolderPlus size={16} aria-hidden="true" />
-              Add folder...
-            </button>
+            <Button icon={FolderPlus} className="min-w-[118px]" onClick={() => void addFolder()}>
+              Add folder…
+            </Button>
             {addingSource || tokenFor ? null : (
-              <button
-                type="button"
+              <Button
+                icon={Plus}
                 ref={addSourceRef}
-                className="library-add"
+                className="min-w-[118px]"
                 onClick={() => {
                   setTokenFor(null);
                   setAddingSource(true);
                 }}
               >
-                <Plus size={16} aria-hidden="true" />
-                Add source...
-              </button>
+                Add source…
+              </Button>
             )}
           </div>
           {refusal ? (
-            <p className="library-refusal" role="alert">
+            <AlertLine>
               {refusal}
-            </p>
+            </AlertLine>
           ) : null}
         </div>
       ) : null}

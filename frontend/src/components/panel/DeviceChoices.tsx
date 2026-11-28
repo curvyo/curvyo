@@ -3,7 +3,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
-import { APPLY, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { MUTED } from "@/components/panel/devicesUi";
 import type { DevicesApi } from "@/hooks/useDevices";
 import type { OfferedWorkspace } from "@/hooks/useSyncedWorkspaces";
 import { firstSyncAnswer } from "@/lib/librarySyncView";
@@ -13,6 +13,10 @@ import {
   devices_text,
   devices_workspaces_for,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { Copy, Plug, RefreshCw, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SECTION_HEADING } from "@/components/ui/looks";
 
 /** A copy of a synced workspace that is here already (ux-notes 2.3, criterion 14). */
 export function DecisionRow({ devices, id, name, text }: { devices: DevicesApi; id: string; name: string; text: string }) {
@@ -20,12 +24,12 @@ export function DecisionRow({ devices, id, name, text }: { devices: DevicesApi; 
     <div role="group" aria-label={name} className="flex flex-col gap-2 py-1">
       <p className="text-xs text-[var(--toolbar-icon)]">{text}</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={`${BUTTON} ${APPLY} w-[148px]`} onClick={() => devices.connectCopy(id)}>
+        <Button variant="primary" icon={Plug} className="min-w-[148px]" onClick={() => devices.connectCopy(id)}>
           Connect this folder
-        </button>
-        <button type="button" className={`${BUTTON} ${OUTLINE} w-[148px]`} onClick={() => devices.secondCopy(id)}>
+        </Button>
+        <Button icon={Copy} className="min-w-[148px]" onClick={() => devices.secondCopy(id)}>
           Make a second copy
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -48,20 +52,16 @@ export function LibrarySyncConfirm({
     <div role="group" aria-label="Sync to my devices" className="flex flex-col gap-2">
       <p className="text-xs text-[var(--toolbar-icon)]">{sentence}</p>
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={`${BUTTON} ${APPLY} px-3`}
+        <Button variant="primary" icon={RefreshCw}
           onClick={() => firstSyncAnswer(true, onSync, onDecline)}
         >
           Sync libraries
-        </button>
-        <button
-          type="button"
-          className={`${BUTTON} ${OUTLINE} px-3`}
+        </Button>
+        <Button icon={X}
           onClick={() => firstSyncAnswer(false, onSync, onDecline)}
         >
           Keep local
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -119,23 +119,24 @@ export function PickWorkspaces({
         }
       }}
     >
-      <p className="text-sm font-semibold text-[var(--toolbar-icon)]">{devices_workspaces_for(label)}</p>
+      <p className={SECTION_HEADING}>{devices_workspaces_for(label)}</p>
       {alreadyLine ? <p className={MUTED}>{alreadyLine}</p> : null}
       {rows.length > 0 ? (
         <ul aria-label="Workspaces to sync" className="flex max-h-[160px] flex-col overflow-y-auto">
           {rows.map((row, index) => (
             <li key={row.id}>
               <label className="flex min-h-8 items-center gap-2 text-sm text-[var(--toolbar-icon)] pointer-coarse:min-h-9">
-                <input
+                <Checkbox
                   autoFocus={index === 0}
-                  type="checkbox"
                   aria-disabled={row.memberOnly || undefined}
+                  aria-label={row.name}
                   checked={!unchecked.includes(row.id)}
-                  onChange={(event) => {
+                  className={row.memberOnly ? "opacity-40" : ""}
+                  onClick={() => {
                     if (row.memberOnly) {
                       return;
                     }
-                    setUnchecked(event.target.checked ? unchecked.filter((id) => id !== row.id) : [...unchecked, row.id]);
+                    setUnchecked(unchecked.includes(row.id) ? unchecked.filter((id) => id !== row.id) : [...unchecked, row.id]);
                   }}
                 />
                 <span className="flex min-w-0 flex-1 flex-col">
@@ -153,14 +154,12 @@ export function PickWorkspaces({
       {libraryConfirm ? <LibrarySyncConfirm sentence={libraryConfirm} onSync={onLibrarySync} onDecline={onLibraryDecline} /> : null}
       {frozenWarning ? <p className="text-xs text-[var(--toolbar-icon)]">{frozenWarning}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <button ref={notNow} type="button" className={`${BUTTON} ${OUTLINE} w-[90px]`} onClick={() => onDone([])}>
+        <Button icon={X} ref={notNow} className="min-w-[90px]" onClick={() => onDone([])}>
           Not now
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button variant="primary" icon={RefreshCw}
           aria-disabled={chosen.length === 0}
-          aria-describedby={chosen.length > 0 ? undefined : reasonId}
-          className={`${BUTTON} ${APPLY} w-[100px]`}
+          aria-describedby={chosen.length > 0 ? undefined : reasonId} className="min-w-[100px]"
           onClick={() => {
             if (chosen.length > 0) {
               onDone(chosen);
@@ -168,7 +167,7 @@ export function PickWorkspaces({
           }}
         >
           Sync these
-        </button>
+        </Button>
       </div>
       {chosen.length > 0 ? null : (
         <p id={reasonId} className={MUTED}>

@@ -21,6 +21,7 @@ import {
   pathFieldText,
   positionUnit,
 } from "@/lib/textPathText";
+import { NumberField } from "@/components/ui/number-field";
 
 /** The tool rail's clearance from the canvas's left edge, px (as the transform entry chip). */
 const TOOL_RAIL_CLEAR_PX = 128;
@@ -36,7 +37,7 @@ const LINE_GLYPHS: Record<LineCode, string> = {
 };
 
 const BUTTON_CLASS =
-  "flex size-7 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+  "flex size-7 shrink-0 items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 interface TextPathEntryChipProps {
   entry: TextPathEntry;
@@ -101,36 +102,18 @@ function EntryField({
   onChange: (text: string) => void;
 }) {
   return (
-    <div className="relative w-[136px]">
-      <span aria-hidden className="pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-xs">
-        {label}
-      </span>
-      <input
-        ref={inputRef}
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        spellCheck={false}
-        aria-label={label}
-        aria-invalid={invalid ? true : undefined}
-        aria-describedby={describedBy}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={`h-7 w-full rounded-[5px] border bg-white pr-8 pl-[62px] text-right text-sm tabular-nums outline-none ${
-          invalid
-            ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_1px_var(--field-invalid)]"
-            : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
-        }`}
-        style={{ color: "var(--toolbar-icon)" }}
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
-        style={{ opacity: 0.7 }}
-      >
-        {unit}
-      </span>
-    </div>
+    <NumberField
+      width={136}
+      label={label}
+      labelPx={62}
+      unit={unit}
+      invalid={invalid}
+      inputRef={inputRef}
+      aria-label={label}
+      aria-describedby={describedBy}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
   );
 }
 

@@ -50,22 +50,17 @@ export function centreLinesNotice(result: CentreLinesResult, paths?: number): { 
   if (refusal) {
     return { text: refusal, alert: true };
   }
-  if (result.kind !== "applied" || (result.kept === 0 && result.skipped === 0 && result.unlinked === 0)) {
+  // No counts of what came out (customer 2026-11-27, `specs/0159` S7): the lines on the canvas
+  // are the feedback; a notice only names what was skipped or changed besides.
+  if (result.kind !== "applied" || (result.skipped === 0 && result.unlinked === 0)) {
     return null;
   }
   const parts = [
-    // The Apply tooltip counts paths; the same word here when the preview's count is known.
-    paths === undefined ? [result.converted, "converted"] : [paths, paths === 1 ? "path" : "paths"],
-    [result.kept, "kept filled"],
-    [result.skipped, "skipped"],
-  ]
-    .filter(([count]) => (count as number) > 0)
-    .map(([count, what]) => `${count} ${what}`);
-  let text = `Centre lines: ${parts.length > 0 ? parts.join(", ") : "0 converted"}.`;
-  if (result.unlinked > 0) {
-    text += " Linked clones became ordinary paths.";
-  }
-  return { text, alert: false };
+    result.skipped > 0 ? "Centre lines: some shapes were skipped." : "",
+    result.unlinked > 0 ? "Linked clones became ordinary paths." : "",
+  ].filter((part) => part !== "");
+  void paths;
+  return { text: parts.join(" "), alert: false };
 }
 
 /** The options of the bar, remembered for the session (UX notes §3). */

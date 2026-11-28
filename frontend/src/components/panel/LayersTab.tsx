@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, Copy, Layers, LayersPlus, Link2, Trash2 } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { Fragment, type ComponentType } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -34,6 +35,7 @@ import {
 import { OPACITY_CLICK_MIN_P, VALUE_FIELD_SCALE_END } from "@/lib/sliderNames";
 import { isTauri } from "@/platform/host";
 import { Tooltip } from "@/components/ui/tooltip";
+import { ActionNotice } from "@/components/ui/notice";
 
 const CELLS: RowCell[] = ["name", "action", "eye", "lock"];
 const PERCENT_MESSAGES = { percent: "Enter a number from 0 to 100" } as const;
@@ -90,7 +92,7 @@ function ToolbarButton({
   onPress: () => void;
 }) {
   return (
-    <Tooltip side="bottom" content={name}>
+    <Tooltip side="left" content={name}>
       <button
         ref={buttonRef}
         type="button"
@@ -727,9 +729,9 @@ export function LayersTab({
   ));
 
   return (
-    // A 12 px inset at the right keeps the rows 244 px wide and clear of an overlay scrollbar
-    // (UX review item 5).
-    <div className="flex min-h-0 flex-1 flex-col pr-3">
+    // The list's stable scrollbar gutter keeps the rows clear of the scrollbar (UX review item
+    // 5); no further inset, so a selected row's ground reaches the panel's column (0159 F37).
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* The toolbar: operations are buttons with a visible trigger, never sections that appear
           (customer feedback 2026-10-14). */}
       <div
@@ -802,7 +804,7 @@ export function LayersTab({
       {drag?.active ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed z-50 flex items-center gap-1 rounded-[4px] bg-[var(--panel-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)] opacity-70 shadow"
+          className="pointer-events-none fixed z-50 flex items-center gap-1 rounded-[8px] bg-[var(--panel-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)] opacity-70 shadow"
           style={{ left: drag.x + 12, top: drag.y + 8 }}
         >
           <span className="max-w-[160px] truncate">{drag.refusal !== "" ? drag.refusal : drag.pressed.name}</span>
@@ -816,18 +818,9 @@ export function LayersTab({
           targeted, so the list never jumps. */}
       <div className="relative shrink-0 pt-1">
         {skipNotice ? (
-          <p
-            key={skipNotice.id}
-            role="status"
-            className="pointer-events-none absolute right-0 bottom-full z-10 mb-1 max-w-[256px] rounded-md px-2 py-1 text-right text-xs"
-            style={{
-              background: "var(--toolbar-bg)",
-              color: "var(--toolbar-icon)",
-              boxShadow: "var(--panel-elevation-shadow)",
-            }}
-          >
+          <ActionNotice key={skipNotice.id} maxWidth={256} className="absolute right-0 bottom-full z-10 mb-1 text-right">
             {skipNotice.text}
-          </p>
+          </ActionNotice>
         ) : null}
         <div role="status" className="h-4 truncate text-xs text-[var(--panel-muted-fg)]">
           {hint}
@@ -883,7 +876,7 @@ export function LayersTab({
           className="flex h-4 items-center gap-1 truncate text-xs text-[var(--panel-muted-fg)]"
           title={opacity.tooltip || undefined}
         >
-          {opacity.layer ? <Layers size={12} strokeWidth={1.5} aria-hidden /> : null}
+          {opacity.layer ? <Layers {...SMALL_GLYPH} aria-hidden /> : null}
           {opacity.caption}
         </p>
       </div>

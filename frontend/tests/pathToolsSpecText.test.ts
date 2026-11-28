@@ -76,17 +76,13 @@ test("0034 criterion 16: the four close chips", () => {
 });
 
 test("0034 criterion 20: the Close path notices and their durations", () => {
-  const a = closeNoticeText({ closed: 3, skipped: 0 });
-  assert.equal(a, "Closed 3 paths.");
-  assert.equal(closeNoticeMs(a ?? ""), 3000);
+  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  assert.equal(closeNoticeText({ closed: 3, skipped: 0 }), null);
   const b = closeNoticeText({ closed: 2, skipped: 1 });
-  assert.equal(b, "Closed 2 paths. 1 path has fewer than 3 nodes and was not closed.");
-  // The sentence "No undo yet." is gone (0020 criterion 52): the skipped variant has 65 characters,
-  // so it keeps the 3 s; a longer sentence (above 70 characters) keeps 5 s.
-  assert.equal((b ?? "").length, 65);
+  assert.equal(b, "1 path has fewer than 3 nodes and was not closed.");
   assert.equal(closeNoticeMs(b ?? ""), 3000);
   assert.equal(closeNoticeMs("x".repeat(71)), 5000);
-  assert.equal(closeNoticeText({ closed: 1, skipped: 0 }), "Closed 1 path.");
+  assert.equal(closeNoticeText({ closed: 1, skipped: 0 }), null);
   assert.equal(closeNoticeText({ closed: 0, skipped: 0 }), null);
 });
 

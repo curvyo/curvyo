@@ -1,13 +1,17 @@
 import { CircleAlert, Dices } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { Tooltip } from "radix-ui";
 import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import type { ArcBarApi } from "@/hooks/useArcBar";
 import { ARC_GREY_LINE, ARC_KIND_TEXT, ARC_TEXT, type ArcKindName } from "@/lib/arcText";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
+import { NumberField } from "@/components/ui/number-field";
+import { fieldLabelWidth } from "@/lib/fieldLabelWidth";
 
 const ICON_BUTTON_CLASS =
-  "flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+  "flex size-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /** Start and End are 93 px and Curve 99 px: the three fit the 308 px inside the 324 px bar
  * of an 800 px window on one row with the group's divider (13 + 93 + 93 + 99 + 2 × 4). */
@@ -71,7 +75,7 @@ function BarTooltip({
         <Tooltip.Content
           side="bottom"
           sideOffset={6}
-          className="z-50 max-w-[300px] rounded-md px-2 py-1 text-xs"
+          className={TOOLTIP_CLASS}
           style={TOOLTIP_STYLE}
         >
           <div className="font-semibold">{name}</div>
@@ -231,6 +235,9 @@ function BarNumberField({
     }
   };
 
+  // The label, 8 px of air and the value never touch (0159 W19): the padding grows to the label's
+  // measured width when the font draws it wider than the constant assumes.
+  const labelPad = Math.max(labelPx, Math.ceil(6 + fieldLabelWidth(label) + 8));
   return (
     <div className="relative flex items-center text-[var(--toolbar-icon)]">
       <BarTooltip
@@ -240,73 +247,44 @@ function BarNumberField({
         extra={limited ?? undefined}
         closed={invalid}
       >
-        <div className="relative" style={{ width: widthPx }}>
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-[12px]"
-            style={{ opacity: disabled ? 0.4 : 0.7 }}
-          >
-            {label}
-          </span>
-          <input
-            id={id}
-            type="text"
-            inputMode="decimal"
-            autoComplete="off"
-            spellCheck={false}
-            aria-label={accessibleName}
-            aria-disabled={disabled || undefined}
-            readOnly={disabled}
-            aria-invalid={invalid || undefined}
-            aria-describedby={invalid ? `${id}-message` : undefined}
-            placeholder={mixed && !disabled ? "Mixed" : undefined}
-            value={text}
-            onFocus={(event) => {
-              editing.current = !disabled;
-              event.currentTarget.select();
-            }}
-            onChange={(event) => {
-              if (!disabled) {
-                setText(event.target.value);
-                setInvalid(false);
-              }
-            }}
-            onBlur={() => {
-              editing.current = false;
-              if (stepping.current !== null) {
-                stepping.current = null;
-                onStepCommit?.();
-              }
-              setText(shown);
+        <NumberField
+          width={widthPx + labelPad - labelPx}
+          label={label}
+          labelPx={labelPad}
+          unit={suffix}
+          unitPx={16}
+          limited={limited !== null}
+          dimmed={disabled}
+          invalid={invalid}
+          id={id}
+          aria-label={accessibleName}
+          aria-disabled={disabled || undefined}
+          readOnly={disabled}
+          aria-describedby={invalid ? `${id}-message` : undefined}
+          placeholder={mixed && !disabled ? "Mixed" : undefined}
+          value={text}
+          onFocus={(event) => {
+            editing.current = !disabled;
+            event.currentTarget.select();
+          }}
+          onChange={(event) => {
+            if (!disabled) {
+              setText(event.target.value);
               setInvalid(false);
-            }}
-            onKeyDown={onKeyDown}
-            onKeyUp={onKeyUp}
-            className={`h-7 w-full rounded-[5px] border bg-white text-right text-sm tabular-nums outline-none ${
-              limited ? "pr-[62px]" : "pr-4"
-            } ${disabled ? "opacity-40" : ""} ${
-              invalid
-                ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_2px_var(--field-invalid)]"
-                : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
-            }`}
-            style={{ color: "var(--toolbar-icon)", paddingLeft: labelPx }}
-          />
-          {limited && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute top-1/2 right-[16px] -translate-y-1/2 text-[12px] opacity-60"
-            >
-              limited
-            </span>
-          )}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
-            style={{ opacity: disabled ? 0.4 : 0.7 }}
-          >
-            {suffix}
-          </span>
-        </div>
+            }
+          }}
+          onBlur={() => {
+            editing.current = false;
+            if (stepping.current !== null) {
+              stepping.current = null;
+              onStepCommit?.();
+            }
+            setText(shown);
+            setInvalid(false);
+          }}
+          onKeyDown={onKeyDown}
+          onKeyUp={onKeyUp}
+        />
       </BarTooltip>
       <div
         id={`${id}-message`}
@@ -407,7 +385,7 @@ function ArcKindRow({
 function ArcFieldRow({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocus: () => void }) {
   const { state } = arc;
   return (
-    <div className="flex h-9 items-center gap-1">
+    <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-1">
       <BarNumberField
         label="Start"
         labelPx={START_LABEL_PX}
@@ -615,7 +593,7 @@ function RerollSeedButton({ arc, onReturnFocus }: { arc: ArcBarApi; onReturnFocu
         }}
         className={`${ICON_BUTTON_CLASS} hover:bg-[var(--editor-accent-hover)] ${enabled ? "" : "opacity-40"}`}
       >
-        <Dices size={16} strokeWidth={1.5} aria-hidden />
+        <Dices {...GLYPH} aria-hidden />
       </button>
     </BarTooltip>
   );

@@ -1,9 +1,12 @@
-import { CircleAlert, Link2 } from "lucide-react";
+import { CircleAlert, Copy, Link2 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import type { TransformEntryState } from "@/hooks/useEditorSession";
 import { entryHasCopyCheck } from "@/lib/paramEntryCopy";
 import { placeEntryChip, placeMoveChip } from "@/lib/readoutPlacement";
+import { toggleClass, GLYPH } from "@/components/ui/looks";
+import { NumberField } from "@/components/ui/number-field";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** The tool rail's clearance from the canvas's left edge, px (`App.tsx`'s
  * `left-[calc(var(--rail-right)+12px)]` for the contextual bars: `--rail-right` + 12 = 128px with two
@@ -86,7 +89,7 @@ export function TransformEntryChip({
   // The Copy check of a parameter chip: unset on every open, the chip remounts per entry.
   const hasCopy = entryHasCopyCheck(entry.kind);
   const [copy, setCopy] = useState(false);
-  const copyRef = useRef<HTMLInputElement>(null);
+  const copyRef = useRef<HTMLButtonElement>(null);
   const [sizes, setSizes] = useState({
     chip: { width: 0, height: 0 },
     canvas: { width: Number.POSITIVE_INFINITY, height: Number.POSITIVE_INFINITY },
@@ -202,7 +205,7 @@ export function TransformEntryChip({
     setTexts(next);
   };
 
-  const onCopyKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const onCopyKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter") {
       event.preventDefault();
       submit();
@@ -219,7 +222,7 @@ export function TransformEntryChip({
   // Cancel on a blur that leaves the chip (a press elsewhere, a tool switch,
   // the window losing focus). A press on the canvas is also processed by the
   // canvas itself, so it is not swallowed.
-  const onBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+  const onBlur = (event: React.FocusEvent<HTMLElement>) => {
     const next = event.relatedTarget;
     if (next instanceof Node && chipRef.current?.contains(next)) {
       return;
@@ -288,49 +291,30 @@ export function TransformEntryChip({
               {index === 1 && entry.linked && (
                 <Link2 aria-hidden className="size-3" style={{ color: "var(--toolbar-icon)" }} />
               )}
-              <div className="relative" style={{ width: fieldWidth }}>
-                {visibleLabel(field) !== "" && (
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-xs"
-                  >
-                    {visibleLabel(field)}
-                  </span>
-                )}
-                <input
-                  ref={(node) => {
+              <Tooltip side="bottom" content={isSize ? SIZE_FIELD_DESCRIPTION : undefined}>
+              <span className="block">
+              <NumberField
+                  width={fieldWidth}
+                  label={visibleLabel(field) === "" ? undefined : visibleLabel(field)}
+                  labelPx={visibleLabel(field).length > 1 ? 48 : 20}
+                  unit={isAngle ? "°" : isCurve ? "%" : isRatio ? undefined : "mm"}
+                  unitPx={isRatio ? 8 : undefined}
+                  invalid={isInvalid}
+                  inputRef={(node) => {
                     inputRefs.current[index] = node;
                   }}
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  spellCheck={false}
                   aria-label={field.name}
-                  aria-invalid={isInvalid ? true : undefined}
                   aria-describedby={
                     isInvalid ? messageId : isSize ? `${descriptionId} ${noteId}` : undefined
                   }
-                  title={isSize ? SIZE_FIELD_DESCRIPTION : undefined}
                   readOnly={!field.editable}
                   value={texts[index] ?? ""}
                   onChange={(event) => onChange(index, event.target.value)}
                   onKeyDown={(event) => onKeyDown(event, index)}
                   onBlur={onBlur}
-                  className={`h-7 w-full rounded-[5px] border bg-white ${isAngle || isCurve ? "pr-6" : isRatio ? "pr-2" : "pr-8"} ${visibleLabel(field).length > 1 ? "pl-12" : "pl-5"} text-right text-sm tabular-nums outline-none ${
-                    isInvalid
-                      ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_1px_var(--field-invalid)]"
-                      : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
-                  }`}
-                  style={{ color: "var(--toolbar-icon)" }}
                 />
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
-                  style={{ opacity: 0.7 }}
-                >
-                  {isAngle ? "°" : isCurve ? "%" : isRatio ? "" : "mm"}
-                </span>
-              </div>
+              </span>
+              </Tooltip>
             </div>
           );
         })}
@@ -360,19 +344,18 @@ export function TransformEntryChip({
       )}
       {hasCopy && (
         // The Copy check of the Move entry chip, the chip's last row (`0073` UX notes V3).
-        <label className="mt-1.5 flex h-6 cursor-pointer items-center gap-1.5 px-1 text-xs">
-          <input
-            ref={copyRef}
-            type="checkbox"
-            checked={copy}
-            aria-label="Copy"
-            onChange={(event) => setCopy(event.target.checked)}
-            onKeyDown={onCopyKeyDown}
-            onBlur={onBlur}
-            className="size-3.5 cursor-pointer accent-[var(--editor-accent)]"
-          />
-          <span aria-hidden>Copy</span>
-        </label>
+        <button
+          ref={copyRef}
+          type="button"
+          aria-pressed={copy}
+          onClick={() => setCopy(!copy)}
+          onKeyDown={onCopyKeyDown}
+          onBlur={onBlur}
+          className={toggleClass("bar", false, "mt-1.5 h-6 self-start text-xs")}
+        >
+          <Copy {...GLYPH} aria-hidden />
+          Copy
+        </button>
       )}
       {/* Always mounted so the polite live region announces a change; empty
           it has no height. The message sits outside the field row (the chip

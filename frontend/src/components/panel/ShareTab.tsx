@@ -1,7 +1,7 @@
-import { FolderPlus } from "lucide-react";
+import { FolderPlus, Plus, X } from "lucide-react";
 import { useEffect } from "react";
 
-import { ALERT, APPLY, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { MUTED } from "@/components/panel/devicesUi";
 import { EndedBlock } from "@/components/panel/EndedBlock";
 import { AdminChangeLine, MembershipNotices } from "@/components/panel/MembershipNotices";
 import { MyDevicesBlock } from "@/components/panel/MyDevicesBlock";
@@ -23,6 +23,8 @@ import {
   sharing_make_workspace_confirm,
   sharing_word,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The open workspace as the Share tab's Workspace block needs it (`specs/0095-workspace`). */
 export interface ShareTabWorkspace {
@@ -65,10 +67,9 @@ function MakeWorkspaceBlock({ make }: { make: MakeWorkspaceApi }) {
     <div className="flex flex-col gap-2">
       <p className={MUTED}>{sharing_word("works-on-workspaces")}</p>
       {make.offered && make.folder === null ? (
-        <button type="button" className={`${BUTTON} ${OUTLINE} px-3`} onClick={make.ask}>
-          <FolderPlus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-          {sharing_word("make-workspace")}
-        </button>
+        <Button icon={FolderPlus}  onClick={make.ask}>
+{sharing_word("make-workspace")}
+</Button>
       ) : null}
       {make.offered && make.folder !== null ? (
         <div role="group" aria-label={sharing_word("make-workspace")} className="flex flex-col gap-2">
@@ -76,19 +77,19 @@ function MakeWorkspaceBlock({ make }: { make: MakeWorkspaceApi }) {
             {sharing_make_workspace_confirm(make.folder, make.fileName)}
           </p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" autoFocus className={`${BUTTON} ${APPLY} px-3`} onClick={make.confirm}>
+            <Button variant="primary" icon={Plus} autoFocus onClick={make.confirm}>
               Make workspace
-            </button>
-            <button type="button" className={`${BUTTON} ${OUTLINE} px-3`} onClick={make.cancel}>
+            </Button>
+            <Button icon={X} onClick={make.cancel}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
       {make.failure ? (
-        <p role="alert" className={ALERT}>
+        <AlertLine>
           {make.failure}
-        </p>
+        </AlertLine>
       ) : null}
     </div>
   );
@@ -210,9 +211,9 @@ export function ShareTab({ collab, onReturnFocus, workspace, desktop, makeWorksp
           />
         ) : null}
         {collab.passphrase?.wrong ? (
-          <p role="alert" className={ALERT}>
+          <AlertLine>
             This passphrase does not open the key file.
-          </p>
+          </AlertLine>
         ) : null}
       </div>
 

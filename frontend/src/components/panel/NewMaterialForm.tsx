@@ -2,25 +2,27 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { MaterialsApi } from "@/hooks/useMaterials";
 import { NAME_MAX, newMaterialRefusal, typedNumber } from "@/lib/materialRows";
+import { Button } from "@/components/ui/button";
+import { Plus, X } from "lucide-react";
+import { FIELD_FRAME_LABEL, fieldFrameClass, SECTION_HEADING } from "@/components/ui/looks";
+import { AlertLine } from "@/components/ui/notice";
 
-const INPUT = "h-full min-w-0 flex-1 bg-transparent px-0.5 text-right text-[13px] tabular-nums text-[var(--toolbar-icon)] outline-none";
+const INPUT = "h-full min-w-0 flex-1 bg-transparent px-0.5 text-right text-sm tabular-nums text-[var(--toolbar-icon)] outline-none";
 
 /** A plain field with its word inside the left edge and its unit inside the right (the app's
  * field look); the border marks a refused value. */
 function FormField({ label, unit, invalid, width, children }: { label: string; unit?: string; invalid: boolean; width: number; children: ReactNode }) {
   return (
     <div
-      className={`flex h-7 items-center rounded bg-white focus-within:ring-2 focus-within:ring-[var(--editor-accent)] ${
-        invalid ? "border-2 border-[var(--field-invalid)]" : "border border-[var(--lane-line)]"
-      }`}
+      className={fieldFrameClass(invalid)}
       style={{ width }}
     >
-      <span aria-hidden className="shrink-0 pl-1.5 text-[11px] text-[var(--panel-muted-fg)]">
+      <span aria-hidden className={`${FIELD_FRAME_LABEL} pl-1.5`}>
         {label}
       </span>
       {children}
       {unit ? (
-        <span aria-hidden className="shrink-0 pr-1.5 text-[11px] text-[var(--panel-muted-fg)]">
+        <span aria-hidden className={`${FIELD_FRAME_LABEL} pr-1.5`}>
           {unit}
         </span>
       ) : null}
@@ -81,7 +83,7 @@ export function NewMaterialForm({ api, defaultName, onDone }: { api: MaterialsAp
       className="flex w-[244px] flex-col gap-1 rounded-[5px] p-2"
       style={{ border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
     >
-      <span className="text-[11px] font-semibold text-[var(--panel-muted-fg)]">New material</span>
+      <span className={SECTION_HEADING}>New material</span>
       <FormField label="Name" invalid={refusal?.field === "name"} width={228}>
         <input
           ref={nameField}
@@ -107,25 +109,21 @@ export function NewMaterialForm({ api, defaultName, onDone }: { api: MaterialsAp
         />
       </FormField>
       {refusal ? (
-        <p role="alert" className="text-xs text-[var(--field-invalid)]">
+        <AlertLine>
           {refusal.text}
-        </p>
+        </AlertLine>
       ) : null}
       <div className="flex gap-1">
-        <button
-          type="button"
-          onClick={cancel}
-          className="h-7 w-[112px] rounded border border-[var(--lane-line)] text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        <Button icon={X}
+          onClick={cancel} className="min-w-[112px]"
         >
           Cancel
-        </button>
-        <button
-          type="button"
-          onClick={add}
-          className="h-7 w-[112px] rounded bg-[var(--toolbar-icon-active-bg)] text-xs text-white focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        </Button>
+        <Button variant="primary" icon={Plus}
+          onClick={add} className="min-w-[112px]"
         >
           Add
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -61,7 +61,7 @@ async function barHtml(overrides: Record<string, unknown> = {}): Promise<string>
 /** The names of the Tab stops in DOM order: buttons and radios with tabIndex 0, spin buttons. */
 function stops(html: string): string[] {
   const names: string[] = [];
-  for (const m of html.matchAll(/<(button|div|input)\b([^>]*)>([^<]*)/g)) {
+  for (const m of html.matchAll(/<(button|div|input)\b([^>]*)>(?:<svg[\s\S]*?<\/svg>)?([^<]*)/g)) {
     const attrs = m[2];
     if (/tabindex="-1"/.test(attrs) || /\shidden(=""|\s|$)/.test(attrs)) {
       continue;

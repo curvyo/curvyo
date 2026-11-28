@@ -67,3 +67,23 @@ export function toolpathToggle(page: PageRow): { pressed: boolean } | null {
 
 /** The accessible name and tooltip of the Toolpath view toggle. */
 export const TOOLPATH_VIEW_NAME = "Toolpath view";
+
+/** The page label's height and its gap to the frame or to a bar above it, px. */
+export const PAGE_LABEL_HEIGHT = 16;
+export const PAGE_LABEL_GAP = 4;
+
+/** Where a page's name label sits, as its top relative to the page frame: 20 px above the frame,
+ * or, where a bar covers that place and the page reaches below the bar, 4 px below the bar's
+ * bottom (inside the frame), so the label is never under a bar of any height (`specs/0159` F50,
+ * Proposal). `bars` is the bars' box in the same coordinates as the page, or null for none. */
+export function pageLabelTop(
+  page: Pick<PageRow, "screenX" | "screenY" | "screenWidth" | "screenHeight">,
+  bars: { left: number; right: number; bottom: number } | null,
+): number {
+  const above = -(PAGE_LABEL_HEIGHT + PAGE_LABEL_GAP);
+  if (!bars) return above;
+  const overlaps = page.screenX < bars.right && page.screenX + page.screenWidth > bars.left;
+  const covered = page.screenY + above < bars.bottom + PAGE_LABEL_GAP;
+  const reachesBelow = page.screenY + page.screenHeight > bars.bottom + PAGE_LABEL_GAP + PAGE_LABEL_HEIGHT;
+  return overlaps && covered && reachesBelow ? bars.bottom + PAGE_LABEL_GAP - page.screenY : above;
+}

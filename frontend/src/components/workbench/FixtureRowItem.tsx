@@ -1,4 +1,5 @@
 import { Check, Eye, EyeOff, Trash2 } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { type KeyboardEvent, useRef, useState } from "react";
 
 import { FixtureBody } from "@/components/workbench/FixtureBody";
@@ -11,6 +12,7 @@ import type { FixturesApi } from "@/hooks/useFixtures";
 import { rowKey, rowKeyAction, rowName, tabStopRow } from "@/lib/fixtureRows";
 import { fixtureArmStatus, removedStatus, renamedText } from "@/lib/fixtureSets";
 import type { FixtureRow, FixturesView } from "@/lib/fixturesView";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const LINE1_CONTROLS =
   "[data-line1] > button[role=checkbox], [data-line1] > button[aria-pressed], [data-line1] > button[data-arm-trash]";
@@ -118,7 +120,7 @@ function FixtureRowItem({ row, index, rows, tabStop, onFocusRow, view, api, arm,
         if (event.target === event.currentTarget) onFocusRow();
       }}
       onKeyDown={onRowKey}
-      className={`flex flex-col rounded-md px-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : selected ? "bg-[var(--value-fill)] shadow-[inset_3px_0_0_var(--editor-accent)]" : ""}`}
+      className={`flex flex-col rounded-[5px] px-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : selected ? "bg-[var(--value-fill)] shadow-[inset_3px_0_0_var(--editor-accent)]" : ""}`}
     >
       <div data-line1 className="flex h-6 items-center gap-2 pointer-coarse:h-7">
         {known && !renaming ? (
@@ -131,7 +133,7 @@ function FixtureRowItem({ row, index, rows, tabStop, onFocusRow, view, api, arm,
             className={checkBoxClass(row.active)}
             onClick={() => api.setActive(row.id, !row.active)}
           >
-            {row.active ? <Check size={12} strokeWidth={3} absoluteStrokeWidth aria-hidden /> : null}
+            {row.active ? <Check {...SMALL_GLYPH} aria-hidden /> : null}
           </button>
         ) : null}
         <FixtureGlyph kind={row.kind} className={`shrink-0 ${known && row.onBed ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`} />
@@ -151,18 +153,19 @@ function FixtureRowItem({ row, index, rows, tabStop, onFocusRow, view, api, arm,
             }}
           />
         ) : (
-          <button
-            type="button"
-            aria-label={rowName(row)}
-            aria-expanded={unfolded}
-            title={row.name}
-            tabIndex={-1}
-            className={`min-w-0 flex-1 truncate text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${row.onBed ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
-            onClick={() => onOpen(row)}
-            onDoubleClick={readOnly ? undefined : () => setRenaming(true)}
-          >
-            {row.name}
-          </button>
+          <Tooltip side="left" content={row.name}>
+            <button
+              type="button"
+              aria-label={rowName(row)}
+              aria-expanded={unfolded}
+              tabIndex={-1}
+              className={`min-w-0 flex-1 truncate text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${row.onBed ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
+              onClick={() => onOpen(row)}
+              onDoubleClick={readOnly ? undefined : () => setRenaming(true)}
+            >
+              {row.name}
+            </button>
+          </Tooltip>
         )}
         {!readOnly && !renaming ? (
           <FixtureLockButton
@@ -182,24 +185,25 @@ function FixtureRowItem({ row, index, rows, tabStop, onFocusRow, view, api, arm,
             onClick={() => api.setVisible(row.id, !row.visible)}
           >
             {row.visible ? (
-              <Eye size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+              <Eye {...GLYPH} aria-hidden />
             ) : (
-              <EyeOff size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+              <EyeOff {...GLYPH} aria-hidden />
             )}
           </button>
         ) : null}
         {renaming || readOnly ? null : (
-          <button
-            type="button"
-            {...{ [ARM_TRASH]: row.id }}
-            aria-label={trashLabel}
-            title={trashLabel}
-            tabIndex={-1}
-            className={armed ? ARMED_TRASH : `${ICON_BUTTON} text-[var(--panel-muted-fg)]`}
-            onClick={removeRow}
-          >
-            <Trash2 size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-          </button>
+          <Tooltip side="left" content={trashLabel}>
+            <button
+              type="button"
+              {...{ [ARM_TRASH]: row.id }}
+              aria-label={trashLabel}
+              tabIndex={-1}
+              className={armed ? ARMED_TRASH : `${ICON_BUTTON} text-[var(--panel-muted-fg)]`}
+              onClick={removeRow}
+            >
+              <Trash2 {...GLYPH} aria-hidden />
+            </button>
+          </Tooltip>
         )}
       </div>
       <p title={row.line2} className="h-4 truncate pl-6 text-[11px] leading-4 text-[var(--panel-muted-fg)] pointer-coarse:h-5 pointer-coarse:leading-5">

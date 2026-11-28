@@ -1,17 +1,18 @@
 import { Barcode, Box, Cog, Grid3x3, QrCode, Spline, SquareRoundCorner } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import type { ReactNode } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import type { GeneratorKindsApi } from "@/hooks/useGenerators";
 
 const GLYPHS: Record<string, ReactNode> = {
-  Barcode: <Barcode size={16} strokeWidth={1.5} aria-hidden />,
-  Box: <Box size={16} strokeWidth={1.5} aria-hidden />,
-  Cog: <Cog size={16} strokeWidth={1.5} aria-hidden />,
-  Grid3x3: <Grid3x3 size={16} strokeWidth={1.5} aria-hidden />,
-  QrCode: <QrCode size={16} strokeWidth={1.5} aria-hidden />,
-  Spline: <Spline size={16} strokeWidth={1.5} aria-hidden />,
-  SquareRoundCorner: <SquareRoundCorner size={16} strokeWidth={1.5} aria-hidden />,
+  Barcode: <Barcode {...GLYPH} aria-hidden />,
+  Box: <Box {...GLYPH} aria-hidden />,
+  Cog: <Cog {...GLYPH} aria-hidden />,
+  Grid3x3: <Grid3x3 {...GLYPH} aria-hidden />,
+  QrCode: <QrCode {...GLYPH} aria-hidden />,
+  Spline: <Spline {...GLYPH} aria-hidden />,
+  SquareRoundCorner: <SquareRoundCorner {...GLYPH} aria-hidden />,
 };
 
 /** The segment's width: 84 px, or wider for a longer name ("Rounded box"), so the text stays on
@@ -49,7 +50,7 @@ export function GeneratorsBar({
   return (
     <div
       data-placement-keeps
-      className="pointer-events-auto flex h-9 min-w-0 items-center rounded-lg px-2"
+      className="pointer-events-auto flex min-h-9 max-w-full min-w-0 items-center rounded-[8px] px-2 py-1"
       style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
     >
       <div

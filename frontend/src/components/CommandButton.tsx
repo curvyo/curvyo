@@ -1,5 +1,6 @@
 import { Tooltip } from "radix-ui";
 import { forwardRef, useRef, useState } from "react";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
 interface CommandButtonProps {
   /** The command's name; also its accessible name and the first tooltip line. */
@@ -93,7 +94,7 @@ export const CommandButton = forwardRef<HTMLButtonElement, CommandButtonProps>(
               onActivate(event.detail > 0);
             }}
             data-pressed={pressed ? "true" : undefined}
-            className={`flex size-10 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] data-[pressed=true]:bg-[var(--editor-accent-hover)] ${
+            className={`flex size-10 items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] data-[pressed=true]:bg-[var(--editor-accent-hover)] ${
               dimmed
                 ? ""
                 : "hover:bg-[var(--editor-accent-hover)] active:bg-[var(--editor-accent-hover)]"
@@ -111,7 +112,7 @@ export const CommandButton = forwardRef<HTMLButtonElement, CommandButtonProps>(
           <Tooltip.Content
             side="right"
             sideOffset={tooltipOffset}
-            className="z-50 max-w-[260px] rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground ring-1 ring-foreground/10"
+            className={TOOLTIP_CLASS}
           >
             <div className="font-semibold whitespace-nowrap">{name}</div>
             <div className="whitespace-nowrap">{rule}</div>

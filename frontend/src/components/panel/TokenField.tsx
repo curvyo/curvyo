@@ -5,6 +5,7 @@
 import { forwardRef, useId, useImperativeHandle, useRef } from "react";
 
 import { tokenWords } from "@/lib/tokenWords";
+import { AlertLine } from "@/components/ui/notice";
 
 export interface TokenFieldHandle {
   /** The typed text; the only way out of the field. */
@@ -72,9 +73,9 @@ export const TokenField = forwardRef<TokenFieldHandle, TokenFieldProps>(function
         {tokenWords().statement}
       </p>
       {refusal ? (
-        <p id={ids.refusal} role="alert" className="library-refusal">
+        <AlertLine id={ids.refusal}>
           {refusal}
-        </p>
+        </AlertLine>
       ) : null}
     </>
   );

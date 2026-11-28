@@ -1,10 +1,9 @@
 import { useRef } from "react";
 
 import { shiftStyle, useNoticeShift } from "@/hooks/useNoticeShift";
+import { Button } from "@/components/ui/button";
+import { Box } from "lucide-react";
 
-/** The look of "Object to path" and "Linked clone": a 28 px text button. */
-const BUTTON_CLASS =
-  "my-1 h-7 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /**
  * The Box from path button of the Select bar (`specs/0149-path-box` UX notes §1.1): a text button,
@@ -25,8 +24,7 @@ export function BoxFromPathButton({
   const shift = useNoticeShift(noticeRef, notice);
   return (
     <div className="relative">
-      <button
-        type="button"
+      <Button size="bar" icon={Box} iconOnly tooltip="Box from path" className="my-1"
         data-select-command="box-from-path"
         onClick={(event) => {
           onPress();
@@ -35,15 +33,14 @@ export function BoxFromPathButton({
             onReturnFocus();
           }
         }}
-        className={BUTTON_CLASS}
       >
         Box from path
-      </button>
+      </Button>
       {/* Takes no focus; the live region is in the tree from the start. */}
       <div
         ref={noticeRef}
         role="alert"
-        className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-md px-2 py-1 text-xs ring-1 ring-[var(--field-invalid)]"
+        className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-[8px] px-2 py-1 text-xs ring-1 ring-[var(--field-invalid)]"
         style={
           notice
             ? { background: "var(--popover)", color: "var(--field-invalid)", ...shiftStyle(shift) }

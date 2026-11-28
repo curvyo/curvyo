@@ -1,4 +1,3 @@
-import { CircleAlert } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ColourPicker } from "@/components/panel/ColourPicker";
@@ -7,6 +6,9 @@ import type { GradientApi } from "@/hooks/useGradient";
 import { stepAngle, stepRadius, stopColour } from "@/lib/gradientText";
 import type { GradientEntry } from "@/lib/gradientView";
 import { clampInside } from "@/lib/readoutPlacement";
+import { NumberField } from "@/components/ui/number-field";
+import { TextField } from "@/components/ui/text-field";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The box lies 16 px right of and below its handle (UX notes §7). */
 const OFFSET_PX = 16;
@@ -26,9 +28,6 @@ const FIELD_LABELS = {
   position: { prefix: "Position", suffix: "%", name: "position, percent", width: 88 },
 } as const;
 
-const INPUT =
-  "style-field h-7 w-full rounded-[5px] border bg-white text-sm tabular-nums outline-none focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]";
-const BORDER = "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]";
 
 interface Props {
   entry: GradientEntry;
@@ -162,7 +161,7 @@ export function GradientEntryBox({ entry, gradient, containerRef }: Props) {
           gradient.closeEntry();
         }
       }}
-      className="pointer-events-auto absolute flex flex-col gap-1 rounded-lg p-1.5"
+      className="pointer-events-auto absolute flex flex-col gap-1 rounded-[8px] p-1.5"
       style={{
         left,
         top,
@@ -173,29 +172,22 @@ export function GradientEntryBox({ entry, gradient, containerRef }: Props) {
     >
       <div className="flex items-center gap-1">
         {label && (
-          <div className="relative" style={{ width: label.width }}>
-            <input
-              type="text"
-              data-gradient-field=""
-              aria-label={entry.field === "position" ? `${stopName} ${label.name}` : label.name}
-              aria-invalid={invalid === "number" || invalid === "range" ? true : undefined}
-              autoComplete="off"
-              spellCheck={false}
-              value={field}
-              onChange={(event) => {
-                setField(event.target.value);
-                setInvalid(null);
-              }}
-              className={`${INPUT} ${BORDER} text-right`}
-              style={{ paddingLeft: 8 + label.prefix.length * 6.5, paddingRight: label.suffix.length > 1 ? 32 : 24 }}
-            />
-            <span aria-hidden className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-xs text-[var(--panel-muted-fg)]">
-              {label.prefix}
-            </span>
-            <span aria-hidden className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-sm text-[var(--panel-muted-fg)]">
-              {label.suffix}
-            </span>
-          </div>
+          <NumberField
+            width={label.width}
+            label={label.prefix}
+            unit={label.suffix}
+            largeUnit
+            invalid={invalid === "number" || invalid === "range"}
+            inputMode="text"
+            inputClassName="style-field"
+            data-gradient-field=""
+            aria-label={entry.field === "position" ? `${stopName} ${label.name}` : label.name}
+            value={field}
+            onChange={(event) => {
+              setField(event.target.value);
+              setInvalid(null);
+            }}
+          />
         )}
         <button
           type="button"
@@ -206,10 +198,9 @@ export function GradientEntryBox({ entry, gradient, containerRef }: Props) {
         >
           <Swatch rgb={colour?.rgb ?? 0} opacity={colour?.opacity ?? 100} mixed={false} size={20} />
         </button>
-        <input
-          type="text"
+        <TextField
           aria-label={`${stopName} colour`}
-          aria-invalid={invalid === "hex" ? true : undefined}
+          invalid={invalid === "hex"}
           autoComplete="off"
           spellCheck={false}
           value={hex}
@@ -217,7 +208,7 @@ export function GradientEntryBox({ entry, gradient, containerRef }: Props) {
             setHex(event.target.value);
             setInvalid(null);
           }}
-          className={`${INPUT} ${BORDER} pl-1.5 text-left`}
+          className="style-field tabular-nums"
           style={{ width: 92 }}
         />
       </div>
@@ -238,10 +229,9 @@ export function GradientEntryBox({ entry, gradient, containerRef }: Props) {
         </div>
       )}
       {invalid && (
-        <p role="alert" className="flex items-start gap-1 text-xs text-[var(--field-invalid)]">
-          <CircleAlert size={12} aria-hidden className="mt-0.5 shrink-0" />
+        <AlertLine>
           {invalid === "range" && entry.field === "radius" ? "Enter a number above 0." : (MESSAGES[invalid] ?? "Not a valid value")}
-        </p>
+        </AlertLine>
       )}
     </div>
   );

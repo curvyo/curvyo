@@ -1,7 +1,8 @@
-import { Crop } from "lucide-react";
+import { Crop, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { HANDLES, arrowStep, moveFrame, resizeFrame, shownHeight, sizeReadout, type Frame, type Handle } from "@/lib/photoSize";
+import { Button } from "@/components/ui/button";
 
 const HANDLE_NAMES: Record<Handle, string> = {
   nw: "top left",
@@ -143,21 +144,15 @@ export function PhotoCrop({ url, width, height, onCancel, onCrop }: PhotoCropPro
       </div>
       <p className="text-[11px] tabular-nums text-[var(--panel-muted-fg)]">{sizeReadout(frame.width, frame.height)}</p>
       <div className="flex gap-1">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="h-7 w-[112px] rounded border border-[var(--lane-line)] text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-        >
+        <Button icon={X} onClick={onCancel} className="min-w-[112px]">
           Cancel
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button variant="primary" icon={Crop}
           onClick={() => onCrop(frame)}
-          className="flex h-7 w-[112px] items-center justify-center gap-1 rounded bg-[var(--toolbar-icon-active-bg)] text-xs text-white focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+           className="min-w-[112px]"
         >
-          <Crop size={16} aria-hidden />
-          Crop
-        </button>
+Crop
+</Button>
       </div>
     </div>
   );

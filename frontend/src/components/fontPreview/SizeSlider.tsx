@@ -10,9 +10,10 @@ import { useSliderPointer } from "@/hooks/useSliderPointer";
 import { DEFAULT_SIZE, SIZE_RANGE, clampSize } from "@/lib/fontPreviewState";
 import { sizeTip } from "@/lib/fontPreviewText";
 import { positionOfValue, valueAtPosition } from "@/lib/sliderValue";
+import { SLIDER_INSET_PX, SLIDER_THUMB_PX, SliderMarks } from "@/components/ui/slider";
 
-const THUMB = 14;
-const INSET = THUMB / 2 + 1;
+const THUMB = SLIDER_THUMB_PX;
+const INSET = SLIDER_INSET_PX;
 const TARGET_HEIGHT = 24;
 /** A slider's range, default and arrow steps; the font preview's unless given. */
 export interface SizeScale {
@@ -114,7 +115,7 @@ export function SizeSlider({ scale = FONT_SCALE, size, width, onSize, onReturnFo
           aria-valuenow={size}
           aria-valuetext={`${size} pixels`}
           aria-keyshortcuts="Enter F2"
-          className="relative shrink-0 cursor-pointer rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          className="group relative shrink-0 cursor-pointer rounded-[5px] outline-none"
           style={{ width, height: TARGET_HEIGHT, touchAction: "manipulation" }}
           onPointerDown={(event) => {
             start.current = size;
@@ -125,21 +126,7 @@ export function SizeSlider({ scale = FONT_SCALE, size, width, onSize, onReturnFo
           onPointerCancel={pointer.onPointerCancel}
           onKeyDown={onKeyDown}
         >
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full"
-            style={{ left: INSET, right: INSET, background: "color-mix(in srgb, var(--toolbar-icon) 35%, transparent)" }}
-          />
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--editor-accent)]"
-            style={{ left: INSET, width: thumbLeft - INSET }}
-          />
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 rounded-full border-2 border-[var(--editor-accent)] bg-white"
-            style={{ width: THUMB, height: THUMB, left: thumbLeft - THUMB / 2, marginTop: -THUMB / 2 }}
-          />
+          <SliderMarks thumbLeft={thumbLeft} />
         </div>
       </Tooltip>
       {entry ? (

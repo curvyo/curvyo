@@ -83,7 +83,7 @@ test("U4, U9: the bar's Dither stands in two halves that wrap, and Home and End 
   const bar = source("components/TestGridBar.tsx");
   assert.match(bar, /<Segments<DitherMode>\s+halves/);
   assert.match(bar, /const ends = halves && \(event\.key === "Home" \|\| event\.key === "End"\)/);
-  assert.match(bar, /HALVES_CLASS = "flex min-w-0 max-w-full flex-wrap/);
+  assert.match(bar, /HALVES_CLASS = `flex min-w-0 max-w-full flex-wrap/);
 });
 
 test("U6: the not-a-picture line selects its items and unfolds its operation's row", () => {

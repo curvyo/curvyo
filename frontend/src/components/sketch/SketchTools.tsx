@@ -8,7 +8,8 @@ import type { SketchRailTool } from "@/lib/sketchView";
 
 const tools = [["select","Select",MousePointer2],["point","Point",Dot],["polyline","Polyline",PenLine],["arc","Arc",Spline],["circle","Circle",Circle],["ellipse","Ellipse",Ellipse],["rectangle","Rectangle",Square],["slot","Slot",RectangleHorizontal],["fillet","Fillet",CornerDownRight]] as const;
 const family = (tool: string) => tool.split("-")[0];
-const BUTTON_CLASS = "pointer-events-auto flex size-10 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)]";
+/** The main rail's tool button: 40 px, the one focus ring, pressed in the one "on" colour. */
+const BUTTON_CLASS = "pointer-events-auto flex size-10 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)]";
 /** A 1px, 25% divider follows Fixed and Midpoint (UX notes revision 2, section 1). */
 const DIVIDER_AFTER = new Set(["fixed", "midpoint"]);
 const ROVING_KEYS = ["ArrowUp", "ArrowDown", "Home", "End"];
@@ -17,18 +18,25 @@ function roving(key: string, index: number, count: number) {
   return key === "Home" ? 0 : key === "End" ? count - 1 : (index + (key === "ArrowDown" ? 1 : -1) + count) % count;
 }
 
+/** The draw tools in three cards like the main rail's (0159 F49): Select, the shapes, Fillet. */
+const TOOL_CARDS = [tools.slice(0, 1), tools.slice(1, 8), tools.slice(8)] as const;
+
 function SketchToolRailBody({ sketch, paused }: { sketch: SketchApi; paused: boolean }) {
   const constraintArmed = sketch.view.tool === "constraints";
   return <nav aria-label="Sketch tools" inert={paused} className="pointer-events-none absolute top-3 bottom-1 left-3 z-30 flex gap-2">
-    <div className={`${RAIL_CARD_CLASS} self-start overflow-y-auto`} style={RAIL_CARD_STYLE} onKeyDown={e => {
+    {/* One column of cards, 8 px apart; it scrolls in a low window. One roving group over the
+        three cards: Up, Down, Home and End move through every draw tool. */}
+    <div className="pointer-events-auto flex min-h-0 flex-col gap-2 self-start overflow-y-auto [scrollbar-width:none]" style={{ maxHeight: "100%" }} onKeyDown={e => {
       if (!ROVING_KEYS.includes(e.key)) return;
       const buttons=Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
       const index=buttons.indexOf(document.activeElement as HTMLButtonElement);
       e.preventDefault(); buttons[roving(e.key, index, buttons.length)]?.focus();
-    }}>{tools.map(([tool,label,Icon]) => <Tooltip key={tool} content={label} side="right"><button type="button" aria-label={label}
-      aria-pressed={!constraintArmed && family(sketch.view.tool) === tool}
-      className={BUTTON_CLASS}
-      onClick={e => { sketch.run(s => s.set_sketch_tool(tool)); if(e.detail>0) sketch.focusCanvas(); }}><Icon size={20} strokeWidth={1.5} /></button></Tooltip>)}</div>
+    }}>{TOOL_CARDS.map((card, cardIndex) => <div key={cardIndex} className={RAIL_CARD_CLASS} style={RAIL_CARD_STYLE}>
+      {card.map(([tool,label,Icon]) => <Tooltip key={tool} content={`${label} tool`} side="right"><button type="button" aria-label={label}
+        aria-pressed={!constraintArmed && family(sketch.view.tool) === tool}
+        className={BUTTON_CLASS}
+        onClick={e => { sketch.run(s => s.set_sketch_tool(tool)); if(e.detail>0) sketch.focusCanvas(); }}><Icon size={20} strokeWidth={1.5} absoluteStrokeWidth /></button></Tooltip>)}
+    </div>)}</div>
     <ConstraintCard sketch={sketch} />
   </nav>;
 }

@@ -1,4 +1,4 @@
-import { CircleAlert } from "lucide-react";
+import { ActionNotice as NoticeSurface } from "@/components/ui/notice";
 
 import {
   PATH_CARD_HEIGHT_PX,
@@ -38,32 +38,10 @@ export function BooleanNotice({ notice }: { notice: ActionNotice | null }) {
       data-boolean-notice
     >
       <div role="status">
-        {notice?.kind === "success" ? (
-          <div
-            className="rounded-lg p-2"
-            style={{
-              background: "var(--toolbar-bg)",
-              color: "var(--toolbar-icon)",
-              boxShadow: "var(--panel-elevation-shadow)",
-            }}
-          >
-            {notice.text}
-          </div>
-        ) : null}
+        {notice?.kind === "success" ? <NoticeSurface announce={false}>{notice.text}</NoticeSurface> : null}
       </div>
       <div role="alert">
-        {notice?.kind === "refusal" ? (
-          <div
-            className="flex items-start gap-1.5 rounded-lg bg-popover p-2"
-            style={{
-              color: "var(--field-invalid)",
-              boxShadow: "0 0 0 1px var(--field-invalid), var(--panel-elevation-shadow)",
-            }}
-          >
-            <CircleAlert size={12} aria-hidden="true" className="mt-0.5 shrink-0" />
-            <span>{notice.text}</span>
-          </div>
-        ) : null}
+        {notice?.kind === "refusal" ? <NoticeSurface refusal announce={false}>{notice.text}</NoticeSurface> : null}
       </div>
     </div>
   );

@@ -4,10 +4,10 @@ import { useRef } from "react";
 import type { StrokeToPathBarNotice } from "@/hooks/useStrokeToPath";
 import { shiftStyle, useNoticeShift } from "@/hooks/useNoticeShift";
 import { STROKE_TO_PATH_DIMMED, STROKE_TO_PATH_NAME } from "@/lib/strokeToPathText";
+import { Button } from "@/components/ui/button";
+import { Spline } from "lucide-react";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
-/** The look of "Object to path" and "Linked clone": a 28 px text button. */
-const BUTTON_CLASS =
-  "my-1 h-7 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /**
  * The Stroke to path button of the Select bar (`specs/0085-stroke-to-path` criteria 1, 2 and 22,
@@ -34,8 +34,7 @@ export function StrokeToPathButton({
       <Tooltip.Provider delayDuration={400}>
         <Tooltip.Root>
           <Tooltip.Trigger asChild>
-            <button
-              type="button"
+            <Button size="bar" icon={Spline} iconOnly className="my-1"
               // Not the `disabled` attribute: the button keeps its tooltip and its Tab stop.
               aria-disabled={!enabled}
               data-select-command="stroke-to-path"
@@ -49,16 +48,15 @@ export function StrokeToPathButton({
                   onReturnFocus();
                 }
               }}
-              className={`${BUTTON_CLASS} ${enabled ? "hover:bg-[var(--editor-accent-hover)]" : "opacity-40"}`}
             >
               {STROKE_TO_PATH_NAME}
-            </button>
+            </Button>
           </Tooltip.Trigger>
           <Tooltip.Portal>
             <Tooltip.Content
               side="bottom"
               sideOffset={6}
-              className="z-50 rounded-md px-2 py-1 text-xs"
+              className={TOOLTIP_CLASS}
               style={{
                 background: "var(--toolbar-bg)",
                 color: "var(--toolbar-icon)",
@@ -74,7 +72,7 @@ export function StrokeToPathButton({
       <div
         ref={noticeRef}
         role={notice?.alert ? "alert" : "status"}
-        className={`absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-md px-2 py-1 text-xs ${
+        className={`absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-[8px] px-2 py-1 text-xs ${
           notice?.alert ? "ring-1 ring-[var(--field-invalid)]" : ""
         }`}
         style={

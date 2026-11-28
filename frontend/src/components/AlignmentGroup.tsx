@@ -14,6 +14,7 @@ import {
   alignTabStop,
   alignTooltipLine,
 } from "@/lib/textLayoutText";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
 const TOOLTIP_STYLE = {
   background: "var(--toolbar-bg)",
@@ -22,7 +23,7 @@ const TOOLTIP_STYLE = {
 } as const;
 
 const BUTTON_CLASS =
-  "flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+  "flex size-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 const GLYPHS: Record<AlignCode, typeof TextAlignStart> = {
   left: TextAlignStart,
@@ -107,7 +108,7 @@ export function AlignmentGroup({ align, onPress, onReturnFocus }: AlignmentGroup
               <Tooltip.Content
                 side="bottom"
                 sideOffset={6}
-                className="z-50 max-w-[300px] rounded-md px-2 py-1 text-xs"
+                className={TOOLTIP_CLASS}
                 style={TOOLTIP_STYLE}
               >
                 <div className="font-semibold">{ALIGN_NAMES[code]}</div>

@@ -1,6 +1,8 @@
+import { FIELD_FRAME, GLYPH as LOOKS_GLYPH } from "@/components/ui/looks";
+
 /** The 28 px (36 px coarse) symbol button of the Machine block and the field frame (`docs/design-system.md`). */
 export const ICON_BUTTON =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:size-9";
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:size-9";
 
 /** The armed symbol button of Update profile: filled `--armed-accent`, white glyph (`specs/0130`
  * criterion 3, Frage 254 A). */
@@ -15,11 +17,10 @@ export const ARMED_DESTRUCTIVE_BUTTON = ICON_BUTTON.replace(
   "bg-[var(--destructive)] text-white",
 );
 
-export const FIELD =
-  "flex h-7 items-center gap-1 rounded-[5px] border border-[var(--field-border)] bg-white px-2 text-sm focus-within:ring-2 focus-within:ring-[var(--editor-accent)]";
+export const FIELD = FIELD_FRAME;
 
 /** A 16 px Lucide glyph at 1.5 px absolute stroke (`docs/design-system.md`). */
-export const GLYPH = { size: 16, strokeWidth: 1.5, absoluteStrokeWidth: true, "aria-hidden": true } as const;
+export const GLYPH = { ...LOOKS_GLYPH, "aria-hidden": true } as const;
 
 /** The 12 px glyph before a state line. */
 export const SMALL = { size: 12, strokeWidth: 1.5, absoluteStrokeWidth: true, "aria-hidden": true } as const;

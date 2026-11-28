@@ -1,10 +1,10 @@
+import { ArrowDownToLine } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { DropBadgePill } from "@/components/DropBadgePill";
 import { OperationRowView, type RowActions } from "@/components/panel/OperationRow";
 import { OperationBody } from "@/components/panel/OperationBody";
 import { OperationSettingsBlock } from "@/components/panel/OperationSettingsBlock";
-import { PanelSwitch } from "@/components/ui/switch";
 import type { OperationsApi } from "@/hooks/useOperations";
 import { useDeleteArm } from "@/hooks/useDeleteArm";
 import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
@@ -25,6 +25,7 @@ import {
 import { operationIdKey, type OperationsView } from "@/lib/operationsView";
 import { bodyOpen, pressUnfolds, rowHeight, unfoldedViewport } from "@/lib/operationUnfold";
 import { visibleRange } from "@/lib/operationWindow";
+import { ToggleButton } from "@/components/ui/toggle-button";
 
 /** The list's scroll area: 300 px high; the rows outside it (and the overscan) are not drawn. */
 const VIEWPORT = 300;
@@ -398,10 +399,10 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
 
   return (
     <section ref={addRef} aria-label="Operations" className="flex flex-col gap-2">
-      <PanelSwitch
+      <ToggleButton icon={ArrowDownToLine}
         label="Cuts last"
-        checked={view.cutsLast}
-        onCheckedChange={(on) => api.setCutsLast(on)}
+        pressed={view.cutsLast}
+        onPressedChange={(on) => api.setCutsLast(on)}
         onReturnFocus={onReturnFocus}
       />
       {view.rows.length === 0 ? (
@@ -515,7 +516,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
         <div
           aria-hidden
           data-reorder-ghost=""
-          className="pointer-events-none fixed z-50 flex h-10 items-center rounded bg-[var(--value-fill)] px-2 text-[13px] text-[var(--toolbar-icon)] shadow"
+          className="pointer-events-none fixed z-50 flex h-10 items-center rounded-[8px] bg-[var(--value-fill)] px-2 text-sm text-[var(--toolbar-icon)] shadow"
           style={{
             left: ghost.left,
             top: ghostTop(ghost.y, ghost.offset, ghost.top, ghost.bottom, 40),

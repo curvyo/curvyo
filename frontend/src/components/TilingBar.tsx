@@ -1,9 +1,8 @@
-import { CircleAlert, SlidersHorizontal } from "lucide-react";
+import { Check, CircleAlert, Copy, Focus, SlidersHorizontal } from "lucide-react";
 import { Tooltip } from "radix-ui";
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 
 import { Divider, useRowStarts } from "@/components/SelectToolbar";
-import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import type { TilingApi } from "@/hooks/useTiling";
 import { BAR_ROW_CLASS } from "@/lib/barLayout";
 import {
@@ -26,17 +25,20 @@ import {
   tilingAnnouncement,
   varianceSummary,
 } from "@/lib/tilingText";
+import { Button } from "@/components/ui/button";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { buttonClass, SEGMENT_ITEM, SEGMENT_STRIP, toggleClass, GLYPH } from "@/components/ui/looks";
+import { Tooltip as SharedTooltip, TOOLTIP_CLASS } from "@/components/ui/tooltip";
+import { NumberField } from "@/components/ui/number-field";
+import { ActionNotice } from "@/components/ui/notice";
 
-const BUTTON_CLASS =
-  "h-7 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
-const SELECTED_CLASS = "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:bg-[var(--toolbar-icon-active-bg)]";
 /** A group of the bar: its controls on one 28 px centre line, 4 px above and below (UX notes
  * §12.2), `relative` for the divider before it. */
 const GROUP_CLASS = "group/row relative flex flex-wrap items-center gap-x-2 gap-y-1 py-1";
 const TOOLTIP_STYLE = { background: "var(--toolbar-bg)", color: "var(--toolbar-icon)", boxShadow: "var(--panel-elevation-shadow)" };
 const LABEL_CLASS = "text-sm text-[var(--toolbar-icon)]";
-const CHIP_CLASS = "absolute left-0 top-full z-30 mt-1 w-max max-w-[320px] rounded-lg px-2 py-1 text-xs";
-const CHIP_STYLE = { background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)", color: "var(--toolbar-icon)" };
+/** Where a field's or a button's notice hangs: 4 px under it, at its left edge. */
+const CHIP_PLACE = "absolute left-0 top-full z-30 mt-1";
 
 /** Lets a field tell the bar that it holds an invalid text (Apply is then disabled). */
 const InvalidFields = createContext<(id: string, invalid: boolean) => void>(() => undefined);
@@ -85,15 +87,13 @@ function TilingField({ label, name, value, unit, rule, width, onValue, inputRef,
     <label className="relative flex items-center gap-2">
       {hideLabel ? null : <span className={LABEL_CLASS}>{label}</span>}
       <span className="relative">
-        <input
-          ref={inputRef}
+        <NumberField
+          width={width}
+          unit={unit || undefined}
+          invalid={error !== null}
+          small={compact}
+          inputRef={inputRef}
           aria-label={name}
-          aria-invalid={error !== null}
-          inputMode="decimal"
-          className={`${compact ? "h-6 pointer-coarse:h-9" : "h-7"} rounded-md bg-white text-right text-sm tabular-nums text-black outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
-            error ? "ring-2 ring-[var(--field-invalid)]" : ""
-          }`}
-          style={{ width, paddingRight: unit ? 32 : 6, paddingLeft: 6 }}
           value={text}
           onFocus={() => {
             focused.current = true;
@@ -115,21 +115,21 @@ function TilingField({ label, name, value, unit, rule, width, onValue, inputRef,
             }
           }}
         />
-        {unit ? <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[var(--panel-muted-fg)]">{unit}</span> : null}
         {error ? (
-          <span role="status" className={CHIP_CLASS} style={CHIP_STYLE}>
+          <ActionNotice maxWidth={320} className={CHIP_PLACE}>
             {error}
-          </span>
+          </ActionNotice>
         ) : null}
       </span>
     </label>
   );
 }
 
-/** A radiogroup of text segments (UX notes §2.1: one Tab stop, arrows move). */
+/** A radiogroup of text segments in the one segmented look (UX notes §2.1: one Tab stop, arrows
+ * move; `docs/ui-elements.md` §7, 0159 F45). */
 function Segments<T extends string>({ name, options, value, onChange }: { name: string; options: { value: T; label: string }[]; value: T; onChange: (value: T) => void }) {
   return (
-    <div role="radiogroup" aria-label={name} className="flex items-center gap-1">
+    <div role="radiogroup" aria-label={name} className={`flex ${SEGMENT_STRIP}`}>
       {options.map((option, index) => (
         <button
           key={option.value}
@@ -137,7 +137,7 @@ function Segments<T extends string>({ name, options, value, onChange }: { name: 
           role="radio"
           aria-checked={option.value === value}
           tabIndex={option.value === value ? 0 : -1}
-          className={`${BUTTON_CLASS} ${option.value === value ? SELECTED_CLASS : ""}`}
+          className={SEGMENT_ITEM}
           onClick={() => onChange(option.value)}
           onKeyDown={(event) => arrowStep(event, options, index, onChange)}
         >
@@ -183,43 +183,28 @@ const LAYOUTS = [
   { value: "circle" as const, label: CIRCLE, glyph: <CircleGlyph /> },
 ];
 
-/** The Layout radiogroup (UX notes §12.2): two 28 px icon segments in the Offset chip's pill
- * look, the name in the tooltip and the accessible name; one Tab stop, arrows choose. */
+/** The Layout radiogroup (UX notes §12.2): two 28 px icon segments in the one segmented look
+ * (0159 F45), the name in the tooltip and the accessible name; one Tab stop, arrows choose. */
 function LayoutSegments({ value, onChange }: { value: "grid" | "circle"; onChange: (value: "grid" | "circle") => void }) {
   return (
-    <div
-      role="radiogroup"
-      aria-label="Layout"
-      className="flex h-7 rounded-[7px] p-[1.5px]"
-      // A 1.5 px ring as a shadow: a CSS border of 1.5 px computes to 1 px at a device pixel ratio of 1.
-      style={{ boxShadow: "inset 0 0 0 1.5px var(--toolbar-icon)" }}
-    >
+    <div role="radiogroup" aria-label="Layout" className={`flex ${SEGMENT_STRIP}`}>
       {LAYOUTS.map((option, index) => {
         const selected = option.value === value;
         return (
-          <Tooltip.Root key={option.value}>
-            <Tooltip.Trigger asChild>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={option.label}
-                tabIndex={selected ? 0 : -1}
-                className={`flex h-[25px] w-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
-                  selected ? SELECTED_CLASS : "hover:bg-[var(--editor-accent-hover)]"
-                }`}
-                onClick={() => onChange(option.value)}
-                onKeyDown={(event) => arrowStep(event, LAYOUTS, index, onChange)}
-              >
-                {option.glyph}
-              </button>
-            </Tooltip.Trigger>
-            <Tooltip.Portal>
-              <Tooltip.Content side="bottom" sideOffset={4} className="z-50 rounded-md px-2 py-1 text-xs" style={TOOLTIP_STYLE}>
-                {option.label}
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip.Root>
+          <SharedTooltip key={option.value} side="bottom" content={option.label}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={option.label}
+              tabIndex={selected ? 0 : -1}
+              className={`${SEGMENT_ITEM} w-7 px-0`}
+              onClick={() => onChange(option.value)}
+              onKeyDown={(event) => arrowStep(event, LAYOUTS, index, onChange)}
+            >
+              {option.glyph}
+            </button>
+          </SharedTooltip>
         );
       })}
     </div>
@@ -242,18 +227,15 @@ function LineGlyph({ columns, offset }: { columns: boolean; offset: boolean }) {
   );
 }
 
+/** An icon toggle with a drawn glyph: the shared toggle look and tooltip (`docs/ui-elements.md`
+ * §6, 0159 F45). */
 function Toggle({ name, pressed, onPress, children }: { name: string; pressed: boolean; onPress: () => void; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      aria-label={name}
-      title={name}
-      aria-pressed={pressed}
-      className={`${BUTTON_CLASS} flex w-7 items-center justify-center px-0 ${pressed ? SELECTED_CLASS : ""}`}
-      onClick={onPress}
-    >
-      {children}
-    </button>
+    <SharedTooltip side="bottom" content={name}>
+      <button type="button" aria-label={name} aria-pressed={pressed} className={toggleClass("icon")} onClick={onPress}>
+        {children}
+      </button>
+    </SharedTooltip>
   );
 }
 
@@ -303,7 +285,7 @@ function CircleFields({ recipe, tiling }: { recipe: TilingRecipe; tiling: Tiling
     <div className={GROUP_CLASS}>
       <Divider />
       <TilingField label="Count" name="Count" value={recipe.count} rule="count" width={44} onValue={(v, refused) => tiling.type({ count: v }, refused)} inputRef={tiling.firstFieldRef} />
-      <ToolbarSwitch label="Face centre" tooltip="Each instance turns to face the centre." checked={recipe.face_centre} onCheckedChange={(on) => tiling.update({ face_centre: on })} />
+      <ToggleButton icon={Focus} look="bar" label="Face centre" tooltip="Each instance turns to face the centre." pressed={recipe.face_centre} onPressedChange={(on) => tiling.update({ face_centre: on })} />
     </div>
   );
 }
@@ -384,19 +366,19 @@ function NoticeSlot({ lines, refused }: { lines: string[]; refused: boolean }) {
             role="status"
             aria-label={lines.join(" ")}
             tabIndex={0}
-            className="relative flex size-7 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+            className="relative flex size-7 items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
             style={{ color: refused ? "var(--field-invalid)" : "var(--toolbar-icon)" }}
           >
-            <CircleAlert size={16} aria-hidden="true" />
+            <CircleAlert {...GLYPH} aria-hidden="true" />
             {refused ? (
-              <span role="alert" className={`${CHIP_CLASS} ring-1 ring-[var(--field-invalid)]`} style={{ ...CHIP_STYLE, color: "var(--field-invalid)" }}>
+              <ActionNotice refusal maxWidth={320} className={CHIP_PLACE}>
                 {REFUSED_TEXT}
-              </span>
+              </ActionNotice>
             ) : null}
           </span>
         </Tooltip.Trigger>
         <Tooltip.Portal>
-          <Tooltip.Content side="bottom" sideOffset={4} className="z-50 whitespace-pre-line rounded-md px-2 py-1 text-xs" style={TOOLTIP_STYLE}>
+          <Tooltip.Content side="bottom" sideOffset={4} className={`${TOOLTIP_CLASS} whitespace-pre-line`} style={TOOLTIP_STYLE}>
             {text}
           </Tooltip.Content>
         </Tooltip.Portal>
@@ -457,7 +439,7 @@ export function TilingBar({ tiling }: { tiling: TilingApi }) {
   return (
     <InvalidFields.Provider value={report}>
     <Tooltip.Provider delayDuration={400}>
-    <div data-context-bar="" className="pointer-events-auto flex min-w-0 flex-col rounded-lg px-2 text-sm" style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}>
+    <div data-context-bar="" className="pointer-events-auto flex min-w-0 flex-col rounded-[8px] px-2 text-sm" style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}>
       <div className="flex min-w-0 items-start gap-x-[25px]">
         <div ref={clusterRef} className={`${BAR_ROW_CLASS} flex-1`}>
           <div className={GROUP_CLASS}>
@@ -470,11 +452,13 @@ export function TilingBar({ tiling }: { tiling: TilingApi }) {
           {recipe.layout === "grid" ? <GridFields recipe={recipe} tiling={tiling} /> : <CircleFields recipe={recipe} tiling={tiling} />}
           <div className={GROUP_CLASS}>
             <Divider />
-            <button type="button" aria-expanded={varianceOpen} title={summary} className={`${BUTTON_CLASS} relative flex items-center gap-1 ${varianceOpen ? "bg-[var(--editor-accent-hover)]" : ""}`} onClick={() => setVarianceOpen((o) => !o)}>
-              <SlidersHorizontal size={16} aria-hidden="true" />
-              Variance
-              {summary !== "Variance: none" ? <span aria-hidden="true" className="absolute left-5 top-1 h-1.5 w-1.5 rounded-full bg-[var(--toolbar-icon)]" /> : null}
-            </button>
+            <SharedTooltip side="bottom" content={summary}>
+              <button type="button" aria-expanded={varianceOpen} className={buttonClass("secondary", "bar", `relative ${varianceOpen ? "bg-[var(--editor-accent-hover)]" : ""}`)} onClick={() => setVarianceOpen((o) => !o)}>
+                <SlidersHorizontal {...GLYPH} aria-hidden="true" />
+                Variance
+                {summary !== "Variance: none" ? <span aria-hidden="true" className="absolute left-5 top-1 h-1.5 w-1.5 rounded-full bg-[var(--toolbar-icon)]" /> : null}
+              </button>
+            </SharedTooltip>
           </div>
           <div className={GROUP_CLASS}>
             <Divider />
@@ -484,19 +468,19 @@ export function TilingBar({ tiling }: { tiling: TilingApi }) {
           <div className={GROUP_CLASS}>
             <Divider />
             <div className="inline-flex h-7 items-center gap-2">
-              <ToolbarSwitch label={KEEP_SOURCE} shortLabel="Keep source" tooltip={KEEP_SOURCE_RULE} checked={recipe.keep_source} onCheckedChange={(on) => set({ keep_source: on })} />
+              <ToggleButton icon={Copy} look="bar" label={KEEP_SOURCE} shortLabel="Keep source" tooltip={KEEP_SOURCE_RULE} pressed={recipe.keep_source} onPressedChange={(on) => set({ keep_source: on })} />
             </div>
           </div>
           <NoticeSlot lines={noticeLines(status)} refused={refused} />
         </div>
         <div className="relative shrink-0 self-start py-1">
-          <button type="button" aria-disabled={applyBlocked} className={`${BUTTON_CLASS} ${SELECTED_CLASS} w-16 ${applyBlocked ? "opacity-40" : ""}`} onClick={() => !applyBlocked && tiling.apply()}>
+          <Button variant="primary" size="bar" icon={Check} aria-disabled={applyBlocked} className="w-20" onClick={() => !applyBlocked && tiling.apply()}>
             Apply
-          </button>
+          </Button>
           {status.refusal ? (
-            <span role="alert" className={`${CHIP_CLASS} left-auto right-0 ring-1 ring-[var(--field-invalid)]`} style={{ ...CHIP_STYLE, color: "var(--field-invalid)" }}>
+            <ActionNotice refusal maxWidth={320} className="absolute right-0 top-full z-30 mt-1">
               {status.refusal}
-            </span>
+            </ActionNotice>
           ) : null}
         </div>
       </div>

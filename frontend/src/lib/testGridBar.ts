@@ -74,15 +74,28 @@ export function axisKeys(side: "columns" | "rows"): { min: string; max: string; 
   return { min: `${side}_min`, max: `${side}_max`, count: `${side}_count` };
 }
 
-/** The accessible name of an axis field: "Columns Min, %". */
-export function axisFieldName(side: "columns" | "rows", part: "Min" | "Max" | "Count", axis: AxisFields): string {
-  const head = side === "columns" ? "Columns" : "Rows";
-  return part === "Count" ? `${head} count` : `${head} ${part}, ${PARAM_UNIT[axis.param]}`;
+/** The unit inside a bar field: Passes is a count and shows none, so no "×" reads as a clear
+ * button after its number (0159 F47). */
+export function fieldUnit(param: Param): string {
+  return param === "passes" ? "" : PARAM_UNIT[param];
 }
 
-/** The unit inside an axis field (Count has none). */
+/** The accessible name of a shared field: "Power, %", "Passes". */
+export function sharedFieldName(param: Param): string {
+  const unit = fieldUnit(param);
+  return unit === "" ? PARAM_WORD[param] : `${PARAM_WORD[param]}, ${unit}`;
+}
+
+/** The accessible name of an axis field: "Columns Min, %", "Rows Max" for Passes. */
+export function axisFieldName(side: "columns" | "rows", part: "Min" | "Max" | "Count", axis: AxisFields): string {
+  const head = side === "columns" ? "Columns" : "Rows";
+  const unit = fieldUnit(axis.param);
+  return part === "Count" ? `${head} count` : unit === "" ? `${head} ${part}` : `${head} ${part}, ${unit}`;
+}
+
+/** The unit inside an axis field (Count and Passes have none). */
 export function axisUnit(part: "Min" | "Max" | "Count", axis: AxisFields): string {
-  return part === "Count" ? "" : PARAM_UNIT[axis.param];
+  return part === "Count" ? "" : fieldUnit(axis.param);
 }
 
 /** The step of an axis field. */

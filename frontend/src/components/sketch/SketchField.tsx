@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-export const sketchInput = "h-7 min-w-0 w-full rounded border border-[var(--field-border)] bg-[var(--toolbar-bg)] px-2 text-xs text-[var(--toolbar-icon)] outline-none focus:border-[var(--editor-accent)]";
-export const sketchButton = "min-h-7 rounded px-2 text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-disabled:opacity-40";
+import { FIELD_WIDE as sketchInput } from "@/components/ui/looks";
+export const sketchButton = "min-h-7 rounded-[5px] px-2 text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-disabled:opacity-40";
 /** Commit whole drafts once; modifier keys and native text undo keep their usual routing. */
 export function SketchField({ label, value, commit, focusCanvas, autoFocus = false }: { label: string; value: string; commit: (text: string) => boolean; focusCanvas: () => void; autoFocus?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);

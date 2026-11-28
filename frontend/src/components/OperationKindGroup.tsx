@@ -48,7 +48,7 @@ export function OperationKindGroup({ kinds, onPress, onLeaveGroup, tabs }: Opera
               aria-label={name}
               aria-describedby={`${id}-${button.kind}`}
               onClick={(event) => onPress(button.kind, event.shiftKey)}
-              className="flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]"
+              className="flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]"
             >
               <OperationGlyph kind={button.kind} />
               <span id={`${id}-${button.kind}`} className="sr-only">
@@ -64,7 +64,7 @@ export function OperationKindGroup({ kinds, onPress, onLeaveGroup, tabs }: Opera
             pressed={tabs.on}
             onPressedChange={tabs.onToggle}
             aria-label="Tabs"
-            className="ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
+            className="ml-1 flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
           >
             <TabsGlyph pressed={tabs.on} />
           </Toggle.Root>

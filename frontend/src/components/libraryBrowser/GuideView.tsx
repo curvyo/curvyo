@@ -6,8 +6,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { hostingGuide } from "@/lib/libraryBrowserQuery";
 import { openLicence } from "@/lib/onlineApi";
 import { isTauri } from "@/platform/host";
+import { Button } from "@/components/ui/button";
+import { Copy } from "lucide-react";
+import { TEXT_LINK_CLASS } from "@/components/ui/looks";
 
-const LINK = "text-[var(--editor-accent)] underline";
+const LINK = TEXT_LINK_CLASS;
 
 export function GuideView() {
   const guide = useMemo(() => hostingGuide(), []);
@@ -54,15 +57,13 @@ export function GuideView() {
         ) : null}
         <div className="mt-2 flex items-center justify-between">
           <h3 className="text-xs font-semibold text-[var(--panel-muted-fg)]">Example</h3>
-          <button
-            type="button"
+          <Button icon={Copy}
             onClick={() => {
               void navigator.clipboard?.writeText(guide.example).then(() => setCopied(true), () => undefined);
             }}
-            className="h-6 rounded-[5px] px-2 text-xs ring-1 ring-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] hover:bg-[var(--editor-accent-hover)]"
           >
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
         </div>
         <pre className="overflow-x-auto rounded-[5px] border border-[var(--tile-edge)] bg-white p-2 text-xs">{guide.example}</pre>
         <p>

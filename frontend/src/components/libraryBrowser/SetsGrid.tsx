@@ -2,12 +2,14 @@
 // 0.2): one card per set, catalogue, folder or unfetched source, in groups by source with sticky
 // headers; a press selects, a double-click or Enter opens, Space selects; arrows move by card and
 // by row; at the end Host your own library….
-import { Lock } from "lucide-react";
+import { BookOpen, Lock, X } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { BrowserCard } from "@/components/libraryBrowser/BrowserTile";
 import { CARD_WIDTH_PX, GRID_GAP_PX, GRID_PAD_PX, columnsFor } from "@/lib/libraryBrowserLayout";
 import { type CardWords, type SetsAnswer, cardWords } from "@/lib/libraryBrowserQuery";
+import { Button } from "@/components/ui/button";
 
 export interface SetsHandle {
   /** Focuses the first card (Enter in the search field, H9). */
@@ -34,8 +36,6 @@ interface SetsGridProps {
   onClearAll: (() => void) | null;
 }
 
-const BUTTON =
-  "h-7 rounded-[5px] px-3 text-sm text-[var(--toolbar-icon)] ring-1 ring-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] hover:bg-[var(--editor-accent-hover)]";
 
 export const SetsGrid = forwardRef<SetsHandle, SetsGridProps>(function SetsGrid(props, ref) {
   const { answer, current } = props;
@@ -165,7 +165,7 @@ export const SetsGrid = forwardRef<SetsHandle, SetsGridProps>(function SetsGrid(
               {group.private && group.heading.startsWith(group.name) ? (
                 <>
                   {group.name}
-                  <Lock size={12} strokeWidth={1.5} aria-hidden="true" className="ml-1 shrink-0" />
+                  <Lock {...SMALL_GLYPH} aria-hidden="true" className="ml-1 shrink-0" />
                   {group.heading.slice(group.name.length)}
                 </>
               ) : (
@@ -202,20 +202,18 @@ export const SetsGrid = forwardRef<SetsHandle, SetsGridProps>(function SetsGrid(
         <div className="flex flex-col items-center gap-3 px-4 pt-3 text-center">
           <p className="text-sm text-[var(--panel-muted-fg)]">{answer.empty}</p>
           {props.onClearAll ? (
-            <button type="button" onClick={props.onClearAll} className={BUTTON}>
+            <Button icon={X} onClick={props.onClearAll}>
               Clear all
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
       {props.onGuide ? (
-        <button
-          type="button"
-          onClick={props.onGuide}
-          className="mt-4 flex h-7 items-center text-xs text-[var(--editor-accent)] hover:underline"
+        <Button icon={BookOpen}
+          onClick={props.onGuide} className="mt-4"
         >
           Host your own library…
-        </button>
+        </Button>
       ) : null}
     </div>
   );

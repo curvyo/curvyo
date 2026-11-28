@@ -1,6 +1,7 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { type Placement, placeWidthChip } from "@/lib/readoutPlacement";
+import { NumberField } from "@/components/ui/number-field";
 
 type ContainerRef = RefObject<HTMLDivElement | null>;
 
@@ -89,19 +90,18 @@ function EntryField({ entry, onCommit, onClose, containerRef }: EntryProps & { e
     <div
       ref={chipRef}
       data-width-entry
-      className="pointer-events-auto absolute z-20 flex flex-col gap-0.5 rounded-md px-2 py-1 text-xs whitespace-nowrap"
+      className="pointer-events-auto absolute z-20 flex flex-col gap-0.5 rounded-[8px] px-2 py-1 text-xs whitespace-nowrap"
       style={{ ...placement, ...CHIP_STYLE }}
       onPointerDown={(event) => event.stopPropagation()}
     >
       <label className="flex items-center gap-1">
         Width
-        <input
-          ref={inputRef}
+        <NumberField
+          width={64}
+          invalid={invalid}
+          small
+          inputRef={inputRef}
           aria-label="Width at this point, millimetres"
-          aria-invalid={invalid}
-          inputMode="decimal"
-          className="h-6 w-16 rounded border bg-white px-1 text-right"
-          style={{ borderColor: invalid ? "var(--destructive, #B3261E)" : "var(--panel-border, #B4B4B8)" }}
           value={text}
           onChange={(event) => {
             setText(event.target.value);
@@ -151,7 +151,7 @@ export function WidthWheelReadout({
       data-width-wheel-readout
       role="status"
       aria-live="polite"
-      className="pointer-events-none absolute z-20 rounded-md px-2 py-1 text-xs whitespace-nowrap tabular-nums"
+      className="pointer-events-none absolute z-20 rounded-[8px] px-2 py-1 text-xs whitespace-nowrap tabular-nums"
       style={{ ...placement, ...CHIP_STYLE }}
     >
       Width {formatMm(readout.mm)} mm

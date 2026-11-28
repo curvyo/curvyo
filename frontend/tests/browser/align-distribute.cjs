@@ -150,8 +150,9 @@ async function history(page){
     await rows.fill('2');await columns.fill('');
     const before=(await saved(page)).boxes;
     await selectTool(page);
-    await grid.getByRole('textbox',{name:'Grid gap, millimetres',exact:true}).fill('5');
-    await grid.getByRole('textbox',{name:'Grid gap, millimetres',exact:true}).press('Enter');await pump(page);
+    // The one Gap field of the bar is the grid's gap too (0159 Frage 433 B); Enter in Rows arranges.
+    await page.getByRole('textbox',{name:'Gap, millimetres',exact:true}).fill('5');
+    await rows.press('Enter');await pump(page);
     doc=await saved(page);
     const cw=Math.max(...before.map(b=>b.w)),ch=Math.max(...before.map(b=>b.h));
     const x0=Math.min(...before.map(b=>b.x0)),y0=Math.min(...before.map(b=>b.y0));

@@ -1,14 +1,17 @@
-import { CircleAlert, Dices } from "lucide-react";
+import { Dices, Shapes, Spline } from "lucide-react";
+import { GLYPH, PANEL_LABEL } from "@/components/ui/looks";
 import type { ReactNode } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
 import { GeneratorGlyph } from "@/components/panel/PatternIcons";
 import { TileGroup, type Tile } from "@/components/panel/TileGroup";
 import { ValueField } from "@/components/panel/ValueField";
-import { PanelSwitch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import type { PatternFieldView, StylePanelApi } from "@/hooks/useStylePanel";
+import { Button } from "@/components/ui/button";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The generators in the picker's order (criterion 4). */
 const GENERATORS: readonly [string, string][] = [
@@ -109,10 +112,7 @@ export function PatternBlock({ panel, onReturnFocus, colourRows }: PatternBlockP
         <div data-pattern-state className="flex flex-col gap-0.5 text-xs">
           {lines.map((line, index) =>
             index === 0 && alert ? (
-              <p key={line} role="alert" className="flex items-center gap-1 text-[var(--field-invalid)]">
-                <CircleAlert size={12} aria-hidden />
-                {line}
-              </p>
+              <AlertLine key={line}>{line}</AlertLine>
             ) : (
               <p key={line} className="text-[var(--panel-muted-fg)]">
                 {line}
@@ -135,7 +135,7 @@ export function PatternBlock({ panel, onReturnFocus, colourRows }: PatternBlockP
       {pattern.margin && <PatternValueField field={pattern.margin} panel={panel} onReturnFocus={onReturnFocus} />}
       {pattern.seeded && (
         <div className="flex h-7 items-center gap-2">
-          <span className="w-[60px] shrink-0 text-xs text-[var(--toolbar-icon)]">Seed</span>
+          <span className={PANEL_LABEL}>Seed</span>
           <EntryField
             label="Pattern seed"
             shown={pattern.seed}
@@ -159,13 +159,13 @@ export function PatternBlock({ panel, onReturnFocus, colourRows }: PatternBlockP
               }}
               className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
             >
-              <Dices size={16} strokeWidth={1.5} aria-hidden />
+              <Dices {...GLYPH} aria-hidden />
             </button>
           </Tooltip>
         </div>
       )}
       <div className="flex h-7 items-center gap-2">
-        <span className="w-[60px] shrink-0 text-xs text-[var(--toolbar-icon)]">Draw as</span>
+        <span className={PANEL_LABEL}>Draw as</span>
         <ToggleGroup
           label="Draw as"
           options={MODE_OPTIONS}
@@ -177,27 +177,25 @@ export function PatternBlock({ panel, onReturnFocus, colourRows }: PatternBlockP
       </div>
       {pattern.wholeOffered && (
         <div className="flex h-7 items-center" data-pattern-whole>
-          <PanelSwitch
+          <ToggleButton icon={Shapes}
             label="Whole pieces only"
-            checked={pattern.wholePieces === "on"}
-            onCheckedChange={panel.setPatternWholePieces}
+            pressed={pattern.wholePieces === "on"}
+            onPressedChange={panel.setPatternWholePieces}
             onReturnFocus={onReturnFocus}
           />
         </div>
       )}
       {pattern.colourRows && colourRows}
       {pattern.convert && (
-        <button
-          type="button"
+        <Button icon={Spline}
           data-pattern-convert
           onClick={() => {
             panel.convertPattern();
             onReturnFocus();
-          }}
-          className="h-7 w-[244px] rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          }} className="min-w-[244px]"
         >
           Convert to paths
-        </button>
+        </Button>
       )}
     </div>
   );

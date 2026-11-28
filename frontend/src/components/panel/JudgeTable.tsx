@@ -14,6 +14,7 @@ import {
 } from "@/lib/testGridResult";
 import type { CellPlace, TestDetail } from "@/lib/materialsView";
 import { PICK_COLOUR, PICK_KINDS, type PickKind } from "@/lib/picks";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** The corner of the inner box each pick's glyph sits in when a cell carries several (criterion 6). */
 const QUADRANT: Record<PickKind, string> = {
@@ -133,26 +134,27 @@ export function JudgeTable({
               const name = cellName(test.columns, test.rows, { column, row }, kinds);
               return (
                 <div key={column} role="gridcell" style={{ width, height: CELL_ROW }} className="flex items-center justify-center">
-                  <button
-                    type="button"
-                    data-cell={`${column},${row}`}
-                    aria-pressed={kinds.includes(pick)}
-                    aria-label={name}
-                    title={kinds.length > 0 ? name : undefined}
-                    tabIndex={at.column === column && at.row === row ? 0 : -1}
-                    onFocus={() => setStop({ column, row })}
-                    onClick={() => press(column, row)}
-                    onKeyDown={(event) => {
-                      const next = moveCell({ column, row }, event.key, event.ctrlKey || event.metaKey, columns, rows);
-                      if (next === null) return;
-                      event.preventDefault();
-                      focusCell(next);
-                    }}
-                    style={{ width, height: CELL_ROW }}
-                    className="relative flex items-center justify-center text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
-                  >
-                    <CellMark kinds={kinds} width={width} />
-                  </button>
+                  <Tooltip side="left" content={kinds.length > 0 ? name : undefined}>
+                    <button
+                      type="button"
+                      data-cell={`${column},${row}`}
+                      aria-pressed={kinds.includes(pick)}
+                      aria-label={name}
+                      tabIndex={at.column === column && at.row === row ? 0 : -1}
+                      onFocus={() => setStop({ column, row })}
+                      onClick={() => press(column, row)}
+                      onKeyDown={(event) => {
+                        const next = moveCell({ column, row }, event.key, event.ctrlKey || event.metaKey, columns, rows);
+                        if (next === null) return;
+                        event.preventDefault();
+                        focusCell(next);
+                      }}
+                      style={{ width, height: CELL_ROW }}
+                      className="relative flex items-center justify-center text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]"
+                    >
+                      <CellMark kinds={kinds} width={width} />
+                    </button>
+                  </Tooltip>
                 </div>
               );
             })}

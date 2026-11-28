@@ -1,4 +1,5 @@
 import { CirclePlay, LoaderCircle } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useEffect, useRef } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
@@ -115,9 +116,9 @@ export function SendToMachine({
           }`}
         >
           {busy ? (
-            <LoaderCircle size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="animate-spin" />
+            <LoaderCircle {...GLYPH} aria-hidden className="animate-spin" />
           ) : (
-            <CirclePlay size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+            <CirclePlay {...GLYPH} aria-hidden />
           )}
         </button>
       </Tooltip>

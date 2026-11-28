@@ -23,9 +23,10 @@ import {
 import type { Laser, LaserBlock, MaterialSet, OtherPick } from "@/lib/materialsView";
 import type { SetKind } from "@/lib/operationSettingsView";
 import { CHIP_IS_MESSAGE, outcomeOf, stepText, typedNumber } from "@/lib/settingsFieldText";
+import { buttonClass, GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
 
-const OUTLINE_BUTTON =
-  "flex h-7 w-[228px] items-center gap-1 rounded border border-[var(--lane-line)] px-2 text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+const OUTLINE_BUTTON = buttonClass("secondary", "panel", "w-[228px] justify-start px-2");
 
 interface LaserSetsProps {
   materialId: string;
@@ -91,25 +92,26 @@ function SetFields({ materialId, laser, set, api, arm, onReturnFocus }: LaserSet
         <OperationGlyph kind={set.kind} />
         <span className="font-semibold">{KIND_WORD[set.kind]}</span>
         <span className="min-w-0 flex-1 truncate text-right text-[11px] text-[var(--panel-muted-fg)]">{set.source}</span>
-        <button
-          type="button"
-          {...{ [ARM_TRASH]: key }}
-          aria-label={armed ? setArmText(set.kind, laser.name) : `Delete the ${KIND_WORD[set.kind]} set of ${laser.name}`}
-          title={armed ? "Press again to delete" : "Delete"}
-          onClick={() =>
-            arm.press(key, setArmText(set.kind, laser.name), () => {
-              api.deleteSet(materialId, laser.id, set.kind);
-              return `${KIND_WORD[set.kind]} set of ${laser.name} deleted.`;
-            })
-          }
-          className={
-            armed
-              ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
-              : "flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-          }
-        >
-          <Trash2 size={16} aria-hidden />
-        </button>
+        <Tooltip side="left" content={armed ? "Press again to delete" : "Delete"}>
+          <button
+            type="button"
+            {...{ [ARM_TRASH]: key }}
+            aria-label={armed ? setArmText(set.kind, laser.name) : `Delete the ${KIND_WORD[set.kind]} set of ${laser.name}`}
+            onClick={() =>
+              arm.press(key, setArmText(set.kind, laser.name), () => {
+                api.deleteSet(materialId, laser.id, set.kind);
+                return `${KIND_WORD[set.kind]} set of ${laser.name} deleted.`;
+              })
+            }
+            className={
+              armed
+                ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
+                : "flex h-6 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+            }
+          >
+            <Trash2 {...GLYPH} aria-hidden />
+          </button>
+        </Tooltip>
       </div>
       <div className="flex gap-1">
         {field(fields[0], 112)}
@@ -133,14 +135,14 @@ export function LaserSets(props: LaserSetsProps) {
         type="button"
         aria-expanded={block.open}
         onClick={() => api.toggleLaser(block.laser.id)}
-        className="flex h-7 w-[228px] items-center gap-1 rounded text-left text-[13px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="flex h-7 w-[228px] items-center gap-1 rounded-[5px] text-left text-sm text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
         <Chevron size={12} aria-hidden className="shrink-0" />
-        <Zap size={12} aria-hidden className="shrink-0" />
+        <Zap {...SMALL_GLYPH} aria-hidden className="shrink-0" />
         <span className="min-w-0 flex-1 truncate font-semibold">{block.laser.name}</span>
         {block.thisPage ? (
           <span
-            className="shrink-0 rounded-md px-1.5 text-[11px] text-[var(--toolbar-icon)]"
+            className="shrink-0 rounded-[5px] px-1.5 text-[11px] text-[var(--toolbar-icon)]"
             style={{ border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
           >
             This page
@@ -169,7 +171,7 @@ export function LaserSets(props: LaserSetsProps) {
               }}
               className={OUTLINE_BUTTON}
             >
-              <Plus size={16} aria-hidden />
+              <Plus {...GLYPH} aria-hidden />
               <OperationGlyph kind={kind} size={14} />
               {KIND_WORD[kind]} set
             </button>

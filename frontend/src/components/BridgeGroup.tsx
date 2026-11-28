@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import { setBridgeSettings, useBridgeSettings } from "@/hooks/useBridgeSettings";
 import {
   BRIDGES_RANGE,
@@ -10,22 +9,22 @@ import {
   WIDTH_RANGE,
   clampField,
 } from "@/lib/bridgeText";
+import { Button } from "@/components/ui/button";
+import { Link2, Spline } from "lucide-react";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { NumberField } from "@/components/ui/number-field";
 
 /** How long a limit notice stays (UX notes §4.4). */
 const NOTICE_MS = 3000;
 
-const FIELD_CLASS =
-  "h-7 w-16 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-white px-1.5 text-right text-sm tabular-nums outline-none focus:ring-2 focus:ring-[var(--editor-accent)]";
 
-const BUTTON_CLASS =
-  "my-1 h-7 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /** Up to two decimals, no trailing zeros. */
 function formatValue(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
 
-interface NumberFieldProps {
+interface BridgeFieldProps {
   label: string;
   /** The accessible name, as "Width, millimetres". */
   name: string;
@@ -41,7 +40,7 @@ interface NumberFieldProps {
 
 /** A number field whose typed value commits on Enter or blur, clamped with a limit notice; a
  * stepper click or an arrow key commits at once (criterion 5). */
-function NumberField({ label, name, unit, range, step, value, onCommit, onNotice, onReturnFocus }: NumberFieldProps) {
+function BridgeField({ label, name, unit, range, step, value, onCommit, onNotice, onReturnFocus }: BridgeFieldProps) {
   const shown = formatValue(value);
   const [text, setText] = useState(shown);
   const [invalid, setInvalid] = useState(false);
@@ -71,13 +70,15 @@ function NumberField({ label, name, unit, range, step, value, onCommit, onNotice
   return (
     <label className="flex items-center gap-1.5 text-[var(--toolbar-icon)]">
       {label}
-      <input
-        type="number"
+      <NumberField
+        numeric
+        width={unit === "" ? 64 : 88}
+        unit={unit === "" ? undefined : unit}
+        invalid={invalid}
         min={range.min}
         max={range.max}
         step={step}
         aria-label={name}
-        aria-invalid={invalid || undefined}
         value={text}
         onFocus={() => {
           editing.current = true;
@@ -109,10 +110,7 @@ function NumberField({ label, name, unit, range, step, value, onCommit, onNotice
             commit(event.target.value);
           }
         }}
-        className={`${FIELD_CLASS} ${invalid ? "border-2 border-[var(--field-invalid)]" : ""}`}
-        style={{ color: "var(--toolbar-icon)" }}
       />
-      {unit === "" ? null : <span>{unit}</span>}
     </label>
   );
 }
@@ -129,7 +127,7 @@ function ModePill({ mode, onChange }: { mode: BridgeMode; onChange: (mode: Bridg
     <div
       role="radiogroup"
       aria-label="Mode"
-      className="my-1 flex h-7 overflow-hidden rounded-md ring-[1.5px] ring-[var(--toolbar-icon)]"
+      className="my-1 flex h-7 overflow-hidden rounded-[5px] ring-[1.5px] ring-[var(--toolbar-icon)]"
     >
       {MODES.map((entry, index) => {
         const active = entry.mode === mode;
@@ -196,7 +194,7 @@ export function BridgeGroup({ ready, onBridge, onReturnFocus }: BridgeGroupProps
   return (
     <div role="group" aria-label="Bridge" className="relative flex flex-wrap content-start items-center gap-x-2 py-1">
       <ModePill mode={settings.mode} onChange={(mode) => setBridgeSettings({ mode })} />
-      <NumberField
+      <BridgeField
         label="Width"
         name="Width, millimetres"
         unit="mm"
@@ -208,7 +206,7 @@ export function BridgeGroup({ ready, onBridge, onReturnFocus }: BridgeGroupProps
         onReturnFocus={onReturnFocus}
       />
       {stencil ? (
-        <NumberField
+        <BridgeField
           label="Bridges"
           name="Bridges per island"
           unit=""
@@ -221,7 +219,7 @@ export function BridgeGroup({ ready, onBridge, onReturnFocus }: BridgeGroupProps
         />
       ) : (
         <>
-          <NumberField
+          <BridgeField
             label="Reach"
             name="Reach, millimetres"
             unit="mm"
@@ -232,29 +230,27 @@ export function BridgeGroup({ ready, onBridge, onReturnFocus }: BridgeGroupProps
             onNotice={showNotice}
             onReturnFocus={onReturnFocus}
           />
-          <ToolbarSwitch
+          <ToggleButton icon={Link2} look="bar"
             label="Join all"
             tooltip="Join all"
-            checked={settings.joinAll}
-            onCheckedChange={(joinAll) => setBridgeSettings({ joinAll })}
+            pressed={settings.joinAll}
+            onPressedChange={(joinAll) => setBridgeSettings({ joinAll })}
           />
         </>
       )}
-      <button
-        type="button"
+      <Button size="bar" icon={Spline} className="my-1"
         aria-disabled={!ready}
         onClick={() => {
           if (ready) {
             onBridge();
           }
         }}
-        className={`${BUTTON_CLASS} ${ready ? "" : "opacity-40"}`}
       >
         Bridge
-      </button>
+      </Button>
       <div
         role="status"
-        className="absolute top-full left-0 mt-1 w-max max-w-[320px] rounded-md px-2 py-1 text-xs"
+        className="absolute top-full left-0 mt-1 w-max max-w-[320px] rounded-[8px] px-2 py-1 text-xs"
         style={notice ? { background: "var(--popover)", color: "var(--toolbar-icon)" } : { display: "none" }}
       >
         {notice}

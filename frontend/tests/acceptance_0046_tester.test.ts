@@ -11,6 +11,7 @@ import * as text from "../src/lib/guideText.ts";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const guideButton = read("../src/components/GuideButton.tsx");
+const looks = read("../src/components/ui/looks.ts");
 const fileTab = read("../src/components/panel/FileTab.tsx");
 const selectBar = read("../src/components/SelectToolbar.tsx");
 const css = read("../src/index.css");
@@ -45,8 +46,11 @@ test("c19 c23 the template outcome strings give a notice or the session's messag
 test("c9 the Guide button is 28 px, Lucide SquareDashed 16 px at 1.5 stroke, no label", () => {
   assert.match(guideButton, /import \{ SquareDashed \} from "lucide-react"/);
   assert.match(guideButton, /size-7/);
-  assert.match(guideButton, /size=\{16\}/);
-  assert.match(guideButton, /strokeWidth=\{1\.5\}/);
+  // 16 px at 1.5 stroke: the shared control glyph of `ui/looks.ts` (0159 F33).
+  assert.match(guideButton, /<SquareDashed \{\.\.\.GLYPH\}/);
+  assert.match(looks, /export const GLYPH = \{ size: ICON_PX, strokeWidth: ICON_STROKE/);
+  assert.match(looks, /export const ICON_PX = 16;/);
+  assert.match(looks, /export const ICON_STROKE = 1\.5;/);
   assert.match(guideButton, /aria-label=\{GUIDE_NAME\}/);
   assert.match(guideButton, /aria-pressed=\{state === "pressed"\}/);
   // the button's only child is the icon: no visible text next to it
@@ -93,9 +97,10 @@ test("c14 no hint text, popup, Apply button or caption in the Guide or Template 
 
 test("c19 the Template button is an outline text button, 28 px high, like its neighbours", () => {
   const template = fileTab.slice(fileTab.indexOf("function TemplateButton"), fileTab.indexOf("function CommandButton"));
-  assert.match(template, /\$\{BUTTON\} \$\{OUTLINE\}/);
-  assert.match(fileTab, /const BUTTON =\s*\n?\s*"h-7 /);
-  assert.match(template, /\{TEMPLATE_NAME\}\s*<\/button>/);
+  // 0159: the outline look is the shared secondary `Button` (28 px), like its neighbours.
+  assert.match(template, /<Button icon=\{LayoutTemplate\}/);
+  assert.doesNotMatch(template, /variant=/, "secondary, the default look");
+  assert.match(template, /\{TEMPLATE_NAME\}\s*<\/Button>/);
   assert.match(template, /project\.loadTemplate\(\)/);
   // it is in the row after Close, with the five other buttons around it
   const buttons = fileTab.slice(fileTab.indexOf("function Buttons"), fileTab.indexOf("function TemplateButton"));

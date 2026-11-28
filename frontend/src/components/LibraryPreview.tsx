@@ -3,7 +3,8 @@
 // drawn read-only from its source with zoom and pan, picking by the Select tool's rules (click,
 // Shift+click, marquee by outline), the keyboard route, Import page, Import elements and a drag
 // of the picks onto the drawing.
-import { ArrowLeft, Maximize2, Minimize2, X } from "lucide-react";
+import { ArrowLeft, FileInput, Maximize2, Minimize2, X } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
@@ -22,6 +23,9 @@ import { importFromLibrary } from "@/lib/libraryImport";
 import { isBackKey } from "@/lib/browserBack";
 import { returnToBrowser } from "@/lib/libraryBrowserStore";
 import { closePreview, pageRowKey, setPicks, takePendingPage, usePreview } from "@/lib/libraryStore";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
+import { AlertLine } from "@/components/ui/notice";
 
 const ZOOM_STEP = 1.2;
 
@@ -445,26 +449,31 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
     >
       <header className="library-preview-header">
         {page.back ? (
-          <button type="button" aria-label="Back to library browser" title="Back to library browser" onClick={() => returnToBrowser()}>
-            <ArrowLeft size={16} />
-          </button>
+          <Tooltip side="left" content="Back to library browser">
+            <button type="button" aria-label="Back to library browser" onClick={() => returnToBrowser()}>
+              <ArrowLeft {...GLYPH} />
+            </button>
+          </Tooltip>
         ) : null}
         <span className="library-preview-name">{page.pageName}</span>
         {page.chip ? <span className="library-chip">{page.chip}</span> : null}
         <span className="library-preview-subject">{page.subject}</span>
         {layout.canSplit ? (
-          <button
-            type="button"
-            aria-label={layout.full ? "Split view" : "Full view"}
-            title={layout.full ? "Split view" : "Full view"}
-            onClick={onSwitchView}
-          >
-            <FullGlyph size={16} />
-          </button>
+          <Tooltip side="left" content={layout.full ? "Split view" : "Full view"}>
+            <button
+              type="button"
+              aria-label={layout.full ? "Split view" : "Full view"}
+              onClick={onSwitchView}
+            >
+              <FullGlyph size={16} />
+            </button>
+          </Tooltip>
         ) : null}
-        <button type="button" aria-label="Close" title="Close" onClick={closePreview}>
-          <X size={16} />
-        </button>
+        <Tooltip side="left" content="Close">
+          <button type="button" aria-label="Close" onClick={closePreview}>
+            <X {...GLYPH} />
+          </button>
+        </Tooltip>
       </header>
       <div className="library-preview-body" ref={body} aria-busy={!reader && !error}>
         {error ? <p className="library-preview-error">{error}</p> : null}
@@ -543,25 +552,24 @@ export function LibraryPreview({ getSession, sync, canvasRef, showNotice, active
           {status}
         </span>
         {refusal ? (
-          <span className="library-refusal" role="alert">
+          <AlertLine>
             {refusal}
-          </span>
+          </AlertLine>
         ) : null}
         {!error ? (
           <>
             {reader ? (
               <IntoSlotButton ctx={slotCtx} look="text" open={slotListOpen} onToggle={() => setSlotListOpen((o) => !o)} />
             ) : null}
-            <button type="button" disabled={!reader} onClick={() => runImport(true, null)}>
+            <Button variant="primary" icon={FileInput} disabled={!reader} onClick={() => runImport(true, null)}>
               Import page
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button icon={FileInput}
               style={{ visibility: picks.length > 0 ? "visible" : "hidden" }}
               onClick={() => runImport(false, null)}
             >
               Import elements
-            </button>
+            </Button>
           </>
         ) : null}
       </footer>

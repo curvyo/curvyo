@@ -53,7 +53,7 @@ export function FixtureAddBar({
               tabIndex={kind === stop ? 0 : -1}
               onFocus={() => setCurrent(kind)}
               onKeyDown={(event) => onKeyDown?.(event, kind)}
-              className={`flex h-7 w-7 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9 pointer-coarse:w-9 ${on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"}`}
+              className={`flex h-7 w-7 items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9 pointer-coarse:w-9 ${on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"}`}
               onClick={(event) => {
                 const button = event.currentTarget;
                 onPress(kind);

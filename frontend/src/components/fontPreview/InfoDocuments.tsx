@@ -3,10 +3,12 @@
 // list as plain text (never Markdown or HTML), at most its first 1 MiB; a PDF goes to the system
 // viewer (desktop) or a new tab (browser). Escape closes a shown document before the pane.
 import { ExternalLink, FileText, FileType } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useEffect, useRef, useState } from "react";
 
 import { type InfoDocument, openDocumentPdf, readDocumentText } from "@/hooks/useFontInfo";
 import { EMPTY_DOCUMENT, SHOWN_FIRST_MIB, documentFailedText, sizeText } from "@/lib/fontInfoText";
+import { AlertLine } from "@/components/ui/notice";
 
 interface InfoDocumentsProps {
   folder: string;
@@ -85,16 +87,16 @@ export function InfoDocuments({ folder, documents, full }: InfoDocumentsProps) {
                 <Icon size={16} strokeWidth={1.5} aria-hidden className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate">{doc.name}</span>
                 <span className="shrink-0 text-xs text-[var(--panel-muted-fg)]">{sizeText(doc.size)}</span>
-                {doc.pdf ? <ExternalLink size={16} strokeWidth={1.5} aria-hidden className="shrink-0" /> : null}
+                {doc.pdf ? <ExternalLink {...GLYPH} aria-hidden className="shrink-0" /> : null}
               </button>
             </li>
           );
         })}
       </ul>
       {failed ? (
-        <p role="alert" className="m-0 mt-1 text-xs text-[var(--destructive)]">
+        <AlertLine className="m-0 mt-1">
           {failed}
-        </p>
+        </AlertLine>
       ) : null}
       {shown ? (
         <div

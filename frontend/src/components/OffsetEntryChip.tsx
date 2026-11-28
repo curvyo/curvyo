@@ -14,6 +14,8 @@ import {
   stepChipDistance,
 } from "@/lib/offsetText";
 import { placeOffsetEntryChip } from "@/lib/readoutPlacement";
+import { NumberField } from "@/components/ui/number-field";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** The tool rail's clearance from the canvas's left edge, px (`--rail-right` + 12, as the Move
  * chip). */
@@ -251,15 +253,12 @@ export function OffsetEntryChip({ offset, containerRef }: OffsetEntryChipProps) 
           <span aria-hidden className="w-[52px] text-xs">
             Distance
           </span>
-          <div className="relative" style={{ width: 100 }}>
-            <input
-              ref={inputRef}
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              spellCheck={false}
+          <NumberField
+              width={100}
+              unit="mm"
+              invalid={invalid}
+              inputRef={inputRef}
               aria-label="Distance, millimetres"
-              aria-invalid={invalid ? true : undefined}
               aria-describedby={message !== null ? messageId : undefined}
               value={text}
               onChange={(event) => {
@@ -269,21 +268,7 @@ export function OffsetEntryChip({ offset, containerRef }: OffsetEntryChipProps) 
               }}
               onKeyDown={onDistanceKeyDown}
               onBlur={onBlur}
-              className={`h-7 w-full rounded-[5px] border bg-white pr-8 pl-1.5 text-right text-sm tabular-nums outline-none ${
-                invalid
-                  ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_1px_var(--field-invalid)]"
-                  : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
-              }`}
-              style={{ color: "var(--toolbar-icon)" }}
-            />
-            <span
-              aria-hidden
-              className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
-              style={{ opacity: 0.7 }}
-            >
-              mm
-            </span>
-          </div>
+          />
         </div>
         <RadioGroup
           name="Direction"
@@ -417,41 +402,41 @@ function RadioGroup<T extends string>({
     <div
       role="radiogroup"
       aria-label={name}
-      className={`flex h-7 rounded-[7px] p-[1.5px] ${wide ? "w-full" : ""}`}
+      className={`flex h-7 rounded-[5px] p-[1.5px] ${wide ? "w-full" : ""}`}
       // A 1.5 px ring as a shadow: a 1.5 px border computes to 1 px at a device pixel ratio of 1.
       style={{ boxShadow: "inset 0 0 0 1.5px var(--toolbar-icon)" }}
     >
       {items.map((item, index) => {
         const active = item.value === selected;
         return (
-          <button
-            key={item.value}
-            ref={(node) => {
-              refs.current[index] = node;
-            }}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={item.name}
-            tabIndex={active ? 0 : -1}
-            title={item.title}
-            onClick={() => onSelect(item.value)}
-            onKeyDown={(event) => onItemKeyDown(event, index)}
-            onBlur={onBlur}
-            className={`flex cursor-pointer items-center justify-center rounded-[5px] text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
-              wide ? "flex-1" : "w-[27px]"
-            }`}
-            style={
-              active
-                ? {
-                    background: "var(--toolbar-icon-active-bg)",
-                    color: "var(--toolbar-icon-active-fg)",
-                  }
-                : { color: "var(--toolbar-icon)" }
-            }
-          >
-            {item.icon ?? item.label}
-          </button>
+          <Tooltip key={item.value} side="bottom" content={item.title}>
+            <button
+              ref={(node) => {
+                refs.current[index] = node;
+              }}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              aria-label={item.name}
+              tabIndex={active ? 0 : -1}
+              onClick={() => onSelect(item.value)}
+              onKeyDown={(event) => onItemKeyDown(event, index)}
+              onBlur={onBlur}
+              className={`flex cursor-pointer items-center justify-center rounded-[5px] text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
+                wide ? "flex-1" : "w-[27px]"
+              }`}
+              style={
+                active
+                  ? {
+                      background: "var(--toolbar-icon-active-bg)",
+                      color: "var(--toolbar-icon-active-fg)",
+                    }
+                  : { color: "var(--toolbar-icon)" }
+              }
+            >
+              {item.icon ?? item.label}
+            </button>
+          </Tooltip>
         );
       })}
     </div>

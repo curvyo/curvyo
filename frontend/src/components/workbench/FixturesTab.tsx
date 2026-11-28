@@ -7,12 +7,13 @@ import type { FixturesApi } from "@/hooks/useFixtures";
 import { FieldNoticeContext } from "@/components/workbench/fieldNotice";
 import { noticeInTab, setsCountText } from "@/lib/fixtureSets";
 import type { FixtureRow } from "@/lib/fixturesView";
+import { SECTION_HEADING } from "@/components/ui/looks";
 
 /** A section heading: the word 11px semibold muted, an optional count at the right. */
 function Heading({ text, count }: { text: string; count?: string | null }) {
   return (
     <div className="flex h-6 items-center justify-between">
-      <h3 className="text-[11px] font-semibold text-[var(--panel-muted-fg)]">{text}</h3>
+      <h3 className={SECTION_HEADING}>{text}</h3>
       {count ? <span className="text-[11px] tabular-nums text-[var(--panel-muted-fg)]">{count}</span> : null}
     </div>
   );

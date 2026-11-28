@@ -26,7 +26,8 @@ describe("centre lines refusals (tester, 0117 criterion 4)", () => {
     }
   });
   it("counts a mixed selection", () => {
-    assert.equal(centreLinesNotice({ ...base, kept: 1, skipped: 2 })?.text, "Centre lines: 1 converted, 1 kept filled, 2 skipped.");
+  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+    assert.equal(centreLinesNotice({ ...base, kept: 1, skipped: 2 })?.text, "Centre lines: some shapes were skipped.");
   });
   it("writes the dimmed tooltip for text and image", () => {
     assert.equal(centreLinesDimmedTooltip("text", 0), "Find centre lines: convert text to path first.");

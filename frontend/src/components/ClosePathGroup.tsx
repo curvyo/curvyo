@@ -1,3 +1,6 @@
+import { Circle, Triangle } from "lucide-react";
+
+import { buttonClass, GLYPH } from "@/components/ui/looks";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useActionNotice } from "@/hooks/useActionNotice";
 import {
@@ -42,7 +45,7 @@ export function ClosePathGroup({
     <>
       <div className="relative flex items-center gap-1">
         <div role="group" aria-label="Close path" className="flex items-center gap-1">
-          <span className="px-1 text-sm text-[var(--toolbar-icon)]">Close path</span>
+          <span className="px-1 text-xs text-[var(--panel-muted-fg)]">Close path</span>
           {CLOSE_BUTTONS.map((button) => (
             <Tooltip
               key={button.join}
@@ -77,10 +80,13 @@ export function ClosePathGroup({
                     onReturnFocus();
                   }
                 }}
-                className={`h-7 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent px-3 text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
-                  dimmed ? "opacity-40" : "hover:bg-[var(--editor-accent-hover)]"
-                }`}
+                className={buttonClass("secondary", "bar")}
               >
+                {button.join === "sharp" ? (
+                  <Triangle {...GLYPH} aria-hidden />
+                ) : (
+                  <Circle {...GLYPH} aria-hidden />
+                )}
                 {button.label}
               </button>
             </Tooltip>
@@ -94,7 +100,7 @@ export function ClosePathGroup({
         {notice && (
           <p
             aria-hidden
-            className="pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[360px] rounded-md bg-[var(--toolbar-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)]"
+            className="pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[360px] rounded-[8px] bg-[var(--toolbar-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)]"
             style={{ boxShadow: "var(--panel-elevation-shadow)" }}
           >
             {notice.text}

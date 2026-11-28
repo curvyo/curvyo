@@ -89,7 +89,7 @@ export function GradientOverlay({ gradient, containerRef }: Props) {
         <div
           aria-hidden
           data-gradient-readout=""
-          className="absolute rounded-md px-1.5 py-0.5 text-xs whitespace-nowrap tabular-nums"
+          className="absolute rounded-[5px] px-1.5 py-0.5 text-xs whitespace-nowrap tabular-nums"
           style={{
             left: handles.readout.x + 12,
             top: handles.readout.y - 28,

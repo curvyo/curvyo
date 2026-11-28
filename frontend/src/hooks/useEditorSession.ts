@@ -68,6 +68,7 @@ import type { WeldResult } from "@/lib/weldText";
 import { joinNoticeText } from "@/lib/nodeText";
 import type { ClosePathResult } from "@/lib/penText";
 import { type LineCode, type SideCode, type TextPathEntry, parseTextPathEntry } from "@/lib/textPathText";
+import { readSelectionKinds } from "@/lib/selectBarGroups";
 
 /** The canvas's backing-buffer size for a CSS size at the window's current
  * `devicePixelRatio` (`backingBufferFor`; the perf build's ablation can lower the ratio). */
@@ -180,6 +181,9 @@ export interface SelectBarState {
   centreLinesEnabled: boolean;
   /** Stroke to path is in the bar: not for a selection of dimensions only (`0070` UI review). */
   strokeToPathShown: boolean;
+  /** The distinct kinds of the selected objects (`selection_kinds`): a kind group is shown only
+   * while every selected object is of its kind (`specs/0159-ui-consistency`, Frage 433 B). */
+  kinds: string[];
 }
 
 const EMPTY_SELECT_BAR_STATE: SelectBarState = {
@@ -202,6 +206,7 @@ const EMPTY_SELECT_BAR_STATE: SelectBarState = {
   strokeToPathEnabled: false,
   centreLinesEnabled: false,
   strokeToPathShown: false,
+  kinds: [],
 };
 
 function readSelectBar(raw: {
@@ -229,7 +234,7 @@ function readSelectBar(raw: {
   centre_lines_enabled: boolean;
   stroke_to_path_shown: boolean;
   free(): void;
-}): SelectBarState {
+}, kinds: string): SelectBarState {
   const state: SelectBarState = {
     radiusShown: raw.radius_shown,
     radiusMixed: raw.radius_mixed,
@@ -252,6 +257,7 @@ function readSelectBar(raw: {
     strokeToPathEnabled: raw.stroke_to_path_enabled,
     centreLinesEnabled: raw.centre_lines_enabled,
     strokeToPathShown: raw.stroke_to_path_shown,
+    kinds: readSelectionKinds(kinds),
   };
   raw.free();
   return state;
@@ -1260,7 +1266,7 @@ export function useEditorSession(
     const nextAlign = readAlignBar(session);
     setAlignBar((previous) => (sameAlignBar(previous, nextAlign) ? previous : nextAlign));
     setGuideState(readGuideState(session.guide_state()));
-    const nextBar = readSelectBar(session.select_bar_state());
+    const nextBar = readSelectBar(session.select_bar_state(), session.selection_kinds());
     setSelectBar((previous) => (sameSelectBar(previous, nextBar) ? previous : nextBar));
     const zoom = session.zoom_percent();
     if (zoom !== zoomPercentRef.current) {
