@@ -1,7 +1,6 @@
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 
 import { TraceField } from "@/components/TraceField";
-import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import { ToggleGroup } from "@/components/ui/toggle-group";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { SMOOTHING_PARAM } from "@/lib/penModes";
@@ -19,6 +18,13 @@ import {
   withMin,
 } from "@/lib/pencilSettings";
 import type { TraceParam } from "@/lib/traceText";
+import { Button } from "@/components/ui/button";
+import { Activity, Gauge } from "lucide-react";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { BarGroup } from "@/components/TextBar";
+import { useRowStarts } from "@/components/SelectToolbar";
+import { BAR_ROW_CLASS } from "@/lib/barLayout";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** The two width fields: mm, two decimals, arrows 0.1 (Shift 1, Ctrl 0.01). */
 function widthParam(label: string, [min, max]: readonly [number, number], fallback: number): TraceParam {
@@ -49,14 +55,12 @@ const CURVES: readonly { value: PressureCurveName; label: string; tooltip: strin
 const DIMMED_REASON = "Needs pen pressure or Simulate pressure.";
 
 /** One group of the bar; a divider sits between groups (UX notes §2). */
+/** One group of the bar: the shared bar group (divider only between two groups on one row). */
 function Group({ children, divider = true }: { children: React.ReactNode; divider?: boolean }) {
   return (
-    <div className="flex items-center gap-1">
-      {divider ? (
-        <span aria-hidden className="mx-3 h-5 w-px" style={{ background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }} />
-      ) : null}
+    <BarGroup divider={divider} className="flex h-9 items-center gap-1">
       {children}
-    </div>
+    </BarGroup>
   );
 }
 
@@ -65,18 +69,23 @@ function Group({ children, divider = true }: { children: React.ReactNode; divide
  * live for the app run (`lib/pencilSettings`); the session takes them at the next stroke. */
 export function PencilBar({ editor }: { editor: EditorSession }) {
   const settings = useSyncExternalStore(subscribePencilSettings, pencilSettings);
+  const rowRef = useRef<HTMLDivElement>(null);
+  useRowStarts(rowRef);
   const dimmed = widthsDimmed(settings);
   const back = () => editor.containerRef.current?.focus();
   const dim = (child: React.ReactNode) => (
-    <div aria-disabled={dimmed || undefined} aria-description={dimmed ? DIMMED_REASON : undefined} title={dimmed ? DIMMED_REASON : undefined} className={dimmed ? "opacity-40" : undefined}>
-      {child}
-    </div>
+    <Tooltip side="bottom" content={dimmed ? DIMMED_REASON : undefined}>
+      <div aria-disabled={dimmed || undefined} aria-description={dimmed ? DIMMED_REASON : undefined} className={dimmed ? "opacity-40" : undefined}>
+        {child}
+      </div>
+    </Tooltip>
   );
   return (
     <div
+      ref={rowRef}
       role="toolbar"
       aria-label="Pencil options"
-      className="pointer-events-auto flex min-w-0 shrink flex-wrap items-center rounded-lg px-2 text-sm"
+      className={`pointer-events-auto max-w-full shrink rounded-[8px] px-2 text-sm ${BAR_ROW_CLASS}`}
       style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
     >
       <Group divider={false}>
@@ -91,11 +100,11 @@ export function PencilBar({ editor }: { editor: EditorSession }) {
         />
       </Group>
       <Group>
-        <ToolbarSwitch
+        <ToggleButton icon={Gauge} look="bar"
           label="Simulate pressure"
           tooltip="Simulate pressure: a slower stroke draws wider, for a mouse or a pen without pressure"
-          checked={settings.simulate}
-          onCheckedChange={(on) => setPencilSettings({ ...pencilSettings(), simulate: on })}
+          pressed={settings.simulate}
+          onPressedChange={(on) => setPencilSettings({ ...pencilSettings(), simulate: on })}
         />
       </Group>
       <Group>
@@ -144,13 +153,11 @@ export function PencilBar({ editor }: { editor: EditorSession }) {
           <span role="status" className="text-sm whitespace-nowrap text-[var(--panel-muted-fg)]">
             No pen pressure
           </span>
-          <button
-            type="button"
-            onClick={openPenProbe}
-            className="ml-2 h-7 rounded-md px-2 text-sm whitespace-nowrap text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          <Button size="bar" icon={Activity}
+            onClick={openPenProbe} className="ml-2"
           >
-            Pen probe...
-          </button>
+            Pen probe…
+          </Button>
         </Group>
       ) : null}
     </div>

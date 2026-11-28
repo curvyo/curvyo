@@ -189,7 +189,7 @@ export function HandleHintChip({
   return (
     <div
       ref={chipRef}
-      className="pointer-events-none absolute z-10 rounded-md p-2 text-xs whitespace-nowrap"
+      className="pointer-events-none absolute z-10 rounded-[8px] p-2 text-xs whitespace-nowrap"
       style={{
         left: placement.left,
         top: placement.top,

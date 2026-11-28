@@ -10,6 +10,7 @@ import {
   Triangle,
   Minus as MakeLineIcon,
 } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { ContextMenu } from "radix-ui";
 import { useMemo, useRef, type ReactNode } from "react";
 
@@ -66,19 +67,19 @@ const KIND_ACTIONS: {
   {
     key: "corner",
     label: "Make corner",
-    icon: <Square size={14} />,
+    icon: <Square {...GLYPH} />,
     enabled: (state) => state.canConvertToCorner,
   },
   {
     key: "symmetric",
     label: "Make symmetric",
-    icon: <Diamond size={14} />,
+    icon: <Diamond {...GLYPH} />,
     enabled: (state) => state.canConvertToSymmetric,
   },
   {
     key: "asymmetric",
     label: "Make asymmetric",
-    icon: <Triangle size={14} />,
+    icon: <Triangle {...GLYPH} />,
     enabled: (state) => state.canConvertToAsymmetric,
   },
 ];
@@ -104,42 +105,42 @@ const OTHER_ACTIONS: ActionDescriptor[] = [
   {
     key: "insert",
     label: "Insert node",
-    icon: <Plus size={16} />,
+    icon: <Plus {...GLYPH} />,
     enabled: (state) => state.canInsert,
     run: (actions) => actions.insertSelected(),
   },
   {
     key: "delete",
     label: "Delete node",
-    icon: <Trash2 size={16} />,
+    icon: <Trash2 {...GLYPH} />,
     enabled: (state) => state.canDelete,
     run: (actions) => actions.deleteSelected(),
   },
   {
     key: "make-line",
     label: "Make line",
-    icon: <MakeLineIcon size={16} />,
+    icon: <MakeLineIcon {...GLYPH} />,
     enabled: (state) => state.canMakeLine,
     run: (actions) => actions.makeLine(),
   },
   {
     key: "make-curve",
     label: "Make curve",
-    icon: <Spline size={16} />,
+    icon: <Spline {...GLYPH} />,
     enabled: (state) => state.canMakeCurve,
     run: (actions) => actions.makeCurve(),
   },
   {
     key: "join",
     label: "Join",
-    icon: <Merge size={16} />,
+    icon: <Merge {...GLYPH} />,
     enabled: (state) => state.canJoin,
     run: (actions) => actions.joinSelected(),
   },
   {
     key: "split",
     label: "Split",
-    icon: <Split size={16} />,
+    icon: <Split {...GLYPH} />,
     enabled: (state) => state.canSplit,
     run: (actions) => actions.splitSelected(),
   },
@@ -210,7 +211,7 @@ export function NodeToolbar({
       <div
         role="status"
         data-context-bar=""
-        className="pointer-events-auto flex h-9 min-w-0 items-center rounded-lg px-3 text-sm"
+        className="pointer-events-auto flex h-9 min-w-0 items-center rounded-[8px] px-2 text-sm"
         style={{
           background: "var(--toolbar-bg)",
           boxShadow: "var(--panel-elevation-shadow)",
@@ -232,7 +233,7 @@ export function NodeToolbar({
   return (
     <div
       data-context-bar=""
-      className="pointer-events-auto flex min-h-9 max-w-full min-w-0 flex-wrap items-center gap-x-1 gap-y-1 rounded-lg px-2 py-1"
+      className="pointer-events-auto flex min-h-9 max-w-full min-w-0 flex-wrap items-center gap-x-1 gap-y-1 rounded-[8px] px-2 py-1"
       style={{
         background: "var(--toolbar-bg)",
         boxShadow: "var(--panel-elevation-shadow)",
@@ -241,7 +242,7 @@ export function NodeToolbar({
       <div
         role="group"
         aria-label="Node kind"
-        className="flex overflow-hidden rounded-md ring-1 ring-border"
+        className="flex overflow-hidden rounded-[5px] ring-1 ring-[var(--field-border)]"
       >
         {KIND_ACTIONS.map((kind) => (
           <Tooltip key={kind.key} side="bottom" content={<BarTip label={kind.label} />}>
@@ -271,7 +272,7 @@ export function NodeToolbar({
               aria-label={action.label}
               disabled={!action.enabled(state)}
               onClick={() => action.run(actions)}
-              className="flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+              className="flex size-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
             >
               {action.icon}
             </button>
@@ -287,7 +288,7 @@ export function NodeToolbar({
         {notice && (
           <p
             aria-hidden
-            className="pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[360px] rounded-md bg-[var(--toolbar-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)]"
+            className="pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[360px] rounded-[8px] bg-[var(--toolbar-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)]"
             style={{ boxShadow: "var(--panel-elevation-shadow)" }}
           >
             {notice.text}
@@ -353,7 +354,7 @@ function JoinButton({
         }}
         // The dimming is on the icon only, so the focus ring keeps its contrast on a disabled
         // Join (UX review of 2026-10-14, finding 3).
-        className={`flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
+        className={`flex size-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
           enabled ? "hover:bg-[var(--editor-accent-hover)]" : ""
         }`}
       >
@@ -424,7 +425,7 @@ export function NodeContextMenu({ state, actions, select, centreLines, children,
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content
-          className="z-50 min-w-40 rounded-md bg-popover p-1 text-popover-foreground ring-1 ring-foreground/10"
+          className="z-50 min-w-40 rounded-[8px] bg-popover p-1 text-popover-foreground ring-1 ring-foreground/10"
           onCloseAutoFocus={(event) => {
             // Opened from the menu, the centre lines bar takes the focus, not the canvas.
             const requested = barRequested.current;
@@ -445,7 +446,7 @@ export function NodeContextMenu({ state, actions, select, centreLines, children,
                 barRequested.current = true;
                 select.onCentreLines();
               }}
-              className={`flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-highlighted:bg-muted ${
+              className={`flex items-center gap-2 rounded-[5px] px-2 py-1.5 text-sm outline-none data-highlighted:bg-muted ${
                 select.centreLinesEnabled ? "" : "opacity-40"
               }`}
             >
@@ -461,7 +462,7 @@ export function NodeContextMenu({ state, actions, select, centreLines, children,
                   <ContextMenu.Item
                     aria-disabled={centreLines.enabled ? undefined : true}
                     onSelect={centreLines.onPress}
-                    className={`flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-highlighted:bg-muted ${centreLines.enabled ? "" : "opacity-40"}`}
+                    className={`flex items-center gap-2 rounded-[5px] px-2 py-1.5 text-sm outline-none data-highlighted:bg-muted ${centreLines.enabled ? "" : "opacity-40"}`}
                   >
                     <Route className="size-4" strokeWidth={1.5} aria-hidden />
                     {CENTRE_LINES_LABEL}
@@ -485,7 +486,7 @@ function NodeMenuItems({ state, actions }: { state: NodeToolbarState; actions: N
           key={kind.key}
           disabled={!kind.enabled(state)}
           onSelect={() => actions.convertSelected(kind.key)}
-          className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-40 data-highlighted:bg-muted"
+          className="flex items-center gap-2 rounded-[5px] px-2 py-1.5 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-40 data-highlighted:bg-muted"
         >
           {kind.icon}
           {kind.label}
@@ -497,7 +498,7 @@ function NodeMenuItems({ state, actions }: { state: NodeToolbarState; actions: N
           key={action.key}
           disabled={!action.enabled(state)}
           onSelect={() => action.run(actions)}
-          className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-40 data-highlighted:bg-muted"
+          className="flex items-center gap-2 rounded-[5px] px-2 py-1.5 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-40 data-highlighted:bg-muted"
         >
           {action.icon}
           {action.label}

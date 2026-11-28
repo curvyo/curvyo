@@ -1,9 +1,12 @@
-import { Check } from "lucide-react";
+import { Check, MousePointerClick } from "lucide-react";
 import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import type { JobRow, PartRow, PartsView } from "@/lib/fixtureJobsView";
 import { partsAreStatic, partsHeader, tickTitle } from "@/lib/fixtureJobRows";
 import { nextFocusIndex } from "@/lib/operationRows";
+import { Button } from "@/components/ui/button";
+import { checkboxClass, GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export interface PartsActions {
   /** Ticks (`ticked`) or unticks the part `token` in the job. */
@@ -90,7 +93,7 @@ function PartLine({
   actions: PartsActions;
 }) {
   return (
-    <li data-part-index={index} className="flex h-7 items-center gap-2 text-[13px] text-[var(--toolbar-icon)]">
+    <li data-part-index={index} className="flex h-7 items-center gap-2 text-sm text-[var(--toolbar-icon)]">
       {partsAreStatic(job) ? (
         // A fixed job's parts are fixed: a static tick, not a check box (`0113` UX notes 6.3).
         <span
@@ -104,36 +107,35 @@ function PartLine({
           onFocus={onFocusRow}
           className="flex h-4 w-4 shrink-0 items-center justify-center text-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         >
-          <Check size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+          <Check {...GLYPH} aria-hidden />
         </span>
       ) : (
-      <button
-        type="button"
-        role="checkbox"
-        data-part-control="check"
-        aria-checked={part.ticked}
-        aria-label={part.name}
-        aria-description={`Part of ${job.name}`}
-        title={tickTitle(part.ticked, job.name)}
-        tabIndex={stop ? 0 : -1}
-        onFocus={onFocusRow}
-        onClick={() => actions.setPart(job, part.token, !part.ticked)}
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-      >
-        {part.ticked ? <span className="h-2 w-2 bg-[var(--toolbar-icon)]" /> : null}
-      </button>
+      <Tooltip side="left" content={tickTitle(part.ticked, job.name)}>
+        <button
+          type="button"
+          role="checkbox"
+          data-part-control="check"
+          aria-checked={part.ticked}
+          aria-label={part.name}
+          aria-description={`Part of ${job.name}`}
+          tabIndex={stop ? 0 : -1}
+          onFocus={onFocusRow}
+          onClick={() => actions.setPart(job, part.token, !part.ticked)}
+          className={checkboxClass(part.ticked)}
+        >
+          {part.ticked ? <Check {...SMALL_GLYPH} aria-hidden /> : null}
+        </button>
+      </Tooltip>
       )}
       <span className="min-w-0 flex-1 truncate">{part.name}</span>
-      <button
-        type="button"
+      <Button icon={MousePointerClick}
         data-part-control="select"
         tabIndex={-1}
         aria-label={`Select ${part.name}`}
-        onClick={() => actions.selectPart(job, part.token)}
-        className="h-6 shrink-0 px-1 text-xs text-[var(--toolbar-icon)] underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+        onClick={() => actions.selectPart(job, part.token)} className="shrink-0"
       >
         Select
-      </button>
+      </Button>
     </li>
   );
 }

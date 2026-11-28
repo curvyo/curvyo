@@ -17,6 +17,7 @@ import {
   Replace,
   Undo2,
 } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { type ComponentType, useRef } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
@@ -320,11 +321,11 @@ export function StepRow({
                 className={ACTION_CLASS}
               >
                 {action === "clone" ? (
-                  <CopyPlus size={16} strokeWidth={1.5} aria-hidden />
+                  <CopyPlus {...GLYPH} aria-hidden />
                 ) : objectsOpen ? (
-                  <ChevronDown size={16} strokeWidth={1.5} aria-hidden />
+                  <ChevronDown {...GLYPH} aria-hidden />
                 ) : (
-                  <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
+                  <ChevronRight {...GLYPH} aria-hidden />
                 )}
               </button>
             </Tooltip>
@@ -357,7 +358,7 @@ export function StepRow({
                         onClick={() => onClone(n)}
                         className={ACTION_CLASS}
                       >
-                        <CopyPlus size={16} strokeWidth={1.5} aria-hidden />
+                        <CopyPlus {...GLYPH} aria-hidden />
                       </button>
                     </Tooltip>
                   ) : null}

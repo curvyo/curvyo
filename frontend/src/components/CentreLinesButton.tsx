@@ -1,10 +1,10 @@
-import { Route, X } from "lucide-react";
-import { Switch, Tooltip } from "radix-ui";
-import { type ComponentProps, type KeyboardEvent, useEffect, useId, useRef } from "react";
+import { Check, Link2, Route, SquareDashed, type LucideIcon, X } from "lucide-react";
+import { Tooltip } from "radix-ui";
+import { type KeyboardEvent, useEffect, useId, useRef } from "react";
 
 import { ValueField } from "@/components/panel/ValueField";
 import { FINISH_CLASS, InfoButton } from "@/components/TraceBar";
-import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
+import { TOOLTIP_CLASS, Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { CentreLinesApi } from "@/hooks/useCentreLines";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import {
@@ -28,9 +28,12 @@ import {
   focusCentreLinesBar,
 } from "@/lib/centreLinesText";
 import { HELP_RATIO } from "@/lib/sliderNames";
+import { Button } from "@/components/ui/button";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { ActionNotice } from "@/components/ui/notice";
 
-const BUTTON_CLASS =
-  "my-1 flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+const BUTTON_CLASS = buttonClass("secondary", "bar", "my-1");
 
 /** The width of a slider of the bar, px (UX notes §3.1). */
 const FIELD_WIDTH = 150;
@@ -38,30 +41,28 @@ const FIELD_WIDTH = 150;
  * applies; a pointer press hands the keyboard back to the canvas. */
 function CentreSwitch({
   label,
+  icon,
   checked,
   onChange,
   onReturnFocus,
-  ...rest
 }: {
   label: string;
+  icon: LucideIcon;
   checked: boolean;
   onChange: (checked: boolean) => void;
   onReturnFocus: () => void;
-} & Omit<ComponentProps<"label">, "onChange">) {
+}) {
   return (
-    <label {...rest} className="flex h-9 cursor-pointer items-center gap-1.5 rounded-md text-sm whitespace-nowrap text-[var(--toolbar-icon)]">
-      <Switch.Root
-        aria-label={label}
-        data-centre-enter=""
-        checked={checked}
-        onCheckedChange={onChange}
-        onPointerUp={() => onReturnFocus()}
-        className="inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full border-[1.5px] border-[var(--toolbar-icon)] bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] data-[state=checked]:border-[var(--toolbar-icon-active-bg)] data-[state=checked]:bg-[var(--toolbar-icon-active-bg)]"
-      >
-        <Switch.Thumb className="block size-3 rounded-full bg-[var(--toolbar-icon)] transition-transform duration-100 ease-out motion-reduce:transition-none data-[state=checked]:translate-x-[15px] data-[state=checked]:bg-[var(--toolbar-icon-active-fg)] data-[state=unchecked]:translate-x-[2px]" />
-      </Switch.Root>
-      {label}
-    </label>
+    <ToggleButton
+      look="bar"
+      className="my-1"
+      icon={icon}
+      label={label}
+      pressed={checked}
+      onPressedChange={onChange}
+      onReturnFocus={onReturnFocus}
+      extra={{ "data-centre-enter": "" }}
+    />
   );
 }
 
@@ -182,8 +183,8 @@ function ApplyButton({ api, onStop }: { api: CentreLinesApi; onStop: () => void 
           <span className="relative pl-2 text-xs tabular-nums">{percent === null ? "…" : `${percent} %`}</span>
         </div>
         <AppTooltip side="bottom" content="Stop (Esc)">
-          <button type="button" aria-label="Stop (Esc)" onClick={onStop} className="relative flex size-7 items-center justify-center rounded-md text-white outline-none hover:bg-white/20">
-            <X size={16} strokeWidth={1.5} aria-hidden />
+          <button type="button" aria-label="Stop (Esc)" onClick={onStop} className="relative flex size-7 items-center justify-center rounded-[5px] text-white outline-none hover:bg-white/20">
+            <X {...GLYPH} aria-hidden />
           </button>
         </AppTooltip>
       </div>
@@ -192,12 +193,10 @@ function ApplyButton({ api, onStop }: { api: CentreLinesApi; onStop: () => void 
   const nothing = api.preview !== null && api.preview.paths === 0;
   const counts = api.preview ? centrePreviewCounts(api.preview.paths, api.preview.nodes, api.preview.kept) : "";
   const button = (
-    <button
-      type="button"
+    <Button variant="primary" size="bar" icon={Check}
       data-centre-apply="ready"
       aria-disabled={nothing || undefined}
       aria-describedby={nothing ? reasonId : undefined}
-      className={`${FINISH_CLASS} justify-center px-3 ${nothing ? "cursor-default opacity-50" : ""} outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
       onClick={() => {
         if (!nothing) {
           api.apply();
@@ -205,7 +204,7 @@ function ApplyButton({ api, onStop }: { api: CentreLinesApi; onStop: () => void 
       }}
     >
       Apply
-    </button>
+    </Button>
   );
   return (
     <>
@@ -302,7 +301,7 @@ export function CentreLinesBar({ api, info, onReturnFocus }: { api: CentreLinesA
       data-centre-lines-bar=""
       role="toolbar"
       aria-label={CENTRE_LINES_NAME}
-      className="pointer-events-auto flex min-w-0 max-w-full flex-wrap items-center gap-x-2 rounded-lg px-2 text-sm"
+      className="pointer-events-auto flex min-w-0 max-w-full flex-wrap items-center gap-x-2 rounded-[8px] px-2 text-sm"
       style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
       onKeyDown={onKeyDown}
     >
@@ -315,22 +314,20 @@ export function CentreLinesBar({ api, info, onReturnFocus }: { api: CentreLinesA
         <CentreField key={key} field={centreField(key)} value={api.options[key]} onValue={(value) => set({ [key]: value })} onReturnFocus={onReturnFocus} />
       ))}
       <AppTooltip side="bottom" content={CENTRE_JOIN_TIPS_TOOLTIP}>
-        <CentreSwitch label="Join tips" checked={api.options.joinTips} onChange={(joinTips) => set({ joinTips })} onReturnFocus={onReturnFocus} />
+        <CentreSwitch icon={Link2} label="Join tips" checked={api.options.joinTips} onChange={(joinTips) => set({ joinTips })} onReturnFocus={onReturnFocus} />
       </AppTooltip>
-      <CentreSwitch label="Keep inner areas" checked={api.options.keepInner} onChange={(keepInner) => set({ keepInner })} onReturnFocus={onReturnFocus} />
+      <CentreSwitch icon={SquareDashed} label="Keep inner areas" checked={api.options.keepInner} onChange={(keepInner) => set({ keepInner })} onReturnFocus={onReturnFocus} />
       {api.options.keepInner ? <CentreField field={offset} width={OFFSET_WIDTH} value={api.options.offset} onValue={(value) => set({ offset: value })} onReturnFocus={onReturnFocus} /> : null}
       </div>
       <div className="ml-auto flex h-9 items-center gap-1">
-        <button
-          type="button"
-          className={`${BUTTON_CLASS} hover:bg-[var(--editor-accent-hover)]`}
+        <Button size="bar" icon={X}
           onClick={() => {
             api.cancel();
             onReturnFocus();
           }}
         >
           Cancel
-        </button>
+        </Button>
         <ApplyButton api={api} onStop={stop} />
       </div>
       <p role="status" className="sr-only">
@@ -372,9 +369,9 @@ export function CentreLinesButton({
                 // A mouse press too: the keys of the bar work without a click into it.
                 focusCentreLinesBar();
               }}
-              className={`${BUTTON_CLASS} border border-[var(--field-border)] ${enabled ? "hover:bg-[var(--editor-accent-hover)]" : "opacity-40"}`}
+              className={BUTTON_CLASS}
             >
-              <Route aria-hidden size={16} strokeWidth={1.5} />
+              <Route {...GLYPH} aria-hidden />
               {CENTRE_LINES_LABEL}
             </button>
           </Tooltip.Trigger>
@@ -382,7 +379,7 @@ export function CentreLinesButton({
             <Tooltip.Content
               side="bottom"
               sideOffset={6}
-              className="z-50 rounded-md px-2 py-1 text-xs"
+              className={TOOLTIP_CLASS}
               style={{
                 background: "var(--toolbar-bg)",
                 color: "var(--toolbar-icon)",
@@ -394,25 +391,14 @@ export function CentreLinesButton({
           </Tooltip.Portal>
         </Tooltip.Root>
       </Tooltip.Provider>
-      <div
-        role={notice?.alert ? "alert" : "status"}
-        className={`absolute top-full left-0 mt-1 w-max max-w-[min(320px,60vw)] break-words rounded-md px-2 py-1 text-xs ${
-          notice?.alert ? "ring-1 ring-[var(--field-invalid)]" : ""
-        }`}
-        style={
-          notice
-            ? notice.alert
-              ? { background: "var(--popover)", color: "var(--field-invalid)" }
-              : {
-                  background: "var(--toolbar-bg)",
-                  color: "var(--toolbar-icon)",
-                  boxShadow: "var(--panel-elevation-shadow)",
-                }
-            : { display: "none" }
-        }
+      <ActionNotice
+        refusal={notice?.alert ?? false}
+        maxWidth="min(320px, 60vw)"
+        className="absolute top-full left-0 mt-1"
+        style={notice ? undefined : { display: "none" }}
       >
         {notice?.text}
-      </div>
+      </ActionNotice>
     </div>
   );
 }

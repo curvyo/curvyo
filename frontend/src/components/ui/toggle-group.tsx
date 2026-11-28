@@ -46,6 +46,9 @@ interface ToggleGroupProps<T extends string> {
   /** The tool bars' look (the Polygon/Star switch): one ring around the strip, no lines between
    * the items (the Pen bar, customer 2026-11-11). */
   bar?: boolean;
+  /** The items wrap to further rows inside a narrow bar instead of running past it (the
+   * Generators bar, 0159 F40). */
+  wrap?: boolean;
 }
 
 const BORDER = "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]";
@@ -73,6 +76,7 @@ export function ToggleGroup<T extends string>({
   onReturnFocus,
   firstFocus = false,
   bar = false,
+  wrap = false,
   columns,
   rows,
 }: ToggleGroupProps<T>) {
@@ -128,7 +132,7 @@ export function ToggleGroup<T extends string>({
       style={columns ? { display: "grid", gridTemplateColumns: `repeat(${columns}, ${itemWidth}px)` } : undefined}
       className={
         bar
-          ? "inline-flex w-fit shrink-0 overflow-hidden rounded-md ring-1 ring-border"
+          ? `inline-flex w-fit shrink-0 overflow-hidden rounded-[5px] ring-1 ring-[var(--field-border)] ${wrap ? "max-w-full flex-wrap" : ""}`
           : `inline-flex w-fit shrink-0 self-start overflow-hidden rounded-[5px] border ${BORDER}`
       }
     >

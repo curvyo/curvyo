@@ -15,14 +15,15 @@ import {
 export interface GridApi {
   /** The group is in the bar: two or more selected objects (criterion 18). */
   shown: boolean;
-  /** The fields as typed; an empty count shows the derived value. */
+  /** The fields as typed (the gap is the bar's one Gap field, `AlignApi.gap`); an empty count
+   * shows the derived value. */
   fields: GridFields;
   /** The counts the empty fields stand for (criterion 19). */
   derived: { rows: number; columns: number };
   /** The refusal per field of the last press, until that field changes. */
   errors: GridErrors;
-  /** Sets one field; typing a count makes it the driver, the other derived. */
-  setField: (name: keyof GridFields, text: string) => void;
+  /** Sets one count; typing a count makes it the driver, the other derived. */
+  setField: (name: "rows" | "columns", text: string) => void;
   /** A press of the Grid button or Enter in a field. */
   arrange: () => void;
   /** Escape in a field: the three fields as they were on focus, no refusal. */
@@ -129,19 +130,11 @@ export function useAlign(
     [getSession],
   );
 
-  const setField = useCallback((name: keyof GridFields, text: string) => {
-    setFields((previous) => {
-      if (name === "rows") {
-        return { ...previous, rows: text, columns: "" };
-      }
-      if (name === "columns") {
-        return { ...previous, columns: text, rows: "" };
-      }
-      return { ...previous, gap: text };
-    });
-    setErrors((previous) =>
-      name === "gap" ? { ...previous, gap: undefined } : { gap: previous.gap },
+  const setField = useCallback((name: "rows" | "columns", text: string) => {
+    setFields((previous) =>
+      name === "rows" ? { ...previous, rows: text, columns: "" } : { ...previous, columns: text, rows: "" },
     );
+    setErrors({});
   }, []);
 
   const restore = useCallback((previous: GridFields) => {
@@ -150,14 +143,20 @@ export function useAlign(
   }, []);
 
   const count = state.selectedCount;
+  // The grid's gap is the bar's one Gap field (`specs/0159-ui-consistency`, Frage 433 B).
+  const gridFields: GridFields = { rows: fields.rows, columns: fields.columns, gap };
   const arrange = useCallback(() => {
     const session = getSession();
     if (!session || count < 2) {
       return;
     }
-    const plan = gridPlan(count, fields);
+    const plan = gridPlan(count, { rows: fields.rows, columns: fields.columns, gap });
     if (!plan.ok) {
-      setErrors(plan.errors);
+      const { gap: gapMessage, ...counts } = plan.errors;
+      setErrors(counts);
+      if (gapMessage !== undefined) {
+        setGapError(gapMessage);
+      }
       return;
     }
     const outcome = session.arrange_grid(plan.rows, plan.columns, plan.gapMm);
@@ -166,9 +165,9 @@ export function useAlign(
       return;
     }
     onChange();
-  }, [getSession, count, fields, onChange]);
+  }, [getSession, count, fields, gap, onChange]);
 
-  const plan = gridPlan(count, fields);
+  const plan = gridPlan(count, gridFields);
   const derived = plan.ok ? plan.derived : nearestSquareGrid(count);
 
   return {
@@ -182,6 +181,6 @@ export function useAlign(
     setGap,
     gapError,
     setPageCue,
-    grid: { shown: state.shown && count >= 2, fields, derived, errors, setField, arrange, restore },
+    grid: { shown: state.shown && count >= 2, fields: gridFields, derived, errors, setField, arrange, restore },
   };
 }

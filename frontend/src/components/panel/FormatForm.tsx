@@ -1,11 +1,14 @@
-import { CircleAlert } from "lucide-react";
+import { Check, Star, X } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
 
 import { PresetStrip } from "@/components/panel/PresetStrip";
 import { scrollBodyTo } from "@/lib/panelScroll";
-import { PanelSwitch } from "@/components/ui/switch";
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import type { FormField, FormUnit, FormatGroup, FormatsApi } from "@/hooks/useFormats";
+import { Button } from "@/components/ui/button";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { fieldClass, PANEL_LABEL } from "@/components/ui/looks";
+import { ActionNotice } from "@/components/ui/notice";
 
 const NEW_GROUP = "__new__";
 
@@ -23,16 +26,7 @@ const UNIT_OPTIONS: readonly ToggleOption<FormUnit>[] = (
   icon: <span className="text-sm">{value}</span>,
 }));
 
-const FIELD_CLASS =
-  "style-field h-7 w-full rounded-[5px] border bg-white px-1.5 text-sm outline-none";
-const FIELD_BORDER =
-  "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]";
-const FIELD_INVALID = "border-[var(--field-invalid)] shadow-[inset_0_0_0_2px_var(--field-invalid)]";
 
-export const OUTLINE_BUTTON =
-  "h-7 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
-export const PRIMARY_BUTTON =
-  "h-7 rounded-[5px] border border-[var(--toolbar-icon-active-bg)] bg-[var(--toolbar-icon-active-bg)] text-sm text-[var(--toolbar-icon-active-fg)] outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1";
 
 interface TextFieldProps {
   field: FormField;
@@ -65,7 +59,7 @@ function TextField({
   const chipId = useId();
   return (
     <div className="flex min-h-7 items-center gap-2">
-      <span className="w-[60px] shrink-0 text-sm leading-4 text-[var(--toolbar-icon)]">{rowLabel}</span>
+      <span className={`${PANEL_LABEL} leading-4`}>{rowLabel}</span>
       <div className="relative w-[158px]">
         <input
           ref={(element) => setRef(field, element)}
@@ -79,7 +73,7 @@ function TextField({
           value={value}
           onFocus={onFocus}
           onChange={(event) => onChange(event.target.value)}
-          className={`${FIELD_CLASS} ${numeric ? "text-right tabular-nums" : ""} ${error ? FIELD_INVALID : FIELD_BORDER}`}
+          className={fieldClass({ invalid: Boolean(error), extra: `style-field w-full px-1.5 ${numeric ? "text-right tabular-nums" : ""}` })}
           style={{ paddingRight: suffix ? 34 : 6 }}
         />
         {suffix && (
@@ -91,14 +85,14 @@ function TextField({
           </span>
         )}
         {error && showChip && (
-          <div
+          <ActionNotice
+            refusal
+            maxWidth={226}
             id={chipId}
-            role="alert"
-            className="pointer-events-none absolute top-full right-0 z-30 mt-1 flex w-max max-w-[226px] items-start gap-1 rounded-md bg-popover px-2 py-1 text-xs text-[var(--field-invalid)] ring-1 ring-[var(--field-invalid)]"
+            className="absolute top-full right-0 z-30 mt-1"
           >
-            <CircleAlert size={12} aria-hidden className="mt-0.5 shrink-0" />
             {error}
-          </div>
+          </ActionNotice>
         )}
       </div>
     </div>
@@ -203,7 +197,7 @@ export function FormatForm({ formats, onReturnFocus }: FormatFormProps) {
         onChange={(height) => formats.changeForm({ height })}
       />
       <div className="flex h-7 items-center gap-2">
-        <span className="w-[60px] shrink-0 text-sm text-[var(--toolbar-icon)]">Unit</span>
+        <span className={PANEL_LABEL}>Unit</span>
         <ToggleGroup
           label="Format unit"
           options={UNIT_OPTIONS}
@@ -244,29 +238,27 @@ export function FormatForm({ formats, onReturnFocus }: FormatFormProps) {
         />
       )}
       {!editing && (
-        <PanelSwitch
+        <ToggleButton icon={Star}
           label="Add to quick selection"
-          checked={values.favourite}
-          onCheckedChange={(favourite) => formats.changeForm({ favourite })}
+          pressed={values.favourite}
+          onPressedChange={(favourite) => formats.changeForm({ favourite })}
           onReturnFocus={onReturnFocus}
         />
       )}
       <div className="flex gap-2">
-        <button type="submit" className={`${PRIMARY_BUTTON} w-[109px]`}>
+        <Button variant="primary" icon={Check} type="submit" className="min-w-[109px]">
           {editing ? "Save" : "Add"}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button icon={X}
           onClick={(event) => {
             formats.cancelForm(event.detail === 0);
             if (event.detail > 0) {
               onReturnFocus();
             }
-          }}
-          className={`${OUTLINE_BUTTON} w-[109px]`}
+          }} className="min-w-[109px]"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

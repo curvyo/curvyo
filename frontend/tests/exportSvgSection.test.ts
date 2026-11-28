@@ -60,7 +60,7 @@ async function render(): Promise<string> {
 
 test("c4 c147 Export SVG… sits below the block with four switches, all off", async () => {
   const html = await render();
-  const labels = [...html.matchAll(/<button[^>]*>(?:<span[^>]*>(?:<span[^>]*><\/span>)?<\/span>)?([^<]*)<\/button>/g)].map(
+  const labels = [...html.matchAll(/<button[^>]*>(?:<span[^>]*>(?:<span[^>]*><\/span>)?<\/span>)?(?:<svg[\s\S]*?<\/svg>)?(?:<span class="truncate">)?([^<]*)(?:<\/span>)?<\/button>/g)].map(
     (m) => m[1],
   );
   assert.deepEqual(labels, [
@@ -78,6 +78,7 @@ test("c4 c147 Export SVG… sits below the block with four switches, all off", a
     "Quit",
   ]);
   assert.match(html, /role="group" aria-label="Export options"/);
-  assert.equal([...html.matchAll(/role="switch" aria-checked="false"/g)].length, 4);
-  assert.doesNotMatch(html, /aria-checked="true"/);
+  // 0159 S2: the four switches are toggle buttons, all off.
+  assert.equal([...html.matchAll(/aria-pressed="false"[^>]*data-export-option=/g)].length, 4);
+  assert.doesNotMatch(html, /aria-pressed="true"/);
 });

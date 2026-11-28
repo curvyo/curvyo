@@ -30,12 +30,14 @@ import {
   Type,
   Zap,
 } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import type { ComponentType } from "react";
 import { useEffect, useRef } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import { type LayerRowData, indentPx } from "@/lib/layerRows";
 import { tracedTooltip } from "@/lib/traceText";
+import { RenameField } from "@/components/ui/rename-field";
 
 type Glyph = ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>;
 
@@ -137,7 +139,7 @@ export interface LayerRowProps {
 }
 
 const ICON_BUTTON =
-  "flex size-6 shrink-0 items-center justify-center rounded-[4px] outline-none hover:text-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-10 pointer-coarse:w-9";
+  "flex size-6 shrink-0 items-center justify-center rounded-[5px] outline-none hover:text-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-10 pointer-coarse:w-9";
 
 /** The eye or the lock: its own state as a shape, an inherited one muted in a dotted ring. */
 function FlagButton({
@@ -332,13 +334,13 @@ export function LayerRow({
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       onClick={(event) => onPress(event)}
-      className={`group/row absolute right-0 left-0 flex items-center rounded-[4px] pr-1 text-sm outline-none select-none ${pinned ? "z-10 bg-[var(--panel-bg)]" : ""} hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+      className={`group/row absolute right-0 left-0 flex items-center rounded-[5px] pr-1 text-sm outline-none select-none ${pinned ? "z-10 bg-[var(--panel-bg)]" : ""} hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
         selected ? "!bg-[var(--value-fill)]" : ""
       } ${entered || drop === "into" ? "ring-[1.5px] ring-inset ring-[var(--editor-accent)]" : ""}`}
       style={{ top, height }}
     >
       {selected || active ? (
-        <span aria-hidden className="absolute top-0 bottom-0 left-0 w-[3px] rounded-l bg-[var(--editor-accent)]" />
+        <span aria-hidden className="absolute top-0 bottom-0 left-0 w-[3px] rounded-l-full bg-[var(--editor-accent)]" />
       ) : null}
       {drop === "above" || drop === "below" ? (
         <span
@@ -363,9 +365,9 @@ export function LayerRow({
             className="flex h-7 w-6 shrink-0 items-center justify-center text-[var(--toolbar-icon)] outline-none pointer-coarse:h-10 pointer-coarse:w-9"
           >
             {row.expanded ? (
-              <ChevronDown size={16} strokeWidth={1.5} aria-hidden />
+              <ChevronDown {...GLYPH} aria-hidden />
             ) : (
-              <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
+              <ChevronRight {...GLYPH} aria-hidden />
             )}
           </button>
         ) : (
@@ -394,8 +396,8 @@ export function LayerRow({
             </span>
           )}
           {renaming ? (
-            <input
-              ref={inputRef}
+            <RenameField
+              inputRef={inputRef}
               defaultValue={row.name}
               aria-label="Name"
               maxLength={128}
@@ -412,19 +414,21 @@ export function LayerRow({
                 }
               }}
               onBlur={(event) => onRename(event.currentTarget.value)}
-              className="h-7 min-w-0 flex-1 rounded-[5px] border border-[var(--field-border)] bg-white px-1.5 text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+              className="flex-1"
             />
           ) : dragging ? (
-            <span className={nameClass} title={row.name}>{row.text ?? row.name}</span>
+            <span className={nameClass}>{row.text ?? row.name}</span>
           ) : (
-            <Tooltip side="left" content={tooltip}>
-              <span className={nameClass} title={row.name}>{row.text ?? row.name}</span>
+            // Below the row, not left of it over the panel's tab strip (0159 F37); the shared
+            // tooltip only, no native title beside it.
+            <Tooltip side="bottom" content={tooltip}>
+              <span className={nameClass}>{row.text ?? row.name}</span>
             </Tooltip>
           )}
           {row.slot ? <span className="shrink-0 text-xs text-[var(--panel-muted-fg)]">{` · ${row.slot}`}</span> : null}
           {root ? (
             <span className="flex shrink-0 items-center gap-1 text-[11px] text-[var(--panel-muted-fg)]">
-              <Zap size={12} strokeWidth={1.5} aria-hidden />
+              <Zap {...SMALL_GLYPH} aria-hidden />
               Laser
             </span>
           ) : null}
@@ -465,9 +469,9 @@ export function LayerRow({
               }`}
             >
               {row.rowAction === "select-original" ? (
-                <Locate size={16} strokeWidth={1.5} aria-hidden />
+                <Locate {...GLYPH} aria-hidden />
               ) : (
-                <ListChecks size={16} strokeWidth={1.5} aria-hidden />
+                <ListChecks {...GLYPH} aria-hidden />
               )}
             </button>
           </Tooltip>

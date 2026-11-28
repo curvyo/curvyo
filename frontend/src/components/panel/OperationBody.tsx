@@ -1,4 +1,5 @@
 import { SwatchBook } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useLayoutEffect, useRef } from "react";
 
 import { ImageSettingsGroup } from "@/components/panel/ImageSettingsGroup";
@@ -81,7 +82,7 @@ export function OperationBody({ row, pick, settings, tools, onEditMaterial, onRe
       />
       {row.source ? (
         <p className="flex min-h-4 items-start gap-1 text-[11px] text-[var(--panel-muted-fg)]">
-          <SwatchBook size={12} aria-hidden className="mt-px shrink-0" />
+          <SwatchBook {...SMALL_GLYPH} aria-hidden className="mt-px shrink-0" />
           <span>{row.source.text}</span>
         </p>
       ) : null}

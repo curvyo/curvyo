@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 import { openLicence } from "@/lib/onlineApi";
 import { isTauri } from "@/platform/host";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface Credit {
   text: string;
@@ -40,19 +41,21 @@ export function CreditsBlock({ getSession, revision }: { getSession: () => WasmS
         const at = credit.licence ? credit.text.lastIndexOf(credit.licence) : -1;
         const [before, after] = at >= 0 ? [credit.text.slice(0, at), credit.text.slice(at + credit.licence.length)] : [`${credit.text} `, ""];
         return (
-          <p key={`${credit.text}|${credit.licence}`} title={credit.address}>
-            {credit.licence_url && isTauri ? (
-              <>
-                {before}
-                <button type="button" onClick={() => void openLicence(credit.licence_url).catch(() => undefined)}>
-                  {credit.licence}
-                </button>
-                {after}
-              </>
-            ) : (
-              credit.text
-            )}
-          </p>
+          <Tooltip key={`${credit.text}|${credit.licence}`} side="left" content={credit.address}>
+            <p>
+              {credit.licence_url && isTauri ? (
+                <>
+                  {before}
+                  <button type="button" onClick={() => void openLicence(credit.licence_url).catch(() => undefined)}>
+                    {credit.licence}
+                  </button>
+                  {after}
+                </>
+              ) : (
+                credit.text
+              )}
+            </p>
+          </Tooltip>
         );
       })}
     </section>

@@ -28,11 +28,13 @@ describe("centre lines text", () => {
     assert.equal(centreLinesNotice(base), null);
   });
   it("counts kept and skipped objects", () => {
-    assert.equal(centreLinesNotice({ ...base, kept: 2, skipped: 3 })?.text, "Centre lines: 18 converted, 2 kept filled, 3 skipped.");
+  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+    assert.equal(centreLinesNotice({ ...base, kept: 2, skipped: 3 })?.text, "Centre lines: some shapes were skipped.");
   });
   it("lists only the parts that are not zero", () => {
-    assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 })?.text, "Centre lines: 1 converted, 1 kept filled.");
-    assert.equal(centreLinesNotice({ ...base, converted: 0, kept: 2 })?.text, "Centre lines: 2 kept filled.");
+    // 0159 S7: shapes kept filled are seen on the canvas; no notice for them.
+    assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }), null);
+    assert.equal(centreLinesNotice({ ...base, converted: 0, kept: 2 }), null);
   });
   it("names the field of an out-of-range or non-numeric entry and is silent on a valid one", () => {
     const offset = { label: "Offset", min: -5, max: 5, suffix: "mm" };
@@ -119,8 +121,9 @@ describe("centre lines sliders (0117 UX notes §3.1)", () => {
     assert.deepEqual(terms, ["Overlap", "Thick parts", "Optimise", "Join tips", "Keep inner areas", "Offset"]);
   });
   it("words the Apply notice in paths, as the Apply tooltip does", () => {
-    assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }, 70)?.text, "Centre lines: 70 paths, 1 kept filled.");
-    assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }, 1)?.text, "Centre lines: 1 path, 1 kept filled.");
+    // 0159 S7: no counts after Apply.
+    assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }, 70), null);
+    assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1, skipped: 1 }, 1)?.text, "Centre lines: some shapes were skipped.");
   });
   it("lets Escape cancel the bar, also from a number entry", () => {
     const slider = { tagName: "DIV" };

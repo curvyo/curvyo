@@ -1,7 +1,8 @@
 import { ListTree, Route } from "lucide-react";
 import { useEffect, useLayoutEffect, useState } from "react";
+import { useBarBox } from "@/hooks/useBarBox";
 import type { WasmSession } from "@/lib/editorSession";
-import { OPERATIONS_VIEW_NAME, TOOLPATH_VIEW_NAME, operationsToggle, readPages, toolpathToggle } from "@/lib/pages";
+import { OPERATIONS_VIEW_NAME, TOOLPATH_VIEW_NAME, operationsToggle, pageLabelTop, readPages, toolpathToggle } from "@/lib/pages";
 import { PlayBar } from "@/components/PlayBar";
 import { RingLabels } from "@/components/RingLabels";
 import { UserOriginMarks } from "@/components/UserOriginMarks";
@@ -46,10 +47,12 @@ export function PageFrames({
     return () => cancelAnimationFrame(frame);
   }, [getSession]);
   const pages = readPages(json);
+  const [root, bars] = useBarBox();
   // The play bar and the rings belong to the active page while its Toolpath view is pressed.
   const route = pages.find((page) => page.active && page.toolpathView === true);
   return (
     <div
+      ref={root}
       className="pointer-events-none absolute inset-0 overflow-hidden"
       data-page-frames=""
     >
@@ -79,12 +82,13 @@ export function PageFrames({
             />
           )}
           {/* The label is never wider than its frame: the name truncates first, the word goes
-              below 96 px, the whole label below 24 px (`specs/0098` UX notes §5). */}
+              below 96 px, the whole label below 24 px (`specs/0098` UX notes §5). It is never under a
+              bar: below the bars where they cover its place (0159 F50). */}
           {page.screenWidth >= 24 && (
             <span
               data-page-label=""
-              className="absolute bottom-full left-0 mb-1 flex max-w-full items-center gap-1.5 whitespace-nowrap text-xs"
-              style={{ color: "var(--toolbar-icon)" }}
+              className="absolute left-0 flex h-4 max-w-full items-center gap-1.5 whitespace-nowrap text-xs"
+              style={{ color: "var(--toolbar-icon)", top: pageLabelTop(page, bars) }}
             >
               <span aria-hidden className={`min-w-0 truncate ${page.active || page.home ? "font-semibold" : ""}`}>
                 {page.name}
@@ -170,7 +174,7 @@ function ViewToggle({
         aria-pressed={pressed}
         aria-label={name}
         onClick={onPress}
-        className="pointer-events-auto -my-0.5 flex size-6 shrink-0 items-center justify-center rounded-[7px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="pointer-events-auto -my-0.5 flex size-6 shrink-0 items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
         <span
           className={`flex size-5 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] ${

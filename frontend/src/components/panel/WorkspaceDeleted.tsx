@@ -1,13 +1,13 @@
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2, Undo2 } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useEffect, useRef, useState } from "react";
 
 import type { WorkspaceApi } from "@/hooks/useWorkspace";
+import { Button } from "@/components/ui/button";
 
 /** At most this many Deleted rows are shown (`ux-notes.md` section 5). */
 const MAX_DELETED_ROWS = 200;
 
-const OUTLINE_SMALL =
-  "h-6 shrink-0 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent px-2 text-xs text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9";
 
 /**
  * The Deleted list of a shared workspace (`specs/0095-workspace` criterion 40, `ux-notes.md`
@@ -42,7 +42,7 @@ export function WorkspaceDeleted({ workspace, emptyText }: { workspace: Workspac
         onClick={() => setOpen((value) => !value)}
         className="flex h-7 items-center gap-1 rounded-[5px] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
-        {open ? <ChevronDown size={16} strokeWidth={1.5} aria-hidden /> : <ChevronRight size={16} strokeWidth={1.5} aria-hidden />}
+        {open ? <ChevronDown {...GLYPH} aria-hidden /> : <ChevronRight {...GLYPH} aria-hidden />}
         <span className="flex-1 text-left">Deleted</span>
         <span className="pr-1 text-xs text-[var(--panel-muted-fg)]">{rows.length}</span>
       </button>
@@ -53,24 +53,22 @@ export function WorkspaceDeleted({ workspace, emptyText }: { workspace: Workspac
           <ul ref={list} aria-label="Deleted documents" className="flex flex-col">
             {shown.map((row, index) => (
               <li key={row.node} className="flex h-11 items-center gap-2 px-1">
-                <Trash2 size={16} strokeWidth={1.5} aria-hidden className="shrink-0 text-[var(--toolbar-icon)]" />
+                <Trash2 {...GLYPH} aria-hidden className="shrink-0 text-[var(--toolbar-icon)]" />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span title={row.name} className="truncate text-sm text-[var(--toolbar-icon)]">
                     {row.name}
                   </span>
                   <span className="truncate text-xs text-[var(--panel-muted-fg)]">{row.line}</span>
                 </div>
-                <button
-                  type="button"
+                <Button icon={Undo2}
                   aria-label={`Restore ${row.name}`}
                   onClick={() => {
                     restored.current = { index, count: rows.length };
                     workspace.restore(row);
                   }}
-                  className={OUTLINE_SMALL}
                 >
                   Restore
-                </button>
+                </Button>
               </li>
             ))}
             {rows.length > shown.length ? (

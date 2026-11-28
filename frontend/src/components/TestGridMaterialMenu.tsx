@@ -4,6 +4,7 @@ import type { KeyboardEvent } from "react";
 
 import { MATERIAL_FILTER_ABOVE, filterMaterials, materialButtonText, thicknessLabel } from "@/lib/testGridBar";
 import type { TestGridBarView } from "@/lib/testGridView";
+import { fieldClass, GLYPH } from "@/components/ui/looks";
 
 const MENU_GAP = 4;
 
@@ -136,9 +137,9 @@ export function TestGridMaterialMenu({ view, onPick, onNewMaterial }: TestGridMa
         aria-expanded={open}
         onClick={() => (open ? setOpen(false) : openMenu())}
         onKeyDown={buttonKey}
-        className="my-1 flex h-7 w-[200px] items-center gap-1 rounded-md border border-[var(--toolbar-icon)]/40 px-2 text-sm outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="my-1 flex h-7 w-[200px] items-center gap-1 rounded-[5px] border border-[var(--toolbar-icon)]/40 px-2 text-sm outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
-        <SwatchBook size={16} aria-hidden className="shrink-0 text-[var(--toolbar-icon)]" />
+        <SwatchBook {...GLYPH} aria-hidden className="shrink-0 text-[var(--toolbar-icon)]" />
         <span className={`min-w-0 flex-1 truncate text-left ${button.picked ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}>{button.text}</span>
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" className="shrink-0 text-[var(--toolbar-icon)]">
           <path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -150,7 +151,7 @@ export function TestGridMaterialMenu({ view, onPick, onNewMaterial }: TestGridMa
           role="menu"
           aria-label="Material"
           onKeyDown={menuKey}
-          className="absolute left-0 z-50 flex flex-col rounded-lg py-1"
+          className="absolute left-0 z-50 flex flex-col rounded-[8px] py-1"
           style={{
             minWidth: 232,
             width: "max-content",
@@ -169,7 +170,7 @@ export function TestGridMaterialMenu({ view, onPick, onNewMaterial }: TestGridMa
                 setQuery(event.target.value);
                 setFocused(0);
               }}
-              className="mx-1 mb-1 h-7 rounded border border-[var(--lane-line)] bg-white px-2 text-[13px] text-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+              className={fieldClass({ extra: "mx-1 mb-1 px-1.5" })}
             />
           ) : null}
           <MenuRow
@@ -180,8 +181,8 @@ export function TestGridMaterialMenu({ view, onPick, onNewMaterial }: TestGridMa
             onChoose={choose}
             onHover={setFocused}
             label={
-              <span className="flex items-center gap-2 text-[13px] text-[var(--toolbar-icon)]">
-                <Plus size={16} aria-hidden className="shrink-0" />
+              <span className="flex items-center gap-2 text-sm text-[var(--toolbar-icon)]">
+                <Plus {...GLYPH} aria-hidden className="shrink-0" />
                 New material
               </span>
             }
@@ -199,9 +200,9 @@ export function TestGridMaterialMenu({ view, onPick, onNewMaterial }: TestGridMa
                 onChoose={choose}
                 onHover={setFocused}
                 label={
-                  <span className="flex w-full items-center gap-2 whitespace-nowrap text-[13px] text-[var(--toolbar-icon)]">
+                  <span className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-[var(--toolbar-icon)]">
                     <span aria-hidden className="flex w-4 shrink-0 justify-center">
-                      {checked ? <Check size={16} /> : null}
+                      {checked ? <Check {...GLYPH} /> : null}
                     </span>
                     <span className="min-w-0 flex-1">{one.name}</span>
                     <span className="pl-3 text-xs tabular-nums text-[var(--panel-muted-fg)]">{thicknessLabel(one)}</span>
@@ -236,7 +237,7 @@ function MenuRow({ index, focused, setRef, checked, label, onChoose, onHover }: 
       tabIndex={index === focused ? 0 : -1}
       onClick={() => onChoose(index)}
       onPointerMove={() => onHover(index)}
-      className="mx-1 flex h-8 cursor-default items-center rounded-md px-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+      className="mx-1 flex h-8 cursor-default items-center rounded-[5px] px-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       style={{ background: index === focused ? "var(--editor-accent-hover)" : undefined }}
     >
       {label}

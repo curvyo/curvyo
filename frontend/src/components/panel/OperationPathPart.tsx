@@ -9,6 +9,8 @@ import { PATH_FIELDS, optionStep, optionText, type OptionField } from "@/lib/ope
 import type { LeadKind, PathOptionValues } from "@/lib/operationSettingsView";
 import type { Direction, OperationRow } from "@/lib/operationsView";
 import { CHIP_IS_MESSAGE, outcomeOf, typedNumber } from "@/lib/settingsFieldText";
+import { Button } from "@/components/ui/button";
+import { WandSparkles } from "lucide-react";
 
 const LEADS: readonly LeadKind[] = ["none", "line", "arc"];
 const LEAD_NAMES: Record<LeadKind, string> = { none: "None", line: "Line", arc: "Arc" };
@@ -61,7 +63,7 @@ function SegmentPill<T extends string>({
         const on = v === value;
         const look = segment(v);
         return (
-          <Tooltip key={v} side="bottom" content={look.name}>
+          <Tooltip key={v} side="left" content={look.name}>
             <button
               ref={(node) => {
                 refs.current[index] = node;
@@ -72,7 +74,7 @@ function SegmentPill<T extends string>({
               aria-label={look.name}
               tabIndex={index === current ? 0 : -1}
               onClick={(event) => set(index, event.detail === 0)}
-              className="flex flex-1 items-center justify-center rounded-[3px] text-xs text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-checked:bg-[var(--toolbar-icon-active-bg)] aria-checked:text-[var(--toolbar-icon-active-fg)]"
+              className="flex flex-1 items-center justify-center rounded-[5px] text-xs text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-checked:bg-[var(--toolbar-icon-active-bg)] aria-checked:text-[var(--toolbar-icon-active-fg)]"
             >
               {look.label}
             </button>
@@ -219,17 +221,15 @@ export function OperationItemPathRows({ row, tools, onReturnFocus }: { row: Oper
           <span className="w-14 shrink-0 text-xs text-[var(--toolbar-icon)]">Start</span>
           <span className={`flex-1 text-xs ${start.set ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}>{start.readout}</span>
           {start.set ? (
-            <button
-              type="button"
+            <Button icon={WandSparkles}
               aria-label="Automatic start"
               onClick={() => {
                 tools.setStartAutomatic(row.id);
                 onReturnFocus();
               }}
-              className="h-7 rounded-md border border-[var(--toolbar-icon)] px-2 text-xs text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
             >
               Automatic
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}

@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
@@ -10,9 +10,10 @@ import type { DeleteArm } from "@/hooks/useDeleteArm";
 import type { MaterialsApi } from "@/hooks/useMaterials";
 import type { MaterialBody as Body } from "@/lib/materialsView";
 import { CHIP_IS_MESSAGE, outcomeOf, stepText, typedNumber } from "@/lib/settingsFieldText";
+import { Button } from "@/components/ui/button";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
 
-const OUTLINE_BUTTON =
-  "flex h-7 w-[228px] items-center gap-1 rounded border border-[var(--lane-line)] px-2 text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+const OUTLINE_BUTTON = buttonClass("secondary", "panel", "w-[228px] justify-start px-2");
 
 interface MaterialBodyProps {
   body: Body;
@@ -94,18 +95,18 @@ export function MaterialBody({ body, api, arm, onReturnFocus, onHeight }: Materi
                   role="radio"
                   aria-checked={false}
                   onClick={() => api.pickLaser(body.id, laser.id)}
-                  className="flex h-7 w-[228px] items-center rounded px-2 text-left text-[13px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                  className="flex h-7 w-[228px] items-center rounded-[5px] px-2 text-left text-sm text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
                 >
                   <span className="truncate">{laser.name}</span>
                 </button>
               ))}
-              <button type="button" onClick={() => api.openLaserPick(false)} className={OUTLINE_BUTTON}>
+              <Button icon={X} onClick={() => api.openLaserPick(false)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           ) : body.otherLasers.length > 0 ? (
             <button type="button" onClick={() => api.openLaserPick(true)} className={OUTLINE_BUTTON}>
-              <Plus size={16} aria-hidden />
+              <Plus {...GLYPH} aria-hidden />
               Sets for another laser
             </button>
           ) : null}

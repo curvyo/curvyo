@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronUp, Crop, MoveHorizontal, Power, PowerOff, Trash2, TriangleAlert } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { useState } from "react";
 import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 
@@ -15,7 +16,7 @@ import type { AiSteps } from "@/lib/aiSteps";
 import type { StepField, StepRow } from "@/lib/adjustmentsView";
 
 const CONTROL =
-  "flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "flex h-6 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 /** What a manual row asks of the list: the session calls and the row's own states. */
 export interface StepActions {
@@ -134,7 +135,7 @@ export function AdjustStepRow(props: RowProps) {
       aria-posinset={props.position + 1}
       aria-setsize={props.total}
       {...{ [ARM_ZONE]: key }}
-      className={`relative flex flex-col rounded px-1 ${props.dragSource ? "bg-[color-mix(in_srgb,var(--toolbar-icon)_8%,transparent)]" : ""}`}
+      className={`relative flex flex-col rounded-[5px] px-1 ${props.dragSource ? "bg-[color-mix(in_srgb,var(--toolbar-icon)_8%,transparent)]" : ""}`}
     >
       {props.insertion ? (
         <div
@@ -144,7 +145,7 @@ export function AdjustStepRow(props: RowProps) {
           style={props.insertion === "top" ? { top: 0 } : { bottom: 0 }}
         />
       ) : null}
-      <div className={`flex flex-col rounded ${armed ? "bg-[var(--destructive-soft)]" : ""}`}>
+      <div className={`flex flex-col rounded-[5px] ${armed ? "bg-[var(--destructive-soft)]" : ""}`}>
         <div
           className="flex h-[26px] shrink-0 items-center gap-1"
           onPointerDown={(event) => {
@@ -156,68 +157,75 @@ export function AdjustStepRow(props: RowProps) {
           <span className="flex h-4 w-4 shrink-0 items-center justify-center text-[var(--toolbar-icon)]">
             <AdjustGlyph kind={row.kind} />
           </span>
-          <button
-            type="button"
-            data-adjust-name=""
-            tabIndex={props.tabStop ? 0 : -1}
-            aria-expanded={row.unknown ? undefined : props.unfolded}
-            aria-label={row.accessibleName}
-            title={row.name}
-            onFocus={props.onFocusRow}
-            onClick={() => !row.unknown && actions.fold(index)}
-            onKeyDown={(event) => onNameKey(event, row, armed, actions)}
-            className={`min-w-0 flex-1 truncate rounded-sm text-left text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${muted ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}`}
-          >
-            {row.name}
-          </button>
-          {row.unknown ? null : (
+          <Tooltip side="left" content={row.name}>
             <button
               type="button"
-              data-adjust-power=""
-              tabIndex={-1}
-              onKeyDown={(event) => {
-                if (event.key !== "ArrowLeft") return;
-                event.preventDefault();
-                (event.currentTarget.closest("li")?.querySelector("[data-adjust-name]") as HTMLElement | null)?.focus();
-              }}
-              aria-pressed={row.enabled}
-              aria-label={`Use ${row.name}`}
-              title={`Use ${row.name}`}
-              onClick={() => actions.setEnabled(index, !row.enabled)}
-              className={CONTROL}
+              data-adjust-name=""
+              tabIndex={props.tabStop ? 0 : -1}
+              aria-expanded={row.unknown ? undefined : props.unfolded}
+              aria-label={row.accessibleName}
+              onFocus={props.onFocusRow}
+              onClick={() => !row.unknown && actions.fold(index)}
+              onKeyDown={(event) => onNameKey(event, row, armed, actions)}
+              className={`min-w-0 flex-1 truncate rounded-[5px] text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${muted ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}`}
             >
-              {row.enabled ? <Power size={16} aria-hidden /> : <PowerOff size={16} aria-hidden />}
+              {row.name}
             </button>
+          </Tooltip>
+          {row.unknown ? null : (
+            <Tooltip side="left" content={`Use ${row.name}`}>
+              <button
+                type="button"
+                data-adjust-power=""
+                tabIndex={-1}
+                onKeyDown={(event) => {
+                  if (event.key !== "ArrowLeft") return;
+                  event.preventDefault();
+                  (event.currentTarget.closest("li")?.querySelector("[data-adjust-name]") as HTMLElement | null)?.focus();
+                }}
+                aria-pressed={row.enabled}
+                aria-label={`Use ${row.name}`}
+                onClick={() => actions.setEnabled(index, !row.enabled)}
+                className={CONTROL}
+              >
+                {row.enabled ? <Power {...GLYPH} aria-hidden /> : <PowerOff {...GLYPH} aria-hidden />}
+              </button>
+            </Tooltip>
           )}
-          <button
-            type="button"
-            {...{ [ARM_TRASH]: key }}
-            tabIndex={-1}
-            aria-label={armed ? `Press again to remove ${row.name}` : `Remove ${row.name}`}
-            title={armed ? "Press again to remove" : "Remove"}
-            onClick={() => actions.trash(row)}
-            className={
-              armed
-                ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
-                : CONTROL
-            }
-          >
-            <Trash2 size={16} aria-hidden />
-          </button>
+          <Tooltip side="left" content={armed ? "Press again to remove" : "Remove"}>
+            <button
+              type="button"
+              {...{ [ARM_TRASH]: key }}
+              tabIndex={-1}
+              aria-label={armed ? `Press again to remove ${row.name}` : `Remove ${row.name}`}
+              onClick={() => actions.trash(row)}
+              className={
+                armed
+                  ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
+                  : CONTROL
+              }
+            >
+              <Trash2 {...GLYPH} aria-hidden />
+            </button>
+          </Tooltip>
           {row.unknown ? null : (
             <>
               <span className="w-1 shrink-0" />
               {row.up ? (
-                <button type="button" tabIndex={-1} aria-label={`Move ${row.name} up`} title="Move up" onClick={() => actions.move(index, true)} className={CONTROL}>
-                  <ChevronUp size={16} aria-hidden />
-                </button>
+                <Tooltip side="left" content="Move up">
+                  <button type="button" tabIndex={-1} aria-label={`Move ${row.name} up`} onClick={() => actions.move(index, true)} className={CONTROL}>
+                    <ChevronUp {...GLYPH} aria-hidden />
+                  </button>
+                </Tooltip>
               ) : (
                 <span className="h-6 w-6 shrink-0" aria-hidden />
               )}
               {row.down ? (
-                <button type="button" tabIndex={-1} aria-label={`Move ${row.name} down`} title="Move down" onClick={() => actions.move(index, false)} className={CONTROL}>
-                  <ChevronDown size={16} aria-hidden />
-                </button>
+                <Tooltip side="left" content="Move down">
+                  <button type="button" tabIndex={-1} aria-label={`Move ${row.name} down`} onClick={() => actions.move(index, false)} className={CONTROL}>
+                    <ChevronDown {...GLYPH} aria-hidden />
+                  </button>
+                </Tooltip>
               ) : (
                 <span className="h-6 w-6 shrink-0" aria-hidden />
               )}
@@ -228,7 +236,7 @@ export function AdjustStepRow(props: RowProps) {
           <p title={row.line} className="h-4 truncate pl-5 text-[11px] leading-4 tabular-nums text-[var(--panel-muted-fg)]">
             {/* An out-of-date stored result: the 12 px warn triangle before "Out of date · " (§8). */}
             {row.line.startsWith("Out of date") ? (
-              <TriangleAlert aria-hidden size={12} strokeWidth={1.5} className="mr-1 inline-block align-[-2px] text-[var(--toolbar-icon)]" />
+              <TriangleAlert {...SMALL_GLYPH} aria-hidden className="mr-1 inline-block align-[-2px] text-[var(--toolbar-icon)]" />
             ) : null}
             {row.line}
           </p>
@@ -293,9 +301,9 @@ export function AdjustStepRow(props: RowProps) {
                     aria-label="Crop on the canvas"
                     aria-pressed={actions.cropBarRow === index}
                     onClick={() => actions.openCrop(index)}
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)]"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)]"
                   >
-                    <Crop aria-hidden size={16} strokeWidth={1.5} />
+                    <Crop {...GLYPH} aria-hidden />
                   </button>
                 </Tooltip>
               ) : null}
@@ -303,7 +311,7 @@ export function AdjustStepRow(props: RowProps) {
                 <>
                   <div
                     data-adjust-derived="height_px"
-                    className="flex h-7 w-[112px] items-center justify-between rounded-md border border-[var(--field-border)] px-2 text-[13px] tabular-nums text-[var(--field-derived-fg)]"
+                    className="flex h-7 w-[112px] items-center justify-between rounded-[5px] border border-[var(--field-border)] px-2 text-sm tabular-nums text-[var(--field-derived-fg)]"
                   >
                     <span>Height</span>
                     <span>{row.body.heightPx} px</span>
@@ -320,9 +328,9 @@ export function AdjustStepRow(props: RowProps) {
                 type="button"
                 aria-label="Stretch"
                 onClick={() => actions.stretch(row.index as number)}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
               >
-                <MoveHorizontal aria-hidden size={16} strokeWidth={1.5} />
+                <MoveHorizontal {...GLYPH} aria-hidden />
               </button>
             </Tooltip>
           ) : null}
@@ -355,7 +363,7 @@ function CurvesBody({ row, points, actions }: { row: StepRow; points: [number, n
               type="button"
               aria-label="Straight curve"
               onClick={() => actions.straighten(index)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
             >
               {/* Draft 02's glyph: a square with its diagonal, unlike the Curves step glyph. */}
               <svg aria-hidden width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -379,7 +387,7 @@ function FieldViewNarrow({ row, field, actions }: { row: StepRow; field: StepFie
 export function DerivedRow({ row }: { row: StepRow }): ReactNode {
   return (
     <li data-derived-row={row.kind} className="flex flex-col px-1" aria-label={row.accessibleName}>
-      <div className="flex h-[26px] items-center gap-1 text-[13px] text-[var(--toolbar-icon)]">
+      <div className="flex h-[26px] items-center gap-1 text-sm text-[var(--toolbar-icon)]">
         <span className="flex h-4 w-4 shrink-0 items-center justify-center">
           <AdjustGlyph kind={row.kind} />
         </span>

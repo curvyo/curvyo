@@ -1,4 +1,5 @@
 import { Ban, Pipette, X, type LucideIcon } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 
 import { Swatch } from "@/components/panel/Swatch";
@@ -9,7 +10,7 @@ import { focusAfterRemoval, pickedKey } from "@/lib/tracePickedColours";
 import { AUTO, NO_BACKGROUND, PICK_BACKGROUND, PICK_COLOUR, PICK_TOOLTIP, PICKED_COLOURS, removePickedLabel } from "@/lib/traceText";
 
 const TEXT_BUTTON_CLASS =
-  "my-1 h-7 whitespace-nowrap rounded-md px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "my-1 h-7 whitespace-nowrap rounded-[5px] px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 /** `#RRGGBB` as the packed colour the swatch takes. */
 function packed(hex: string): number {
@@ -38,7 +39,7 @@ function PipetteButton({ label, armed, onToggle, onReturnFocus }: { label: strin
         }}
         className={`${ICON_BUTTON_CLASS} ${pressedClass(armed)}`}
       >
-        <Pipette size={16} strokeWidth={1.5} aria-hidden />
+        <Pipette {...GLYPH} aria-hidden />
       </button>
     </AppTooltip>
   );
@@ -140,8 +141,8 @@ export function SwatchCell({ hex, kind, stop, label, tooltip, excluded = false, 
         onKeyDown={onKeyDown}
         className="group relative flex h-7 w-6 shrink-0 cursor-default items-center justify-center outline-none"
       >
-        <span aria-hidden className={`block size-5 rounded-[4px] border border-[var(--swatch-border)] ${fade}`} style={{ background: hex }} />
-        <span aria-hidden className="pointer-events-none absolute size-5 rounded-[4px] group-focus-visible:ring-2 group-focus-visible:ring-[var(--editor-accent)]" />
+        <span aria-hidden className={`block size-5 rounded-[5px] border border-[var(--swatch-border)] ${fade}`} style={{ background: hex }} />
+        <span aria-hidden className="pointer-events-none absolute size-5 rounded-[5px] group-focus-visible:ring-2 group-focus-visible:ring-[var(--editor-accent)]" />
         {ctrl ? (
           <CasedGlyph icon={Ban} className={excluded ? "block" : "hidden group-hover:block group-focus-visible:block"} />
         ) : (

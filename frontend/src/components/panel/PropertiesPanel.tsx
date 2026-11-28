@@ -1,5 +1,7 @@
+import { PanelTooltipScope } from "@/components/ui/tooltip";
 import { useFramePage } from "@/hooks/useFramePage";
-import { Frame, TriangleAlert } from "lucide-react";
+import { Frame, Plus, TriangleAlert } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { selectedRow } from "@/lib/fixturesView";
 import { FixturesTab } from "@/components/workbench/FixturesTab";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
@@ -80,6 +82,7 @@ import { useStylePanel } from "@/hooks/useStylePanel";
 import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
 import { TRACE_INFO_TITLE } from "@/lib/traceText";
 import { isTauri, PLATFORM } from "@/platform/host";
+import { Button } from "@/components/ui/button";
 
 interface PropertiesPanelProps {
   sketch: SketchApi;
@@ -398,6 +401,9 @@ export function PropertiesPanel({
     activate("materials");
   };
   return (
+    // The shared buttons' tooltips open left in the panel, over the canvas (`docs/ui-elements.md`
+    // §15).
+    <PanelTooltipScope>
     <div className="flex h-full shrink-0 flex-col">
     <LibraryOpenSource
       getSession={getSession}
@@ -508,8 +514,7 @@ export function PropertiesPanel({
             <span
               role="img"
               aria-label={`${page.word} page`}
-              className="shrink-0 rounded-md px-1.5 py-0.5 text-[var(--toolbar-icon)]"
-              style={{ border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
+              className="shrink-0 text-[var(--panel-muted-fg)]"
             >
               <KindChip hidden size={12} kind={{ icon: page.icon, word: page.word, off: page.off }} />
             </span>
@@ -612,16 +617,14 @@ export function PropertiesPanel({
               <DocumentSection
                 registrationMarks={
                   printAndCut.marksOffered ? (
-                    <button
-                      type="button"
+                    <Button icon={Plus}
                       onClick={() => {
                         printAndCut.addMarks();
                         returnFocus();
-                      }}
-                      className="h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                      }} className="w-full"
                     >
                       Add registration marks
-                    </button>
+                    </Button>
                   ) : null
                 }
                 document={doc}
@@ -833,6 +836,7 @@ export function PropertiesPanel({
       </aside>
     </Tabs>
     </div>
+    </PanelTooltipScope>
   );
 }
 
@@ -842,13 +846,13 @@ function SwitchedOffNotice({ word }: { word: string }) {
   return (
     <div
       role="status"
-      className="flex items-start gap-2 rounded-md p-2 text-xs text-[var(--toolbar-icon)]"
+      className="flex items-start gap-2 rounded-[5px] p-2 text-xs text-[var(--toolbar-icon)]"
       style={{
         background: "var(--toolbar-bg)",
         border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)",
       }}
     >
-      <TriangleAlert size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />
+      <TriangleAlert {...GLYPH} aria-hidden className="shrink-0" />
       {`${word} workbench is switched off`}
     </div>
   );
@@ -903,7 +907,7 @@ function PlacedPageBlock({ text }: { text: string }) {
   if (!text) return null;
   return (
     <div role="group" aria-label="Placed page" className="flex items-start gap-1 text-sm text-[var(--toolbar-icon)]">
-      <Frame size={16} aria-hidden className="mt-0.5 shrink-0" />
+      <Frame {...GLYPH} aria-hidden className="mt-0.5 shrink-0" />
       <span>{text}</span>
     </div>
   );

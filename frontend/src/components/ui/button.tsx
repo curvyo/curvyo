@@ -1,66 +1,81 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
-import { Slot } from "radix-ui"
+import type { LucideIcon } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
+import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
-const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
-        outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
-        destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-8",
-        "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
+import { type ButtonSize, type ButtonVariant, buttonClass, GLYPH } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
+import { useControlTooltipSide } from "@/components/ui/tooltip-side";
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  asChild = false,
+type ButtonProps = Omit<ComponentProps<"button">, "children"> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** The symbol left of the label (`docs/ui-elements.md` §0 "Icon rule", Frage 417 A): every
+   * labelled button has one. */
+  icon: LucideIcon;
+  /** The label: the act in one or two words. */
+  children: ReactNode;
+  /** The act is running: the symbol spins, label and width stay. */
+  busy?: boolean;
+  /** A compact bar (`docs/ui-elements.md` §0 Icon rule, 0159 S4): the symbol alone in a 28 px
+   * square; the label stays the accessible name (a string label) and the tooltip's first line. */
+  iconOnly?: boolean;
+  /** The tooltip (below the button, left of it in the panel): the name, and for a compact button
+   * what it does. */
+  tooltip?: ReactNode;
+};
+
+/**
+ * The one labelled button (`docs/ui-elements.md` §1 Primary, §2 Secondary, §3 Destructive):
+ * symbol + label, 28 px, 5 px radius. `aria-disabled` dims it and makes a press do nothing while
+ * it stays a Tab stop with its tooltip reason (§0 "States", Disabled).
+ */
+export function Button({
+  variant = "secondary",
+  size = "panel",
+  icon: Icon,
+  children,
+  busy = false,
+  iconOnly = false,
+  tooltip,
+  className = "",
+  type = "button",
+  onClick,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
-  const Comp = asChild ? Slot.Root : "button"
-
-  return (
-    <Comp
-      data-slot="button"
+}: ButtonProps) {
+  const dimmed = props["aria-disabled"] === true || props["aria-disabled"] === "true";
+  const tooltipSide = useControlTooltipSide();
+  const glyph = busy ? (
+    <LoaderCircle {...GLYPH} aria-hidden className="motion-safe:animate-spin" />
+  ) : (
+    <Icon size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+  );
+  const classes = buttonClass(variant, size, iconOnly ? `size-7 px-0 pointer-coarse:size-9 ${className}` : className);
+  const name = iconOnly && typeof children === "string" ? children : undefined;
+  const button = (
+    <button
+      aria-label={name}
+      type={type}
       data-variant={variant}
-      data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+      aria-busy={busy || undefined}
+      className={classes}
+      onClick={(event: MouseEvent<HTMLButtonElement>) => {
+        if (dimmed) {
+          event.preventDefault();
+          return;
+        }
+        onClick?.(event);
+      }}
       {...props}
-    />
-  )
+    >
+      {glyph}
+      {iconOnly ? null : children}
+    </button>
+  );
+  return tooltip ? (
+    <Tooltip side={tooltipSide} content={tooltip}>
+      {button}
+    </Tooltip>
+  ) : (
+    button
+  );
 }
-
-export { Button, buttonVariants }

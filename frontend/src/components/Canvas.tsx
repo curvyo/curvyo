@@ -7,6 +7,7 @@ import type { SketchApi } from "@/hooks/useSketch";
 import { SketchAnnotations } from "@/components/sketch/SketchAnnotations";
 import { SketchEntryBox, SketchModeLabel } from "@/components/sketch/SketchCanvasChips";
 import { Link, Unlink } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { PageFrames } from "@/components/PageFrames";
@@ -211,7 +212,9 @@ export function Canvas({
           : // Rust decides the Sketch cursor (hit, draggable, drag in progress); CSS only shows it.
             { cursor: sketch.view.workbench === "sketch" ? (sketch.view.cursor ?? "default") : cursorForHint(editor.cursorHint) }
       }
-      className={`relative flex-1 outline-none ${
+      // A keyboard focus on the canvas shows the one 2 px ring, inset, over the overlays (0159
+      // F30): drawn by a pseudo-element so the canvas element does not hide it.
+      className={`relative flex-1 outline-none focus-visible:after:pointer-events-none focus-visible:after:absolute focus-visible:after:inset-0 focus-visible:after:z-50 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--editor-accent)] ${
         // Pan cursor convention (`docs/design-system.md`): grabbing for
         // the duration of a drag-pan, open-hand from the moment Space is
         // held (even before any drag motion) — both override whatever
@@ -566,7 +569,7 @@ function ReadoutChip({ text, second, third, thirdInvalid, glyph, x, y, container
     <div
       ref={chipRef}
       aria-hidden="true"
-      className="pointer-events-none absolute z-40 whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs tabular-nums"
+      className="pointer-events-none absolute z-40 whitespace-nowrap rounded-[8px] px-1.5 py-0.5 text-xs tabular-nums"
       style={{
         left: Math.max(placement.left, TOOL_RAIL_CLEAR_PX),
         top: placement.top,
@@ -578,8 +581,8 @@ function ReadoutChip({ text, second, third, thirdInvalid, glyph, x, y, container
       }}
     >
       <div className="flex items-center gap-1">
-        {glyph === "link" && <Link size={12} strokeWidth={1.5} aria-hidden />}
-        {glyph === "unlink" && <Unlink size={12} strokeWidth={1.5} aria-hidden />}
+        {glyph === "link" && <Link {...SMALL_GLYPH} aria-hidden />}
+        {glyph === "unlink" && <Unlink {...SMALL_GLYPH} aria-hidden />}
         {text}
       </div>
       {second && <div className="text-muted-foreground">{second}</div>}

@@ -2,7 +2,7 @@
 // notes section 8): the holders of the active laser page with a Fill empty slots row and their
 // slots with size, outcome and "filled"; arrows move, Enter takes, Escape closes. A filled row
 // arms Replace in place. The button is hidden, not disabled, without a target slot.
-import { Circle, Grid2x2Plus, Magnet, Square } from "lucide-react";
+import { Circle, FileInput, Grid2x2Plus, Magnet, Ruler, Square } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useArm } from "@/hooks/useArm";
@@ -16,6 +16,9 @@ import {
   unitSize,
 } from "@/lib/intoSlot";
 import { type IntoSlotRow, intoSlotKey, intoSlotRows } from "@/lib/intoSlotKeys";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { Tooltip } from "@/components/ui/tooltip";
 
 type Row = IntoSlotRow;
 
@@ -40,20 +43,22 @@ export function IntoSlotButton({
     return null;
   }
   return (
-    <button
-      type="button"
-      className={look === "icon" ? "library-action into-slot-icon" : "into-slot-button"}
-      data-into-slot-button=""
-      aria-label="Into slot…"
-      aria-expanded={open}
-      title="Into slot…"
-      onClick={(event) => {
-        event.stopPropagation();
-        onToggle();
-      }}
-    >
-      {look === "icon" ? <Magnet size={16} /> : "Into slot…"}
-    </button>
+    <Tooltip side="left" content="Into slot…">
+      <button
+        type="button"
+        className={look === "icon" ? "library-action into-slot-icon" : buttonClass("secondary", "panel", "min-w-[96px] px-2")}
+        data-into-slot-button=""
+        aria-label="Into slot…"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+      >
+        <Magnet {...GLYPH} aria-hidden />
+        {look === "icon" ? null : "Into slot…"}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -175,13 +180,9 @@ export function IntoSlotList({
       <div className="into-slot-caption">
         <span>{size ? `${caption} · ${size[0].toFixed(0)} × ${size[1].toFixed(0)} mm` : caption}</span>
         {whole ? (
-          <button type="button" aria-pressed={placed} title="Place the page live: it follows the source page" onClick={() => setPlaced((p) => !p)}>
-            Placed page
-          </button>
+          <ToggleButton look="bar" className="h-6" icon={FileInput} label="Placed page" tooltip="Place the page live: it follows the source page" pressed={placed} onPressedChange={setPlaced} />
         ) : null}
-        <button type="button" aria-pressed={realSize} onClick={() => setRealSize((r) => !r)}>
-          Real size
-        </button>
+        <ToggleButton look="bar" className="h-6" icon={Ruler} label="Real size" pressed={realSize} onPressedChange={setRealSize} />
       </div>
       <div
         ref={list}
@@ -224,7 +225,7 @@ export function IntoSlotList({
                   >
                     {row.kind === "fill" ? (
                       <>
-                        <Grid2x2Plus size={16} />
+                        <Grid2x2Plus {...GLYPH} />
                         <span className="into-slot-name">Fill empty slots</span>
                         <span className="into-slot-outcome">
                           {holder.of - holder.filled} of {holder.of}
@@ -232,7 +233,7 @@ export function IntoSlotList({
                       </>
                     ) : (
                       <>
-                        {slot?.shape === "circle" ? <Circle size={16} /> : <Square size={16} />}
+                        {slot?.shape === "circle" ? <Circle {...GLYPH} /> : <Square {...GLYPH} />}
                         <span className="into-slot-name">{slot?.name}</span>
                         <span className="into-slot-size">{slot?.size}</span>
                         <span className="into-slot-outcome">

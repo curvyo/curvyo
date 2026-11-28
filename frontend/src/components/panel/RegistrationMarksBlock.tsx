@@ -1,6 +1,8 @@
 import { EntryField } from "@/components/panel/EntryField";
 import type { PrintAndCutApi } from "@/hooks/usePrintAndCut";
 import { parseMeasure } from "@/lib/printAndCutView";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 
 const SIZE_MESSAGES = { range: "Between 3 and 20 mm" } as const;
 const LINE_MESSAGES = { range: "Between 0.05 and 1 mm" } as const;
@@ -65,13 +67,11 @@ export function RegistrationMarksBlock({ api, onReturnFocus }: Props) {
         onReturnFocus={onReturnFocus}
       />
       {marks.add !== null && (
-        <button
-          type="button"
-          onClick={() => api.addMark()}
-          className="h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        <Button icon={Plus}
+          onClick={() => api.addMark()} className="w-full"
         >
           Add mark {marks.add}
-        </button>
+        </Button>
       )}
     </div>
   );

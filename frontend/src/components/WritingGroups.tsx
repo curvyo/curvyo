@@ -17,6 +17,7 @@ import {
   orientationGreyed,
   writingTooltipLine,
 } from "@/lib/textWritingText";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
 const TOOLTIP_STYLE = {
   background: "var(--toolbar-bg)",
@@ -25,7 +26,7 @@ const TOOLTIP_STYLE = {
 } as const;
 
 const BUTTON_CLASS =
-  "flex size-7 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+  "flex size-7 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 /** A 16px glyph on a 24 grid, 1.5 stroke, round caps (the Lucide look). */
 export function Glyph({ d }: { d: string }) {
@@ -150,7 +151,7 @@ export function ChoiceGroup<T extends string>(props: ChoiceGroupProps<T>): React
               <Tooltip.Content
                 side="bottom"
                 sideOffset={6}
-                className="z-50 max-w-[300px] rounded-md px-2 py-1 text-xs"
+                className={TOOLTIP_CLASS}
                 style={TOOLTIP_STYLE}
               >
                 <div className="font-semibold">{props.names[code]}</div>

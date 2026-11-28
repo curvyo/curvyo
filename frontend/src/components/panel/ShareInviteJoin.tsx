@@ -2,10 +2,11 @@
 // 19, `specs/0095-workspace` ux-notes section 8): Invite person writes a 24-hour link; Join… has
 // one field that takes a person's workspace link or a device code.
 
-import { Copy, FolderOpen, LogIn, UserPlus } from "lucide-react";
+import { Check, Copy, FolderOpen, LogIn, UserPlus, X } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useRef, useState } from "react";
 
-import { ALERT, APPLY, BUTTON, FIELD, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { APPLY, BUTTON, FIELD, MUTED } from "@/components/panel/devicesUi";
 import { JoinerBlock } from "@/components/panel/PairingBlocks";
 import { SettingField } from "@/components/panel/ShareSettingField";
 import type { CollaborationApi } from "@/hooks/useCollaboration";
@@ -13,6 +14,8 @@ import type { DevicesApi } from "@/hooks/useDevices";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import { formatPairCode, pairCodeComplete } from "@/lib/pairCode";
 import { invite_link_kind, sharing_word } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
 export /** Invite person: writes a link valid for 24 hours at once (customer 2026-11-09); the
  * expiry, the link and Copy. `shown` shows a link written without a press (Invite person of a
@@ -40,15 +43,14 @@ function InviteBlock({
   };
   if (!open) {
     return (
-      <button ref={inviteButton} type="button" className={`${BUTTON} ${OUTLINE} px-3`}
+      <Button icon={UserPlus} ref={inviteButton} 
         onClick={() => {
           setError(collab.createInvite());
           setOpen(true);
         }}
       >
-        <UserPlus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-        {sharing_word("invite-person")}
-      </button>
+{sharing_word("invite-person")}
+</Button>
     );
   }
   const invite = collab.invite;
@@ -91,24 +93,24 @@ function InviteBlock({
                 );
               }}
             >
-              <Copy size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+              <Copy {...GLYPH} aria-hidden />
               <span role="status" aria-live="polite">{copied}</span>
             </button>
-            <button type="button" className={`${BUTTON} ${OUTLINE} px-3`} onClick={close}>
-              Done
-            </button>
+            <Button icon={Check} onClick={close}>
+              OK
+            </Button>
           </div>
         </>
       ) : (
         <>
           {error ? (
-            <p role="alert" className={ALERT}>
+            <AlertLine>
               {error}
-            </p>
+            </AlertLine>
           ) : null}
-          <button type="button" className={`${BUTTON} ${OUTLINE} px-3`} onClick={close}>
-            Done
-          </button>
+          <Button icon={Check} onClick={close}>
+            OK
+          </Button>
         </>
       )}
     </div>
@@ -182,10 +184,9 @@ export function JoinEntry({
           : (workspace?.joinFolder.refusal ?? "");
   if (!open && !busy && !pairing && phase !== "refused") {
     return (
-      <button type="button" className={`${BUTTON} ${OUTLINE} w-full`} onClick={() => setOpen(true)}>
-        <LogIn size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-        {sharing_word("join")}
-      </button>
+      <Button icon={LogIn}  className="w-full" onClick={() => setOpen(true)}>
+{sharing_word("join")}
+</Button>
     );
   }
   const close = () => {
@@ -234,9 +235,9 @@ export function JoinEntry({
         </label>
       )}
       {refusal ? (
-        <p role="alert" className={ALERT}>
+        <AlertLine>
           {refusal}
-        </p>
+        </AlertLine>
       ) : null}
       {(kind === "code" && devices && !paired) || pairing ? (
         devices ? (
@@ -249,10 +250,9 @@ export function JoinEntry({
           ) : null}
           {kind === "workspace" && workspace && !busy ? (
             <div className="flex flex-col gap-1">
-              <button type="button" className={`${BUTTON} ${OUTLINE} px-3`} onClick={workspace.chooseJoinFolder}>
-                <FolderOpen size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-                Choose folder...
-              </button>
+              <Button icon={FolderOpen}  onClick={workspace.chooseJoinFolder}>
+Choose folder...
+</Button>
               {folder ? <p className={`${MUTED} truncate`} title={folder}>{folder}</p> : null}
             </div>
           ) : null}
@@ -262,13 +262,13 @@ export function JoinEntry({
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={`${BUTTON} ${OUTLINE} px-3`} onClick={close}>
+            <Button icon={X} onClick={close}>
               Cancel
-            </button>
+            </Button>
             {busy || kind !== "workspace" || !workspace ? null : (
-              <button type="button" aria-disabled={linkReason !== ""} className={`${BUTTON} ${APPLY} px-3`} onClick={joinLink}>
+              <Button variant="primary" icon={LogIn} aria-disabled={linkReason !== ""} onClick={joinLink}>
                 Join
-              </button>
+              </Button>
             )}
           </div>
           {kind === "workspace" && workspace && linkReason && !busy ? <p className={MUTED}>{linkReason}</p> : null}

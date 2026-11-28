@@ -119,7 +119,8 @@ async function pane(view = VIEW): Promise<string> {
 test("the Grid pane names the page and holds every control, all enabled with the grid hidden", async () => {
   const html = await pane();
   assert.match(html, /Coasters/);
-  assert.match(html, /role="switch"[^>]*aria-label="Grid"|aria-label="Grid"[^>]*role="switch"/);
+  // 0159 S2: the Grid switch is a toggle button (`aria-pressed`) named by its label.
+  assert.match(html, /aria-pressed="false"[^>]*>(?:<svg[\s\S]*?<\/svg>)?<span class="truncate">Grid</);
   for (const group of ["Mode", "Scale"]) {
     assert.match(html, new RegExp(`role="radiogroup" aria-label="${group}"`));
   }
@@ -147,10 +148,10 @@ test("the origin corner is a radio group of four corners under the page name", a
   const html = await pane();
   const group = html.indexOf('role="radiogroup" aria-label="Origin corner"');
   assert.ok(group > html.indexOf("Coasters"), "under the page name");
-  assert.ok(group < html.indexOf('role="switch"'), "before the Grid switch");
+  assert.ok(group < html.indexOf("aria-pressed="), "before the Grid toggle");
   // The control of the laser Machine block (`0045` criterion 41): four 28 px radios in a 2 x 2 grid,
-  // no page pictogram.
-  assert.match(html, /role="radiogroup" aria-label="Origin corner" class="grid grid-cols-2 gap-1"/);
+  // no page pictogram; one segmented strip since 0159 F21.
+  assert.match(html, /role="radiogroup" aria-label="Origin corner" class="grid grid-cols-2 gap-px[^"]*border/);
   for (const corner of ["Top left", "Top right", "Bottom left", "Bottom right"]) {
     assert.match(html, new RegExp(`role="radio" aria-checked="(true|false)" aria-label="${corner}"`));
   }
@@ -185,9 +186,9 @@ test("the Snapping pane has a Grid target and the Grid snaps with choice", async
   const html = await render((react) =>
     react.createElement(section.SnappingSection as never, { snapping, onReturnFocus: noop }),
   );
-  assert.match(html, /aria-pressed="true"[^>]*>Grid</);
+  assert.match(html, /aria-pressed="true"[^>]*>(?:<svg[\s\S]*?<\/svg>)?<span class="truncate">Grid</);
   // Centres is an ordinary target toggle with the same look as Grid (`specs/0113` criterion 30).
-  const look = (label: string) => html.match(new RegExp(`<button type="button" aria-pressed="true" class="([^"]*)"[^>]*>${label}<`))?.[1];
+  const look = (label: string) => html.match(new RegExp(`<button type="button" aria-pressed="true"[^>]*class="([^"]*)"[^>]*>(?:<svg[\\s\\S]*?<\\/svg>)?<span class="truncate">${label}<`))?.[1];
   assert.ok(look("Centres"), "a Centres toggle");
   assert.equal(look("Centres"), look("Grid"), "the same look as the other targets");
   assert.match(html, /role="radiogroup" aria-label="Grid snaps with"/);
@@ -196,6 +197,6 @@ test("the Snapping pane has a Grid target and the Grid snaps with choice", async
     assert.match(html, new RegExp(`aria-checked="false"[^>]*>${option}<`));
   }
   // The five targets in order: Objects, Guides, Nodes, Page, Grid.
-  const order = ["Objects", "Guides", "Nodes</button>", "Page", ">Grid<"].map((t) => html.indexOf(t));
+  const order = ["Objects", "Guides", ">Nodes</span></button>", "Page", ">Grid<"].map((t) => html.indexOf(t));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
 });

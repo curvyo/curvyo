@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { useArm } from "@/hooks/useArm";
 import { setSlotReplace, useSlotReplace } from "@/lib/intoSlot";
+import { Button } from "@/components/ui/button";
+import { Replace } from "lucide-react";
 
 const LIFETIME_MS = 8000;
 
@@ -44,9 +46,9 @@ export function SlotReplaceNotice() {
       }}
     >
       <span>{shown.text}</span>
-      <button
-        type="button"
-        className={arm.armed ? "slot-replace-button armed" : "slot-replace-button"}
+      <Button icon={Replace}
+        size="bar"
+        className={arm.armed ? "h-6 border-[var(--destructive)] bg-[var(--destructive)] text-white" : "h-6"}
         aria-label={`Replace the content of ${name}`}
         {...arm.control}
         onClick={() =>
@@ -57,7 +59,7 @@ export function SlotReplaceNotice() {
         }
       >
         Replace
-      </button>
+      </Button>
       <span className="sr-only" aria-live="polite">
         {arm.armed ? `Press again to replace the content of ${name}.` : ""}
       </span>

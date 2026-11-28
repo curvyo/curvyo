@@ -2,6 +2,8 @@ import { useContext, useId, useRef, useState } from "react";
 
 import { FieldNoticeContext } from "@/components/workbench/fieldNotice";
 import { cleanName, noticeUnder } from "@/lib/fixtureSets";
+import { FIELD_FRAME, FIELD_FRAME_LABEL } from "@/components/ui/looks";
+import { RenameField as RenameInput } from "@/components/ui/rename-field";
 
 /** A row's name in place: Enter or leaving commits, Escape cancels (`0113` UX notes 4.1, 5.2). */
 export function RenameField({
@@ -24,7 +26,7 @@ export function RenameField({
     else onCancel();
   };
   return (
-    <input
+    <RenameInput
       autoFocus
       onFocus={(event) => event.currentTarget.select()}
       aria-label={label}
@@ -42,7 +44,7 @@ export function RenameField({
           finish(false);
         }
       }}
-      className="h-6 min-w-0 flex-1 rounded-[4px] border border-[var(--editor-accent)] bg-white px-1 text-[13px] outline-none"
+      className="flex-1"
     />
   );
 }
@@ -104,7 +106,7 @@ export function NumberField({
       {/* `width` is the least width: a value the label leaves no room for widens the field (its
           unit wraps whole), it is never cut to its last digits. */}
       <label
-        className={`flex h-7 shrink-0 items-center gap-1 rounded-[5px] border border-[var(--field-border)] bg-white px-2 text-sm focus-within:ring-2 focus-within:ring-[var(--editor-accent)] ${fill ? "min-w-0" : ""} ${disabled ? "opacity-50" : ""}`}
+        className={`${FIELD_FRAME} ${fill ? "" : "shrink-0"} ${disabled ? "opacity-40" : ""}`}
         style={fill ? undefined : { minWidth: width }}
         aria-disabled={disabled || undefined}
       >
@@ -180,8 +182,8 @@ export function TextField({ label, value, onCommit }: { label: string; value: st
     if (clean !== null && clean !== value) onCommit(clean);
   };
   return (
-    <label className="flex h-7 w-[244px] items-center gap-1 rounded-[5px] border border-[var(--field-border)] bg-white px-2 text-sm focus-within:ring-2 focus-within:ring-[var(--editor-accent)]">
-      <span className="shrink-0 text-xs text-[var(--panel-muted-fg)]">{label}</span>
+    <label className={`${FIELD_FRAME} w-[244px]`}>
+      <span className={FIELD_FRAME_LABEL}>{label}</span>
       <input
         aria-label={label}
         maxLength={40}

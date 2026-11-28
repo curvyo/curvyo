@@ -54,7 +54,7 @@ export function PickOverlay({ getSession }: { getSession: () => WasmSession | nu
             {shown > 0 ? (
               <span
                 data-pick-chip=""
-                className="absolute flex h-4 items-center justify-center gap-0.5 rounded-lg border px-0.5"
+                className="absolute flex h-4 items-center justify-center gap-0.5 rounded-[8px] border px-0.5"
                 style={{
                   left: mark.x + mark.width / 2 - chipWidth(shown) / 2,
                   top: mark.y + mark.height / 2 - 8,

@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from "react";
+import { checkboxClass } from "@/components/ui/looks";
 
 /**
  * Left and Right on a focused row walk its line-1 controls (a check box, Lock, the eye, the armed
@@ -21,7 +22,7 @@ export function walkRowControls(event: KeyboardEvent<HTMLElement>, selector: str
 
 /** The classes of a 24px icon button of a row. */
 export const ICON_BUTTON =
-  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 /** The classes of the armed trash (`0081`). */
 export const ARMED_TRASH =
@@ -29,7 +30,7 @@ export const ARMED_TRASH =
 
 /** The classes of a 16px check box (the Active and On this page checks). */
 export function checkBoxClass(on: boolean): string {
-  return `flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border-[1.5px] border-[var(--toolbar-icon)] text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${on ? "bg-[var(--toolbar-icon)]" : "bg-white"}`;
+  return checkboxClass(on);
 }
 
 /**

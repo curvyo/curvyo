@@ -76,8 +76,8 @@ export function joinNoticeText(movedOutlines: number): string | null {
   if (movedOutlines <= 0) {
     return null;
   }
-  const outlines = movedOutlines === 1 ? "1 more outline" : `${movedOutlines} more outlines`;
-  return `Join: ${outlines} moved into this compound path.`;
+  // No count (customer 2026-11-27, `specs/0159` S7): the side effect in one short sentence.
+  return "Join: the other outlines moved into this compound path.";
 }
 
 /**

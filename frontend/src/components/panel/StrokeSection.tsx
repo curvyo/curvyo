@@ -12,17 +12,21 @@ import { StyleRow } from "@/components/panel/StyleRow";
 import { CAP_OPTIONS, JOIN_OPTIONS, PAINT_OPTIONS } from "@/components/panel/styleOptions";
 import { ValueField } from "@/components/panel/ValueField";
 import { useRowsFocus } from "@/components/panel/useRowsFocus";
-import { ToggleGroup } from "@/components/ui/toggle-group";
-import { Tooltip } from "@/components/ui/tooltip";
-import { WIDTH_PRESETS, WIDTH_PRESET_GLYPHS } from "@/lib/widthPresets";
+import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
+import { WIDTH_PRESETS, WIDTH_PRESET_GLYPHS, type WidthPresetCode } from "@/lib/widthPresets";
 import type { StylePanelApi } from "@/hooks/useStylePanel";
 
-/** The segmented-control look of `ToggleGroup` for the width rows' command buttons. */
-const SEGMENTS =
-  "inline-flex w-fit shrink-0 self-start overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]";
-const SEGMENT =
-  "flex h-7 items-center justify-center bg-transparent text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] aria-pressed:!bg-[var(--toolbar-icon-active-bg)] aria-pressed:!text-[var(--toolbar-icon-active-fg)]";
-const SEGMENT_DIVIDER = "border-l border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]";
+/** The width profiles as radio items: the preset's glyph, its name and tooltip. */
+const WIDTH_PROFILE_OPTIONS: readonly ToggleOption<WidthPresetCode>[] = WIDTH_PRESETS.map((preset) => ({
+  value: preset.code,
+  label: preset.label,
+  tooltip: preset.tooltip,
+  icon: (
+    <svg width={18} height={18} viewBox="0 0 24 24" aria-hidden="true">
+      <path d={WIDTH_PRESET_GLYPHS[preset.code]} fill="currentColor" />
+    </svg>
+  ),
+}));
 
 const WIDTH_MESSAGES = { width: "Enter a number from 0 to 1000" } as const;
 const POINT_WIDTH_MESSAGES = { width: "Enter a width of 0 mm or more" } as const;
@@ -133,27 +137,16 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             onReturnFocus={onReturnFocus}
           />
           <StyleRow label="Profile">
-            {/* The segmented look; the preset the path has is marked (UX review U9). */}
-            <div role="group" aria-label="Width profile" className={SEGMENTS}>
-              {WIDTH_PRESETS.map((preset, index) => (
-                <Tooltip key={preset.code} content={preset.tooltip} side="bottom">
-                  <button
-                    type="button"
-                    aria-label={preset.label}
-                    aria-pressed={panel.widthPreset === preset.code}
-                    className={`${SEGMENT} w-9 ${index > 0 ? SEGMENT_DIVIDER : ""}`}
-                    onClick={() => {
-                      panel.applyWidthPreset(preset.code);
-                      onReturnFocus();
-                    }}
-                  >
-                    <svg width={18} height={18} viewBox="0 0 24 24" aria-hidden="true">
-                      <path d={WIDTH_PRESET_GLYPHS[preset.code]} fill="currentColor" />
-                    </svg>
-                  </button>
-                </Tooltip>
-              ))}
-            </div>
+            {/* One radio group like Join and Cap: arrows move and choose, the preset the path has
+                is checked (UX review U9, 0159 F19). */}
+            <ToggleGroup
+              label="Width profile"
+              options={WIDTH_PROFILE_OPTIONS}
+              value={WIDTH_PRESETS.some((preset) => preset.code === panel.widthPreset) ? (panel.widthPreset as WidthPresetCode) : null}
+              onChange={panel.applyWidthPreset}
+              itemWidth={36}
+              onReturnFocus={onReturnFocus}
+            />
           </StyleRow>
           {panel.widthEditActive && panel.widthPointMm !== null ? (
             <StyleRow label="Point">

@@ -26,6 +26,7 @@ import { CurveToBezierButton } from "@/components/CurveToBezierButton";
 import { FixtureLockBar } from "@/components/FixtureLockBar";
 import { selectedLockBar } from "@/lib/fixturesView";
 import { SelectToolbar } from "@/components/SelectToolbar";
+import { publishBarBox } from "@/hooks/useBarBox";
 import { CropBar } from "@/components/CropBar";
 import { CropOverlay } from "@/components/CropOverlay";
 import { WidthEditToggle } from "@/components/WidthEditToggle";
@@ -248,9 +249,6 @@ function Editor() {
   // Roles, leave, add back and the notices (`specs/0097-membership-lifecycle`).
   const membership = useMembership(editor, project, collab, workspace, workspaceSync, devices);
 
-  /** The Pen bar: centred, and at the right edge where the canvas is too narrow for it to clear
-   * the page's name label at the top left (`specs/0110` UX review U7). */
-  const PEN_BAR_PLACE = "justify-end min-[1100px]:justify-center";
   const workbench = workbenchEntry<WorkbenchContext, ReactNode>(activeKind(workbenches.list));
   const drawingOverlay = (
     <>
@@ -258,15 +256,14 @@ function Editor() {
          * rail, so showing/hiding it never resizes the canvas
          * (`docs/design-system.md`, "no layout shift on tool switch"). */}
         <div
+          // The bars' live box, for the canvas labels and tags that keep clear of them (0159 F42, F50).
+          ref={publishBarBox}
           data-bar-area
           inert={historyPreview.kind === "document"}
-          className={`pointer-events-none absolute top-3 right-3 left-[calc(var(--rail-right)+12px)] z-20 flex ${
+          // One anchor for every bar: left, right of the tool rail, so a bar's first control never
+          // moves with the selection or the tool (`docs/ui-elements.md` §13, 0159 F43, Proposal).
+          className={`pointer-events-none absolute top-3 right-3 left-[calc(var(--rail-right)+12px)] z-20 flex justify-start ${
             historyPreview.kind === "document" ? "opacity-40" : ""
-          } ${
-            // The Select bar is left-aligned so its two switches never move
-            // when the selection changes; the Node and Shape bars stay
-            // centred (`docs/design-system.md`, "Select bar layout").
-            editor.tool === "select" || editor.tool === "trace" || editor.tool === "test-grid" || (editor.tool === "node" && editor.centreLines.open) ? "justify-start" : editor.tool === "pen" || editor.tool === "pencil" ? PEN_BAR_PLACE : "justify-center"
           } ${
             // The Select bar's chips (Curve to Bézier, Width) go to a second row when they do
             // not fit beside it, so they never squeeze it (`specs/0110` UX review U4).

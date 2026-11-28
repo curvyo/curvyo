@@ -7,6 +7,8 @@ import { cachedCell, cachedDetail, drawCells, namesLoading } from "@/lib/glyphFa
 import { DETAIL_BAR_PX } from "@/lib/glyphTableLayout";
 import { charOf, detailMeta, emptyCellLabel } from "@/lib/glyphTableText";
 import type { FontFace as ListedFace } from "@/lib/textText";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 
 const BOX_PX = 80;
 const BOX_CAP_PX = 40;
@@ -56,13 +58,11 @@ export function GlyphDetailBar({ face, cp, singleLine, onInsert }: GlyphDetailBa
               {detailMeta(shown, detail?.glyph_name ?? null, detail?.block ?? "")}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={(event) => onInsert(shown, event.detail === 0)}
-            className="h-7 shrink-0 rounded-[5px] px-3 text-sm text-[var(--toolbar-icon)] outline-none ring-1 ring-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          <Button icon={Plus}
+            onClick={(event) => onInsert(shown, event.detail === 0)} className="shrink-0"
           >
             Insert
-          </button>
+          </Button>
         </>
       ) : null}
     </div>

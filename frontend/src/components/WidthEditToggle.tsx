@@ -22,7 +22,7 @@ export function WidthEditToggle({ editor, inBar = false }: { editor: EditorSessi
   return (
     <div
       data-width-edit
-      className={`pointer-events-auto relative flex shrink-0 items-center ${inBar ? "" : "ml-1 h-9 rounded-lg px-1"}`}
+      className={`pointer-events-auto relative flex shrink-0 items-center ${inBar ? "" : "ml-1 h-9 rounded-[8px] px-1"}`}
       style={inBar ? undefined : { background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
     >
       <Tooltip side="bottom" content={active ? "Leave width editing (Esc)" : "Edit width: drag, double-click or scroll the diamonds"}>
@@ -66,7 +66,7 @@ export function WidthEditToggle({ editor, inBar = false }: { editor: EditorSessi
       {notice && !active ? (
         <div
           role="status"
-          className="absolute top-full right-0 mt-1 rounded-md px-2 py-1 text-xs whitespace-nowrap"
+          className="absolute top-full right-0 mt-1 rounded-[8px] px-2 py-1 text-xs whitespace-nowrap"
           style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
         >
           {notice}

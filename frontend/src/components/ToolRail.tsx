@@ -10,6 +10,7 @@ import {
   Type,
   PencilLine,
 } from "lucide-react";
+import { RAIL_GLYPH } from "@/components/ui/looks";
 import { Tooltip } from "radix-ui";
 
 import { BooleanCommands } from "@/components/BooleanCommands";
@@ -28,6 +29,7 @@ import { MAC } from "@/hooks/useHistory";
 import type { RailCommands } from "@/hooks/useRailCommands";
 import type { Tool } from "@/hooks/useEditorSession";
 import { SELECT_KEYS_TOOLTIP } from "@/lib/nudgeText";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
 interface ToolRailProps {
   /** The selection is move-only (`specs/0106` criterion 11): the Grouping, Path and Boolean
@@ -116,7 +118,7 @@ function ToolButton({
               onReturnFocus();
             }
           }}
-          className="flex size-10 items-center justify-center rounded-md outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]"
+          className="flex size-10 items-center justify-center rounded-[5px] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]"
           style={{
             background: active ? "var(--toolbar-icon-active-bg)" : "transparent",
             color: active ? "var(--toolbar-icon-active-fg)" : "var(--toolbar-icon)",
@@ -130,7 +132,7 @@ function ToolButton({
         <Tooltip.Content
           side="right"
           sideOffset={COLUMN_A_TOOLTIP_OFFSET_PX}
-          className="z-50 rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground ring-1 ring-foreground/10"
+          className={TOOLTIP_CLASS}
         >
           <div>{shortcut ? `${label} (${shortcut})` : label}</div>
           {unavailable && <div className="text-muted-foreground">{unavailable}</div>}
@@ -207,7 +209,7 @@ export function ToolRail({
               shortcut="S or Esc"
               hint="Drag a box. Shift: add. Ctrl: remove. Alt: invert, lasso, cycle"
               keys={SELECT_KEYS_TOOLTIP}
-              icon={<SelectIcon size={20} />}
+              icon={<SelectIcon {...RAIL_GLYPH} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
@@ -216,7 +218,7 @@ export function ToolRail({
               active={tool === "pen"}
               label="Pen tool"
               shortcut="B"
-              icon={<PenToolIcon size={20} />}
+              icon={<PenToolIcon {...RAIL_GLYPH} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
@@ -226,7 +228,7 @@ export function ToolRail({
               label="Node tool"
               shortcut="N"
               hint="Drag a segment to bend it. Shift: one axis"
-              icon={<MousePointer2 size={20} />}
+              icon={<MousePointer2 {...RAIL_GLYPH} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
@@ -236,7 +238,7 @@ export function ToolRail({
               label="Rectangle tool"
               shortcut={letterActsOnSelection ? "Esc, R" : "R"}
               hint="Shift: from center. Ctrl: square or circle"
-              icon={<Square size={20} />}
+              icon={<Square {...RAIL_GLYPH} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
@@ -246,7 +248,7 @@ export function ToolRail({
               label="Ellipse tool"
               shortcut="E"
               hint="Shift: from center. Ctrl: square or circle"
-              icon={<CircleIcon size={20} />}
+              icon={<CircleIcon {...RAIL_GLYPH} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
@@ -255,7 +257,7 @@ export function ToolRail({
               active={tool === "polygon-star"}
               label="Polygon/star tool"
               shortcut="*"
-              icon={<Star size={20} />}
+              icon={<Star {...RAIL_GLYPH} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
@@ -266,7 +268,7 @@ export function ToolRail({
               active={tool === "text"}
               label="Text tool"
               shortcut="T"
-              icon={<Type size={20} />}
+              icon={<Type {...RAIL_GLYPH} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
@@ -278,7 +280,7 @@ export function ToolRail({
               label="Pencil tool"
               name="Pencil tool (P)"
               shortcut="P"
-              icon={<PencilLine size={20} />}
+              icon={<PencilLine {...RAIL_GLYPH} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
@@ -286,7 +288,7 @@ export function ToolRail({
           {/* "Too short" (design-system row "Tool rail architecture"): the Tools card stays, the
               cards below it scroll inside column A; the negative margin keeps room for their
               shadows. */}
-          <div className="-mx-3 -mb-1 flex min-h-0 flex-col gap-2 overflow-y-auto px-3 pb-1 [scrollbar-width:thin]">
+          <div className="pointer-events-auto -mx-3 -mb-1 flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain px-3 pb-1 [scrollbar-width:thin]">
           {moveOnly ? null : <GroupCommands
             commands={grouping}
             selectTool={tool === "select"}
@@ -320,7 +322,7 @@ export function ToolRail({
               label="Measure tool"
               name={`Measure tool (${letterActsOnSelection ? "Esc, M" : "M"})`}
               shortcut={letterActsOnSelection ? "Esc, M" : "M"}
-              icon={<RulerDimensionLine size={20} />}
+              icon={<RulerDimensionLine {...RAIL_GLYPH} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
@@ -345,7 +347,7 @@ export function ToolRail({
                 active={tool === "generators"}
                 label="Generators"
                 name="Generators"
-                icon={<Blocks size={20} />}
+                icon={<Blocks {...RAIL_GLYPH} />}
                 onSelect={onSelect}
                 onReturnFocus={onReturnFocus}
               />

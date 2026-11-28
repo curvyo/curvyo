@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ALERT, APPLY, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { MUTED } from "@/components/panel/devicesUi";
 import type { ShareView } from "@/hooks/useCollaboration";
 import type { MembershipApi } from "@/hooks/useMembership";
 import type { MembershipNotice } from "@/lib/membershipState";
@@ -18,6 +18,9 @@ import {
   membership_rotation_pending,
   membership_word,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { Check, KeyRound } from "lucide-react";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The admin-change line under the header (criterion 30): the newest change, one line. The
  * live region stays mounted while empty, so the first change is announced. */
@@ -55,11 +58,9 @@ function RotationNotice({ pending, admin, membership }: { pending: MembershipNot
     <div role="group" aria-label={text} className="flex flex-col gap-1">
       <p className="text-xs text-[var(--toolbar-icon)]">{text}</p>
       {admin ? (
-        <button
-          type="button"
+        <Button variant="primary" icon={KeyRound}
           aria-busy={busy}
-          aria-disabled={busy}
-          className={`${BUTTON} ${APPLY} w-[140px]`}
+          aria-disabled={busy} className="min-w-[140px]"
           onClick={() => {
             if (busy) {
               return;
@@ -74,12 +75,12 @@ function RotationNotice({ pending, admin, membership }: { pending: MembershipNot
           }}
         >
           {membership_word(busy ? "changing-keys" : "change-keys-now")}
-        </button>
+        </Button>
       ) : null}
       {refusal ? (
-        <p role="alert" className={ALERT}>
+        <AlertLine>
           {refusal}
-        </p>
+        </AlertLine>
       ) : null}
     </div>
   );
@@ -105,9 +106,7 @@ function MutualNotice({
           {membership_not_applied(h.label ?? "", h.removal === true)}
         </p>
       ))}
-      <button
-        type="button"
-        className={`${BUTTON} ${OUTLINE} w-[60px]`}
+      <Button icon={Check} className="min-w-[60px]"
         onClick={() => {
           // OK removes the notice and its button: the focus goes to the Participants list.
           membership.acknowledge(notice);
@@ -115,7 +114,7 @@ function MutualNotice({
         }}
       >
         {membership_word("ok")}
-      </button>
+      </Button>
     </div>
   );
 }

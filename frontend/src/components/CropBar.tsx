@@ -1,4 +1,5 @@
 import { Check, Crop } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useEffect } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
@@ -48,10 +49,10 @@ export function CropBar({ api, onReturnFocus }: { api: CropBarApi; onReturnFocus
       data-context-bar=""
       role="toolbar"
       aria-label="Crop"
-      className="pointer-events-auto flex h-11 items-center gap-1 rounded-lg px-2 text-sm"
+      className="pointer-events-auto flex h-9 items-center gap-1 rounded-[8px] px-2 text-sm"
       style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
     >
-      <Crop aria-hidden size={16} strokeWidth={1.5} className="text-[var(--toolbar-icon)]" />
+      <Crop {...GLYPH} aria-hidden className="text-[var(--toolbar-icon)]" />
       <span className="mr-1 text-sm text-[var(--toolbar-icon)]">Crop</span>
       {view.fields.map((field) => (
         <EntryField
@@ -83,9 +84,9 @@ export function CropBar({ api, onReturnFocus }: { api: CropBarApi; onReturnFocus
             close();
             onReturnFocus();
           }}
-          className="flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          className="flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         >
-          <Check aria-hidden size={16} strokeWidth={1.5} />
+          <Check {...GLYPH} aria-hidden />
         </button>
       </Tooltip>
     </div>

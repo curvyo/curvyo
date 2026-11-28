@@ -1,4 +1,5 @@
-import { CircleAlert, Info, Lasso, Square, SquareMinus, X } from "lucide-react";
+import { CircleAlert, FileInput, Info, Lasso, RefreshCw, Scan, Square, SquareMinus, X } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { Tooltip } from "radix-ui";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
@@ -11,7 +12,7 @@ import { joinTooltip, partsCount } from "@/lib/traceParts";
 import { TraceField } from "@/components/TraceField";
 import { PickColoursGroup, RemoveBackgroundGroup } from "@/components/TraceColourGroup";
 import { TracePresetMenu } from "@/components/TracePresetMenu";
-import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
+import { TOOLTIP_CLASS, Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import {
@@ -50,9 +51,9 @@ import {
   TRACE_TOOLTIP,
   type TraceParam,
 } from "@/lib/traceText";
+import { Button } from "@/components/ui/button";
+import { Tooltip as UiTooltip } from "@/components/ui/tooltip";
 
-const BUTTON_CLASS =
-  "my-1 h-7 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
 
@@ -79,24 +80,22 @@ export function TraceButton({ onTrace, onReturnFocus }: { onTrace: () => void; o
     <Tooltip.Provider delayDuration={400}>
       <Tooltip.Root>
         <Tooltip.Trigger asChild>
-          <button
-            type="button"
+          <Button size="bar" icon={Scan} iconOnly className="my-1"
             onClick={(event) => {
               onTrace();
               if (event.detail > 0) {
                 onReturnFocus();
               }
             }}
-            className={BUTTON_CLASS}
           >
             {TRACE_BUTTON}
-          </button>
+          </Button>
         </Tooltip.Trigger>
         <Tooltip.Portal>
           <Tooltip.Content
             side="bottom"
             sideOffset={6}
-            className="z-50 rounded-md px-2 py-1 text-xs"
+            className={TOOLTIP_CLASS}
             style={{ background: "var(--toolbar-bg)", color: "var(--toolbar-icon)", boxShadow: "var(--panel-elevation-shadow)" }}
           >
             {TRACE_TOOLTIP}
@@ -125,12 +124,12 @@ function MaskPill({ outside, onOutside, locked }: { outside: boolean; onOutside:
     }
   };
   return (
-    <div
+    <UiTooltip side="bottom" content={locked ? MASK_LOCKED : undefined}>
+      <div
       role="radiogroup"
       aria-label="Mask"
       aria-disabled={locked || undefined}
-      title={locked ? MASK_LOCKED : undefined}
-      className={`my-1 flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40 ${locked ? "opacity-50" : ""}`}
+      className={`my-1 flex h-7 overflow-hidden rounded-[5px] outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40 ${locked ? "opacity-50" : ""}`}
       onKeyDown={keyDown}
     >
       {(["Inside", "Outside"] as const).map((label, index) => {
@@ -159,6 +158,7 @@ function MaskPill({ outside, onOutside, locked }: { outside: boolean; onOutside:
         );
       })}
     </div>
+    </UiTooltip>
   );
 }
 
@@ -182,7 +182,7 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
         onReturnFocus={onReturnFocus}
         onSay={setSaid}
       >
-        <Square size={16} strokeWidth={1.5} aria-hidden />
+        <Square {...GLYPH} aria-hidden />
       </MaskToggle>
       <MaskToggle
         name={MASK_LASSO}
@@ -193,7 +193,7 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
         onReturnFocus={onReturnFocus}
         onSay={setSaid}
       >
-        <Lasso size={16} strokeWidth={1.5} aria-hidden />
+        <Lasso {...GLYPH} aria-hidden />
       </MaskToggle>
       <MaskToggle
         name={MASK_SUBTRACT}
@@ -204,7 +204,7 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
         onReturnFocus={onReturnFocus}
         onSay={setSaid}
       >
-        <SquareMinus size={16} strokeWidth={1.5} aria-hidden />
+        <SquareMinus {...GLYPH} aria-hidden />
       </MaskToggle>
       <MaskPill outside={trace.mask.outside} onOutside={trace.setMaskOutside} locked={locked} />
       <AppTooltip side="bottom" content={locked ? MASK_LOCKED : CLEAR_MASK}>
@@ -225,7 +225,7 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
           }}
           className={`${ICON_BUTTON_CLASS} text-[var(--toolbar-icon)] ${locked ? "cursor-default opacity-50" : "hover:bg-[var(--editor-accent-hover)]"}`}
         >
-          <X size={16} strokeWidth={1.5} aria-hidden />
+          <X {...GLYPH} aria-hidden />
         </button>
       </AppTooltip>
       <span role="status" aria-live="polite" className="sr-only">
@@ -309,7 +309,7 @@ function MaskToggle({
 /** The finish button's blue ground and shape (customer 2026-10-30): the same in every state,
  * 75 px at rest and while running; Stopped and Failed widen it for their Retry. */
 export const FINISH_CLASS =
-  "relative my-1 flex h-7 min-w-[75px] shrink-0 items-center overflow-hidden rounded-md bg-[var(--editor-accent)] text-sm text-white";
+  "relative my-1 flex h-7 min-w-[75px] shrink-0 items-center overflow-hidden rounded-[5px] bg-[var(--toolbar-icon-active-bg)] text-sm text-white";
 
 /** The finish button at the far right of the bar (criteria 10, 53, 54; `specs/0089` Frage 84,
  * customer 2026-10-30): always blue, "Trace" at rest (the same as Enter); while a job runs (shown
@@ -335,12 +335,10 @@ function ProgressSlot({
   const reasonId = useId();
   if (slot.kind === "none") {
     const button = (
-      <button
-        type="button"
-        data-trace-slot="none"
+      <Button variant="primary" size="bar" icon={Scan}
+        data-trace-slot="none" className="my-1 min-w-[75px]"
         aria-disabled={blocked !== "" || undefined}
         aria-describedby={blocked !== "" ? reasonId : undefined}
-        className={`${FINISH_CLASS} justify-center px-3 ${blocked !== "" ? "cursor-default opacity-50" : ""} outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
         onClick={() => {
           if (blocked === "") {
             onCreate();
@@ -348,7 +346,7 @@ function ProgressSlot({
         }}
       >
         {TRACE_FINISH}
-      </button>
+      </Button>
     );
     if (blocked === "" && tooltip !== "") {
       return (
@@ -387,7 +385,7 @@ function ProgressSlot({
         </div>
         <AppTooltip side="bottom" content={STOP}>
           <button type="button" aria-label={STOP} onClick={onStop} className={`${ICON_BUTTON_CLASS} relative text-white hover:bg-white/20`}>
-            <X size={16} strokeWidth={1.5} aria-hidden />
+            <X {...GLYPH} aria-hidden />
           </button>
         </AppTooltip>
       </div>
@@ -398,8 +396,8 @@ function ProgressSlot({
     <div data-trace-slot={slot.kind} className={`${FINISH_CLASS} gap-1 pl-2`}>
       <AppTooltip side="bottom" content={failed ? slot.text : PREVIEW_OUT_OF_DATE}>
         {/* A plain state of the button, as Stopped: no ring (customer 2026-11-10). */}
-        <span className={`flex h-7 items-center gap-1 rounded-md text-xs ${failed ? "" : "opacity-90"}`}>
-          {failed ? <CircleAlert size={12} aria-hidden className="shrink-0" /> : null}
+        <span className={`flex h-7 items-center gap-1 rounded-[5px] text-xs ${failed ? "" : "opacity-90"}`}>
+          {failed ? <CircleAlert {...SMALL_GLYPH} aria-hidden className="shrink-0" /> : null}
           {failed ? FAILED : STOPPED}
         </span>
       </AppTooltip>
@@ -408,9 +406,9 @@ function ProgressSlot({
           {slot.text}
         </span>
       ) : null}
-      <button type="button" className="h-7 rounded-md px-2 text-sm text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white" onClick={onRetry}>
+      <Button variant="primary" size="bar" icon={RefreshCw} onClick={onRetry}>
         {RETRY}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -447,7 +445,7 @@ export function InfoButton({
           info.shown ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
         }`}
       >
-        <Info size={16} strokeWidth={1.5} aria-hidden />
+        <Info {...GLYPH} aria-hidden />
       </button>
     </AppTooltip>
   );
@@ -496,7 +494,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
   const advancedId = useId();
   const descriptionId = useId();
   const param = (name: TraceParam["name"]) => trace.params.find((p) => p.name === name)!;
-  const pill = "pointer-events-auto flex min-w-0 flex-col rounded-lg px-2 text-sm";
+  const pill = "pointer-events-auto flex min-w-0 flex-col rounded-[8px] px-2 text-sm";
   const pillStyle = { background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" };
   const label = (
     <span className={`${LABEL_CLASS} py-2`}>
@@ -512,9 +510,9 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             {trace.selection === "empty" ? TRACE_EMPTY : TRACE_NOT_IMAGE}
           </span>
           {trace.selection === "empty" ? (
-            <button type="button" className={BUTTON_CLASS} onClick={onImport}>
+            <Button size="bar" icon={FileInput} className="my-1" onClick={onImport}>
               {TRACE_IMPORT}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { Redo2, Undo2 } from "lucide-react";
+import { Eraser, Redo2, Undo2, X } from "lucide-react";
 import {
   type ComponentType,
   useCallback,
@@ -41,6 +41,7 @@ import {
   canRestoreScroll,
   wipeConfirmKey,
 } from "@/lib/historyRows";
+import { Button } from "@/components/ui/button";
 
 type Glyph = ComponentType<{ size: number; strokeWidth: number; "aria-hidden": boolean }>;
 
@@ -366,8 +367,8 @@ export function HistoryTab({ editor, shown, onReturnFocus, historyScope }: Histo
         className="absolute right-0 left-0 flex flex-col justify-center gap-1 px-2"
         style={place}
       >
-        <span className="h-2 w-2/3 rounded bg-[var(--value-fill)]" />
-        <span className="h-2 w-1/3 rounded bg-[var(--value-fill)]" />
+        <span className="h-2 w-2/3 rounded-full bg-[var(--value-fill)]" />
+        <span className="h-2 w-1/3 rounded-full bg-[var(--value-fill)]" />
       </div>
     );
   });
@@ -547,7 +548,7 @@ function HistoryHeader({
       <p
         role="status"
         aria-live="polite"
-        className={`pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[244px] rounded-md p-2 text-right text-xs ${
+        className={`pointer-events-none absolute top-full right-0 z-30 mt-1 max-w-[244px] rounded-[8px] p-2 text-right text-xs ${
           panelNotice ? "" : "sr-only"
         }`}
         style={
@@ -647,9 +648,8 @@ function WipeFooter({
   }
   if (!confirming) {
     return (
-      <button
+      <Button variant="destructive" icon={Eraser}
         ref={opener}
-        type="button"
         disabled={paused}
         onClick={() => {
           // An unfinished Pen path: ignored with the hint, like the keys (criteria 6e and 51).
@@ -659,11 +659,10 @@ function WipeFooter({
           }
           restoreToOpener.current = true;
           setConfirming(true);
-        }}
-        className="mt-2 h-7 w-full shrink-0 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] text-sm text-[var(--destructive)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] disabled:opacity-40 disabled:hover:bg-transparent"
+        }} className="mt-2 w-full shrink-0"
       >
         {objectScope ? "Wipe object history" : "Wipe history"}
-      </button>
+      </Button>
     );
   }
   const close = () => {
@@ -687,16 +686,13 @@ function WipeFooter({
     >
       <p className="mb-2 text-xs text-[var(--toolbar-icon)]">{question}</p>
       <div className="flex gap-2">
-        <button
+        <Button icon={X}
           ref={cancel}
-          type="button"
-          onClick={close}
-          className="h-7 w-[118px] rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          onClick={close} className="min-w-[118px]"
         >
           Cancel
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button variant="destructive" icon={Eraser}
           aria-disabled={!armed}
           onClick={() => {
             if (!armed) {
@@ -708,11 +704,10 @@ function WipeFooter({
               setConfirming(false);
               onReturnFocus();
             }
-          }}
-          className="h-7 w-[118px] rounded-[5px] border border-[var(--destructive)] bg-white text-sm text-[var(--destructive)] outline-none hover:bg-[var(--destructive)] hover:text-white aria-disabled:hover:bg-white aria-disabled:hover:text-[var(--destructive)] focus-visible:bg-[var(--destructive)] focus-visible:text-white aria-disabled:focus-visible:bg-white aria-disabled:focus-visible:text-[var(--destructive)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          }} className="min-w-[118px]"
         >
           Wipe
-        </button>
+        </Button>
       </div>
     </div>
   );

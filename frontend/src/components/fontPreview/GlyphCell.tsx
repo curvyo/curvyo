@@ -41,7 +41,7 @@ export function GlyphDrawing({ cell, side, cap, singleLine, label }: GlyphDrawin
         />
         <span
           aria-hidden
-          className="absolute inset-x-0 text-center text-[10px] leading-3 text-[var(--panel-muted-fg)] tabular-nums"
+          className="absolute inset-x-0 text-center text-[11px] leading-3 text-[var(--panel-muted-fg)] tabular-nums"
           style={{ top: baseline + 3 }}
         >
           {label}

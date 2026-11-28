@@ -1,11 +1,14 @@
-import { ChevronDown, ChevronUp, Link } from "lucide-react";
+import { ChevronDown, ChevronUp, Link, Share2, Unlink } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { PanelSwitch } from "@/components/ui/switch";
 import type { SketchApi } from "@/hooks/useSketch";
 import type { SketchExpose, SketchLink } from "@/lib/sketchView";
 import { stopTitle } from "@/lib/sketchInstanceView";
 import { SketchField } from "./SketchField";
+import { Button } from "@/components/ui/button";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** A limit as the field shows it: a number, or "None" (unlimited) as a muted state word. */
 const limitText = (value: number | null) => (value === null ? "" : String(Number(value.toFixed(6))));
@@ -36,11 +39,13 @@ export function ExposeControls({ expose, subject, sketch }: { expose: SketchExpo
     command(s => s.sketch_exposed_limits(expose.key, min, max, name));
   const nameValue = expose.name ?? expose.suggest ?? "";
   return <div ref={root} data-expose={expose.key} className="col-span-3 flex flex-col gap-1">
-    <div className="flex h-7 items-center" title={expose.on ? stopTitle(expose.holders, expose.link?.partners) : "Clones may set their own value"}>
-      <PanelSwitch label="Expose" name={`Expose ${subject}`} checked={expose.on}
-        onCheckedChange={on => command(s => on ? s.sketch_expose(expose.key, expose.suggest ?? "") : s.sketch_unexpose(expose.key))}
-        onReturnFocus={sketch.focusCanvas} />
-    </div>
+    <Tooltip side="bottom" content={expose.on ? stopTitle(expose.holders, expose.link?.partners) : "Clones may set their own value"}>
+      <div className="flex h-7 items-center">
+        <ToggleButton icon={Share2} label="Expose" name={`Expose ${subject}`} pressed={expose.on}
+          onPressedChange={on => command(s => on ? s.sketch_expose(expose.key, expose.suggest ?? "") : s.sketch_unexpose(expose.key))}
+          onReturnFocus={sketch.focusCanvas} />
+      </div>
+    </Tooltip>
     {expose.on && <>
       {expose.suggest !== undefined && <SketchField label={`${subject} exposed name`} value={nameValue}
         commit={text => command(s => s.sketch_exposed_limits(expose.key, limitText(expose.min), limitText(expose.max), text))}
@@ -48,10 +53,10 @@ export function ExposeControls({ expose, subject, sketch }: { expose: SketchExpo
       <div className="flex gap-2">
         <div className="w-[118px]"><SketchField label={`${subject} minimum, ${unit}`} value={limitText(expose.min)}
           commit={text => limits(text, limitText(expose.max), expose.suggest !== undefined ? nameValue : "")} focusCanvas={sketch.focusCanvas} />
-          {expose.min === null && <span aria-hidden className="block px-1 text-[10px] text-[var(--panel-muted-fg)]">Min: None</span>}</div>
+          {expose.min === null && <span aria-hidden className="block px-1 text-xs text-[var(--panel-muted-fg)]">Min: None</span>}</div>
         <div className="w-[118px]"><SketchField label={`${subject} maximum, ${unit}`} value={limitText(expose.max)}
           commit={text => limits(limitText(expose.min), text, expose.suggest !== undefined ? nameValue : "")} focusCanvas={sketch.focusCanvas} />
-          {expose.max === null && <span aria-hidden className="block px-1 text-[10px] text-[var(--panel-muted-fg)]">Max: None</span>}</div>
+          {expose.max === null && <span aria-hidden className="block px-1 text-xs text-[var(--panel-muted-fg)]">Max: None</span>}</div>
       </div>
       {expose.link && <LinkLine link={expose.link} subject={subject}
         onLink={partner => { focusAfter.current = ["[data-unlink]"]; command(s => s.sketch_link(expose.key, partner)); }}
@@ -73,10 +78,9 @@ function LinkLine({ link, subject, onLink, onUnlink }: { link: SketchLink; subje
   if (link.group !== null) {
     const text = `Linked with ${(link.partners ?? []).join(", ")}`;
     return <div className="mt-2 flex h-7 items-center gap-1 text-xs text-[var(--toolbar-icon)]" data-link-line>
-      <span aria-hidden className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[var(--panel-muted-fg)]"><Link size={12} strokeWidth={1.5} />{link.group}</span>
+      <span aria-hidden className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[var(--panel-muted-fg)]"><Link {...SMALL_GLYPH} />{link.group}</span>
       <span className="min-w-0 flex-1 truncate" title={text}>{text}</span>
-      <button type="button" data-unlink aria-label={`Unlink ${subject}`} onClick={onUnlink}
-        className="h-7 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] px-2 text-sm hover:border-[var(--toolbar-icon)]">Unlink</button>
+      <Button icon={Unlink} data-unlink aria-label={`Unlink ${subject}`} onClick={onUnlink}>Unlink</Button>
     </div>;
   }
   const options = link.options ?? [];
@@ -85,7 +89,7 @@ function LinkLine({ link, subject, onLink, onUnlink }: { link: SketchLink; subje
       onClick={() => setOpen(!open)}
       onKeyDown={e => { if (e.key === "Escape" && open) { e.preventDefault(); e.stopPropagation(); close(); } }}
       className="flex h-7 w-[244px] items-center justify-between rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] px-2 text-sm text-[var(--toolbar-icon)] hover:border-[var(--toolbar-icon)]">
-      Link{open ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+      Link{open ? <ChevronUp {...SMALL_GLYPH} aria-hidden /> : <ChevronDown {...SMALL_GLYPH} aria-hidden />}
     </button>
     {open && <div id={listId} role="listbox" aria-label={`Link ${subject} with`} className="flex w-[244px] flex-col"
       onKeyDown={e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } }}>
@@ -93,8 +97,8 @@ function LinkLine({ link, subject, onLink, onUnlink }: { link: SketchLink; subje
         aria-label={option.group ? `Group ${option.group}: ${option.label}` : option.label}
         onClick={() => { setOpen(false); onLink(option.with); }}
         onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(false); onLink(option.with); } }}
-        className="flex h-7 cursor-pointer items-center gap-1 rounded-[4px] px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]">
-        {option.group && <span aria-hidden className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[var(--panel-muted-fg)]"><Link size={12} strokeWidth={1.5} />{option.group}</span>}
+        className="flex h-7 cursor-pointer items-center gap-1 rounded-[5px] px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]">
+        {option.group && <span aria-hidden className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[var(--panel-muted-fg)]"><Link {...SMALL_GLYPH} />{option.group}</span>}
         <span className="truncate">{option.label}</span>
       </div>)}
     </div>}

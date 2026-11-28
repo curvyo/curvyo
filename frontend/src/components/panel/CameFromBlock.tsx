@@ -1,7 +1,8 @@
 // The Came from line (`specs/0137-document-library` criterion 7, UX notes section 8): the last
 // block of the Style tab for the selection, and of the Document tab for the active page; "Open
 // source" while the source document is found in a known source. The words come from Rust.
-import { FileInput, LoaderCircle } from "lucide-react";
+import { FileInput, FolderOpen } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 
 import { library_page_gone_text, library_source_gone_text } from "@/wasm-bindings/curvyo_editor_wasm.js";
 import { useEffect, useRef, useState } from "react";
@@ -12,6 +13,8 @@ import { openSource } from "@/lib/libraryOpenSource";
 import { openLicence } from "@/lib/onlineApi";
 import { isTauri } from "@/platform/host";
 import { activateWhenOpen } from "@/lib/libraryStore";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface CameFromView {
   text: string;
@@ -115,21 +118,24 @@ export function CameFromBlock({ getSession, pageId, revision, openInWorkspace, o
 
   return (
     <div role="group" aria-label="Came from" className="came-from-block">
-      <p className="came-from-line" title={view.tooltip ?? view.text}>
-        <FileInput size={16} aria-hidden="true" />
-        <span>{view.text}</span>
-      </p>
+      <Tooltip side="left" content={view.tooltip ?? view.text}>
+        <p className="came-from-line">
+          <FileInput {...GLYPH} aria-hidden="true" />
+          <span>{view.text}</span>
+        </p>
+      </Tooltip>
       {view.online ? (
         <p className="library-line" style={{ margin: 0 }}>
           {view.online.licence_url && isTauri ? (
-            <button
-              type="button"
-              className="library-licence-link"
-              title={view.online.licence_url}
-              onClick={() => void openLicence(view.online?.licence_url ?? "").catch(() => undefined)}
-            >
-              {view.online.licence}
-            </button>
+            <Tooltip side="left" content={view.online.licence_url}>
+              <button
+                type="button"
+                className="library-licence-link"
+                onClick={() => void openLicence(view.online?.licence_url ?? "").catch(() => undefined)}
+              >
+                {view.online.licence}
+              </button>
+            </Tooltip>
           ) : (
             view.online.licence
           )}
@@ -137,10 +143,9 @@ export function CameFromBlock({ getSession, pageId, revision, openInWorkspace, o
         </p>
       ) : null}
       {found ? (
-        <button type="button" className="came-from-open" aria-busy={busy || undefined} onClick={run}>
-          {busy ? <LoaderCircle size={16} aria-hidden className="motion-safe:animate-spin" /> : null}
+        <Button icon={FolderOpen} busy={busy} className="w-full" onClick={run}>
           Open source
-        </button>
+        </Button>
       ) : null}
     </div>
   );

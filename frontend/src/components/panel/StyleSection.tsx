@@ -30,7 +30,7 @@ function Notice({ top, alert, children }: { top: number; alert: boolean; childre
   return (
     <p
       role={alert ? "alert" : "status"}
-      className="pointer-events-none absolute right-0 z-10 max-w-[256px] break-words rounded-md px-2 py-1 text-right text-xs"
+      className="pointer-events-none absolute right-0 z-10 max-w-[256px] break-words rounded-[8px] px-2 py-1 text-right text-xs"
       style={{
         top,
         background: "var(--toolbar-bg)",

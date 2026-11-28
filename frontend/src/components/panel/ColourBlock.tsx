@@ -1,4 +1,5 @@
 import { Pipette } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 
 import { EntryField } from "@/components/panel/EntryField";
 import { Swatch } from "@/components/panel/Swatch";
@@ -63,7 +64,7 @@ export function ColourBlock({
           }}
           className="flex size-7 shrink-0 items-center justify-center rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-pressed:border-transparent aria-pressed:!bg-[var(--toolbar-icon-active-bg)] aria-pressed:!text-[var(--toolbar-icon-active-fg)]"
         >
-          <Pipette size={16} strokeWidth={1.5} aria-hidden />
+          <Pipette {...GLYPH} aria-hidden />
         </button>
       </Tooltip>
       <EntryField

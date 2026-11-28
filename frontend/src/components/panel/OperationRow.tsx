@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Eye, EyeOff, Power, PowerOff, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Eye, EyeOff, Minus, Power, PowerOff, Trash2 } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
@@ -8,6 +8,9 @@ import { NumbersText } from "@/components/panel/NumbersText";
 import { canUnfold } from "@/lib/operationUnfold";
 import type { OperationRow as Row } from "@/lib/operationsView";
 import type { PressMods } from "@/lib/rowSelection";
+import { checkboxClass, GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
+import { RenameField as RenameInput } from "@/components/ui/rename-field";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** What a row asks of the section: the session calls and the row's own states. */
 export interface RowActions {
@@ -68,7 +71,7 @@ export interface RowProps {
 }
 
 const CONTROL =
-  "flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "flex h-6 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 /** The tick for a row while items are selected (`ux-notes.md` 6.2). */
 function TickBox({ row, actions }: { row: Row; actions: RowActions }) {
@@ -77,24 +80,25 @@ function TickBox({ row, actions }: { row: Row; actions: RowActions }) {
   // A mixed group row: the description says which group runs here in part (`specs/0111` UX 11).
   const part = row.groupInPart === null ? null : `${row.groupInPart} in part`;
   return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      aria-label={row.name}
-      aria-describedby={part === null ? undefined : partId}
-      title={tickPressAdds(row.tick) ? `Assign to ${row.name}` : `Remove from ${row.name}`}
-      onClick={() => actions.tick(row, tickPressAdds(row.tick))}
-      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-    >
-      {row.tick === "all" ? <span className="h-2 w-2 bg-[var(--toolbar-icon)]" /> : null}
-      {row.tick === "some" ? <span className="h-0.5 w-2 bg-[var(--toolbar-icon)]" /> : null}
-      {part === null ? null : (
-        <span id={partId} className="sr-only">
-          {part}
-        </span>
-      )}
-    </button>
+    <Tooltip side="left" content={tickPressAdds(row.tick) ? `Assign to ${row.name}` : `Remove from ${row.name}`}>
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={row.name}
+        aria-describedby={part === null ? undefined : partId}
+        onClick={() => actions.tick(row, tickPressAdds(row.tick))}
+        className={checkboxClass(checked)}
+      >
+        {row.tick === "all" ? <Check {...SMALL_GLYPH} aria-hidden /> : null}
+        {row.tick === "some" ? <Minus {...SMALL_GLYPH} aria-hidden /> : null}
+        {part === null ? null : (
+          <span id={partId} className="sr-only">
+            {part}
+          </span>
+        )}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -113,7 +117,7 @@ export function OperationRowView(props: RowProps) {
       aria-selected={props.open}
       {...{ [ARM_ZONE]: `op:${key}` }}
       style={{ height: props.height }}
-      className={`relative flex flex-col rounded px-1 ${props.unfolded ? "" : "overflow-hidden"} has-[[data-row-name]:focus-visible]:ring-2 has-[[data-row-name]:focus-visible]:ring-inset has-[[data-row-name]:focus-visible]:ring-[var(--editor-accent)] ${props.open ? "bg-[var(--value-fill)]" : ""} ${props.dropping ? "bg-[var(--value-fill)] outline outline-[1.5px] -outline-offset-[1.5px] outline-[var(--editor-accent)]" : ""} ${props.dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""}`}
+      className={`relative flex flex-col rounded-[5px] px-1 ${props.unfolded ? "" : "overflow-hidden"} has-[[data-row-name]:focus-visible]:ring-2 has-[[data-row-name]:focus-visible]:ring-inset has-[[data-row-name]:focus-visible]:ring-[var(--editor-accent)] ${props.open ? "bg-[var(--value-fill)]" : ""} ${props.dropping ? "bg-[var(--value-fill)] outline outline-[1.5px] -outline-offset-[1.5px] outline-[var(--editor-accent)]" : ""} ${props.dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""}`}
     >
       {props.insertion ? (
         <div
@@ -124,10 +128,10 @@ export function OperationRowView(props: RowProps) {
         />
       ) : null}
       {props.unfolded ? (
-        <div aria-hidden data-row-bar="" className="absolute top-0 bottom-0 left-0 w-[3px] rounded-l bg-[var(--accent)]" />
+        <div aria-hidden data-row-bar="" className="absolute top-0 bottom-0 left-0 w-[3px] rounded-l-full bg-[var(--accent)]" />
       ) : null}
       {/* Arming the trash tints the lines of the row only; the body keeps its ground. */}
-      <div style={{ height: props.base }} className={`flex shrink-0 flex-col rounded ${armed ? "bg-[var(--destructive-soft)]" : ""}`}>
+      <div style={{ height: props.base }} className={`flex shrink-0 flex-col rounded-[5px] ${armed ? "bg-[var(--destructive-soft)]" : ""}`}>
       <div className="flex h-[26px] shrink-0 items-center gap-1 pointer-coarse:h-[34px]" onPointerDown={(event) => {
         if (!renaming && (event.target as HTMLElement).closest("button:not([data-row-name]), input") === null) actions.dragStart(row, event);
       }}>
@@ -144,44 +148,47 @@ export function OperationRowView(props: RowProps) {
         {renaming ? (
           <RenameField row={row} actions={actions} />
         ) : (
-          <button
-            type="button"
-            data-row-name
-            tabIndex={props.tabStop ? 0 : -1}
-            aria-expanded={canUnfold(row) ? props.unfolded : undefined}
-            aria-label={rowName(row)}
-            title={row.name}
-            onFocus={props.onFocusRow}
-            onClick={(event) => pressRow(event, row, actions)}
-            onDoubleClick={() => actions.select(row, true)}
-            onKeyDown={(event) => onNameKey(event, row, armed, actions)}
-            className={`min-w-0 flex-1 truncate text-left text-[13px] focus-visible:outline-none ${row.output ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
-          >
-            {row.name}
-          </button>
+          <Tooltip side="left" content={row.name}>
+            <button
+              type="button"
+              data-row-name
+              tabIndex={props.tabStop ? 0 : -1}
+              aria-expanded={canUnfold(row) ? props.unfolded : undefined}
+              aria-label={rowName(row)}
+              onFocus={props.onFocusRow}
+              onClick={(event) => pressRow(event, row, actions)}
+              onDoubleClick={() => actions.select(row, true)}
+              onKeyDown={(event) => onNameKey(event, row, armed, actions)}
+              className={`min-w-0 flex-1 truncate text-left text-sm focus-visible:outline-none ${row.output ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
+            >
+              {row.name}
+            </button>
+          </Tooltip>
         )}
         {renaming || unknown ? null : (
           <>
-            <button
-              type="button"
-              aria-pressed={row.show}
-              aria-label={`Show ${row.name}`}
-              title={`Show ${row.name}`}
-              onClick={() => actions.setShow(row, !row.show)}
-              className={CONTROL}
-            >
-              {row.show ? <Eye size={16} aria-hidden /> : <EyeOff size={16} aria-hidden />}
-            </button>
-            <button
-              type="button"
-              aria-pressed={row.output}
-              aria-label={`Output ${row.name}`}
-              title={`Output ${row.name}`}
-              onClick={() => actions.setOutput(row, !row.output)}
-              className={CONTROL}
-            >
-              {row.output ? <Power size={16} aria-hidden /> : <PowerOff size={16} aria-hidden />}
-            </button>
+            <Tooltip side="left" content={`Show ${row.name}`}>
+              <button
+                type="button"
+                aria-pressed={row.show}
+                aria-label={`Show ${row.name}`}
+                onClick={() => actions.setShow(row, !row.show)}
+                className={CONTROL}
+              >
+                {row.show ? <Eye {...GLYPH} aria-hidden /> : <EyeOff {...GLYPH} aria-hidden />}
+              </button>
+            </Tooltip>
+            <Tooltip side="left" content={`Output ${row.name}`}>
+              <button
+                type="button"
+                aria-pressed={row.output}
+                aria-label={`Output ${row.name}`}
+                onClick={() => actions.setOutput(row, !row.output)}
+                className={CONTROL}
+              >
+                {row.output ? <Power {...GLYPH} aria-hidden /> : <PowerOff {...GLYPH} aria-hidden />}
+              </button>
+            </Tooltip>
           </>
         )}
         {renaming ? null : <TrashButton row={row} armed={armed} actions={actions} />}
@@ -201,14 +208,15 @@ export function OperationRowView(props: RowProps) {
           </>
         )}
       </div>
-      <div
-        className="flex min-h-0 flex-1 flex-col text-[11px] leading-[14px] text-[var(--panel-muted-fg)]"
-        title={line2Title(row, props.digit)}
-        onClick={(event) => pressRow(event, row, actions)}
-      >
-        <Line2 row={row} digit={props.digit} />
-        <NumbersLines row={row} />
-      </div>
+      <Tooltip side="left" content={line2Title(row, props.digit)}>
+        <div
+          className="flex min-h-0 flex-1 flex-col text-[11px] leading-[14px] text-[var(--panel-muted-fg)]"
+          onClick={(event) => pressRow(event, row, actions)}
+        >
+          <Line2 row={row} digit={props.digit} />
+          <NumbersLines row={row} />
+        </div>
+      </Tooltip>
       </div>
       {props.body}
     </li>
@@ -282,20 +290,21 @@ function NumbersLines({ row }: { row: Row }) {
 function TrashButton({ row, armed, actions }: { row: Row; armed: boolean; actions: RowActions }) {
   const key = `${row.id.peer}:${row.id.counter}`;
   return (
-    <button
-      type="button"
-      {...{ [ARM_TRASH]: `op:${key}` }}
-      aria-label={armed ? `Press again to delete ${row.name}` : `Delete ${row.name}`}
-      title={armed ? "Press again to delete" : "Delete"}
-      onClick={() => actions.trash(row)}
-      className={
-        armed
-          ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
-          : `${CONTROL} hover:bg-[var(--editor-accent-hover)]`
-      }
-    >
-      <Trash2 size={16} aria-hidden />
-    </button>
+    <Tooltip side="left" content={armed ? "Press again to delete" : "Delete"}>
+      <button
+        type="button"
+        {...{ [ARM_TRASH]: `op:${key}` }}
+        aria-label={armed ? `Press again to delete ${row.name}` : `Delete ${row.name}`}
+        onClick={() => actions.trash(row)}
+        className={
+          armed
+            ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
+            : `${CONTROL} hover:bg-[var(--editor-accent-hover)]`
+        }
+      >
+        <Trash2 {...GLYPH} aria-hidden />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -303,15 +312,16 @@ function TrashButton({ row, armed, actions }: { row: Row; armed: boolean; action
 function ArrowButton({ row, up, actions }: { row: Row; up: boolean; actions: RowActions }) {
   const Icon = up ? ChevronUp : ChevronDown;
   return (
-    <button
-      type="button"
-      aria-label={`Move ${row.name} ${up ? "up" : "down"}`}
-      title={up ? "Move up" : "Move down"}
-      onClick={() => actions.step(row, up ? -1 : 1)}
-      className={CONTROL}
-    >
-      <Icon size={16} aria-hidden />
-    </button>
+    <Tooltip side="left" content={up ? "Move up" : "Move down"}>
+      <button
+        type="button"
+        aria-label={`Move ${row.name} ${up ? "up" : "down"}`}
+        onClick={() => actions.step(row, up ? -1 : 1)}
+        className={CONTROL}
+      >
+        <Icon size={16} aria-hidden />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -333,8 +343,8 @@ function RenameField({ row, actions }: { row: Row; actions: RowActions }) {
     actions.endRename(row, focusAfterRename(reason));
   };
   return (
-    <input
-      ref={field}
+    <RenameInput
+      inputRef={field}
       aria-label={`Name of ${row.name}`}
       value={draft}
       maxLength={128}
@@ -351,7 +361,7 @@ function RenameField({ row, actions }: { row: Row; actions: RowActions }) {
           finish("escape");
         }
       }}
-      className="min-w-0 flex-1 rounded border border-[var(--editor-accent)] bg-white px-1 text-[13px] text-[var(--toolbar-icon)]"
+      className="flex-1"
     />
   );
 }

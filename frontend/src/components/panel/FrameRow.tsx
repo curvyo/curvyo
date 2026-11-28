@@ -61,7 +61,7 @@ export function FrameRow({ model, frame }: { model: MachineControlsModel; frame:
       >
         <Scan {...GLYPH} />
       </SymbolButton>
-      <div role="radiogroup" aria-label="Frame shape" className="flex overflow-hidden rounded-md border border-[var(--field-border)]">
+      <div role="radiogroup" aria-label="Frame shape" className="flex overflow-hidden rounded-[5px] border border-[var(--field-border)]">
         {FRAME_SHAPES.map(({ value, label }, at) => (
           <button
             key={value}

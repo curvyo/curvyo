@@ -1,9 +1,12 @@
+import { Ruler, Share2 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { EntryField } from "@/components/EntryField";
 import type { SketchApi } from "@/hooks/useSketch";
 import { placeSketchChip, type Size } from "@/lib/readoutPlacement";
 import type { SketchEntry } from "@/lib/sketchView";
+import { toggleClass, GLYPH } from "@/components/ui/looks";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The tool rail's clearance from the canvas's left edge, as the Pen entry chip keeps it. */
 const TOOL_RAIL_CLEAR_PX = 128;
@@ -61,7 +64,7 @@ export function SketchModeLabel({ sketch, containerRef }: { sketch: SketchApi; c
     {/* A polite live region says the new mode on each change (UX notes revision 2, section 2). */}
     <div aria-live="polite" role="status" className="sr-only">{label?.text ?? ""}</div>
     {label && <div ref={ref} aria-hidden data-sketch-mode-label
-      className="pointer-events-none absolute z-20 rounded px-1.5 py-0.5 text-xs whitespace-nowrap"
+      className="pointer-events-none absolute z-20 rounded-[8px] px-1.5 py-0.5 text-xs whitespace-nowrap"
       style={{
         ...placeSketchChip({ x: label.x, y: label.y }, { x: label.away_x, y: label.away_y }, sizes.chip, sizes.canvas, LABEL_OFFSET_PX, TOOL_RAIL_CLEAR_PX),
         background: "var(--toolbar-bg)",
@@ -182,17 +185,15 @@ function EntryBox({ sketch, entry, containerRef }: { sketch: SketchApi; entry: S
         }}
         onKeyDown={onKeyDown(index)} onFocus={event => event.target.select()} />)}
     </div>
-    {entry.reference && <label className="mt-1 flex items-center gap-1 text-xs">
-      <input type="checkbox" tabIndex={-1} className="size-3.5" checked={reference}
-        onChange={event => { setReference(event.target.checked); inputs.current[0]?.focus(); }} />Reference
-    </label>}
-    {editing && !reference && exposure && <label className="mt-1 flex items-center gap-1 text-xs">
-      <input type="checkbox" tabIndex={-1} className="size-3.5" checked={exposure.on} aria-label={`Expose ${exposure.name ?? exposure.suggest ?? "dimension"}`}
-        onChange={event => {
-          sketch.run(s => { const refused = event.target.checked ? s.sketch_expose(exposure.key, exposure.suggest ?? "") : s.sketch_unexpose(exposure.key); if (refused !== "") throw refused; });
+    {entry.reference && <button type="button" tabIndex={-1} aria-pressed={reference} className={toggleClass("bar", false, "mt-1 h-6 text-xs")}
+      onMouseDown={event => event.preventDefault()}
+      onClick={() => { setReference(!reference); inputs.current[0]?.focus(); }}><Ruler {...GLYPH} aria-hidden />Reference</button>}
+    {editing && !reference && exposure && <button type="button" tabIndex={-1} aria-pressed={exposure.on} aria-label={`Expose ${exposure.name ?? exposure.suggest ?? "dimension"}`} className={toggleClass("bar", false, "mt-1 h-6 text-xs")}
+      onMouseDown={event => event.preventDefault()}
+      onClick={() => {
+          sketch.run(s => { const refused = !exposure.on ? s.sketch_expose(exposure.key, exposure.suggest ?? "") : s.sketch_unexpose(exposure.key); if (refused !== "") throw refused; });
           inputs.current[0]?.focus();
-        }} />Expose
-    </label>}
-    {refusal && <p id={messageId} role="alert" className="mt-1 text-xs text-[var(--field-invalid)]">{refusal.message}</p>}
+      }}><Share2 {...GLYPH} aria-hidden />Expose</button>}
+    {refusal && <AlertLine id={messageId} className="mt-1">{refusal.message}</AlertLine>}
   </div>;
 }

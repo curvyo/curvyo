@@ -1,10 +1,11 @@
-import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Replace, Spline, TriangleAlert, Unlink } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
+import { SMALL_GLYPH, SECTION_HEADING, PANEL_LABEL } from "@/components/ui/looks";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
 import { Swatch } from "@/components/panel/Swatch";
 import { ValueField } from "@/components/panel/ValueField";
-import { PanelSwitch } from "@/components/ui/switch";
 import { ToggleGroup, type ToggleOption } from "@/components/ui/toggle-group";
 import type { GeneratorBlockApi } from "@/hooks/useGenerators";
 import {
@@ -22,6 +23,8 @@ import {
   unitWordsOf,
   valueAt,
 } from "@/lib/generatedView";
+import { Button } from "@/components/ui/button";
+import { ToggleButton } from "@/components/ui/toggle-button";
 
 const MESSAGES = { number: "Enter a number" } as const;
 const WIDTH = 244;
@@ -161,7 +164,7 @@ function ChoiceRow({
   );
   return labelled ? (
     <div className="flex w-[244px] items-center gap-2">
-      <span className="w-[60px] shrink-0 text-sm text-[var(--toolbar-icon)]">{row.label}</span>
+      <span className={PANEL_LABEL}>{row.label}</span>
       {strip}
     </div>
   ) : (
@@ -270,7 +273,7 @@ function TextRow({
       />
       {invalid ? (
         <p id={reason} role="status" className="flex items-start gap-1 text-xs" style={{ color: "var(--field-invalid)" }}>
-          <TriangleAlert size={12} className="mt-[2px] shrink-0" aria-hidden="true" />
+          <TriangleAlert {...SMALL_GLYPH} className="mt-[2px] shrink-0" aria-hidden="true" />
           <span>{row.problem}</span>
         </p>
       ) : null}
@@ -442,13 +445,11 @@ function FontRow({
       <span className="w-[60px] shrink-0 text-sm text-[var(--toolbar-icon)]">
         {row.label}
       </span>
+      <Tooltip side="left" content={missing ? "Missing on this computer. Shown in Source Sans 3." : name}>
       <button
         type="button"
         data-generator-font
         aria-label={`${row.label}: ${shown}`}
-        title={
-          missing ? "Missing on this computer. Shown in Source Sans 3." : name
-        }
         onClick={onOpenFonts}
         className="flex h-7 w-[176px] items-center gap-1 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
@@ -462,6 +463,7 @@ function FontRow({
         ) : null}
         <span className="min-w-0 flex-1 truncate text-left">{shown}</span>
       </button>
+      </Tooltip>
     </div>
   );
 }
@@ -506,7 +508,7 @@ function ClampNotice({ text }: { text: string }) {
   return (
     <p
       role="status"
-      className="pointer-events-none absolute top-full right-0 z-10 mt-1 w-max max-w-[244px] break-words rounded-md p-2 text-right text-xs"
+      className="pointer-events-none absolute top-full right-0 z-10 mt-1 w-max max-w-[244px] break-words rounded-[8px] p-2 text-right text-xs"
       style={{
         background: "var(--toolbar-bg)",
         color: "var(--toolbar-icon)",
@@ -527,7 +529,7 @@ function PartsGroup({ api, onReturnFocus }: { api: GeneratorBlockApi; onReturnFo
   }
   return (
     <section className="flex flex-col gap-2" data-generator-parts>
-      <h3 className="text-sm text-[var(--toolbar-icon)]">Parts</h3>
+      <h3 className={SECTION_HEADING}>Parts</h3>
       {parts.map((part) => (
         <div key={part.key} className="flex h-7 w-[244px] items-center gap-2" data-generator-part={part.key}>
           <span className="min-w-0 flex-1 truncate text-sm text-[var(--toolbar-icon)]">{part.name}</span>
@@ -537,8 +539,7 @@ function PartsGroup({ api, onReturnFocus }: { api: GeneratorBlockApi; onReturnFo
           >
             {part.operation}
           </span>
-          <button
-            type="button"
+          <Button icon={Unlink}
             disabled={!part.canDetach}
             aria-label={`${part.detached ? "Attach" : "Detach"} ${part.name.toLowerCase()}`}
             onClick={() => {
@@ -549,10 +550,9 @@ function PartsGroup({ api, onReturnFocus }: { api: GeneratorBlockApi; onReturnFo
               }
               onReturnFocus();
             }}
-            className="h-6 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] px-2 text-xs text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] disabled:opacity-40"
           >
             {part.detached ? "Attach" : "Detach"}
-          </button>
+          </Button>
         </div>
       ))}
     </section>
@@ -608,7 +608,7 @@ export function GeneratorBlock({
       {groups.map((group) => (
         <section key={group.label} className="flex flex-col gap-2">
           {group.label === ADVANCED ? (
-            <h3 className="text-sm text-[var(--toolbar-icon)]">
+            <h3 className={SECTION_HEADING}>
               <button
                 type="button"
                 aria-expanded={advancedOpen}
@@ -616,35 +616,33 @@ export function GeneratorBlock({
                 onClick={() => setAdvancedOpen(!advancedOpen)}
                 className="flex items-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
               >
-                {advancedOpen ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
+                {advancedOpen ? <ChevronDown {...SMALL_GLYPH} aria-hidden="true" /> : <ChevronRight {...SMALL_GLYPH} aria-hidden="true" />}
                 {group.label}
               </button>
             </h3>
           ) : (
-            <h3 className="text-sm text-[var(--toolbar-icon)]">{group.label}</h3>
+            <h3 className={SECTION_HEADING}>{group.label}</h3>
           )}
           {group.label === "Size" && view.label === "Path box" ? (
-            <button
-              type="button"
+            <Button icon={Replace}
               data-generator-replace-outline
               onClick={() => {
                 api.replaceOutline();
                 onReturnFocus();
-              }}
-              className="h-7 w-[244px] rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+              }} className="min-w-[244px]"
             >
               Replace outline
-            </button>
+            </Button>
           ) : null}
           {(group.label === ADVANCED && !advancedOpen ? [] : group.rows).map((row) => (
             // Each row is the anchor of its clamp notice, 4 px under it (UX notes §6).
             <div key={row.key} className="relative w-fit">
               {row.kind.kind === "switch" ? (
                 <div className="flex h-7 items-center">
-                  <PanelSwitch
+                  <ToggleButton icon={Check}
                     label={row.label}
-                    checked={row.value === true}
-                    onCheckedChange={(on) => api.setValue(row.key, on)}
+                    pressed={row.value === true}
+                    onPressedChange={(on) => api.setValue(row.key, on)}
                     onReturnFocus={onReturnFocus}
                   />
                 </div>
@@ -666,26 +664,24 @@ export function GeneratorBlock({
           ))}
           {group.label === "Colours" && view.contrastLow ? (
             <p role="status" className="flex w-[244px] items-start gap-1 text-xs text-[var(--toolbar-icon)]">
-              <TriangleAlert size={12} className="mt-[2px] shrink-0" aria-hidden="true" />
+              <TriangleAlert {...SMALL_GLYPH} className="mt-[2px] shrink-0" aria-hidden="true" />
               <span>Low contrast, may not scan</span>
             </p>
           ) : null}
         </section>
       ))}
       <PartsGroup api={api} onReturnFocus={onReturnFocus} />
-      <button
-        type="button"
+      <Button icon={Spline}
         data-generator-convert
         onClick={() => {
           api.convert();
           // The button leaves the tree with the block, by pointer or by key: focus goes to the
           // canvas (UX notes §11).
           onReturnFocus();
-        }}
-        className="h-7 w-[244px] rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        }} className="min-w-[244px]"
       >
         Convert to paths
-      </button>
+      </Button>
       </div>
     </div>
   );

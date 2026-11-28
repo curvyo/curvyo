@@ -1,4 +1,5 @@
 import { RotateCcw } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
@@ -369,9 +370,9 @@ export function ValueField({
                 onReturnFocus();
               }
             }}
-            className="absolute top-0.5 right-1 flex size-6 items-center justify-center rounded-[4px] text-[var(--toolbar-icon)] opacity-80 outline-none hover:bg-[var(--editor-accent-hover)]"
+            className="absolute top-0.5 right-1 flex size-6 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] opacity-80 outline-none hover:bg-[var(--editor-accent-hover)]"
           >
-            <RotateCcw size={12} strokeWidth={1.5} aria-hidden />
+            <RotateCcw {...SMALL_GLYPH} aria-hidden />
           </button>
         </Tooltip>
       )}

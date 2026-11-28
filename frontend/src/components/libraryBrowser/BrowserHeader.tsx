@@ -2,16 +2,18 @@
 // notes sections 0.1, 0.3 and 4): the Items | Sets strip first, the search field with Search
 // online and Clear, Size (Items only), the subject line with Back at its start, Full view and
 // Close; in the narrow layout a second row with the Filters button.
-import { ArrowLeft, Globe, Maximize2, Minimize2, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowLeft, Globe, Maximize2, Minimize2, SlidersHorizontal, X } from "lucide-react";
 import { useRef } from "react";
 
 import { SizeSlider, type SizeScale } from "@/components/fontPreview/SizeSlider";
 import { Tooltip } from "@/components/ui/tooltip";
 import { BROWSER_SIZE_RANGE, DEFAULT_BROWSER_SIZE, MAX_BROWSER_SEARCH_CHARS } from "@/lib/libraryBrowserState";
+import { iconButtonClass, GLYPH } from "@/components/ui/looks";
+import { SearchField } from "@/components/ui/search-field";
+import { IconButton } from "@/components/ui/icon-button";
 
 const SCALE: SizeScale = { min: BROWSER_SIZE_RANGE.min, max: BROWSER_SIZE_RANGE.max, fallback: DEFAULT_BROWSER_SIZE, step: 8, bigStep: 32 };
-const ICON_BUTTON =
-  "flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+const ICON_BUTTON = iconButtonClass("outlined", 28);
 
 /** The view strip's value; the guide (and the keyword licences) press neither cell. */
 export type HeaderView = "items" | "sets" | "guide";
@@ -96,64 +98,47 @@ export function BrowserHeader(props: HeaderProps) {
   const strip = <ViewStrip view={props.view} onView={props.onView} />;
   const searchable = props.view !== "guide";
   const field = (
-    <div className={`relative h-7 min-w-0 flex-1 ${props.wide ? "max-w-[480px] min-w-[200px]" : ""}`}>
-      <Search size={16} strokeWidth={1.5} aria-hidden className="pointer-events-none absolute top-1.5 left-2 text-[var(--panel-muted-fg)]" />
-      <input
-        ref={searchRef}
-        type="text"
-        value={props.text}
-        maxLength={MAX_BROWSER_SEARCH_CHARS}
-        placeholder="Search library"
-        aria-label="Search library"
-        spellCheck={false}
-        onChange={(event) => props.onText(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Backspace" && (event.ctrlKey || event.metaKey) && props.text) {
-            // Clear search is no Tab stop: the key clears the field (UX review).
-            event.preventDefault();
-            props.onText("");
-          } else if (event.key === "Enter") {
-            event.preventDefault();
-            props.onSearchOnline?.();
-            props.onFieldDown();
-          } else if (event.key === "ArrowDown") {
-            event.preventDefault();
-            props.onFieldDown();
-          }
-        }}
-        className={`h-7 w-full rounded-[5px] bg-white pl-7 ${props.text && props.onSearchOnline ? "pr-14" : "pr-7"} text-sm text-[var(--toolbar-icon)] outline-none ring-1 ring-border focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]`}
-      />
-      {props.text && props.onSearchOnline ? (
-        <Tooltip side="bottom" content="Search Iconify sources (Enter)">
-          <button
-            type="button"
-            tabIndex={-1}
-            aria-label="Search Iconify sources (Enter)"
-            onClick={() => {
-              props.onSearchOnline?.();
-              searchRef.current?.focus();
-            }}
-            className="absolute top-0.5 right-7 flex size-6 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-          >
-            <Globe size={16} strokeWidth={1.5} aria-hidden />
-          </button>
-        </Tooltip>
-      ) : null}
-      {props.text ? (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label="Clear search"
-          onClick={() => {
-            props.onText("");
-            searchRef.current?.focus();
-          }}
-          className="absolute top-0.5 right-0.5 flex size-6 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-        >
-          <X size={16} strokeWidth={1.5} aria-hidden />
-        </button>
-      ) : null}
-    </div>
+    <SearchField
+      className={`flex-1 ${props.wide ? "max-w-[480px] min-w-[200px]" : ""}`}
+      clearUntabbable
+      inputRef={searchRef}
+      value={props.text}
+      onValue={props.onText}
+      maxLength={MAX_BROWSER_SEARCH_CHARS}
+      placeholder="Search library"
+      aria-label="Search library"
+      onKeyDown={(event) => {
+        if (event.key === "Backspace" && (event.ctrlKey || event.metaKey) && props.text) {
+          // Clear search is no Tab stop: the key clears the field (UX review).
+          event.preventDefault();
+          props.onText("");
+        } else if (event.key === "Enter") {
+          event.preventDefault();
+          props.onSearchOnline?.();
+          props.onFieldDown();
+        } else if (event.key === "ArrowDown") {
+          event.preventDefault();
+          props.onFieldDown();
+        }
+      }}
+      action={
+        props.onSearchOnline ? (
+          <Tooltip side="bottom" content="Search Iconify sources (Enter)">
+            <IconButton
+              icon={Globe}
+              size={24}
+              tabIndex={-1}
+              aria-label="Search Iconify sources (Enter)"
+              className="pointer-coarse:size-6"
+              onClick={() => {
+                props.onSearchOnline?.();
+                searchRef.current?.focus();
+              }}
+            />
+          </Tooltip>
+        ) : undefined
+      }
+    />
   );
   const size = (
     <div className="flex shrink-0 items-center gap-1">
@@ -171,7 +156,7 @@ export function BrowserHeader(props: HeaderProps) {
             onClick={props.onBack}
             className="flex size-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
           >
-            <ArrowLeft size={16} strokeWidth={1.5} aria-hidden />
+            <ArrowLeft {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
       ) : null}
@@ -188,13 +173,13 @@ export function BrowserHeader(props: HeaderProps) {
       {props.canSplit ? (
         <Tooltip side="bottom" content={props.full ? "Split view" : "Full view"}>
           <button type="button" aria-label={props.full ? "Split view" : "Full view"} onClick={props.onFull} className={ICON_BUTTON}>
-            {props.full ? <Minimize2 size={16} strokeWidth={1.5} aria-hidden /> : <Maximize2 size={16} strokeWidth={1.5} aria-hidden />}
+            {props.full ? <Minimize2 {...GLYPH} aria-hidden /> : <Maximize2 {...GLYPH} aria-hidden />}
           </button>
         </Tooltip>
       ) : null}
       <Tooltip side="bottom" content="Close library browser">
         <button type="button" aria-label="Close library browser" onClick={props.onClose} className={ICON_BUTTON}>
-          <X size={16} strokeWidth={1.5} aria-hidden />
+          <X {...GLYPH} aria-hidden />
         </button>
       </Tooltip>
     </div>
@@ -234,7 +219,7 @@ export function BrowserHeader(props: HeaderProps) {
             props.filtersOpen ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
           }`}
         >
-          <SlidersHorizontal size={16} strokeWidth={1.5} aria-hidden />
+          <SlidersHorizontal {...GLYPH} aria-hidden />
           Filters
           {props.activeFilters > 0 ? <span className="text-xs tabular-nums opacity-80">{props.activeFilters}</span> : null}
         </button> : null}

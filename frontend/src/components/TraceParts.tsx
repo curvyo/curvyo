@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { type KeyboardEvent, useEffect, useRef } from "react";
 
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
@@ -106,7 +107,7 @@ export function TraceParts({ parts, locked = false, onSelect, onAdd, onRemove, o
       data-trace-parts=""
       data-flow=""
       {...{ [ARM_ZONE]: ZONE }}
-      className={`flex min-h-9 max-w-full min-w-0 flex-wrap items-center gap-1 rounded-md ${ARM_TRANSITION} ${armed ? "bg-[var(--destructive-soft)]" : ""}`}
+      className={`flex min-h-9 max-w-full min-w-0 flex-wrap items-center gap-1 rounded-[5px] ${ARM_TRANSITION} ${armed ? "bg-[var(--destructive-soft)]" : ""}`}
     >
       <span aria-hidden className="flex h-9 w-8 shrink-0 items-center text-xs text-[var(--toolbar-icon)] opacity-70">
         {PARTS}
@@ -165,7 +166,7 @@ export function TraceParts({ parts, locked = false, onSelect, onAdd, onRemove, o
             }}
             className={`${ICON_BUTTON_CLASS} ${full ? "cursor-default opacity-50 text-[var(--toolbar-icon)]" : plain}`}
           >
-            <Plus size={16} strokeWidth={1.5} aria-hidden />
+            <Plus {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
         <Tooltip side="bottom" content={locked ? MASK_LOCKED : canRemove ? removePartText(active, armed) : KEEP_ONE_PART}>
@@ -181,7 +182,7 @@ export function TraceParts({ parts, locked = false, onSelect, onAdd, onRemove, o
               !canRemove ? "cursor-default opacity-50 text-[var(--toolbar-icon)]" : armed ? ARMED_TRASH : plain
             }`}
           >
-            <Trash2 size={16} strokeWidth={1.5} aria-hidden />
+            <Trash2 {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
       </div>

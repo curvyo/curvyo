@@ -8,9 +8,10 @@ import type { MachineProfileRow } from "@/hooks/useWorkbenches";
 import type { LibrarySyncApi } from "@/lib/devicesApi";
 import { librarySyncOn } from "@/lib/librarySyncView";
 import { areaText, profileRowKey } from "@/lib/machineBlockKeys";
+import { FIELD_FRAME, FIELD_FRAME_LABEL, GLYPH } from "@/components/ui/looks";
 
 const ROW_BUTTON =
-  "inline-flex h-7 w-6 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)]";
+  "inline-flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)]";
 
 /** The armed trash's text (UX notes §3). */
 const ARMED_DELETE = "Delete profile. Projects keep their copy.";
@@ -144,7 +145,7 @@ export function MachineProfileList({
         ref={listRef}
         role="listbox"
         aria-label="Machine profiles"
-        className="flex max-h-[220px] flex-col overflow-y-auto overflow-x-hidden rounded-md"
+        className="flex max-h-[220px] flex-col overflow-y-auto overflow-x-hidden rounded-[5px]"
         style={{ border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
       >
       {rows.map((row, index) => {
@@ -167,7 +168,7 @@ export function MachineProfileList({
             className={`flex h-11 shrink-0 cursor-default items-center gap-1 px-1 outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : ""}`}
           >
             <span className="flex w-4 shrink-0 justify-center text-[var(--toolbar-icon)]">
-              {row.chosen ? <Check size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden /> : null}
+              {row.chosen ? <Check {...GLYPH} aria-hidden /> : null}
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
               {renaming === row.id ? (
@@ -189,18 +190,18 @@ export function MachineProfileList({
               <span className="text-xs text-[var(--panel-muted-fg)]">{areaText(row.width, row.height)}</span>
             </span>
             <RowButton label={`Duplicate ${row.name}`} onPress={() => duplicate(row.id)}>
-              <Copy size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+              <Copy {...GLYPH} aria-hidden />
             </RowButton>
             {row.builtin ? null : (
               <>
                 <RowButton label={`Rename ${row.name}`} onPress={() => setRenaming(row.id)}>
-                  <Pencil size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+                  <Pencil {...GLYPH} aria-hidden />
                 </RowButton>
                 <RowButton
                   label={`Edit work area of ${row.name}`}
                   onPress={() => setSizing(sizing === row.id ? null : row.id)}
                 >
-                  <Ruler size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+                  <Ruler {...GLYPH} aria-hidden />
                 </RowButton>
                 {library ? (
                   <LibrarySyncToggle
@@ -219,7 +220,7 @@ export function MachineProfileList({
                   armed={armed}
                   onPress={() => remove(index)}
                 >
-                  <Trash2 size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+                  <Trash2 {...GLYPH} aria-hidden />
                 </RowButton>
               </>
             )}
@@ -325,12 +326,11 @@ function WorkAreaRow({
 }) {
   const [notice, setNotice] = useState("");
   const field = (label: "Width" | "Height", value: number) => (
-    <label className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-md border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] px-1 text-xs">
-      <span className="text-[var(--panel-muted-fg)]">{label}</span>
+    <label className={`${FIELD_FRAME} flex-1`}>
+      <span className={FIELD_FRAME_LABEL}>{label}</span>
       <input
         aria-label={`${label} of ${row.name} (mm)`}
-        type="number"
-        step="any"
+        inputMode="decimal"
         defaultValue={value}
         className="min-w-0 flex-1 bg-transparent text-right tabular-nums outline-none"
         onKeyDown={(event) => {
@@ -344,7 +344,7 @@ function WorkAreaRow({
           }
         }}
         onBlur={(event) => {
-          const typed = Number(event.target.value);
+          const typed = Number(event.target.value.trim().replace(",", "."));
           if (!event.target.value.trim() || !Number.isFinite(typed)) {
             event.target.value = String(value);
             return;
@@ -354,7 +354,7 @@ function WorkAreaRow({
           setNotice(onCommit(width, height));
         }}
       />
-      <span className="text-[var(--panel-muted-fg)]">mm</span>
+      <span className={FIELD_FRAME_LABEL}>mm</span>
     </label>
   );
   return (

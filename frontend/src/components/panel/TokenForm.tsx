@@ -2,12 +2,14 @@
 // "Change token…" or "Add token…" opens it in the place of the Add source form. The field is empty
 // on opening (the old token is never shown), Save checks the new token with one request and keeps it
 // only on success, Remove token is an armed action. The refusals are Rust's words.
-import { Lock, LoaderCircle } from "lucide-react";
+import { Lock, Save, Trash2, X } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useRef, useState } from "react";
 
 import { TokenField, type TokenFieldHandle } from "@/components/panel/TokenField";
 import { forgetOnlineToken, setOnlineToken, type TokenCleanup } from "@/lib/onlineApi";
 import { tokenWords } from "@/lib/tokenWords";
+import { Button } from "@/components/ui/button";
 
 /** How long an armed press waits for the second one (`specs/0137` UX notes 4.4). */
 const ARM_MS = 4000;
@@ -102,7 +104,7 @@ export function TokenForm({ source, name, hasToken, onDone, onCancel }: TokenFor
     >
       <p className="library-line" style={{ margin: 0, fontWeight: 600 }}>
         {name}
-        {hasToken ? <Lock size={12} strokeWidth={1.5} aria-hidden="true" className="library-lock" /> : null}
+        {hasToken ? <Lock {...SMALL_GLYPH} aria-hidden="true" className="library-lock" /> : null}
       </p>
       <TokenField
         ref={token}
@@ -113,21 +115,22 @@ export function TokenForm({ source, name, hasToken, onDone, onCancel }: TokenFor
         autoFocus
       />
       {hasToken ? (
-        <button
-          type="button"
-          className={armed ? "library-token-remove library-armed" : "library-token-remove"}
+        <Button
+          variant="destructive"
+          icon={Trash2}
+          className={armed ? "self-start bg-[var(--destructive)] text-white" : "self-start"}
           onClick={remove}
         >
           {armed ? words.remove_armed : words.remove}
-        </button>
+        </Button>
       ) : null}
-      <div className="library-source-buttons">
-        <button type="button" onClick={cancel}>
+      <div className="grid grid-cols-2 gap-2">
+        <Button icon={X} onClick={cancel}>
           Cancel
-        </button>
-        <button type="button" aria-busy={busy || undefined} onClick={save}>
-          {busy ? <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" /> : "Save"}
-        </button>
+        </Button>
+        <Button variant="primary" icon={Save} busy={busy} onClick={save}>
+          Save
+        </Button>
       </div>
     </div>
   );

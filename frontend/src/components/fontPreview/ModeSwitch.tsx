@@ -4,6 +4,7 @@
 import { useRef } from "react";
 
 import type { PreviewMode } from "@/lib/fontPreviewState";
+import { SEGMENT_ITEM, SEGMENT_STRIP } from "@/components/ui/looks";
 
 const MODES: { mode: PreviewMode; label: string }[] = [
   { mode: "fonts", label: "Fonts" },
@@ -29,7 +30,7 @@ export function ModeSwitch({ mode, onMode, onReturnFocus }: ModeSwitchProps) {
     <div
       role="radiogroup"
       aria-label="Preview mode"
-      className="flex h-7 shrink-0 gap-px overflow-hidden rounded-[5px] ring-1 ring-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]"
+      className={`flex shrink-0 ${SEGMENT_STRIP}`}
       onKeyDown={(event) => {
         const to: Record<string, number> = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: MODES.length - 1 };
         if (event.key in to) {
@@ -56,11 +57,7 @@ export function ModeSwitch({ mode, onMode, onReturnFocus }: ModeSwitchProps) {
                 onReturnFocus();
               }
             }}
-            className={`min-w-8 px-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
-              pressed
-                ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]"
-                : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-            }`}
+            className={`${SEGMENT_ITEM} min-w-8 px-1.5`}
           >
             {entry.label}
           </button>

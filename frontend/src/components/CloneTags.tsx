@@ -1,12 +1,13 @@
 import { ArrowRight, Link2 } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { useBarBox } from "@/hooks/useBarBox";
+import { PAGE_LABEL_GAP, PAGE_LABEL_HEIGHT } from "@/lib/pages";
 import type { CloneTag } from "@/lib/cloneText";
 
 /** A tag is 20 px high (`docs/design-system.md`, "Linked clone marks"). */
 const TAG_HEIGHT_PX = 20;
-/** An edge chip keeps clear of the Select bar: its top edge (12 px), its 36 px and a 12 px gap. */
-const BAR_CLEAR_PX = 60;
 /** The chip's distance from the canvas edges and from the tool rail (`--rail-right` + 12). */
 const EDGE_GAP_PX = 12;
 
@@ -18,8 +19,9 @@ const CHIP_STYLE = {
 } as const;
 
 /** An edge chip, centred on the session's point and clamped with its real width right of the
- * tool rail, below the bar and inside the canvas (UX review must-fix 6). */
-function EdgeChip({ tag }: { tag: CloneTag }) {
+ * tool rail, 12 px below the bars' measured bottom (any number of rows) and inside the canvas
+ * (UX review must-fix 6, 0159 F42). */
+function EdgeChip({ tag, top }: { tag: CloneTag; top: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
@@ -33,12 +35,12 @@ function EdgeChip({ tag }: { tag: CloneTag }) {
       style={{
         ...CHIP_STYLE,
         left: `clamp(calc(var(--rail-right, 0px) + ${EDGE_GAP_PX}px), ${tag.x - half}px, calc(100% - ${width + EDGE_GAP_PX}px))`,
-        top: `clamp(${BAR_CLEAR_PX}px, ${tag.y - TAG_HEIGHT_PX / 2}px, calc(100% - ${TAG_HEIGHT_PX + EDGE_GAP_PX}px))`,
+        top: `clamp(${top}px, ${tag.y - TAG_HEIGHT_PX / 2}px, calc(100% - ${TAG_HEIGHT_PX + EDGE_GAP_PX}px))`,
       }}
     >
-      <Link2 size={12} />
+      <Link2 {...SMALL_GLYPH} />
       {tag.text}
-      <ArrowRight size={12} style={{ transform: `rotate(${tag.toward}rad)` }} />
+      <ArrowRight {...SMALL_GLYPH} style={{ transform: `rotate(${tag.toward}rad)` }} />
     </div>
   );
 }
@@ -53,21 +55,24 @@ interface CloneTagsProps {
  * (the selection announcer says the link) and with no pointer events.
  */
 export function CloneTags({ tags }: CloneTagsProps) {
+  const [root, bars] = useBarBox();
+  // Below the bar and the page label that may sit under it (`pageLabelTop`), so a chip never covers it.
+  const top = (bars?.bottom ?? 0) + PAGE_LABEL_GAP + PAGE_LABEL_HEIGHT + PAGE_LABEL_GAP;
   if (tags.length === 0) {
     return null;
   }
   return (
-    <div aria-hidden data-clone-tags="" className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+    <div ref={root} aria-hidden data-clone-tags="" className="pointer-events-none absolute inset-0 z-[15] overflow-hidden">
       {tags.map((tag, index) =>
         tag.kind === "chip" ? (
-          <EdgeChip key={`chip:${tag.text}:${index}`} tag={tag} />
+          <EdgeChip key={`chip:${tag.text}:${index}`} tag={tag} top={top} />
         ) : (
           <div
             key={`tag:${tag.text}:${index}`}
             className="absolute flex items-center gap-1 whitespace-nowrap rounded-[8px] px-1.5 text-xs"
             style={{ ...CHIP_STYLE, left: tag.x, top: tag.y }}
           >
-            <Link2 size={12} />
+            <Link2 {...SMALL_GLYPH} />
             {tag.text}
           </div>
         ),

@@ -1,4 +1,5 @@
-import { ClipboardPaste, Columns2, Copy, RotateCcw, TriangleAlert } from "lucide-react";
+import { ClipboardPaste, Columns2, Copy, Pencil, RotateCcw, TriangleAlert } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
@@ -21,12 +22,12 @@ import {
   typedField,
 } from "@/lib/adjustText";
 import type { AddButton, AdjustmentsView, PresetKey, StepRow } from "@/lib/adjustmentsView";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
 const RULE = { background: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" };
 const HEADER_BUTTON =
-  "flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-transparent";
-const OUTLINE_BUTTON =
-  "h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-transparent";
 
 /** The strip's two fixed rows: a break after Black and white (`ux-notes.md` §3.2). */
 const PRESET_BREAK = ["black_white"];
@@ -188,7 +189,7 @@ function StepList({
       {drag ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed z-50 rounded bg-[var(--toolbar-bg)] px-2 py-1 text-[13px] text-[var(--toolbar-icon)] opacity-70"
+          className="pointer-events-none fixed z-50 rounded-[8px] bg-[var(--toolbar-bg)] px-2 py-1 text-sm text-[var(--toolbar-icon)] opacity-70"
           style={{ left: drag.x + 8, top: drag.y + 8 }}
         >
           {drag.name}
@@ -217,12 +218,12 @@ function Header({ view, adjust, onToggleBeforeAfter }: { view: AdjustmentsView; 
             onClick={onToggleBeforeAfter}
             className={HEADER_BUTTON}
           >
-            <Columns2 aria-hidden size={16} strokeWidth={1.5} />
+            <Columns2 {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
         <Tooltip side="top" content="Copy adjustments">
           <button type="button" aria-label="Copy adjustments" onClick={() => void adjust.copyAdjustments()} className={HEADER_BUTTON}>
-            <Copy aria-hidden size={16} strokeWidth={1.5} />
+            <Copy {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
         <Tooltip side="top" content="Paste adjustments">
@@ -235,7 +236,7 @@ function Header({ view, adjust, onToggleBeforeAfter }: { view: AdjustmentsView; 
             }}
             className={HEADER_BUTTON}
           >
-            <ClipboardPaste aria-hidden size={16} strokeWidth={1.5} />
+            <ClipboardPaste {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
         <Tooltip side="top" content="Restore original">
@@ -248,7 +249,7 @@ function Header({ view, adjust, onToggleBeforeAfter }: { view: AdjustmentsView; 
             }}
             className={HEADER_BUTTON}
           >
-            <RotateCcw aria-hidden size={16} strokeWidth={1.5} />
+            <RotateCcw {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
       </div>
@@ -312,9 +313,9 @@ export function AdjustmentsGroup({ adjust, view, onToggleBeforeAfter, onReturnFo
       </span>
       <Header view={view} adjust={adjust} onToggleBeforeAfter={onToggleBeforeAfter} />
       {view.memoryLine ? (
-        <p role="alert" className="text-xs text-[var(--field-invalid)]">
+        <AlertLine>
           {view.memoryLine}
-        </p>
+        </AlertLine>
       ) : null}
       {view.stateLine ? <p className="h-4 text-xs text-[var(--panel-muted-fg)]">{view.stateLine}</p> : null}
       <PresetStrip
@@ -358,15 +359,13 @@ export function AdjustmentsGroup({ adjust, view, onToggleBeforeAfter, onReturnFo
               <DerivedRow key={`${i}:${row.kind}`} row={row} />
             ))}
           </ul>
-          <button
-            type="button"
-            className={OUTLINE_BUTTON}
+          <Button icon={Pencil} className="w-full"
             onClick={() => {
               if (adjust.makeEditable()) focusFirst.current = true;
             }}
           >
             Make editable
-          </button>
+          </Button>
         </>
       ) : null}
       {/* No lone hairline: it parts the add toolbar or the steps from what is above. */}
@@ -380,7 +379,7 @@ export function AdjustmentsGroup({ adjust, view, onToggleBeforeAfter, onReturnFo
             data-stored-results=""
             className={`flex h-4 items-center gap-1 text-xs ${view.storedResults.warns ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
           >
-            {view.storedResults.warns ? <TriangleAlert aria-hidden size={12} strokeWidth={1.5} /> : null}
+            {view.storedResults.warns ? <TriangleAlert {...SMALL_GLYPH} aria-hidden /> : null}
             {view.storedResults.line}
           </p>
         </>

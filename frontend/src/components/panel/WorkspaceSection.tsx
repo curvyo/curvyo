@@ -1,4 +1,5 @@
-import { FilePlus, Folder, FolderOpen, FolderPlus, History, X } from "lucide-react";
+import { Check, FilePlus, Folder, FolderOpen, FolderPlus, History, Trash2, Undo2, X } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { WorkspaceDeleted } from "@/components/panel/WorkspaceDeleted";
@@ -8,6 +9,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import type { WorkspaceApi, WorkspaceSlot } from "@/hooks/useWorkspace";
 import { type RecentWorkspaceData, type WorkspaceRowData, targetFolder } from "@/lib/workspaceRows";
 import { devices_removed_alert, workspace_tree_words_json } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The fixed words of a shared workspace's tree, formatted in Rust; read on first use, since the
  * wasm module is not ready while this module loads. */
@@ -20,8 +23,6 @@ function words(): { noDeleted: string } {
 /** Delete ignores presses for this long after the confirm appears, as the File tab's Discard. */
 const DELETE_ARM_MS = 400;
 
-const OUTLINE =
-  "h-7 shrink-0 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9";
 const ICON =
   "flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] pointer-coarse:size-9";
 
@@ -77,9 +78,9 @@ export function WorkspaceSection({ workspace, sharedLine, documentLine, devicesR
           <p role="alert" className="min-w-0 flex-1 text-xs text-[var(--toolbar-icon)]">
             {devicesRemoved ? devices_removed_alert() : workspace.removedText}
           </p>
-          <button type="button" onClick={devicesRemoved ?? workspace.dismissRemoved} className={`${OUTLINE} w-[52px] text-xs`}>
+          <Button icon={Check} onClick={devicesRemoved ?? workspace.dismissRemoved} className="min-w-[52px]">
             OK
-          </button>
+          </Button>
         </div>
       ) : null}
       <div className="flex min-h-7 items-center gap-1">
@@ -99,39 +100,37 @@ export function WorkspaceSection({ workspace, sharedLine, documentLine, devicesR
         {workspace.open ? (
           <>
             <HeaderButton label="New document" data-ws-new="" onPress={() => startNew("new-document")}>
-              <FilePlus size={16} strokeWidth={1.5} aria-hidden />
+              <FilePlus {...GLYPH} aria-hidden />
             </HeaderButton>
             <HeaderButton label="New folder" onPress={() => startNew("new-folder")}>
-              <FolderPlus size={16} strokeWidth={1.5} aria-hidden />
+              <FolderPlus {...GLYPH} aria-hidden />
             </HeaderButton>
             <HeaderButton label="Recent workspaces" pressed={workspace.showRecent} onPress={workspace.toggleRecent}>
-              <History size={16} strokeWidth={1.5} aria-hidden />
+              <History {...GLYPH} aria-hidden />
             </HeaderButton>
             <HeaderButton label="Close workspace" onPress={() => workspace.close(focusTree)}>
-              <X size={16} strokeWidth={1.5} aria-hidden />
+              <X {...GLYPH} aria-hidden />
             </HeaderButton>
           </>
         ) : null}
       </div>
       {!workspace.open ? (
         <div className="mt-2 flex flex-col">
-          <button
-            type="button"
+          <Button icon={FolderOpen}
             onClick={(event) => {
               workspace.pickWorkspace();
               if (event.detail > 0) {
                 onReturnFocus();
               }
             }}
-            className={`${OUTLINE} flex w-full items-center justify-center gap-2`}
+             className="w-full"
           >
-            <FolderOpen size={16} strokeWidth={1.5} aria-hidden />
-            Open workspace…
-          </button>
+Open workspace…
+</Button>
           {workspace.refusal !== "" ? (
-            <p role="alert" className="mt-1 text-xs text-[var(--field-invalid)]">
+            <AlertLine className="mt-1">
               {workspace.refusal}
-            </p>
+            </AlertLine>
           ) : null}
           <RecentList workspace={workspace} />
         </div>
@@ -154,9 +153,9 @@ export function WorkspaceSection({ workspace, sharedLine, documentLine, devicesR
             <div className="mb-1 flex items-start gap-2 pl-1">
               <span aria-hidden className="mt-1 flex text-[var(--toolbar-icon)]">
                 {workspace.naming.mode === "new-folder" ? (
-                  <FolderPlus size={16} strokeWidth={1.5} />
+                  <FolderPlus {...GLYPH} />
                 ) : (
-                  <FilePlus size={16} strokeWidth={1.5} />
+                  <FilePlus {...GLYPH} />
                 )}
               </span>
               <WorkspaceNameField
@@ -199,7 +198,7 @@ function HeaderButton({
   "data-ws-new"?: string;
 }) {
   return (
-    <Tooltip side="bottom" content={label}>
+    <Tooltip side="left" content={label}>
       <button type="button" aria-label={label} aria-pressed={pressed} onClick={onPress} className={ICON} {...rest}>
         {children}
       </button>
@@ -216,31 +215,32 @@ function RecentList({ workspace }: { workspace: WorkspaceApi }) {
     <ul aria-label="Recent workspaces" className="mt-2 flex flex-col">
       {workspace.recents.map((recent: RecentWorkspaceData, index) => (
         <li key={recent.path} className="flex h-10 items-center gap-1 pointer-coarse:h-11">
-          <button
-            type="button"
-            title={recent.path}
-            aria-label={recent.found ? `${recent.name}, ${recent.path}` : `${recent.name}, not found`}
-            onClick={(event) => {
-              if (!recent.found) {
-                event.currentTarget.parentElement?.querySelector<HTMLElement>("[data-ws-remove]")?.focus();
-                return;
-              }
-              workspace.openRecent(index);
-            }}
-            className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-[4px] px-1 text-left outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-            style={{ opacity: recent.found ? 1 : 0.55 }}
-          >
-            <span aria-hidden className="flex text-[var(--toolbar-icon)]">
-              <Folder size={16} strokeWidth={1.5} />
-            </span>
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-sm text-[var(--toolbar-icon)]">{recent.name}</span>
-              <span className="truncate text-xs text-[var(--panel-muted-fg)]" style={{ direction: "rtl", textAlign: "left" }}>
-                {recent.found ? recent.path : "Not found"}
+          <Tooltip side="left" content={recent.path}>
+            <button
+              type="button"
+              aria-label={recent.found ? `${recent.name}, ${recent.path}` : `${recent.name}, not found`}
+              onClick={(event) => {
+                if (!recent.found) {
+                  event.currentTarget.parentElement?.querySelector<HTMLElement>("[data-ws-remove]")?.focus();
+                  return;
+                }
+                workspace.openRecent(index);
+              }}
+              className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-[5px] px-1 text-left outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+              style={{ opacity: recent.found ? 1 : 0.55 }}
+            >
+              <span aria-hidden className="flex text-[var(--toolbar-icon)]">
+                <Folder {...GLYPH} />
               </span>
-            </span>
-          </button>
-          <Tooltip side="bottom" content={`Remove ${recent.name} from recent`}>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm text-[var(--toolbar-icon)]">{recent.name}</span>
+                <span className="truncate text-xs text-[var(--panel-muted-fg)]" style={{ direction: "rtl", textAlign: "left" }}>
+                  {recent.found ? recent.path : "Not found"}
+                </span>
+              </span>
+            </button>
+          </Tooltip>
+          <Tooltip side="left" content={`Remove ${recent.name} from recent`}>
             <button
               type="button"
               data-ws-remove=""
@@ -248,7 +248,7 @@ function RecentList({ workspace }: { workspace: WorkspaceApi }) {
               onClick={() => workspace.removeRecent(index)}
               className={ICON}
             >
-              <X size={16} strokeWidth={1.5} aria-hidden />
+              <X {...GLYPH} aria-hidden />
             </button>
           </Tooltip>
         </li>
@@ -283,9 +283,9 @@ function ActionSlot({
         <p role="status" className="min-w-0 flex-1 text-xs text-[var(--toolbar-icon)]">
           {slot.text}
         </p>
-        <button type="button" onClick={workspace.undoMove} className={`${OUTLINE} w-[76px] text-xs`}>
+        <Button icon={Undo2} onClick={workspace.undoMove} className="min-w-[76px]">
           Undo move
-        </button>
+        </Button>
       </div>
     );
   }
@@ -335,20 +335,18 @@ function AskConfirm({
     >
       <p className="text-xs text-[var(--toolbar-icon)]">{slot.text}</p>
       <div className="mt-2 flex gap-2">
-        <button type="button" autoFocus onClick={cancel} className={`${OUTLINE} w-[76px]`}>
+        <Button icon={X} autoFocus onClick={cancel} className="min-w-[76px]">
           Cancel
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button icon={Check}
           onClick={() => {
             workspace.dismissSlot();
             slot.run();
             refocus();
-          }}
-          className={`${OUTLINE} w-[76px]`}
+          }} className="min-w-[76px]"
         >
           {slot.action}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -382,21 +380,19 @@ function DeleteConfirm({ workspace, text, refocus }: { workspace: WorkspaceApi; 
     >
       <p className="text-xs text-[var(--toolbar-icon)]">{text}</p>
       <div className="mt-2 flex gap-2">
-        <button ref={cancel} type="button" onClick={close} className={`${OUTLINE} w-[76px]`}>
+        <Button icon={X} ref={cancel} onClick={close} className="min-w-[76px]">
           Cancel
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button variant="destructive" icon={Trash2}
           aria-disabled={!armed}
           onClick={() => {
             if (armed) {
               workspace.confirmDelete(refocus);
             }
-          }}
-          className="h-7 w-[76px] shrink-0 rounded-[5px] border border-[var(--destructive)] bg-[var(--background)] text-sm text-[var(--destructive)] outline-none hover:bg-[var(--destructive)] hover:text-white focus-visible:bg-[var(--destructive)] focus-visible:text-white aria-disabled:hover:bg-[var(--background)] aria-disabled:hover:text-[var(--destructive)] pointer-coarse:h-9"
+          }} className="min-w-[76px] shrink-0"
         >
           Delete
-        </button>
+        </Button>
       </div>
     </div>
   );

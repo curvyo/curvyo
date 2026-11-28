@@ -49,7 +49,7 @@ async function barHtml(level: string, layout = "grid", imagesCopies = false): Pr
 
 async function applyButton(level: string): Promise<string> {
   const html = await barHtml(level);
-  const match = /<button[^>]*>Apply<\/button>/.exec(html);
+  const match = /<button[^>]*>(?:<svg[\s\S]*?<\/svg>)?Apply<\/button>/.exec(html);
   assert.ok(match, "Apply is rendered");
   return match[0];
 }
@@ -75,7 +75,7 @@ test("UX notes §12.2: no Cancel, seed or count text; Apply last; Grid and Circl
     assert.doesNotMatch(html, /instances?</, "no count text");
     assert.match(html, /role="radio"[^>]*aria-label="Grid"/);
     assert.match(html, /role="radio"[^>]*aria-label="Circle"/);
-    const buttons = [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
+    const buttons = [...html.matchAll(/<button[^>]*>(?:<svg[\s\S]*?<\/svg>)?([^<]*)<\/button>/g)].map((m) => m[1]);
     assert.equal(buttons.at(-1), "Apply", "Apply comes last in the DOM");
   }
   const circle = await barHtml("fine", "circle");
@@ -91,7 +91,8 @@ test("UX notes §12.3: the notice slot shows only while a notice is active", asy
   assert.match(await barHtml("simplified"), /role="status"[^>]*aria-label="Over 10,000 instances\. The preview is simplified\."/);
   assert.match(await barHtml("fine", "grid", true), /aria-label="Images become copies\."/);
   const refused = await barHtml("refused");
-  assert.match(refused, /role="alert"[^>]*>Too many instances\. 100,000 at most\.</, "the refusal stays readable");
+  // The shared refusal notice (0159 F57): its CircleAlert, then the text.
+  assert.match(refused, /role="alert"[^>]*>(?:<svg[\s\S]*?<\/svg>)?<span[^>]*>Too many instances\. 100,000 at most\.</, "the refusal stays readable");
 });
 
 test("UX notes §12.5 (2026-11-02): the Variance blocks sit side by side and wrap on a narrower bar", () => {

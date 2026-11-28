@@ -1,7 +1,9 @@
 import { Import } from "lucide-react";
+import { RAIL_GLYPH } from "@/components/ui/looks";
 import { Tooltip } from "radix-ui";
 
 import { COLUMN_A_TOOLTIP_OFFSET_PX, RAIL_CARD_CLASS, RAIL_CARD_STYLE } from "@/components/railCard";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
 interface ImportCardProps {
   /** The primary modifier's name: "Cmd" on macOS, else "Ctrl". */
@@ -33,16 +35,16 @@ export function ImportCard({ primary, onImport }: ImportCardProps) {
             aria-label="Import"
             data-import-button
             onClick={onImport}
-            className="flex size-10 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] active:bg-[var(--editor-accent-hover)]"
+            className="flex size-10 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] active:bg-[var(--editor-accent-hover)]"
           >
-            <Import size={20} />
+            <Import {...RAIL_GLYPH} />
           </button>
         </Tooltip.Trigger>
         <Tooltip.Portal>
           <Tooltip.Content
             side="right"
             sideOffset={COLUMN_A_TOOLTIP_OFFSET_PX}
-            className="z-50 rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground ring-1 ring-foreground/10"
+            className={TOOLTIP_CLASS}
           >
             {name}
           </Tooltip.Content>

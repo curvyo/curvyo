@@ -1,4 +1,4 @@
-import { Diff, Link2Off, RotateCcw, TriangleAlert } from "lucide-react";
+import { Diff, Link2Off, Pencil, RotateCcw, TriangleAlert } from "lucide-react";
 import { useId, useRef, useState, type ReactNode } from "react";
 
 import { MaterialPick } from "@/components/panel/MaterialPick";
@@ -22,6 +22,8 @@ import {
 } from "@/lib/operationSettingsRows";
 import type { OperationRow } from "@/lib/operationsView";
 import type { OperationSettings, PickMaterial, SetView } from "@/lib/operationSettingsView";
+import { Button } from "@/components/ui/button";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
 
 interface OperationSettingsBlockProps {
   /** The selected operations in list order. */
@@ -46,8 +48,7 @@ const GLYPHS: Record<StateGlyph, typeof Link2Off> = {
   warning: TriangleAlert,
 };
 
-const BUTTON =
-  "flex h-7 items-center gap-1 rounded border border-[var(--lane-line)] px-2 text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+const BUTTON = buttonClass("secondary", "panel", "px-2");
 
 /** The two sets of Engrave + Outline have sub-headings; any other kind has one set and none. */
 function SetHeading({ set }: { set: SetView }) {
@@ -109,7 +110,7 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
   if (single === null) {
     return (
       <div role="group" aria-label={`Settings of ${subject}`} className="flex flex-col gap-1">
-        <div className="flex h-6 items-center text-[13px] font-semibold text-[var(--toolbar-icon)]">{subject}</div>
+        <div className="flex h-6 items-center text-sm font-semibold text-[var(--toolbar-icon)]">{subject}</div>
         {picker}
         {pickPick}
         {skip}
@@ -127,7 +128,7 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
         {blockSummary(settings)}
       </p>
       {embedded ? null : (
-        <div className="flex h-6 items-center gap-2 text-[13px] font-semibold text-[var(--toolbar-icon)]">
+        <div className="flex h-6 items-center gap-2 text-sm font-semibold text-[var(--toolbar-icon)]">
           {single.kind === "unknown" ? null : <OperationGlyph kind={single.kind} />}
           <span className="min-w-0 truncate" title={single.name}>
             {single.name}
@@ -139,7 +140,7 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
       {skip}
       {settings.state === "damaged" ? (
         <p className="flex items-start gap-1 text-xs text-[var(--toolbar-icon)]">
-          <TriangleAlert size={16} aria-hidden className="shrink-0" />
+          <TriangleAlert {...GLYPH} aria-hidden className="shrink-0" />
           Damaged settings
         </p>
       ) : null}
@@ -183,21 +184,19 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
               }}
               className={BUTTON}
             >
-              <RotateCcw size={16} aria-hidden />
+              <RotateCcw {...GLYPH} aria-hidden />
               Reset to material
             </button>
           ) : (
             <span />
           )}
           {showEdit && material ? (
-            <button
-              type="button"
+            <Button icon={Pencil}
               aria-label={`Edit material ${material.name}`}
               onClick={() => onEditMaterial(material.id)}
-              className={BUTTON}
             >
               Edit material
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}

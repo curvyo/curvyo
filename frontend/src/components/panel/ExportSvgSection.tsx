@@ -7,18 +7,17 @@ import {
   saveSvgExportOptions,
   type SvgExportOptions,
 } from "@/lib/svgExport";
+import { Button } from "@/components/ui/button";
+import { File, FileOutput, MousePointerClick, Spline, Type, type LucideIcon } from "lucide-react";
+import { ToggleButton } from "@/components/ui/toggle-button";
 
-const BUTTON =
-  "h-7 shrink-0 rounded-[5px] border text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9";
-const OUTLINE =
-  "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
 
 /** The labels of the four export switches, in tab order (`0024` `ux-notes.md`, exact). */
-const EXPORT_SWITCHES: [keyof SvgExportOptions, string][] = [
-  ["textAsPaths", "Text as paths"],
-  ["strokesAsPaths", "Strokes as paths"],
-  ["selectionOnly", "Selection only"],
-  ["activePageOnly", "Active page only"],
+const EXPORT_SWITCHES: [keyof SvgExportOptions, string, LucideIcon][] = [
+  ["textAsPaths", "Text as paths", Type],
+  ["strokesAsPaths", "Strokes as paths", Spline],
+  ["selectionOnly", "Selection only", MousePointerClick],
+  ["activePageOnly", "Active page only", File],
 ];
 
 /** The page's storage, or `null` where reading it throws. */
@@ -63,49 +62,24 @@ export function ExportSvgSection({
         SVG export
       </h3>
       <Tooltip side="left" content="Export SVG">
-        <button
-          type="button"
+        <Button icon={FileOutput}
           data-export-svg
-          onClick={(event) => project.exportSvg(options, event.detail > 0)}
-          className={`${BUTTON} ${OUTLINE} w-[118px]`}
+          onClick={(event) => project.exportSvg(options, event.detail > 0)} className="min-w-[118px]"
         >
           Export SVG…
-        </button>
+        </Button>
       </Tooltip>
-      <div role="group" aria-label="Export options" className="mt-2 flex flex-col">
-        {EXPORT_SWITCHES.map(([name, label]) => (
-          <button
+      <div role="group" aria-label="Export options" className="mt-2 flex flex-col gap-1">
+        {EXPORT_SWITCHES.map(([name, label, icon]) => (
+          <ToggleButton
             key={name}
-            type="button"
-            role="switch"
-            aria-checked={options[name]}
-            data-export-option={name}
-            onClick={(event) => {
-              toggle(name);
-              if (event.detail > 0) {
-                onReturnFocus();
-              }
-            }}
-            className="flex h-6 items-center gap-2 rounded-[5px] text-left text-xs text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9"
-          >
-            <span
-              aria-hidden
-              className={`relative inline-block h-[14px] w-6 shrink-0 rounded-full border ${
-                options[name]
-                  ? "border-[var(--toolbar-icon-active-bg)] bg-[var(--toolbar-icon-active-bg)]"
-                  : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent"
-              }`}
-            >
-              <span
-                className={`absolute top-[2px] h-2 w-2 rounded-full transition-[left] motion-reduce:transition-none ${
-                  options[name]
-                    ? "left-[12px] bg-[var(--toolbar-icon-active-fg)]"
-                    : "left-[2px] bg-[var(--toolbar-icon)]"
-                }`}
-              />
-            </span>
-            {label}
-          </button>
+            icon={icon}
+            label={label}
+            pressed={options[name]}
+            onPressedChange={() => toggle(name)}
+            onReturnFocus={onReturnFocus}
+            extra={{ "data-export-option": name }}
+          />
         ))}
       </div>
     </section>

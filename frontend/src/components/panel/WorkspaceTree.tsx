@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, Copy, FilePlus, FileText, Folder, Trash2, TriangleAlert } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { WorkspaceNameField } from "@/components/panel/WorkspaceNameField";
@@ -23,6 +24,7 @@ import {
   thumbnailKey,
 } from "@/lib/workspaceRows";
 import { isMac } from "@/lib/historyText";
+import { Button } from "@/components/ui/button";
 
 const MAC = isMac(navigator.platform);
 
@@ -56,7 +58,7 @@ interface WorkspaceTreeProps {
 }
 
 const ICON_BUTTON =
-  "flex size-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "flex size-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 /**
  * The workspace tree (`specs/0095-workspace` criteria 5 to 9, 11, 13 to 17; `ux-notes.md`
@@ -419,7 +421,7 @@ export function WorkspaceTree({ workspace, onFocusRow, onReturnFocus, rootDropRe
       {drag?.active ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed z-50 rounded-[4px] bg-[var(--toolbar-bg)] px-2 py-1 text-sm text-[var(--toolbar-icon)] opacity-70 border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)]"
+          className="pointer-events-none fixed z-50 rounded-[8px] bg-[var(--toolbar-bg)] px-2 py-1 text-sm text-[var(--toolbar-icon)] opacity-70 border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)]"
           style={{ left: drag.x + 12, top: drag.y + 8 }}
         >
           {drag.name}
@@ -434,13 +436,11 @@ function EmptyTree({ onNew }: { onNew: () => void }) {
   return (
     <div className="flex flex-col items-center pt-4">
       <p className="text-xs text-[var(--panel-muted-fg)]">No documents.</p>
-      <button
-        type="button"
-        onClick={onNew}
-        className="mt-4 h-7 w-[118px] rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9"
+      <Button icon={FilePlus}
+        onClick={onNew} className="mt-4 min-w-[118px]"
       >
         New document
-      </button>
+      </Button>
     </div>
   );
 }
@@ -515,19 +515,19 @@ function TreeRow({
           onDragStart(event);
         }
       }}
-      className={`group absolute right-0 left-0 flex items-center gap-2 rounded-[4px] pr-1 outline-none select-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-inset ${
+      className={`group absolute right-0 left-0 flex items-center gap-2 rounded-[5px] pr-1 outline-none select-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-inset ${
         open ? "bg-[color-mix(in_srgb,var(--editor-accent)_14%,transparent)] font-semibold" : "hover:bg-[var(--editor-accent-hover)]"
       } ${dropTarget ? "outline outline-[1.5px] outline-[var(--editor-accent)]" : ""} ${renaming ? "z-10 bg-[var(--toolbar-bg)]" : ""}`}
       style={{ top, height, paddingLeft: indentPx(row.level) + 4, opacity: cut ? 0.55 : 1 }}
     >
-      {open ? <span aria-hidden className="absolute top-1 bottom-1 left-0 w-[3px] rounded bg-[var(--editor-accent)]" /> : null}
+      {open ? <span aria-hidden className="absolute top-1 bottom-1 left-0 w-[3px] rounded-full bg-[var(--editor-accent)]" /> : null}
       {folder ? (
         <>
           <span aria-hidden className="flex text-[var(--toolbar-icon)]">
-            {row.expanded ? <ChevronDown size={16} strokeWidth={1.5} /> : <ChevronRight size={16} strokeWidth={1.5} />}
+            {row.expanded ? <ChevronDown {...GLYPH} /> : <ChevronRight {...GLYPH} />}
           </span>
           <span aria-hidden className="flex text-[var(--toolbar-icon)]">
-            <Folder size={16} strokeWidth={1.5} />
+            <Folder {...GLYPH} />
           </span>
         </>
       ) : (
@@ -579,7 +579,7 @@ function TreeRow({
               tabbable={false}
               onPress={() => workspace.startNaming({ mode: "new-document", folder: targetFolder(row), error: "" })}
             >
-              <FilePlus size={16} strokeWidth={1.5} aria-hidden />
+              <FilePlus {...GLYPH} aria-hidden />
             </RowButton>
           </span>
         </>
@@ -598,7 +598,7 @@ function TreeRow({
             onFocus={() => onFocus("duplicate")}
             onPress={() => workspace.duplicate(row.path)}
           >
-            <Copy size={16} strokeWidth={1.5} aria-hidden />
+            <Copy {...GLYPH} aria-hidden />
           </RowButton>
           <RowButton
             label={`Delete ${row.name}`}
@@ -607,7 +607,7 @@ function TreeRow({
             onFocus={() => onFocus("delete")}
             onPress={() => workspace.askDelete(row.path)}
           >
-            <Trash2 size={16} strokeWidth={1.5} aria-hidden />
+            <Trash2 {...GLYPH} aria-hidden />
           </RowButton>
         </span>
       )}
@@ -653,7 +653,7 @@ function RowButton({
   children: React.ReactNode;
 }) {
   return (
-    <Tooltip side="bottom" content={label}>
+    <Tooltip side="left" content={label}>
       <button
         type="button"
         role="gridcell"
@@ -679,14 +679,14 @@ function Thumbnail({ state }: { state: ThumbnailState | null }) {
   return (
     <span
       aria-hidden
-      className="flex h-7 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[3px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] bg-[var(--canvas-bg)] text-[var(--toolbar-icon)]"
+      className="flex h-7 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] bg-[var(--canvas-bg)] text-[var(--toolbar-icon)]"
     >
       {state?.kind === "unreadable" ? (
-        <TriangleAlert size={16} strokeWidth={1.5} />
+        <TriangleAlert {...GLYPH} />
       ) : state?.kind === "thumbnail" && state.url ? (
         <img src={state.url} alt="" draggable={false} className="h-full w-full object-contain" />
       ) : (
-        <FileText size={16} strokeWidth={1.5} />
+        <FileText {...GLYPH} />
       )}
     </span>
   );

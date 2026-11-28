@@ -22,6 +22,7 @@ import {
   membership_role_line,
   membership_word,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const GLYPH = { size: 16, strokeWidth: 1.5, absoluteStrokeWidth: true, "aria-hidden": true } as const;
 const ICON = `${BUTTON} ${OUTLINE} w-7 border-transparent pointer-coarse:w-9`;
@@ -134,54 +135,57 @@ function ParticipantRow({
         </div>
         {roleAction ? (
           <span {...roleArm.zone} className="flex">
-            <button
-              {...roleArm.control}
-              type="button"
-              data-slot="role"
-              data-make-admin={makeAdmin ? "" : undefined}
-              aria-label={membership_role_action_name(label, makeAdmin, own)}
-              aria-disabled={roleBlocked}
-              aria-description={roleBlocked ? blocked : undefined}
-              title={roleBlocked ? blocked : membership_word(makeAdmin ? (frozenText ? "make-admin-anyway" : "make-admin") : own ? "step-down" : "make-member")}
-              className={iconLook(roleArm.armed, makeAdmin && !frozenText)}
-              onClick={pressRole}
-            >
-              {makeAdmin ? <ShieldPlus {...GLYPH} /> : <ShieldMinus {...GLYPH} />}
-            </button>
+            <Tooltip side="left" content={roleBlocked ? blocked : membership_word(makeAdmin ? (frozenText ? "make-admin-anyway" : "make-admin") : own ? "step-down" : "make-member")}>
+              <button
+                {...roleArm.control}
+                type="button"
+                data-slot="role"
+                data-make-admin={makeAdmin ? "" : undefined}
+                aria-label={membership_role_action_name(label, makeAdmin, own)}
+                aria-disabled={roleBlocked}
+                aria-description={roleBlocked ? blocked : undefined}
+                className={iconLook(roleArm.armed, makeAdmin && !frozenText)}
+                onClick={pressRole}
+              >
+                {makeAdmin ? <ShieldPlus {...GLYPH} /> : <ShieldMinus {...GLYPH} />}
+              </button>
+            </Tooltip>
           </span>
         ) : (
           <span aria-hidden className="w-7 shrink-0 pointer-coarse:w-9" />
         )}
         {stopping ? (
           <span {...actionArm.zone} className="flex">
-            <button
-              {...actionArm.control}
-              type="button"
-              data-slot="action"
-              aria-label={membership_word("stop-sharing")}
-              title={membership_word("stop-sharing")}
-              className={iconLook(actionArm.armed)}
-              onClick={pressAction}
-            >
-              <CircleOff {...GLYPH} />
-            </button>
+            <Tooltip side="left" content={membership_word("stop-sharing")}>
+              <button
+                {...actionArm.control}
+                type="button"
+                data-slot="action"
+                aria-label={membership_word("stop-sharing")}
+                className={iconLook(actionArm.armed)}
+                onClick={pressAction}
+              >
+                <CircleOff {...GLYPH} />
+              </button>
+            </Tooltip>
           </span>
         ) : removable || (own && participant.canLeave) ? (
           <span {...actionArm.zone} className="flex">
-            <button
-              {...actionArm.control}
-              ref={actionButton}
-              type="button"
-              data-slot="action"
-              aria-label={removable ? membership_remove_name(label) : membership_leave_name(name)}
-              aria-disabled={!removable && leaveBlocked}
-              aria-description={!removable && leaveBlocked ? blocked : undefined}
-              title={!removable && leaveBlocked ? blocked : membership_word(removable ? "remove" : "leave")}
-              className={iconLook(actionArm.armed)}
-              onClick={pressAction}
-            >
-              {removable ? <UserMinus {...GLYPH} /> : <LogOut {...GLYPH} />}
-            </button>
+            <Tooltip side="left" content={!removable && leaveBlocked ? blocked : membership_word(removable ? "remove" : "leave")}>
+              <button
+                {...actionArm.control}
+                ref={actionButton}
+                type="button"
+                data-slot="action"
+                aria-label={removable ? membership_remove_name(label) : membership_leave_name(name)}
+                aria-disabled={!removable && leaveBlocked}
+                aria-description={!removable && leaveBlocked ? blocked : undefined}
+                className={iconLook(actionArm.armed)}
+                onClick={pressAction}
+              >
+                {removable ? <UserMinus {...GLYPH} /> : <LogOut {...GLYPH} />}
+              </button>
+            </Tooltip>
           </span>
         ) : (
           <span aria-hidden className="w-7 shrink-0 pointer-coarse:w-9" />

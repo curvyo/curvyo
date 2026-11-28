@@ -6,6 +6,7 @@
 // characters" button, 12 px below. It is in the tree only while a text is selected or edited (the
 // customer's exception to "Hidden, not disabled", design system).
 import { ChevronDown, ChevronRight, WholeWord } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { ValueField } from "@/components/panel/ValueField";
@@ -33,7 +34,7 @@ const MESSAGES = { number: "Enter a number" } as const;
 
 /** The 28 x 28 icon button beside a per-character field (the Text bar's icon button look). */
 const ALL_BUTTON_CLASS =
-  "flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-disabled:opacity-40 aria-disabled:hover:bg-transparent";
+  "flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)] aria-disabled:opacity-40 aria-disabled:hover:bg-transparent";
 
 interface TextLayoutBlockProps {
   layout: TextLayoutApi;
@@ -117,14 +118,14 @@ export function TextLayoutBlock({ layout, fields, onReturnFocus }: TextLayoutBlo
               }}
               className={ALL_BUTTON_CLASS}
             >
-              <WholeWord size={16} strokeWidth={1.5} aria-hidden />
+              <WholeWord {...GLYPH} aria-hidden />
             </button>
           </Tooltip>
         ) : null}
         {layout.notice?.field === code ? (
           <div
             role="status"
-            className="absolute top-full left-0 z-30 mt-1 w-max max-w-[480px] rounded-lg bg-[var(--toolbar-bg)] p-2 text-xs text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)]"
+            className="absolute top-full left-0 z-30 mt-1 w-max max-w-[480px] rounded-[8px] bg-[var(--toolbar-bg)] p-2 text-xs text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)]"
           >
             {layout.notice.text}
           </div>
@@ -151,7 +152,7 @@ export function TextLayoutBlock({ layout, fields, onReturnFocus }: TextLayoutBlo
         }}
         className="flex h-7 w-full items-center gap-1 rounded-[5px] px-1 text-left text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
-        {open ? <ChevronDown size={12} aria-hidden /> : <ChevronRight size={12} aria-hidden />}
+        {open ? <ChevronDown {...SMALL_GLYPH} aria-hidden /> : <ChevronRight {...SMALL_GLYPH} aria-hidden />}
         <span>Text layout</span>
         {changed ? (
           <span

@@ -4,6 +4,7 @@ import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { EntryField } from "@/components/panel/EntryField";
 import { Divider, useRowStarts } from "@/components/SelectToolbar";
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
+import { ToggleButton } from "@/components/ui/toggle-button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { TestGridMaterialMenu } from "@/components/TestGridMaterialMenu";
 import type { TestGridToolApi } from "@/hooks/useTestGridTool";
@@ -11,7 +12,6 @@ import type { DitherMode, SetKind } from "@/lib/operationSettingsView";
 import {
   CELL_STEP,
   PARAM_STEP,
-  PARAM_UNIT,
   PARAM_WORD,
   SHARED_WIDTH,
   axisFieldName,
@@ -20,11 +20,14 @@ import {
   axisUnit,
   barName,
   fieldText,
+  fieldUnit,
   plainNumber,
+  sharedFieldName,
   steppedText,
 } from "@/lib/testGridBar";
 import type { AxisFields, Param, TestGridBarView } from "@/lib/testGridView";
 import { CHIP_IS_MESSAGE, outcomeOf } from "@/lib/settingsFieldText";
+import { SEGMENT_ITEM, SEGMENT_STRIP } from "@/components/ui/looks";
 
 const KINDS: readonly { kind: SetKind; word: string }[] = [
   { kind: "cut", word: "Cut" },
@@ -38,11 +41,11 @@ const KINDS: readonly { kind: SetKind; word: string }[] = [
 const ROW_CLASS = "flex min-w-0 flex-wrap items-start gap-x-[25px] gap-y-0";
 
 /** The segments' ground: 28 px, 1 px ink at 60 %, rounded 5 px (the preset strip look). */
-const GROUP_CLASS = "flex h-7 shrink-0 overflow-hidden rounded-[5px] outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/60";
+const GROUP_CLASS = `flex shrink-0 ${SEGMENT_STRIP}`;
 
 /** The Dither's ground: the same look, its two halves side by side or, when the bar row is too
  * narrow for the six, one under the other (two rows of three). */
-const HALVES_CLASS = "flex min-w-0 max-w-full flex-wrap overflow-hidden rounded-[5px] outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/60";
+const HALVES_CLASS = `flex min-w-0 max-w-full flex-wrap ${SEGMENT_STRIP}`;
 
 interface SegmentOption<T extends string> {
   value: T;
@@ -98,7 +101,7 @@ function Segments<T extends string>({
         tabIndex={on ? 0 : -1}
         onClick={() => onPick(option.value)}
         style={{ minWidth: option.width }}
-        className={`flex shrink-0 items-center justify-center gap-1 px-1.5 text-[13px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${on ? "bg-[var(--value-fill)]" : ""}`}
+        className={`${SEGMENT_ITEM} shrink-0 px-1.5`}
       >
         {option.glyph ? <OperationGlyph kind={option.glyph} /> : null}
         {option.symbol ?? option.label}
@@ -251,7 +254,7 @@ export function TestGridBar({ tool, view, onNewMaterial, onReturnFocus }: TestGr
   const noticeId = useId();
   const shared = (param: Param) => view.shared.find((one) => one.param === param);
   const notice = tool.pressNotice ?? view.fit;
-  const pill = "pointer-events-auto flex min-w-0 max-w-full flex-col rounded-lg px-2 text-sm";
+  const pill = "pointer-events-auto flex min-w-0 max-w-full flex-col rounded-[8px] px-2 text-sm";
   const row1 = useRef<HTMLDivElement>(null);
   const row2 = useRef<HTMLDivElement>(null);
   useRowStarts(row1);
@@ -277,12 +280,14 @@ export function TestGridBar({ tool, view, onNewMaterial, onReturnFocus }: TestGr
           </div>
           <div className="group/row relative flex items-center gap-2">
             <Divider />
+            {/* The code says what it is: the muted caption "Test" before it, like the row captions
+                (0159 F47). */}
             {view.id !== null ? (
-              <span
-                title="Test id"
-                className="flex h-9 w-16 shrink-0 items-center font-mono text-[13px] font-semibold tracking-[0.08em] text-[var(--toolbar-icon)]"
-              >
-                {view.id}
+              <span className="flex h-9 shrink-0 items-center gap-1.5 text-[var(--toolbar-icon)]">
+                <span className="text-xs text-[var(--panel-muted-fg)]">Test</span>
+                <Tooltip side="bottom" content="Test id">
+                  <span className="font-mono text-sm font-semibold tracking-[0.08em]">{view.id}</span>
+                </Tooltip>
               </span>
             ) : null}
             <TestGridMaterialMenu
@@ -299,9 +304,9 @@ export function TestGridBar({ tool, view, onNewMaterial, onReturnFocus }: TestGr
               return (
                 <BarField
                   key={param}
-                  name={`${PARAM_WORD[param]}, ${PARAM_UNIT[param]}`}
+                  name={sharedFieldName(param)}
                   prefix={PARAM_WORD[param]}
-                  unit={PARAM_UNIT[param]}
+                  unit={fieldUnit(param)}
                   fieldKey={param}
                   value={one.value}
                   width={SHARED_WIDTH[param]}
@@ -313,20 +318,14 @@ export function TestGridBar({ tool, view, onNewMaterial, onReturnFocus }: TestGr
               );
             })}
             {view.crosshatch !== null ? (
-              <button
-                type="button"
-                aria-label="Crosshatch"
-                aria-pressed={view.crosshatch}
-                title="Crosshatch"
-                onClick={() => tool.setCrosshatch(!view.crosshatch)}
-                className={`flex size-7 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
-                  view.crosshatch
-                    ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]"
-                    : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-                }`}
-              >
-                <Hash size={16} aria-hidden />
-              </button>
+              <ToggleButton
+                look="icon"
+                icon={Hash}
+                label="Crosshatch"
+                tooltip="Crosshatch"
+                pressed={view.crosshatch}
+                onPressedChange={(on) => tool.setCrosshatch(on)}
+              />
             ) : null}
           </div>
           {view.picture !== null ? (
@@ -389,7 +388,7 @@ export function TestGridBar({ tool, view, onNewMaterial, onReturnFocus }: TestGr
         <p
           id={noticeId}
           role="alert"
-          className="pointer-events-auto w-fit max-w-full rounded-md px-2 py-1 text-xs text-[var(--toolbar-icon)]"
+          className="pointer-events-auto w-fit max-w-full rounded-[8px] px-2 py-1 text-xs text-[var(--toolbar-icon)]"
           style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
         >
           {notice}

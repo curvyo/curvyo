@@ -110,7 +110,7 @@ export function CurvesGraph({
       onPointerUp={up}
       onPointerCancel={() => setDrag(null)}
       onKeyDown={key}
-      className="shrink-0 touch-none rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+      className="shrink-0 touch-none rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
     >
       <rect x={0} y={0} width={SIDE} height={SIDE} fill="var(--field-bg, white)" stroke="var(--field-border)" strokeWidth={1} />
       {[0.25, 0.5, 0.75].map((f) => (

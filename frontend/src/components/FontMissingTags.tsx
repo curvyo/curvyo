@@ -1,6 +1,7 @@
 // The "Font missing" tags on the canvas (`specs/0074-text-objects` criterion 29, UX notes §4):
 // on every text drawn with the substitute face, selected or not, above its line box.
 import { TriangleAlert } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 
 interface FontMissingTagsProps {
   marks: { x: number; y: number }[];
@@ -24,10 +25,10 @@ export function FontMissingTags({ marks, hidden }: FontMissingTagsProps) {
           // eslint-disable-next-line react/no-array-index-key
           key={index}
           aria-hidden
-          className="pointer-events-none absolute flex items-center gap-1 rounded-lg border border-[var(--field-invalid)] bg-[var(--toolbar-bg)] px-1.5 text-xs whitespace-nowrap text-[var(--toolbar-icon)]"
+          className="pointer-events-none absolute flex items-center gap-1 rounded-[8px] border border-[var(--field-invalid)] bg-[var(--toolbar-bg)] px-1.5 text-xs whitespace-nowrap text-[var(--toolbar-icon)]"
           style={{ left: mark.x, top: mark.y - TAG_PX - CLEAR_PX, height: TAG_PX }}
         >
-          <TriangleAlert size={12} className="text-[var(--field-invalid)]" />
+          <TriangleAlert {...SMALL_GLYPH} className="text-[var(--field-invalid)]" />
           Font missing
         </div>
       ))}

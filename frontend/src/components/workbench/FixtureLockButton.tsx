@@ -5,7 +5,7 @@ import { lockTooltip } from "@/lib/fixtureSets";
 
 /** `ICON_BUTTON` without its text colour, so the ink and the muted state each set their own. */
 const LOCK_BUTTON =
-  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 /** Only a Lock that presses lights on hover. */
 const PRESSABLE = "hover:bg-[var(--editor-accent-hover)]";
 const INK = "text-[var(--toolbar-icon)]";

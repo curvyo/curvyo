@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronUp, Eye, EyeOff, Power, PowerOff, Trash2 } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
@@ -6,6 +7,8 @@ import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import type { JobRow } from "@/lib/fixtureJobsView";
 import { armKey, isFixedJob, jobAccessibleName, jobLine2 } from "@/lib/fixtureJobRows";
 import { focusAfterRename, nameKeyAction } from "@/lib/operationRows";
+import { RenameField as RenameInput } from "@/components/ui/rename-field";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** What a job row asks of the section: the session calls and the row's own states. */
 export interface JobRowActions {
@@ -50,7 +53,7 @@ export interface JobRowProps {
 }
 
 const CONTROL =
-  "flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "flex h-6 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 /**
  * One job's row (`specs/0103-fixture-jobs` `ux-notes.md` section 4): line 1 the glyph, the name,
@@ -71,7 +74,7 @@ export function FixtureJobRowView(props: JobRowProps) {
       aria-posinset={index + 1}
       aria-setsize={props.total}
       {...{ [ARM_ZONE]: key }}
-      className={`relative flex flex-col rounded px-1 has-[[data-row-name]:focus-visible]:ring-2 has-[[data-row-name]:focus-visible]:ring-inset has-[[data-row-name]:focus-visible]:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : ""} ${props.dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""} ${props.selected ? "bg-[var(--value-fill)] shadow-[inset_3px_0_0_var(--editor-accent)]" : ""}`}
+      className={`relative flex flex-col rounded-[5px] px-1 has-[[data-row-name]:focus-visible]:ring-2 has-[[data-row-name]:focus-visible]:ring-inset has-[[data-row-name]:focus-visible]:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : ""} ${props.dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""} ${props.selected ? "bg-[var(--value-fill)] shadow-[inset_3px_0_0_var(--editor-accent)]" : ""}`}
       style={{ height: props.children ? undefined : 40 }}
     >
       {props.insertion ? (
@@ -94,44 +97,47 @@ export function FixtureJobRowView(props: JobRowProps) {
         {renaming ? (
           <RenameField row={row} actions={actions} />
         ) : (
-          <button
-            type="button"
-            data-row-name
-            tabIndex={props.tabStop ? 0 : -1}
-            aria-expanded={unknown ? undefined : props.selected}
-            aria-label={jobAccessibleName(row)}
-            title={row.name}
-            onFocus={props.onFocusRow}
-            onClick={() => actions.select(row)}
-            onDoubleClick={() => actions.select(row, !fixed)}
-            onKeyDown={(event) => onNameKey(event, row, armed, actions)}
-            className={`min-w-0 flex-1 truncate text-left text-[13px] focus-visible:outline-none ${row.show && row.output && !unknown ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
-          >
-            {row.name}
-          </button>
+          <Tooltip side="left" content={row.name}>
+            <button
+              type="button"
+              data-row-name
+              tabIndex={props.tabStop ? 0 : -1}
+              aria-expanded={unknown ? undefined : props.selected}
+              aria-label={jobAccessibleName(row)}
+              onFocus={props.onFocusRow}
+              onClick={() => actions.select(row)}
+              onDoubleClick={() => actions.select(row, !fixed)}
+              onKeyDown={(event) => onNameKey(event, row, armed, actions)}
+              className={`min-w-0 flex-1 truncate text-left text-sm focus-visible:outline-none ${row.show && row.output && !unknown ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
+            >
+              {row.name}
+            </button>
+          </Tooltip>
         )}
         {renaming || unknown ? null : (
           <>
-            <button
-              type="button"
-              aria-pressed={row.show}
-              aria-label={`Show ${row.name}`}
-              title={`Show ${row.name}`}
-              onClick={() => actions.setShow(row, !row.show)}
-              className={CONTROL}
-            >
-              {row.show ? <Eye size={16} aria-hidden /> : <EyeOff size={16} aria-hidden />}
-            </button>
-            <button
-              type="button"
-              aria-pressed={row.output}
-              aria-label={`Output ${row.name}`}
-              title={`Output ${row.name}`}
-              onClick={() => actions.setOutput(row, !row.output)}
-              className={CONTROL}
-            >
-              {row.output ? <Power size={16} aria-hidden /> : <PowerOff size={16} aria-hidden />}
-            </button>
+            <Tooltip side="left" content={`Show ${row.name}`}>
+              <button
+                type="button"
+                aria-pressed={row.show}
+                aria-label={`Show ${row.name}`}
+                onClick={() => actions.setShow(row, !row.show)}
+                className={CONTROL}
+              >
+                {row.show ? <Eye {...GLYPH} aria-hidden /> : <EyeOff {...GLYPH} aria-hidden />}
+              </button>
+            </Tooltip>
+            <Tooltip side="left" content={`Output ${row.name}`}>
+              <button
+                type="button"
+                aria-pressed={row.output}
+                aria-label={`Output ${row.name}`}
+                onClick={() => actions.setOutput(row, !row.output)}
+                className={CONTROL}
+              >
+                {row.output ? <Power {...GLYPH} aria-hidden /> : <PowerOff {...GLYPH} aria-hidden />}
+              </button>
+            </Tooltip>
           </>
         )}
         {renaming || fixed ? null : <TrashButton row={row} armed={armed} actions={actions} />}
@@ -152,20 +158,21 @@ export function FixtureJobRowView(props: JobRowProps) {
 /** The trash (`0081`): idle, or armed as the filled square; the section's arm store owns the state. */
 function TrashButton({ row, armed, actions }: { row: JobRow; armed: boolean; actions: JobRowActions }) {
   return (
-    <button
-      type="button"
-      {...{ [ARM_TRASH]: armKey(row.id) }}
-      aria-label={armed ? `Press again to delete ${row.name}` : `Delete ${row.name}`}
-      title={armed ? "Press again to delete" : "Delete"}
-      onClick={() => actions.trash(row)}
-      className={
-        armed
-          ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
-          : CONTROL
-      }
-    >
-      <Trash2 size={16} aria-hidden />
-    </button>
+    <Tooltip side="left" content={armed ? "Press again to delete" : "Delete"}>
+      <button
+        type="button"
+        {...{ [ARM_TRASH]: armKey(row.id) }}
+        aria-label={armed ? `Press again to delete ${row.name}` : `Delete ${row.name}`}
+        onClick={() => actions.trash(row)}
+        className={
+          armed
+            ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
+            : CONTROL
+        }
+      >
+        <Trash2 {...GLYPH} aria-hidden />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -173,15 +180,16 @@ function TrashButton({ row, armed, actions }: { row: JobRow; armed: boolean; act
 function ArrowButton({ row, up, actions }: { row: JobRow; up: boolean; actions: JobRowActions }) {
   const Icon = up ? ChevronUp : ChevronDown;
   return (
-    <button
-      type="button"
-      aria-label={`Move ${row.name} ${up ? "up" : "down"}`}
-      title={up ? "Move up" : "Move down"}
-      onClick={() => actions.step(row, up ? -1 : 1)}
-      className={CONTROL}
-    >
-      <Icon size={16} aria-hidden />
-    </button>
+    <Tooltip side="left" content={up ? "Move up" : "Move down"}>
+      <button
+        type="button"
+        aria-label={`Move ${row.name} ${up ? "up" : "down"}`}
+        onClick={() => actions.step(row, up ? -1 : 1)}
+        className={CONTROL}
+      >
+        <Icon size={16} aria-hidden />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -203,8 +211,8 @@ function RenameField({ row, actions }: { row: JobRow; actions: JobRowActions }) 
     actions.endRename(row, focusAfterRename(reason));
   };
   return (
-    <input
-      ref={field}
+    <RenameInput
+      inputRef={field}
       aria-label={`Name of ${row.name}`}
       value={draft}
       maxLength={128}
@@ -221,7 +229,7 @@ function RenameField({ row, actions }: { row: JobRow; actions: JobRowActions }) 
           finish("escape");
         }
       }}
-      className="min-w-0 flex-1 rounded border border-[var(--editor-accent)] bg-white px-1 text-[13px] text-[var(--toolbar-icon)]"
+      className="flex-1"
     />
   );
 }

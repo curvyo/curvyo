@@ -1,22 +1,16 @@
-import {
-  CircleAlert,
-  ChevronDown,
-  ChevronRight,
-  FileInput,
-  FileOutput,
-  Pencil,
-  Plus,
-  Star,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, FileInput, FileOutput, Pencil, Plus, Star } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { ARM_TRANSITION, RowTrash } from "@/components/panel/FontTreeRows";
 import { FormatForm } from "@/components/panel/FormatForm";
 import { scrollBodyTo } from "@/lib/panelScroll";
-import { PanelSwitch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ARM_ZONE } from "@/hooks/useDeleteArm";
 import type { FormatGroup, FormatNotice, FormatRow, FormatsApi } from "@/hooks/useFormats";
+import { ToggleButton } from "@/components/ui/toggle-button";
+import { RenameField as RenameInput } from "@/components/ui/rename-field";
+import { ActionNotice } from "@/components/ui/notice";
 
 const ICON_BUTTON =
   "flex shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]";
@@ -36,13 +30,13 @@ function NoticeUnder({ notice }: { notice: FormatNotice | null }) {
     return null;
   }
   return (
-    <div
-      role="alert"
-      className="pointer-events-none absolute top-full right-0 z-30 mt-1 flex max-w-[244px] items-start gap-1 rounded-md bg-popover px-2 py-1 text-xs text-[var(--field-invalid)] ring-1 ring-[var(--field-invalid)]"
+    <ActionNotice
+      refusal
+      maxWidth={244}
+      className="absolute top-full right-0 z-30 mt-1"
     >
-      <CircleAlert size={12} aria-hidden className="mt-0.5 shrink-0" />
       {notice.text}
-    </div>
+    </ActionNotice>
   );
 }
 
@@ -67,13 +61,12 @@ function RenameField({ formats, kind, id, name }: RenameFieldProps) {
   }
   return (
     <div className="relative min-w-0 flex-1 px-1">
-      <input
-        ref={input}
+      <RenameInput
+        inputRef={input}
         type="text"
         autoComplete="off"
         spellCheck={false}
         aria-label={name}
-        aria-invalid={rename.error ? true : undefined}
         value={rename.text}
         onChange={(event) => formats.changeRename(event.target.value)}
         onBlur={() => formats.commitRename("blur")}
@@ -87,20 +80,17 @@ function RenameField({ formats, kind, id, name }: RenameFieldProps) {
             formats.cancelRename();
           }
         }}
-        className={`style-field h-6 w-full rounded-[5px] bg-white px-1.5 text-sm outline-none ${
-          rename.error
-            ? "border-2 border-[var(--field-invalid)]"
-            : "border border-[var(--editor-accent)]"
-        }`}
+        invalid={Boolean(rename.error)}
+        className="style-field w-full"
       />
       {rename.error && (
-        <div
-          role="alert"
-          className="pointer-events-none absolute top-full right-0 z-30 mt-1 flex w-max max-w-[226px] items-start gap-1 rounded-md bg-popover px-2 py-1 text-xs text-[var(--field-invalid)] ring-1 ring-[var(--field-invalid)]"
+        <ActionNotice
+          refusal
+          maxWidth={226}
+          className="absolute top-full right-0 z-30 mt-1"
         >
-          <CircleAlert size={12} aria-hidden className="mt-0.5 shrink-0" />
           {rename.error}
-        </div>
+        </ActionNotice>
       )}
     </div>
   );
@@ -151,7 +141,7 @@ function FormatRowView({ row, formats, onReturnFocus }: RowProps) {
             onClick={click(() => formats.setFavourite(row.id, !row.favourite))}
             className={`${ICON_BUTTON} h-7 w-7 ${row.favourite ? "" : "!text-[var(--panel-muted-fg)]"}`}
           >
-            <Star size={16} aria-hidden fill={row.favourite ? "currentColor" : "none"} strokeWidth={1.5} />
+            <Star {...GLYPH} aria-hidden fill={row.favourite ? "currentColor" : "none"} />
           </button>
         </Tooltip>
       )}
@@ -194,7 +184,7 @@ function FormatRowView({ row, formats, onReturnFocus }: RowProps) {
                 onClick={click(() => formats.openEdit(row.id))}
                 className={EDIT_BUTTON}
               >
-                <Pencil size={16} aria-hidden strokeWidth={1.5} />
+                <Pencil {...GLYPH} aria-hidden />
               </button>
             </Tooltip>
             <RowTrash
@@ -246,7 +236,7 @@ function FormatGroupView({ group, formats, onReturnFocus }: GroupProps) {
           onClick={click(() => formats.toggleFold(group.id))}
           className={`${ICON_BUTTON} h-7 w-7 disabled:opacity-40`}
         >
-          {showRows ? <ChevronDown size={12} aria-hidden /> : <ChevronRight size={12} aria-hidden />}
+          {showRows ? <ChevronDown {...SMALL_GLYPH} aria-hidden /> : <ChevronRight {...SMALL_GLYPH} aria-hidden />}
         </button>
         {renaming ? (
           <RenameField formats={formats} kind="group" id={group.id} name={group.renameName} />
@@ -272,12 +262,12 @@ function FormatGroupView({ group, formats, onReturnFocus }: GroupProps) {
         )}
         {group.canToggle && (
           <span className="ml-1">
-            <PanelSwitch
+            <ToggleButton icon={Eye} look="bar"
               label="Show"
               name={group.showName}
               control="show"
-              checked={group.enabled}
-              onCheckedChange={(on) => formats.setGroupEnabled(group.id, on)}
+              pressed={group.enabled}
+              onPressedChange={(on) => formats.setGroupEnabled(group.id, on)}
               onReturnFocus={onReturnFocus}
             />
           </span>
@@ -480,7 +470,7 @@ export function FormatList({ formats, onReturnFocus }: FormatListProps) {
           }}
           className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-[5px] px-1 text-left text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         >
-          {expanded ? <ChevronDown size={12} aria-hidden /> : <ChevronRight size={12} aria-hidden />}
+          {expanded ? <ChevronDown {...SMALL_GLYPH} aria-hidden /> : <ChevronRight {...SMALL_GLYPH} aria-hidden />}
           <span className="flex-1">All formats</span>
           <span className="text-xs text-[var(--panel-muted-fg)]">{list.total}</span>
         </button>

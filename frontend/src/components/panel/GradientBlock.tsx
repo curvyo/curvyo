@@ -1,4 +1,5 @@
 import { ArrowLeftRight, Pipette, Plus, Trash2 } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useEffect, useRef, useState } from "react";
 
 import { ColourPicker } from "@/components/panel/ColourPicker";
@@ -70,7 +71,7 @@ function StopRow({ gradient, row, index, count, active, picking, onPick, onRetur
       onPointerDown={activate}
     >
       {active && (
-        <span aria-hidden className="absolute top-0 -left-2 h-7 w-[3px] rounded-[1px] bg-[var(--editor-accent)]" />
+        <span aria-hidden className="absolute top-0 -left-2 h-7 w-[3px] rounded-full bg-[var(--editor-accent)]" />
       )}
       <Swatch rgb={colour?.rgb ?? 0} opacity={colour?.opacity ?? 100} mixed={colour === null} />
       <Tooltip side="left" content="Pick a color from the drawing (Esc cancels)">
@@ -88,7 +89,7 @@ function StopRow({ gradient, row, index, count, active, picking, onPick, onRetur
           }}
           className={`${OUTLINED} shrink-0 aria-pressed:border-transparent aria-pressed:!bg-[var(--toolbar-icon-active-bg)] aria-pressed:!text-[var(--toolbar-icon-active-fg)]`}
         >
-          <Pipette size={16} strokeWidth={1.5} aria-hidden />
+          <Pipette {...GLYPH} aria-hidden />
         </button>
       </Tooltip>
       <EntryField
@@ -134,7 +135,7 @@ function StopRow({ gradient, row, index, count, active, picking, onPick, onRetur
             }}
             className={`${BUTTON} w-6 shrink-0`}
           >
-            <Trash2 size={16} strokeWidth={1.5} aria-hidden />
+            <Trash2 {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
       )}
@@ -208,13 +209,13 @@ export function GradientBlock({ gradient, pickTarget, onPick, onReturnFocus }: G
       {!view.mixedGradients && (
         <Tooltip side="left" content="Add stop">
           <button type="button" aria-label="Add stop" data-gradient-add="" onClick={pressButton(gradient.addStop)} className={OUTLINED}>
-            <Plus size={16} strokeWidth={1.5} aria-hidden />
+            <Plus {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
       )}
       <Tooltip side="left" content="Reverse">
         <button type="button" aria-label="Reverse" data-gradient-reverse="" onClick={pressButton(gradient.reverse)} className={OUTLINED}>
-          <ArrowLeftRight size={16} strokeWidth={1.5} aria-hidden />
+          <ArrowLeftRight {...GLYPH} aria-hidden />
         </button>
       </Tooltip>
     </div>

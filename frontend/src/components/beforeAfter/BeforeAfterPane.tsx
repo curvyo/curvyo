@@ -1,4 +1,5 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BeforeAfterPictures } from "@/components/beforeAfter/BeforeAfterPictures";
@@ -9,7 +10,7 @@ import { operationIdText } from "@/lib/operationsView";
 import { type PaneLayout, headerRows } from "@/lib/fontPreviewLayout";
 
 const BUTTON =
-  "flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+  "flex size-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 const VIEW_CELLS = [
   { id: "split", content: "Split", label: "Split", tooltip: "" },
   { id: "side_by_side", content: "Side by side", label: "Side by side", tooltip: "" },
@@ -107,13 +108,13 @@ export function BeforeAfterPane({ api, layout, onSwitchView, onReturnFocus }: Pa
         {layout.canSplit || layout.full ? (
           <Tooltip side="bottom" content={layout.full ? "Split view" : "Full view"}>
             <button type="button" aria-label={layout.full ? "Split view" : "Full view"} onClick={onSwitchView} className={BUTTON}>
-              {layout.full ? <Minimize2 aria-hidden size={16} strokeWidth={1.5} /> : <Maximize2 aria-hidden size={16} strokeWidth={1.5} />}
+              {layout.full ? <Minimize2 {...GLYPH} aria-hidden /> : <Maximize2 {...GLYPH} aria-hidden />}
             </button>
           </Tooltip>
         ) : null}
         <Tooltip side="bottom" content="Close">
           <button type="button" aria-label="Close" onClick={close} className={BUTTON}>
-            <X aria-hidden size={16} strokeWidth={1.5} />
+            <X {...GLYPH} aria-hidden />
           </button>
         </Tooltip>
       </div>

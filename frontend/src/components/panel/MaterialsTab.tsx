@@ -13,6 +13,7 @@ import { librarySyncOn } from "@/lib/librarySyncView";
 import { MATERIAL_WINDOW_ABOVE, armText, deletedText, materialHeights, moveTarget, rowTitle } from "@/lib/materialRows";
 import { insertionEdge, nextFocusIndex } from "@/lib/operationRows";
 import { visibleRange } from "@/lib/operationWindow";
+import { Button } from "@/components/ui/button";
 
 const OVERSCAN = 160;
 
@@ -172,15 +173,13 @@ export function MaterialsTab({ api, library, onReturnFocus }: MaterialsTabProps)
           }}
         />
       ) : (
-        <button
+        <Button icon={Plus}
           ref={newRef}
-          type="button"
           onClick={() => api.openForm()}
-          className="flex h-7 w-[244px] items-center justify-center gap-1 rounded border border-[var(--lane-line)] text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+           className="min-w-[244px]"
         >
-          <Plus size={16} aria-hidden />
-          New material
-        </button>
+New material
+</Button>
       )}
       {rows.length > 0 ? (
         <ul ref={listRef} role="list" aria-label="Materials" onKeyDown={onListKey} className="flex flex-col">
@@ -223,7 +222,7 @@ export function MaterialsTab({ api, library, onReturnFocus }: MaterialsTabProps)
         <div
           aria-hidden
           data-reorder-ghost=""
-          className="pointer-events-none fixed z-50 flex h-10 items-center rounded bg-[var(--value-fill)] px-2 text-[13px] text-[var(--toolbar-icon)] shadow"
+          className="pointer-events-none fixed z-50 flex h-10 items-center rounded-[8px] bg-[var(--value-fill)] px-2 text-sm text-[var(--toolbar-icon)] shadow"
           style={{ left: drag.ghost.left, top: drag.ghost.at, width: drag.ghost.width, opacity: 0.6 }}
         >
           {drag.ghost.label}

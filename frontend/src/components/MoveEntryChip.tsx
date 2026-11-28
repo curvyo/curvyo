@@ -1,4 +1,4 @@
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, Copy } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { EntryField } from "@/components/EntryField";
@@ -6,6 +6,8 @@ import { HandleHintChip } from "@/components/HandleHintChip";
 import { type MoveEntryState, REFERENCE_COUNT } from "@/hooks/useEditorSession";
 import { fieldText, submittedTexts } from "@/lib/moveEntryText";
 import { placeMoveEntryChip } from "@/lib/readoutPlacement";
+import { SEGMENT_ITEM, SEGMENT_STRIP, toggleClass, GLYPH } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** The tool rail's clearance from the canvas's left edge, px (`App.tsx`'s
  * `left-[calc(var(--rail-right)+12px)]` for the contextual bars: `--rail-right` + 12 = 128px with two
@@ -90,7 +92,7 @@ export function MoveEntryChip({
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const switchRef = useRef<HTMLButtonElement>(null);
-  const copyRef = useRef<HTMLInputElement>(null);
+  const copyRef = useRef<HTMLButtonElement>(null);
   const radioRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const messageId = useId();
   const [absolute, setAbsolute] = useState(false);
@@ -219,9 +221,14 @@ export function MoveEntryChip({
   };
 
   const onSwitchKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === " " || event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
       setAbsolute((previous) => !previous);
+      // The chosen item is the Tab stop: the focus follows it once it renders.
+      requestAnimationFrame(() => switchRef.current?.focus());
+    } else if (event.key === " ") {
+      event.preventDefault();
+      event.currentTarget.click();
     } else {
       onKeyDown(event);
     }
@@ -277,9 +284,6 @@ export function MoveEntryChip({
     [absolute, markHover, entry.referenceHints, edited],
   );
 
-  const segment = (active: boolean) =>
-    `flex-1 px-2 text-center text-xs leading-[24px] ${active ? "rounded-[5px]" : ""}`;
-
   return (
     <>
       <div
@@ -326,54 +330,33 @@ export function MoveEntryChip({
               );
             })}
           </div>
-          <button
-            ref={switchRef}
-            type="button"
-            role="switch"
-            aria-checked={absolute}
-            aria-label="Absolute position"
-            aria-description={ABSOLUTE_HINT}
-            title={ABSOLUTE_HINT}
-            onClick={() => setAbsolute((previous) => !previous)}
-            onKeyDown={onSwitchKeyDown}
-            onBlur={onBlur}
-            className="mt-1.5 flex h-7 w-full cursor-pointer rounded-[7px] p-[1.5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-            // A 1.5 px ring as a shadow: a CSS border of 1.5 px computes to 1 px
-            // at a device pixel ratio of 1, a shadow spread does not snap.
-            style={{
-              boxShadow: "inset 0 0 0 1.5px var(--toolbar-icon)",
-              color: "var(--toolbar-icon)",
-            }}
-          >
-            <span
-              aria-hidden
-              className={segment(!absolute)}
-              style={
-                absolute
-                  ? undefined
-                  : {
-                      background: "var(--toolbar-icon-active-bg)",
-                      color: "var(--toolbar-icon-active-fg)",
-                    }
-              }
+          {/* Two named states are a choice, not on/off (`docs/ui-elements.md` §7, 0159 F20):
+              one radio group, the chosen item the Tab stop, the arrows move and choose. */}
+          <Tooltip side="bottom" content={ABSOLUTE_HINT}>
+            <div
+              role="radiogroup"
+              aria-label="Position"
+              aria-description={ABSOLUTE_HINT}
+              className={`mt-1.5 flex w-full ${SEGMENT_STRIP}`}
             >
-              Relative
-            </span>
-            <span
-              aria-hidden
-              className={segment(absolute)}
-              style={
-                absolute
-                  ? {
-                      background: "var(--toolbar-icon-active-bg)",
-                      color: "var(--toolbar-icon-active-fg)",
-                    }
-                  : undefined
-              }
-            >
-              Absolute
-            </span>
-          </button>
+              {([false, true] as const).map((isAbsolute) => (
+                <button
+                  key={isAbsolute ? "absolute" : "relative"}
+                  ref={isAbsolute === absolute ? switchRef : undefined}
+                  type="button"
+                  role="radio"
+                  aria-checked={isAbsolute === absolute}
+                  tabIndex={isAbsolute === absolute ? 0 : -1}
+                  onClick={() => setAbsolute(isAbsolute)}
+                  onKeyDown={onSwitchKeyDown}
+                  onBlur={onBlur}
+                  className={`${SEGMENT_ITEM} flex-1 text-xs`}
+                >
+                  {isAbsolute ? "Absolute" : "Relative"}
+                </button>
+              ))}
+            </div>
+          </Tooltip>
           {absolute && (
             <div className="mt-1.5 flex items-center gap-2">
               <div
@@ -403,23 +386,22 @@ export function MoveEntryChip({
             </div>
           )}
           {entry.copyAllowed ? (
-          <label className="mt-1.5 flex h-6 cursor-pointer items-center gap-1.5 px-1 text-xs">
-            <input
-              ref={copyRef}
-              type="checkbox"
-              checked={copy}
-              aria-label="Copy"
-              onChange={(event) => setCopy(event.target.checked)}
-              onKeyDown={(event) => {
-                if (!loopFocus(event, false)) {
-                  onKeyDown(event);
-                }
-              }}
-              onBlur={onBlur}
-              className="size-3.5 cursor-pointer accent-[var(--editor-accent)]"
-            />
-            <span aria-hidden>Copy</span>
-          </label>
+          <button
+            ref={copyRef}
+            type="button"
+            aria-pressed={copy}
+            onClick={() => setCopy(!copy)}
+            onKeyDown={(event) => {
+              if (!loopFocus(event, false)) {
+                onKeyDown(event);
+              }
+            }}
+            onBlur={onBlur}
+            className={toggleClass("bar", false, "mt-1.5 h-6 self-start text-xs")}
+          >
+            <Copy {...GLYPH} aria-hidden />
+            Copy
+          </button>
           ) : null}
         </div>
         {/* Always mounted so the polite live region announces a change; empty it
@@ -491,39 +473,40 @@ function ReferenceRadio({
   const dotX = 5 + (index % 3) * 7;
   const dotY = 5 + Math.floor(index / 3) * 7;
   return (
-    <button
-      ref={buttonRef}
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      aria-label={name}
-      aria-posinset={index + 1}
-      aria-setsize={REFERENCE_COUNT}
-      tabIndex={selected ? 0 : -1}
-      title={name}
-      onClick={onSelect}
-      onKeyDown={(event) => onKeyDown(event, index)}
-      onPointerEnter={() => onHover(index)}
-      onPointerLeave={() => onHover(-1)}
-      onFocus={() => onHover(index)}
-      onBlur={(event) => {
-        onHover(-1);
-        onBlur(event);
-      }}
-      className="flex size-6 cursor-pointer items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-      style={
-        selected
-          ? {
-              background: "var(--toolbar-icon-active-bg)",
-              color: "var(--toolbar-icon-active-fg)",
-            }
-          : { color: "var(--toolbar-icon)" }
-      }
-    >
-      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
-        <rect x="5" y="5" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1" />
-        <circle cx={dotX} cy={dotY} r="2" fill="currentColor" />
-      </svg>
-    </button>
+    <Tooltip side="bottom" content={name}>
+      <button
+        ref={buttonRef}
+        type="button"
+        role="radio"
+        aria-checked={selected}
+        aria-label={name}
+        aria-posinset={index + 1}
+        aria-setsize={REFERENCE_COUNT}
+        tabIndex={selected ? 0 : -1}
+        onClick={onSelect}
+        onKeyDown={(event) => onKeyDown(event, index)}
+        onPointerEnter={() => onHover(index)}
+        onPointerLeave={() => onHover(-1)}
+        onFocus={() => onHover(index)}
+        onBlur={(event) => {
+          onHover(-1);
+          onBlur(event);
+        }}
+        className="flex size-6 cursor-pointer items-center justify-center rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        style={
+          selected
+            ? {
+                background: "var(--toolbar-icon-active-bg)",
+                color: "var(--toolbar-icon-active-fg)",
+              }
+            : { color: "var(--toolbar-icon)" }
+        }
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+          <rect x="5" y="5" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1" />
+          <circle cx={dotX} cy={dotY} r="2" fill="currentColor" />
+        </svg>
+      </button>
+    </Tooltip>
   );
 }

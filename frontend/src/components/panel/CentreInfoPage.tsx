@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import { CENTRE_INFO_ENTRIES, CENTRE_INFO_INTRO, CENTRE_INFO_PAGE_ID, CENTRE_INFO_TITLE } from "@/lib/centreLinesText";
@@ -126,7 +127,7 @@ export function CentreInfoPage({ onReturnFocus }: { onReturnFocus: () => void })
                 <dd aria-hidden className="flex h-12 w-[244px] items-center">
                   <Frame>{picture[0]}</Frame>
                   <span className="flex w-9 justify-center text-[var(--panel-muted-fg)]">
-                    <ArrowRight size={16} strokeWidth={1.5} />
+                    <ArrowRight {...GLYPH} />
                   </span>
                   <Frame>{picture[1]}</Frame>
                 </dd>

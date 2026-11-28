@@ -10,9 +10,10 @@ import type { MaterialsApi } from "@/hooks/useMaterials";
 import { NOTE_MAX, deletedText, testArmText } from "@/lib/materialRows";
 import type { MaterialBody, TestDetail as Detail } from "@/lib/materialsView";
 import { PICK_COLOUR, type PickKind } from "@/lib/picks";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
 
-const OUTLINE_BUTTON =
-  "flex h-7 w-[228px] items-center gap-1 rounded border border-[var(--lane-line)] px-2 text-xs text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
+const OUTLINE_BUTTON = buttonClass("secondary", "panel", "w-[228px] justify-start px-2");
 
 interface TestDetailProps {
   material: MaterialBody;
@@ -62,7 +63,7 @@ function NoteField({ material, test, api }: { material: string; test: Detail; ap
             setText(test.note);
           }
         }}
-        className="w-[228px] resize-none rounded border border-[var(--lane-line)] bg-white px-1 py-1 text-[13px] leading-[18px] text-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="w-[228px] resize-none rounded-[5px] border border-[var(--lane-line)] bg-white px-1 py-1 text-sm leading-[18px] text-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       />
     </div>
   );
@@ -75,7 +76,7 @@ function PickLines({ test }: { test: Detail }) {
   return (
     <div className="flex flex-col gap-1">
       {lines.map((p) => (
-        <p key={p.pick} className="flex items-start gap-1 text-[13px] tabular-nums text-[var(--toolbar-icon)]">
+        <p key={p.pick} className="flex items-start gap-1 text-sm tabular-nums text-[var(--toolbar-icon)]">
           <span style={{ color: PICK_COLOUR[p.pick] }} className="mt-[3px] flex shrink-0">
             <PickGlyph kind={p.pick} size={12} />
           </span>
@@ -116,39 +117,40 @@ export function TestDetail({ material, test, api, arm, onBack, onDeleted }: Test
         type="button"
         data-test-back=""
         onClick={onBack}
-        className="flex h-7 w-[228px] items-center gap-1 rounded text-left text-[13px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="flex h-7 w-[228px] items-center gap-1 rounded-[5px] text-left text-sm text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
-        <ChevronLeft size={16} aria-hidden className="shrink-0" />
+        <ChevronLeft {...GLYPH} aria-hidden className="shrink-0" />
         <span className="min-w-0 truncate">{material.name}</span>
       </button>
       <div className="flex items-center gap-2" {...{ [ARM_ZONE]: key }}>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="font-mono text-base font-semibold tracking-[0.08em] text-[var(--toolbar-icon)]">{test.id}</span>
-          <span className="truncate text-[13px] text-[var(--toolbar-icon)]">{test.head}</span>
+          <span className="truncate text-sm text-[var(--toolbar-icon)]">{test.head}</span>
         </div>
-        <button
-          type="button"
-          {...{ [ARM_TRASH]: key }}
-          aria-label={armed ? testArmText(test.id, test.photo !== null) : `Delete test ${test.id}`}
-          title={armed ? "Press again to delete" : "Delete"}
-          onClick={() =>
-            arm.press(key, testArmText(test.id, test.photo !== null), () => {
-              const refused = api.deleteTest(material.id, test.id);
-              if (refused === "") {
-                api.openTest("");
-                onDeleted();
-              }
-              return deletedText(`Test ${test.id}`);
-            })
-          }
-          className={
-            armed
-              ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
-              : "flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-          }
-        >
-          <Trash2 size={16} aria-hidden />
-        </button>
+        <Tooltip side="left" content={armed ? "Press again to delete" : "Delete"}>
+          <button
+            type="button"
+            {...{ [ARM_TRASH]: key }}
+            aria-label={armed ? testArmText(test.id, test.photo !== null) : `Delete test ${test.id}`}
+            onClick={() =>
+              arm.press(key, testArmText(test.id, test.photo !== null), () => {
+                const refused = api.deleteTest(material.id, test.id);
+                if (refused === "") {
+                  api.openTest("");
+                  onDeleted();
+                }
+                return deletedText(`Test ${test.id}`);
+              })
+            }
+            className={
+              armed
+                ? "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white"
+                : "flex h-6 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+            }
+          >
+            <Trash2 {...GLYPH} aria-hidden />
+          </button>
+        </Tooltip>
       </div>
       <p className="text-xs text-[var(--panel-muted-fg)]">{test.stateLine}</p>
       <p className="text-[11px] tabular-nums text-[var(--panel-muted-fg)]">{test.axesLine}</p>
@@ -159,7 +161,7 @@ export function TestDetail({ material, test, api, arm, onBack, onDeleted }: Test
       <NoteField material={material.id} test={test} api={api} />
       <TestPhoto key={`photo:${test.id}`} material={material.id} test={test} api={api} arm={arm} />
       <button type="button" onClick={() => api.place(material.id, test.id)} className={OUTLINE_BUTTON}>
-        <MapPin size={16} aria-hidden />
+        <MapPin {...GLYPH} aria-hidden />
         <span className="truncate">{test.place.label}</span>
       </button>
     </div>

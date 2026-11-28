@@ -13,11 +13,12 @@ import {
   snapToStep,
   valueAtPosition,
 } from "@/lib/sliderValue";
+import { SLIDER_INSET_PX, SLIDER_THUMB_PX, SliderMarks } from "@/components/ui/slider";
 
 /** The slider's width in px, and the inset that keeps the thumb inside it. */
 const WIDTH = 96;
-const THUMB = 14;
-const INSET = THUMB / 2 + 1;
+const THUMB = SLIDER_THUMB_PX;
+const INSET = SLIDER_INSET_PX;
 /** The pointer target is 24 px high around a 4 px track (WCAG 2.5.8). */
 const TARGET_HEIGHT = 24;
 
@@ -161,7 +162,7 @@ export function RatioSlider({
         aria-valuenow={mixed ? undefined : value}
         aria-valuetext={mixed ? "Mixed" : value.toFixed(2)}
         aria-keyshortcuts="Enter F2"
-        className="relative shrink-0 cursor-pointer rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="group relative shrink-0 cursor-pointer rounded-[5px] outline-none"
         style={{
           width: WIDTH,
           height: TARGET_HEIGHT,
@@ -182,30 +183,7 @@ export function RatioSlider({
         }}
         onBlur={endKeyRun}
       >
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full"
-          style={{ left: INSET, right: INSET, background: trackColour }}
-        />
-        {!mixed && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--editor-accent)]"
-            style={{ left: INSET, width: thumbLeft - INSET }}
-          />
-        )}
-        {!mixed && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 rounded-full border-2 border-[var(--editor-accent)] bg-white"
-            style={{
-              width: THUMB,
-              height: THUMB,
-              left: thumbLeft - THUMB / 2,
-              marginTop: -THUMB / 2,
-            }}
-          />
-        )}
+        <SliderMarks thumbLeft={thumbLeft} track={trackColour} mixed={mixed} />
       </div>
       </SliderTip>
       {entry ? (

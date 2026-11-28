@@ -1,12 +1,14 @@
 // The tag line of a family row (`specs/0075-font-library` criterion 10, UX tags amendment §2 to
 // §5 and §8): the family's tags as chips with an x each, "+N" when they do not fit, Add tag at
 // the end, and the add field with inline completion in place of the line.
-import { CircleAlert, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import { chipTooltip, moreTagsName, tagNameError } from "@/lib/fontLibraryText";
 import type { RowTag } from "@/lib/fontRows";
+import { iconButtonClass, GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
+import { ActionNotice } from "@/components/ui/notice";
 
 const CONTROL =
   "outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
@@ -101,16 +103,16 @@ function AddField({ family, completions, onAdd, onClose }: AddFieldProps) {
           }
         }}
         onClick={(event) => event.stopPropagation()}
-        className="h-5 w-full rounded-[5px] bg-white px-1.5 text-xs outline-none selection:bg-transparent selection:text-[var(--panel-muted-fg)] ring-1 ring-border focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="h-5 w-full rounded-[5px] bg-white px-1.5 text-xs outline-none selection:bg-transparent selection:text-[var(--panel-muted-fg)] ring-1 ring-[var(--field-border)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       />
       {error ? (
-        <p
-          role="alert"
-          className="absolute top-full left-0 z-30 mt-1 flex w-max max-w-[244px] items-center gap-1 rounded-md bg-popover px-2 py-1 text-xs text-[var(--field-invalid)] ring-1 ring-[var(--field-invalid)]"
+        <ActionNotice
+          refusal
+          maxWidth={244}
+          className="absolute top-full left-0 z-30 mt-1"
         >
-          <CircleAlert size={12} aria-hidden />
           {error}
-        </p>
+        </ActionNotice>
       ) : null}
     </div>
   );
@@ -237,12 +239,12 @@ export function FontTagLine({
                   }}
                   className="flex h-5 w-[18px] shrink-0 items-center justify-center rounded-r-[5px] text-[var(--panel-muted-fg)] outline-none hover:bg-[var(--editor-accent-hover)] hover:text-[var(--toolbar-icon)]"
                 >
-                  <X size={10} aria-hidden />
+                  <X {...SMALL_GLYPH} aria-hidden />
                 </button>
               </span>
             );
             return tip ? (
-              <Tooltip key={tag.id} side="bottom" content={tip}>
+              <Tooltip key={tag.id} side="left" content={tip}>
                 {chip}
               </Tooltip>
             ) : (
@@ -264,7 +266,7 @@ export function FontTagLine({
               +{more}
             </button>
           ) : null}
-          <Tooltip side="bottom" content="Add tag">
+          <Tooltip side="left" content="Add tag">
             <button
               type="button"
               tabIndex={-1}
@@ -276,9 +278,9 @@ export function FontTagLine({
                 event.stopPropagation();
                 onStartAdd(event.detail === 0);
               }}
-              className={`ml-auto flex size-5 shrink-0 items-center justify-center rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] ${CONTROL}`}
+              className={iconButtonClass("outlined", 24, `ml-auto ${CONTROL}`)}
             >
-              <Plus size={14} aria-hidden />
+              <Plus {...GLYPH} aria-hidden />
             </button>
           </Tooltip>
         </>

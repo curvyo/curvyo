@@ -1,4 +1,5 @@
 import { LineSquiggle } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useReducer, useRef, type ReactNode } from "react";
 
 import { TraceField } from "@/components/TraceField";
@@ -66,7 +67,7 @@ const ICONS: Record<PenModeCode, ReactNode> = {
   spiro: <SpiroIcon />,
   bspline: <BSplineIcon />,
   lines: <LinesIcon />,
-  freehand: <LineSquiggle size={16} />,
+  freehand: <LineSquiggle {...GLYPH} />,
 };
 
 const OPTIONS = PEN_MODES.map((mode) => ({ ...mode, icon: ICONS[mode.value] }));
@@ -108,7 +109,7 @@ export function PenModeBar({ editor }: { editor: EditorSession }) {
       onKeyDown={() => {
         pressed.current = null;
       }}
-      className="pointer-events-auto flex h-9 min-w-0 shrink-0 items-center gap-3 rounded-lg px-2 text-sm"
+      className="pointer-events-auto flex h-9 min-w-0 shrink-0 items-center gap-3 rounded-[8px] px-2 text-sm"
       style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
     >
       <ToggleGroup

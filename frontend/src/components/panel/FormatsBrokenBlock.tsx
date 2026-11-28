@@ -1,7 +1,9 @@
-import { CircleAlert } from "lucide-react";
+import { Archive, CircleAlert } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 
-import { OUTLINE_BUTTON } from "@/components/panel/FormatForm";
 import type { FormatsApi } from "@/hooks/useFormats";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
 /**
  * The block at the top of the format area while the user file cannot be read
@@ -18,20 +20,18 @@ export function FormatsBrokenBlock({ formats }: { formats: FormatsApi }) {
   return (
     <div className="flex flex-col gap-2 rounded-[5px] border border-[var(--field-invalid)] p-2">
       <p className="flex items-start gap-1 text-xs text-[var(--field-invalid)]">
-        <CircleAlert size={12} aria-hidden className="mt-0.5 shrink-0" />
+        <CircleAlert {...SMALL_GLYPH} aria-hidden className="mt-0.5 shrink-0" />
         <span>Your formats file could not be read: {broken}. Built-in formats are shown.</span>
       </p>
-      <button
-        type="button"
-        onClick={(event) => formats.setAside(event.detail === 0)}
-        className={`${OUTLINE_BUTTON} w-full`}
+      <Button icon={Archive}
+        onClick={(event) => formats.setAside(event.detail === 0)} className="w-full"
       >
         Set file aside
-      </button>
+      </Button>
       {notice && (
-        <p role="alert" className="text-xs text-[var(--field-invalid)]">
+        <AlertLine>
           {notice.text}
-        </p>
+        </AlertLine>
       )}
     </div>
   );

@@ -9,8 +9,9 @@ import { closeDimmed, closeNoticeText, closeTooltipNote } from "../src/lib/penTe
 import { readFileSync } from "node:fs";
 
 test("c5c: join notice counts outlines in digits, singular for one", () => {
-  assert.equal(joinNoticeText(2), "Join: 2 more outlines moved into this compound path.");
-  assert.equal(joinNoticeText(1), "Join: 1 more outline moved into this compound path.");
+  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  assert.equal(joinNoticeText(2), "Join: the other outlines moved into this compound path.");
+  assert.equal(joinNoticeText(1), "Join: the other outlines moved into this compound path.");
   assert.equal(joinNoticeText(0), null);
 });
 
@@ -24,21 +25,11 @@ test("c6: split notices", () => {
 });
 
 test("c7: close notice counts paths and outlines apart", () => {
-  assert.equal(
-    closeNoticeText({ closed: 1, skipped: 0, closedOutlines: 3, skippedOutlines: 0 }),
-    "Closed 1 path and 3 outlines.",
-  );
-  assert.equal(
-    closeNoticeText({ closed: 0, skipped: 0, closedOutlines: 3, skippedOutlines: 0 }),
-    "Closed 3 outlines.",
-  );
-  assert.equal(
-    closeNoticeText({ closed: 0, skipped: 0, closedOutlines: 1, skippedOutlines: 0 }),
-    "Closed 1 outline.",
-  );
+  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  assert.equal(closeNoticeText({ closed: 1, skipped: 0, closedOutlines: 3, skippedOutlines: 0 }), null);
+  assert.equal(closeNoticeText({ closed: 0, skipped: 0, closedOutlines: 3, skippedOutlines: 0 }), null);
   const skipped = closeNoticeText({ closed: 1, skipped: 0, closedOutlines: 3, skippedOutlines: 1 });
-  assert.ok(skipped?.startsWith("Closed 1 path and 3 outlines."));
-  assert.ok(skipped?.includes("1 outline has fewer than 3 nodes and was not closed."));
+  assert.equal(skipped, "1 outline has fewer than 3 nodes and was not closed.");
   assert.equal(closeNoticeText({ closed: 0, skipped: 2 }), null);
 });
 

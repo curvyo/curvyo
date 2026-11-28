@@ -1,4 +1,5 @@
 import { ArchiveRestore, Trash2, TriangleAlert } from "lucide-react";
+import { GLYPH, SECTION_HEADING } from "@/components/ui/looks";
 import { type KeyboardEvent, useEffect, useRef } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
@@ -109,7 +110,7 @@ export function RecoveryBlock({ recovery, onReturnFocus }: RecoveryBlockProps) {
 
   return (
     <section aria-labelledby="recovery-heading" className="mb-4">
-      <h3 id="recovery-heading" className="h-5 text-sm font-semibold text-[var(--toolbar-icon)]">
+      <h3 id="recovery-heading" className={`h-5 ${SECTION_HEADING}`}>
         {recovery.heading}
       </h3>
       <Tooltip side="left" content={recovery.where ?? recovery.help}>
@@ -137,7 +138,7 @@ export function RecoveryBlock({ recovery, onReturnFocus }: RecoveryBlockProps) {
               style={{ minHeight: view.line3 || damaged ? ROW_THREE_LINES_PX : ROW_PX }}
               className={`flex items-center gap-1 rounded-[5px] pr-1 pl-2 outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : ""}`}
             >
-              {damaged ? <TriangleAlert size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0 text-[var(--panel-muted-fg)]" /> : null}
+              {damaged ? <TriangleAlert {...GLYPH} aria-hidden className="shrink-0 text-[var(--panel-muted-fg)]" /> : null}
               <div className="min-w-0 flex-1 py-1">
                 <Tooltip side="left" content={view.name}>
                   <p className="truncate text-sm text-[var(--toolbar-icon)]">{view.name}</p>
@@ -149,38 +150,40 @@ export function RecoveryBlock({ recovery, onReturnFocus }: RecoveryBlockProps) {
                 {damaged ? (
                   <span className="size-7 shrink-0 pointer-coarse:size-9" aria-hidden />
                 ) : (
+                  <Tooltip side="left" content={view.restore_label}>
+                    <button
+                      type="button"
+                      data-recovery-restore
+                      tabIndex={-1}
+                      aria-label={view.restore_label}
+                      onClick={(event) => {
+                        recovery.restore(item, () => focusRow(index));
+                        if (event.detail > 0) {
+                          onReturnFocus();
+                        }
+                      }}
+                      className={ICON_BUTTON}
+                    >
+                      <ArchiveRestore {...GLYPH} aria-hidden />
+                    </button>
+                  </Tooltip>
+                )}
+                <Tooltip side="left" content={armed ? view.discard_armed_label : view.discard_label}>
                   <button
                     type="button"
-                    data-recovery-restore
                     tabIndex={-1}
-                    aria-label={view.restore_label}
-                    title={view.restore_label}
-                    onClick={(event) => {
-                      recovery.restore(item, () => focusRow(index));
-                      if (event.detail > 0) {
-                        onReturnFocus();
-                      }
-                    }}
-                    className={ICON_BUTTON}
+                    {...{ [ARM_TRASH]: zone }}
+                    aria-label={armed ? view.discard_armed_label : view.discard_label}
+                    onClick={() => press(item, index)}
+                    className={
+                      armed
+                        ? "flex size-7 shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white pointer-coarse:size-9"
+                        : ICON_BUTTON
+                    }
                   >
-                    <ArchiveRestore size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+                    <Trash2 {...GLYPH} aria-hidden />
                   </button>
-                )}
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  {...{ [ARM_TRASH]: zone }}
-                  aria-label={armed ? view.discard_armed_label : view.discard_label}
-                  title={armed ? view.discard_armed_label : view.discard_label}
-                  onClick={() => press(item, index)}
-                  className={
-                    armed
-                      ? "flex size-7 shrink-0 items-center justify-center rounded-[5px] bg-[var(--destructive)] text-white pointer-coarse:size-9"
-                      : ICON_BUTTON
-                  }
-                >
-                  <Trash2 size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-                </button>
+                </Tooltip>
               </div>
             </li>
           );

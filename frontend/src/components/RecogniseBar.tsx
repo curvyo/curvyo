@@ -1,11 +1,12 @@
-import { CircleAlert, X } from "lucide-react";
+import { CircleAlert, RefreshCw, ScanText, X } from "lucide-react";
+import { GLYPH, SMALL_GLYPH } from "@/components/ui/looks";
 import { Tooltip } from "radix-ui";
 import { useRef } from "react";
 
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { FINISH_CLASS } from "@/components/TraceBar";
 import { TraceField } from "@/components/TraceField";
-import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
+import { TOOLTIP_CLASS, Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import { shiftStyle, useNoticeShift } from "@/hooks/useNoticeShift";
 import type { RecogniseApi, RecogniseBarNotice, RecogniseSlot } from "@/hooks/useRecognise";
 import {
@@ -18,10 +19,9 @@ import {
   TOLERANCE_PARAM,
 } from "@/lib/recogniseText";
 import { FAILED, RETRY, STOP, STOPPED, percentText } from "@/lib/traceText";
+import { Button } from "@/components/ui/button";
+import { Tooltip as UiTooltip } from "@/components/ui/tooltip";
 
-/** The look of "Linked clone": a 28 px text button. */
-const BUTTON_CLASS =
-  "my-1 h-7 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
 
 const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
 
@@ -48,8 +48,7 @@ export function RecogniseTextButton({
       <Tooltip.Provider delayDuration={400}>
         <Tooltip.Root>
           <Tooltip.Trigger asChild>
-            <button
-              type="button"
+            <Button size="bar" icon={ScanText} iconOnly className="my-1"
               data-select-command="recognise-text"
               onClick={(event) => {
                 // `detail` is 0 for Space and Enter (the focus goes to the bar), 1 or more for a click.
@@ -58,13 +57,12 @@ export function RecogniseTextButton({
                   onReturnFocus();
                 }
               }}
-              className={BUTTON_CLASS}
             >
               {RECOGNISE_TEXT}
-            </button>
+            </Button>
           </Tooltip.Trigger>
           <Tooltip.Portal>
-            <Tooltip.Content side="bottom" sideOffset={6} className="z-50 rounded-md px-2 py-1 text-xs" style={TOOLTIP_STYLE}>
+            <Tooltip.Content side="bottom" sideOffset={6} className={TOOLTIP_CLASS} style={TOOLTIP_STYLE}>
               {RECOGNISE_TEXT}
             </Tooltip.Content>
           </Tooltip.Portal>
@@ -75,7 +73,7 @@ export function RecogniseTextButton({
         ref={noticeRef}
         role="status"
         data-recognise-notice=""
-        className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-md px-2 py-1 text-xs"
+        className="absolute top-full right-0 mt-1 w-max max-w-[320px] break-words rounded-[8px] px-2 py-1 text-xs"
         style={notice ? { ...TOOLTIP_STYLE, ...shiftStyle(shift) } : { display: "none" }}
       >
         {notice?.text}
@@ -89,14 +87,12 @@ export function RecogniseTextButton({
 function FinishSlot({ slot, onRun, onStop }: { slot: RecogniseSlot; onRun: () => void; onStop: () => void }) {
   if (slot.kind === "none" || (slot.kind === "running" && slot.percent === null)) {
     return (
-      <button
-        type="button"
-        data-recognise-slot="none"
-        className={`${FINISH_CLASS} justify-center px-3 outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]`}
+      <Button variant="primary" size="bar" icon={ScanText}
+        data-recognise-slot="none" className="my-1 min-w-[75px]"
         onClick={slot.kind === "none" ? onRun : undefined}
       >
         {RECOGNISE}
-      </button>
+      </Button>
     );
   }
   if (slot.kind === "running") {
@@ -116,7 +112,7 @@ function FinishSlot({ slot, onRun, onStop }: { slot: RecogniseSlot; onRun: () =>
         </div>
         <AppTooltip side="bottom" content={STOP}>
           <button type="button" aria-label={STOP} onClick={onStop} className={`${ICON_BUTTON_CLASS} relative text-white hover:bg-white/20`}>
-            <X size={16} strokeWidth={1.5} aria-hidden />
+            <X {...GLYPH} aria-hidden />
           </button>
         </AppTooltip>
       </div>
@@ -125,25 +121,24 @@ function FinishSlot({ slot, onRun, onStop }: { slot: RecogniseSlot; onRun: () =>
   const failed = slot.kind === "failed";
   return (
     <div data-recognise-slot={slot.kind} className={`${FINISH_CLASS} gap-1 pl-2`}>
-      <span
-        title={failed ? slot.text : undefined}
-        className={`flex h-7 items-center gap-1 rounded-md text-xs ${failed ? "" : "opacity-90"}`}
+      <UiTooltip side="bottom" content={failed ? slot.text : undefined}>
+        <span
+        className={`flex h-7 items-center gap-1 rounded-[5px] text-xs ${failed ? "" : "opacity-90"}`}
       >
-        {failed ? <CircleAlert size={12} aria-hidden className="shrink-0" /> : null}
+        {failed ? <CircleAlert {...SMALL_GLYPH} aria-hidden className="shrink-0" /> : null}
         {failed ? FAILED : STOPPED}
       </span>
+      </UiTooltip>
       {failed ? (
         <span role="alert" className="sr-only">
           {slot.text}
         </span>
       ) : null}
-      <button
-        type="button"
-        className="h-7 rounded-md px-2 text-sm text-white outline-none hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white"
+      <Button variant="primary" size="bar" icon={RefreshCw}
         onClick={onRun}
       >
         {RETRY}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -155,7 +150,7 @@ function FinishSlot({ slot, onRun, onStop }: { slot: RecogniseSlot; onRun: () =>
  * words.
  */
 export function RecogniseBar({ recognise, onReturnFocus }: { recognise: RecogniseApi; onReturnFocus: () => void }) {
-  const pill = "pointer-events-auto flex min-w-0 flex-col rounded-lg px-2 text-sm";
+  const pill = "pointer-events-auto flex min-w-0 flex-col rounded-[8px] px-2 text-sm";
   const pillStyle = { background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" };
   const label = <span className={`${LABEL_CLASS} whitespace-nowrap py-2`}>{RECOGNISE_TEXT}</span>;
   if (recognise.selection !== "paths" && recognise.slot.kind !== "running") {

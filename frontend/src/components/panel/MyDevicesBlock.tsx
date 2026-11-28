@@ -1,10 +1,10 @@
 // The Share tab's My devices block (`specs/0096-own-devices-sync` ux-notes 2 to 9): the rows,
 // and where the decision rows, the workspace pick, the pairing and backup blocks go.
 
-import { ChevronDown, ChevronRight, Globe, LogOut, Monitor, MonitorSmartphone, Unlink } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Globe, LogOut, Monitor, MonitorSmartphone, Unlink } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { ALERT, APPLY, ARMED, ArmLines, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { ARMED, ArmLines, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
 import { useArm } from "@/hooks/useArm";
 import { EntryField } from "@/components/panel/EntryField";
 import { DecisionRow, PickWorkspaces } from "@/components/panel/DeviceChoices";
@@ -20,6 +20,10 @@ import {
   library_word,
   sharing_word,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { SECTION_HEADING } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
+import { AlertLine } from "@/components/ui/notice";
 
 interface MyDevicesBlockProps {
   devices: DevicesApi;
@@ -148,31 +152,32 @@ function DeviceRowView({
           <span aria-hidden className="w-7 shrink-0" />
         ) : (
           <span {...arm.zone} className="flex">
-            <button
-              {...arm.control}
-              ref={action}
-              type="button"
-              data-row-first={details.length > 0 ? undefined : row.member || "own"}
-              title={row.own ? "Leave my devices" : "Remove"}
-              aria-label={row.own ? "Leave my devices" : `Remove ${row.label}`}
-              className={`${BUTTON} w-7 ${arm.armed ? ARMED : `${OUTLINE} border-transparent`}`}
-              onClick={() =>
-                arm.press(() => {
-                  const refusal = row.own ? devices.leave() : devices.remove(row.member);
-                  if (refusal === "") {
-                    if (row.own) {
-                      // A passkey backup of a device that left is deleted (ADR 0040 decision 13).
-                      backup.forget();
-                    } else {
-                      onRemoved(row.member);
+            <Tooltip side="left" content={row.own ? "Leave my devices" : "Remove"}>
+              <button
+                {...arm.control}
+                ref={action}
+                type="button"
+                data-row-first={details.length > 0 ? undefined : row.member || "own"}
+                aria-label={row.own ? "Leave my devices" : `Remove ${row.label}`}
+                className={`${BUTTON} w-7 ${arm.armed ? ARMED : `${OUTLINE} border-transparent`}`}
+                onClick={() =>
+                  arm.press(() => {
+                    const refusal = row.own ? devices.leave() : devices.remove(row.member);
+                    if (refusal === "") {
+                      if (row.own) {
+                        // A passkey backup of a device that left is deleted (ADR 0040 decision 13).
+                        backup.forget();
+                      } else {
+                        onRemoved(row.member);
+                      }
                     }
-                  }
-                  return refusal;
-                })
-              }
-            >
-              {row.own ? <LogOut {...GLYPH} /> : <Unlink {...GLYPH} />}
-            </button>
+                    return refusal;
+                  })
+                }
+              >
+                {row.own ? <LogOut {...GLYPH} /> : <Unlink {...GLYPH} />}
+              </button>
+            </Tooltip>
           </span>
         )}
       </div>
@@ -268,23 +273,21 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
       className="flex flex-col gap-2 border-b border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] pb-3"
     >
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-sm font-semibold text-[var(--toolbar-icon)]">My devices</p>
+        <p className={SECTION_HEADING}>My devices</p>
         <span className={MUTED}>{paired ? view.count : devices_text("only-this-device")}</span>
       </div>
       {view?.removed ? (
         <div className="flex flex-col gap-2">
-          <p role="alert" className={ALERT}>
+          <AlertLine>
             {devices_removed_alert()}
-          </p>
-          <button
-            type="button"
-            className={`${BUTTON} ${OUTLINE} w-[60px]`}
+          </AlertLine>
+          <Button icon={Check} className="min-w-[60px]"
             onClick={() => {
               devices.dismissRemoved();
             }}
           >
             OK
-          </button>
+          </Button>
         </div>
       ) : null}
       <ul aria-label="My devices" className="flex flex-col">
@@ -321,9 +324,9 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
       ) : null}
       {paired
         ? (view.alerts ?? []).map((alert) => (
-            <p key={alert} role="alert" className={ALERT}>
+            <AlertLine key={alert}>
               {alert}
-            </p>
+            </AlertLine>
           ))
         : null}
       {paired
@@ -338,9 +341,9 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
       ) : null}
       {paired
         ? devices.syncAlerts.map((alert) => (
-            <p key={alert} role="alert" className={ALERT}>
+            <AlertLine key={alert}>
               {alert}
-            </p>
+            </AlertLine>
           ))
         : null}
       {paired && devices.browser && !openerBlock ? <KeyBackupRow backup={backup} /> : null}
@@ -365,21 +368,18 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
       ) : (
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button variant="primary" icon={MonitorSmartphone}
               ref={addButton}
-              type="button"
               aria-disabled={addReason !== ""}
               aria-describedby={addReason ? reasonId : undefined}
-              className={`${BUTTON} ${APPLY} px-3`}
               onClick={() => {
                 if (addReason === "") {
                   devices.addDevice();
                 }
               }}
             >
-              <MonitorSmartphone {...GLYPH} />
-              {sharing_word("add-device")}
-            </button>
+{sharing_word("add-device")}
+</Button>
           </div>
           {!paired && devices.browser ? (
             <>

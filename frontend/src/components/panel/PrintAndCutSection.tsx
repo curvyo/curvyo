@@ -1,10 +1,4 @@
-import {
-  ChevronDown,
-  ChevronRight,
-  LocateFixed,
-  TriangleAlert,
-  X,
-} from "lucide-react";
+import { Check, ChevronDown, ChevronRight, FileText, LocateFixed, RotateCcw, TriangleAlert, X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
@@ -21,16 +15,18 @@ import {
 } from "@/lib/printAndCutView";
 import { controllerWord } from "@/lib/connectorText";
 import { isTauri } from "@/platform/host";
+import { Button } from "@/components/ui/button";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
+import { InlinePickList } from "@/components/InlinePickList";
 
 const MEASURE_MESSAGES = {
   range: "Enter a number from -10000 to 10000",
 } as const;
 const TOLERANCE_MESSAGES = { range: "Between 0.05 and 5 mm" } as const;
 
-const OUTLINE_BUTTON =
-  "h-7 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-disabled:opacity-40 aria-disabled:hover:bg-transparent";
+const OUTLINE_BUTTON = buttonClass("secondary");
 const SYMBOL_BUTTON =
-  "flex h-7 w-6 shrink-0 items-center justify-center rounded text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-disabled:opacity-40 aria-disabled:hover:bg-transparent";
+  "flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-disabled:opacity-40 aria-disabled:hover:bg-transparent";
 
 interface Props {
   api: PrintAndCutApi;
@@ -144,46 +140,44 @@ export function PrintAndCutSection({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex h-7 w-full items-center gap-1 rounded text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="flex h-7 w-full items-center gap-1 rounded-[5px] text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
         {open ? (
-          <ChevronDown size={16} aria-hidden />
+          <ChevronDown {...GLYPH} aria-hidden />
         ) : (
-          <ChevronRight size={16} aria-hidden />
+          <ChevronRight {...GLYPH} aria-hidden />
         )}
         <span>Print and cut</span>
         <span className="ml-auto flex items-center gap-1 text-xs text-[var(--panel-muted-fg)] tabular-nums">
-          {view.warn_summary && <TriangleAlert size={14} aria-hidden />}
+          {view.warn_summary && <TriangleAlert {...GLYPH} aria-hidden />}
           {view.summary}
         </span>
       </button>
       {open && (
         <div className="flex flex-col gap-1">
           {view.sheets.length > 1 ? (
-            <select
-              aria-label="Sheet"
-              className={`${OUTLINE_BUTTON} w-full px-2`}
-              value={JSON.stringify(view.sheet)}
-              onChange={(event) =>
-                api.chooseSheet(JSON.parse(event.target.value))
-              }
-            >
-              {view.sheets.map((sheet) => (
-                <option
-                  key={JSON.stringify(sheet.id)}
-                  value={JSON.stringify(sheet.id)}
-                >
-                  {sheet.name} ({sheet.marks} marks)
-                </option>
-              ))}
-            </select>
+            // No system dropdown in the panel (`docs/ui-elements.md` §12, 0159 F23): an inline list.
+            <div className="flex flex-col">
+              <span className="text-xs text-[var(--panel-muted-fg)]">Sheet</span>
+              <InlinePickList
+                icon={FileText}
+                label={view.sheets.find((sheet) => JSON.stringify(sheet.id) === JSON.stringify(view.sheet))?.name ?? "Sheet"}
+                className={`${OUTLINE_BUTTON} w-full justify-start px-2`}
+                rows={view.sheets.map((sheet) => ({
+                  id: JSON.stringify(sheet.id),
+                  name: sheet.name,
+                  detail: `${sheet.marks} marks`,
+                }))}
+                onPick={(id) => api.chooseSheet(JSON.parse(id))}
+              />
+            </div>
           ) : (
             <div className="flex flex-col">
               <span className="text-xs text-[var(--panel-muted-fg)]">
                 Sheet
               </span>
               <span
-                className="truncate text-[13px] text-[var(--toolbar-icon)]"
+                className="truncate text-sm text-[var(--toolbar-icon)]"
                 title={view.sheet_name}
               >
                 {view.sheet_name}
@@ -216,7 +210,7 @@ export function PrintAndCutSection({
               >
                 <span
                   aria-hidden
-                  className="w-[14px] text-center text-[13px] font-semibold text-[var(--toolbar-icon)]"
+                  className="w-[14px] text-center text-sm font-semibold text-[var(--toolbar-icon)]"
                 >
                   {row.number}
                 </span>
@@ -241,7 +235,7 @@ export function PrintAndCutSection({
                   ) : (
                     <span
                       key={axis}
-                      className="text-right text-[13px] text-[var(--panel-muted-fg)] tabular-nums"
+                      className="text-right text-sm text-[var(--panel-muted-fg)] tabular-nums"
                       style={{ width: connected ? 86 : 98 }}
                     >
                       {row[axis] ?? ""}
@@ -279,7 +273,7 @@ export function PrintAndCutSection({
                             );
                         }}
                       >
-                        <LocateFixed size={16} aria-hidden />
+                        <LocateFixed {...GLYPH} aria-hidden />
                       </button>
                     </Tooltip>
                   )}
@@ -294,7 +288,7 @@ export function PrintAndCutSection({
                           api.clear(row.number);
                         }}
                       >
-                        <X size={16} aria-hidden />
+                        <X {...GLYPH} aria-hidden />
                       </button>
                     </Tooltip>
                   )}
@@ -323,7 +317,7 @@ export function PrintAndCutSection({
             {view.state &&
               (stateIsWarning(view) ? (
                 <span className="flex items-start gap-1 text-[var(--toolbar-icon)]">
-                  <TriangleAlert size={16} aria-hidden className="shrink-0" />
+                  <TriangleAlert {...GLYPH} aria-hidden className="shrink-0" />
                   {view.state}
                 </span>
               ) : (
@@ -332,7 +326,7 @@ export function PrintAndCutSection({
                 </span>
               ))}
             {view.fit && (
-              <dl className="grid grid-cols-[64px_1fr] gap-y-0.5">
+              <dl className="grid grid-cols-[60px_1fr] gap-y-0.5">
                 <dt className="text-[var(--panel-muted-fg)]">Moved</dt>
                 <dd className="text-[var(--toolbar-icon)] tabular-nums">
                   {view.fit.moved}
@@ -348,7 +342,7 @@ export function PrintAndCutSection({
                 <dt className="text-[var(--panel-muted-fg)]">Error</dt>
                 <dd className="flex items-start gap-1 text-[var(--toolbar-icon)] tabular-nums">
                   {view.fit.warn && (
-                    <TriangleAlert size={16} aria-hidden className="shrink-0" />
+                    <TriangleAlert {...GLYPH} aria-hidden className="shrink-0" />
                   )}
                   <span>
                     {view.fit.error}
@@ -363,7 +357,7 @@ export function PrintAndCutSection({
                 key={warning}
                 className="flex items-start gap-1 text-[var(--toolbar-icon)]"
               >
-                <TriangleAlert size={16} aria-hidden className="shrink-0" />
+                <TriangleAlert {...GLYPH} aria-hidden className="shrink-0" />
                 {warning}
               </span>
             ))}
@@ -410,12 +404,10 @@ export function PrintAndCutSection({
             {/* Apply is greyed, never absent, so Reset placement never moves (UX notes §4.8);
                 a fit that is not usable gives its line as the reason. */}
             <Tooltip side="top" content={applyReason || applyLabel}>
-              <button
-                type="button"
+              <Button icon={Check}
                 data-pnc-apply
                 aria-disabled={applyReason !== null}
-                aria-description={applyReason || undefined}
-                className={`${OUTLINE_BUTTON} w-[120px]`}
+                aria-description={applyReason || undefined} className="min-w-[120px]"
                 onClick={() => {
                   if (applyReason !== null) return;
                   const text = api.apply();
@@ -423,23 +415,21 @@ export function PrintAndCutSection({
                 }}
               >
                 {applyLabel}
-              </button>
+              </Button>
             </Tooltip>
             <Tooltip
               side="top"
               content={view.reset.reason ?? "Reset placement"}
             >
-              <button
-                type="button"
+              <Button icon={RotateCcw}
                 aria-disabled={!view.reset.enabled}
-                aria-description={view.reset.reason ?? undefined}
-                className={`${OUTLINE_BUTTON} w-[120px]`}
+                aria-description={view.reset.reason ?? undefined} className="min-w-[120px]"
                 onClick={() => {
                   if (view.reset.enabled) api.reset();
                 }}
               >
                 Reset placement
-              </button>
+              </Button>
             </Tooltip>
           </div>
         </div>

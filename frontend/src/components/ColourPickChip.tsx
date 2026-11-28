@@ -190,7 +190,7 @@ export function ColourPickChip({
       ref={chipRef}
       data-colour-chip=""
       aria-hidden
-      className="pointer-events-none absolute z-40 flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs whitespace-nowrap tabular-nums"
+      className="pointer-events-none absolute z-40 flex items-center gap-1.5 rounded-[8px] px-1.5 py-0.5 text-xs whitespace-nowrap tabular-nums"
       style={{
         left: placement.left,
         top: placement.top,

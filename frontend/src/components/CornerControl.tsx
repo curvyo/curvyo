@@ -1,17 +1,16 @@
 import { useRef } from "react";
 
+import { SEGMENT_ITEM, SEGMENT_STRIP } from "@/components/ui/looks";
 import { Tooltip } from "@/components/ui/tooltip";
 import { CORNER_NAMES, CORNERS, type Corner, cornerKey } from "@/lib/machineBlockKeys";
-
-const CORNER_BUTTON =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)]";
 
 /**
  * The 2 x 2 origin corner radiogroup of the laser Machine block and the Grid & Rulers pane
  * (`specs/0026-machine-profile` UX notes §6, `specs/0045-document-formats-library` criterion 41):
  * one Tab stop on the chosen corner, arrows move within a row or column and choose without
  * wrapping, Home and End jump. `onReturnFocus` runs after a pointer press (the Grid pane gives the
- * keyboard back to the canvas; the form-like Machine block keeps it).
+ * keyboard back to the canvas; the form-like Machine block keeps it). One bordered 2 x 2 strip
+ * in the segmented look, its label beside the top row (`docs/ui-elements.md` §7, 0159 F21).
  */
 export function CornerControl({
   label,
@@ -31,11 +30,11 @@ export function CornerControl({
     group.current?.querySelector<HTMLElement>(`[data-corner="${next}"]`)?.focus();
   };
   return (
-    <div className="flex h-[60px] items-center justify-between">
-      <span aria-hidden className="text-sm text-[var(--toolbar-icon)]">
+    <div className="flex items-start justify-between">
+      <span aria-hidden className="flex h-7 items-center text-sm text-[var(--toolbar-icon)]">
         {label}
       </span>
-      <div ref={group} role="radiogroup" aria-label="Origin corner" className="grid grid-cols-2 gap-1">
+      <div ref={group} role="radiogroup" aria-label="Origin corner" className={`grid grid-cols-2 ${SEGMENT_STRIP}`}>
         {CORNERS.map((name) => (
           <Tooltip key={name} side="left" content={CORNER_NAMES[name]}>
             <button
@@ -58,7 +57,7 @@ export function CornerControl({
                   select(next);
                 }
               }}
-              className={`${CORNER_BUTTON} ${name === corner ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:bg-[var(--toolbar-icon-active-bg)]" : ""}`}
+              className={`${SEGMENT_ITEM} w-7 px-0`}
             >
               <CornerGlyph corner={name} />
             </button>

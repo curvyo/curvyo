@@ -7,6 +7,8 @@ import { MATERIAL_WINDOW_ABOVE } from "@/lib/materialRows";
 import { PICK_FILTER_ABOVE, filterPick, kindsText, thicknessText } from "@/lib/operationSettingsRows";
 import type { PickMaterial } from "@/lib/operationSettingsView";
 import { visibleRange } from "@/lib/operationWindow";
+import { fieldClass } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const PICK_ROW = 28;
 const OVERSCAN = 112;
@@ -118,12 +120,12 @@ export function MaterialPick(props: MaterialPickProps) {
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         onClick={() => (open ? close(false) : setOpen(true))}
-        className="flex h-7 w-full max-w-[244px] items-center gap-1 rounded text-left hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="flex h-7 w-full max-w-[244px] items-center gap-1 rounded-[5px] text-left hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
         <Chevron size={12} aria-hidden className="shrink-0" />
         <span className="text-xs text-[var(--panel-muted-fg)]">Material</span>
         <span
-          className={`min-w-0 flex-1 truncate text-right text-[13px] ${mixed ? "text-[var(--field-placeholder)]" : "text-[var(--toolbar-icon)]"}`}
+          className={`min-w-0 flex-1 truncate text-right text-sm ${mixed ? "text-[var(--field-placeholder)]" : "text-[var(--toolbar-icon)]"}`}
         >
           {value}
         </span>
@@ -145,7 +147,7 @@ export function MaterialPick(props: MaterialPickProps) {
                   listRef.current?.querySelector<HTMLElement>('[data-choice="0"]')?.focus();
                 }
               }}
-              className="mb-1 h-7 rounded border border-[var(--lane-line)] bg-white px-2 text-[13px] text-[var(--toolbar-icon)]"
+              className={fieldClass({ extra: "mb-1 px-1.5" })}
             />
           ) : null}
           <div ref={listRef} role="radiogroup" aria-label={`Material of ${subject}`} className="flex flex-col">
@@ -156,38 +158,38 @@ export function MaterialPick(props: MaterialPickProps) {
               const checked = choice.id === (currentId ?? "") && !mixed;
               const reason = disabledFor(choice.id);
               return (
-                <button
-                  key={choice.id || "own"}
-                  type="button"
-                  role="radio"
-                  data-choice={at}
-                  aria-checked={checked}
-                  aria-disabled={reason !== null ? true : undefined}
-                  aria-label={
-                    entry ? `${entry.name}, ${thicknessText(entry.thicknessMm)}, ${reason ?? kindsText(entry.kinds)}` : "Own numbers"
-                  }
-                  title={reason ?? undefined}
-                  tabIndex={at === stop ? 0 : -1}
-                  onFocus={() => setStop(at)}
-                  onClick={() => pick(choice.id)}
-                  style={{ height: PICK_ROW }}
-                  className={`relative flex shrink-0 items-center gap-2 rounded pl-2 pr-1 text-left text-[13px] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${checked ? "bg-[var(--value-fill)]" : ""} ${reason !== null ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}`}
-                >
-                  {checked ? (
-                    <span aria-hidden className="absolute left-0 top-0 h-full w-[3px] rounded bg-[var(--accent)]" />
-                  ) : null}
-                  <span className="min-w-0 flex-1 truncate">{entry ? entry.name : "Own numbers"}</span>
-                  {entry ? (
-                    <>
-                      <span className="text-xs tabular-nums text-[var(--panel-muted-fg)]">{thicknessText(entry.thicknessMm)}</span>
-                      {reason !== null ? (
-                        <span className="text-[11px] text-[var(--panel-muted-fg)]">{reason}</span>
-                      ) : (
-                        <KindSymbols kinds={entry.kinds} />
-                      )}
-                    </>
-                  ) : null}
-                </button>
+                <Tooltip key={choice.id || "own"} side="left" content={reason ?? undefined}>
+                  <button
+                    type="button"
+                    role="radio"
+                    data-choice={at}
+                    aria-checked={checked}
+                    aria-disabled={reason !== null ? true : undefined}
+                    aria-label={
+                      entry ? `${entry.name}, ${thicknessText(entry.thicknessMm)}, ${reason ?? kindsText(entry.kinds)}` : "Own numbers"
+                    }
+                    tabIndex={at === stop ? 0 : -1}
+                    onFocus={() => setStop(at)}
+                    onClick={() => pick(choice.id)}
+                    style={{ height: PICK_ROW }}
+                    className={`relative flex shrink-0 items-center gap-2 rounded-[5px] pl-2 pr-1 text-left text-sm hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${checked ? "bg-[var(--value-fill)]" : ""} ${reason !== null ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}`}
+                  >
+                    {checked ? (
+                      <span aria-hidden className="absolute left-0 top-0 h-full w-[3px] rounded-full bg-[var(--accent)]" />
+                    ) : null}
+                    <span className="min-w-0 flex-1 truncate">{entry ? entry.name : "Own numbers"}</span>
+                    {entry ? (
+                      <>
+                        <span className="text-xs tabular-nums text-[var(--panel-muted-fg)]">{thicknessText(entry.thicknessMm)}</span>
+                        {reason !== null ? (
+                          <span className="text-[11px] text-[var(--panel-muted-fg)]">{reason}</span>
+                        ) : (
+                          <KindSymbols kinds={entry.kinds} />
+                        )}
+                      </>
+                    ) : null}
+                  </button>
+                </Tooltip>
               );
             })}
             <div aria-hidden style={{ height: range.after }} />

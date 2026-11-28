@@ -1,4 +1,5 @@
 import { Lock } from "lucide-react";
+import { SMALL_GLYPH } from "@/components/ui/looks";
 import { useEffect, useState } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
@@ -99,7 +100,7 @@ export function FixtureLabels({ getSession }: { getSession: () => WasmSession | 
             <span
               key={`lock-${index}`}
               data-lock-badge=""
-              className="absolute flex h-4 w-4 items-center justify-center rounded-[4px] border"
+              className="absolute flex h-4 w-4 items-center justify-center rounded-full border"
               style={{
                 left: label.x,
                 top: label.y,
@@ -109,7 +110,7 @@ export function FixtureLabels({ getSession }: { getSession: () => WasmSession | 
                 borderColor: "var(--lane-line)",
               }}
             >
-              <Lock size={12} strokeWidth={1.5} absoluteStrokeWidth />
+              <Lock {...SMALL_GLYPH} />
             </span>
           );
         }
@@ -121,7 +122,7 @@ export function FixtureLabels({ getSession }: { getSession: () => WasmSession | 
             key={`${label.kind}-${index}`}
             className={
               chip
-                ? "absolute flex h-5 items-center whitespace-nowrap rounded-lg border px-1.5 text-xs"
+                ? "absolute flex h-5 items-center whitespace-nowrap rounded-[8px] border px-1.5 text-xs"
                 : "absolute whitespace-nowrap text-[11px] leading-none tabular-nums"
             }
             style={{

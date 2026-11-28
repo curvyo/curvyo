@@ -1,4 +1,5 @@
 import { Check, ChevronDown, ChevronUp, type LucideIcon } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
@@ -142,7 +143,7 @@ export function OutputPick({
               setOpen(true);
             }
           }}
-          className="flex h-7 w-full items-center gap-1.5 rounded-[5px] border border-[var(--field-border)] bg-white px-1.5 text-[13px] text-[var(--toolbar-icon)] outline-none hover:border-[var(--editor-accent)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+          className="flex h-7 w-full items-center gap-1.5 rounded-[5px] border border-[var(--field-border)] bg-white px-1.5 text-sm text-[var(--toolbar-icon)] outline-none hover:border-[var(--editor-accent)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         >
           {Icon ? <Icon size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" /> : null}
           <span className="shrink-0 text-xs text-[var(--panel-muted-fg)]">{label}</span>
@@ -172,16 +173,16 @@ export function OutputPick({
                 tabIndex={at === stop ? 0 : -1}
                 onFocus={() => setStop(at)}
                 onClick={(event) => choose(option, event.detail > 0)}
-                className={`relative flex h-7 shrink-0 items-center justify-between gap-2 rounded pl-2 pr-1 text-left text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+                className={`relative flex h-7 shrink-0 items-center justify-between gap-2 rounded-[5px] pl-2 pr-1 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
                   checked ? "bg-[var(--value-fill)]" : ""
                 } ${option.pickable ? "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]" : "text-[var(--panel-muted-fg)]"}`}
               >
                 {checked ? (
-                  <span aria-hidden className="absolute left-0 top-0 h-full w-[3px] rounded bg-[var(--editor-accent)]" />
+                  <span aria-hidden className="absolute left-0 top-0 h-full w-[3px] rounded-full bg-[var(--editor-accent)]" />
                 ) : null}
                 <span className="truncate">{option.name}</span>
                 {checked ? (
-                  <Check size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />
+                  <Check {...GLYPH} aria-hidden className="shrink-0" />
                 ) : option.note ? (
                   <span className="shrink-0 text-[11px]">{option.note}</span>
                 ) : null}

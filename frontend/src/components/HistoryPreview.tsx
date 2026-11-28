@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { NO_PREVIEW, previewBanner, previewReadout, sinceText } from "@/lib/historyPreview";
 import { setPreviewState, usePreviewState } from "@/lib/historyPreviewStore";
 import type { WasmSession } from "@/lib/editorSession";
+import { Button } from "@/components/ui/button";
+import { Undo2 } from "lucide-react";
 
 /**
  * The persistent line of the canvas notice slot while a version from the History list shows
@@ -23,7 +25,7 @@ export function HistoryPreviewLine({ getSession }: { getSession: () => WasmSessi
   };
   if (state.kind === "object") {
     return (
-      <div role="status" aria-live="polite" className="rounded-md p-2 text-xs" style={box}>
+      <div role="status" aria-live="polite" className="rounded-[8px] p-2 text-xs" style={box}>
         {previewReadout(state, now)}
       </div>
     );
@@ -33,23 +35,21 @@ export function HistoryPreviewLine({ getSession }: { getSession: () => WasmSessi
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-auto flex items-center gap-3 rounded-md p-2 text-xs"
+      className="pointer-events-auto flex items-center gap-3 rounded-[5px] p-2 text-xs"
       style={box}
     >
       <span>
         {previewBanner(state, now)}
         {since !== "" ? <span className="text-[var(--panel-muted-fg)]"> {since}</span> : null}
       </span>
-      <button
-        type="button"
+      <Button icon={Undo2}
         onClick={() => {
           getSession()?.history_preview_end();
           setPreviewState(NO_PREVIEW);
-        }}
-        className="h-7 shrink-0 whitespace-nowrap rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] px-2 text-xs text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        }} className="shrink-0"
       >
         Back to live
-      </button>
+      </Button>
     </div>
   );
 }

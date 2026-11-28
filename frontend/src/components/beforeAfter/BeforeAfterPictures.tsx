@@ -42,7 +42,7 @@ function present(target: HTMLCanvasElement | null, source: HTMLCanvasElement, sh
 function Tag({ side, children }: { side: "left" | "right"; children: string }) {
   return (
     <span
-      className={`pointer-events-none absolute top-2 ${side === "left" ? "left-2" : "right-2"} z-10 flex h-5 items-center rounded border border-[var(--lane-line)] bg-[var(--toolbar-bg)] px-1.5 text-xs text-[var(--toolbar-icon)]`}
+      className={`pointer-events-none absolute top-2 ${side === "left" ? "left-2" : "right-2"} z-10 flex h-5 items-center rounded-[8px] border border-[var(--lane-line)] bg-[var(--toolbar-bg)] px-1.5 text-xs text-[var(--toolbar-icon)]`}
     >
       {children}
     </span>

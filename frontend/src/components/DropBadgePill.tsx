@@ -47,7 +47,7 @@ export function DropBadgePill({
     <div
       aria-hidden
       data-drop-badge=""
-      className={`pointer-events-none ${position} z-50 flex h-5 items-center gap-1 whitespace-nowrap rounded-lg border px-1.5 text-xs`}
+      className={`pointer-events-none ${position} z-50 flex h-5 items-center gap-1 whitespace-nowrap rounded-[8px] border px-1.5 text-xs`}
       style={{
         left: badge.x,
         top: badge.y,

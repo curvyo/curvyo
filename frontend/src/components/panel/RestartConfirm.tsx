@@ -3,6 +3,9 @@ import { useEffect, useRef } from "react";
 import { CONFIRM_GUARD_MS, type ListEntry, restartAt, restartQuestion } from "@/lib/jobList";
 import { formatCount } from "@/lib/connectorText";
 import { ignoredKey } from "@/lib/sendArm";
+import { Button } from "@/components/ui/button";
+import { RotateCcw, X } from "lucide-react";
+import { GLYPH } from "@/components/ui/looks";
 
 const BUTTON =
   "flex h-7 shrink-0 items-center justify-center rounded-[5px] border text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 pointer-coarse:h-9";
@@ -59,17 +62,15 @@ export function RestartConfirm({
     >
       <p className="text-xs leading-4 text-[var(--toolbar-icon)]">{question}</p>
       <div className="flex gap-2">
-        <button
-          ref={cancel}
-          type="button"
-          className={`${BUTTON} w-[76px] border-[var(--field-border)] bg-[var(--panel-bg)] text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}
+        <Button icon={X}
+          ref={cancel} className="min-w-[76px]"
           onClick={onCancel}
         >
           Cancel
-        </button>
+        </Button>
         <button
           type="button"
-          className={`${BUTTON} w-[160px] border-[var(--armed-accent)] bg-white text-[var(--armed-accent)] hover:bg-[var(--armed-accent)] hover:text-white focus-visible:bg-[var(--armed-accent)] focus-visible:text-white active:bg-[var(--armed-accent)] active:text-white`}
+          className={`${BUTTON} min-w-[160px] gap-1 px-3 border-[var(--armed-accent)] bg-white text-[var(--armed-accent)] hover:bg-[var(--armed-accent)] hover:text-white focus-visible:bg-[var(--armed-accent)] focus-visible:text-white active:bg-[var(--armed-accent)] active:text-white`}
           onKeyDown={(event) => {
             if (ignoredKey(event.key, event.repeat)) event.preventDefault();
           }}
@@ -77,6 +78,7 @@ export function RestartConfirm({
             if (performance.now() - opened.current >= CONFIRM_GUARD_MS) onConfirm();
           }}
         >
+          <RotateCcw {...GLYPH} aria-hidden />
           {action}
         </button>
       </div>

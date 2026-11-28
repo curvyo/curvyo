@@ -1,4 +1,5 @@
 import { Crosshair, Download } from "lucide-react";
+import { GLYPH, SECTION_HEADING } from "@/components/ui/looks";
 import { useEffect, useRef, useState } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
@@ -80,7 +81,7 @@ export function OutputGroup({
   return (
     <section aria-label="Output" data-output-group className="flex flex-col gap-2">
       <Divider />
-      <h3 className="text-[11px] font-semibold text-[var(--panel-muted-fg)]">Output</h3>
+      <h3 className={SECTION_HEADING}>Output</h3>
       <p className="text-xs text-[var(--toolbar-icon)]" data-output-machine>
         <span className="font-semibold">{machine.name}</span>
         <span className="text-[var(--panel-muted-fg)]">{machine.rest}</span>
@@ -109,14 +110,14 @@ export function OutputGroup({
       {view.total ? <Divider /> : null}
       {view.total ? (
         <section aria-label="Total" role="status" aria-atomic="true" className="flex flex-col gap-0.5">
-          <p className="text-[13px] leading-4 font-semibold text-[var(--toolbar-icon)]">{view.total.time}</p>
+          <p className="text-sm leading-4 font-semibold text-[var(--toolbar-icon)]">{view.total.time}</p>
           {view.total.runs === null ? null : (
             <p className="text-xs tabular-nums text-[var(--panel-muted-fg)]" data-total-runs>
               {view.total.runs.before}
               <button
                 type="button"
                 onClick={() => api.selectRunning()}
-                className="rounded-sm underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                className="rounded-[5px] underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
               >
                 {view.total.runs.button}
               </button>
@@ -128,7 +129,7 @@ export function OutputGroup({
               <button
                 type="button"
                 onClick={() => api.selectItems(fixtureLine.ids)}
-                className="rounded-sm underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                className="rounded-[5px] underline outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
               >
                 {fixtureLine.button}
               </button>
@@ -151,13 +152,13 @@ export function OutputGroup({
               void api.exportJob();
               if (event.detail > 0) onReturnFocus();
             }}
-            className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-2 rounded-[5px] text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 ${
+            className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-2 rounded-[5px] text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 ${
               exportOn
                 ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:brightness-110"
                 : "cursor-default bg-[var(--field-disabled-bg)] text-[var(--field-disabled-fg)]"
             }`}
           >
-            <Download size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+            <Download {...GLYPH} aria-hidden />
             <span aria-hidden>{EXPORT_NAME}</span>
           </button>
         </Tooltip>

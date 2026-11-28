@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { SlotGlyph } from "@/components/workbench/FixtureGlyphs";
 import { NumberField, TextField } from "@/components/workbench/FixtureFields";
@@ -9,6 +9,9 @@ import type { FixturesApi } from "@/hooks/useFixtures";
 import { MAX_SLOTS, slotCountText } from "@/lib/fixtureRows";
 import { fixtureArmStatus, removedStatus } from "@/lib/fixtureSets";
 import type { FixtureRow, SlotRow } from "@/lib/fixturesView";
+import { Button } from "@/components/ui/button";
+import { SEGMENT_ITEM, SEGMENT_STRIP, GLYPH } from "@/components/ui/looks";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /**
  * The unfolded body of a fixture row, by kind: a grid's fields, a holder's slots, a pin's or
@@ -63,7 +66,7 @@ function GridFields({ row, grid, api, locked }: { row: FixtureRow; grid: NonNull
               type="button"
               aria-label={`Tape on ${edge}`}
               aria-pressed={grid.tapes[edge]}
-              className={`h-7 min-w-0 flex-1 rounded-md border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${grid.tapes[edge] ? "bg-[var(--toolbar-icon)] text-white" : "bg-white text-[var(--toolbar-icon)]"}`}
+              className={`h-7 min-w-0 flex-1 rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${grid.tapes[edge] ? "border-[var(--toolbar-icon-active-bg)] bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "bg-white text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"}`}
               onClick={() => api.setTape(row.id, edge, !grid.tapes[edge])}
             >
               {word}
@@ -103,13 +106,11 @@ function HolderFields({
         ))}
       </ul>
       {row.canAddSlot && !locked && row.slots.length < MAX_SLOTS ? (
-        <button
-          type="button"
-          className="h-7 rounded border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        <Button icon={Plus}
           onClick={() => api.addSlot(row.id)}
         >
           Add slot
-        </button>
+        </Button>
       ) : null}
       {slot ? <SlotFields slot={slot} api={api} locked={locked} /> : null}
     </div>
@@ -123,12 +124,12 @@ function SlotItem({ slot, selected, api, arm, locked }: { slot: SlotRow; selecte
   return (
     <li
       {...{ [ARM_ZONE]: slot.id }}
-      className={`flex h-7 items-center gap-2 rounded-md px-1 ${armed ? "bg-[var(--destructive-soft)]" : selected ? "bg-[var(--value-fill)]" : ""}`}
+      className={`flex h-7 items-center gap-2 rounded-[5px] px-1 ${armed ? "bg-[var(--destructive-soft)]" : selected ? "bg-[var(--value-fill)]" : ""}`}
     >
       <button
         type="button"
         aria-label={`${slot.name}, ${slot.shape === "rect" ? "rectangle" : "circle"}, ${slot.wMm} by ${slot.hMm} mm`}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left text-[13px] text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         onClick={() => api.selectSlot(slot.id)}
       >
         <SlotGlyph shape={slot.shape} className="shrink-0" />
@@ -137,21 +138,22 @@ function SlotItem({ slot, selected, api, arm, locked }: { slot: SlotRow; selecte
         {slot.outside ? <span className="shrink-0 text-[11px] text-[var(--panel-muted-fg)]">Outside the board</span> : null}
       </button>
       {locked ? null : (
-        <button
-          type="button"
-          {...{ [ARM_TRASH]: slot.id }}
-          aria-label={label}
-          title={label}
-          className={armed ? ARMED_TRASH : `${ICON_BUTTON} text-[var(--panel-muted-fg)]`}
-          onClick={() =>
-            arm.press(slot.id, fixtureArmStatus(slot.name), () => {
-              api.removeSlot(slot.id);
-              return removedStatus(slot.name);
-            })
-          }
-        >
-          <Trash2 size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-        </button>
+        <Tooltip side="left" content={label}>
+          <button
+            type="button"
+            {...{ [ARM_TRASH]: slot.id }}
+            aria-label={label}
+            className={armed ? ARMED_TRASH : `${ICON_BUTTON} text-[var(--panel-muted-fg)]`}
+            onClick={() =>
+              arm.press(slot.id, fixtureArmStatus(slot.name), () => {
+                api.removeSlot(slot.id);
+                return removedStatus(slot.name);
+              })
+            }
+          >
+            <Trash2 {...GLYPH} aria-hidden />
+          </button>
+        </Tooltip>
       )}
     </li>
   );
@@ -179,14 +181,14 @@ function SlotFields({ slot, api, locked }: { slot: SlotRow; api: FixturesApi; lo
   return (
     <div className="flex flex-col gap-2 border-t border-[color-mix(in_srgb,var(--toolbar-icon)_20%,transparent)] pt-2">
       <TextField key={`${slot.id}:${slot.name}`} label="Name" value={slot.name} onCommit={(name) => api.renameSlot(slot.id, name)} />
-      <div role="radiogroup" aria-label="Shape" className="flex gap-1">
+      <div role="radiogroup" aria-label="Shape" className={`flex ${SEGMENT_STRIP}`}>
         {(["rect", "circle"] as const).map((shape) => (
           <button
             key={shape}
             type="button"
             role="radio"
             aria-checked={slot.shape === shape}
-            className={`h-7 w-[118px] rounded-md border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] text-xs outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${slot.shape === shape ? "bg-[var(--toolbar-icon)] text-white" : "bg-white text-[var(--toolbar-icon)]"}`}
+            className={`${SEGMENT_ITEM} flex-1 text-xs`}
             onClick={() => api.setSlotShape(slot.id, shape)}
           >
             {shape === "rect" ? "Rectangle" : "Circle"}

@@ -1,16 +1,18 @@
 // The pairing blocks of My devices (`specs/0096-own-devices-sync` ux-notes 3 and 4): the old
 // device's code and compare step, and the new device's join block, with the check words.
 
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, KeyRound, Plug, RefreshCw, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { ALERT, APPLY, BUTTON, FIELD, MUTED, OUTLINE, SURFACE } from "@/components/panel/devicesUi";
+import { FIELD, MUTED, SURFACE } from "@/components/panel/devicesUi";
 import type { DevicesApi, PairingView } from "@/hooks/useDevices";
 import { formatPairCode, pairCodeComplete } from "@/lib/pairCode";
 import {
   devices_waiting_for_other,
   server_shown,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { Button } from "@/components/ui/button";
+import { AlertLine } from "@/components/ui/notice";
 
 /** The four check words in a 2 x 2 grid (ux-notes 3, step 2). */
 function CheckWords({ view }: { view: PairingView }) {
@@ -46,23 +48,21 @@ export function OpenerBlock({ devices, view, server }: { devices: DevicesApi; vi
   if (view.phase === "failed") {
     return (
       <div className="flex flex-col gap-2">
-        <p role="alert" className={ALERT}>
+        <AlertLine>
           {view.text}
-        </p>
+        </AlertLine>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={devices.closePairing}>
+          <Button icon={X} className="min-w-[76px]" onClick={devices.closePairing}>
             Close
-          </button>
-          <button
-            type="button"
-            className={`${BUTTON} ${APPLY} w-[100px]`}
+          </Button>
+          <Button variant="primary" icon={RefreshCw} className="min-w-[100px]"
             onClick={() => {
               devices.closePairing();
               devices.addDevice();
             }}
           >
             New code
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -75,12 +75,12 @@ export function OpenerBlock({ devices, view, server }: { devices: DevicesApi; vi
         <p className="font-mono text-xs text-[var(--panel-muted-fg)]">{view.fingerprint}</p>
         <CheckWords view={view} />
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={`${BUTTON} ${APPLY} w-[76px]`} onClick={devices.pair}>
+          <Button variant="primary" icon={KeyRound} className="min-w-[76px]" onClick={devices.pair}>
             Pair
-          </button>
-          <button type="button" className={`${BUTTON} ${OUTLINE} w-[110px]`} onClick={() => devices.cancelPairing(true)}>
+          </Button>
+          <Button icon={X} className="min-w-[110px]" onClick={() => devices.cancelPairing(true)}>
             Words differ
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -115,9 +115,9 @@ export function OpenerBlock({ devices, view, server }: { devices: DevicesApi; vi
       <p role="status" aria-live="polite" className={MUTED}>
         {view.wrong ? view.wrong : devices_waiting_for_other()}
       </p>
-      <button type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={() => devices.cancelPairing(false)}>
+      <Button icon={X} className="min-w-[76px]" onClick={() => devices.cancelPairing(false)}>
         Cancel
-      </button>
+      </Button>
     </div>
   );
 }
@@ -217,20 +217,18 @@ export function JoinerBlock({
         </p>
         {view.phase === "compare" ? <CheckWords view={view} /> : null}
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
+          <Button icon={X} className="min-w-[76px]" onClick={close}>
             Cancel
-          </button>
+          </Button>
           {view.phase === "compare" ? (
-            <button
-              type="button"
-              className={`${BUTTON} ${OUTLINE} w-[110px]`}
+            <Button icon={X} className="min-w-[110px]"
               onClick={() => {
                 devices.cancelPairing(true);
                 onClose();
               }}
             >
               Words differ
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -273,13 +271,13 @@ export function JoinerBlock({
       ) : null}
       {problem !== "" ? (
         <div className="flex flex-col gap-1">
-          <p id={alertId} role="alert" className={ALERT}>
+          <AlertLine id={alertId}>
             {view?.text}
-          </p>
+          </AlertLine>
           {problem === "lost" || problem === "unreachable" ? (
-            <button type="button" className={`${BUTTON} ${OUTLINE} w-[90px]`} onClick={connect}>
+            <Button icon={RefreshCw} className="min-w-[90px]" onClick={connect}>
               Try again
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
@@ -306,31 +304,28 @@ export function JoinerBlock({
           <p className={`${MUTED} truncate`} title={devices.syncedFolder.path || "~/Curvyo"}>
             {devices.syncedFolder.path || "~/Curvyo"}
           </p>
-          <button type="button" className={`${BUTTON} ${OUTLINE} w-[148px]`} onClick={devices.chooseSyncedFolder}>
-            <FolderOpen size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-            Change folder...
-          </button>
+          <Button icon={FolderOpen}  className="min-w-[148px]" onClick={devices.chooseSyncedFolder}>
+Change folder...
+</Button>
           {devices.syncedFolder.refusal ? (
-            <p role="alert" className={ALERT}>
+            <AlertLine>
               {devices.syncedFolder.refusal}
-            </p>
+            </AlertLine>
           ) : null}
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
+        <Button icon={X} className="min-w-[76px]" onClick={close}>
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button variant="primary" icon={Plug}
           ref={connectButton}
-          type="button"
           aria-disabled={!ready}
-          aria-describedby={ready ? undefined : locked ? alertId : reasonId}
-          className={`${BUTTON} ${APPLY} w-[90px]`}
+          aria-describedby={ready ? undefined : locked ? alertId : reasonId} className="min-w-[90px]"
           onClick={connect}
         >
           Connect
-        </button>
+        </Button>
       </div>
       {reason ? (
         <p id={reasonId} className={MUTED}>

@@ -1,3 +1,6 @@
+import { Spline } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import type { EditorSession } from "@/hooks/useEditorSession";
 
 /** Explicitly replaces editable curve controls with Bézier artwork. One line that never wraps
@@ -7,8 +10,8 @@ export function CurveToBezierButton({ editor }: { editor: EditorSession }) {
   const bspline = session?.can_convert_selected_bspline_to_bezier() ?? false;
   const spiro = session?.can_convert_selected_spiro_to_bezier() ?? false;
   if (!bspline && !spiro) return null;
-  return <div className="pointer-events-auto relative ml-1 flex h-9 shrink-0 items-center rounded-lg bg-[var(--toolbar-bg)] px-1 shadow-md">
-    <button type="button" className="h-7 rounded-md px-2 text-xs whitespace-nowrap hover:bg-[var(--editor-accent-hover)]" title="Replace curve controls with Bézier nodes" onClick={(event) => {
+  return <div className="pointer-events-auto relative ml-1 flex h-9 shrink-0 items-center rounded-[8px] bg-[var(--toolbar-bg)] px-1 shadow-md">
+    <Button size="bar" icon={Spline} tooltip="Replace curve controls with Bézier nodes" onClick={(event) => {
       const current = editor.getSession();
       const converted = spiro
         ? current?.convert_selected_spiro_to_bezier() ?? false
@@ -23,6 +26,6 @@ export function CurveToBezierButton({ editor }: { editor: EditorSession }) {
       }
       editor.sync();
       editor.containerRef.current?.focus();
-    }}>Curve to Bézier</button>
+    }}>Curve to Bézier</Button>
   </div>;
 }

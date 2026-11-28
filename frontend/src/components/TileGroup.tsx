@@ -1,9 +1,11 @@
+import { Ungroup } from "lucide-react";
 import { Tooltip } from "radix-ui";
 
 import { EDIT_TILING, RELEASE_TILING, RELEASE_TILING_RULE, TILE, type TileSlot, tileRule } from "@/lib/tilingText";
+import { buttonClass, GLYPH } from "@/components/ui/looks";
+import { TOOLTIP_CLASS } from "@/components/ui/tooltip";
 
-const BUTTON_CLASS =
-  "flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
+const BUTTON_CLASS = buttonClass("secondary", "bar");
 
 const TOOLTIP_STYLE = { background: "var(--toolbar-bg)", color: "var(--toolbar-icon)", boxShadow: "var(--panel-elevation-shadow)" };
 
@@ -26,7 +28,8 @@ function TipButton({ name, rule, disabled, onPress, children }: { name: string; 
           type="button"
           data-select-command={name}
           aria-disabled={disabled}
-          className={`${BUTTON_CLASS} ${disabled ? "opacity-40" : ""}`}
+          aria-label={name}
+          className={`${BUTTON_CLASS} size-7 px-0`}
           onClick={(event) => {
             if (!disabled) {
               // `detail` is 0 for Space and Enter, 1 or more for a click.
@@ -38,7 +41,7 @@ function TipButton({ name, rule, disabled, onPress, children }: { name: string; 
         </button>
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content side="bottom" sideOffset={4} className="z-50 rounded-md px-2 py-1 text-xs" style={TOOLTIP_STYLE}>
+        <Tooltip.Content side="bottom" sideOffset={4} className={TOOLTIP_CLASS} style={TOOLTIP_STYLE}>
           <div className="font-semibold">{name}</div>
           <div className="text-[var(--panel-muted-fg)]">{rule}</div>
         </Tooltip.Content>
@@ -69,7 +72,6 @@ export function TileGroup({
       <div role="group" aria-label="Tiling" className="flex items-center gap-1 py-1">
         <TipButton name={slot === "edit" ? EDIT_TILING : TILE} rule={tileRule(slot)} disabled={disabled} onPress={onEnter}>
           <TileGlyph />
-          {slot === "edit" ? EDIT_TILING : TILE}
         </TipButton>
         {slot === "edit" ? (
           <TipButton
@@ -82,7 +84,7 @@ export function TileGroup({
               }
             }}
           >
-            {RELEASE_TILING}
+            <Ungroup {...GLYPH} aria-hidden />
           </TipButton>
         ) : null}
       </div>

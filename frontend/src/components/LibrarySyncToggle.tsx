@@ -57,7 +57,7 @@ export function LibrarySyncToggle({ name, on, view, onToggle, slot, keyHint = tr
             onToggle();
           }
         }}
-        className={`${slot} shrink-0 items-center justify-center rounded outline-none ${RING} ${
+        className={`${slot} shrink-0 items-center justify-center rounded-[5px] outline-none ${RING} ${
           on
             ? "aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] aria-pressed:hover:bg-[var(--toolbar-icon-active-bg)]"
             : "text-[var(--panel-muted-fg)] hover:bg-[var(--editor-accent-hover)]"
