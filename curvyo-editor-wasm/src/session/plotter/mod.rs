@@ -75,17 +75,15 @@ impl PlotterPage {
         op.kind.as_deref().and_then(OpKind::parse)
     }
 
-    /// The machine's area on the page: the active mat's cut area, else the whole page.
+    /// The machine's area in page mm: the page on every profile, which is the active mat's cut
+    /// area on a mat profile (ADR 0098 decision 1).
     pub(in crate::session) fn cut_area(&self) -> curvyo_cutter_core::Rect {
-        match (&self.mat, self.copy.values.mats.is_empty()) {
-            (Some((_, mat)), false) => mat.size.cut_area(),
-            _ => curvyo_cutter_core::Rect::new(
-                0.0,
-                0.0,
-                self.page.size.width.as_mm(),
-                self.page.size.height.as_mm(),
-            ),
-        }
+        curvyo_cutter_core::Rect::new(
+            0.0,
+            0.0,
+            self.page.size.width.as_mm(),
+            self.page.size.height.as_mm(),
+        )
     }
 
     /// The active mat when the profile offers mats.

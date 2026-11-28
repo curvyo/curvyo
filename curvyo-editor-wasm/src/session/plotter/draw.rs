@@ -3,7 +3,8 @@
 //! canvas labels, and the job's moves as the Toolpath view.
 
 use curvyo_cutter_core::{
-    Grip, MatRead, MoveKind, OpKind, PrintText, Rect, SHEET_RADIUS_MM, TEXT_MM, mat_print,
+    Grip, MatRead, MoveKind, OpKind, PAGE_ORIGIN_ON_MAT, PrintText, Rect, SHEET_RADIUS_MM, TEXT_MM,
+    mat_print,
 };
 use curvyo_document_core::{Page, Point, Vec2, ViewTransform};
 use curvyo_render_core::{
@@ -17,10 +18,8 @@ use super::{PlotterPage, plotter_page};
 
 /// `--mat-print`, white.
 const PRINT: RgbaColor = RgbaColor::opaque(0xFF, 0xFF, 0xFF);
-/// The ink of the cut-area edge and the sheet outline (`--toolbar-icon`).
+/// The ink of the field edge and the sheet outline (`--toolbar-icon`).
 const INK: RgbaColor = RgbaColor::opaque(0x3A, 0x3A, 0x3F);
-/// The veil over the band outside the cut area: white at 45 % over the grip colour.
-const VEIL_PERCENT: u32 = 45;
 /// Numbers and the grip word are not drawn below this digit height in device px (UX 5.2).
 const MIN_TEXT_PX: f64 = 6.0;
 /// Grid lines go below this spacing in device px (UX 5.2).
@@ -48,13 +47,10 @@ fn grip_colour(grip: Grip) -> RgbaColor {
     RgbaColor::opaque(byte(16), byte(8), byte(0))
 }
 
-/// `colour` with white laid over it at `percent`.
-fn veiled(colour: RgbaColor, percent: u32) -> RgbaColor {
-    let mix = |c: u8| {
-        let v = (u32::from(c) * (100 - percent) + 255 * percent + 50) / 100;
-        u8::try_from(v).unwrap_or(u8::MAX)
-    };
-    RgbaColor::opaque(mix(colour.r), mix(colour.g), mix(colour.b))
+/// Where the mat origin of a mat page sits in document space: [`PAGE_ORIGIN_ON_MAT`] above and
+/// left of the page origin.
+fn mat_origin(page: Point) -> Point {
+    Point::new(page.x - PAGE_ORIGIN_ON_MAT.x, page.y - PAGE_ORIGIN_ON_MAT.y)
 }
 
 fn push_triangle(list: &mut DrawList, a: Point, b: Point, c: Point, color: RgbaColor) {
@@ -127,8 +123,8 @@ fn push_outline(list: &mut DrawList, r: Rect, width: f64, color: RgbaColor) {
     }
 }
 
-/// The mat of `mat` in document space at `origin`, first-wins order: notch hole, printing,
-/// cut-area edge, veil band, sheet (UX 5.3). `px` is one device pixel in mm.
+/// The mat of `mat` in document space with its mat origin at `origin`, first-wins order: notch
+/// hole, printing, field edge (grid off), sheet (UX 5.3). `px` is one device pixel in mm.
 fn mat_list(mat: MatRead, origin: Point, px: f64, pasteboard: RgbaColor) -> DrawList {
     let mut list = DrawList::default();
     let size = mat.size;
@@ -139,36 +135,12 @@ fn mat_list(mat: MatRead, origin: Point, px: f64, pasteboard: RgbaColor) -> Draw
             list.extend(thick_line(line.a, line.b, line.width_mm.max(px), PRINT));
         }
     }
-    let cut = size.cut_area();
-    push_outline(&mut list, cut, px, INK);
+    // The page frame is the cut area's edge, and the mat shows at full grip colour inside the
+    // page: no veil and no cut-area line (ADR 0098 decision 1, UX unify U14).
     if !mat.grid {
         push_outline(&mut list, size.field(), px, INK);
     }
     let colour = grip_colour(mat.grip);
-    let field = size.field();
-    let veil = veiled(colour, VEIL_PERCENT);
-    push_rect(
-        &mut list,
-        Rect::new(field.x, field.y, field.w, cut.y - field.y),
-        veil,
-    );
-    let bottom = cut.y + cut.h;
-    push_rect(
-        &mut list,
-        Rect::new(field.x, bottom, field.w, field.h - bottom),
-        veil,
-    );
-    push_rect(
-        &mut list,
-        Rect::new(field.x, cut.y, cut.x - field.x, cut.h),
-        veil,
-    );
-    let right = cut.x + cut.w;
-    push_rect(
-        &mut list,
-        Rect::new(right, cut.y, field.w - right, cut.h),
-        veil,
-    );
     push_outline(&mut list, size.sheet(), px, INK);
     push_rounded(&mut list, size.sheet(), SHEET_RADIUS_MM, colour);
     for vertex in &mut list.triangles {
@@ -200,7 +172,12 @@ impl Session {
             if grids.len() < pages.len() {
                 grids.resize_with(pages.len(), DrawList::default);
             }
-            let mut list = mat_list(mat, page.origin, px, curvyo_render_core::PASTEBOARD_BG);
+            let mut list = mat_list(
+                mat,
+                mat_origin(page.origin),
+                px,
+                curvyo_render_core::PASTEBOARD_BG,
+            );
             list.triangles.append(&mut grids[index].triangles);
             grids[index] = list;
         }
@@ -221,7 +198,7 @@ impl Session {
         if size * self.device_pixel_ratio.max(f64::MIN_POSITIVE) < MIN_TEXT_PX {
             return Vec::new();
         }
-        let origin = page.page.origin;
+        let origin = mat_origin(page.page.origin);
         mat_print(mat.size, mat.grip)
             .texts
             .into_iter()
@@ -250,7 +227,7 @@ impl Session {
     }
 
     pub(in crate::session) fn plotter_look(&self, page: &PlotterPage) -> ToolpathLook {
-        let built = self.plotter_job(page);
+        let built = self.plotter_job(page, false);
         let origin = page.page.origin;
         let at = |p: curvyo_geometry_core::PointUm| {
             let mm = p.to_mm();
@@ -311,11 +288,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_veil_lightens_the_grip_colour() {
+    fn the_grip_colour_is_the_published_one() {
         let standard = grip_colour(Grip::Standard);
         assert_eq!((standard.r, standard.g, standard.b), (0x9C, 0xB8, 0x7D));
-        let v = veiled(standard, VEIL_PERCENT);
-        assert!(v.r > standard.r && v.g > standard.g && v.b > standard.b);
     }
 
     #[test]

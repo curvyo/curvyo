@@ -67,8 +67,8 @@ impl Builtin {
         }
     }
 
-    /// The size of a new page that takes this profile: the first mat's field, else the work
-    /// area (PL11).
+    /// The size of a new page that takes this profile: the first mat's cut area, else the work
+    /// area (ADR 0098 decision 1).
     #[must_use]
     pub fn page_size(&self) -> DocumentSize {
         self.profile().values.page_size()
@@ -111,7 +111,7 @@ mod tests {
         assert_eq!(maker.values.mats, [MatSize::In12x12, MatSize::In12x24]);
         assert_eq!(
             CRICUT_MAKER_3.page_size(),
-            DocumentSize::from_mm(304.8, 304.8)
+            DocumentSize::from_mm(292.1, 292.1)
         );
         let hpgl = builtin("generic-hpgl-cutter").unwrap();
         assert_eq!(hpgl.values.name, "Generic HPGL cutter");

@@ -29,7 +29,7 @@ pub use job::{CncJob, JobOperation, Move, MoveKind, OperationReport, build_job};
 pub use manifest::{ADD_PAGE_COMMIT_LABEL, PROCESS_ID, WORD, manifest};
 pub use operation::{Direction, PROFILE_KIND, ProfileSettings, Side};
 pub use profile::{CncProfile, CncValues, JUNCTION_DEVIATION_MM, MAX_NAME_CHARS, OutputFormat};
-pub use profile_copy::{CncCopy, CopyRead, read_copy, write_copy};
+pub use profile_copy::{CncCopy, CopyRead, differs, read_copy, resize_anchor, write_copy};
 pub use profile_file::{
     MAX_RECORD_BYTES, RECORD_FORMAT_VERSION, RecordError, merge_cnc_record, read_record,
     write_record,

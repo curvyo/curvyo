@@ -24,7 +24,7 @@ fn origin(s: &Session) -> Point {
     s.active_plotter().unwrap().page.origin
 }
 
-/// A rectangle from `(x, y)` mm of the mat origin, `w` x `h`.
+/// A rectangle from `(x, y)` mm of the page origin (the cut area's corner), `w` x `h`.
 fn rect(s: &mut Session, left: f64, top: f64, width: f64, height: f64) -> NodeId {
     let at = origin(s);
     s.document.create_rect(RectBounds::from_corners(
@@ -57,15 +57,18 @@ fn criterion_1_add_page_plotter_is_a_12x12_mat_page_and_set_mat_resizes_in_one_s
     assert_eq!(undo_name(&mut s), "Add plotter page");
     let m = s.active_output_page().unwrap();
     assert_eq!(m.process, PLOTTER);
-    assert_eq!(page_size(&s), DocumentSize::from_mm(304.8, 304.8));
+    // ADR 0098 decision 1: the page is the mat's cut area.
+    assert_eq!(page_size(&s), DocumentSize::from_mm(292.1, 292.1));
+    let at = origin(&s);
     let steps = s.undo_len();
     assert!(s.set_plotter_mat("12x24"));
     assert_eq!(s.undo_len(), steps + 1, "one step");
     assert_eq!(undo_name(&mut s), "Set mat");
-    assert_eq!(page_size(&s), DocumentSize::from_mm(304.8, 609.6));
+    assert_eq!(page_size(&s), DocumentSize::from_mm(292.1, 596.9));
+    assert_eq!(origin(&s), at, "the cut area's top-left corner stays");
     assert_eq!(view(&s)["mat"]["size"], "12x24");
     s.undo();
-    assert_eq!(page_size(&s), DocumentSize::from_mm(304.8, 304.8));
+    assert_eq!(page_size(&s), DocumentSize::from_mm(292.1, 292.1));
 }
 
 #[test]
@@ -205,7 +208,7 @@ fn criterion_10_the_toolpath_view_draws_the_moves_of_the_written_job() {
     assert!(s.toggle_toolpath_view(&page));
     let page = s.active_plotter().unwrap();
     let look = s.plotter_look(&page);
-    let job = s.plotter_job(&page).job;
+    let job = s.plotter_job(&page, true).job;
     assert_eq!(look.segments.len(), job.moves().len(), "one builder");
     assert!(s.plotter_toolpath(s.view()).is_some());
     assert_eq!(view(&s)["toolpath"], true);
@@ -214,7 +217,9 @@ fn criterion_10_the_toolpath_view_draws_the_moves_of_the_written_job() {
 #[test]
 fn criterion_11_16_export_is_the_design_space_svg_under_the_laser_name_rule() {
     let mut s = plotter();
-    let a = rect(&mut s, 10.0, 20.0, 30.0, 40.0);
+    // ADR 0098 decision 1: the page origin sits 6.35 mm into the mat, so this item at mat
+    // (10, 20) exports as it did when the page was the printed field.
+    let a = rect(&mut s, 10.0 - 6.35, 20.0 - 6.35, 30.0, 40.0);
     assign(&mut s, "cut", &[a]);
     let steps = s.undo_len();
     let job = s.export_job("Card.curvyo").unwrap();
@@ -284,7 +289,7 @@ fn laser_tools_are_absent_on_a_plotter_page() {
         v["status"]
             .as_str()
             .unwrap()
-            .starts_with("Cricut Maker 3 · 304.8 × 304.8")
+            .starts_with("Cricut Maker 3 · 292.1 × 292.1")
     );
 }
 

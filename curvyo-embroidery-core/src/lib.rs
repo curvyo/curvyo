@@ -26,7 +26,7 @@ pub use builtins::{BUILTINS, Builtin, DEFAULT_BUILTIN, W6_EU7, builtin};
 pub use dst_read::{DstRead, read_dst};
 pub use dst_write::{DstError, Extents, HEADER_BYTES, MAX_STEP, encode_step, extents, write_dst};
 pub use emit::TRIM_ABOVE;
-pub use hoop::{HoopSize, PAGE_MARGIN_MM, outside_field, page_mm};
+pub use hoop::{HoopSize, outside_field};
 pub use manifest::{ADD_PAGE_COMMIT_LABEL, PROCESS_ID, WORD, manifest};
 pub use operation::{EmbroiderySettings, Field, KEY_THREAD, OpKind, ThreadColour, edit_setting};
 pub use plan::{
@@ -37,7 +37,7 @@ pub use profile::{
     DST_MAX_STITCH, EmbroideryProfile, EmbroideryValues, MAX_NAME_CHARS, MIN_MAX_STITCH,
     OutputFormat, StitchesPerMin,
 };
-pub use profile_copy::{CopyRead, EmbroideryCopy, read_copy, write_copy};
+pub use profile_copy::{CopyRead, EmbroideryCopy, differs, read_copy, resize_anchor, write_copy};
 pub use profile_file::{
     MAX_RECORD_BYTES, RECORD_FORMAT_VERSION, RecordError, merge_embroidery_record, read_record,
     write_record,

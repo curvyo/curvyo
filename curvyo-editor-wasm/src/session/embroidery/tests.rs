@@ -54,14 +54,15 @@ fn undo_name(s: &mut Session) -> String {
 }
 
 #[test]
-fn criterion_1_2_add_page_is_a_190_x_290_page_with_the_w6_eu7() {
+fn criterion_1_2_add_page_is_the_150_x_250_field_with_the_w6_eu7() {
     let mut s = Session::new(160_002);
     let steps = s.undo_len();
     s.add_page_of_kind(EMBROIDERY, None).unwrap();
     assert_eq!(s.undo_len(), steps + 1);
     assert_eq!(undo_name(&mut s), "Add embroidery page");
     let page = s.active_embroidery().unwrap();
-    assert_eq!(page.page.size, DocumentSize::from_mm(190.0, 290.0));
+    // ADR 0098 decision 1: the page is the active hoop's sewing field.
+    assert_eq!(page.page.size, DocumentSize::from_mm(150.0, 250.0));
     let v = view(&s);
     assert_eq!(v["profile"]["name"], "W6 EU7");
     assert_eq!(v["profile"]["output"], "DST");
@@ -83,7 +84,7 @@ fn criterion_1_2_add_page_is_a_190_x_290_page_with_the_w6_eu7() {
     );
     assert_eq!(
         s.active_embroidery().unwrap().page.size,
-        DocumentSize::from_mm(190.0, 290.0)
+        DocumentSize::from_mm(150.0, 250.0)
     );
 }
 
@@ -120,7 +121,7 @@ fn criterion_2_save_as_profile_writes_an_embroidery_record_that_syncs() {
 }
 
 #[test]
-fn criterion_3_set_hoop_switches_the_field_and_keeps_the_page() {
+fn criterion_3_set_hoop_switches_the_field_and_resizes_the_page_about_its_centre() {
     let mut s = embroidery();
     s.show_default_view();
     assert_eq!(s.embroidery_hoop(), Some(HoopSize::Field150x250));
@@ -128,14 +129,16 @@ fn criterion_3_set_hoop_switches_the_field_and_keeps_the_page() {
     assign(&mut s, "running", &[a]);
     let large = s.embroidery_export().unwrap().bytes;
     let before = hoop_field_top(&s);
+    let centre = s.active_embroidery().unwrap().centre();
     assert!(s.set_embroidery_hoop("100x100"));
     assert_eq!(undo_name(&mut s), "Set hoop");
     assert_eq!(s.embroidery_hoop(), Some(HoopSize::Field100x100));
     assert_eq!(view(&s)["hoop"]["key"], "100x100");
-    assert_eq!(
-        s.active_embroidery().unwrap().page.size,
-        DocumentSize::from_mm(190.0, 290.0)
-    );
+    // ADR 0098 decision 1: the page is the new field, resized about the hoop centre.
+    let page = s.active_embroidery().unwrap();
+    assert_eq!(page.page.size, DocumentSize::from_mm(100.0, 100.0));
+    let moved = page.centre();
+    assert!((moved.x - centre.x).abs() < 1e-6 && (moved.y - centre.y).abs() < 1e-6);
     let after = hoop_field_top(&s);
     assert!(
         (after - before - 75.0).abs() < 1e-6,

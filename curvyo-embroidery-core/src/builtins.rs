@@ -80,7 +80,7 @@ mod tests {
         );
         assert_eq!(eu7.values.max_stitch.mm(), 12.1);
         assert_eq!(eu7.values.speed.get(), 600);
-        assert_eq!(W6_EU7.page_size(), DocumentSize::from_mm(190.0, 290.0));
+        assert_eq!(W6_EU7.page_size(), DocumentSize::from_mm(150.0, 250.0));
         assert_eq!(DEFAULT_BUILTIN.id, "w6-eu7");
         assert!(eu7.values.is_valid());
     }

@@ -26,21 +26,18 @@ impl Session {
     #[must_use]
     pub fn plotter_export(&self) -> Option<PlotterExport> {
         let page = self.active_plotter()?;
-        let built = self.plotter_job(&page);
+        let built = self.plotter_job(&page, true);
         if !built.outside.is_empty() || built.job.is_empty() {
             return None;
         }
         let values = &page.copy.values;
         let format = values.output_format;
+        // A mat job counts from the mat origin over the printed field (ADR 0098 decision 1).
+        let mat = page.active_mat().map(|m| m.size);
+        let size = mat.map_or(page.page.size, curvyo_cutter_core::MatSize::field_size);
         let text = match format {
-            OutputFormat::DesignSpaceSvg => write_svg(
-                &built.job,
-                page.page.size,
-                page.active_mat().map(|m| m.size),
-            ),
-            OutputFormat::Hpgl => {
-                write_hpgl(&built.job, page.page.size, values.origin, values.force)
-            }
+            OutputFormat::DesignSpaceSvg => write_svg(&built.job, size, mat),
+            OutputFormat::Hpgl => write_hpgl(&built.job, size, values.origin, values.force),
         };
         Some(PlotterExport {
             text,

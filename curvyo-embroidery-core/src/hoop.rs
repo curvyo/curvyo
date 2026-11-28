@@ -1,11 +1,10 @@
 //! The W6 EU7 hoops as fixtures of an embroidery page (`specs/0160-embroidery` criteria 1, 3, 4,
-//! `adrs.md` EM2, EM7, EM10): their sewing fields, centred on the page, and the needle points that
-//! fall outside the active one.
+//! `adrs.md` EM2, EM7, ADR 0098 decision 1): their sewing fields, each the page while it is the
+//! active hoop, and the needle points that fall outside the active one.
+
+use curvyo_document_core::DocumentSize;
 
 use crate::stitch::{Stitch, StitchKind};
-
-/// The margin of the page around the largest sewing field on every side (UX M5).
-pub const PAGE_MARGIN_MM: f64 = 20.0;
 
 /// A hoop of the EU7 (criterion 2, fact 1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -77,6 +76,13 @@ impl HoopSize {
         }
     }
 
+    /// The page size while this hoop is active: its sewing field (ADR 0098 decision 1).
+    #[must_use]
+    pub fn page_size(self) -> DocumentSize {
+        let (w, h) = self.field_mm();
+        DocumentSize::from_mm(f64::from(w), f64::from(h))
+    }
+
     /// The sewing field's area in mm², to find the largest hoop.
     #[must_use]
     pub const fn area_mm2(self) -> u32 {
@@ -97,22 +103,6 @@ impl HoopSize {
     }
 }
 
-/// The page size of `hoops`: the largest sewing field plus the margin on every side, in mm
-/// (190 x 290 for the EU7, `adrs.md` EM10).
-#[must_use]
-pub fn page_mm(hoops: &[HoopSize]) -> (f64, f64) {
-    let largest = hoops
-        .iter()
-        .copied()
-        .max_by_key(|h| h.area_mm2())
-        .unwrap_or_default();
-    let (w, h) = largest.field_mm();
-    (
-        f64::from(w) + 2.0 * PAGE_MARGIN_MM,
-        f64::from(h) + 2.0 * PAGE_MARGIN_MM,
-    )
-}
-
 /// The indices of the stitches of `stitches` outside `hoop`'s field.
 #[must_use]
 pub fn outside_field(stitches: &[Stitch], hoop: HoopSize) -> Vec<usize> {
@@ -130,8 +120,15 @@ mod tests {
     use crate::stitch::StitchPoint;
 
     #[test]
-    fn the_page_is_the_largest_field_plus_20_mm_and_the_field_is_centred() {
-        assert_eq!(page_mm(&HoopSize::ALL), (190.0, 290.0));
+    fn the_page_is_the_sewing_field_and_the_field_is_centred() {
+        assert_eq!(
+            HoopSize::Field150x250.page_size(),
+            DocumentSize::from_mm(150.0, 250.0)
+        );
+        assert_eq!(
+            HoopSize::Field100x100.page_size(),
+            DocumentSize::from_mm(100.0, 100.0)
+        );
         let at = |x, y| Stitch {
             at: StitchPoint::new(x, y),
             kind: StitchKind::Normal,

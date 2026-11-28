@@ -274,6 +274,22 @@ pub struct PageCorner {
     pub bottom: bool,
 }
 
+/// The point of an output page that keeps its place in the plane when the page size changes: the
+/// point the family's export counts from (ADR 0098 decision 1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageAnchor {
+    /// A corner: the machine origin (laser, CNC, matless plotter) or the mat origin (plotter).
+    Corner(PageCorner),
+    /// The page centre: the hoop centre (embroidery).
+    Centre,
+}
+
+impl From<PageCorner> for PageAnchor {
+    fn from(corner: PageCorner) -> Self {
+        Self::Corner(corner)
+    }
+}
+
 /// A refused manufacturing command; it writes nothing.
 #[derive(Debug, thiserror::Error)]
 pub enum ManufacturingError {
@@ -534,11 +550,20 @@ impl Document {
         id: NodeId,
         profile: &FixtureParams,
         work_area: DocumentSize,
-        anchor: PageCorner,
+        anchor: impl Into<PageAnchor>,
         change: ProfileChange,
         contents: &crate::PageContents,
     ) -> Result<bool, ManufacturingError> {
-        self.write_profile(id, profile, work_area, anchor, change, None, &[], contents)
+        self.write_profile(
+            id,
+            profile,
+            work_area,
+            anchor.into(),
+            change,
+            None,
+            &[],
+            contents,
+        )
     }
 
     /// As [`Document::set_manufacturing_profile`], and in the same step the page's sets are
@@ -557,7 +582,7 @@ impl Document {
         id: NodeId,
         profile: &FixtureParams,
         work_area: DocumentSize,
-        anchor: PageCorner,
+        anchor: impl Into<PageAnchor>,
         change: ProfileChange,
         sets: ProfileSets<'_>,
         contents: &crate::PageContents,
@@ -566,7 +591,7 @@ impl Document {
             id,
             profile,
             work_area,
-            anchor,
+            anchor.into(),
             change,
             Some(sets),
             &[],
@@ -589,14 +614,21 @@ impl Document {
         id: NodeId,
         profile: &FixtureParams,
         work_area: DocumentSize,
-        anchor: PageCorner,
+        anchor: impl Into<PageAnchor>,
         change: ProfileChange,
         sets: Option<ProfileSets<'_>>,
         fills: &[crate::SettingsWrite],
         contents: &crate::PageContents,
     ) -> Result<bool, ManufacturingError> {
         self.write_profile(
-            id, profile, work_area, anchor, change, sets, fills, contents,
+            id,
+            profile,
+            work_area,
+            anchor.into(),
+            change,
+            sets,
+            fills,
+            contents,
         )
     }
 
@@ -606,7 +638,7 @@ impl Document {
         id: NodeId,
         profile: &FixtureParams,
         work_area: DocumentSize,
-        anchor: PageCorner,
+        anchor: PageAnchor,
         change: ProfileChange,
         sets: Option<ProfileSets<'_>>,
         fills: &[crate::SettingsWrite],
@@ -704,20 +736,18 @@ impl Document {
     }
 }
 
-/// The shift of the page's origin and its new frame when the page takes `size` and keeps `anchor`.
-fn anchored_frame(page: &Page, size: DocumentSize, anchor: PageCorner) -> (Vec2, Frame) {
-    let shift = Vec2::new(
-        if anchor.right {
-            page.size.width.as_mm() - size.width.as_mm()
-        } else {
-            0.0
-        },
-        if anchor.bottom {
-            page.size.height.as_mm() - size.height.as_mm()
-        } else {
-            0.0
-        },
-    );
+/// The shift of the page's origin and its new frame when the page takes `size` and keeps `anchor`:
+/// a corner keeps its place, the centre shifts the origin by half the size change on each axis.
+fn anchored_frame(page: &Page, size: DocumentSize, anchor: PageAnchor) -> (Vec2, Frame) {
+    let dw = page.size.width.as_mm() - size.width.as_mm();
+    let dh = page.size.height.as_mm() - size.height.as_mm();
+    let shift = match anchor {
+        PageAnchor::Corner(corner) => Vec2::new(
+            if corner.right { dw } else { 0.0 },
+            if corner.bottom { dh } else { 0.0 },
+        ),
+        PageAnchor::Centre => Vec2::new(dw / 2.0, dh / 2.0),
+    };
     let frame = Frame {
         origin: Point::new(page.origin.x + shift.x, page.origin.y + shift.y),
         size,

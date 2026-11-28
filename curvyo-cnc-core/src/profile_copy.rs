@@ -2,7 +2,7 @@
 //! `adrs.md` CN2): the opaque `mfg_profile` map, every value read on its own with the default
 //! built-in's value on damage. The connection stays on the record.
 
-use curvyo_document_core::{DocumentSize, Length};
+use curvyo_document_core::{DocumentSize, Length, PageAnchor, PageCorner};
 use serde_json::{Map, Value};
 
 use crate::builtins::{DEFAULT_BUILTIN, builtin};
@@ -41,6 +41,21 @@ impl CncCopy {
             values: profile.values.clone(),
         }
     }
+}
+
+/// The point a CNC page keeps when its size changes (ADR 0098 decision 1): the top-left corner,
+/// where the stock and the G-code origin sit.
+#[must_use]
+pub fn resize_anchor(copy: &CncCopy) -> PageAnchor {
+    let _ = copy;
+    PageAnchor::Corner(PageCorner::default())
+}
+
+/// Whether the page's `copy` differs from the library `record` it names (ADR 0098 decision 5):
+/// the values, the work area among them.
+#[must_use]
+pub fn differs(copy: &CncCopy, record: &CncProfile) -> bool {
+    copy.values != record.values
 }
 
 /// A copy as read and how many of its values were damaged.
@@ -165,6 +180,19 @@ pub fn write_copy(copy: &CncCopy) -> Map<String, Value> {
 mod tests {
     use super::*;
     use crate::builtins::GENERIC_GRBL_ROUTER;
+
+    #[test]
+    fn a_cnc_page_keeps_its_top_left_and_differs_by_value() {
+        let router = GENERIC_GRBL_ROUTER.profile();
+        let mut copy = CncCopy::of(&router);
+        assert_eq!(
+            resize_anchor(&copy),
+            PageAnchor::Corner(PageCorner::default())
+        );
+        assert!(!differs(&copy, &router));
+        copy.values.name = "Mine".to_owned();
+        assert!(differs(&copy, &router));
+    }
 
     #[test]
     fn a_copy_writes_and_reads_back() {

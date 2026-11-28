@@ -71,7 +71,7 @@ impl Session {
     /// The view as a value, `None` on another page.
     pub(in crate::session) fn plotter_view(&self) -> Option<Value> {
         let page = self.active_plotter()?;
-        let built = self.plotter_job(&page);
+        let built = self.plotter_job(&page, false);
         let values = &page.copy.values;
         let format = values.output_format;
         let hidden_numbers = format.sets_numbers();

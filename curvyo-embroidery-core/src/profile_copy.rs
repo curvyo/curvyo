@@ -2,6 +2,7 @@
 //! 0039 via `adrs.md` EM5): the opaque `mfg_profile` map, every value read on its own with the
 //! default built-in's value on damage.
 
+use curvyo_document_core::PageAnchor;
 use serde_json::{Map, Value};
 
 use crate::builtins::{DEFAULT_BUILTIN, builtin};
@@ -37,6 +38,21 @@ impl EmbroideryCopy {
             values: profile.values.clone(),
         }
     }
+}
+
+/// The point an embroidery page keeps when its size changes (ADR 0098 decision 1): the page
+/// centre, which is the hoop centre the DST counts from, for Pick, Reset and Set hoop.
+#[must_use]
+pub fn resize_anchor(copy: &EmbroideryCopy) -> PageAnchor {
+    let _ = copy;
+    PageAnchor::Centre
+}
+
+/// Whether the page's `copy` differs from the library `record` it names (ADR 0098 decision 5):
+/// the values, not the page size, which follows the active hoop.
+#[must_use]
+pub fn differs(copy: &EmbroideryCopy, record: &EmbroideryProfile) -> bool {
+    copy.values != record.values
 }
 
 /// A copy as read and how many of its values were damaged.
@@ -141,6 +157,16 @@ fn hoops_of(value: &Value) -> Option<Vec<HoopSize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_embroidery_page_keeps_its_centre_and_differs_by_value() {
+        let eu7 = crate::builtins::DEFAULT_BUILTIN.profile();
+        let mut copy = EmbroideryCopy::of(&eu7);
+        assert_eq!(resize_anchor(&copy), PageAnchor::Centre);
+        assert!(!differs(&copy, &eu7));
+        copy.values.name = "Mine".to_owned();
+        assert!(differs(&copy, &eu7));
+    }
     use crate::builtins::W6_EU7;
 
     #[test]

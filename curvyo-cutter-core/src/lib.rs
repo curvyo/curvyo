@@ -32,8 +32,8 @@ pub use job::{
 };
 pub use manifest::{ADD_PAGE_COMMIT_LABEL, PROCESS_ID, WORD, manifest};
 pub use mat::{
-    CUT_INSET_MM, Grip, INCH_MM, MatRead, MatSize, PARAM_GRID, PARAM_GRIP, Rect, SHEET_END_MM,
-    SHEET_RADIUS_MM, SHEET_SIDE_MM, mat_params,
+    CUT_INSET_MM, Grip, INCH_MM, MatRead, MatSize, PAGE_ORIGIN_ON_MAT, PARAM_GRID, PARAM_GRIP,
+    Rect, SHEET_END_MM, SHEET_RADIUS_MM, SHEET_SIDE_MM, mat_params, mat_to_page, page_to_mat,
 };
 pub use mat_print::{
     CROSS_LINE_MM, GRID_LINE_MM, MatPrint, PrintLine, PrintText, TEXT_MM, mat_print,
@@ -45,7 +45,7 @@ pub use operation::{
 pub use profile::{
     CutterProfile, CutterValues, ForceRange, MAX_NAME_CHARS, OriginCorner, OutputFormat, WorkArea,
 };
-pub use profile_copy::{CopyRead, CutterCopy, read_copy, write_copy};
+pub use profile_copy::{CopyRead, CutterCopy, differs, read_copy, resize_anchor, write_copy};
 pub use profile_file::{
     MAX_RECORD_BYTES, RECORD_FORMAT_VERSION, RecordError, merge_cutter_record, read_record,
     write_record,

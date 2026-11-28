@@ -16,8 +16,8 @@ use std::path::PathBuf;
 
 use curvyo_document_core::{
     Affine, CURRENT_FORMAT_VERSION, Document, DocumentSize, FixtureParams, NewOutputPage, NodeId,
-    ObjectSnapshot, PageCorner, PageError, PageKind, Point, ProfileChange, RectBounds, Style, Vec2,
-    pack, unpack,
+    ObjectSnapshot, PageAnchor, PageCorner, PageError, PageKind, Point, ProfileChange, RectBounds,
+    Style, Vec2, pack, unpack,
 };
 use curvyo_sketch_core::{Constraint, Position, Relation, Sketch};
 use loro::{LoroDoc, LoroValue, TreeParentId};
@@ -308,6 +308,42 @@ fn a_profile_change_keeps_the_origin_corner_and_the_placed_content_in_the_plane(
     let frame = d.manufacturing(id).unwrap().page.unwrap();
     assert!((frame.origin.x + 600.0 - (page.origin.x + 400.0)).abs() < TOL);
     assert_eq!(frame.origin.y, page.origin.y);
+}
+
+/// ADR 0098 decision 1: a centre-anchored resize keeps the page centre in the plane (the hoop
+/// centre is the DST origin), and a placement keeps its global place.
+#[test]
+fn a_centre_anchored_resize_keeps_the_page_centre_in_the_plane() {
+    let d = Document::new(1);
+    let generic = profile("generic-laser", "bottom_left");
+    let page = d.add_output_page(laser(&generic, 150.0, 250.0)).unwrap();
+    let id = page.kind.manufacturing().unwrap();
+    let centre = |p: &curvyo_document_core::Page| {
+        Point::new(
+            p.origin.x + p.size.width.as_mm() / 2.0,
+            p.origin.y + p.size.height.as_mm() / 2.0,
+        )
+    };
+    let before = centre(&d.manufacturing(id).unwrap().page.unwrap());
+    assert!(
+        d.set_manufacturing_profile(
+            id,
+            &generic,
+            DocumentSize::from_mm(100.0, 100.0),
+            PageAnchor::Centre,
+            ProfileChange::Pick,
+            &curvyo_document_core::PageContents::new()
+        )
+        .unwrap()
+    );
+    let frame = d.manufacturing(id).unwrap().page.unwrap();
+    assert_eq!(frame.size, DocumentSize::from_mm(100.0, 100.0));
+    let after = centre(&frame);
+    assert!((after.x - before.x).abs() < TOL && (after.y - before.y).abs() < TOL);
+    assert_eq!(
+        PageAnchor::from(PageCorner::default()),
+        PageAnchor::Corner(PageCorner::default())
+    );
 }
 
 #[test]

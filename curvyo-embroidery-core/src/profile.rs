@@ -3,7 +3,7 @@
 
 use curvyo_document_core::DocumentSize;
 
-use crate::hoop::{HoopSize, page_mm};
+use crate::hoop::HoopSize;
 use crate::stitch::TenthMm;
 
 /// The longest profile name.
@@ -121,11 +121,10 @@ impl EmbroideryValues {
             && (MIN_MAX_STITCH..=DST_MAX_STITCH).contains(&self.max_stitch)
     }
 
-    /// The page size: the largest sewing field plus 20 mm on every side (criterion 1).
+    /// The page size of a new page: the first hoop's sewing field (ADR 0098 decision 1).
     #[must_use]
     pub fn page_size(&self) -> DocumentSize {
-        let (w, h) = page_mm(&self.hoops);
-        DocumentSize::from_mm(w, h)
+        self.default_hoop().page_size()
     }
 
     /// The hoop a new page takes: the first.

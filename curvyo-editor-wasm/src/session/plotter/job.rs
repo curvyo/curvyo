@@ -25,8 +25,10 @@ pub(in crate::session) struct PlotterJob {
 
 impl Session {
     /// The job of `page`: its operations in list order, each with the leaves whose key chain one
-    /// of its members names, both Cut and Draw following the leaf's own outlines (PL8).
-    pub(in crate::session) fn plotter_job(&self, page: &PlotterPage) -> PlotterJob {
+    /// of its members names, both Cut and Draw following the leaf's own outlines (PL8). With
+    /// `on_mat` and an active mat the outlines are in mat mm, as the writers count (ADR 0098
+    /// decision 1); else in page mm. The checks read page mm either way.
+    pub(in crate::session) fn plotter_job(&self, page: &PlotterPage, on_mat: bool) -> PlotterJob {
         let Some(manufacturing) = self.document.manufacturing(page.id) else {
             return PlotterJob {
                 damaged: 0,
@@ -65,7 +67,11 @@ impl Session {
                     items.push((node, bounds));
                 }
                 job_items.push(JobItem {
-                    outlines,
+                    outlines: if on_mat && page.active_mat().is_some() {
+                        outlines.into_iter().map(onto_mat).collect()
+                    } else {
+                        outlines
+                    },
                     stacking: u32::try_from(stacking).unwrap_or(u32::MAX),
                 });
             }
@@ -94,6 +100,18 @@ impl Session {
             outside,
             counts,
         }
+    }
+}
+
+/// `outline` in mat mm: moved by the page origin's place on the mat.
+fn onto_mat(outline: ItemOutline) -> ItemOutline {
+    ItemOutline {
+        anchors: outline
+            .anchors
+            .into_iter()
+            .map(|(p, a, b)| (curvyo_cutter_core::page_to_mat(p), a, b))
+            .collect(),
+        closed: outline.closed,
     }
 }
 

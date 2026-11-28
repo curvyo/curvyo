@@ -122,7 +122,7 @@ fn check(name: &str, golden: &str, actual: &str) {
 #[test]
 fn design_space_svg_of_cut_and_draw_on_the_12x12_mat() {
     let mat = MatSize::In12x12;
-    let svg = write_svg(&build_job(&cut_draw()), mat.page_size(), Some(mat));
+    let svg = write_svg(&build_job(&cut_draw()), mat.field_size(), Some(mat));
     check(
         "cutter_mat12_cut_draw.svg",
         include_str!("fixtures/cutter_mat12_cut_draw.svg"),
@@ -138,7 +138,7 @@ fn design_space_svg_of_two_cuts_on_the_12x24_mat() {
         operation("Cut", OpKind::Cut, 1, vec![square(10.0, 400.0, 100.0)]),
         operation("Cut", OpKind::Cut, 3, vec![circle(150.0, 150.0, 40.0)]),
     ];
-    let svg = write_svg(&build_job(&ops), mat.page_size(), Some(mat));
+    let svg = write_svg(&build_job(&ops), mat.field_size(), Some(mat));
     check(
         "cutter_mat24_cut.svg",
         include_str!("fixtures/cutter_mat24_cut.svg"),
@@ -224,8 +224,8 @@ fn hpgl_of_cut_and_draw() {
 #[test]
 fn two_exports_of_an_unchanged_job_are_byte_identical() {
     let mat = MatSize::In12x12;
-    let a = write_svg(&build_job(&cut_draw()), mat.page_size(), Some(mat));
-    let b = write_svg(&build_job(&cut_draw()), mat.page_size(), Some(mat));
+    let a = write_svg(&build_job(&cut_draw()), mat.field_size(), Some(mat));
+    let b = write_svg(&build_job(&cut_draw()), mat.field_size(), Some(mat));
     assert_eq!(a, b, "criterion 16");
     assert_eq!(
         CRICUT_MAKER_3.profile().values.mats.first(),

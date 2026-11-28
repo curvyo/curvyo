@@ -5,11 +5,9 @@
 use curvyo_cutter_core::{
     ADD_PAGE_COMMIT_LABEL, BUILTINS, CutterCopy, CutterProfile, DEFAULT_BUILTIN, Field, Grip,
     MatRead, MatSize, OpKind, PROCESS_ID, PressurePct, SpeedMmS, WORD, builtin, edit_setting,
-    mat_params, write_copy, write_record,
+    mat_params, resize_anchor, write_copy, write_record,
 };
-use curvyo_document_core::{
-    FixtureAdd, NewFixture, NewOutputPage, NodeId, PageCorner, ProfileChange,
-};
+use curvyo_document_core::{FixtureAdd, NewFixture, NewOutputPage, NodeId, ProfileChange};
 use curvyo_laser_core::{LibraryWrite, new_record_id};
 
 use super::super::Session;
@@ -29,12 +27,6 @@ pub(in crate::session) const EDIT_DEFAULT_PRESSURE_LABEL: &str = "edit_default_p
 pub(in crate::session) const EDIT_DEFAULT_SPEED_LABEL: &str = "edit_default_speed";
 /// The step of the Max speed field.
 pub(in crate::session) const EDIT_MAX_SPEED_LABEL: &str = "edit_max_speed";
-
-/// The top-left corner: a mat page grows away from the mat origin (PL11).
-const TOP_LEFT: PageCorner = PageCorner {
-    right: false,
-    bottom: false,
-};
 
 impl Session {
     /// Every plotter profile the pick lists: the built-ins, then the maker's (criterion 2).
@@ -114,7 +106,7 @@ impl Session {
                         active.id,
                         &copy,
                         size,
-                        TOP_LEFT,
+                        resize_anchor(&active.copy),
                         ProfileChange::Pick,
                         &contents,
                     )
@@ -144,7 +136,7 @@ impl Session {
                     active.id,
                     &copy,
                     active.page.size,
-                    TOP_LEFT,
+                    resize_anchor(&active.copy),
                     ProfileChange::SaveAs,
                     &contents,
                 )
@@ -216,7 +208,7 @@ impl Session {
                     active.id,
                     copy,
                     active.page.size,
-                    TOP_LEFT,
+                    resize_anchor(&active.copy),
                     ProfileChange::EditName,
                     &contents,
                 )
@@ -225,8 +217,9 @@ impl Session {
         })
     }
 
-    /// Set mat (criteria 1, 3; PL11): the mat `size` (`12x12`, `12x24`) becomes the active one
-    /// and the page its printed field, anchored at the mat origin, in one step "Set mat".
+    /// Set mat (criteria 1, 3; ADR 0098 decision 1): the mat `size` (`12x12`, `12x24`) becomes the
+    /// active one and the page its cut area, anchored at the cut area's top-left corner, in one
+    /// step "Set mat".
     pub fn set_plotter_mat(&mut self, size: &str) -> bool {
         let (Some(active), Some(size)) = (self.active_plotter(), MatSize::parse(size)) else {
             return false;
@@ -255,7 +248,7 @@ impl Session {
                         active.id,
                         &copy,
                         size.page_size(),
-                        TOP_LEFT,
+                        resize_anchor(&active.copy),
                         ProfileChange::Pick,
                         &contents,
                     )

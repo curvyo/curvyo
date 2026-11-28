@@ -1,6 +1,7 @@
 //! The Cricut mats as fixtures of a plotter page (`specs/0159-cutting-plotter` criteria 3 to 5,
-//! `ux-notes.md` 5.1, `adrs.md` PL3, PL11): their sizes, grips and the outlines of sheet, printed
-//! field, cut area and notch in page mm, the mat origin at the field's top-left corner.
+//! `ux-notes.md` 5.1, `adrs.md` PL3, ADR 0098 decision 1): their sizes, grips and the outlines of
+//! sheet, printed field, cut area and notch in mat mm (the mat origin at the field's top-left
+//! corner); the page is the cut area, [`PAGE_ORIGIN_ON_MAT`] from the mat origin.
 
 use curvyo_document_core::{DocumentSize, FixtureParams, Length, Point};
 use serde_json::Value;
@@ -15,6 +16,25 @@ pub const SHEET_SIDE_MM: f64 = 12.7;
 pub const SHEET_END_MM: f64 = 25.4;
 /// The sheet's corner radius.
 pub const SHEET_RADIUS_MM: f64 = 3.0;
+
+/// Where the page origin (the cut area's top-left corner) sits in mat mm: the only place that
+/// knows the offset between page and mat (ADR 0098 decision 1).
+pub const PAGE_ORIGIN_ON_MAT: Point = Point {
+    x: CUT_INSET_MM,
+    y: CUT_INSET_MM,
+};
+
+/// A point in page mm of a mat page in mat mm.
+#[must_use]
+pub fn page_to_mat(p: Point) -> Point {
+    Point::new(p.x + PAGE_ORIGIN_ON_MAT.x, p.y + PAGE_ORIGIN_ON_MAT.y)
+}
+
+/// A point in mat mm in page mm of a mat page.
+#[must_use]
+pub fn mat_to_page(p: Point) -> Point {
+    Point::new(p.x - PAGE_ORIGIN_ON_MAT.x, p.y - PAGE_ORIGIN_ON_MAT.y)
+}
 
 /// The fixture param of the grip.
 pub const PARAM_GRIP: &str = "grip";
@@ -91,7 +111,7 @@ impl MatSize {
         }
     }
 
-    /// The printed field from the mat origin: the page of a mat profile (PL11).
+    /// The printed field from the mat origin.
     #[must_use]
     pub fn field(self) -> Rect {
         match self {
@@ -100,11 +120,18 @@ impl MatSize {
         }
     }
 
-    /// The page size: the printed field (PL11).
+    /// The size of the printed field: the size the Design Space SVG declares.
     #[must_use]
-    pub fn page_size(self) -> DocumentSize {
+    pub fn field_size(self) -> DocumentSize {
         let field = self.field();
         DocumentSize::from_mm(field.w, field.h)
+    }
+
+    /// The page size: the cut area (ADR 0098 decision 1).
+    #[must_use]
+    pub fn page_size(self) -> DocumentSize {
+        let cut = self.cut_area();
+        DocumentSize::from_mm(cut.w, cut.h)
     }
 
     /// The machine's cut area, 0.25 in inside the field on every side (criterion 4 c).
@@ -334,9 +361,22 @@ mod tests {
     }
 
     #[test]
+    fn the_page_is_the_cut_area_and_counts_from_its_corner_on_the_mat() {
+        let page = MatSize::In12x12.page_size();
+        assert!(near(page.width.as_mm(), 292.1) && near(page.height.as_mm(), 292.1));
+        let page = MatSize::In12x24.page_size();
+        assert!(near(page.width.as_mm(), 292.1) && near(page.height.as_mm(), 596.9));
+        let on_mat = page_to_mat(Point::new(0.0, 0.0));
+        let cut = MatSize::In12x12.cut_area();
+        assert!(near(on_mat.x, cut.x) && near(on_mat.y, cut.y));
+        let back = mat_to_page(page_to_mat(Point::new(10.0, 20.0)));
+        assert!(near(back.x, 10.0) && near(back.y, 20.0));
+    }
+
+    #[test]
     fn the_12x24_mat_is_twice_as_long() {
         let mat = MatSize::In12x24;
-        assert_eq!(mat.page_size(), DocumentSize::from_mm(304.8, 609.6));
+        assert_eq!(mat.field_size(), DocumentSize::from_mm(304.8, 609.6));
         let cut = mat.cut_area();
         assert!(near(cut.w, 292.1) && near(cut.h, 596.9));
         let sheet = mat.sheet();

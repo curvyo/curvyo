@@ -1,12 +1,10 @@
 //! The commands of an embroidery page (`specs/0160-embroidery` criteria 1 to 3, UX 3, 4): Add
 //! page, Pick and Save as profile, Edit speed and Set hoop, each one history step.
 
-use curvyo_document_core::{
-    FixtureAdd, NewFixture, NewOutputPage, NodeId, PageCorner, ProfileChange,
-};
+use curvyo_document_core::{FixtureAdd, NewFixture, NewOutputPage, NodeId, ProfileChange};
 use curvyo_embroidery_core::{
     ADD_PAGE_COMMIT_LABEL, BUILTINS, DEFAULT_BUILTIN, EmbroideryCopy, EmbroideryProfile, HoopSize,
-    PROCESS_ID, StitchesPerMin, WORD, builtin, write_copy, write_record,
+    PROCESS_ID, StitchesPerMin, WORD, builtin, resize_anchor, write_copy, write_record,
 };
 use curvyo_laser_core::{LibraryWrite, new_record_id};
 
@@ -20,12 +18,6 @@ pub(in crate::session) const EDIT_SPEED_LABEL: &str = "edit_embroidery_speed";
 const PICK_PROFILE_LABEL: &str = "pick_profile";
 /// The message of a speed out of range (UX 10).
 pub(in crate::session) const SPEED_MESSAGE: &str = "Speed is 100 to 1,500 stitches/min.";
-
-/// The page grows from its top-left corner; the hoop stays centred on it.
-const TOP_LEFT: PageCorner = PageCorner {
-    right: false,
-    bottom: false,
-};
 
 impl Session {
     /// Every embroidery profile the pick lists: the built-ins, then the maker's (criterion 2).
@@ -102,7 +94,7 @@ impl Session {
                         active.id,
                         &copy,
                         size,
-                        TOP_LEFT,
+                        resize_anchor(&active.copy),
                         ProfileChange::Pick,
                         &contents,
                     )
@@ -132,7 +124,7 @@ impl Session {
                     active.id,
                     &copy,
                     active.page.size,
-                    TOP_LEFT,
+                    resize_anchor(&active.copy),
                     ProfileChange::SaveAs,
                     &contents,
                 )
@@ -170,7 +162,7 @@ impl Session {
                     active.id,
                     &map,
                     active.page.size,
-                    TOP_LEFT,
+                    resize_anchor(&active.copy),
                     ProfileChange::EditName,
                     &contents,
                 )
@@ -179,8 +171,9 @@ impl Session {
         }))
     }
 
-    /// Set hoop (criterion 3): the hoop `key` (`150x250`, `100x100`) of the profile becomes the
-    /// active one in one step "Set hoop"; the page keeps its size.
+    /// Set hoop (criterion 3, ADR 0098 decision 1): the hoop `key` (`150x250`, `100x100`) of the
+    /// profile becomes the active one and the page its sewing field, resized about the page
+    /// centre (the hoop centre the DST counts from), in one step "Set hoop".
     pub fn set_embroidery_hoop(&mut self, key: &str) -> bool {
         let (Some(active), Some(size)) = (self.active_embroidery(), HoopSize::parse(key)) else {
             return false;
@@ -190,13 +183,25 @@ impl Session {
         {
             return false;
         }
+        let copy = write_copy(&active.copy);
+        let contents = self.page_contents().unwrap_or_default();
         self.recording_unguarded(|this| {
             this.document
                 .batch(SET_HOOP_LABEL, |d| {
                     if !active.hoops.iter().any(|h| h.1 == size) {
                         add_hoops(d, active.id, &[size], false)?;
                     }
-                    activate(d, active.id, size)
+                    activate(d, active.id, size)?;
+                    d.set_manufacturing_profile(
+                        active.id,
+                        &copy,
+                        size.page_size(),
+                        resize_anchor(&active.copy),
+                        ProfileChange::Pick,
+                        &contents,
+                    )
+                    .ok()
+                    .map(|_| ())
                 })
                 .is_some()
         })

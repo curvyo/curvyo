@@ -2,6 +2,7 @@
 //! via `adrs.md` PL3): the opaque `mfg_profile` map, every value read on its own with the default
 //! built-in's value on damage.
 
+use curvyo_document_core::{PageAnchor, PageCorner};
 use serde_json::{Map, Value};
 
 use crate::builtins::{DEFAULT_BUILTIN, builtin};
@@ -42,6 +43,23 @@ impl CutterCopy {
             values: profile.values.clone(),
         }
     }
+}
+
+/// The point a plotter page keeps when its size changes (ADR 0098 decision 1): the cut area's
+/// top-left corner on a mat profile (fixed to the mat origin), else the machine's origin corner.
+#[must_use]
+pub fn resize_anchor(copy: &CutterCopy) -> PageAnchor {
+    PageAnchor::Corner(PageCorner {
+        right: false,
+        bottom: copy.values.mats.is_empty() && copy.values.origin == OriginCorner::BottomLeft,
+    })
+}
+
+/// Whether the page's `copy` differs from the library `record` it names (ADR 0098 decision 5):
+/// the values, not the page size, which follows the active mat.
+#[must_use]
+pub fn differs(copy: &CutterCopy, record: &CutterProfile) -> bool {
+    copy.values != record.values
 }
 
 /// A copy as read and how many of its values were damaged.
@@ -199,6 +217,28 @@ fn mats_of(value: &Value) -> Option<Vec<MatSize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_mat_page_keeps_its_top_left_and_a_matless_one_its_origin_corner() {
+        let maker = crate::builtins::DEFAULT_BUILTIN.profile();
+        let mut copy = CutterCopy::of(&maker);
+        assert_eq!(copy.values.mats.len(), 2);
+        copy.values.origin = OriginCorner::BottomLeft;
+        assert_eq!(
+            resize_anchor(&copy),
+            PageAnchor::Corner(PageCorner::default())
+        );
+        copy.values.mats.clear();
+        assert_eq!(
+            resize_anchor(&copy),
+            PageAnchor::Corner(PageCorner {
+                right: false,
+                bottom: true
+            })
+        );
+        assert!(differs(&copy, &maker));
+        assert!(!differs(&CutterCopy::of(&maker), &maker));
+    }
     use crate::builtins::GENERIC_HPGL_CUTTER;
 
     #[test]
