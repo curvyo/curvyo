@@ -730,7 +730,7 @@ export function LayersTab({
 
   return (
     // The list's stable scrollbar gutter keeps the rows clear of the scrollbar (UX review item
-    // 5); no further inset, so a selected row's ground reaches the panel's column (0159 F37).
+    // 5); no further inset, so a selected row's ground reaches the panel's column (0164 F37).
     <div className="flex min-h-0 flex-1 flex-col">
       {/* The toolbar: operations are buttons with a visible trigger, never sections that appear
           (customer feedback 2026-10-14). */}

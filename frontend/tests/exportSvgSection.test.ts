@@ -78,7 +78,7 @@ test("c4 c147 Export SVG… sits below the block with four switches, all off", a
     "Quit",
   ]);
   assert.match(html, /role="group" aria-label="Export options"/);
-  // 0159 S2: the four switches are toggle buttons, all off.
+  // 0164 S2: the four switches are toggle buttons, all off.
   assert.equal([...html.matchAll(/aria-pressed="false"[^>]*data-export-option=/g)].length, 4);
   assert.doesNotMatch(html, /aria-pressed="true"/);
 });

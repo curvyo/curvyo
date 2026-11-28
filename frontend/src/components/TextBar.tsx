@@ -308,7 +308,7 @@ export function BarGroup({ divider = true, className = "flex h-9 items-center", 
 }) {
   return (
     // A group whose component drew nothing (only its divider, or empty wrappers) takes no room, so
-    // it never wraps to an empty row or leaves a divider after the last group (0159 F38, F41).
+    // it never wraps to an empty row or leaves a divider after the last group (0164 F38, F41).
     <div className={`group/row relative ${className} [&:not(:has(>:not([aria-hidden]):not(:empty)))]:hidden`}>
       {divider ? <Divider /> : null}
       {children}

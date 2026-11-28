@@ -156,7 +156,7 @@ export function PrintAndCutSection({
       {open && (
         <div className="flex flex-col gap-1">
           {view.sheets.length > 1 ? (
-            // No system dropdown in the panel (`docs/ui-elements.md` §12, 0159 F23): an inline list.
+            // No system dropdown in the panel (`docs/ui-elements.md` §12, 0164 F23): an inline list.
             <div className="flex flex-col">
               <span className="text-xs text-[var(--panel-muted-fg)]">Sheet</span>
               <InlinePickList

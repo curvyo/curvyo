@@ -26,7 +26,7 @@ function GridGlyph() {
  * The Grid group of the Select bar (`specs/0061-align-and-distribute/`
  * criteria 18 to 22): the Arrange in a grid button, then Rows and Columns with
  * their labels inside; the gap is the Distribute group's one Gap field
- * (`specs/0159-ui-consistency`, Frage 433 B). In the bar from two selected
+ * (`specs/0164-ui-consistency`, Frage 460 B). In the bar from two selected
  * objects; Enter in a field arranges.
  */
 export function GridBarGroup({ align, onReturnFocus }: { align: AlignApi; onReturnFocus: () => void }) {

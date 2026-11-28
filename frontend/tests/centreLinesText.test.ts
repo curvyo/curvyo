@@ -28,11 +28,11 @@ describe("centre lines text", () => {
     assert.equal(centreLinesNotice(base), null);
   });
   it("counts kept and skipped objects", () => {
-  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  // 0164 S7 (customer 2026-11-27): result notices carry no counts of what came out.
     assert.equal(centreLinesNotice({ ...base, kept: 2, skipped: 3 })?.text, "Centre lines: some shapes were skipped.");
   });
   it("lists only the parts that are not zero", () => {
-    // 0159 S7: shapes kept filled are seen on the canvas; no notice for them.
+    // 0164 S7: shapes kept filled are seen on the canvas; no notice for them.
     assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }), null);
     assert.equal(centreLinesNotice({ ...base, converted: 0, kept: 2 }), null);
   });
@@ -121,7 +121,7 @@ describe("centre lines sliders (0117 UX notes §3.1)", () => {
     assert.deepEqual(terms, ["Overlap", "Thick parts", "Optimise", "Join tips", "Keep inner areas", "Offset"]);
   });
   it("words the Apply notice in paths, as the Apply tooltip does", () => {
-    // 0159 S7: no counts after Apply.
+    // 0164 S7: no counts after Apply.
     assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }, 70), null);
     assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1, skipped: 1 }, 1)?.text, "Centre lines: some shapes were skipped.");
   });

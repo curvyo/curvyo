@@ -215,7 +215,7 @@ interface BarFieldProps {
 }
 
 /** A number field of the arrange groups, the one number field look: the
- * label inside the left edge (`specs/0159-ui-consistency`, Frage 433 B), the
+ * label inside the left edge (`specs/0164-ui-consistency`, Frage 460 B), the
  * value right-aligned, an optional fixed suffix inside the right edge, the
  * refusal ring and chip. Enter applies; Escape restores the value the field
  * had on focus and blurs. */
@@ -303,7 +303,7 @@ const AXIS_COMMANDS: Record<"horizontal" | "vertical", AlignCommand[]> = {
 /**
  * One Align group of the Select bar (`specs/0061-align-and-distribute/`
  * criteria 1, 2, 14, 15): the three symbol-only buttons of one axis, so a
- * narrow bar wraps between the axes (`specs/0159-ui-consistency`, Frage 433 B,
+ * narrow bar wraps between the axes (`specs/0164-ui-consistency`, Frage 460 B,
  * Proposal).
  */
 export function AlignBarGroup({
@@ -371,7 +371,7 @@ export function DistributeBarGroup({
 
 /**
  * The one Gap field of the Select bar, between Distribute and Arrange in a grid
- * (`specs/0159-ui-consistency`, Frage 433 B): both use it; empty keeps the
+ * (`specs/0164-ui-consistency`, Frage 460 B): both use it; empty keeps the
  * distribute ends and arranges the grid without a gap. Enter distributes the
  * horizontal gaps, as before.
  */

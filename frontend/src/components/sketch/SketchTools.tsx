@@ -18,7 +18,7 @@ function roving(key: string, index: number, count: number) {
   return key === "Home" ? 0 : key === "End" ? count - 1 : (index + (key === "ArrowDown" ? 1 : -1) + count) % count;
 }
 
-/** The draw tools in three cards like the main rail's (0159 F49): Select, the shapes, Fillet. */
+/** The draw tools in three cards like the main rail's (0164 F49): Select, the shapes, Fillet. */
 const TOOL_CARDS = [tools.slice(0, 1), tools.slice(1, 8), tools.slice(8)] as const;
 
 function SketchToolRailBody({ sketch, paused }: { sketch: SketchApi; paused: boolean }) {

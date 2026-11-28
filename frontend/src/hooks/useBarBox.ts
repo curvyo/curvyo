@@ -1,5 +1,5 @@
 // The box the context bars cover over the canvas, measured live, so canvas labels and tags keep
-// clear of a bar of any height (`specs/0159-ui-consistency` F42, F50): the bar area publishes it,
+// clear of a bar of any height (`specs/0164-ui-consistency` F42, F50): the bar area publishes it,
 // the clone tags and the page labels read it in their own coordinates.
 import { useState, useSyncExternalStore } from "react";
 

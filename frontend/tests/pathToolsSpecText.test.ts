@@ -76,7 +76,7 @@ test("0034 criterion 16: the four close chips", () => {
 });
 
 test("0034 criterion 20: the Close path notices and their durations", () => {
-  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  // 0164 S7 (customer 2026-11-27): result notices carry no counts of what came out.
   assert.equal(closeNoticeText({ closed: 3, skipped: 0 }), null);
   const b = closeNoticeText({ closed: 2, skipped: 1 });
   assert.equal(b, "1 path has fewer than 3 nodes and was not closed.");

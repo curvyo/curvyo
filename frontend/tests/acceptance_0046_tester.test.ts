@@ -46,7 +46,7 @@ test("c19 c23 the template outcome strings give a notice or the session's messag
 test("c9 the Guide button is 28 px, Lucide SquareDashed 16 px at 1.5 stroke, no label", () => {
   assert.match(guideButton, /import \{ SquareDashed \} from "lucide-react"/);
   assert.match(guideButton, /size-7/);
-  // 16 px at 1.5 stroke: the shared control glyph of `ui/looks.ts` (0159 F33).
+  // 16 px at 1.5 stroke: the shared control glyph of `ui/looks.ts` (0164 F33).
   assert.match(guideButton, /<SquareDashed \{\.\.\.GLYPH\}/);
   assert.match(looks, /export const GLYPH = \{ size: ICON_PX, strokeWidth: ICON_STROKE/);
   assert.match(looks, /export const ICON_PX = 16;/);
@@ -97,7 +97,7 @@ test("c14 no hint text, popup, Apply button or caption in the Guide or Template 
 
 test("c19 the Template button is an outline text button, 28 px high, like its neighbours", () => {
   const template = fileTab.slice(fileTab.indexOf("function TemplateButton"), fileTab.indexOf("function CommandButton"));
-  // 0159: the outline look is the shared secondary `Button` (28 px), like its neighbours.
+  // 0164: the outline look is the shared secondary `Button` (28 px), like its neighbours.
   assert.match(template, /<Button icon=\{LayoutTemplate\}/);
   assert.doesNotMatch(template, /variant=/, "secondary, the default look");
   assert.match(template, /\{TEMPLATE_NAME\}\s*<\/Button>/);

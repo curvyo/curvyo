@@ -419,7 +419,7 @@ export function LayerRow({
           ) : dragging ? (
             <span className={nameClass}>{row.text ?? row.name}</span>
           ) : (
-            // Below the row, not left of it over the panel's tab strip (0159 F37); the shared
+            // Below the row, not left of it over the panel's tab strip (0164 F37); the shared
             // tooltip only, no native title beside it.
             <Tooltip side="bottom" content={tooltip}>
               <span className={nameClass}>{row.text ?? row.name}</span>

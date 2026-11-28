@@ -20,7 +20,7 @@ test("the toggle keeps one constant name; the state is aria-pressed", () => {
   assert.equal(OPERATIONS_VIEW_NAME, "Operations view");
 });
 
-// `specs/0159-ui-consistency` F50: the page label is never under a bar of any height.
+// `specs/0164-ui-consistency` F50: the page label is never under a bar of any height.
 test("the page label sits above its frame, or just below a bar that covers that place", () => {
   const page = { screenX: 200, screenY: 72, screenWidth: 400, screenHeight: 500 };
   assert.equal(pageLabelTop(page, null), -20, "no bar: 20 px above the frame");

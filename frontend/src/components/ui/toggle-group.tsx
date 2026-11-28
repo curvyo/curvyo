@@ -47,7 +47,7 @@ interface ToggleGroupProps<T extends string> {
    * the items (the Pen bar, customer 2026-11-11). */
   bar?: boolean;
   /** The items wrap to further rows inside a narrow bar instead of running past it (the
-   * Generators bar, 0159 F40). */
+   * Generators bar, 0164 F40). */
   wrap?: boolean;
 }
 

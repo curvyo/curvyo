@@ -3,7 +3,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import { InPanelTooltips } from "@/components/ui/tooltip-side";
 
-/** The one tooltip look (`docs/ui-elements.md` §15, 0159 S7): the canvas chip surface, 12 px,
+/** The one tooltip look (`docs/ui-elements.md` §15, 0164 S7): the canvas chip surface, 12 px,
  * 8 px radius, at most 260 px wide; also for the bars' own Radix tooltips. */
 export const TOOLTIP_CLASS =
   "pointer-events-none z-[60] max-w-[260px] whitespace-pre-line rounded-[8px] bg-[var(--toolbar-bg)] px-2 py-1 text-xs text-[var(--toolbar-icon)] shadow-[var(--panel-elevation-shadow)]";

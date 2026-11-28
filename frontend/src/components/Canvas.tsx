@@ -212,7 +212,7 @@ export function Canvas({
           : // Rust decides the Sketch cursor (hit, draggable, drag in progress); CSS only shows it.
             { cursor: sketch.view.workbench === "sketch" ? (sketch.view.cursor ?? "default") : cursorForHint(editor.cursorHint) }
       }
-      // A keyboard focus on the canvas shows the one 2 px ring, inset, over the overlays (0159
+      // A keyboard focus on the canvas shows the one 2 px ring, inset, over the overlays (0164
       // F30): drawn by a pseudo-element so the canvas element does not hide it.
       className={`relative flex-1 outline-none focus-visible:after:pointer-events-none focus-visible:after:absolute focus-visible:after:inset-0 focus-visible:after:z-50 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--editor-accent)] ${
         // Pan cursor convention (`docs/design-system.md`): grabbing for

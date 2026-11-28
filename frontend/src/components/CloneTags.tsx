@@ -20,7 +20,7 @@ const CHIP_STYLE = {
 
 /** An edge chip, centred on the session's point and clamped with its real width right of the
  * tool rail, 12 px below the bars' measured bottom (any number of rows) and inside the canvas
- * (UX review must-fix 6, 0159 F42). */
+ * (UX review must-fix 6, 0164 F42). */
 function EdgeChip({ tag, top }: { tag: CloneTag; top: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);

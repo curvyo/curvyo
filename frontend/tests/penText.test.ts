@@ -68,7 +68,7 @@ test("only a close chip is immediate, and nothing else has a chip", () => {
 });
 
 test("the Close path notice (criterion 20)", () => {
-  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  // 0164 S7 (customer 2026-11-27): result notices carry no counts of what came out.
   assert.equal(closeNoticeText({ closed: 3, skipped: 0 }), null);
   assert.equal(closeNoticeText({ closed: 1, skipped: 0 }), null);
   const skipped = closeNoticeText({ closed: 2, skipped: 1 });

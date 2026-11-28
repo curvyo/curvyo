@@ -74,7 +74,7 @@ export const PAGE_LABEL_GAP = 4;
 
 /** Where a page's name label sits, as its top relative to the page frame: 20 px above the frame,
  * or, where a bar covers that place and the page reaches below the bar, 4 px below the bar's
- * bottom (inside the frame), so the label is never under a bar of any height (`specs/0159` F50,
+ * bottom (inside the frame), so the label is never under a bar of any height (`specs/0164` F50,
  * Proposal). `bars` is the bars' box in the same coordinates as the page, or null for none. */
 export function pageLabelTop(
   page: Pick<PageRow, "screenX" | "screenY" | "screenWidth" | "screenHeight">,

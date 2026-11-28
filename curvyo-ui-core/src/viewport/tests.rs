@@ -293,7 +293,7 @@ fn an_axis_that_does_not_fit_keeps_the_start_margin_and_the_other_is_centred() {
     assert!((top - (800.0 - bottom)).abs() < 1e-9);
 }
 
-/// `specs/0159-ui-consistency` F50: the page's name label (20 px above the page) never lies under
+/// `specs/0164-ui-consistency` F50: the page's name label (20 px above the page) never lies under
 /// a one-row bar (12 px from the top, 36 px high) in a new view, also for a page that would fit
 /// centred but close to the top.
 #[test]

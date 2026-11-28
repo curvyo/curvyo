@@ -235,7 +235,7 @@ function BarNumberField({
     }
   };
 
-  // The label, 8 px of air and the value never touch (0159 W19): the padding grows to the label's
+  // The label, 8 px of air and the value never touch (0164 W19): the padding grows to the label's
   // measured width when the font draws it wider than the constant assumes.
   const labelPad = Math.max(labelPx, Math.ceil(6 + fieldLabelWidth(label) + 8));
   return (

@@ -157,7 +157,7 @@ function pathsAndOutlines(pathCount: number, outlineCount: number): string {
 
 /** The notice after a press (criterion 20, `0055` criterion 7), or `null` if nothing was
  * closed. No count of what was closed: the closed outlines are the feedback, the notice names
- * only what was skipped and why (customer 2026-11-27, `specs/0159` S7). */
+ * only what was skipped and why (customer 2026-11-27, `specs/0164` S7). */
 export function closeNoticeText(result: ClosePathResult): string | null {
   const closedOutlines = result.closedOutlines ?? 0;
   if (result.closed === 0 && closedOutlines === 0) {

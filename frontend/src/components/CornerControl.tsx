@@ -10,7 +10,7 @@ import { CORNER_NAMES, CORNERS, type Corner, cornerKey } from "@/lib/machineBloc
  * one Tab stop on the chosen corner, arrows move within a row or column and choose without
  * wrapping, Home and End jump. `onReturnFocus` runs after a pointer press (the Grid pane gives the
  * keyboard back to the canvas; the form-like Machine block keeps it). One bordered 2 x 2 strip
- * in the segmented look, its label beside the top row (`docs/ui-elements.md` §7, 0159 F21).
+ * in the segmented look, its label beside the top row (`docs/ui-elements.md` §7, 0164 F21).
  */
 export function CornerControl({
   label,

@@ -1,4 +1,4 @@
-# 0159 UI consistency: code-level inventory
+# 0164 UI consistency: code-level inventory
 
 Status: Draft (UX, 2026-11-27). Input for `specification.md` and `plan.md` of this folder; the
 target look of every element kind is in [`docs/ui-elements.md`](../../docs/ui-elements.md).
@@ -64,7 +64,7 @@ notes asked for "4 px radius, the 16 px symbol inside at 2 px inset, centred"
 22 px. One object in two operations shows two separate squares 4 px apart, not one shape.
 Target: "Canvas symbol pill": one pill per object, height 22, radius 11, 3 px padding, symbols
 16 px centred at 3 px, 4 px apart, `OP_CHIP_GROUND` ground and a 1 px `OP_LANE_LINE` edge;
-anchor and collision rules unchanged (Frage 419).
+anchor and collision rules unchanged (Frage 455).
 
 **I2 (low). The chip ground and edge colours are copies of DOM tokens.** `curvyo-render-core/src/theme.rs:263-273`
 (`OP_MUTED_INK`, `OP_INK`, `OP_CHIP_GROUND`, `OP_LANE_LINE`) repeat `--panel-muted-fg`,
@@ -164,7 +164,7 @@ workspace, Undo move, Add slot), bar commands (I4), Library (Import page, Import
 page, Real size, Clear all 3 times, Show sets, Copy, Replace, Insert), Sketch panel (Inspect, Edit,
 Add parameter, Construction, Delete, Show free geometry, Unlink), `sketch/SketchesPanel.tsx:31`
 (a "×" character as Remove) and `panel/FontTagLine.tsx:253` (a "+" character with a count).
-Target: "Icon rule" in `docs/ui-elements.md`: symbol + label; the mapping table there (Frage 417).
+Target: "Icon rule" in `docs/ui-elements.md`: symbol + label; the mapping table there (Frage 453).
 
 **I11 (low). Text links act as buttons in five looks.** `libraryBrowser/BrowserFacets.tsx:79`
 (Licences, hover underline), `:251` (Clear all, accent, no underline), `GuideView.tsx:10` (always
@@ -188,7 +188,7 @@ become buttons (Clear all, Select, Show all become "Secondary button", small).
 - `panel/ExportSvgSection.tsx:77` (24 x 14 track drawn by hand): four export options;
 - `panel/PagesBlock.tsx:345` (20 x 12 track, `--editor-accent` fill, dark thumb): Move frame only.
 `ui/switch.tsx` and `ToolbarSwitch.tsx` differ in the off border (60 % 1 px versus 100 % 1.5 px;
-the design system's "Switch" row says 1.5 px `--toolbar-icon`). Target: "Toggle button" (Frage 416).
+the design system's "Switch" row says 1.5 px `--toolbar-icon`). Target: "Toggle button" (Frage 452).
 
 **I13 (medium). A two-state choice is built as a switch with segments.** `MoveEntryChip.tsx:330`
 (Relative / Absolute, `role="switch"` drawn as two segments). Two named states are a choice, not
@@ -270,7 +270,7 @@ buttons, `outline-2`). Target: "Text field", "Secondary button".
 `sketch/SketchesPanel.tsx:36`, `:164`. Custom 16 px `role="checkbox"`: `panel/OperationRow.tsx:80`,
 `panel/FixtureJobParts.tsx:97`, `:112`, `workbench/FixtureSetRow.tsx:154`,
 `workbench/FixtureRowItem.tsx:127`. The design system has no checkbox entry. Target: "Checkbox"
-(list ticks only); option checks become toggle buttons (Frage 420).
+(list ticks only); option checks become toggle buttons (Frage 456).
 
 ### Pick lists, menus, selects
 
@@ -304,7 +304,7 @@ Tailwind theme (`--radius` 0.625rem, `index.css` `@theme`). Target: "Canvas chip
 `HandleHintChip.tsx`, `EditHintChip.tsx`, `PenHintChip.tsx` (rendered from `Canvas.tsx:410-441`)
 and the slider help lines `frontend/src/lib/sliderNames.ts:52-54` ("Click to set, double-click
 to type, ..."). Accepted features from before 2026-10-16; removing them changes accepted
-behaviour (Frage 418). No new one is added by this story.
+behaviour (Frage 454). No new one is added by this story.
 
 ### Tooltips, notices, dialogs
 
@@ -387,32 +387,32 @@ Chevrons at 12, 14 and 16 px for the same disclosure (`FixtureJobsSection.tsx:39
 
 ## Questions for the customer
 
-Frage 416 (SWITCH-LOOK): How an on/off setting in the panel looks once the switch is gone
+Frage 452 (SWITCH-LOOK): How an on/off setting in the panel looks once the switch is gone
 - A: a full-width 244 x 28 button with symbol and label; on = blue ground, white symbol and label.
 - B: the label at the left, a 28 x 28 symbol toggle at the right.
 - C: keep the switch in the panel, toggle buttons only in the bars.
 Recommendation: A (one look in panel and bars, the whole row is the target). Default if unanswered: A.
 
-Frage 417 (BTN-SYMBOL): "All buttons with symbols": which buttons
+Frage 453 (BTN-SYMBOL): "All buttons with symbols": which buttons
 - A: every button with a label gets a symbol before it, Cancel (`X`), OK (`Check`) and Add (`Plus`) included.
 - B: action buttons get one; Cancel, OK and Done stay text only (outlined).
 - C: bars icon-only with tooltips, panel symbol + label.
 Recommendation: A (what was asked, and one rule). Default: A.
 
-Frage 418 (HINT-KEEP): The four canvas hint chips (keys, handles, edit, Pen) and the slider help
+Frage 454 (HINT-KEEP): The four canvas hint chips (keys, handles, edit, Pen) and the slider help
 line ("Click to set, double-click to type ...") are operating hints from before the no-hint rule
 - A: keep them as they are (accepted behaviour).
 - B: remove them all.
 - C: remove the slider help line, keep the canvas chips.
 Recommendation: A (not part of this request; removing accepted behaviour is your call). Default: A.
 
-Frage 419 (OP-PILL): The operation symbols on the laser canvas
+Frage 455 (OP-PILL): The operation symbols on the laser canvas
 - A: one rounded pill per object holding all its symbols, centred.
 - B: one chip per kind as now, but rounded (4 px) and centred.
 - C: A plus a count when more than three kinds.
 Recommendation: A (what "in a pill" reads as; at most six kinds, no count needed). Default: A.
 
-Frage 420 (CHECK-TOGGLE): The option checks in the entry chips (Copy in the move, transform and
+Frage 456 (CHECK-TOGGLE): The option checks in the entry chips (Copy in the move, transform and
 placement chips) and in the Sketch panel (Reference, Fix origin, Expose)
 - A: become toggle buttons like the former switches.
 - B: stay checkboxes, in the one checkbox look.
@@ -427,7 +427,7 @@ them are in. Order by what the customer named first.
    radius, focus and disabled rules in `docs/ui-elements.md`; unit tests for keyboard and ARIA.
 2. **Buttons**: every primary, secondary and destructive button onto `Button`, with symbols
    (I3 to I8, I10, I11, I39); the library CSS rules go (I6).
-3. **Switches to toggle buttons** (I12 to I15, I23 option checks if Frage 420 is A).
+3. **Switches to toggle buttons** (I12 to I15, I23 option checks if Frage 456 is A).
 4. **Canvas symbol pill** in `curvyo-render-core/src/operation_symbol.rs` (I1), golden draw-list
    test of centre and radius.
 5. **Fields**: `NumberField`, `TextField`, `SearchField`, `RenameField` (I18 to I22); the native

@@ -16,7 +16,7 @@ test("the bar is a toolbar of two rows with plain fields: no slider, no caption 
   assert.doesNotMatch(bar, /type="range"|<Slider|ui\/slider/);
   assert.match(bar, /label="Kind"/);
   assert.match(bar, /\$\{caption\} parameter/);
-  // The shared toggle button names itself from `label` (0159 F47).
+  // The shared toggle button names itself from `label` (0164 F47).
   assert.match(bar, /label="Crosshatch"/);
 });
 

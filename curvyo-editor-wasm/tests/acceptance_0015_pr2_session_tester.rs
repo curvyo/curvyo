@@ -135,7 +135,7 @@ fn ac12_size_text_follows_the_open_file() {
 /// keeps the document centred through size reports and window resizes (x in
 /// the space right of the 128 px rail, y in the full height); an axis it does
 /// not fit starts at its margin (128 px left, 24 px top; 72 px top since
-/// `specs/0159-ui-consistency` F50, so the page label clears a one-row bar).
+/// `specs/0164-ui-consistency` F50, so the page label clears a one-row bar).
 #[test]
 fn ac11a_default_view_stays_centred_through_resizes_until_first_pan_or_zoom() {
     let px_per_mm = 96.0 / 25.4;

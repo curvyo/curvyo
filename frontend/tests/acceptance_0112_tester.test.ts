@@ -31,7 +31,7 @@ test("c1: the dimmed Test grid tool says Laser pages only.", () => {
 
 test("c3: row 1 shows the test id read-only with the tooltip Test id; Crosshatch is # for Engrave", () => {
   const bar = source("components/TestGridBar.tsx");
-  // 0159: the shared tooltip instead of the native `title`; Crosshatch is the shared toggle.
+  // 0164: the shared tooltip instead of the native `title`; Crosshatch is the shared toggle.
   assert.match(bar, /content="Test id"/);
   assert.match(bar, /tooltip="Crosshatch"/);
   assert.match(bar, /label="Crosshatch"/);

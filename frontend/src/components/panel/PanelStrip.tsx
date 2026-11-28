@@ -212,7 +212,7 @@ export function PanelStrip({
           }
         }}
         // Radix makes the strip itself a Tab stop until a tab was focused once; it hands the focus
-        // on at once, and shows the one ring if it ever keeps it (0159 F30).
+        // on at once, and shows the one ring if it ever keeps it (0164 F30).
         className="flex min-h-0 w-full flex-1 flex-col items-start gap-1 overflow-y-auto overflow-x-hidden rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab) => {

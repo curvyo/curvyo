@@ -9,7 +9,7 @@ import { closeDimmed, closeNoticeText, closeTooltipNote } from "../src/lib/penTe
 import { readFileSync } from "node:fs";
 
 test("c5c: join notice counts outlines in digits, singular for one", () => {
-  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  // 0164 S7 (customer 2026-11-27): result notices carry no counts of what came out.
   assert.equal(joinNoticeText(2), "Join: the other outlines moved into this compound path.");
   assert.equal(joinNoticeText(1), "Join: the other outlines moved into this compound path.");
   assert.equal(joinNoticeText(0), null);
@@ -25,7 +25,7 @@ test("c6: split notices", () => {
 });
 
 test("c7: close notice counts paths and outlines apart", () => {
-  // 0159 S7 (customer 2026-11-27): result notices carry no counts of what came out.
+  // 0164 S7 (customer 2026-11-27): result notices carry no counts of what came out.
   assert.equal(closeNoticeText({ closed: 1, skipped: 0, closedOutlines: 3, skippedOutlines: 0 }), null);
   assert.equal(closeNoticeText({ closed: 0, skipped: 0, closedOutlines: 3, skippedOutlines: 0 }), null);
   const skipped = closeNoticeText({ closed: 1, skipped: 0, closedOutlines: 3, skippedOutlines: 1 });
