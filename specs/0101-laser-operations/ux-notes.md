@@ -288,6 +288,11 @@ Live regions: the summary (`role="status"`, `aria-atomic`), the tab's sr-only st
 
 ### 13.3 Symbol placement (View: Operations only)
 
+> **Superseded in part by `specs/0159-ui-consistency` (2026-11-27, Fragen 419 A and 432 A):** one
+> rounded pill per object holds all its symbols, centred above the object; the corner anchor below
+> applies while the object shows its handles. The look is `docs/ui-elements.md` §13 "Canvas symbol
+> pill".
+
 - **One symbol per kind the object is in** (criterion 18, Proposal: two operations of one kind give one symbol). A symbol is a 22 x 22px chip: `--toolbar-bg` ground, 1px `--lane-line` border, 4px radius, the 16px symbol inside at 2px inset, centred. Chips are 4px apart, in the kind order Cut, Cut-out, Score, Engrave, Engrave + Outline, from left to right.
 - **Anchor:** the chip row starts 10px to the right of the object's bounding box top-right corner, its bottom edge 6px above the box's top edge (screen-space, constant at every zoom). The corner resize handle, the right edge handle and the rotate handle (above the top-centre) stay clear: the row never sits under a handle. If the row would leave the viewport on the right, it mirrors to the top-left corner (ends 10px left of it).
 - **Chips never cover a handle or a reference box.** A chip whose 22px box would touch a handle's hit area is not drawn (for a multi-selection, the group box's handles win).
